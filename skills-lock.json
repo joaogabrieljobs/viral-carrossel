@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "polish": {
+      "source": "Aston1690/polish",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e91a4f1989ae3015a548a6852491c778f67b0d5ad3a687207d4dc37b9eae43c6"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+---
+description: Bridge that registers project-local universal skills (.agents/skills/) so the Cursor agent can invoke them on demand.
+alwaysApply: true
+---
+
+# Skills Bridge
+
+This project ships with universal Agent Skills installed via `npx skills add`, located at `.agents/skills/<skill-name>/SKILL.md`.
+
+When the user's request matches a skill's trigger conditions (described in each skill's frontmatter `description`), READ and FOLLOW that skill's `SKILL.md` immediately — do not just acknowledge it.
+
+## Available Skills
+
+### `polish`
+**Path:** `.agents/skills/polish/SKILL.md`
+
+**Triggers:** user mentions "polish", "polir", "finalizar", "finishing touches", "pre-launch review", "going from good to great", "something looks off", or any final-quality-pass request.
+
+**What it does:** Performs a meticulous final pass for alignment, spacing, typography, color/contrast, interaction states, micro-interactions, copy consistency, icons, forms, edge cases, responsiveness, performance, and code-quality cleanup.
+
+**Important:** This skill explicitly references `/frontend-design` and `/teach-impeccable` as preparation steps. Those slash-commands are Claude Code conventions and may not exist in Cursor — when not available here, treat them as informational and proceed with the skill body, while substituting the project's existing design-system context (read `DESIGN.md` and `.cursor/rules/design-system.mdc` first to anchor the polish pass to the project's actual visual language).
+
+## How to invoke
+
+If the user explicitly types `/polish`, `polish this`, "passa um polish", "dá uma polida", "finaliza", or similar, READ `.agents/skills/polish/SKILL.md` in full and execute its protocol against the target the user named (or the most-recently-edited UI surface if no target is given).

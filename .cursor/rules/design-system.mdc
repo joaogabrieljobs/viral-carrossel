@@ -1,0 +1,95 @@
+---
+description: Apple-inspired design system for the Viral Carrossel app. Always read DESIGN.md before any UI work and obey its tokens strictly.
+globs:
+  - "**/*.jsx"
+  - "**/*.tsx"
+  - "**/*.css"
+  - "**/*.html"
+alwaysApply: true
+---
+
+# Design System: Apple (via DESIGN.md)
+
+This project follows an **Apple-inspired design system** documented in `/DESIGN.md` (sourced from `npx getdesign add apple`). Read that file before any UI change. Treat its tokens as law.
+
+## Mandatory Rules
+
+### Color
+- Single accent color: **Action Blue `#0066cc`** for every interactive element (links, primary CTAs, focus rings). Do NOT introduce a second accent.
+- Focus state: `#0071e3` (2px solid outline).
+- Sky blue `#2997ff` ONLY on dark surfaces (would disappear on light).
+- Light surfaces: `#ffffff` (canvas), `#f5f5f7` (parchment), `#fafafc` (pearl).
+- Dark surfaces: `#272729` / `#2a2a2c` / `#252527` / `#000000` (nav only).
+- Text: `#1d1d1f` (ink, on light) / `#ffffff` (on dark) / `#7a7a7a` (muted/disabled).
+- Hairlines: `#e0e0e0` solid OR `rgba(0,0,0,0.04)` soft.
+
+### Typography
+- Font family: `SF Pro Display, SF Pro Text, system-ui, -apple-system, sans-serif`.
+- Headline weight: **600** (never 700 except taglines).
+- Body weight: **400**. Strong inline: **600**. Weight **500 is forbidden** (Apple's ladder is 300/400/600/700).
+- Body copy: **17px / 1.47 / -0.374px tracking** (NOT 16px).
+- Display sizes: negative letter-spacing (-0.28 to -0.374px) — the "Apple tight" cadence.
+- Weight 300 reserved for `button-large` (18px) and airy lead text (24px).
+
+### Shape & Radius
+- `rounded-pill` (9999px) → primary blue CTAs, search inputs, configurator chips, sticky bars.
+- `rounded.lg` (18px) → utility cards.
+- `rounded.md` (11px) → pearl ghost capsules.
+- `rounded.sm` (8px) → dark utility buttons.
+- `rounded.none` (0px) → full-bleed product tiles.
+- Don't mix radii grammars.
+
+### Spacing
+- Base 8px. Scale: 4 / 8 / 12 / 17 / 24 / 32 / 48 / 80px.
+- Section vertical padding: **80px** inside product tiles.
+- Card padding: **24px**.
+- Button padding: 8–11px V × 15–22px H.
+
+### Elevation
+- **Exactly ONE drop-shadow** in the entire system: `rgba(0,0,0,0.22) 3px 5px 30px` — applied **only** to product imagery resting on a surface. NEVER to cards, buttons, or text.
+- Elevation comes from surface-color change (light ↔ dark) and `backdrop-filter: blur()` on sticky bars.
+
+### Interaction
+- All buttons: **`transform: scale(0.95)`** on active/press (system-wide micro-interaction).
+- No hover-state coloring documented — keep it subtle.
+
+### Layout Philosophy
+- Photography-first: UI recedes so content can speak.
+- Alternate light/dark full-bleed sections — the color change IS the divider.
+- No decorative gradients. Atmosphere comes from imagery, not CSS.
+- Whitespace is generous: 64px+ above headlines.
+
+## Anti-patterns — NEVER do these
+- ❌ Introduce a second brand color (orange, purple, etc.).
+- ❌ Add shadows to cards, buttons, text, or UI chrome.
+- ❌ Use decorative gradients as backgrounds.
+- ❌ Set body copy at 16px or weight 500.
+- ❌ Round full-bleed tiles.
+- ❌ Tighten body line-height below 1.47.
+- ❌ Mix multiple radius grammars in the same component group.
+
+## Token Reference (CSS Variables defined in `ViralCarrossel.jsx` GLOBAL_STYLE)
+
+When editing styles, prefer using the variables already declared in `:root` rather than hex literals. Token map:
+
+| Token | Value | Use |
+|---|---|---|
+| `--bg-base` | `#ffffff` | Page canvas |
+| `--bg-parchment` | `#f5f5f7` | Alternate light surfaces, footer |
+| `--bg-pearl` | `#fafafc` | Ghost button fill |
+| `--bg-tile-dark` | `#272729` | Dark tiles |
+| `--bg-black` | `#000000` | Global nav, video |
+| `--text-primary` | `#1d1d1f` | Ink |
+| `--text-secondary` | `#333333` | Muted body |
+| `--text-muted` | `#7a7a7a` | Disabled, fine print |
+| `--text-on-dark` | `#ffffff` | Text on dark surfaces |
+| `--accent` | `#0066cc` | Action Blue (the ONLY accent) |
+| `--accent-focus` | `#0071e3` | Focus ring |
+| `--accent-on-dark` | `#2997ff` | Sky blue on dark surfaces only |
+| `--hairline` | `#e0e0e0` | Card borders |
+| `--divider-soft` | `rgba(0,0,0,0.04)` | Soft separators |
+
+## When in doubt
+1. Re-read `DESIGN.md`.
+2. Alternate surface color (light ↔ dark) before adding chrome.
+3. Default to `#ffffff` background, `#1d1d1f` text, `#0066cc` accent. That trio handles 90% of cases.

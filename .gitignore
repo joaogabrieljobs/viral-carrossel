@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+
+# Referência local opcional (repo git embutido — não versionar como submodule por defeito)
+awesome-design-md/
