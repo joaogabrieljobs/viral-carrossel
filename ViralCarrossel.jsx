@@ -1080,7 +1080,7 @@ const mkSlide = (n = 1) => ({
   refImage: null,
   /** Instruções extras por slide (marca, packshot, cor de fundo) — entram no prompt Web trend e GPT Image. */
   imgExtraPrompt: '',
-  imgMode: 'web_trend', // 'web_trend' = fotos reais (Unsplash/Pexels em dev + Commons) | 'dalle' = GPT Image
+  imgMode: 'dalle',
   bgX: 50, bgY: 50, bgZoom: 100,
   /** 'cover' = preenche o card | 'contain' = imagem inteira visível | 'custom' = zoom % legado */
   bgFit: 'cover',
@@ -1379,10 +1379,10 @@ async function downloadCanvasPng(canvas, filename) {
   downloadBlob(blob, filename);
 }
 
-/** Migra modos antigos: `stock` (Picsum) e `ai` (FLUX) → web trend. */
+/** Migra modos antigos e `web_trend` (desativado na UI) → GPT Image. */
 const normalizeSlideImgMode = (m) => {
-  if (m === 'stock' || m === 'ai') return 'web_trend';
-  return m || 'web_trend';
+  void m;
+  return 'dalle';
 };
 
 // ─── WEB TREND (dev: Unsplash → Pexels → Commons | produção: só Commons no cliente)
@@ -2244,14 +2244,14 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
             fontWeight:600,
             letterSpacing:'-0.011em',
           }}>
-            {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : imgModeNorm === 'web_trend' ? 'Carregando foto editorial…' : 'Carregando…'}
+            {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
           </span>
-          {(imgModeNorm === 'web_trend' || imgModeNorm === 'dalle') && (
-            <span style={{
-              color:'rgba(255,255,255,0.32)',
-              fontSize:f.w*0.02,
-              letterSpacing:'-0.011em',
-            }}>{imgModeNorm === 'dalle' ? 'GPT Image 2 · OpenAI · ~30s por slide' : 'Web trend · fotos reais (stock acervo)'}</span>
+          {imgModeNorm === 'dalle' && (
+          <span style={{
+            color:'rgba(255,255,255,0.32)',
+            fontSize:f.w*0.02,
+            letterSpacing:'-0.011em',
+          }}>GPT Image 2 · OpenAI · ~30s por slide</span>
           )}
         </div>
       )}
@@ -3115,9 +3115,6 @@ function GenerateModal({
   const [packCreative, setPackCreative] = useState(defaultCreativePreset || 'livre');
   useEffect(() => { if (open) setMode(defaultMode); }, [open, defaultMode]);
   useEffect(() => { if (open) setPackCreative(defaultCreativePreset || 'livre'); }, [open, defaultCreativePreset]);
-  // Prefere GPT Image quando há chave OpenAI; senão Web trend (Commons, sem chave).
-  const [imgMode, setImgMode] = useState(hasOpenAI ? 'dalle' : 'web_trend');
-  useEffect(() => { if (open) setImgMode(hasOpenAI ? 'dalle' : 'web_trend'); }, [open, hasOpenAI]);
   // Cópia local mutável dos eixos da imagem (commit no doc só ao gerar)
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
@@ -3167,7 +3164,7 @@ function GenerateModal({
         niche,
         tone,
         audience,
-        imgMode,
+        imgMode: 'dalle',
         imgParams: params,
         mode,
         creativePreset: packCreative,
@@ -3375,44 +3372,33 @@ function GenerateModal({
             </div>
           </div>
 
-          {/* Image mode */}
+          {/* Imagens — só GPT Image (busca stock tipo “Web trend” desativada até novo método). */}
           <div>
             <label className="vc-label">Imagens dos Cards</label>
-            <div style={{ display:'grid', gridTemplateColumns: hasOpenAI ? '1fr 1fr' : '1fr', gap:8 }}>
-              {[
-                { id:'dalle', icon:'⬡', label:'GPT Image 2', sub:'OpenAI · Geração 2026', needsKey:true, recommended:true },
-                { id:'web_trend', icon:'🌐', label:'Web trend', sub:'Unsplash/Pexels ou Commons', recommended:!hasOpenAI },
-              ].filter(m => !m.needsKey || hasOpenAI).map(m => {
-                const active = imgMode === m.id;
-                return (
-                  <button key={m.id} onClick={()=>setImgMode(m.id)} style={{
-                    padding:'10px 10px', borderRadius:11, cursor:'pointer', textAlign:'left',
-                    border:`1.5px solid ${active ? 'var(--accent)' : 'var(--hairline)'}`,
-                    background: active ? 'rgba(0,113,227,0.08)' : 'var(--bg-base)',
-                    transition:'all 0.15s var(--ease-smooth)', position:'relative',
-                  }}>
-                    {m.recommended && (
-                      <span style={{
-                        position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
-                        background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
-                        letterSpacing:'-0.011em',
-                      }}>Recomendado</span>
-                    )}
-                    <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color: active ? 'var(--accent)' : 'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
-                      {m.icon} {m.label}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>{m.sub}</div>
-                  </button>
-                );
-              })}
-            </div>
-            {imgMode === 'web_trend' && (
+            {hasOpenAI ? (
               <div style={{
-                marginTop:8, fontSize:11, color:'var(--text-secondary)', background:'var(--bg-pearl)',
-                border:'1px solid var(--hairline)', borderRadius:11, padding:'8px 10px',
+                padding:'10px 12px', borderRadius:11, border:'1.5px solid var(--accent)',
+                background:'rgba(0,113,227,0.08)', position:'relative',
+              }}>
+                <span style={{
+                  position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
+                  background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
+                  letterSpacing:'-0.011em',
+                }}>Ativo</span>
+                <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--accent)', marginBottom:3, letterSpacing:'-0.011em' }}>
+                  ⬡ GPT Image 2
+                </div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+                  OpenAI · geração a partir do tema e das palavras-chave de cada slide
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                fontSize:13, color:'var(--text-secondary)', background:'var(--bg-pearl)',
+                border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
                 fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
               }}>
-                Web trend monta uma busca a partir do texto do slide + <b>imageQuery</b> em inglês. No <code style={{ fontSize:11 }}>npm run dev</code>, coloque <b>UNSPLASH_ACCESS_KEY</b> ou <b>PEXELS_API_KEY</b> no <code style={{ fontSize:11 }}>.env.local</code> para fotos atuais e mais fiéis ao tema; sem chave, usa Wikimedia Commons (acervo misto). Para cena exata, use <b>GPT Image 2</b>.
+                A geração automática de fundos usa <b>GPT Image 2</b>. Sem chave OpenAI, o carrossel sai com texto e palavras-chave de imagem; depois use Upload ou URL em cada card.
               </div>
             )}
             {!hasOpenAI && (
@@ -3505,7 +3491,7 @@ function GenerateModal({
           </div>
 
           {/* Direção da imagem — eixos só alteram prompts do GPT Image (geração). */}
-          {imgMode === 'dalle' && (
+          {hasOpenAI && (
             <ImgParamsPanel value={params} onChange={setAxis} />
           )}
 
@@ -4115,9 +4101,22 @@ function SidebarContent({
   generateSlideImageAt = () => {},
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
-  const [webTrendLoading, setWebTrendLoading] = React.useState(false);
 
-  const replaceImg = async (forceMode) => {
+  const applyDalleQuery = async (q) => {
+    if (!hasOpenAI) { toast?.('Configure a chave OpenAI primeiro (ícone ⚙ no header ou OPENAI_API_KEY no .env.local)', 'error'); return; }
+    updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
+    setDalleLoading(true);
+    try {
+      const url = await generateDALLE(q, openaiKey, imgParams, {
+        refImage: slide.refImage,
+        imgExtraPrompt: slide.imgExtraPrompt,
+      });
+      updateSlide({ bgImage: url });
+    } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
+    finally { setDalleLoading(false); }
+  };
+
+  const replaceImg = async () => {
     const q = await askPrompt({
       title: 'Buscar imagem',
       label: 'PALAVRAS-CHAVE EM INGLÊS',
@@ -4126,82 +4125,12 @@ function SidebarContent({
       cta: 'Aplicar',
     });
     if (!q) return;
-    const mode = normalizeSlideImgMode(forceMode || slide.imgMode);
-    if (mode === 'dalle') {
-      if (!hasOpenAI) { toast?.('Configure a chave OpenAI primeiro (ícone ⚙ no header ou OPENAI_API_KEY no .env.local)', 'error'); return; }
-      updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
-      setDalleLoading(true);
-      try {
-        const url = await generateDALLE(q, openaiKey, imgParams, {
-          refImage: slide.refImage,
-          imgExtraPrompt: slide.imgExtraPrompt,
-        });
-        updateSlide({ bgImage: url });
-      } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
-      finally { setDalleLoading(false); }
-      return;
-    }
-    setWebTrendLoading(true);
-    try {
-      const url = await fetchWebTrendImage(q, Date.now() + '', {
-        title: slide.title,
-        subtitle: slide.subtitle,
-        imgExtraPrompt: slide.imgExtraPrompt,
-      });
-      updateSlide({
-        bgImage: url,
-        imageQuery: q, imgMode: 'web_trend', overlay: 68,
-      });
-    } catch (e) { toast?.('Web trend: ' + e.message, 'error'); }
-    finally { setWebTrendLoading(false); }
+    await applyDalleQuery(q);
   };
 
   const refreshImg = async () => {
     if (!slide.imageQuery) return replaceImg();
-    const m = normalizeSlideImgMode(slide.imgMode);
-    if (m === 'dalle') return replaceImg('dalle');
-    setWebTrendLoading(true);
-    try {
-      const url = await fetchWebTrendImage(slide.imageQuery, Date.now() + '', {
-        title: slide.title,
-        subtitle: slide.subtitle,
-        imgExtraPrompt: slide.imgExtraPrompt,
-      });
-      updateSlide({ bgImage: url });
-    } catch (e) { toast?.('Web trend: ' + e.message, 'error'); }
-    finally { setWebTrendLoading(false); }
-  };
-
-  const switchImgMode = async (mode) => {
-    if (!slide.imageQuery) return;
-    const target = normalizeSlideImgMode(mode);
-    if (target === 'dalle') {
-      if (!hasOpenAI) { toast?.('Configure a chave OpenAI primeiro (ícone ⚙ no header ou OPENAI_API_KEY no .env.local)', 'error'); return; }
-      updateSlide({ imgMode: 'dalle', bgImage: null });
-      setDalleLoading(true);
-      try {
-        const url = await generateDALLE(slide.imageQuery, openaiKey, imgParams, {
-          refImage: slide.refImage,
-          imgExtraPrompt: slide.imgExtraPrompt,
-        });
-        updateSlide({ bgImage: url });
-      } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
-      finally { setDalleLoading(false); }
-      return;
-    }
-    setWebTrendLoading(true);
-    try {
-      const url = await fetchWebTrendImage(slide.imageQuery, Date.now() + '', {
-        title: slide.title,
-        subtitle: slide.subtitle,
-        imgExtraPrompt: slide.imgExtraPrompt,
-      });
-      updateSlide({
-        imgMode: 'web_trend',
-        bgImage: url,
-      });
-    } catch (e) { toast?.('Web trend: ' + e.message, 'error'); }
-    finally { setWebTrendLoading(false); }
+    await applyDalleQuery(slide.imageQuery);
   };
 
   const askUrlImg = async () => {
@@ -4321,10 +4250,10 @@ function SidebarContent({
                   {/* action buttons */}
                   <div style={{ position:'absolute', top:5, right:5, display:'flex', gap:4 }}>
                     {slide.imageQuery && (
-                      <button onClick={refreshImg} disabled={dalleLoading||webTrendLoading} title="Nova foto (mesmo tema)" style={{
+                      <button onClick={refreshImg} disabled={dalleLoading} title="Nova foto (mesmo tema)" style={{
                         background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.1)',
-                        color:'#fff', padding:'4px 5px', borderRadius:5, cursor:(dalleLoading||webTrendLoading)?'wait':'pointer', display:'flex',
-                        opacity:(dalleLoading||webTrendLoading)?0.45:1,
+                        color:'#fff', padding:'4px 5px', borderRadius:5, cursor:dalleLoading?'wait':'pointer', display:'flex',
+                        opacity:dalleLoading?0.45:1,
                       }}><RefreshCw size={10}/></button>
                     )}
                     <button onClick={()=>updateSlide({bgImage:null})} title="Remover imagem" style={{
@@ -4334,29 +4263,15 @@ function SidebarContent({
                   </div>
                 </div>
               )}
-              {/* Modo de imagem: Web trend ou GPT Image */}
-              <div style={{ display:'grid', gridTemplateColumns: hasOpenAI ? '1fr 1fr' : '1fr', gap:4 }}>
-                {[
-                  { id:'web_trend', label:'🌐 Web trend', sub:'Stock search' },
-                  ...(hasOpenAI ? [{ id:'dalle', label:'⬡ GPT Image', sub:'OpenAI' }] : []),
-                ].map(m => {
-                  const active = normalizeSlideImgMode(slide.imgMode) === m.id;
-                  const isLoading = (dalleLoading && m.id === 'dalle') || (webTrendLoading && m.id === 'web_trend');
-                  return (
-                    <button key={m.id} onClick={()=>switchImgMode(m.id)} disabled={isLoading} style={{
-                      padding:'8px 4px', borderRadius:11, border:'1px solid',
-                      borderColor: active ? 'var(--accent)' : 'var(--hairline)',
-                      background: active ? 'rgba(0,113,227,0.08)' : 'var(--bg-base)',
-                      cursor: isLoading ? 'wait' : 'pointer', transition:'all 0.15s var(--ease-smooth)', textAlign:'center',
-                      opacity: isLoading ? 0.6 : 1,
-                    }}>
-                      <div style={{ fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', color: active ? 'var(--accent)' : 'var(--text-primary)', letterSpacing:'-0.011em' }}>
-                        {isLoading ? '…' : m.label}
-                      </div>
-                      <div style={{ fontSize:11, fontFamily:'var(--font-ui)', color:'var(--text-muted)', letterSpacing:'-0.011em', marginTop:2 }}>{m.sub}</div>
-                    </button>
-                  );
-                })}
+              <div style={{
+                fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
+                color:'var(--text-muted)',
+                background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
+                padding:'8px 10px',
+              }}>
+                {hasOpenAI
+                  ? 'Fundo: GPT Image 2. Buscar altera as palavras-chave; ⟳ gera outra imagem com o mesmo tema.'
+                  : 'Para gerar fundos por IA, configure a chave OpenAI (⚙). Até lá: Upload ou URL.'}
               </div>
 
               {/* Action buttons */}
@@ -4380,16 +4295,16 @@ function SidebarContent({
                 ))}
               </div>
 
-              {/* Web trend — termos de busca */}
-              {normalizeSlideImgMode(slide.imgMode) === 'web_trend' && slide.imageQuery && (
+              {slide.imageQuery && (
                 <div style={{
                   fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)',
                   background:'rgba(0,113,227,0.05)', border:'1px solid rgba(0,113,227,0.14)',
                   borderRadius:8, padding:'6px 10px', lineHeight:1.5,
                 }}>
-                  🌐 Web trend · "{slide.imageQuery}"
+                  {hasOpenAI ? '⬡ ' : ''}Palavras-chave · &quot;{slide.imageQuery}&quot;
                 </div>
               )}
+
               {slide.bgImage && (
                 <>
                   <div>
@@ -6394,8 +6309,7 @@ export default function App() {
       return;
     }
 
-    const mode = normalizeSlideImgMode(snap.imgMode);
-    if (mode === 'dalle' && !hasOpenAI) {
+    if (!hasOpenAI) {
       toast('Configure a chave OpenAI para gerar com GPT Image (ícone de engrenagem).', 'error');
       return;
     }
@@ -6403,33 +6317,17 @@ export default function App() {
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     try {
-      if (mode === 'dalle') {
-        const url = await generateDALLE(q, openaiKey, imgParams, {
-          refImage: snap.refImage,
-          imgExtraPrompt: snap.imgExtraPrompt,
-        });
-        setSlides(prev => {
-          const j = prev.findIndex(sl => sl.id === slideId);
-          return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, overlay: 70 } : sl));
-        });
-      } else {
-        const url = await fetchWebTrendImage(q, `${Date.now()}-${slideId}`, {
-          title: snap.title,
-          subtitle: snap.subtitle,
-          imgExtraPrompt: snap.imgExtraPrompt,
-        });
-        setSlides(prev => {
-          const j = prev.findIndex(sl => sl.id === slideId);
-          return j < 0
-            ? prev
-            : prev.map((sl, k) =>
-                k === j ? { ...sl, bgImage: url, imgMode: 'web_trend', overlay: 68 } : sl,
-              );
-        });
-      }
+      const url = await generateDALLE(q, openaiKey, imgParams, {
+        refImage: snap.refImage,
+        imgExtraPrompt: snap.imgExtraPrompt,
+      });
+      setSlides(prev => {
+        const j = prev.findIndex(sl => sl.id === slideId);
+        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, imgMode: 'dalle', overlay: 70 } : sl));
+      });
       toast(`Slide ${idx + 1}: imagem gerada`, 'success');
     } catch (e) {
-      toast(mode === 'dalle' ? `GPT Image: ${e.message}` : `Web trend: ${e.message}`, 'error');
+      toast(`GPT Image: ${e.message}`, 'error');
     } finally {
       slideImgGenIdsRef.current.delete(slideId);
       setSlideImgGenBusy(prev => {
@@ -6492,7 +6390,7 @@ export default function App() {
     niche: n,
     tone,
     audience,
-    imgMode: chosenMode = 'web_trend',
+    imgMode: chosenMode = 'dalle',
     imgParams: axes,
     mode: chosenNarrativeMode,
     creativePreset: presetArg,
@@ -6508,10 +6406,7 @@ export default function App() {
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
-    const commonsPipeline = normalizeSlideImgMode(chosenMode || 'web_trend') === 'web_trend';
-    const imageLayer = commonsPipeline
-      ? buildGenerationImageLayerForCommons(topic, n, audience)
-      : buildGenerationImageLayer(cp, topic, n, audience);
+    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience);
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp);
 
     const prompt = `${introLine}
@@ -6538,7 +6433,7 @@ JSON exato a retornar (sem mais nada):
     const result = await callAI(prompt, { json:true, maxTokens:4096, openaiKey });
     if (!result?.slides?.length) throw new Error('IA não retornou slides. Tente um tema mais específico.');
 
-    const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'web_trend');
+    const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const newSlides = result.slides.map((s,i) => ({
       ...mkSlide(i+1),
       title: s.title || `Slide ${i+1}`,
@@ -6554,7 +6449,7 @@ JSON exato a retornar (sem mais nada):
     if (n) setNiche(n);
     if (result.caption) setCaption(result.caption);
 
-    // GPT Image e Web trend: preenchem bgImage assincronamente (slide a slide)
+    // GPT Image: preenche bgImage assincronamente (slide a slide)
     // Guard contra race-condition: cancela qualquer loop anterior ainda em voo.
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
     const abort = { cancelled: false };
@@ -6563,7 +6458,7 @@ JSON exato a retornar (sem mais nada):
     let imgFailCount = 0;
 
     if (fetchImagesNow) {
-      if (resolvedImgMode === 'dalle' && hasOpenAI) {
+      if (hasOpenAI) {
         for (let i = 0; i < result.slides.length; i++) {
           if (abort.cancelled) break;
           const q = result.slides[i]?.imageQuery;
@@ -6578,25 +6473,6 @@ JSON exato a retornar (sem mais nada):
           } catch(e) {
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
-          }
-        }
-      }
-      if (resolvedImgMode === 'web_trend') {
-        for (let i = 0; i < result.slides.length; i++) {
-          if (abort.cancelled) break;
-          const q = result.slides[i]?.imageQuery;
-          if (!q) continue;
-          try {
-            const url = await fetchWebTrendImage(q, String(i), {
-              title: result.slides[i]?.title,
-              subtitle: result.slides[i]?.subtitle,
-              imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
-            });
-            if (!abort.cancelled)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
-          } catch (e) {
-            imgFailCount++;
-            console.warn(`Web trend slide ${i+1}:`, e.message);
           }
         }
       }
@@ -6840,7 +6716,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       title: s.title,
       subtitle: s.subtitle,
       imageQuery: s.q,
-      imgMode: 'web_trend',
+      imgMode: 'dalle',
       bgImage: null,
       overlay: 65,
       layout: i === 0 ? 'mc' : 'bl',
@@ -6858,15 +6734,16 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
     const abort = { cancelled: false };
     imgGenAbortRef.current = abort;
     (async () => {
+      if (!hasOpenAI || !String(openaiKey || '').trim()) return;
       let failCount = 0;
       for (let i = 0; i < tpl.slides.length; i++) {
         if (abort.cancelled) break;
         const q = tpl.slides[i]?.q;
         if (!q) continue;
         try {
-          const url = await fetchWebTrendImage(q, String(i), {
-            title: tpl.slides[i]?.title,
-            subtitle: tpl.slides[i]?.subtitle,
+          const url = await generateDALLE(q, openaiKey, imgParams, {
+            refImage: newSlides[i]?.refImage,
+            imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
           });
           if (!abort.cancelled)
             setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url } : sl));
@@ -6878,7 +6755,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       if (!abort.cancelled && failCount > 0)
         toast(`${failCount} imagem(ns) do template não carregou.`, 'warning', 5000);
     })();
-  }, [history, toast, setSlides]);
+  }, [history, toast, setSlides, hasOpenAI, openaiKey, imgParams]);
 
   // Reordena slides (drag-and-drop)
   const reorderSlides = useCallback((from, to) => {
