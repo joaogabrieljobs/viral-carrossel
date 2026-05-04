@@ -4,10 +4,53 @@ import {
   Plus, Palette, Layout, Wand2, Loader2,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Type, Quote, BookOpen,
+  Type, Quote, BookOpen, Image,
   ArrowUp, ArrowDown, Zap, Flame, Lightbulb,
-  ChevronRight, ChevronLeft, Instagram, Settings, Maximize2
+  ChevronRight, ChevronLeft, Instagram, Settings, Maximize2, Minus,
+  Home, Layers, SlidersHorizontal,
 } from 'lucide-react';
+
+// ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
+// Chaves centralizadas — nunca use string literal de localStorage diretamente.
+const SK = {
+  library:       'vc_library',
+  legacyDoc:     'vc_doc',
+  activeDocId:   'vc_active_doc_id',
+  brands:        'vc_brands',
+  activeBrandId: 'vc_active_brand_id',
+  openaiKey:     'vc_openai_key',
+  onboarding:    'vc_onboarding_done',
+  shellView:     'vc_shell_view',
+};
+
+/** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */
+function readInitialShellView() {
+  try {
+    const raw = localStorage.getItem(SK.shellView);
+    if (raw != null) {
+      const val = JSON.parse(raw);
+      if (val === 'home' || val === 'project') return val;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const rawLib = localStorage.getItem(SK.library);
+    if (!rawLib) return 'home';
+    const lib = JSON.parse(rawLib);
+    if (Array.isArray(lib) && lib.length) {
+      const hasNonTrivial = lib.some((e) => {
+        const sl = e?.doc?.slides;
+        if (!Array.isArray(sl) || sl.length !== 1) return true;
+        return sl[0]?.title !== 'Seu título aqui';
+      });
+      if (hasNonTrivial) return 'project';
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'home';
+}
 
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
 
@@ -15,7 +58,7 @@ const GLOBAL_STYLE = `
   /* Apple Design System — fonts: SF Pro is system-resolved on Apple devices.
      Inter is loaded as the cross-platform fallback (closest open-source equivalent),
      and JetBrains Mono provides a clean monospace for the rare technical labels. */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  /* Google Fonts injetadas via <link> no useEffect — evita bloqueio de render do @import */
 
   :root {
     /* — Surfaces (light-first, the Apple default) — */
@@ -176,6 +219,16 @@ const GLOBAL_STYLE = `
     input[type="range"] { height: 22px; }
     input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
     input[type="range"]::-moz-range-thumb     { width: 22px; height: 22px; }
+  }
+
+  /* Sliders do painel escuro (tela cheia) — sky blue + anel legível */
+  input[type="range"].vc-fs-pres-range::-webkit-slider-thumb {
+    background: var(--accent-on-dark);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+  }
+  input[type="range"].vc-fs-pres-range::-moz-range-thumb {
+    background: var(--accent-on-dark);
+    border: 2px solid rgba(255,255,255,0.22);
   }
 
   /* — Buttons (Apple grammar: pill primary + sm utility) — */
@@ -541,7 +594,7 @@ const BODY_FONTS = [
   { name:'Fraunces',      val:'"Fraunces", serif',           cat:'serif' },
   // Mono
   { name:'Space Mono',    val:'"Space Mono", monospace',     cat:'mono' },
-  { name:'IBM Plex Mono', val:'"IBM Plex Sans", monospace',  cat:'mono' },
+  { name:'IBM Plex Mono', val:'"IBM Plex Mono", monospace',  cat:'mono' },
 ];
 
 const LAYOUTS = [
@@ -557,111 +610,138 @@ const LAYOUTS = [
 ];
 
 // ─── MODOS DE GERAÇÃO ─────────────────────────────────────────────────────────
-// Cada modo é uma "camada narrativa" diferente que substitui a seção MÉTODO
-// no prompt principal. Mantemos o resto (regras de tamanho, brand, material,
-// imageQuery, etc) inalterado pra que mudar de modo não quebre as outras camadas.
+// Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
+// de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
 const GEN_MODES = [
   {
     id: 'editorial',
     icon: '📰',
     label: 'Editorial',
-    desc: 'Análise estratégica, leitura sofisticada de mercado',
-    method: `MÉTODO EDITORIAL — análise estratégica:
-- Slide 1 (Hook/Tese): frase-tese contraintuitiva que para o scroll. Use formatos: "X não está fazendo Y, está fazendo Z.", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z."
-- Slides intermediários: cada um revela UMA camada — contexto de mercado, quebra da leitura óbvia, mecanismo oculto por trás, impacto na categoria, erro que a maioria comete. Use linguagem de mercado: categoria, distribuição, posicionamento, percepção, comportamento, recorrência, narrativa, repertório, diferenciação, sinal, confiança.
-- Último slide (CTA): elegante, reflexivo. Exemplos: "Quem entende isso constrói marca. Quem ignora disputa preço.", "Salve para revisar antes da próxima campanha."`,
+    desc: 'Tese forte, camadas de mercado e leitura que desmonta o óbvio',
+    method: `MÉTODO EDITORIAL — leitura estratégica (escala ao número total de slides):
+Objetivo: soar como análise de quem enxerga categoria, não como post motivacional.
+- Slide 1 · HOOK/Tese: uma frase-tese contraintuitiva que para o scroll. Formatos úteis: "X não está fazendo Y, está fazendo Z.", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X deixou de ser sobre Y. Agora é sobre Z."
+- Slides do meio (2 até penúltimo): cada um = UMA camada nova — sem repetir o mesmo tipo de argumento. Ordens possíveis (combine conforme N): contexto de mercado → onde a leitura óbvia quebra → mecanismo ou estrutura por trás → impacto na categoria ou no consumidor → erro recorrente → contraste com o que "todo mundo faz". Vocabulário útil quando couber: categoria, distribuição, posicionamento, percepção, comportamento, recorrência, narrativa (da categoria), repertório, diferenciação, sinal, confiança.
+- Último slide · Fecho: elegante, reflexivo (não obrigatoriamente "ganhe dinheiro"). Ex.: "Quem entende isso constrói marca. Quem ignora disputa preço." / "Salve antes da próxima campanha."
+EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos em vários slides.`,
   },
   {
     id: 'deep',
     icon: '🔬',
     label: 'Profundo',
-    desc: 'Deep dive — mecanismo oculto, padrão, antecipação',
-    method: `MÉTODO PROFUNDO — modo cientista, anatomia do fenômeno:
-Você vai dissecar o tema como se fosse um patologista. Identificar variáveis, isolar padrões, criar hipóteses testáveis. Nada de "seja autêntico" ou conselho genérico. Quero a anatomia exata do que funciona neste tema.
-- Slide 1 (HOOK): tese contraintuitiva que revela um padrão escondido. Provocativa e específica. Formatos:
-  • "Não existe X. Existe Y."
-  • "Todo mundo está medindo X. O que importa é Y."
-  • "X não é o problema. X é o sintoma."
-- Slide 2 (AUTÓPSIA): disseque o fenômeno. Mostre o que está acontecendo POR DENTRO — não a aparência, o mecanismo. Use linguagem de sistema: gatilho, fricção, atrito, sinal, distribuição, ciclo, dependência.
-- Slide 3 (PADRÃO OCULTO): extraia o princípio que conecta os casos visíveis. O que se repete que ninguém nomeou ainda. Esse padrão é a "fórmula" — explicite-a.
-- Slide 4 (DEMONSTRAÇÃO): aplique o padrão num exemplo concreto. Mostre como ele opera num caso específico.
-- Slide 5 (IMPLICAÇÃO ESTRATÉGICA): o que muda agora que você sabe disso. Ação concreta, não motivacional. Quem antecipa, ganha. Quem ignora, paga.
-- Último slide (CTA): convite reflexivo elegante, sem urgência forçada. Exemplo: "Quem enxerga padrão vence quem corre atrás de truque."
-Vocabulário obrigatório: mecanismo, gatilho, sinal, distribuição, comportamento, recorrência, fricção, atrito, antecipação, leitura, repertório, hipótese, variável, sistema, dependência. EVITE: dicas, hacks, fórmula mágica, segredo.`,
+    desc: 'Autopsia do tema — variáveis, padrão escondido, o que muda na prática',
+    method: `MÉTODO PROFUNDO — anatomia do fenômeno (modo "patologista"; escala ao N de slides):
+Disseque o tema: variáveis, padrões, hipóteses testáveis. Zero "seja autêntico", zero conselho genérico.
+- Slide 1 · HOOK: tese contraintuitiva que expõe um padrão escondido. Ex.: "Não existe X. Existe Y." / "Todo mundo mede X. O que importa é Y." / "X não é o problema. É sintoma."
+- Slides do meio — distribua estas ETAPAS ao longo dos slides 2…penúltimo (se N for pequeno, una etapas adjacentes; se N for grande, detalhe mais dentro da mesma etapa):
+  (A) AUTÓPSIA — o que acontece por dentro do fenômeno (mecanismo, não aparência): gatilho, fricção, atrito, sinal, ciclo, dependência.
+  (B) PADRÃO OCULTO — princípio que conecta casos visíveis; nomeie o que se repete.
+  (C) DEMONSTRAÇÃO — um caso onde o padrão aparece em ação.
+  (D) IMPLICAÇÃO — o que muda na decisão ou na leitura quando você enxerga isso.
+- Último slide · CTA: reflexivo, sem urgência falsa. Ex.: "Quem enxerga padrão vence quem corre atrás de truque."
+Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento, recorrência, fricção, antecipação, hipótese, variável, sistema. EVITE: hack, segredo, fórmula mágica.`,
   },
   {
     id: 'pain',
     icon: '💔',
     label: 'Odisseia da Dor',
-    desc: 'Identificação emocional → validação → raiz → saída',
-    method: `MÉTODO ODISSEIA DA DOR — empatia analítica, jornada emocional:
-Você está escrevendo para quem está sofrendo agora com este tema. Sua função é nomear o que ele sente, validar a experiência, mostrar o ciclo invisível, e oferecer uma direção (não promessa). Tom sóbrio, empático, ZERO motivacional, ZERO "você consegue", ZERO performance.
-- Slide 1 (HOOK / IDENTIFICAÇÃO IMEDIATA): nomeie o sentimento que o leitor não consegue verbalizar. A frase que faz ele pensar "isso é exatamente o que eu sinto agora". Formatos:
-  • "Você fez tudo certo. E ainda assim parece que travou."
-  • "Você não está cansado. Está exausto de fingir que está bem."
-  • "A parte mais difícil de X não é Y. É Z — e ninguém te avisou."
-- Slide 2 (VALIDAÇÃO): descreva a dor com tanta precisão que o leitor sente que você está dentro da cabeça dele. Use detalhes sensoriais, situações concretas: o e-mail que releu 5 vezes, a notificação que ficou olhando sem abrir, a aula que você assistiu mas não conseguiu aplicar.
-- Slide 3 (O FALSO REMÉDIO): o que ele tentou e por que não funcionou. As soluções superficiais que o mercado vende e que aliviam por 3 dias. Sem julgar quem comprou — explicar por que falhou.
-- Slide 4 (A RAIZ): o mecanismo real por trás da dor. Por que ela insiste em voltar. Diferença entre sintoma e causa. Esta é a parte que muda a leitura do leitor sobre si mesmo.
-- Slide 5 (A SAÍDA): o ângulo que ninguém apresenta. NÃO é uma promessa, é uma direção. Pequena, possível, honesta. Algo que pode ser feito ainda hoje.
-- Último slide (CTA): convite gentil, sem performance, sem CTA forçado. Exemplo: "Salve para reler quando o ciclo voltar." ou "Comente: qual foi a primeira frase que doeu?"
-Vocabulário: ciclo, padrão, raiz, sintoma vs causa, exaustão, repetição, busca, saída, pausa, presença. EVITE: você consegue, vai dar certo, basta acreditar, foco e disciplina, jornada.`,
+    desc: 'Nomeia a dor, valida, mostra o que falhou e uma saída honesta',
+    method: `MÉTODO ODISSEIA DA DOR — jornada empática (escala ao N de slides):
+Escreva para quem sofre com o tema agora. Nomear, validar, expor o ciclo, apontar direção pequena e real — não promessa. Tom sóbrio e perto; ZERO "você consegue", ZERO performance coaching.
+- Slide 1 · IDENTIFICAÇÃO: o sentimento que o leitor mal consegue nomear — preciso o suficiente para ele pensar "sou eu". Ex.: "Você fez tudo certo. E ainda assim travou." / "Você não está cansado. Está exausto de fingir que está bem."
+- Slides do meio — distribua ao longo de 2…penúltimo:
+  VALIDAÇÃO (detalhes sensoriais e situações concretas da dor),
+  FALSO REMÉDIO (o que tentaram e por que não segurou — sem julgar),
+  RAIZ (mecanismo; sintoma vs causa — o que muda a autoimagem),
+  SAÍDA (ângulo honesto e possível hoje — não milagre).
+Se poucos slides: priorize validação → raiz → saída.
+- Último slide: convite gentil. Ex.: "Salve pra reler quando o ciclo voltar." / pergunta nos comentários qual frase doeu primeiro.
+Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EVITE: jornada, mindset, foco, você nasceu pra isso.`,
   },
   {
     id: 'viral',
     icon: '🚀',
     label: 'Viral Trends',
-    desc: 'Engenharia de algoritmo: interrupção, retenção, share',
-    method: `MÉTODO VIRAL TRENDS — engenharia de distribuição algorítmica:
-Você está escrevendo para o algoritmo do Instagram tanto quanto para o leitor. Cada slide tem uma função técnica. 90% dos carrosséis morrem no slide 1. Sua missão é fazer este passar.
-- Slide 1 (HOOK / PARADA DE SCROLL): tem 0.5 segundo pra fazer o dedo parar. Use UMA destas técnicas, NUNCA "Hoje vou te ensinar / Você sabia que":
-  • INTERRUPÇÃO: contraria o que o público espera ler. "Pare de [comportamento comum no nicho]."
-  • PROMESSA NUMÉRICA ESPECÍFICA: "3 frases que mudam como você [X] em [N dias]"
-  • REVELAÇÃO ATRASADA: mostra o resultado primeiro, explica depois. "Triplicou em 2 semanas. Não foi sorte."
-  • IDENTIFICAÇÃO BRUTAL: a frase que faz o leitor pensar "isso sou eu". "Você está postando todo dia e ninguém compartilha. O motivo é absurdo."
-  • PERGUNTA QUE DÓI: a pergunta que o público faz às 2h da manhã. "Por que [X] funciona pra todo mundo menos pra você?"
-- Slide 2: BUILD-UP DE TENSÃO. Abre um loop: introduz a tese mas adia a resposta. "E aqui está o que ninguém percebeu primeiro:".
-- Slide 3: DESENVOLVIMENTO da tensão. Mostre que você sabe o que está dizendo (autoridade rápida) sem ser técnico demais.
-- Slide 4: SHARE-TRIGGER. Inclua UMA frase tão precisa, tão "essa eu vou guardar", que o leitor sente vontade de mandar pra alguém. É a frase quotable do carrossel.
-- Slide 5: PAYOFF. Entrega a peça final que justifica todo o build-up. O "ahá!" pago.
-- Último slide (CTA): pergunta genuína nos comentários OU instrução de save com motivo concreto. EVITE: "siga pra mais conteúdo", "compartilhe se gostou", "marca aquele amigo". Use: "Salve pra usar antes da próxima decisão sobre [X]." ou "Me conta nos comentários: qual destes você faria primeiro?"
-Tom: direto, urgente sem ser sensacionalista, confiante, factual. Frases curtas, ritmo acelerado.`,
+    desc: 'Parada de scroll, loop de tensão, prova e frase para guardar ou mandar',
+    method: `MÉTODO VIRAL TRENDS — retenção e clareza algorítmica (escala ao N de slides):
+Cada slide tem função para segurar o dedo e completar o arco. 90% morre no slide 1 — o hook decide tudo.
+- Slide 1 · PARADA DE SCROLL (≤0,5s): UMA técnica abaixo. PROIBIDO abrir com "Hoje vou te ensinar", "Você sabia que", "5 dicas infalíveis".
+  • INTERRUPÇÃO — contraria a expectativa do nicho.
+  • PROMESSA NUMÉRICA específica — "3 decisões que mudam [X] em [prazo]."
+  • REVELAÇÃO ATRASADA — resultado primeiro, causa depois.
+  • IDENTIFICAÇÃO brutal — "isso sou eu."
+  • PERGUNTA que tira sono — a dúvida às 2h.
+- Slides do meio — distribua funções (repetir ou expandir se N for grande):
+  BUILD-UP (abre loop; atrasa resposta),
+  DESENVOLVIMENTO (prova parcial, autoridade rápida sem paper acadêmico),
+  SHARE-TRIGGER (uma frase quotável memorável),
+  PAYOFF (fecha o loop — o "ahá").
+- Último slide: pergunta real nos comentários OU save com motivo concreto. EVITE: "segue pra mais", "marca o amigo", "compartilha se gostou".
+Tom: curto, rápido, confiante; urgência sem sensacionalismo.`,
   },
   {
     id: 'storytelling',
     icon: '📖',
     label: 'Storytelling',
-    desc: 'Narrativa em arco — identificação por cena',
-    method: `MÉTODO STORYTELLING — narrativa em arco, cena concreta:
-Você não vai explicar o tema, você vai CONTAR uma história sobre o tema. Cenas concretas com nomes, horários, lugares, sensações. Detalhes específicos. NUNCA generalize.
-- Slide 1 (HOOK / IN MEDIA RES): comece NO MEIO da ação. Uma frase que coloca o leitor dentro de uma cena imediatamente, sem contexto prévio. Exemplos:
-  • "Era 23h e ela releu o e-mail pela quinta vez."
-  • "O cliente desligou antes da segunda frase."
-  • "A planilha estava aberta há 14 horas."
-- Slide 2 (CONTEXTO DA TENSÃO): zoom out. O que estava em jogo, o estado anterior, o que se esperava que acontecesse. Use detalhes sensoriais: barulho da rua, cor da luz, peso na mochila.
-- Slide 3 (PONTO DE VIRADA): algo aconteceu que mudou tudo. Detalhe específico, não conceito. Foi UMA frase, UM número, UMA pessoa, UM e-mail.
-- Slide 4 (CONSEQUÊNCIA): o que mudou DEPOIS. A nova realidade. Sem dizer "a moral é".
-- Slide 5 (LIÇÃO IMPLÍCITA → GENERALIZAÇÃO): a verdade universal que essa cena revela. Aqui você sai do caso específico e nomeia o que ele significa pra qualquer pessoa.
-- Último slide (CTA): pergunta que convida o leitor a contar a SUA história. "Você já viveu uma cena assim? Comenta com a sua." ou "Qual foi o seu 23h de [tema]?"
-Vocabulário: específico, sensorial, com nomes, lugares, horas, cores, sons. Use VERBOS no passado e presente, NUNCA gerúndio em excesso. NUNCA: "todos nós sabemos que", "muitas pessoas", "as pessoas em geral".`,
+    desc: 'História com arco — cena, tempo e virada (não headline de pitch)',
+    method: `MÉTODO STORYTELLING — narrativa em cena (escala ao N de slides):
+Conte uma história sobre o tema; não explique em modo manual. Cenas com tempo, lugar, gesto, detalhe verificável. Evite título conceitual genérico ("X: uma reflexão") no lugar de imagem viva.
+- Slide 1 · IN MEDIAS RES: entre no meio da ação. Ex.: "Era 23h e ela releu o e-mail pela quinta vez." / "O cliente desligou antes da segunda frase."
+- Slides do meio — distribua ao longo de 2…penúltimo:
+  CONTEXTO (o que estava em jogo; sensorial),
+  VIRADA (um evento concreto que muda tudo — número, fala, objeto),
+  CONSEQUÊNCIA (como fica o mundo depois),
+  e se couber GENERALIZAÇÃO leve (o que isso significa além deste caso) — antes do fecho.
+Se poucos slides: contexto → virada → consequência.
+- Último slide: convite a partilhar experiência. Ex.: "Já te aconteceu algo assim?" / "Qual foi teu '23h' com [tema]?"
+Use verbos no passado/presente; EVITE "muitas pessoas", "em geral", gerúndio em excesso.`,
   },
   {
     id: 'how_to',
     icon: '🎓',
     label: 'Passo-a-passo',
-    desc: 'Tutorial direto, replicável, sem encheção',
-    method: `MÉTODO PASSO-A-PASSO — tutorial direto, replicável:
-Você está fazendo um manual de instruções de altíssima qualidade. Sem teoria desnecessária, sem inspiração, sem "antes de começar lembre-se que...". Direto ao processo.
-- Slide 1 (HOOK / PROMESSA CONCRETA): "Como [resultado específico] em [N passos] / [tempo definido]". Sem encheção, sem suspense. O leitor sabe exatamente o que vai aprender.
-  • "Como escrever um bio que converte em 4 passos."
-  • "Como auditar a primeira versão de um carrossel em 90 segundos."
-- Slides intermediários: UM PASSO POR SLIDE. Cada slide tem ESTRUTURA INTERNA fixa:
-  • TÍTULO: "Passo N · [nome curto e ativo do passo]" (ex: "Passo 1 · Identifique o gatilho")
-  • SUBTÍTULO: 3 partes em sequência: (1) o quê fazer, com verbo no imperativo; (2) como fazer, com instrução precisa; (3) erro comum a evitar OU exemplo concreto.
-  Linguagem imperativa: "Identifique X.", "Anote Y.", "Compare com Z." — NÃO "É importante identificar...".
-- Penúltimo slide: O ERRO MAIS COMUM que faz a maioria falhar mesmo seguindo os passos. Específico, não genérico.
-- Último slide (CTA): "Salve para aplicar amanhã." + pergunta sobre qual passo o leitor já aplica/quer testar primeiro.
-Tom: direto, claro, profissional, sem rodeios. Como receita de chef ou manual de equipamento bem escrito. Zero motivacional, zero "você consegue".`,
+    desc: 'Manual — um passo por slide, imperativo e verificável',
+    method: `MÉTODO PASSO-A-PASSO — tutorial replicável (escala ao N de slides):
+Sem palestra motivacional. O leitor deve sair sabendo o que fazer na ordem certa.
+- Slide 1 · PROMESSA: deixe explícito resultado + número de passos (alinhado ao total de slides intermediários). Ex.: "Como [resultado] em [K] passos."
+- Slides do meio (2 até penúltimo): UM PASSO POR SLIDE, numerados em sequência real (Passo 1… Passo K). Em cada um:
+  • TÍTULO: "Passo N · [verbo + objeto]" (nome curto e ativo).
+  • SUBTÍTULO: (1) imperativo do que fazer; (2) como fazer com precisão; (3) erro comum OU mini-exemplo.
+  Linguagem imperativa: "Identifique…", "Anote…", "Compare…" — evite "é importante que você…".
+- Penúltimo slide (se K≥2): o ERRO que faz a maioria falhar mesmo seguindo o roteiro — específico ao tema.
+- Último slide: save com utilidade + pergunta sobre qual passo testar primeiro.
+Se houver mais slides que passos necessários: acrescente slide de checklist rápido ou variação do passo mais crítico — não encha com teoria.`,
+  },
+  {
+    id: 'jornalistico',
+    icon: '🗞',
+    label: 'Jornalístico',
+    desc: 'Fio tipo capa digital: selo de editoria, manchete e texto em pirâmide invertida',
+    method: `MÉTODO JORNALÍSTICO — fio editorial / digital first (escala ao N de slides):
+Soar como postagem de veículo sério ou newsletter de analítico — não viral barulhento nem pitch de marca.
+- Slide 1 · CAPA: hierarquia de três camadas quando couber ao formato do JSON (use título e subtítulo de forma criativa para isso):
+  (A) SELO/CATEGORIA — uma linha curta em tom de editoria em CAIXA ALTA OU caixa alta suave (ex.: "ANÁLISE", "MERCADO", "[NICHO]").
+  (B) MANCHETE — frase forte, pode ser maior e mais objetiva que um hook meme; até ~12 palavras se precisar densidade.
+  (C) LEAD/NUT — 1 linha ou 2 máximas: o "por que importa agora", factual e direto — sem perguntinha vazia.
+- Slides do meio (2…penúltimo): cada um como BLOCO DE MATÉRIA — parágrafos curtos (estilo pirâmide invertida: fato/implicação → contexto → detalhe). Um slide = uma peça da história ou um ângulo novo (who/what/when/why/so what). Vocabulário: fonte implícita, consequência, precedente, cenário — sem jargão de guru.
+- Último slide · FECHO: linha-editorial ou o que falta saber próximo — convite sóbrio (pergunta precisa ou "salve para acompanhar").
+EVITE: "X mudou tudo" sem nuance; clickbait que o miolo não sustenta; tom de relatório institucional de marca.`,
+  },
+  {
+    id: 'sensacionalista',
+    icon: '📣',
+    label: 'Sensacionalista',
+    desc: 'Ganchos tipo tablóide, tensão extrema e viradas — sem mentir nem prometer miragem',
+    method: `MÉTODO SENSACIONALISTA — alto impacto, tom de tablóide moderno (escala ao N de slides):
+Máximo drama na forma, honestidade no conteúdo: pode exagerar RITMO e TENSÃO lexical, não fatos nem promessas.
+- Slide 1 · BERRANTE CONTROLADO — UMA destas âncoras (troque conforme tema):
+  • REVELAÇÃO com custo ("O que ninguém te contou sobre [X]").
+  • NÚMERO ou prazo espremido ("3 dias de [cenário] e já dá pra ver…").
+  • PERGUNTA que arranha ("Por que [grupo] ainda acredita em [Y]?").
+  PROIBIDO: "chocante!", "você não vai acreditar" vazio, ou prometer prova que o carrossel não entrega.
+- Slides do meio — distribua tensão máxima: cada slide abre novo micro-gancho OU fecha um aberto antes; uso de cortes curtos, frases de efeito, contraste visceral ("parecia X / era Y"). Um slide deve ter a frase "compartilhável" de choque sóbrio quando houver espaço — não vulgaridade gratuita.
+- Último slide: payoff real (o que ficou provado neste carrossel) + pergunta inflamável NOS FATOS OU save — sem arme-se sem fechar o arco.
+Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo.`,
   },
 ];
 const GEN_MODE_BY_ID = Object.fromEntries(GEN_MODES.map(m => [m.id, m]));
@@ -801,8 +881,38 @@ const lsGet = (key, fallback) => {
     return JSON.parse(raw);
   } catch { return fallback; }
 };
+// lsSet retorna true em sucesso, false em falha.
+// Em caso de QuotaExceededError dispara evento customizado que o App escuta para exibir toast.
 const lsSet = (key, value) => {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (err) {
+    const isQuota = err instanceof DOMException && (
+      err.code === 22 || err.code === 1014 ||
+      err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    );
+    if (isQuota) {
+      // Tenta salvar uma versão compacta: remove bgImage (base64) de todos os slides
+      try {
+        const slim = JSON.parse(JSON.stringify(value));
+        if (key === 'vc_library' && Array.isArray(slim)) {
+          slim.forEach(entry => {
+            (entry.doc?.slides || []).forEach(s => { delete s.bgImage; });
+          });
+          localStorage.setItem(key, JSON.stringify(slim));
+          window.dispatchEvent(new CustomEvent('vc:quota-warning', {
+            detail: 'Limite de armazenamento quase atingido. Imagens de fundo foram omitidas do cache. Exporte seus projetos como JSON para não perder dados.',
+          }));
+          return true;
+        }
+      } catch { /* fallback falhou também */ }
+      window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
+        detail: 'Limite de armazenamento do browser atingido. Exporte seus projetos como JSON antes que dados sejam perdidos.',
+      }));
+    }
+    return false;
+  }
 };
 
 // ─── BIBLIOTECA + PERFIS DE MARCA ─────────────────────────────────────────────
@@ -852,12 +962,17 @@ function usePersistedState(key, initial) {
 
 // Hook: histórico para undo/redo. Mudanças muito próximas no tempo
 // (ex: digitar em um input) são agrupadas em um único snapshot.
+// canUndo e canRedo são booleanos reativos — mudam de valor quando o histórico muda,
+// o que permite que botões de undo/redo reflitam o estado corretamente sem polling.
 function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
   const [state, setStateInternal] = React.useState(initialState);
   const past = React.useRef([]);
   const future = React.useRef([]);
   const skipNext = React.useRef(false);
   const lastPushAt = React.useRef(0);
+  // Versão incremental: muda sempre que o histórico muda → permite derivar canUndo/canRedo reativos
+  const [histVer, setHistVer] = React.useState(0);
+  const bumpHist = React.useCallback(() => setHistVer(v => v + 1), []);
 
   const push = React.useCallback((updater) => {
     setStateInternal((prev) => {
@@ -870,11 +985,15 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
       if (!coalesce) {
         past.current.push(prev);
         if (past.current.length > limit) past.current.shift();
+        future.current = [];
+        // Agenda bump fora do setState (não pode chamar setHistVer dentro de outro setState)
+        Promise.resolve().then(bumpHist);
+      } else {
+        future.current = [];
       }
-      future.current = [];
       return next;
     });
-  }, [limit, coalesceMs]);
+  }, [limit, coalesceMs, bumpHist]);
 
   // setState que NÃO grava no histórico (uso interno)
   const setSilent = React.useCallback((updater) => {
@@ -887,27 +1006,33 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
       if (!past.current.length) return prev;
       const previous = past.current.pop();
       future.current.push(prev);
+      Promise.resolve().then(bumpHist);
       return previous;
     });
-  }, []);
+  }, [bumpHist]);
 
   const redo = React.useCallback(() => {
     setStateInternal((prev) => {
       if (!future.current.length) return prev;
       const next = future.current.pop();
       past.current.push(prev);
+      Promise.resolve().then(bumpHist);
       return next;
     });
-  }, []);
+  }, [bumpHist]);
 
   const reset = React.useCallback((next) => {
     past.current = [];
     future.current = [];
     setStateInternal(next);
-  }, []);
+    bumpHist();
+  }, [bumpHist]);
 
-  const canUndo = () => past.current.length > 0;
-  const canRedo = () => future.current.length > 0;
+  // Valores reativos derivados da versão do histórico
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const canUndo = React.useMemo(() => past.current.length > 0, [histVer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const canRedo = React.useMemo(() => future.current.length > 0, [histVer]);
 
   return { state, set: push, setSilent, undo, redo, reset, canUndo, canRedo };
 }
@@ -918,9 +1043,14 @@ const mkSlide = (n = 1) => ({
   subtitle: 'Subtítulo descritivo que reforça o gancho principal do carrossel.',
   layout: 'mc', align: 'center',
   bgImage: null, imageQuery: '',
+  /** Campo opcional `presentationImgAdjust` (tela cheia) — não definido em slides novos; ver FullscreenViewer. */
+  /** Data URL ou URL https — enviada à API de imagem como referência (produto, pack, moodboard). */
+  refImage: null,
+  /** Instruções extras por slide (marca, packshot, cor de fundo) — entram no prompt Web trend e GPT Image. */
+  imgExtraPrompt: '',
   imgMode: 'web_trend', // 'web_trend' = fotos reais (Unsplash/Pexels em dev + Commons) | 'dalle' = GPT Image
   bgX: 50, bgY: 50, bgZoom: 100,
-  /** 'cover' = preenche o cartão | 'contain' = imagem inteira visível | 'custom' = zoom % legado */
+  /** 'cover' = preenche o card | 'contain' = imagem inteira visível | 'custom' = zoom % legado */
   bgFit: 'cover',
   bgOpacity: 100, bgMirror: false,
   overlay: 60, titleSize: 100, subSize: 100,
@@ -940,7 +1070,9 @@ const mkSlide = (n = 1) => ({
 });
 
 const isDefault = (slides) =>
-  slides.length === 1 && slides[0].title === 'Seu título aqui';
+  Array.isArray(slides) &&
+  slides.length === 1 &&
+  slides[0]?.title === 'Seu título aqui';
 
 const extractJSON = (raw) => {
   if (!raw) throw new Error('IA retornou resposta vazia. Tente novamente.');
@@ -975,6 +1107,30 @@ const IS_LOCAL_DEV =
 const ANTHROPIC_URL    = IS_LOCAL_DEV ? '/api/anthropic/v1/messages'           : 'https://api.anthropic.com/v1/messages';
 const OPENAI_CHAT_URL  = IS_LOCAL_DEV ? '/api/openai/v1/chat/completions'      : 'https://api.openai.com/v1/chat/completions';
 const OPENAI_IMAGE_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/generations'    : 'https://api.openai.com/v1/images/generations';
+const OPENAI_IMAGE_EDITS_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/edits'     : 'https://api.openai.com/v1/images/edits';
+
+/** Converte "Failed to fetch" numa mensagem acionável (CORS, preview sem proxy, rede). */
+function enhanceNetworkError(err, label) {
+  const m = (err && err.message) ? err.message : String(err);
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
+    const hosted = typeof window !== 'undefined' && !IS_LOCAL_DEV;
+    const preview =
+      typeof window !== 'undefined' &&
+      /^(localhost|127\.|\[::1\])/.test(window.location.hostname) &&
+      (window.location.port === '4173' || window.location.port === '4174');
+    let hint =
+      'Mantenha `npm run dev` ativo e `.env.local` com ANTHROPIC_API_KEY ou OPENAI_API_KEY (o proxy /api só existe no dev server).';
+    if (preview) {
+      hint =
+        '`npm run preview` não inclui o proxy /api — use `npm run dev` para IA ou gere só no ambiente de desenvolvimento.';
+    } else if (hosted) {
+      hint =
+        'Num site hospedado (ex.: Vercel) o navegador não pode chamar api.anthropic.com direto por CORS. Use a chave OpenAI em ⚙ (vai direto à OpenAI) ou sirva o app em localhost com `npm run dev`.';
+    }
+    return new Error(`${label}: falha de rede (${m}). ${hint}`);
+  }
+  return err instanceof Error ? err : new Error(m);
+}
 
 // Cache do health-check do servidor (quais providers tem chave configurada)
 let _serverStatusPromise = null;
@@ -994,12 +1150,22 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
     messages: [{ role: 'user', content: userMsg }],
   };
   if (tools) body.tools = tools;
-  const res = await fetch(ANTHROPIC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw enhanceNetworkError(e, 'Claude');
+  }
   const raw = await res.text();
+  if (res.status === 404 && IS_LOCAL_DEV && String(ANTHROPIC_URL).startsWith('/api')) {
+    throw new Error(
+      'Endpoint /api não existe neste servidor (ex.: `npm run preview` não inclui proxy). Use `npm run dev` para IA com Claude/OpenAI.',
+    );
+  }
   let data;
   try { data = JSON.parse(raw); }
   catch { throw new Error(`Resposta inválida (HTTP ${res.status})`); }
@@ -1037,12 +1203,22 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
   } else {
     headers['Authorization'] = `Bearer ${key}`;
   }
-  const res = await fetch(OPENAI_CHAT_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(OPENAI_CHAT_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw enhanceNetworkError(e, 'OpenAI');
+  }
   const raw = await res.text();
+  if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_CHAT_URL).startsWith('/api')) {
+    throw new Error(
+      'Endpoint /api não existe neste servidor (ex.: `npm run preview`). Use `npm run dev` para IA com proxy.',
+    );
+  }
   let data;
   try { data = JSON.parse(raw); }
   catch { throw new Error(`OpenAI: resposta inválida (HTTP ${res.status})`); }
@@ -1151,15 +1327,21 @@ function expandTopicHintsForStockSearch(title, subtitle, imageQuery) {
 }
 
 /** Combina imageQuery (IA) com palavras do título/subtítulo + hints temáticos para a busca não fugir do tema. */
-function buildCommonsSearchQuery(imageQuery, title, subtitle) {
+function buildCommonsSearchQuery(imageQuery, title, subtitle, imgExtraPrompt = '') {
   const q = (imageQuery || '').trim();
+  const extra = (imgExtraPrompt || '').trim();
   const text = `${title || ''} ${subtitle || ''}`;
   const words = text.match(/[\p{L}\p{N}]+/gu) || [];
   const keywords = words
     .filter(w => w.length > 2 && !COMMONS_STOP.has(w.toLowerCase()))
     .slice(0, 18)
     .join(' ');
-  let merged = [keywords, q].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  const extraWords = extra.match(/[\p{L}\p{N}]+/gu) || [];
+  const extraPack = extraWords
+    .filter(w => w.length > 2 && !COMMONS_STOP.has(w.toLowerCase()))
+    .slice(0, 24)
+    .join(' ');
+  let merged = [keywords, q, extraPack].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   const hintPack = expandTopicHintsForStockSearch(title, subtitle, q);
   if (hintPack) merged = `${merged} ${hintPack}`.replace(/\s+/g, ' ').trim();
   if (merged.length > 280) merged = merged.slice(0, 280);
@@ -1167,7 +1349,7 @@ function buildCommonsSearchQuery(imageQuery, title, subtitle) {
 }
 
 const fetchWebTrendImage = async (query, seed = '', ctx = {}) => {
-  const qBase = buildCommonsSearchQuery(query, ctx.title, ctx.subtitle);
+  const qBase = buildCommonsSearchQuery(query, ctx.title, ctx.subtitle, ctx.imgExtraPrompt);
 
   if (IS_LOCAL_DEV) {
     try {
@@ -1267,6 +1449,44 @@ Photorealistic, shot like 35mm film photograph at eye level using a 50mm lens, s
 EXPECTED OUTPUT
 A photorealistic, sophisticated and natural image related to the theme indirectly, with low saturation, moderate contrast, clean composition, generous text-friendly space, premium editorial appearance. Feels real, silent, intelligent and visually refined. Strictly no text, no captions, no watermarks, no logos inside the image.`;
 
+function dataUrlToBlob(dataUrl) {
+  const m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/s);
+  if (!m) throw new Error('Formato de imagem inválido.');
+  const bin = atob(m[2]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const mime = (m[1] || 'image/png').split(';')[0].trim();
+  return new Blob([arr], { type: mime || 'image/png' });
+}
+
+async function blobFromSlideRef(refImage) {
+  if (!refImage || typeof refImage !== 'string') throw new Error('Referência ausente.');
+  if (refImage.startsWith('data:')) return dataUrlToBlob(refImage);
+  const res = await fetch(refImage);
+  if (!res.ok) throw new Error('Não foi possível carregar a URL da imagem de referência.');
+  return res.blob();
+}
+
+/** Prompt completo para GPT Image (geração ou edição com referência). */
+function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference = false } = {}) {
+  const safeTheme = (q || '').slice(0, 280);
+  const axisTags = buildImgParamsTagsEN(imgParams);
+  const extra = (imgExtraPrompt || '').trim().slice(0, 2000);
+  const refLead = withReference
+    ? 'REFERENCE IMAGE IS ATTACHED: Preserve brand/product identity — palette, materials, proportions, packaging style, typography mood. Produce a NEW editorial photograph suitable as a carousel slide background with generous negative space for headline/body text; reinterpret in a fresh scene aligned with the theme — do not output a flat crop of the reference alone.\n\n'
+    : '';
+  let body =
+    `${GPT_IMAGE_ART_DIRECTION}\n\n` +
+    refLead +
+    `THEME OF THIS CARD: ${safeTheme}` +
+    `${axisTags}`;
+  if (extra) {
+    body += `\n\nBRAND / CLIENT DIRECTION (priority — incorporate faithfully):\n${extra}`;
+  }
+  body += `\n\nNow create the image following all the directions above. Use photorealistic real-photograph rendering.`;
+  return body;
+}
+
 // Lista de modelos OpenAI tentados em ordem (do mais novo/melhor pro mais antigo).
 // `gpt-image-2` exige org verificada (>=abril/2026); `gpt-image-1` e `dall-e-3`
 // não. O fallback acontece automaticamente quando a API retorna 403 (verificação)
@@ -1282,16 +1502,96 @@ const OPENAI_IMAGE_MODELS = [
 
 let _cachedModel = null; // memoiza o primeiro modelo que funcionou nesta sessão
 
-const generateDALLE = async (q, apiKey, imgParams = null) => {
-  // Em local dev, o proxy usa OPENAI_API_KEY do .env.local quando o user não envia chave.
+/** Geração com uma ou mais imagens de referência (API edits — multipart). */
+async function generateDALLEEdits(refBlob, prompt, apiKey) {
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
-  const safeTheme = (q || '').slice(0, 280);
-  const axisTags = buildImgParamsTagsEN(imgParams);
-  const prompt =
-    `${GPT_IMAGE_ART_DIRECTION}\n\n` +
-    `THEME OF THIS CARD: ${safeTheme}` +
-    `${axisTags}\n\n` +
-    `Now create the image following all the directions above. Use photorealistic real-photograph rendering.`;
+  const headers = {};
+  if (IS_LOCAL_DEV) {
+    if (apiKey) headers['x-openai-key'] = apiKey;
+  } else {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
+  const order = _cachedModel
+    ? [_cachedModel, ...OPENAI_IMAGE_MODELS.filter(m => m.name !== _cachedModel.name)]
+    : OPENAI_IMAGE_MODELS;
+
+  let lastErr = null;
+  for (const model of order) {
+    const fd = new FormData();
+    fd.append('model', model.name);
+    fd.append('prompt', prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000));
+    fd.append('n', '1');
+    fd.append('size', model.size);
+    fd.append('quality', model.quality);
+    if (model.style) fd.append('style', model.style);
+    if (model.responseFormat) fd.append('response_format', 'b64_json');
+    const ext =
+      (refBlob.type && refBlob.type.includes('jpeg')) || (refBlob.type && refBlob.type.includes('jpg'))
+        ? 'jpg'
+        : 'png';
+    fd.append('image[]', refBlob, `reference.${ext}`);
+
+    try {
+      let res;
+      try {
+        res = await fetch(OPENAI_IMAGE_EDITS_URL, { method: 'POST', headers, body: fd });
+      } catch (e) {
+        throw enhanceNetworkError(e, 'GPT Image (referência)');
+      }
+      if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_IMAGE_EDITS_URL).startsWith('/api')) {
+        throw new Error(
+          'Endpoint /api não existe (`npm run preview` não tem proxy). Use `npm run dev` para GPT Image.',
+        );
+      }
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => ({}));
+        const msg = errPayload.error?.message || `HTTP ${res.status}`;
+        const shouldFallback =
+          res.status === 403 ||
+          res.status === 404 ||
+          res.status === 400 ||
+          /must be verified|model.*not.*found|does not have access|unsupported model|not supported/i.test(msg);
+        if (shouldFallback) {
+          console.warn(`[OpenAI Image edits] ${model.name}: ${msg} — próximo modelo`);
+          lastErr = new Error(msg);
+          continue;
+        }
+        throw new Error(msg);
+      }
+      const d = await res.json();
+      _cachedModel = model;
+      return `data:image/png;base64,${d.data[0].b64_json}`;
+    } catch (e) {
+      if (e instanceof TypeError) { lastErr = e; continue; }
+      throw e;
+    }
+  }
+  throw new Error(
+    lastErr?.message ||
+      'Nenhum modelo aceitou imagem de referência. Tente gerar só com texto ou outro modelo.',
+  );
+}
+
+/**
+ * GPT Image a partir de texto. Opcional: `options.refImage` (data URL ou https) + `options.imgExtraPrompt`.
+ * Com referência, usa POST /v1/images/edits; sem referência, /v1/images/generations.
+ */
+const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
+  const { refImage, imgExtraPrompt } = options || {};
+  if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
+
+  if (refImage) {
+    try {
+      const blob = await blobFromSlideRef(refImage);
+      const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: true });
+      return await generateDALLEEdits(blob, promptRef, apiKey);
+    } catch (e) {
+      console.warn('[GPT Image] Referência indisponível, gerando só com texto:', e.message);
+    }
+  }
+
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
   const headers = { 'Content-Type': 'application/json' };
   if (IS_LOCAL_DEV) {
     if (apiKey) headers['x-openai-key'] = apiKey;
@@ -1299,7 +1599,6 @@ const generateDALLE = async (q, apiKey, imgParams = null) => {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  // Se já testamos com sucesso um modelo nesta sessão, vamos direto nele.
   const order = _cachedModel
     ? [_cachedModel, ...OPENAI_IMAGE_MODELS.filter(m => m.name !== _cachedModel.name)]
     : OPENAI_IMAGE_MODELS;
@@ -1313,18 +1612,24 @@ const generateDALLE = async (q, apiKey, imgParams = null) => {
       size: model.size,
       quality: model.quality,
     };
-    if (model.style)          body.style = model.style;
+    if (model.style) body.style = model.style;
     if (model.responseFormat) body.response_format = 'b64_json';
 
     try {
-      const res = await fetch(OPENAI_IMAGE_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+      let res;
+      try {
+        res = await fetch(OPENAI_IMAGE_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+      } catch (e) {
+        throw enhanceNetworkError(e, 'GPT Image');
+      }
+      if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_IMAGE_URL).startsWith('/api')) {
+        throw new Error(
+          'Endpoint /api não existe (`npm run preview` não tem proxy). Use `npm run dev` para GPT Image.',
+        );
+      }
       if (!res.ok) {
-        const errPayload = await res.json().catch(()=>({}));
+        const errPayload = await res.json().catch(() => ({}));
         const msg = errPayload.error?.message || `HTTP ${res.status}`;
-        // Fallback automático para erros conhecidos:
-        // 403 → org não verificada (exclusivo de gpt-image-2)
-        // 404 → modelo não existe nessa conta
-        // 400 com "must be verified" no body
         const shouldFallback =
           res.status === 403 ||
           res.status === 404 ||
@@ -1337,25 +1642,428 @@ const generateDALLE = async (q, apiKey, imgParams = null) => {
         throw new Error(msg);
       }
       const d = await res.json();
-      _cachedModel = model; // memoiza pra próximas chamadas desta sessão
+      _cachedModel = model;
       return `data:image/png;base64,${d.data[0].b64_json}`;
     } catch (e) {
-      // Erros de rede ou timeouts: tenta próximo
       if (e instanceof TypeError) { lastErr = e; continue; }
       throw e;
     }
   }
   throw new Error(
     `Nenhum modelo de imagem da OpenAI disponível para sua conta. ` +
-    `Último erro: ${lastErr?.message || 'desconhecido'}. ` +
-    `Verifique sua organização em https://platform.openai.com/settings/organization/general`
+      `Último erro: ${lastErr?.message || 'desconhecido'}. ` +
+      `Verifique sua organização em https://platform.openai.com/settings/organization/general`,
   );
 };
 
+/** Ajustes de imagem apenas para preview (ex.: tela cheia); valores típicos −50…+50, 0 = neutro. */
+const PRESENTATION_IMG_ADJ_KEYS = ['exposure', 'brightness', 'contrast', 'color', 'blacks', 'tonalidade'];
+
+const DEFAULT_PRESENTATION_IMG_ADJUST = Object.freeze({
+  exposure: 0,
+  brightness: 0,
+  contrast: 0,
+  color: 0,
+  blacks: 0,
+  tonalidade: 0,
+});
+
+function normalizePresentationImgAdjust(raw) {
+  const o = typeof raw === 'object' && raw ? raw : {};
+  const out = { ...DEFAULT_PRESENTATION_IMG_ADJUST };
+  const clampN = (k, lo, hi) => {
+    const x = typeof o[k] === 'number' && Number.isFinite(o[k]) ? o[k] : 0;
+    return Math.round(Math.max(lo, Math.min(hi, x)));
+  };
+  out.exposure = clampN('exposure', -50, 50);
+  out.brightness = clampN('brightness', -50, 50);
+  out.contrast = clampN('contrast', -50, 50);
+  out.color = clampN('color', -50, 50);
+  out.blacks = clampN('blacks', -50, 50);
+  out.tonalidade = clampN('tonalidade', -45, 45);
+  return out;
+}
+
+function buildPresentationImageFilter(vals) {
+  const v = normalizePresentationImgAdjust(vals);
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const expMul = Math.pow(2, clamp(v.exposure / 100, -0.8, 0.8));
+  const briMul = clamp(1 + v.brightness / 120, 0.65, 1.45);
+  const blkLift = clamp(1 + v.blacks / 130, 0.72, 1.35);
+  const bright = clamp(expMul * briMul * blkLift, 0.22, 2.85);
+  const contrastPct = clamp(100 + v.contrast * 0.55 - v.blacks * 0.1, 32, 200);
+  const satPct = clamp(100 + v.color * 1.05, 0, 220);
+  const hue = clamp(v.tonalidade, -45, 45);
+  return `brightness(${bright}) contrast(${contrastPct}%) saturate(${satPct}%) hue-rotate(${hue}deg)`;
+}
+
+function presentationAdjustIsNeutral(v) {
+  const n = normalizePresentationImgAdjust(v);
+  return !PRESENTATION_IMG_ADJ_KEYS.some((k) => n[k] !== 0);
+}
+
+/** Filtro CSS dos ajustes gravados (`presentationImgAdjust`), ou undefined se neutro ou sem imagem. */
+function slideStoredPresentationCssFilter(slide) {
+  if (!slide?.bgImage) return undefined;
+  const n = normalizePresentationImgAdjust(slide.presentationImgAdjust);
+  if (presentationAdjustIsNeutral(n)) return undefined;
+  return buildPresentationImageFilter(n);
+}
+
+/** Compara dois conjuntos já normalizados (ou brutos antes de normalizar). */
+function presentationImgAdjustEquivalent(a, b) {
+  const na = normalizePresentationImgAdjust(a);
+  const nb = normalizePresentationImgAdjust(b);
+  return PRESENTATION_IMG_ADJ_KEYS.every((k) => na[k] === nb[k]);
+}
+
+function formatPresentationAdjDisp(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '0';
+  if (v === 0) return '0';
+  return v > 0 ? `+${v}` : String(v);
+}
+
+const FULLSCREEN_IMG_ADJ_ROWS = [
+  { key: 'exposure', label: 'Exposição', step: 5, min: -50, max: 50 },
+  { key: 'brightness', label: 'Brilho', step: 5, min: -50, max: 50 },
+  { key: 'contrast', label: 'Contraste', step: 5, min: -50, max: 50 },
+  { key: 'color', label: 'Cor', step: 5, min: -50, max: 50, hint: 'Saturação da imagem.' },
+  { key: 'blacks', label: 'Pretos', step: 5, min: -50, max: 50, hint: 'Levanta ou reforça áreas escuras (simulado).' },
+  { key: 'tonalidade', label: 'Tonalidade', step: 3, min: -45, max: 45, hint: 'Matiz (desloca tons quentes/frios).' },
+];
+
+function FullscreenImageAdjustBar({
+  disabled,
+  adj,
+  onBump,
+  onSetKey,
+  onResetSlide,
+  onSave,
+  anyDirty,
+  hasPendingPersist,
+  onClose,
+}) {
+  const btnBase = {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.07)',
+    color: 'var(--accent-on-dark)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    opacity: disabled ? 0.35 : 1,
+    transition: 'background 0.15s, transform 0.1s',
+  };
+  return (
+    <div
+      style={{
+        pointerEvents: 'auto',
+        maxWidth: 560,
+        width: 'calc(100% - 40px)',
+        margin: '0 auto',
+        padding: '11px 12px 10px',
+        borderRadius: 14,
+        background: 'rgba(12,12,14,0.78)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        boxSizing: 'border-box',
+      }}
+      role="region"
+      aria-label="Ajustes de imagem na apresentação"
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          marginBottom: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.92)',
+            fontFamily: 'var(--font-ui)',
+            letterSpacing: '-0.022em',
+            lineHeight: 1.2,
+          }}
+        >
+          Ajustes da foto
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {typeof onClose === 'function' && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar painel de ajustes da foto"
+              style={{
+                height: 30,
+                padding: '0 12px',
+                borderRadius: 9999,
+                border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.88)',
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: 'var(--font-ui)',
+                letterSpacing: '-0.011em',
+                cursor: 'pointer',
+                transition: 'background 0.15s, transform 0.1s',
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              Fechar
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={disabled || !hasPendingPersist}
+            onClick={onSave}
+            aria-label="Salvar ajustes da foto neste projeto"
+            style={{
+              height: 30,
+              padding: '0 14px',
+              borderRadius: 9999,
+              border: `1px solid ${hasPendingPersist && !disabled ? 'transparent' : 'rgba(255,255,255,0.14)'}`,
+              background:
+                hasPendingPersist && !disabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              color: hasPendingPersist && !disabled ? '#fff' : 'rgba(255,255,255,0.45)',
+              fontSize: 11,
+              fontWeight: 600,
+              fontFamily: 'var(--font-ui)',
+              letterSpacing: '-0.011em',
+              cursor: disabled || !hasPendingPersist ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.45 : 1,
+              transition: 'background 0.15s, transform 0.1s',
+            }}
+            onMouseDown={(e) => {
+              if (!disabled && hasPendingPersist) e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            Salvar
+          </button>
+          <button
+            type="button"
+            disabled={disabled || !anyDirty}
+            onClick={onResetSlide}
+            aria-label="Redefinir ajustes deste slide"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              fontFamily: 'var(--font-ui)',
+              letterSpacing: '-0.011em',
+              color: 'rgba(255,255,255,0.55)',
+              background: 'transparent',
+              border: 'none',
+              cursor: disabled || !anyDirty ? 'not-allowed' : 'pointer',
+              padding: '4px 2px',
+              opacity: disabled || !anyDirty ? 0.42 : 1,
+            }}
+          >
+            Redefinir este slide
+          </button>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(252px, 1fr))',
+          columnGap: 14,
+          rowGap: 12,
+          maxHeight: 'min(42vh, 360px)',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingBottom: 2,
+          WebkitOverflowScrolling: 'touch',
+          opacity: disabled ? 0.45 : 1,
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {FULLSCREEN_IMG_ADJ_ROWS.map((row) => {
+          const val = adj[row.key];
+          const atMin = val <= row.min;
+          const atMax = val >= row.max;
+          const span = row.max - row.min || 1;
+          const pct = ((val - row.min) / span) * 100;
+          return (
+            <div
+              key={row.key}
+              title={row.hint || undefined}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                paddingBottom: 10,
+                borderBottom: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-ui)',
+                    color: 'rgba(255,255,255,0.58)',
+                    letterSpacing: '-0.011em',
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {row.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 400,
+                    fontFamily: 'var(--font-mono)',
+                    color: 'rgba(255,255,255,0.95)',
+                    fontVariantNumeric: 'tabular-nums',
+                    flexShrink: 0,
+                    letterSpacing: '-0.02em',
+                  }}
+                  aria-live="polite"
+                >
+                  {formatPresentationAdjDisp(val)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  minWidth: 0,
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label={`Diminuir ${row.label}`}
+                  disabled={disabled || atMin}
+                  style={btnBase}
+                  onMouseDown={(e) => {
+                    if (!disabled && !atMin) e.currentTarget.style.transform = 'scale(0.95)';
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  onClick={() => onBump(row.key, -row.step)}
+                >
+                  <Minus size={12} strokeWidth={2.25} />
+                </button>
+                <input
+                  type="range"
+                  className="vc-fs-pres-range"
+                  aria-label={`${row.label}: deslizar para ajustar`}
+                  aria-valuemin={row.min}
+                  aria-valuemax={row.max}
+                  aria-valuenow={val}
+                  disabled={disabled}
+                  min={row.min}
+                  max={row.max}
+                  step={row.step}
+                  value={val}
+                  onChange={(e) => onSetKey(row.key, Number(e.target.value))}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    margin: '2px 0',
+                    '--pct': `${pct}%`,
+                    backgroundImage: `linear-gradient(to right, var(--accent-on-dark) 0%, var(--accent-on-dark) ${pct}%, rgba(255,255,255,0.2) ${pct}%, rgba(255,255,255,0.2) 100%)`,
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label={`Aumentar ${row.label}`}
+                  disabled={disabled || atMax}
+                  style={btnBase}
+                  onMouseDown={(e) => {
+                    if (!disabled && !atMax) e.currentTarget.style.transform = 'scale(0.95)';
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  onClick={() => onBump(row.key, row.step)}
+                >
+                  <Plus size={12} strokeWidth={2.25} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {!disabled && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 10,
+            fontWeight: 400,
+            lineHeight: 1.45,
+            color: 'rgba(255,255,255,0.36)',
+            fontFamily: 'var(--font-ui)',
+            letterSpacing: '-0.011em',
+          }}
+        >
+          Use «Salvar» para gravar no projeto (persiste ao fechar). Exportação PNG/PDF usa esta foto assim
+          quando salvo. Ao fechar sem salvar, as alterações em aberto continuam só na sessão atual.
+        </div>
+      )}
+      {disabled && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            fontWeight: 400,
+            color: 'rgba(255,255,255,0.45)',
+            fontFamily: 'var(--font-ui)',
+            letterSpacing: '-0.011em',
+            lineHeight: 1.45,
+          }}
+        >
+          Adicione uma imagem de fundo ao slide para ajustar.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SLIDE CARD ───────────────────────────────────────────────────────────────
 
-const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=1 }, ref) => {
-  const f = FORMATS[fmt];
+const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=1, presentationImgFilter }, ref) => {
+  const f = FORMATS[fmt] || FORMATS.carrossel;
   const L = LAYOUTS.find(l=>l.id===slide.layout)||LAYOUTS[4];
   const bg = slide.customBg || brand.bg;
   const isBebas = brand.titleFont?.includes('Bebas');
@@ -1378,6 +2086,17 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
   }, [slide.bgImage]);
 
   const imgLoading = !!slide.bgImage && !imgReady;
+
+  const derivedStoredPresentationFilter = slideStoredPresentationCssFilter(slide);
+
+  let effectivePresentationFilter;
+  if (presentationImgFilter === undefined) {
+    effectivePresentationFilter = derivedStoredPresentationFilter;
+  } else if (presentationImgFilter == null || presentationImgFilter === '') {
+    effectivePresentationFilter = undefined;
+  } else {
+    effectivePresentationFilter = presentationImgFilter;
+  }
 
   const inner = (
     <div
@@ -1403,6 +2122,7 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
                   transform: `${slide.bgMirror ? 'scaleX(-1) ' : ''}scale(${bgScale})`,
                   transformOrigin: bgPos,
                 }),
+            ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
           }}/>
         </div>
       )}
@@ -1471,16 +2191,6 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
         </div>
       )}
 
-      {/* Slide counter */}
-      <div style={{
-        position:'absolute', top:f.h*0.038, right:f.w*0.05,
-        color:brand.titleColor, opacity:0.4,
-        fontSize:f.w*0.02, fontWeight:600, fontFamily:'-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-        fontVariantNumeric:'tabular-nums', letterSpacing:'-0.011em',
-      }}>
-        {String(num).padStart(2,'0')}{total ? `/${String(total).padStart(2,'0')}` : ''}
-      </div>
-
       {/* Main content */}
       {(() => {
         const inset = (slide.textInset ?? 7);
@@ -1544,18 +2254,6 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
         );
       })()}
 
-      {/* Bottom accent line */}
-      <div style={{
-        position:'absolute', bottom:f.h*0.04, right:f.w*0.05,
-        width:f.w*0.05, height:2, background:brand.accent,
-        borderRadius:99,
-      }}/>
-      <div style={{
-        position:'absolute', bottom:f.h*0.04, right:f.w*0.12,
-        width:f.w*0.02, height:2, background:brand.accent,
-        opacity:0.4, borderRadius:99,
-      }}/>
-
       {/* Logo da marca — renderiza em qualquer canto, baseado no brand.logoPosition */}
       {brand.logo && (() => {
         // Se o handle está no topo, evita conflito com a logo (desloca pra mais longe)
@@ -1602,6 +2300,7 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.num !== next.num || prev.total !== next.total || prev.scale !== next.scale) return false;
   if (prev.brand !== next.brand) return false;
   if (prev.slide !== next.slide) return false;
+  if (prev.presentationImgFilter !== next.presentationImgFilter) return false;
   return true;
 });
 
@@ -1778,7 +2477,7 @@ function ModePicker({ value, onChange }) {
               style={{
                 padding:'10px 10px 9px', borderRadius:10, cursor:'pointer', textAlign:'left',
                 border:`1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
-                background: on ? 'rgba(255,77,46,0.08)' : 'var(--bg-card)',
+                background: on ? 'rgba(0,102,204,0.08)' : 'var(--bg-card)',
                 transition:'all 0.12s',
                 display:'flex', flexDirection:'column', gap:3, minHeight:60,
               }}
@@ -1911,30 +2610,40 @@ function ImgParamsPanel({ value, onChange }) {
 // Drawer bottom-sheet com swipe-to-dismiss, backdrop e safe-area iOS.
 // Detecta arrasto vertical pra baixo (>80px ou vel > 0.4 px/ms) → fecha.
 function MobileDrawer({ open, onClose, children }) {
-  const [drag, setDrag] = useState(0);          // deslocamento atual em px
-  const startRef = useRef({ y:0, t:0 });        // posição/tempo iniciais
-  const dragging = useRef(false);
+  // ── drag via ref direto no DOM para eliminar o lag do setState async ──────
+  const panelRef  = useRef(null);
+  const startRef  = useRef({ y:0, t:0 });
+  const dragging  = useRef(false);
+
+  // Aplica o offset de drag diretamente no elemento (sem re-render React)
+  const applyDrag = useCallback((dy) => {
+    if (!panelRef.current) return;
+    panelRef.current.style.transition = dy > 0 ? 'none' : 'transform 0.3s var(--ease-smooth)';
+    panelRef.current.style.transform  = open ? `translateY(${dy}px)` : 'translateY(110%)';
+  }, [open]);
 
   // Bloqueia scroll do body quando aberto, evita "double-scroll" no iOS
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Reseta qualquer drag residual ao fechar
+    applyDrag(0);
     return () => { document.body.style.overflow = prev; };
-  }, [open]);
+  }, [open, applyDrag]);
 
   const onTouchStart = (e) => {
     // Só reage a arrasto iniciado no handle/header (não no scroll do conteúdo)
     if (!e.target.closest('[data-drawer-handle]')) return;
     dragging.current = true;
     startRef.current = { y: e.touches[0].clientY, t: Date.now() };
-    setDrag(0);
+    applyDrag(0);
   };
   const onTouchMove = (e) => {
     if (!dragging.current) return;
     const dy = e.touches[0].clientY - startRef.current.y;
     if (dy < 0) return; // ignora arrasto pra cima
-    setDrag(dy);
+    applyDrag(dy);
   };
   const onTouchEnd = (e) => {
     if (!dragging.current) return;
@@ -1942,8 +2651,8 @@ function MobileDrawer({ open, onClose, children }) {
     const dt = Math.max(1, Date.now() - startRef.current.t);
     const velocity = dy / dt; // px/ms
     dragging.current = false;
+    applyDrag(0);
     if (dy > 80 || velocity > 0.4) onClose();
-    setDrag(0);
   };
 
   return (
@@ -1958,8 +2667,9 @@ function MobileDrawer({ open, onClose, children }) {
           }}
         />
       )}
-      {/* Painel */}
+      {/* Painel — transform/transition controlados via ref (applyDrag) para zero lag */}
       <div
+        ref={panelRef}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -1971,10 +2681,8 @@ function MobileDrawer({ open, onClose, children }) {
           display:'flex', flexDirection:'column',
           maxHeight:'88vh',
           boxShadow:'0 -8px 40px rgba(0,0,0,0.6)',
-          transform: open
-            ? `translateY(${drag}px)`
-            : 'translateY(110%)',
-          transition: dragging.current ? 'none' : 'transform 0.3s var(--ease-smooth)',
+          transform: open ? 'translateY(0)' : 'translateY(110%)',
+          transition: 'transform 0.3s var(--ease-smooth)',
           paddingBottom:'env(safe-area-inset-bottom, 0)',
         }}
       >
@@ -2158,9 +2866,7 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
   }, [open, openaiKey, onRefreshStatus]);
   if (!open) return null;
   const save = () => {
-    const k = val.trim();
-    onSave(k);
-    localStorage.setItem('vc_openai_key', k);
+    onSave(val.trim());
     onClose();
   };
   return (
@@ -2310,6 +3016,10 @@ function GenerateModal({
   const setAxis = (key, val) => setParams(p => ({ ...p, [key]: val }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [autoFetchSlideImages, setAutoFetchSlideImages] = useState(true);
+  useEffect(() => {
+    if (open) setAutoFetchSlideImages(true);
+  }, [open]);
 
   useEffect(()=>{ if(open){ setErr(''); if(defaultTopic) setTopic(defaultTopic); } },[open,defaultTopic]);
   useEffect(()=>{ if(defaultNiche) setNiche(defaultNiche); },[defaultNiche]);
@@ -2334,7 +3044,7 @@ function GenerateModal({
 
   const run = async () => {
     if (!resolvedGenerationTopic) {
-      setErr('Informe o tema em “Sobre o que é o conteúdo?”, ou o nicho, ou preencha Marca/Material.');
+      setErr('Informe o tema em “Sobre o que é o conteúdo?”, ou o nicho, ou preencha Marca e Conteúdo.');
       return;
     }
     setBusy(true); setErr('');
@@ -2345,7 +3055,15 @@ function GenerateModal({
       onCreativePresetChange?.(packCreative);
       await onGenerate({
         topic: resolvedGenerationTopic,
-        count, niche, tone, audience, imgMode, imgParams: params, mode, creativePreset: packCreative,
+        count,
+        niche,
+        tone,
+        audience,
+        imgMode,
+        imgParams: params,
+        mode,
+        creativePreset: packCreative,
+        fetchImagesNow: autoFetchSlideImages,
       });
       onClose();
     } catch(e) { setErr(e.message); }
@@ -2385,7 +3103,7 @@ function GenerateModal({
           {onGoToMaterial && (
             <div
               role="region"
-              aria-label="Material para geração"
+              aria-label="Conteúdo para geração"
               style={{
                 borderRadius:11,
                 border:'1px solid var(--hairline)',
@@ -2399,14 +3117,14 @@ function GenerateModal({
               <div style={{ fontSize:13, lineHeight:1.47, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
                 {hasMaterialPack ? (
                   <>
-                    <span style={{ fontWeight:600 }}>Material</span>
-                    {' '}já tem conteúdo — podes ajustar matéria-prima, fontes e instruções na aba lateral quando quiseres.
+                    <span style={{ fontWeight:600 }}>Conteúdo</span>
+                    {' '}já tem base — você pode ajustar matéria-prima, fontes e instruções na aba Conteúdo quando quiser.
                   </>
                 ) : (
                   <>
-                    Vais gerar só pelo tema abaixo? Para basear o carrossel em{' '}
-                    <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preenche primeiro a aba{' '}
-                    <span style={{ fontWeight:600 }}>Material</span> — assim a IA não inventa em cima de um ponto genérico.
+                    Vai gerar só pelo tema abaixo? Para basear o carrossel em{' '}
+                    <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preencha primeiro a aba{' '}
+                    <span style={{ fontWeight:600 }}>Conteúdo</span> — assim a IA não inventa em cima de um ponto genérico.
                   </>
                 )}
               </div>
@@ -2435,7 +3153,7 @@ function GenerateModal({
                 onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
-                Ir para a aba Material
+                Ir para a aba Conteúdo
               </button>
             </div>
           )}
@@ -2477,13 +3195,31 @@ function GenerateModal({
             />
             {hasContextPack && (
               <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
-                Opcional se já houver Marca/Material: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.
+                Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.
               </div>
             )}
           </div>
 
           {/* Modo narrativo — escolha da camada estratégica */}
           <ModePicker value={mode} onChange={setMode}/>
+          <div
+            aria-live="polite"
+            style={{
+              fontSize:11,
+              color:'var(--text-muted)',
+              lineHeight:1.47,
+              letterSpacing:'-0.011em',
+              padding:'8px 10px',
+              background:'var(--bg-pearl)',
+              borderRadius:11,
+              border:'1px solid var(--hairline)',
+            }}
+          >
+            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Será aplicado ao gerar:</span>{' '}
+            <span>{GEN_MODE_BY_ID[mode]?.icon} {GEN_MODE_BY_ID[mode]?.label}</span>
+            {' · '}
+            <span>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
+          </div>
 
           {/* Niche + Audience */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -2515,7 +3251,7 @@ function GenerateModal({
 
           {/* Slide count */}
           <div>
-            <label className="vc-label">Número de slides</label>
+            <label className="vc-label">Número de Cards</label>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {[3,4,5,6,7,8,9,10].map(n=>(
                 <button key={n} onClick={()=>setCount(n)} style={{
@@ -2533,7 +3269,7 @@ function GenerateModal({
 
           {/* Image mode */}
           <div>
-            <label className="vc-label">Imagens dos slides</label>
+            <label className="vc-label">Imagens dos Cards</label>
             <div style={{ display:'grid', gridTemplateColumns: hasOpenAI ? '1fr 1fr' : '1fr', gap:8 }}>
               {[
                 { id:'dalle', icon:'⬡', label:'GPT Image 2', sub:'OpenAI · Geração 2026', needsKey:true, recommended:true },
@@ -2599,6 +3335,65 @@ function GenerateModal({
                 )}
               </div>
             )}
+            <label
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                cursor: 'pointer',
+                padding: '10px 12px',
+                borderRadius: 11,
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-pearl)',
+                boxSizing: 'border-box',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={autoFetchSlideImages}
+                onChange={(e) => setAutoFetchSlideImages(e.target.checked)}
+                style={{
+                  width: 17,
+                  height: 17,
+                  marginTop: 2,
+                  flexShrink: 0,
+                  accentColor: 'var(--accent)',
+                  cursor: 'pointer',
+                }}
+              />
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-ui)',
+                    letterSpacing: '-0.011em',
+                    display: 'block',
+                    lineHeight: 1.35,
+                  }}
+                >
+                  Buscar imagens de fundo ao gerar
+                </span>
+                <span
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    fontWeight: 400,
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-ui)',
+                    letterSpacing: '-0.011em',
+                    lineHeight: 1.47,
+                    display: 'block',
+                  }}
+                >
+                  Desligado, ficam só o texto e as palavras-chave da imagem; use depois{' '}
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Gerar imagem</span>{' '}
+                  em cada slide (uma a uma ou na ordem que preferir).
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Direção da imagem — eixos só alteram prompts do GPT Image (geração). */}
@@ -2620,7 +3415,7 @@ function GenerateModal({
                 <div>Marca: {brandSummary.join(', ')}</div>
               )}
               {materialSummary && materialSummary.length > 0 && (
-                <div>Material: {materialSummary.join(', ')}</div>
+                <div>Conteúdo: {materialSummary.join(', ')}</div>
               )}
             </div>
           )}
@@ -2663,7 +3458,7 @@ function GenerateModal({
 
 // ─── RESEARCH PANEL ───────────────────────────────────────────────────────────
 
-function ResearchPanel({ open, onClose, onUseIdea, onSetNiche }) {
+function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre' }) {
   const [niche, setNiche] = useState('');
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState(null);
@@ -2679,7 +3474,7 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche }) {
         `Atue como estrategista sênior de conteúdo, branding e cultura de mercado. Pesquise tendências REAIS e atuais na web.
 
 Nicho: "${niche}"
-
+${buildResearchPromptBias(narrativeMode, creativePreset)}
 ENTREGUE SOMENTE este JSON exato (sem texto extra, sem markdown):
 {
   "trending_topics": [{"topic":"...","why":"por que isso está movimentando o mercado agora"}],
@@ -2921,28 +3716,25 @@ function TemplatesModal({ open, onClose, onApply }) {
 
 // ─── HOOK VARIATIONS MODAL ────────────────────────────────────────────────────
 
-function HookVariationsModal({ open, onClose, onPick, slide, niche, openaiKey }) {
+function HookVariationsModal({ open, onClose, onPick, slide, niche, openaiKey, narrativeMode = 'editorial', creativePreset = 'livre' }) {
   const [busy, setBusy] = useState(false);
   const [hooks, setHooks] = useState([]);
   const [err, setErr] = useState('');
 
-  useEffect(() => { if (open) { setHooks([]); setErr(''); run(); } }, [open]); // eslint-disable-line
-
-  async function run() {
-    setBusy(true); setErr('');
+  const run = useCallback(async () => {
+    setBusy(true); setErr(''); setHooks([]);
     try {
       const r = await callAI(
         `Atue como copywriter sênior. Gere 5 variações de gancho (slide 1 de carrossel Instagram) com base no contexto abaixo.
+
+${buildNarrativeModeReminder(narrativeMode)}
 
 Tema atual: "${slide?.title || ''}"
 Contexto: "${slide?.subtitle || ''}"
 ${niche ? `Nicho: ${niche}` : ''}
 
 REGRAS:
-- Use formatos contraintuitivos: "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z."
-- Tom assertivo, sofisticado, sem clichê motivacional.
-- Cada gancho: 4-12 palavras de impacto máximo.
-- 5 variações DIFERENTES entre si (formatos diferentes).
+${buildHookVariationRules(narrativeMode, creativePreset)}
 
 Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha que justifica o gancho"}]}`,
         { json: true, openaiKey }
@@ -2950,7 +3742,9 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
       setHooks(r.hooks || []);
     } catch(e) { setErr(e.message); }
     finally { setBusy(false); }
-  }
+  }, [slide?.title, slide?.subtitle, niche, openaiKey, narrativeMode, creativePreset]);
+
+  useEffect(() => { if (open) run(); }, [open, run]);
 
   if (!open) return null;
   return (
@@ -3017,6 +3811,132 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
   );
 }
 
+// ─── PER-SLIDE REF + EXTRA PROMPT (marca / produto) ───────────────────────────
+
+function PerSlideImageRefBlock({
+  slide, width, onChangeExtra, onRemoveRef, onPickRef,
+  onGenerateImage, generateImageBusy, generateImageDisabled,
+}) {
+  const extra = slide.imgExtraPrompt ?? '';
+  const ref = slide.refImage;
+  return (
+    <div
+      style={{
+        width: width || '100%',
+        marginTop: 10,
+        padding: 12,
+        borderRadius: 11,
+        border: '1px solid var(--hairline)',
+        background: 'var(--bg-pearl)',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '-0.011em', marginBottom: 8 }}>
+        Referência + direção da imagem
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>
+        <button
+          type="button"
+          onClick={onPickRef}
+          style={{
+            flexShrink: 0,
+            width: 56,
+            height: 56,
+            borderRadius: 8,
+            border: '1px dashed var(--border)',
+            background: 'var(--bg-card)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-muted)',
+            transition: 'border-color 0.12s, color 0.12s',
+          }}
+          title="Enviar foto de referência (produto, embalagem, mood)"
+          aria-label="Adicionar imagem de referência"
+        >
+          {ref ? (
+            <img src={ref} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
+          ) : (
+            <Image size={20} strokeWidth={1.75} />
+          )}
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <label className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
+            Prompt extra (este slide)
+          </label>
+          <textarea
+            value={extra}
+            onChange={(e) => onChangeExtra(e.target.value)}
+            rows={3}
+            placeholder="Ex.: fundo branco minimalista, garrafa centralizada, sombra suave, estética skincare premium…"
+            className="vc-input vc-textarea"
+            style={{ fontSize: 13, lineHeight: 1.47, letterSpacing: '-0.011em', width: '100%', resize: 'vertical', minHeight: 56 }}
+          />
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+            Com <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>GPT Image</span>, a referência vai para a API de edição. No{' '}
+            <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Web trend</span>, só o texto reforça a busca.
+          </div>
+        </div>
+      </div>
+      {typeof onGenerateImage === 'function' && (
+        <button
+          type="button"
+          onClick={onGenerateImage}
+          disabled={generateImageDisabled || generateImageBusy}
+          aria-busy={generateImageBusy || undefined}
+          className="vc-btn vc-btn-primary"
+          title={
+            generateImageDisabled
+              ? 'Defina palavras-chave de imagem neste card (aba Cards ou ao gerar o carrossel).'
+              : 'Gera só a imagem deste slide com GPT Image ou Web trend, conforme o modo atual.'
+          }
+          style={{
+            width: '100%',
+            height: 34,
+            marginTop: 0,
+            borderRadius: 9999,
+            fontSize: 12,
+            fontWeight: 400,
+            fontFamily: 'var(--font-ui)',
+            letterSpacing: '-0.011em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          {generateImageBusy ? (
+            <Loader2 size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
+          ) : (
+            <Sparkles size={12} />
+          )}
+          Gerar imagem
+        </button>
+      )}
+      {ref && (
+        <button
+          type="button"
+          onClick={onRemoveRef}
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: 'var(--font-ui)',
+            color: 'var(--text-muted)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            letterSpacing: '-0.011em',
+          }}
+        >
+          Remover referência
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── SIDEBAR CONTENT ─────────────────────────────────────────────────────────
 
 function SidebarContent({
@@ -3030,6 +3950,9 @@ function SidebarContent({
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
+  openRefImagePicker = () => {},
+  slideImgGenBusy = {},
+  generateSlideImageAt = () => {},
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
   const [webTrendLoading, setWebTrendLoading] = React.useState(false);
@@ -3049,7 +3972,10 @@ function SidebarContent({
       updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
       setDalleLoading(true);
       try {
-        const url = await generateDALLE(q, openaiKey, imgParams);
+        const url = await generateDALLE(q, openaiKey, imgParams, {
+          refImage: slide.refImage,
+          imgExtraPrompt: slide.imgExtraPrompt,
+        });
         updateSlide({ bgImage: url });
       } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
       finally { setDalleLoading(false); }
@@ -3060,6 +3986,7 @@ function SidebarContent({
       const url = await fetchWebTrendImage(q, Date.now() + '', {
         title: slide.title,
         subtitle: slide.subtitle,
+        imgExtraPrompt: slide.imgExtraPrompt,
       });
       updateSlide({
         bgImage: url,
@@ -3078,6 +4005,7 @@ function SidebarContent({
       const url = await fetchWebTrendImage(slide.imageQuery, Date.now() + '', {
         title: slide.title,
         subtitle: slide.subtitle,
+        imgExtraPrompt: slide.imgExtraPrompt,
       });
       updateSlide({ bgImage: url });
     } catch (e) { toast?.('Web trend: ' + e.message, 'error'); }
@@ -3092,7 +4020,10 @@ function SidebarContent({
       updateSlide({ imgMode: 'dalle', bgImage: null });
       setDalleLoading(true);
       try {
-        const url = await generateDALLE(slide.imageQuery, openaiKey, imgParams);
+        const url = await generateDALLE(slide.imageQuery, openaiKey, imgParams, {
+          refImage: slide.refImage,
+          imgExtraPrompt: slide.imgExtraPrompt,
+        });
         updateSlide({ bgImage: url });
       } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
       finally { setDalleLoading(false); }
@@ -3103,6 +4034,7 @@ function SidebarContent({
       const url = await fetchWebTrendImage(slide.imageQuery, Date.now() + '', {
         title: slide.title,
         subtitle: slide.subtitle,
+        imgExtraPrompt: slide.imgExtraPrompt,
       });
       updateSlide({
         imgMode: 'web_trend',
@@ -3133,15 +4065,16 @@ function SidebarContent({
   });
 
   const bgFitKey = slide.bgFit ?? 'custom';
+  const sidebarBgPreviewFilter = slide.bgImage ? slideStoredPresentationCssFilter(slide) : undefined;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       {/* Tab bar */}
       <div data-vc-tour="sidebar-tabs" style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         {[
-          {id:'slide',    icon:Layout,   label:'Slide'},
           {id:'brand',    icon:Palette,  label:'Marca'},
-          {id:'material', icon:BookOpen, label:'Material'},
+          {id:'material', icon:BookOpen, label:'Conteúdo'},
+          {id:'slide',    icon:Layout,   label:'Cards'},
           {id:'ai',       icon:Wand2,    label:'IA'},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} className={`tab-bar-item ${tab===t.id?'active':''}`}>
@@ -3155,7 +4088,7 @@ function SidebarContent({
 
         {tab==='slide' && (
           <>
-            <S title={`Slide ${activeIdx+1} / ${slides.length}`}>
+            <S title={`Card ${activeIdx+1} / ${slides.length}`}>
               <div>
                 <label className="vc-label-sm">Título</label>
                 <textarea value={slide.title} onChange={e=>updateSlide({title:e.target.value})} rows={2}
@@ -3188,10 +4121,33 @@ function SidebarContent({
               </button>
             </S>
 
+            <PerSlideImageRefBlock
+              slide={slide}
+              onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
+              onRemoveRef={() => updateSlide({ refImage: null })}
+              onPickRef={() => openRefImagePicker(activeIdx)}
+              onGenerateImage={() => generateSlideImageAt(activeIdx)}
+              generateImageBusy={!!slideImgGenBusy[slide.id]}
+              generateImageDisabled={
+                !(slide.imageQuery || '').trim() ||
+                (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
+              }
+            />
+
             <S title="Imagem de fundo">
               {slide.bgImage && (
                 <div style={{ position:'relative', marginBottom:2, borderRadius:8, overflow:'hidden' }}>
-                  <img src={slide.bgImage} alt="" style={{ width:'100%', height:80, objectFit:'cover', display:'block' }}/>
+                  <img
+                    src={slide.bgImage}
+                    alt=""
+                    style={{
+                      width:'100%',
+                      height:80,
+                      objectFit:'cover',
+                      display:'block',
+                      ...(sidebarBgPreviewFilter ? { filter: sidebarBgPreviewFilter } : {}),
+                    }}
+                  />
                   {/* overlay label showing query */}
                   {slide.imageQuery && (
                     <div style={{
@@ -3277,7 +4233,7 @@ function SidebarContent({
               {slide.bgImage && (
                 <>
                   <div>
-                    <label className="vc-label-sm">Encaixe no cartão</label>
+                    <label className="vc-label-sm">Encaixe no card</label>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginTop:6 }}>
                       {[
                         { id:'cover', label:'Cobrir', sub:'preenche' },
@@ -3482,7 +4438,7 @@ function SidebarContent({
               <Toggle label="Mostrar @ nos slides" value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
             </S>
 
-            <S title="Logo da marca" hint="Aplicado automaticamente em todos os slides. PNG transparente é o ideal.">
+            <S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
               {brand.logo ? (
                 <div style={{
                   display:'flex', alignItems:'center', gap:10,
@@ -3846,7 +4802,7 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Refinar TODOS os slides">
+            <S title="Refinar todos os cards">
               <RefineBtn onRefine={refineAll} busy={refining}/>
               <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5 }}>
                 Aplica uma instrução a todo o carrossel mantendo coerência narrativa.
@@ -4023,12 +4979,12 @@ const CREATIVE_PRESETS = [
   {
     id: 'livre',
     label: 'Personalizado',
-    desc: 'Modo narrativo, tom, marca, material e eixos de imagem no comando — sem camada extra fixa de mercado/editorial.',
+    desc: 'Modo narrativo, tom, marca, conteúdo de base e eixos de imagem — sem camada fixa “parece ser / é”. Melhor para Storytelling e quando a aba Conteúdo já está preenchida.',
   },
   {
     id: 'estudio_editorial',
     label: 'Estúdio editorial',
-    desc: 'Ativa o pacote extra: leitura estratégica “parece ser vs realmente é”, vocabulário de mercado e direção visual sóbria e editorial.',
+    desc: 'Camada extra opcional: contraste estratégico e léxico de categoria + direção visual sóbria. Nos modos Storytelling, Dor ou Viral, o arco desse modo continua a mandar.',
   },
 ];
 const CREATIVE_PRESET_BY_ID = Object.fromEntries(CREATIVE_PRESETS.map((p) => [p.id, p]));
@@ -4040,7 +4996,42 @@ function buildGenerationIntroLine(presetId) {
   return 'Crie conteúdo para Instagram alinhado ao contexto abaixo. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
 }
 
-function buildGenerationLanguageLayer(presetId, tone) {
+function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial') {
+  const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
+  const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
+  const journalMode = narrativeMode === 'jornalistico';
+  const howToMode = narrativeMode === 'how_to';
+
+  // Storytelling/Odisseia colidem com o pacote “Estúdio editorial”: priorizar instruções narrativas.
+  if (presetId === 'estudio_editorial' && storyLike) {
+    return `REGRAS DE LINGUAGEM (pacote Estúdio editorial + modo narrativo "${narrativeMode}"):
+- O MÉTODO narrativo acima MANDA a estrutura. Use só sobriedade lexical e precisão — NÃO impor “parece ser / realmente é”, contraste binário de marca ou raciocínio de consultoria em cada slide.
+- PROIBIDO soar como relatório de posicionamento ou headline + subtítulo “tese/antítese” repetidos (ex.: “Inovação X: uma reflexão” + “quem incorpora Y ganha credibilidade”).
+- Prosa de narrador: tempo, gesto, sensação, consequência — não slogan analítico.
+- Tom base: "${tone}".`;
+  }
+  if (presetId === 'estudio_editorial' && viralMode && narrativeMode === 'sensacionalista') {
+    return `REGRAS DE LINGUAGEM (Estúdio editorial + Sensacionalista):
+- O MÉTODO SENSACIONALISTA manda tensão forte e cortes rápidos. O pacote editorial empresta precisão de palavra — PROIBIDO engrossar cada slide em parágrafo de consultoria.
+- Ritmo tablóide moderno SEM clickbait desonesto: tensão lexical sim, factualidade obrigatória.
+- Tom "${tone}".`;
+  }
+  if (presetId === 'estudio_editorial' && viralMode) {
+    return `REGRAS DE LINGUAGEM (Estúdio editorial + Viral Trends):
+- O MÉTODO VIRAL acima manda ritmo, loops e parada de scroll. O pacote editorial empresta só sobriedade lexical — NÃO impor “parece ser / realmente é” nem subtítulo denso de relatório slide a slide.
+- Tom "${tone}", preferindo frases curtas e cortantes nos slides de tensão.`;
+  }
+  if (presetId === 'estudio_editorial' && journalMode) {
+    return `REGRAS DE LINGUAGEM (Estúdio editorial + Jornalístico):
+- Hierarquia de matéria: selo/editoria → manchete → lead factual. O método jornalístico prevalece sobre o molde binário “parece ser / realmente é” em todos os slides.
+- Vocabulário de analítico e consequência — não slogan de marca.
+- Tom "${tone}", factual e adulto.`;
+  }
+  if (presetId === 'estudio_editorial' && howToMode) {
+    return `REGRAS DE LINGUAGEM (Estúdio editorial + Passo-a-passo):
+- O tutorial imperativo do MÉTODO acima prevalece. O pacote editorial não transforma passos em análise de mercado nem em contraste estratégico genérico.
+- Tom "${tone}" em modo instrução clara, não keynote.`;
+  }
   if (presetId === 'estudio_editorial') {
     return `REGRAS DE LINGUAGEM OBRIGATÓRIAS (todos os slides):
 - Frases assertivas. Zero clichês de marketing, zero tom de guru, zero motivacional.
@@ -4048,11 +5039,155 @@ function buildGenerationLanguageLayer(presetId, tone) {
 - Transforme informação em interpretação estratégica.
 - O ritmo do carrossel deve ser: hook curto → conteúdo denso (vários slides) → fechamento curto.`;
   }
+  if (storyLike) {
+    return `REGRAS DE TEXTO (modo narrativo "${narrativeMode}" — prioridade sobre tom genérico):
+- Vocabulário de história, não de slide de pitch. Evite fórmulas de marca (“não é sobre X, é sobre Y”) salvo um fecho pontual.
+- Tom "${tone}" aplicado em cenas e falas, não em manuais de estratégia.
+- Deixe identidade da marca colorir a voz, mas não substitua arco narrativo por mensagem institucional.`;
+  }
+  if (viralMode && narrativeMode === 'sensacionalista') {
+    return `REGRAS DE TEXTO (modo Sensacionalista — tom "${tone}"):
+- Frases de impacto máximo; urgência lexical sem mentir nem inventar consequência não sustentada pelo miolo.
+- Gancho/miolo devem soar “capa sensacionalista” honesta — não post corporativo nem ensaio acadêmico.`;
+  }
+  if (viralMode) {
+    return `REGRAS DE TEXTO (modo Viral — tom "${tone}"):
+- Telegrama mental: corte palavras mortas. Gancho e meio pedem ritmo, não parágrafo de consultoria.
+- Marca e material podem informar vocabulário — não viram slide de posicionamento institucional no lugar de tensão ou payoff.`;
+  }
+  if (journalMode) {
+    return `REGRAS DE TEXTO (modo Jornalístico — tom "${tone}"):
+- Clara hierarquia de capa quando o slide permitir (categoria/manifestação no título vs lead no subtítulo, ou distribua conforme método).
+- Prosa econômica, factual onde couber ao tema — sem meme de influencer nem tom de guru.`;
+  }
+  if (howToMode) {
+    return `REGRAS DE TEXTO (modo Passo-a-passo — tom "${tone}"):
+- Imperativo e verificável em cada subtítulo; sem narrativa pessoal nem tese de marca entre um passo e outro.
+- Marca só afina escolha de palavras — não slogan por slide.`;
+  }
   return `REGRAS DE TEXTO (prioridade: MODO NARRATIVO acima → tom "${tone}" → identidade da marca e material. Não replique um único formato nem uma “voz de página” fixa):
 - Deixe o modo narrativo guiar a estrutura; adapte vocabulário ao tema e ao público (sem forçar jargão de mercado se o tom ou o modo pedirem outra coisa).
 - Cada slide = 1 ideia principal; evite repetir a mesma fórmula em todos os slides.
 - Prefira substância a frases vazias; evite motivacional genérico e guru.
 - Ritmo: hook enxuto → desenvolvimento → fechamento, conforme o modo escolhido (não imponha sempre o mesmo arco “analítico”).`;
+}
+
+/** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
+function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId) {
+  const hookMag = creativePresetId === 'estudio_editorial'
+    ? '   - Peso de capa sim, mas em modo narrativo o hook é CENA ou momento — não título de relatório (“X: uma reflexão”).'
+    : '   - Hook que para o scroll: linha de cena ou tensão, não conceito abstrato de marca.';
+
+  if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
+    return `
+REGRAS DE ESTRUTURA POR SLIDE (modo "${narrativeModeId}" — PREVALECEM sobre qualquer hábito de copy “estratégico/coded”):
+O MÉTODO deste modo (seção acima) é a lei. Estas instruções substituem o formato padrão de carrossel consultivo.
+
+- PROIBIDO repetir o molde “headline de marca + subtítulo raciocínio binário” em vários slides (ex.: título “Peptídeos: uma revolução na estética” + subtítulo “não é A, é B”; ou “Inovação e ciência” + “quem incorpora ciência constrói credibilidade…”).
+- PROIBIDO títulos formulaicos “[Tema]: uma reflexão”, “[Tema]: uma revolução”, “[Dois conceitos] e [conceito]: …” como capa de deck.
+- Slide 1 (hook): entrada em cena (in medias res ou imagem forte). Título = momento ou fragmento narrativo. Subtítulo = continua a cena ou a tensão — não posicionamento institucional.
+- Slides intermediários: cada um AVANÇA a história (tempo, gesto, virada, consequência). Subtítulo em prosa narrativa: tipicamente 120–280 caracteres; É PERMITIDO bem menos quando for batida seca, fala ou linha única.
+- Último slide: desfecho, pergunta ao leitor ou convite honesto — não obrigatoriamente “lição de estratégia”.
+
+🪝 SLIDE 1 — HOOK NARRATIVO:
+${hookMag}
+
+📖 SLIDES DO MEIO — narrativa (NÃO mini-artigos de 200–320 caracteres tipo análise de mercado):
+   - Título: virada, detalhe sensível, diálogo implícito — evite headline de LinkedIn.
+   - Subtítulo: microcena ou sequência de causas; ritmo de narrador, não de slide de pitch.
+
+🔚 SLIDE FINAL — fechamento narrativo ou convite à conversa.
+`;
+  }
+
+  if (narrativeModeId === 'viral') {
+    return `
+REGRAS DE ESTRUTURA POR SLIDE (modo "viral" — retenção e ritmo, NÃO parágrafo de ensaio):
+O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras substituem o formato “subtítulo denso 200–320 caracteres analíticos”.
+
+- Slides intermediários: subtítulo tipicamente ENTRE 90 E 220 caracteres; pode ser MENOR quando for punch, cliffhanger ou frase quotável. Priorize loop, número concreto e virada — não explicação acadêmica longa.
+- Título: curto, cortante, pode incluir número ou pergunta — não headline de relatório.
+- Um slide do meio deve carregar a frase “guardável” (share-trigger) quando o arco tiver slides suficientes.
+
+🪝 SLIDE 1 — parada de scroll (ver método viral).
+
+📖 MEIO — tensão → prova → payoff (distribuído conforme N).
+
+🔚 FINAL — pergunta ou save com motivo concreto (sem CTA preguiçoso).
+`;
+  }
+
+  if (narrativeModeId === 'how_to') {
+    return `
+REGRAS DE ESTRUTURA POR SLIDE (modo "passo-a-passo" — manual, não narrativa nem pitch):
+O MÉTODO acima manda: um passo por slide com "Passo N · …".
+
+- Slides intermediários: subtítulo tipicamente ENTRE 160 E 280 caracteres — imperativo + como fazer + erro ou exemplo; pode ultrapassar levemente se a instrução exigir checklist curto.
+- Título DEVE refletir sequência de passos (Passo 1, 2…) até o penúltimo ou até o bloco de “erro comum”, conforme o método.
+- PROIBIDO diluir em storytelling ou em tese de marca; mantenha linguagem de procedimento.
+
+🪝 SLIDE 1 — promessa do que será ensinado.
+
+📖 MEIO — instruções numeradas.
+
+🔚 FINAL — save + pergunta sobre qual passo testar.
+`;
+  }
+
+  if (narrativeModeId === 'sensacionalista') {
+    return `
+REGRAS DE ESTRUTURA POR SLIDE (modo "sensacionalista" — tensão alta, payoff honesto — NÃO parágrafo de ensaio):
+O método sensacionalista acima manda cortes rápidos e micro-ganchos.
+
+- Slides intermediários: subtítulo tipicamente ENTRE 85 E 210 caracteres — pode ser MENOR quando for tacada única ou cliffhanger. Priorize vigas de tensão e contraste visceral sobre explicação longa.
+- Título: curto até médio — pode soar "capa" ou pergunta incômoda; evite headline de relatório corporativo.
+
+🪝 SLIDE 1 — gancho forte (ver método).
+
+📖 MEIO — viradas e fechos de mini-loop (distribuído conforme N); um slide pode carregar frase quotável chocante-mas-verdadeira.
+
+🔚 FINAL — revelação ou síntese real + provocação factual / save útil — sem clichê de "segue pra parte 2".
+`;
+  }
+
+  if (narrativeModeId === 'jornalistico') {
+    return `
+REGRAS DE ESTRUTURA POR SLIDE (modo "jornalístico" — matéria digital, hierarquia de capa):
+O método jornalístico prevalece. Slides devem ler como sequência de fio ou capas de seção — não meme deck.
+
+🪝 SLIDE 1 (CAPA DE FIO):
+   - Manifeste selo/editoria no título (parte inicial CAIXA ALTA OU equivalente compacto se o JSON só tiver dois campos) + manchete impactante na mesma peça textual de forma fluida OU use título = manchete e subtítulo = selo + lead — mantenha a hierarquia clara ao leitor.
+   - Subtítulo: LEAD factual (1 linha forte). Se o título já carregar a manchete inteira, o subtítulo faz o nut graf ou data-contexto breve.
+
+📖 MEIO — blocos de matéria pirâmide invertida:
+   - Título: ângulo, fato-âncora ou antetítulo curto da peça DAQUELE slide.
+   - Subtítulo: 2-4 frases curtas OU um parágrafo denso factual: tipicamente ENTRE 140 E 300 caracteres; informação primeiro, ornamentação zero.
+
+🔚 FINAL — editorial curto ou o que falta saber próximo — sem CTA influencer vazio.
+`;
+  }
+
+  const hookVisualHint = creativePresetId === 'estudio_editorial'
+    ? '   - Pense no hook como uma capa de revista — pouco texto, muito peso.'
+    : '   - Hook com impacto visual forte; não precisa parecer “capa de revista de mercado” se outro formato servir melhor ao modo.';
+
+  return `
+REGRAS DE TAMANHO POR POSIÇÃO (CRÍTICO — siga estritamente, NÃO trate todos os slides com mesmo peso):
+
+🪝 SLIDE 1 (HOOK) — texto MÍNIMO, máximo impacto:
+   - Título: 5-9 palavras. Frase-tese curta e cortante. Usa o espaço visual.
+   - Subtítulo: UMA frase curta apenas, máx 80 caracteres. Pode ser inclusive vazio se a tese se sustenta sozinha.
+${hookVisualHint}
+
+📖 SLIDES INTERMEDIÁRIOS (2 ao penúltimo) — texto DENSO e com CONTEÚDO:
+   - Título: 5-12 palavras, ideia única em frase clara.
+   - Subtítulo: 2-4 frases. ENTRE 200 E 320 CARACTERES. Cada slide intermediário é onde MORA o conteúdo — explica o mecanismo, traz exemplo, contraste, dado, leitura. Não economize palavras aqui.
+   - É aqui que o leitor deve sentir que está aprendendo algo de verdade. Use vírgulas, pontos, ritmo. Construa o argumento.
+
+🔚 SLIDE FINAL (CTA) — concisão elegante:
+   - Título: 5-9 palavras. Conclusão ou convite.
+   - Subtítulo: 1-2 frases curtas, máx 140 caracteres. Fechamento limpo, sem repetir o título.
+`;
 }
 
 function buildGenerationImageLayer(presetId, topic, n, audience) {
@@ -4099,20 +5234,213 @@ function buildGenerationImageLayerForCommons(topic, n, audience) {
 • 12-26 palavras. Varie entre slides. Alinhado ao tema "${topic}"${nicheStr}${audStr}.`;
 }
 
-function buildRefineVoiceRules(presetId) {
+function buildNarrativeModeReminder(modeId) {
+  const m = GEN_MODE_BY_ID[modeId] || GEN_MODE_BY_ID.editorial;
+  return `Modo narrativo do carrossel (persistido no documento): "${m.label}" — ${m.desc}.`;
+}
+
+/** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo. */
+function buildRefineSingleSlideRules(narrativeModeId) {
+  if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
+    return `- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
+- Título pode ser fragmento de cena ou virada; subtítulo em prosa coerente com o modo, sem forçar três frases analíticas se uma batida basta.`;
+  }
+  if (narrativeModeId === 'viral') {
+    return `- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
+  }
+  if (narrativeModeId === 'sensacionalista') {
+    return `- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
+  }
+  if (narrativeModeId === 'jornalistico') {
+    return `- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
+  }
+  if (narrativeModeId === 'how_to') {
+    return `- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
+  }
+  return `- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
+}
+
+/** Estrutura sugerida da legenda conforme modo narrativo. */
+function buildCaptionOutlineInstructions(narrativeModeId) {
+  switch (narrativeModeId) {
+    case 'storytelling':
+    case 'pain':
+      return `ESTRUTURA DA LEGENDA (modo narrativo — tom humano):
+1. Abrir com tensão, momento ou pergunta (não copiar o título do slide 1).
+2. Uma ou duas linhas que sintetizem o arco (${narrativeModeId === 'pain' ? 'da dor e da saída honesta' : 'da história e da virada'}).
+3. Insight central sem soar como relatório executivo.
+4. Convite aos comentários ou à partilha de experiência.
+5. Hashtags no final.`;
+    case 'viral':
+      return `ESTRUTURA DA LEGENDA (modo viral — ritmo curto):
+1. Linha que reforça parada de scroll (gancho).
+2. Uma ou duas linhas com payoff, número ou virada principal.
+3. CTA de save ou pergunta direta.
+4. Hashtags. Evite ensaio longo.`;
+    case 'how_to':
+      return `ESTRUTURA DA LEGENDA (modo passo-a-passo):
+1. Reformular a promessa do que o carrossel ensina.
+2. Resumir os passos em uma linha fluida (sem listar todos os títulos).
+3. Sugerir qual passo testar primeiro + save útil.
+4. Hashtags.`;
+    case 'deep':
+      return `ESTRUTURA DA LEGENDA (modo profundo):
+1. Tese contraintuitiva reformulada.
+2. Padrão ou mecanismo central em linguagem acessível.
+3. Implicação para quem reconhece o padrão.
+4. Pergunta precisa ou save para revisitar.
+5. Hashtags.`;
+    case 'jornalistico':
+      return `ESTRUTURA DA LEGENDA (modo jornalístico — fio/coletânea):
+1. Linha de editoria/subject em CAIXAS compactas só se ficar natural no Instagram.
+2. Manchete resumindo o ângulo (não copie slide 1 por extenso).
+3. Lead em 2-3 linhas: o núcleo factual ou implicação.
+4. Para onde isso aponta a seguir + pergunta precisa OU save sóbrio.
+5. Hashtags.`;
+    case 'sensacionalista':
+      return `ESTRUTURA DA LEGENDA (modo sensacionalista — honestidade):
+1. Gancho forte que casa com o payoff do carrossel (sem cilada).
+2. Uma ou duas linhas de tensão antes da revelação sintetizada.
+3. PAYOFF verdadeiro — aquilo que o leitor vai descobrir se engajar.
+4. Pergunta provocadora ou save com âncora concreta.
+5. Hashtags. Ritmo curtíssimo.`;
+    default:
+      return `ESTRUTURA DA LEGENDA:
+1. Frase-tese forte (não repita literalmente o slide 1).
+2. Contextualize o problema ou a leitura comum.
+3. Sua leitura ou síntese principal.
+4. Consequência prática ou insight aplicável.
+5. Pergunta nos comentários OU CTA de salvamento elegante.`;
+  }
+}
+
+/** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */
+function buildHookVariationRules(narrativeModeId, creativePresetId) {
+  const baseEditorial = creativePresetId === 'estudio_editorial';
+  if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
+    return `- Priorize entrada em CENA ou identificação emocional imediata (in medias res / "é exatamente isso") — não só fórmulas "X não é Y".
+- Subtítulo: uma linha que prolonga a tensão ou o momento, não pitch analítico.
+- 5 variações com cadências diferentes (tempo, gesto, fala implícita).`;
+  }
+  if (narrativeModeId === 'viral') {
+    return `- Parada de scroll: interrupção, número específico, identificação brutal, pergunta noturna ou revelação atrasada — PROIBIDO "hoje vou te ensinar" / "você sabia".
+- Subtítulo: linha de tensão ou promessa parcial.
+- 5 ganchos distintos nas técnicas acima.`;
+  }
+  if (narrativeModeId === 'how_to') {
+    return `- Título do gancho = promessa clara: "Como [resultado] em [N passos]" ou equivalente.
+- Subtítulo: qual dor ou bloqueio isso resolve em uma linha.
+- 5 formulações diferentes da mesma promessa (ângulos distintos).`;
+  }
+  if (narrativeModeId === 'deep') {
+    return `- Gancho = tese contraintuitiva sobre padrão ou mecanismo escondido (sintoma vs causa).
+- Subtítulo: pista seca do que será dissecado.
+- 5 ângulos de tese diferentes.`;
+  }
+  if (narrativeModeId === 'jornalistico') {
+    return `- Capa tipo fio: selo/editoria CAIXA ALTA uma linha + manchete de impacto no título principal.
+- Subtítulo: LEAD factual (por que ler agora) — pode incluir marcador temporal leve quando fizer sentido ao tema.
+- 5 ângulos de capa distintos (mesmo tema): ângulos de mercado, consequência política/socioeconômica humanizada, erro comum sobre o tema, dado novo, contra-narrativa factível — sem clickbait falso.`;
+  }
+  if (narrativeModeId === 'sensacionalista') {
+    return `- Grito de tensão forte + promessa só do que ENTREGARÁ (sem miragem).
+- Subtítulo: linha que aumenta o custo cognitivo de ignorar OU contraste visceral inicial.
+- 5 hooks em cadências bem diferentes — tablóide moderno honesto — sem "você vai se arrepender" vazio nem ALL CAPS exagerado em todas.`;
+  }
+  const editorialFormats = `- Use formatos contraintuitivos: "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z."`;
+  if (baseEditorial) {
+    return `${editorialFormats}
+- Tom assertivo, sofisticado, leitura estratégica — sem clichê motivacional.
+- Cada gancho: 4-12 palavras de impacto.
+- 5 variações DIFERENTES entre si (formatos diferentes).`;
+  }
+  return `${editorialFormats}
+- Tom assertivo, sofisticado; pode incluir um gancho mais direto ou numérico se servir ao tema.
+- Cada gancho: 4-12 palavras de impacto máximo.
+- 5 variações DIFERENTES entre si (formatos diferentes).`;
+}
+
+function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
+  const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
+  const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
+  const journalMode = narrativeMode === 'jornalistico';
+  const howToMode = narrativeMode === 'how_to';
+
+  if (presetId === 'estudio_editorial' && storyLike) {
+    return `- Refinamento: o modo narrativo "${narrativeMode}" manda — use o pacote editorial só para precisão de palavra, não para virar cada slide em "parece ser / realmente é".
+- Não substitua cena ou dor por análise de mercado genérica.`;
+  }
+  if (presetId === 'estudio_editorial' && viralMode && narrativeMode === 'sensacionalista') {
+    return `- Refinamento sensacionalista: tensão máxima e cortes rápidos; payoff honesto. O pacote editorial afina léxico sem esvaziar o drama nem engrossar em relatório corporativo.
+- Zero clickbait falso: pode ser incômodo, não mentiroso.`;
+  }
+  if (presetId === 'estudio_editorial' && viralMode) {
+    return `- Refinamento viral: frases curtas e tensão; o pacote editorial não deve densificar em parágrafo de consultoria.`;
+  }
+  if (presetId === 'estudio_editorial' && howToMode) {
+    return `- Refinamento tutorial: imperativo e claro; sem transformar passos em keynote estratégico.`;
+  }
+  if (presetId === 'estudio_editorial' && journalMode) {
+    return `- Refinamento jornalístico: hierarquia de capa onde couber ao slide; factual e preciso — sem soar como pitch institucional.
+- Preserve selo/editoria vs manchete vs lead quando o método pedir.`;
+  }
   if (presetId === 'estudio_editorial') {
     return `- Tom assertivo, direto, sofisticado. Sem clichês, sem linguagem motivacional, sem guru.
 - Use vocabulário de mercado quando pertinente: categoria, posicionamento, percepção, distribuição, comportamento, narrativa, diferenciação.`;
   }
-  return `- Respeite identidade da marca, material e o tom já presentes no carrossel — não uniformize tudo ao estilo “análise de mercado” se o conteúdo for outro.
-- Refine sem impor a camada fixa do modo Estúdio editorial: siga a instrução do usuário e mantenha coerência entre slides.`;
+  if (storyLike) {
+    return `- Refinar mantendo coerência com modo "${narrativeMode}" (narrativa empática ou em cena).
+- Respeite marca e material sem impor voz de relatório.`;
+  }
+  if (viralMode) {
+    return narrativeMode === 'sensacionalista'
+      ? `- Refinar mantendo ritmo sensacionalista: tacadas curtas, viradas; sem parágrafos analíticos longos nem promessa vazia.`
+      : `- Refinar mantendo ritmo viral: cortar palavras mortas; sem parágrafo analítico longo no subtítulo.`;
+  }
+  if (journalMode) {
+    return `- Refinar mantendo registro jornalístico: lead claro quando couber ao slide; dados e consequência antes de opinião solta de influencer.`;
+  }
+  if (howToMode) {
+    return `- Refinar mantendo passos acionáveis e linguagem de manual.`;
+  }
+  return `- Respeite identidade da marca, material e o tom já presentes no carrossel — não uniformize tudo ao estilo “análise de mercado” se o modo for outro.
+- Siga a instrução do usuário e mantenha coerência entre slides.`;
 }
 
-function buildCaptionVoiceRules(presetId) {
+function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
+  let presetLine;
   if (presetId === 'estudio_editorial') {
-    return `- Tom: direto, analítico, sofisticado. Sem emojis em excesso (máx 2-3). Sem frases de guru. Sem linguagem motivacional.`;
+    presetLine = `- Tom: direto, analítico quando couber ao tema; sem emojis em excesso (máx 2-3). Sem guru nem motivacional vazio.`;
+  } else {
+    presetLine = `- Tom: alinhado à marca e ao material; natural — sem forçar frieza analítica se o modo narrativo pedir calor humano. Emojis com moderação.`;
   }
-  return `- Tom: alinhado à marca e ao material; direto e natural — sem forçar analítico-frio se o carrossel for outro registro. Emojis com moderação conforme o tom do conteúdo.`;
+  const modeLine =
+    narrativeMode === 'storytelling' || narrativeMode === 'pain'
+      ? `- Legenda com voz humana; sintetize o arco ${narrativeMode === 'pain' ? 'empático ' : ''}sem soar como resumo de relatório.`
+      : narrativeMode === 'sensacionalista'
+        ? `- Legenda ultra-curta; gancho + payoff real (sem cilada); CTA ou pergunta com âncora concreta.`
+        : narrativeMode === 'viral'
+          ? `- Legenda enxuta; reforço de gancho + payoff; CTA ou pergunta direta.`
+          : narrativeMode === 'how_to'
+            ? `- Legenda útil: o que foi ensinado + qual passo testar primeiro.`
+            : narrativeMode === 'deep'
+              ? `- Legenda que destaque padrão ou mecanismo sem jargão desnecessário.`
+              : narrativeMode === 'jornalistico'
+                ? `- Legenda em tom de fio: manchete + lead factual antes de hashtags.`
+                : '';
+  return [presetLine, modeLine].filter(Boolean).join('\n');
+}
+
+/** Viés para pesquisa de nicho — alinha ideias e ganchos ao modo/pacote do documento. */
+function buildResearchPromptBias(narrativeModeId, creativePresetId) {
+  const m = GEN_MODE_BY_ID[narrativeModeId] || GEN_MODE_BY_ID.editorial;
+  const p = CREATIVE_PRESET_BY_ID[creativePresetId] || CREATIVE_PRESET_BY_ID.livre;
+  return `
+Preferências do usuário (viés suave — continue a pesquisar fatos REAIS na web):
+- Modo narrativo alvo: "${m.label}" — ${m.desc}
+- Pacote criativo de referência: "${p.label}" — ${p.desc}
+Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (ex.: storytelling → arco em cena; passo-a-passo → passos numerados; viral → tensão e payoff; profundo → padrão/mecanismo). Em "viral_hooks", combine formatos estratégicos com variações compatíveis com o modo.
+`;
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -4164,14 +5492,36 @@ const DEFAULT_DOC = {
   creativePreset: 'livre',
 };
 
+/** Evita ecrã em branco quando `vc_library` ou import JSON tem doc incompleto (sem slides, etc.). */
+function ensureDocShape(d) {
+  if (!d || typeof d !== 'object') {
+    return JSON.parse(JSON.stringify(DEFAULT_DOC));
+  }
+  const out = {
+    ...DEFAULT_DOC,
+    ...d,
+    brand: { ...DEFAULT_BRAND, ...(d.brand && typeof d.brand === 'object' ? d.brand : {}) },
+    material: { ...DEFAULT_DOC.material, ...(d.material && typeof d.material === 'object' ? d.material : {}) },
+    imgParams: { ...DEFAULT_DOC.imgParams, ...(d.imgParams && typeof d.imgParams === 'object' ? d.imgParams : {}) },
+  };
+  if (!Array.isArray(out.slides) || out.slides.length === 0) {
+    out.slides = [mkSlide(1)];
+  }
+  if (!FORMATS[out.fmt]) out.fmt = 'carrossel';
+  if (!out.mode) out.mode = 'editorial';
+  if (out.creativePreset == null) out.creativePreset = 'livre';
+  if (typeof out.caption !== 'string') out.caption = '';
+  return out;
+}
+
 export default function App() {
   // ── BIBLIOTECA + PERFIS DE MARCA (multi-doc) ────────────────────────────────
   // Schema novo (vc_library + vc_brands). Migra automaticamente do `vc_doc`
   // legado se existir e a biblioteca estiver vazia.
   const [library, setLibrary] = useState(() => {
-    const lib = lsGet('vc_library', null);
+    const lib = lsGet(SK.library, null);
     if (Array.isArray(lib) && lib.length) return lib;
-    const legacy = lsGet('vc_doc', null);
+    const legacy = lsGet(SK.legacyDoc, null);
     if (legacy && legacy.slides?.length) {
       // Migra o doc antigo pra primeira entrada da biblioteca
       return [mkLibEntry({ ...DEFAULT_DOC, ...legacy }, 'Carrossel')];
@@ -4179,37 +5529,48 @@ export default function App() {
     return [mkLibEntry(DEFAULT_DOC, 'Carrossel')];
   });
   const [activeDocId, setActiveDocId] = useState(() => {
-    const stored = lsGet('vc_active_doc_id', null);
+    const stored = lsGet(SK.activeDocId, null);
     if (stored) return stored;
-    const lib = lsGet('vc_library', null);
+    const lib = lsGet(SK.library, null);
     return Array.isArray(lib) && lib[0]?.id ? lib[0].id : null;
   });
   const [brandRoster, setBrandRoster] = useState(() => {
-    const stored = lsGet('vc_brands', null);
+    const stored = lsGet(SK.brands, null);
     if (Array.isArray(stored) && stored.length) return stored;
     return [DEFAULT_BRAND];
   });
-  const [activeBrandId, setActiveBrandId] = useState(() => lsGet('vc_active_brand_id', 'default'));
+  const [activeBrandId, setActiveBrandId] = useState(() => lsGet(SK.activeBrandId, 'default'));
 
   // Persiste os 3 stores (debounced)
-  useEffect(() => { const t = setTimeout(() => lsSet('vc_library', library), 250); return () => clearTimeout(t); }, [library]);
-  useEffect(() => { lsSet('vc_active_doc_id', activeDocId); }, [activeDocId]);
-  useEffect(() => { lsSet('vc_brands', brandRoster); }, [brandRoster]);
-  useEffect(() => { lsSet('vc_active_brand_id', activeBrandId); }, [activeBrandId]);
+  useEffect(() => { const t = setTimeout(() => lsSet(SK.library, library), 250); return () => clearTimeout(t); }, [library]);
+  useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
+  useEffect(() => { lsSet(SK.brands, brandRoster); }, [brandRoster]);
+  useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
+
+  // Guard de primeira visita: localStorage vazio → activeDocId nasce null porque a
+  // biblioteca ainda não foi persistida. Sem isso, o efeito de save-back faz early-
+  // return em `if (!activeDocId)` e as edições da primeira sessão são perdidas.
+  useEffect(() => {
+    if (!activeDocId && library[0]?.id) setActiveDocId(library[0].id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Doc ativo da biblioteca + ponteiro pro index dele (pra updates eficientes)
   const activeEntry = library.find(e => e.id === activeDocId) || library[0];
-  const initialDoc  = activeEntry?.doc || DEFAULT_DOC;
+  const initialDoc  = ensureDocShape(activeEntry?.doc || DEFAULT_DOC);
 
   const history = useHistory(initialDoc);
   // Quando trocar de doc ativo, recarrega o histórico com o novo doc
   useEffect(() => {
-    if (activeEntry?.doc) history.reset(activeEntry.doc);
+    if (activeEntry?.doc) history.reset(ensureDocShape(activeEntry.doc));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDocId]);
 
-  const doc = history.state;
-  const { slides, brand, fmt, caption } = doc;
+  const doc = (history.state && typeof history.state === 'object') ? history.state : DEFAULT_DOC;
+  // Nunca deixar slides vazio: senão `slide` fica undefined e a árvore inteira rebenta (tela branca).
+  const slides = (Array.isArray(doc.slides) && doc.slides.length > 0) ? doc.slides : [mkSlide(1)];
+  const brand = doc.brand && typeof doc.brand === 'object' ? doc.brand : DEFAULT_BRAND;
+  const fmt = doc.fmt && FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
+  const caption = typeof doc.caption === 'string' ? doc.caption : '';
   const material  = doc.material  || { content:'', sources:'', context:'' };
   const imgParams = doc.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 };
   const mode      = doc.mode      || 'editorial';
@@ -4218,7 +5579,10 @@ export default function App() {
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
   const setBrand     = useCallback(next => history.set(d => ({ ...d, brand:     typeof next==='function' ? next(d.brand)    : next })), [history]);
-  const setFmt       = useCallback(next => history.set(d => ({ ...d, fmt:       typeof next==='function' ? next(d.fmt)      : next })), [history]);
+  const setFmt       = useCallback(next => history.set(d => {
+    const raw = typeof next === 'function' ? next(d.fmt) : next;
+    return { ...d, fmt: FORMATS[raw] ? raw : 'carrossel' };
+  }), [history]);
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
   const setMaterial  = useCallback(next => history.set(d => ({
     ...d,
@@ -4248,9 +5612,15 @@ export default function App() {
   const setDocStatus = useCallback((docId, newStatus) => {
     setLibrary(prev => prev.map(e => e.id === docId ? { ...e, status: newStatus, updatedAt: Date.now() } : e));
   }, []);
+  const [shellView, setShellView] = useState(readInitialShellView);
+  useEffect(() => {
+    lsSet(SK.shellView, shellView);
+  }, [shellView]);
+
   const openDoc = useCallback((docId) => {
     setActiveDocId(docId);
     setLibraryOpen(false);
+    setShellView('project');
   }, []);
   const newDoc = useCallback((seedDoc = null, name = 'Novo carrossel') => {
     // Aplica brand ativo no doc novo
@@ -4260,6 +5630,7 @@ export default function App() {
     setLibrary(prev => [entry, ...prev]);
     setActiveDocId(entry.id);
     setLibraryOpen(false);
+    setShellView('project');
   }, [brandRoster, activeBrandId]);
   const duplicateDoc = useCallback((docId) => {
     setLibrary(prev => {
@@ -4282,6 +5653,64 @@ export default function App() {
       return next;
     });
   }, [activeDocId]);
+
+  // ── EXPORT / IMPORT de projetos ─────────────────────────────────────────────
+  // Exporta UMA entrada da biblioteca como arquivo .json
+  const exportDoc = useCallback((docId) => {
+    const entry = library.find(e => e.id === docId);
+    if (!entry) return;
+    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [entry] }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${entry.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [library]);
+
+  // Exporta TODA a biblioteca de uma vez
+  const exportAllDocs = useCallback(() => {
+    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: library }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [library]);
+
+  // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
+  const importDocRef = useRef(null);
+  const handleImportFile = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        const docs = parsed.docs || (Array.isArray(parsed) ? parsed : null);
+        if (!docs?.length) throw new Error('Formato inválido');
+        // Cada doc importado recebe um novo id pra evitar conflitos
+        const newEntries = docs.map(e => ({
+          ...e,
+          id: uid(),
+          name: e.name || 'Importado',
+          importedAt: Date.now(),
+        }));
+        setLibrary(prev => [...newEntries, ...prev]);
+        // Ativa o primeiro importado
+        setActiveDocId(newEntries[0].id);
+        setLibraryOpen(false);
+        setShellView('project');
+      } catch {
+        window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
+          detail: 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pelo Viral Carrossel.',
+        }));
+      }
+    };
+    reader.readAsText(file);
+  }, []);
 
   // ── PERFIS DE MARCA: handlers ───────────────────────────────────────────────
   const applyBrand = useCallback((brandId) => {
@@ -4326,7 +5755,7 @@ export default function App() {
   }, [doc, activeDocId]);
 
   const [activeIdx, setActiveIdx] = useState(0);
-  const [tab, setTab] = useState('slide');
+  const [tab, setTab] = useState('brand');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
@@ -4339,7 +5768,17 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
-  const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('vc_openai_key') || '');
+  const [openaiKey, setOpenaiKey] = useState(() => {
+    try { return localStorage.getItem(SK.openaiKey) || ''; } catch { return ''; }
+  });
+  // Persiste a chave na mesma camada que os outros stores (App é o dono, modal só chama setOpenaiKey)
+  useEffect(() => {
+    try { localStorage.setItem(SK.openaiKey, openaiKey); } catch { /* privado / bloqueado */ }
+  }, [openaiKey]);
+  // Ref para cancelar loops de geração de imagem órfãos (race-condition guard)
+  const imgGenAbortRef = useRef(null);
+  const slideImgGenIdsRef = useRef(new Set());
+  const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const hasOpenAI    = !!openaiKey || (IS_LOCAL_DEV && serverStatus.openai);
   const hasAnthropic = serverStatus.anthropic;
@@ -4350,7 +5789,7 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     try {
-      if (!localStorage.getItem('vc_onboarding_done')) {
+      if (!localStorage.getItem(SK.onboarding)) {
         const t = window.setTimeout(() => setTourOpen(true), 850);
         return () => window.clearTimeout(t);
       }
@@ -4365,6 +5804,8 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const fileInputRef = useRef(null);
+  const refImageInputRef = useRef(null);
+  const refImageTargetIdxRef = useRef(null);
   const slideRefs = useRef({});
 
   // Toast helpers
@@ -4376,13 +5817,90 @@ export default function App() {
   }, [dismissToast]);
   const setError = useCallback((msg) => { if (msg) toast(msg, 'error', 5000); }, [toast]);
 
-  // Inject global styles
+  // Escuta eventos de quota do localStorage — disparados por lsSet quando o storage enche
   useEffect(() => {
+    const onQuotaWarning  = (e) => toast(e.detail, 'warn', 8000);
+    const onQuotaExceeded = (e) => toast(e.detail, 'error', 0); // ttl=0 → permanente até fechar
+    window.addEventListener('vc:quota-warning',  onQuotaWarning);
+    window.addEventListener('vc:quota-exceeded', onQuotaExceeded);
+    return () => {
+      window.removeEventListener('vc:quota-warning',  onQuotaWarning);
+      window.removeEventListener('vc:quota-exceeded', onQuotaExceeded);
+    };
+  }, [toast]);
+
+  // Cancela loops de imagem em voo quando o componente desmonta
+  useEffect(() => {
+    return () => {
+      if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    };
+  }, []);
+
+  // Inject global styles + Google Fonts para todas as famílias do FontPicker
+  useEffect(() => {
+    // CSS tokens / reset
     const style = document.createElement('style');
     style.id = 'vc-global-styles';
     style.textContent = GLOBAL_STYLE;
     if (!document.getElementById('vc-global-styles')) document.head.appendChild(style);
-    return () => { const s = document.getElementById('vc-global-styles'); if(s) s.remove(); };
+
+    // Google Fonts — cobre todos os itens de TITLE_FONTS e BODY_FONTS.
+    // Usar <link> em vez de @import evita bloqueio de render e é mais rápido.
+    const FONTS_URL =
+      'https://fonts.googleapis.com/css2?' +
+      'family=Anton&' +
+      'family=Archivo+Black&' +
+      'family=Bebas+Neue&' +
+      'family=Big+Shoulders+Display:wght@400;500;600;700;800;900&' +
+      'family=Bricolage+Grotesque:wght@300;400;500;600;700&' +
+      'family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&' +
+      'family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600&' +
+      'family=DM+Sans:wght@300;400;500;600;700&' +
+      'family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&' +
+      'family=Familjen+Grotesk:wght@400;500;600;700&' +
+      'family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
+      'family=Funnel+Display:wght@300;400;500;600;700&' +
+      'family=IBM+Plex+Mono:wght@300;400;500;600;700&' +
+      'family=IBM+Plex+Sans:wght@300;400;500;600;700&' +
+      'family=Instrument+Serif:ital@0;1&' +
+      'family=Inter:wght@300;400;500;600;700&' +
+      'family=Inter+Tight:wght@300;400;500;600;700&' +
+      'family=Italiana&' +
+      'family=JetBrains+Mono:wght@400;500;600&' +
+      'family=Libre+Caslon+Display&' +
+      'family=Major+Mono+Display&' +
+      'family=Manrope:wght@300;400;500;600;700&' +
+      'family=Oswald:wght@300;400;500;600;700&' +
+      'family=Outfit:wght@300;400;500;600;700&' +
+      'family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&' +
+      'family=Plus+Jakarta+Sans:wght@300;400;500;600;700&' +
+      'family=Poppins:wght@300;400;500;600;700&' +
+      'family=Raleway:wght@300;400;500;600;700&' +
+      'family=Sora:wght@300;400;500;600;700&' +
+      'family=Source+Sans+3:wght@300;400;500;600;700&' +
+      'family=Space+Grotesk:wght@300;400;500;600;700&' +
+      'family=Space+Mono:wght@400;700&' +
+      'family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
+      'family=Syne:wght@400;500;600;700;800&' +
+      'family=Unbounded:wght@300;400;500;600;700&' +
+      'family=Yeseva+One&' +
+      'display=swap';
+
+    if (!document.getElementById('vc-google-fonts')) {
+      const mkLink = (attrs) => {
+        const el = document.createElement('link');
+        Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+        return el;
+      };
+      document.head.appendChild(mkLink({ rel:'preconnect', href:'https://fonts.googleapis.com' }));
+      document.head.appendChild(mkLink({ rel:'preconnect', href:'https://fonts.gstatic.com', crossorigin:'' }));
+      document.head.appendChild(mkLink({ id:'vc-google-fonts', rel:'stylesheet', href:FONTS_URL }));
+    }
+
+    return () => {
+      const s = document.getElementById('vc-global-styles'); if (s) s.remove();
+      const f = document.getElementById('vc-google-fonts');  if (f) f.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -4417,7 +5935,7 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
-  const f = FORMATS[fmt];
+  const f = FORMATS[fmt] || FORMATS.carrossel;
   const previewScale = useMemo(() => {
     if (isMobile) {
       // Mobile: usa praticamente a largura inteira (24px de margem total).
@@ -4427,7 +5945,7 @@ export default function App() {
     return Math.min(360 / f.w, 0.44);
   }, [isMobile, vw, f]);
 
-  const slide = slides[activeIdx] || slides[0];
+  const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1);
   const empty = isDefault(slides);
 
   const updateSlide = useCallback(patch => {
@@ -4435,30 +5953,143 @@ export default function App() {
   }, [activeIdx]);
 
   const updateSlideAt = useCallback((idx, patch) => {
-    setSlides(s => s.map((sl,i) => i===idx ? {...sl,...patch} : sl));
+    setSlides(s => s.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)));
   }, []);
 
-  const addSlide = () => {
+  const persistFullscreenPresentationAdjustDraft = useCallback((draftBySlideId) => {
+    if (!draftBySlideId || typeof draftBySlideId !== 'object') return;
+    setSlides((prev) =>
+      prev.map((sl) => {
+        if (!Object.prototype.hasOwnProperty.call(draftBySlideId, sl.id)) return sl;
+        const normalized = normalizePresentationImgAdjust(draftBySlideId[sl.id]);
+        const next = { ...sl };
+        if (presentationAdjustIsNeutral(normalized)) delete next.presentationImgAdjust;
+        else next.presentationImgAdjust = normalized;
+        return next;
+      }),
+    );
+    toast('Ajustes da foto gravados no projeto.', 'success');
+  }, [setSlides, toast]);
+
+  const generateSlideImageAt = useCallback(async (idx) => {
+    const snap = slides[idx];
+    if (!snap) return;
+    const slideId = snap.id;
+    if (slideImgGenIdsRef.current.has(slideId)) return;
+
+    const q = (snap.imageQuery || '').trim();
+    if (!q) {
+      toast(
+        'Este card ainda não tem palavras-chave de imagem. Gere o carrossel com IA ou defina-as em Cards → Imagem de fundo.',
+        'error',
+      );
+      return;
+    }
+
+    const mode = normalizeSlideImgMode(snap.imgMode);
+    if (mode === 'dalle' && !hasOpenAI) {
+      toast('Configure a chave OpenAI para gerar com GPT Image (ícone de engrenagem).', 'error');
+      return;
+    }
+
+    slideImgGenIdsRef.current.add(slideId);
+    setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
+    try {
+      if (mode === 'dalle') {
+        const url = await generateDALLE(q, openaiKey, imgParams, {
+          refImage: snap.refImage,
+          imgExtraPrompt: snap.imgExtraPrompt,
+        });
+        setSlides(prev => {
+          const j = prev.findIndex(sl => sl.id === slideId);
+          return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, overlay: 70 } : sl));
+        });
+      } else {
+        const url = await fetchWebTrendImage(q, `${Date.now()}-${slideId}`, {
+          title: snap.title,
+          subtitle: snap.subtitle,
+          imgExtraPrompt: snap.imgExtraPrompt,
+        });
+        setSlides(prev => {
+          const j = prev.findIndex(sl => sl.id === slideId);
+          return j < 0
+            ? prev
+            : prev.map((sl, k) =>
+                k === j ? { ...sl, bgImage: url, imgMode: 'web_trend', overlay: 68 } : sl,
+              );
+        });
+      }
+      toast(`Slide ${idx + 1}: imagem gerada`, 'success');
+    } catch (e) {
+      toast(mode === 'dalle' ? `GPT Image: ${e.message}` : `Web trend: ${e.message}`, 'error');
+    } finally {
+      slideImgGenIdsRef.current.delete(slideId);
+      setSlideImgGenBusy(prev => {
+        const next = { ...prev };
+        delete next[slideId];
+        return next;
+      });
+    }
+  }, [slides, hasOpenAI, openaiKey, imgParams, setSlides, toast]);
+
+  const openRefImagePicker = useCallback((slideIdx) => {
+    refImageTargetIdxRef.current = slideIdx;
+    refImageInputRef.current?.click();
+  }, []);
+  const handleRefImageFile = useCallback((e) => {
+    const file = e.target.files?.[0];
+    const idx = refImageTargetIdxRef.current;
+    refImageTargetIdxRef.current = null;
+    e.target.value = '';
+    if (!file || idx == null) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateSlideAt(idx, { refImage: reader.result });
+    };
+    reader.readAsDataURL(file);
+  }, [updateSlideAt]);
+
+  // Repara histórico se `slides` estiver vazio (storage/import estragado) — sem novo passo de undo.
+  useLayoutEffect(() => {
+    const raw = history.state?.slides;
+    if (Array.isArray(raw) && raw.length > 0) return;
+    history.setSilent(d => ({ ...d, slides: [mkSlide(1)] }));
+    // history omitido de propósito — só repara ao trocar de doc
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDocId]);
+
+  const addSlide = useCallback(() => {
     const n = {...mkSlide(slides.length+1), layout:'bl', align:'left'};
     setSlides([...slides, n]); setActiveIdx(slides.length);
-  };
-  const deleteSlide = (i) => {
+  }, [slides]);
+  const deleteSlide = useCallback((i) => {
     if (slides.length<=1) return;
     const next = slides.filter((_,j)=>j!==i).map((s,j)=>({...s,num:j+1}));
     setSlides(next); setActiveIdx(Math.min(activeIdx, next.length-1));
-  };
-  const duplicateSlide = (i) => {
+  }, [slides, activeIdx]);
+  const duplicateSlide = useCallback((i) => {
     const dup = {...slides[i], id:uid(), num:slides.length+1};
     const next = [...slides]; next.splice(i+1,0,dup);
     setSlides(next.map((s,j)=>({...s,num:j+1}))); setActiveIdx(i+1);
-  };
-  const moveSlide = (i,d) => {
+  }, [slides]);
+  const moveSlide = useCallback((i,d) => {
     const j=i+d; if(j<0||j>=slides.length) return;
     const next=[...slides]; [next[i],next[j]]=[next[j],next[i]];
     setSlides(next.map((s,k)=>({...s,num:k+1}))); setActiveIdx(j);
-  };
+  }, [slides]);
 
-  const handleGenerate = async ({ topic, count, niche:n, tone, audience, imgMode:chosenMode='web_trend', imgParams:axes, mode:chosenNarrativeMode, creativePreset: presetArg }) => {
+  const handleGenerate = async ({
+    topic,
+    count,
+    niche: n,
+    tone,
+    audience,
+    imgMode: chosenMode = 'web_trend',
+    imgParams: axes,
+    mode: chosenNarrativeMode,
+    creativePreset: presetArg,
+    fetchImagesNow = true,
+  }) => {
     const effectiveAxes = axes || imgParams;
     const effectiveMode = chosenNarrativeMode || mode || 'editorial';
     const cp = presetArg ?? creativePreset ?? 'livre';
@@ -4468,14 +6099,12 @@ export default function App() {
     const materialPriorityBlock = buildMaterialPriorityBlock(material);
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
-    const langLayer = buildGenerationLanguageLayer(cp, tone);
+    const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
     const commonsPipeline = normalizeSlideImgMode(chosenMode || 'web_trend') === 'web_trend';
     const imageLayer = commonsPipeline
       ? buildGenerationImageLayerForCommons(topic, n, audience)
       : buildGenerationImageLayer(cp, topic, n, audience);
-    const hookVisualHint = cp === 'estudio_editorial'
-      ? '   - Pense no hook como uma capa de revista — pouco texto, muito peso.'
-      : '   - Hook com impacto visual forte; não precisa parecer “capa de revista de mercado” se outro formato servir melhor ao modo.';
+    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp);
 
     const prompt = `${introLine}
 Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
@@ -4489,21 +6118,7 @@ ${imgParamsBlock}
 
 ${modeDef.method}
 
-REGRAS DE TAMANHO POR POSIÇÃO (CRÍTICO — siga estritamente, NÃO trate todos os slides com mesmo peso):
-
-🪝 SLIDE 1 (HOOK) — texto MÍNIMO, máximo impacto:
-   - Título: 5-9 palavras. Frase-tese curta e cortante. Usa o espaço visual.
-   - Subtítulo: UMA frase curta apenas, máx 80 caracteres. Pode ser inclusive vazio se a tese se sustenta sozinha.
-${hookVisualHint}
-
-📖 SLIDES INTERMEDIÁRIOS (2 ao penúltimo) — texto DENSO e com CONTEÚDO:
-   - Título: 5-12 palavras, ideia única em frase clara.
-   - Subtítulo: 2-4 frases. ENTRE 200 E 320 CARACTERES. Cada slide intermediário é onde MORA o conteúdo — explica o mecanismo, traz exemplo, contraste, dado, leitura. Não economize palavras aqui.
-   - É aqui que o leitor deve sentir que está aprendendo algo de verdade. Use vírgulas, pontos, ritmo. Construa o argumento.
-
-🔚 SLIDE FINAL (CTA) — concisão elegante:
-   - Título: 5-9 palavras. Conclusão ou convite.
-   - Subtítulo: 1-2 frases curtas, máx 140 caracteres. Fechamento limpo, sem repetir o título.
+${slideLayoutRules}
 
 ${langLayer}
 
@@ -4515,49 +6130,84 @@ JSON exato a retornar (sem mais nada):
     const result = await callAI(prompt, { json:true, maxTokens:4096, openaiKey });
     if (!result?.slides?.length) throw new Error('IA não retornou slides. Tente um tema mais específico.');
 
-    const mode = normalizeSlideImgMode(chosenMode || 'web_trend');
+    const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'web_trend');
     const newSlides = result.slides.map((s,i) => ({
       ...mkSlide(i+1),
       title: s.title || `Slide ${i+1}`,
       subtitle: s.subtitle || '',
       imageQuery: s.imageQuery || '',
-      imgMode: mode,
+      imgMode: resolvedImgMode,
       bgImage: null,
       overlay: s.imageQuery ? 70 : 0,
       layout: i===0 ? 'mc' : 'bl',
       align: i===0 ? 'center' : 'left',
     }));
-    setSlides(newSlides); setActiveIdx(0);
+    setSlides(newSlides); setActiveIdx(0); setShellView('project');
     if (n) setNiche(n);
     if (result.caption) setCaption(result.caption);
 
     // GPT Image e Web trend: preenchem bgImage assincronamente (slide a slide)
-    if (mode === 'dalle' && hasOpenAI) {
-      for (let i = 0; i < result.slides.length; i++) {
-        const q = result.slides[i]?.imageQuery;
-        if (!q) continue;
-        try {
-          const url = await generateDALLE(q, openaiKey, effectiveAxes);
-          setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
-        } catch(e) {
-          console.warn(`Image gen slide ${i+1}:`, e.message);
+    // Guard contra race-condition: cancela qualquer loop anterior ainda em voo.
+    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    const abort = { cancelled: false };
+    imgGenAbortRef.current = abort;
+
+    let imgFailCount = 0;
+
+    if (fetchImagesNow) {
+      if (resolvedImgMode === 'dalle' && hasOpenAI) {
+        for (let i = 0; i < result.slides.length; i++) {
+          if (abort.cancelled) break;
+          const q = result.slides[i]?.imageQuery;
+          if (!q) continue;
+          try {
+            const url = await generateDALLE(q, openaiKey, effectiveAxes, {
+              refImage: newSlides[i]?.refImage,
+              imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
+            });
+            if (!abort.cancelled)
+              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
+          } catch(e) {
+            imgFailCount++;
+            console.warn(`Image gen slide ${i+1}:`, e.message);
+          }
         }
       }
-    }
-    if (mode === 'web_trend') {
-      for (let i = 0; i < result.slides.length; i++) {
-        const q = result.slides[i]?.imageQuery;
-        if (!q) continue;
-        try {
-          const url = await fetchWebTrendImage(q, String(i), {
-            title: result.slides[i]?.title,
-            subtitle: result.slides[i]?.subtitle,
-          });
-          setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
-        } catch (e) {
-          console.warn(`Web trend slide ${i+1}:`, e.message);
+      if (resolvedImgMode === 'web_trend') {
+        for (let i = 0; i < result.slides.length; i++) {
+          if (abort.cancelled) break;
+          const q = result.slides[i]?.imageQuery;
+          if (!q) continue;
+          try {
+            const url = await fetchWebTrendImage(q, String(i), {
+              title: result.slides[i]?.title,
+              subtitle: result.slides[i]?.subtitle,
+              imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
+            });
+            if (!abort.cancelled)
+              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
+          } catch (e) {
+            imgFailCount++;
+            console.warn(`Web trend slide ${i+1}:`, e.message);
+          }
         }
       }
+
+      if (!abort.cancelled && imgFailCount > 0) {
+        toast(
+          imgFailCount === 1
+            ? '1 imagem não carregou — o slide ficou sem fundo.'
+            : `${imgFailCount} imagens não carregaram — os slides ficaram sem fundo.`,
+          'warning',
+          5000,
+        );
+      }
+    } else if (result.slides.some(s => (s.imageQuery || '').trim())) {
+      toast(
+        'Imagens não foram buscadas automaticamente. Use «Gerar imagem» em cada slide quando quiser.',
+        'info',
+        5500,
+      );
     }
   };
 
@@ -4567,9 +6217,11 @@ JSON exato a retornar (sem mais nada):
       const ctx = slides.map((s,i)=>`${i+1}. ${s.title}`).join('\n');
       const brandBlock = buildBrandBlock(brand);
       const materialBlock = buildMaterialBlock(material);
-      const voiceRefine = buildRefineVoiceRules(creativePreset);
+      const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Responda APENAS com JSON.
+
+${buildNarrativeModeReminder(mode)}
 
 Contexto do carrossel:\n${ctx}
 ${brandBlock}${materialBlock}
@@ -4581,8 +6233,8 @@ Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
-- Título: 4-12 palavras de impacto máximo. Subtítulo: 1-3 frases curtas que aprofundam a tese.
-- Mantenha coerência narrativa com os outros slides do carrossel.
+${buildRefineSingleSlideRules(mode)}
+- Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
 
 Retorne exatamente: {"title":"...","subtitle":"..."}`,
@@ -4599,19 +6251,16 @@ Retorne exatamente: {"title":"...","subtitle":"..."}`,
       const ctx = slides.map((s,i)=>`Slide ${i+1}: ${s.title} — ${s.subtitle}`).join('\n');
       const brandBlock = buildBrandBlock(brand);
       const materialBlock = buildMaterialBlock(material);
-      const capRules = buildCaptionVoiceRules(creativePreset);
+      const capRules = buildCaptionVoiceRules(creativePreset, mode);
       const r = await callAI(
         `Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.
+
+${buildNarrativeModeReminder(mode)}
 
 Carrossel:
 ${ctx}
 ${brandBlock}${materialBlock}
-ESTRUTURA DA LEGENDA:
-1. Abrir com uma frase-tese forte (não repita o título do slide 1, reformule com mais profundidade)
-2. Contextualize o problema ou a leitura comum sobre o assunto
-3. Apresente sua leitura ou síntese principal
-4. Consequência prática ou insight aplicável
-5. Fechar com pergunta para comentários OU CTA de salvamento elegante
+${buildCaptionOutlineInstructions(mode)}
 
 REGRAS:
 ${capRules}
@@ -4647,7 +6296,7 @@ ${capRules}
       return new Promise(res => {
         img.addEventListener('load',  res, { once:true });
         img.addEventListener('error', res, { once:true });
-        setTimeout(res, 5000); // failsafe
+        setTimeout(res, 3000); // failsafe
       });
     }));
   };
@@ -4656,7 +6305,7 @@ ${capRules}
     const h2c = await loadHtml2Canvas();
     const el = slideRefs.current[slideObj.id];
     if (!el) throw new Error('Elemento de export não encontrado');
-    const f = FORMATS[fmt];
+    const f = FORMATS[fmt] || FORMATS.carrossel;
     return h2c(el, {
       scale: 2,                 // 2× resolução final pra ficar nítido
       useCORS: true,
@@ -4705,7 +6354,7 @@ ${capRules}
     try {
       const [, JsPDF] = await Promise.all([loadHtml2Canvas(), loadJsPdf()]);
       await waitForRender();
-      const f = FORMATS[fmt];
+      const f = FORMATS[fmt] || FORMATS.carrossel;
       const pdf = new JsPDF({ unit:'px', format:[f.w, f.h], orientation: f.h > f.w ? 'portrait' : 'landscape', compress:true });
       for (let i=0; i<slides.length; i++) {
         setExportProgress({current:i+1,total:slides.length});
@@ -4735,29 +6384,24 @@ ${capRules}
       const ctx = slides.map((s,i)=>`${i+1}. Título: "${s.title}" | Subtítulo: "${s.subtitle}"`).join('\n');
       const brandBlock = buildBrandBlock(brand);
       const materialBlock = buildMaterialBlock(material);
-      const voiceBulk = buildRefineVoiceRules(creativePreset);
+      const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
+      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Reescreva TODOS os slides do carrossel abaixo aplicando a instrução do usuário, mantendo coerência narrativa entre eles.
+
+${buildNarrativeModeReminder(mode)}
 
 Carrossel atual:
 ${ctx}
 ${brandBlock}${materialBlock}
 Instrução: ${instruction}
 
-REGRAS:
+REGRAS DE VOZ:
 ${voiceBulk}
-- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 continua sendo gancho/tese, último continua sendo CTA).
+- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
-REGRAS DE TAMANHO POR POSIÇÃO (CRÍTICO — respeite estritamente, NÃO escreva tudo com mesmo peso):
-
-🪝 Slide 1 (HOOK): texto MÍNIMO. Título 5-9 palavras cortantes. Subtítulo é UMA frase curta apenas (máx 80 caracteres) — pode ser vazio se a tese se sustenta sozinha.
-
-📖 Slides do 2 ao ${slides.length - 1} (INTERMEDIÁRIOS): texto DENSO e com CONTEÚDO. Título 5-12 palavras. Subtítulo 2-4 frases ENTRE 200 E 320 CARACTERES — é AQUI que mora o conteúdo: explica mecanismo, traz exemplo, contraste, dado, leitura. Não economize palavras nestes slides.
-
-🔚 Slide ${slides.length} (CTA): título 5-9 palavras + subtítulo 1-2 frases curtas (máx 140 caracteres). Fechamento limpo, sem repetir o título.
-
-O ritmo do carrossel deve ser: hook curto → conteúdo denso (vários slides) → fechamento curto.
+${layoutBulk}
 
 Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         { json:true, openaiKey }
@@ -4771,7 +6415,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       toast('Todos os slides refinados', 'success');
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
-  }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset]);
+  }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset, mode]);
 
   // Aplica um template pronto (preenche slides + brand)
   const applyTemplate = useCallback((tpl) => {
@@ -4796,8 +6440,14 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
     }));
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
+    // Guard contra race-condition (mesmo padrão do handleGenerate)
+    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    const abort = { cancelled: false };
+    imgGenAbortRef.current = abort;
     (async () => {
+      let failCount = 0;
       for (let i = 0; i < tpl.slides.length; i++) {
+        if (abort.cancelled) break;
         const q = tpl.slides[i]?.q;
         if (!q) continue;
         try {
@@ -4805,11 +6455,15 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
             title: tpl.slides[i]?.title,
             subtitle: tpl.slides[i]?.subtitle,
           });
-          setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url } : sl));
+          if (!abort.cancelled)
+            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url } : sl));
         } catch (e) {
+          failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
         }
       }
+      if (!abort.cancelled && failCount > 0)
+        toast(`${failCount} imagem(ns) do template não carregou.`, 'warning', 5000);
     })();
   }, [history, toast, setSlides]);
 
@@ -4838,6 +6492,20 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
+      if (shellView === 'home') {
+        if (mod && k === '/') {
+          e.preventDefault();
+          setHelpOpen(o => !o);
+          return;
+        }
+        if (!mod && !isEditable(e.target) && !anyModalOpen && k === '?') {
+          e.preventDefault();
+          setHelpOpen(o => !o);
+          return;
+        }
+        return;
+      }
+
       // Atalhos com modificador (funcionam mesmo em campos de texto, exceto undo dentro do campo)
       if (mod && !e.shiftKey && (k === 'z' || k === 'Z')) {
         if (isEditable(e.target)) return; // deixa o input fazer undo nativo
@@ -4856,6 +6524,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         e.preventDefault(); exportSlide(activeIdx); return;
       }
       if (mod && (k === 's' || k === 'S')) {
+        if (isEditable(e.target)) return;
         e.preventDefault(); exportAll(); return;
       }
       if (mod && (k === '/' )) {
@@ -4873,10 +6542,10 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen]); // eslint-disable-line
+  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
-    slide, slides, activeIdx, brand, setBrand, updateSlide, updateSlideAt,
+    slide, slides, activeIdx, brand, setBrand, updateSlide,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
     exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
@@ -4885,7 +6554,12 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
     material, setMaterial,
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
+    openRefImagePicker,
+    slideImgGenBusy,
+    generateSlideImageAt,
   };
+
+  const desktopThumbWidth = f.w * previewScale;
 
   return (
     <div style={{
@@ -4893,6 +6567,35 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'var(--font-ui)',
     }}>
 
+      {shellView === 'home' ? (
+        <AccountHomeShell
+          library={library}
+          activeDocId={activeDocId}
+          activeEntryName={activeEntry?.name}
+          brandCount={brandRoster.length}
+          hasOpenAI={hasOpenAI}
+          hasAnthropic={hasAnthropic}
+          hasAnyAI={hasAnyAI}
+          isMobile={isMobile}
+          onGenerate={() => setSetupOpen(true)}
+          onOpenLibrary={() => setLibraryOpen(true)}
+          onOpenTemplates={() => setTemplatesOpen(true)}
+          onOpenResearch={() => setResearchOpen(true)}
+          onOpenHelp={() => setHelpOpen(true)}
+          onOpenSettings={() => setKeysOpen(true)}
+          onContinueEditor={() => setShellView('project')}
+          onImportPick={() => importDocRef.current?.click()}
+          openDoc={openDoc}
+          newDoc={newDoc}
+          renameDoc={renameDoc}
+          duplicateDoc={duplicateDoc}
+          deleteDoc={deleteDoc}
+          setDocStatus={setDocStatus}
+          exportDoc={exportDoc}
+          askPrompt={askPrompt}
+        />
+      ) : (
+      <>
       {/* ── HEADER ── */}
       <header style={{
         borderBottom:'1px solid var(--border)', background:'var(--bg-sidebar)',
@@ -4917,9 +6620,15 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
             {/* Nome do doc atual — clicável pra renomear inline (substitui o subtítulo "Carrossel Studio") */}
             {activeEntry && !isMobile && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const current = activeEntry.name || 'Carrossel';
-                  const next = window.prompt('Renomear este carrossel:', current);
+                  const next = await askPrompt({
+                    title: 'Renomear projeto',
+                    label: 'Nome',
+                    defaultValue: current,
+                    placeholder: 'Ex: Meu carrossel viral',
+                    cta: 'Renomear',
+                  });
                   if (next && next.trim() && next !== current) renameDoc(activeEntry.id, next.trim());
                 }}
                 style={{
@@ -4937,6 +6646,28 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           </div>
         </div>
 
+        <button
+          type="button"
+          onClick={() => setShellView('home')}
+          title="Início — projetos e conta"
+          aria-label="Início"
+          style={{
+            width: isMobile ? 36 : 32,
+            height: isMobile ? 36 : 32,
+            borderRadius: 11,
+            border: '1px solid var(--border)',
+            background: 'var(--bg-card)',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Home size={14} />
+        </button>
+
         {/* Undo/Redo */}
         {!isMobile && (
           <div style={{
@@ -4945,32 +6676,32 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           }}>
             <button
               onClick={history.undo}
-              disabled={!history.canUndo()}
+              disabled={!history.canUndo}
               title="Desfazer (⌘Z)"
               aria-label="Desfazer"
               style={{
                 width:28, height:26, borderRadius:5, border:'none', background:'transparent',
-                color:'var(--text-muted)', cursor: history.canUndo() ? 'pointer' : 'not-allowed',
+                color:'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                opacity: history.canUndo() ? 1 : 0.35, transition:'all 0.12s',
+                opacity: history.canUndo ? 1 : 0.35, transition:'all 0.12s',
               }}
-              onMouseEnter={e=>{ if(history.canUndo()) e.currentTarget.style.color='var(--text-primary)'; }}
+              onMouseEnter={e=>{ if(history.canUndo) e.currentTarget.style.color='var(--text-primary)'; }}
               onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
             </button>
             <button
               onClick={history.redo}
-              disabled={!history.canRedo()}
+              disabled={!history.canRedo}
               title="Refazer (⌘⇧Z)"
               aria-label="Refazer"
               style={{
                 width:28, height:26, borderRadius:5, border:'none', background:'transparent',
-                color:'var(--text-muted)', cursor: history.canRedo() ? 'pointer' : 'not-allowed',
+                color:'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                opacity: history.canRedo() ? 1 : 0.35, transition:'all 0.12s',
+                opacity: history.canRedo ? 1 : 0.35, transition:'all 0.12s',
               }}
-              onMouseEnter={e=>{ if(history.canRedo()) e.currentTarget.style.color='var(--text-primary)'; }}
+              onMouseEnter={e=>{ if(history.canRedo) e.currentTarget.style.color='var(--text-primary)'; }}
               onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
@@ -5172,7 +6903,9 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           }}
           >
             <div style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2 }}>
-              {slides.map((s,i)=>(
+              {slides.map((s, i) => {
+                const stripThumbFil = slideStoredPresentationCssFilter(s);
+                return (
                 <button
                   key={s.id}
                   onClick={()=>setActiveIdx(i)}
@@ -5199,6 +6932,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                     background: s.customBg||brand.bg,
                     backgroundImage: s.bgImage?`url(${s.bgImage})`:'none',
                     backgroundSize:'cover', backgroundPosition:'center',
+                    ...(stripThumbFil ? { filter: stripThumbFil } : {}),
                   }}>
                     {s.bgImage && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)' }}/>}
                     <span style={{
@@ -5208,7 +6942,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                     }}>{String(i+1).padStart(2,'0')}</span>
                   </div>
                 </button>
-              ))}
+                );
+              })}
               <button onClick={addSlide} style={{
                 flexShrink:0, width:44, height:56, borderRadius:4,
                 border:'1px dashed var(--border)', background:'transparent',
@@ -5335,19 +7070,6 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                       }}
                     ><ChevronRight size={18}/></button>
                   )}
-
-                  {/* Botão tela cheia sobreposto */}
-                  <button
-                    onClick={()=>setFullscreenOpen(true)}
-                    aria-label="Apresentar em tela cheia"
-                    style={{
-                      position:'absolute', top:8, right:8,
-                      width:34, height:34, borderRadius:8,
-                      background:'rgba(0,0,0,0.55)', border:'1px solid rgba(255,255,255,0.18)',
-                      color:'#fff', cursor:'pointer', backdropFilter:'blur(6px)',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                    }}
-                  ><Maximize2 size={13}/></button>
                 </div>
 
                 {/* Dots + contador */}
@@ -5371,6 +7093,20 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                     {String(activeIdx+1).padStart(2,'0')} / {String(slides.length).padStart(2,'0')} — arraste ou use setas
                   </span>
                 </div>
+
+                <PerSlideImageRefBlock
+                  slide={slide}
+                  width={Math.min(vw - 48, f.w * previewScale)}
+                  onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
+                  onRemoveRef={() => updateSlide({ refImage: null })}
+                  onPickRef={() => openRefImagePicker(activeIdx)}
+                  onGenerateImage={() => generateSlideImageAt(activeIdx)}
+                  generateImageBusy={!!slideImgGenBusy[slide.id]}
+                  generateImageDisabled={
+                    !(slide.imageQuery || '').trim() ||
+                    (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
+                  }
+                />
               </div>
             ) : (
               // Desktop: all slides row
@@ -5406,6 +7142,19 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                       onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
                       ><Download size={11}/></button>
                     </div>
+                    <PerSlideImageRefBlock
+                      slide={s}
+                      width={desktopThumbWidth}
+                      onChangeExtra={(v) => updateSlideAt(i, { imgExtraPrompt: v })}
+                      onRemoveRef={() => updateSlideAt(i, { refImage: null })}
+                      onPickRef={() => openRefImagePicker(i)}
+                      onGenerateImage={() => generateSlideImageAt(i)}
+                      generateImageBusy={!!slideImgGenBusy[s.id]}
+                      generateImageDisabled={
+                        !((s.imageQuery || '').trim()) ||
+                        (normalizeSlideImgMode(s.imgMode) === 'dalle' && !hasOpenAI)
+                      }
+                    />
                   </div>
                 ))}
               </div>
@@ -5427,9 +7176,9 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
             }}
             >
               {[
-                { id:'slide',    label:'Slide',    icon:Layout },
                 { id:'brand',    label:'Marca',    icon:Palette },
-                { id:'material', label:'Material', icon:BookOpen },
+                { id:'material', label:'Conteúdo', icon:BookOpen },
+                { id:'slide',    label:'Cards',    icon:Layout },
                 { id:'ai',       label:'IA',       icon:Wand2 },
               ].map(({ id, label, icon:Icon }) => (
                 <button
@@ -5472,9 +7221,12 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           )}
         </main>
       </div>
+      </>
+      )}
 
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageUpload}/>
+      <input ref={refImageInputRef} type="file" accept="image/*" hidden onChange={handleRefImageFile}/>
 
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
@@ -5499,6 +7251,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         hasAnthropic={hasAnthropic}
         onOpenKeys={() => setKeysOpen(true)}
         onGoToMaterial={() => {
+          setShellView('project');
           setTab('material');
           if (isMobile) setDrawerOpen(true);
         }}
@@ -5526,6 +7279,9 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         onClose={()=>setResearchOpen(false)}
         onSetNiche={setNiche}
         onUseIdea={text=>{setResearchOpen(false);setPrefilledTopic(text);setSetupOpen(true);}}
+        narrativeMode={mode}
+        creativePreset={creativePreset}
+        openaiKey={openaiKey}
       />
       <TemplatesModal
         open={templatesOpen}
@@ -5538,6 +7294,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         slide={slide}
         niche={niche}
         openaiKey={openaiKey}
+        narrativeMode={mode}
+        creativePreset={creativePreset}
         onPick={(h)=>{
           updateSlide({ title: h.title, subtitle: h.subtitle || slide.subtitle });
           toast('Gancho atualizado', 'success');
@@ -5556,13 +7314,14 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       <OnboardingTour
         open={tourOpen}
         onDismiss={() => {
-          try { localStorage.setItem('vc_onboarding_done', '1'); } catch {}
+          try { localStorage.setItem(SK.onboarding, '1'); } catch {}
           setTourOpen(false);
         }}
         isMobile={isMobile}
         empty={empty}
         setTab={setTab}
         setDrawerOpen={setDrawerOpen}
+        onEnterEditor={() => setShellView('project')}
       />
       <HelpModal
         open={helpOpen}
@@ -5573,6 +7332,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         open={fullscreenOpen} onClose={()=>setFullscreenOpen(false)}
         slides={slides} fmt={fmt} brand={brand}
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
+        onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
       />
       <LibraryModal
         open={libraryOpen}
@@ -5585,6 +7345,17 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         onDelete={deleteDoc}
         onRename={renameDoc}
         onSetStatus={setDocStatus}
+        onExportDoc={exportDoc}
+        onExportAll={exportAllDocs}
+        onImportTrigger={() => importDocRef.current?.click()}
+      />
+      {/* Input oculto para importar JSON */}
+      <input
+        ref={importDocRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display:'none' }}
+        onChange={handleImportFile}
       />
       <BrandsModal
         open={brandsOpen}
@@ -5617,13 +7388,607 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
 
 // ─── FULLSCREEN VIEWER ────────────────────────────────────────────────────────
 // Apresentação tela cheia com setas e swipe; ESC fecha.
+
+// ─── ACCOUNT HOME — visão da conta + lista de projetos (antes do editor) ─────
+function AccountHomeShell({
+  library,
+  activeDocId,
+  activeEntryName,
+  brandCount,
+  hasOpenAI,
+  hasAnthropic,
+  hasAnyAI,
+  isMobile,
+  onGenerate,
+  onOpenLibrary,
+  onOpenTemplates,
+  onOpenResearch,
+  onOpenHelp,
+  onOpenSettings,
+  onContinueEditor,
+  onImportPick,
+  openDoc,
+  newDoc,
+  renameDoc,
+  duplicateDoc,
+  deleteDoc,
+  setDocStatus,
+  exportDoc,
+  askPrompt,
+}) {
+  const totalCards = useMemo(
+    () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
+    [library],
+  );
+
+  const [search, setSearch] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const items = useMemo(() => (
+    [...library]
+      .filter(e => !search.trim() || (e.name || '').toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  ), [library, search]);
+
+  return (
+    <div
+      data-vc-tour="account-home"
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: 'var(--bg-base)',
+        minHeight: 0,
+        minWidth: 0,
+        width: '100%',
+      }}
+    >
+      <header style={{
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-sidebar)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        padding: `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8, background: 'var(--accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Flame size={16} color="#fff" />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
+              fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
+            }}>
+              Viral<span style={{ color: 'var(--accent)' }}>.</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
+              Início · dados apenas neste navegador
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {!isMobile && (
+            <button type="button" onClick={() => onOpenTemplates()} aria-label="Templates prontos" style={{
+              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
+              background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Layout size={13} />
+            </button>
+          )}
+          {!isMobile && (
+            <button type="button" onClick={() => onOpenResearch()} aria-label="Pesquisar nicho" style={{
+              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--divider-soft)',
+              background: 'var(--bg-pearl)', color: 'var(--text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <TrendingUp size={14} />
+            </button>
+          )}
+          {!isMobile && (
+            <button type="button" onClick={() => onOpenHelp()} aria-label="Ajuda" style={{
+              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
+              background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>?</span>
+            </button>
+          )}
+          <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
+            width: 36, height: 36, borderRadius: 11,
+            border: `1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
+            background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
+            color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Settings size={13} />
+          </button>
+          <button type="button" data-vc-tour="generate" onClick={() => onGenerate()} style={{
+            height: 38, padding: '0 20px',
+            borderRadius: 9999, border: 'none', cursor: 'pointer',
+            background: 'var(--accent)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 400,
+            letterSpacing: '-0.016em',
+            fontFamily: 'var(--font-ui)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+          onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <Sparkles size={13} /> {isMobile ? 'IA' : 'Gerar com IA'}
+          </button>
+        </div>
+      </header>
+
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
+        width: '100%',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        <div style={{
+          boxSizing: 'border-box',
+          width: '100%',
+          maxWidth: 912,
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          padding: isMobile ? '24px 16px 32px' : '48px 24px 80px',
+        }}>
+        <p style={{
+          margin: '0 0 8px', fontSize: 11, letterSpacing: '0.12em',
+          fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)',
+          fontFamily: 'var(--font-ui)',
+        }}>Área da conta</p>
+        <h2 style={{
+          margin: '0 0 12px', fontSize: 28, fontWeight: 600, letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1.12,
+        }}>Olá de novo</h2>
+        <p style={{
+          margin: '0 0 32px', fontSize: 17, lineHeight: 1.47,
+          letterSpacing: '-0.011em', color: 'var(--text-secondary)',
+          maxWidth: '62ch',
+        }}>
+          <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Projeto em edição:</strong>{' '}
+          <button type="button" onClick={onContinueEditor} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 0, color: 'var(--accent)', font: 'inherit', fontWeight: 600,
+          }}>{activeEntryName || 'Sem título'}</button>.
+          Para continuar, abra o editor e use as abas <strong style={{ fontWeight: 600 }}>Marca</strong>,{' '}
+          <strong style={{ fontWeight: 600 }}>Conteúdo</strong>,{' '}
+          <strong style={{ fontWeight: 600 }}>Cards</strong> e <strong style={{ fontWeight: 600 }}>IA</strong>.
+        </p>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 32,
+        }}>
+          {[
+            { k: 'projetos', label: 'Projetos', value: library.length },
+            { k: 'perfis', label: 'Perfis de marca', value: brandCount },
+            {
+              k: 'cartoes',
+              label: 'Cards no total',
+              value: totalCards,
+              hint: 'Soma todos os projetos salvos aqui.',
+            },
+          ].map(({ k, label, value, hint }) => (
+            <div key={k} style={{
+              background: 'var(--bg-pearl)', borderRadius: 18,
+              border: '1px solid var(--hairline)',
+              padding: 20,
+            }}>
+              <div style={{
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
+                marginBottom: 8,
+              }}>{label}</div>
+              <div style={{
+                fontSize: 30, fontWeight: 600,
+                letterSpacing: '-0.028em',
+                fontFamily: 'var(--font-display)',
+                color: 'var(--text-primary)',
+                lineHeight: 1,
+              }}>{value}</div>
+              {hint && (
+                <div style={{
+                  marginTop: 10, fontSize: 13, letterSpacing: '-0.011em',
+                  color: 'var(--text-muted)',
+                }}>{hint}</div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          background: 'var(--bg-parchment)', borderRadius: 18, border: '1px solid var(--hairline)',
+          padding: 20,
+          marginBottom: 24,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            flex: '1 1 200px',
+            fontSize: 14,
+            color: 'var(--text-secondary)',
+            letterSpacing: '-0.011em',
+          }}>
+            <div style={{
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: 4,
+            }}>Ligações de IA</div>
+            {hasAnthropic ? 'Anthropic disponível para texto. ' : 'Anthropic opcional. '}
+            {hasOpenAI ? 'OpenAI disponível para texto e imagens. ' : 'OpenAI opcional (GPT Image ou chave neste dispositivo). '}
+            {!hasAnyAI && 'Configure as chaves no ícone de engrenagem.'}
+          </div>
+          <button type="button" onClick={() => onOpenSettings()} style={{
+            height: 40, padding: '0 18px', borderRadius: 9999,
+            border: '1px solid var(--accent)', cursor: 'pointer',
+            background: 'var(--bg-base)', color: 'var(--accent)',
+            fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 400,
+          }}>APIs</button>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          marginBottom: 16,
+          alignItems: 'center',
+        }}>
+          <h3 style={{
+            flex: '1 1 auto', margin: 0, fontSize: 21, letterSpacing: '-0.022em',
+            fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
+          }}>Projetos</h3>
+          <button type="button" onClick={() => onOpenLibrary()} data-vc-tour="library" style={{
+            height: 38, padding: '0 16px',
+            borderRadius: 9999, border: '1px solid var(--border)',
+            background: 'var(--bg-base)', cursor: 'pointer',
+            color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600,
+          }}>Ver tudo na biblioteca</button>
+          <button type="button" onClick={() => onImportPick()} style={{
+            height: 38, padding: '0 16px',
+            borderRadius: 9999, border: '1px solid var(--border)',
+            background: 'var(--bg-base)', cursor: 'pointer',
+            color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600,
+          }}>Importar JSON</button>
+          <button type="button" onClick={() => newDoc()} style={{
+            height: 38, padding: '0 16px',
+            borderRadius: 9999, border: 'none',
+            cursor: 'pointer',
+            background: 'var(--accent)',
+            color: '#fff', fontSize: 13, fontFamily: 'var(--font-ui)',
+          }}>
+            <Layers size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
+            Novo projeto
+          </button>
+          <button type="button" onClick={() => onContinueEditor()} style={{
+            height: 38, padding: '0 16px',
+            borderRadius: 9999, border: '1px solid var(--accent)',
+            background: 'var(--bg-base)', cursor: 'pointer',
+            color: 'var(--accent)', fontSize: 13, fontFamily: 'var(--font-ui)',
+          }}>
+            Ir ao editor
+          </button>
+        </div>
+
+        <input
+          type="search"
+          placeholder="Filtrar por nome…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="vc-input"
+          aria-label="Filtrar projetos"
+          style={{ width: '100%', marginBottom: 16 }}
+        />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.length === 0 && (
+            <div style={{
+              padding: 40,
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              border: `1px dashed var(--hairline)`,
+              borderRadius: 18,
+              fontSize: 15,
+              letterSpacing: '-0.011em',
+            }}>
+              Sem correspondências nesta pesquisa.
+            </div>
+          )}
+          {items.map(entry => {
+            const isActive = entry.id === activeDocId;
+            const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
+            const slides = entry.doc?.slides || [];
+            const firstSlide = slides[0];
+            const bg = firstSlide?.customBg || entry.doc?.brand?.bg || '#fafafc';
+            return (
+              <div
+                key={entry.id}
+                style={{
+                  background: isActive ? 'rgba(0,102,204,0.06)' : 'var(--bg-pearl)',
+                  border: `1px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
+                  borderRadius: 18,
+                  padding: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  transition: 'border-color 0.15s var(--ease-smooth)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => openDoc(entry.id)}
+                  aria-label={`Abrir ${entry.name}`}
+                  style={{
+                    width: 56,
+                    height: 70,
+                    borderRadius: 11,
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    border: '1px solid var(--hairline)',
+                    background: bg,
+                    backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {firstSlide?.bgImage && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.28)',
+                    }} />
+                  )}
+                  <span style={{
+                    position: 'absolute',
+                    bottom: 5,
+                    left: 6,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: '#fff',
+                    fontFamily: 'var(--font-mono)',
+                    opacity: 0.85,
+                  }}>{slides.length}</span>
+                </button>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => openDoc(entry.id)}
+                      title="Abrir projeto no editor"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 16,
+                        fontWeight: 600,
+                        letterSpacing: '-0.022em',
+                        color: 'var(--text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    >
+                      {entry.name || 'Sem título'}
+                      {isActive && (
+                        <span style={{
+                          marginLeft: 8,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: 'var(--accent)',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                        }}>
+                          atual
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const next = await askPrompt({
+                          title: 'Renomear projeto',
+                          label: 'Nome',
+                          defaultValue: entry.name || '',
+                          placeholder: 'Ex: Lançamento de produto',
+                          cta: 'Guardar',
+                        });
+                        if (next?.trim()) renameDoc(entry.id, next.trim());
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: 11,
+                        color: 'var(--accent)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        background: 'transparent',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Renomear
+                    </button>
+                  </div>
+                  <div style={{
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    <span style={{
+                      padding: '2px 7px',
+                      borderRadius: 99,
+                      background: status.bg,
+                      border: `1px solid ${status.border}`,
+                      color: status.color,
+                      fontWeight: 600,
+                    }}>{status.label}</span>
+                    {' · '}
+                    {slides.length}{' '}card{slides.length !== 1 ? 's' : ''}
+                    {entry.updatedAt && (
+                      <span>{' '}· atualizado {' '}{fmtDate(entry.updatedAt)}</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  alignItems: 'stretch',
+                  flexShrink: 0,
+                }}>
+                  <select
+                    aria-label={`Estado para ${entry.name}`}
+                    value={entry.status}
+                    onChange={e => setDocStatus(entry.id, e.target.value)}
+                    style={{
+                      fontSize: 11,
+                      padding: '4px 6px',
+                      borderRadius: 8,
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border)',
+                      cursor: 'pointer',
+                      minWidth: 100,
+                      fontFamily: 'var(--font-ui)',
+                    }}
+                  >
+                    {STATUS_DEFS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button type="button" onClick={() => duplicateDoc(entry.id)} title="Duplicar"
+                      aria-label={`Duplicar ${entry.name}`}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        background: 'var(--bg-base)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-muted)',
+                      }}
+                    ><Copy size={13} /></button>
+                    <button type="button" onClick={() => exportDoc(entry.id)} title="Exportar JSON"
+                      aria-label={`Exportar ${entry.name}`}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        background: 'var(--bg-base)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-muted)',
+                      }}
+                    ><Download size={13} /></button>
+                    {confirmDeleteId === entry.id ? (
+                      <>
+                        <button type="button" onClick={() => { deleteDoc(entry.id); setConfirmDeleteId(null); }}
+                          style={{
+                            padding: '0 10px',
+                            height: 32,
+                            borderRadius: 8,
+                            border: '1px solid rgba(255,59,48,0.35)',
+                            cursor: 'pointer',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#ff3b30',
+                            background: 'rgba(255,59,48,0.08)',
+                          }}
+                        >
+                          Confirmar eliminação
+                        </button>
+                        <button type="button" onClick={() => setConfirmDeleteId(null)} style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          background: 'var(--bg-base)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        ><X size={13} /></button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setConfirmDeleteId(entry.id)}
+                        aria-label={`Apagar ${entry.name}`}
+                        style={{
+                          width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          background: 'var(--bg-base)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff3b30',
+                        }}
+                      ><Trash2 size={13} /></button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {!isMobile && (
+          <p style={{
+            marginTop: 48,
+            fontSize: 14,
+            lineHeight: 1.47,
+            letterSpacing: '-0.011em',
+            color: 'var(--text-muted)',
+          }}>
+            Fluxo recomendado: primeiro <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Marca</strong>{' '}
+            e a base de <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Conteúdo</strong>,
+            {' '}depois edição nos <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Cards</strong>,
+            {' '}por fim <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>IA</strong> para refinar e gerar legenda.
+          </p>
+        )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── LIBRARY MODAL ────────────────────────────────────────────────────────────
 // Lista os carrosséis salvos com mini-thumbnail, nome editável, status e ações.
-function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDuplicate, onDelete, onRename, onSetStatus }) {
+function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDuplicate, onDelete, onRename, onSetStatus, onExportDoc, onExportAll, onImportTrigger }) {
   const [filter, setFilter] = useState('all'); // all | draft | ready | published
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   if (!open) return null;
 
@@ -5660,7 +8025,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
             </div>
             <div>
               <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Biblioteca</div>
-              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{counts.all} carrosséis salvos</div>
+              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{counts.all} projetos salvos</div>
             </div>
           </div>
           <button onClick={onClose} aria-label="Fechar" style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:6, borderRadius:6 }}>
@@ -5670,18 +8035,44 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
 
         {/* Toolbar */}
         <div style={{ padding:'14px 20px 0', display:'flex', flexDirection:'column', gap:12 }}>
-          <button
-            onClick={() => onNew()}
-            style={{
-              height:40, borderRadius:9, border:'none', cursor:'pointer',
-              background:'linear-gradient(135deg, var(--accent), #e03220)',
-              color:'#fff', fontSize:13, fontWeight:700, fontFamily:'var(--font-ui)',
-              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-              boxShadow:'0 4px 14px rgba(255,77,46,0.25)',
-            }}
-          >
-            <Plus size={14}/>Novo carrossel
-          </button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button
+              onClick={() => onNew()}
+              style={{
+                height:40, flex:1, borderRadius:9, border:'none', cursor:'pointer',
+                background:'linear-gradient(135deg, var(--accent), #e03220)',
+                color:'#fff', fontSize:13, fontWeight:700, fontFamily:'var(--font-ui)',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                boxShadow:'0 4px 14px rgba(255,77,46,0.25)',
+              }}
+            >
+              <Plus size={14}/>Novo carrossel
+            </button>
+            <button
+              onClick={onExportAll}
+              title="Exportar toda a biblioteca como JSON"
+              style={{
+                height:40, padding:'0 14px', borderRadius:9, cursor:'pointer',
+                background:'var(--bg-card)', border:'1px solid var(--border)',
+                color:'var(--text-secondary)', fontSize:12, fontWeight:600,
+                fontFamily:'var(--font-ui)', display:'flex', alignItems:'center', gap:6,
+              }}
+            >
+              <Download size={13}/>Exportar
+            </button>
+            <button
+              onClick={onImportTrigger}
+              title="Importar projetos de um arquivo JSON"
+              style={{
+                height:40, padding:'0 14px', borderRadius:9, cursor:'pointer',
+                background:'var(--bg-card)', border:'1px solid var(--border)',
+                color:'var(--text-secondary)', fontSize:12, fontWeight:600,
+                fontFamily:'var(--font-ui)', display:'flex', alignItems:'center', gap:6,
+              }}
+            >
+              <Upload size={13}/>Importar
+            </button>
+          </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <input
               type="text"
@@ -5806,7 +8197,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
                       background: status.bg, color: status.color,
                       border: `1px solid ${status.border}`, fontWeight:700,
                     }}>{status.label}</span>
-                    <span>{slides.length} slides</span>
+                    <span>{slides.length} cards</span>
                     <span style={{ opacity:0.6 }}>· {fmtDate(entry.updatedAt)}</span>
                   </div>
                 </div>
@@ -5843,14 +8234,34 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
                       <Copy size={10}/>
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Apagar "${entry.name}"? Esta ação não pode ser desfeita.`)) onDelete(entry.id);
-                      }}
-                      title="Apagar"
-                      style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      onClick={() => onExportDoc(entry.id)}
+                      title="Exportar como JSON"
+                      style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
-                      <Trash2 size={10}/>
+                      <Download size={10}/>
                     </button>
+                    {confirmDeleteId === entry.id ? (
+                      <>
+                        <button
+                          onClick={() => { onDelete(entry.id); setConfirmDeleteId(null); }}
+                          title="Confirmar exclusão"
+                          style={{ height:26, padding:'0 8px', borderRadius:5, border:'1px solid rgba(248,113,113,0.5)', background:'rgba(248,113,113,0.15)', color:'#f87171', cursor:'pointer', fontSize:10, fontWeight:700, fontFamily:'var(--font-ui)' }}
+                        >OK</button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          title="Cancelar"
+                          style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        ><X size={10}/></button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(entry.id)}
+                        title="Apagar"
+                        style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      >
+                        <Trash2 size={10}/>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -5866,6 +8277,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
 // Gerencia perfis de marca: lista, aplica, salva o atual como novo, deleta.
 function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApply, onSave, onDelete }) {
   const [newName, setNewName] = useState('');
+  const [confirmDeleteBrandId, setConfirmDeleteBrandId] = useState(null);
   if (!open) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -5969,15 +8381,28 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
                     }}>ATIVO</span>
                   )}
                   {brands.length > 1 && b.id !== 'default' && (
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Apagar perfil "${b.name}"?`)) onDelete(b.id);
-                      }}
-                      title="Apagar perfil"
-                      style={{ width:28, height:28, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                    >
-                      <Trash2 size={11}/>
-                    </button>
+                    confirmDeleteBrandId === b.id ? (
+                      <>
+                        <button
+                          onClick={() => { onDelete(b.id); setConfirmDeleteBrandId(null); }}
+                          title="Confirmar exclusão"
+                          style={{ height:28, padding:'0 8px', borderRadius:5, border:'1px solid rgba(248,113,113,0.5)', background:'rgba(248,113,113,0.15)', color:'#f87171', cursor:'pointer', fontSize:10, fontWeight:700, fontFamily:'var(--font-ui)' }}
+                        >OK</button>
+                        <button
+                          onClick={() => setConfirmDeleteBrandId(null)}
+                          title="Cancelar"
+                          style={{ width:28, height:28, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        ><X size={11}/></button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteBrandId(b.id)}
+                        title="Apagar perfil"
+                        style={{ width:28, height:28, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      >
+                        <Trash2 size={11}/>
+                      </button>
+                    )
                   )}
                 </div>
               );
@@ -5992,12 +8417,18 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
   );
 }
 
-function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx }) {
+function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust }) {
   const touchRef = useRef({ x:0, y:0 });
   const [size, setSize] = useState({ w:0, h:0 });
+  const [photoAdjustOpen, setPhotoAdjustOpen] = useState(false);
+  /** Rascunho da tela cheia: apenas slides com entrada explícita; ausente = usar `slide.presentationImgAdjust`. */
+  const [imgAdjBySlide, setImgAdjBySlide] = useState({});
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setPhotoAdjustOpen(false);
+      return;
+    }
     const upd = () => setSize({ w: window.innerWidth, h: window.innerHeight });
     upd();
     window.addEventListener('resize', upd);
@@ -6007,22 +8438,94 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (photoAdjustOpen) setPhotoAdjustOpen(false);
+        else onClose();
+      }
       else if (e.key === 'ArrowLeft')  { e.preventDefault(); setActiveIdx(Math.max(0, activeIdx - 1)); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); setActiveIdx(Math.min(slides.length - 1, activeIdx + 1)); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, activeIdx, slides.length, setActiveIdx, onClose]);
+  }, [open, activeIdx, slides.length, setActiveIdx, onClose, photoAdjustOpen]);
 
   if (!open || !slides[activeIdx]) return null;
 
-  const f = FORMATS[fmt];
-  // Caber na tela com 24px de padding
+  const activeSlideFs = slides[activeIdx];
+  const slideFsId = activeSlideFs.id;
+  const hasBgImageFs = !!activeSlideFs.bgImage;
+
+  const overlayDraftFs = imgAdjBySlide[slideFsId];
+  const adjFs =
+    overlayDraftFs !== undefined
+      ? normalizePresentationImgAdjust(overlayDraftFs)
+      : normalizePresentationImgAdjust(activeSlideFs.presentationImgAdjust);
+  const presentationImgFilterFs =
+    hasBgImageFs && !presentationAdjustIsNeutral(adjFs)
+      ? buildPresentationImageFilter(adjFs)
+      : null;
+  const fsAdjDirtyUi = !presentationAdjustIsNeutral(adjFs);
+
+  const fsPendingPersist =
+    slides.some((sl) => {
+      if (!Object.prototype.hasOwnProperty.call(imgAdjBySlide, sl.id)) return false;
+      return !presentationImgAdjustEquivalent(sl.presentationImgAdjust, imgAdjBySlide[sl.id]);
+    }) && !!onSavePresentationAdjust;
+
+  const bumpFsAdj = (key, delta) => {
+    if (!hasBgImageFs) return;
+    setImgAdjBySlide((prev) => {
+      const row = FULLSCREEN_IMG_ADJ_ROWS.find((r) => r.key === key);
+      if (!row) return prev;
+      const prevDraft = prev[slideFsId];
+      const base =
+        prevDraft !== undefined
+          ? { ...normalizePresentationImgAdjust(prevDraft) }
+          : { ...normalizePresentationImgAdjust(activeSlideFs.presentationImgAdjust) };
+      let nextVal = base[key] + delta;
+      nextVal = Math.round(nextVal / row.step) * row.step;
+      nextVal = Math.max(row.min, Math.min(row.max, nextVal));
+      return { ...prev, [slideFsId]: { ...base, [key]: nextVal } };
+    });
+  };
+
+  const setFsAdjKey = (key, rawVal) => {
+    if (!hasBgImageFs) return;
+    setImgAdjBySlide((prev) => {
+      const row = FULLSCREEN_IMG_ADJ_ROWS.find((r) => r.key === key);
+      if (!row) return prev;
+      const prevDraft = prev[slideFsId];
+      const base =
+        prevDraft !== undefined
+          ? { ...normalizePresentationImgAdjust(prevDraft) }
+          : { ...normalizePresentationImgAdjust(activeSlideFs.presentationImgAdjust) };
+      let nextVal = Math.round(Number(rawVal));
+      if (!Number.isFinite(nextVal)) return prev;
+      nextVal = Math.round(nextVal / row.step) * row.step;
+      nextVal = Math.max(row.min, Math.min(row.max, nextVal));
+      return { ...prev, [slideFsId]: { ...base, [key]: nextVal } };
+    });
+  };
+
+  const resetFsSlideAdj = () => {
+    setImgAdjBySlide((prev) => ({
+      ...prev,
+      [slideFsId]: { ...DEFAULT_PRESENTATION_IMG_ADJUST },
+    }));
+  };
+
+  const submitFsPersist = () => {
+    if (!onSavePresentationAdjust || !fsPendingPersist) return;
+    onSavePresentationAdjust(imgAdjBySlide);
+  };
+
+  const f = FORMATS[fmt] || FORMATS.carrossel;
   const padding = 32;
+  const bottomReserve = photoAdjustOpen ? 232 : 108;
   const scale = Math.min(
     (size.w - padding * 2) / f.w,
-    (size.h - padding * 2 - 80) / f.h, // -80 pra deixar espaço pro chrome inferior
+    (size.h - padding * 2 - bottomReserve) / f.h,
     1,
   );
   const realScale = Number.isFinite(scale) && scale > 0 ? scale : 0.8;
@@ -6065,7 +8568,7 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
             display:'flex', alignItems:'center', gap:6,
             background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)',
             color:'#fff', borderRadius:8, padding:'6px 12px', cursor:'pointer',
-            fontSize:12, fontFamily:'var(--font-ui)', fontWeight:500,
+            fontSize:12, fontFamily:'var(--font-ui)', fontWeight:600,
           }}
         >
           <X size={13}/> ESC para sair
@@ -6075,8 +8578,11 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
       {/* Slide */}
       <div style={{ pointerEvents:'none' }}>
         <SlideCard
-          slide={slides[activeIdx]} fmt={fmt} brand={brand}
+          slide={activeSlideFs} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
+          {...(overlayDraftFs !== undefined
+            ? { presentationImgFilter: presentationImgFilterFs }
+            : {})}
         />
       </div>
 
@@ -6110,9 +8616,80 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
         >›</button>
       )}
 
+      {/* Ajustes de imagem — abre sob demanda (botão ou tecla já documentada na barra) */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 58,
+          left: 0,
+          right: 0,
+          zIndex: 3,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ pointerEvents: 'auto', width: '100%', display: 'flex', justifyContent: 'center', paddingLeft: 20, paddingRight: 20, boxSizing: 'border-box' }}>
+          {!photoAdjustOpen ? (
+            <button
+              type="button"
+              disabled={!hasBgImageFs}
+              onClick={() => setPhotoAdjustOpen(true)}
+              aria-label={
+                hasBgImageFs ? 'Abrir ajustes da foto' : 'Ajustes da foto indisponíveis sem imagem de fundo'
+              }
+              title={hasBgImageFs ? undefined : 'Adicione uma imagem de fundo para ajustar.'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 18px',
+                borderRadius: 9999,
+                border: `1px solid ${hasBgImageFs ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.1)'}`,
+                background: hasBgImageFs ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
+                color: hasBgImageFs ? '#fff' : 'rgba(255,255,255,0.35)',
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: 'var(--font-ui)',
+                letterSpacing: '-0.022em',
+                cursor: hasBgImageFs ? 'pointer' : 'not-allowed',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                transition: 'background 0.15s, transform 0.1s',
+              }}
+              onMouseDown={(e) => {
+                if (hasBgImageFs) e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <SlidersHorizontal size={14} aria-hidden strokeWidth={2.25} />
+              Ajustar foto
+            </button>
+          ) : (
+            <FullscreenImageAdjustBar
+              disabled={!hasBgImageFs}
+              adj={adjFs}
+              onBump={bumpFsAdj}
+              onSetKey={setFsAdjKey}
+              onResetSlide={resetFsSlideAdj}
+              onSave={submitFsPersist}
+              anyDirty={fsAdjDirtyUi}
+              hasPendingPersist={fsPendingPersist}
+              onClose={() => setPhotoAdjustOpen(false)}
+            />
+          )}
+        </div>
+      </div>
+
       {/* Dots */}
       <div style={{
-        position:'absolute', bottom:24, left:'50%', transform:'translateX(-50%)',
+        position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)',
         display:'flex', gap:6, padding:'8px 14px',
         background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)',
         borderRadius:99, backdropFilter:'blur(8px)',
@@ -6140,9 +8717,9 @@ function getOnboardingSteps(isMobile, empty) {
   if (!isMobile) panelSel = '[data-vc-tour="sidebar-tabs"]';
   else if (!empty) panelSel = '[data-vc-tour="mobile-bar"]';
   const panelBody = !isMobile
-    ? 'Abas Slide (texto/imagem), Marca (identidade e logo), Material (base para a IA) e IA (refinos).'
+    ? 'Abas Marca, Conteúdo (base para a IA), Cards (texto e imagem em cada card) e IA (refinos e legenda).'
     : empty
-      ? 'Depois do primeiro carrossel gerado, uma barra inferior aparece com Slide, Marca, Material e IA.'
+      ? 'Depois do primeiro carrossel gerado, uma barra inferior traz Marca, Conteúdo, Cards e IA.'
       : 'Toque nos ícones na barra inferior para abrir o painel de edição.';
 
   return [
@@ -6150,7 +8727,7 @@ function getOnboardingSteps(isMobile, empty) {
       id: 'welcome',
       title: 'Bem-vindo ao Viral Carrossel',
       body:
-        'Em poucos passos você vê onde gerar conteúdo, organizar projetos e conectar as APIs. Use Avançar ou Pular.',
+        'Em poucos passos você vê o Início (conta local e projetos), onde gerar com IA e como conectar as APIs. Use Avançar ou Pular.',
       selector: null,
     },
     {
@@ -6164,14 +8741,14 @@ function getOnboardingSteps(isMobile, empty) {
       id: 'library',
       title: 'Biblioteca',
       body:
-        'Vários carrosséis ficam salvos só no seu navegador. Troque de projeto, duplique ou organize sem perder o trabalho.',
+        'Vários projetos ficam só no seu navegador. Use o Início para visão geral, ou a biblioteca para filtrar e importar.',
       selector: '[data-vc-tour="library"]',
     },
     {
       id: 'thumbs',
       title: 'Miniaturas',
       body:
-        'Clique para escolher o slide ativo. Arraste para reordenar a narrativa.',
+        'Clique para escolher o card ativo. Arraste para reordenar a narrativa.',
       selector: '[data-vc-tour="thumbnails"]',
     },
     {
@@ -6191,13 +8768,13 @@ function getOnboardingSteps(isMobile, empty) {
       id: 'refs',
       title: 'Perfis de referência',
       body:
-        'Na aba Material, escolha uma voz curada para inspirar tom e ritmo — sem copiar conteúdo de terceiros.',
+        'Na aba Conteúdo, escolha uma voz curada para inspirar tom e ritmo — sem copiar conteúdo de terceiros.',
       selector: '[data-vc-tour="ref-profiles"]',
     },
   ];
 }
 
-function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpen }) {
+function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpen, onEnterEditor }) {
   const steps = useMemo(() => getOnboardingSteps(isMobile, empty), [isMobile, empty]);
   const [idx, setIdx] = useState(0);
   const [hole, setHole] = useState(null);
@@ -6209,10 +8786,14 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
 
   useLayoutEffect(() => {
     if (!open) return undefined;
-    const step = steps[idx];
-    if (step?.id === 'refs') {
+    const stepIds = steps[idx]?.id;
+    if (stepIds === 'refs') {
+      if (typeof onEnterEditor === 'function') onEnterEditor();
       setTab('material');
       if (isMobile) setDrawerOpen(true);
+    } else if (stepIds === 'thumbs' || stepIds === 'panel') {
+      if (typeof onEnterEditor === 'function') onEnterEditor();
+      if (stepIds === 'panel' && isMobile && !empty) setDrawerOpen(true);
     }
     const measure = () => {
       const s = steps[idx];
@@ -6248,7 +8829,10 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
       setBubble({ left, top, maxW });
     };
 
-    const delay = steps[idx]?.id === 'refs' ? (isMobile ? 220 : 90) : 0;
+    const delay =
+      steps[idx]?.id === 'refs' ? (isMobile ? 220 : 90)
+        : (steps[idx]?.id === 'thumbs' || steps[idx]?.id === 'panel') ? (isMobile ? 200 : 120)
+          : 0;
     const onWin = () => measure();
     let t = null;
     if (delay) t = window.setTimeout(measure, delay);
@@ -6260,7 +8844,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
       window.removeEventListener('resize', onWin);
       window.removeEventListener('scroll', onWin, true);
     };
-  }, [open, idx, steps, setTab, setDrawerOpen, isMobile]);
+  }, [open, idx, steps, setTab, setDrawerOpen, isMobile, onEnterEditor, empty]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -6323,7 +8907,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
         />
       )}
 
-      {/* Cartão */}
+      {/* Card */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{

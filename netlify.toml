@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "20"
+
+# Ficheiros em `dist` (CSS/JS hashed) continuam servidos normalmente.
+# Esta regra só aplica quando o caminho não corresponde a nenhum ficheiro —
+# típico de SPAs quando alguém abre uma URL diretamente ou recarrega.
 [[redirects]]
   from = "/*"
   to = "/index.html"

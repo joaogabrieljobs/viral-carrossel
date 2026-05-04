@@ -39,7 +39,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
-      strictPort: false,
+      // Se 5173 estiver ocupada por outro programa, o Vite saltava para 5174, 5175…
+      // e quem abria http://localhost:5173 via 404. Com strictPort, falha em voz alta
+      // ou tens de libertar a porta — assim o URL do terminal corresponde sempre.
+      strictPort: true,
+      // Não usar open:true no Cursor: o browser embutido pode falhar com localhost
+      // (chrome-error://… vs localhost — “Domains, protocols and ports must match”).
       open: false,
       proxy: {
         '/api/anthropic': {
