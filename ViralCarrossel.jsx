@@ -522,6 +522,100 @@ const FORMATS = {
   stories:   { w: 1080, h: 1920, label: 'Stories'  },
 };
 
+/** Proporção de exportação — uma linha no desktop; grelha largura total no mobile (evita barra apertada). */
+function EditorFormatSelector({ fmt, setFmt, layout }) {
+  const grid = layout === 'mobile';
+  const wrapStyle = grid
+    ? {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gap: 8,
+        width: '100%',
+      }
+    : {
+        display: 'flex',
+        alignItems: 'center',
+        background: 'var(--bg-card)',
+        borderRadius: 8,
+        padding: 3,
+        gap: 2,
+        border: '1px solid var(--border)',
+        flexShrink: 0,
+      };
+
+  return (
+    <div style={wrapStyle} role="group" aria-label="Formato do card (exportação)">
+      {Object.entries(FORMATS).map(([k, v]) => {
+        const isActive = fmt === k;
+        const ratio = v.h / v.w;
+        const miniW = 14;
+        const miniH = Math.max(10, Math.min(20, miniW * ratio));
+        const compactLabel = v.label.split(/\s+/)[0];
+        return (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setFmt(k)}
+            title={`${v.label} · ${v.w}×${v.h}`}
+            style={
+              grid
+                ? {
+                    minHeight: 44,
+                    padding: '6px 4px',
+                    borderRadius: 11,
+                    fontSize: 12,
+                    fontWeight: isActive ? 600 : 400,
+                    fontFamily: 'var(--font-ui)',
+                    letterSpacing: '-0.011em',
+                    cursor: 'pointer',
+                    border: `1px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
+                    background: isActive ? 'rgba(0, 102, 204, 0.08)' : 'var(--bg-base)',
+                    color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                    transition: 'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
+                  }
+                : {
+                    padding: '5px 14px',
+                    borderRadius: 9999,
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 400,
+                    fontFamily: 'var(--font-ui)',
+                    letterSpacing: '-0.011em',
+                    cursor: 'pointer',
+                    border: 'none',
+                    transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                    background: isActive ? 'var(--bg-base)' : 'transparent',
+                    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }
+            }
+          >
+            {grid && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: miniW,
+                  height: miniH,
+                  border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--text-muted)'}`,
+                  borderRadius: 2,
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {grid ? compactLabel : v.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const PALETTES = [
   { name:'Carbon',   bg:'#0a0a0a', title:'#ffffff', sub:'#a3a3a3', accent:'#ff5736' },
   { name:'Midnight', bg:'#0c1220', title:'#ffffff', sub:'#94a3b8', accent:'#6366f1' },
@@ -6271,6 +6365,115 @@ export default function App() {
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1);
   const empty = isDefault(slides);
 
+  const editorHeaderActions = (
+        <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 4 : 6, flexShrink:0 }}>
+          {!isMobile && (
+            <button onClick={()=>setTemplatesOpen(true)} style={{
+              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
+              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
+            }}
+                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
+            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
+            title="Templates prontos" aria-label="Abrir templates">
+              <Layout size={13}/>
+            </button>
+          )}
+          <button type="button" data-vc-tour="library" onClick={()=>setLibraryOpen(true)} style={{
+            width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
+            borderRadius:8, border:'1px solid var(--border)',
+            background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
+            position:'relative',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
+          onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
+          title={`Biblioteca · ${library.length} carrosséis`} aria-label="Abrir biblioteca">
+            <BookOpen size={13}/>
+            {library.length > 1 && (
+              <span style={{
+                position:'absolute', top:-4, right:-4,
+                fontSize:8, fontWeight:700, fontFamily:'var(--font-mono)',
+                background:'var(--accent)', color:'#fff',
+                padding:'1px 5px', borderRadius:99, lineHeight:1.2,
+                minWidth:14, textAlign:'center', pointerEvents:'none',
+              }}>{library.length}</span>
+            )}
+          </button>
+          {!empty && (
+            <button onClick={()=>setFullscreenOpen(true)} style={{
+              width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
+              borderRadius:8, border:'1px solid var(--border)',
+              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
+            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
+            title="Tela cheia (F)" aria-label="Apresentar em tela cheia">
+              <Maximize2 size={13}/>
+            </button>
+          )}
+          {!isMobile && (
+            <button onClick={()=>setHelpOpen(true)} style={{
+              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
+              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
+            }}
+                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
+            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
+            title="Atalhos de teclado (?)" aria-label="Ajuda e atalhos">
+              <span style={{ fontSize:14, fontWeight:600 }}>?</span>
+            </button>
+          )}
+          <button type="button" data-vc-tour="settings" onClick={()=>setKeysOpen(true)} style={{
+            width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
+            borderRadius:11, border:`1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
+            background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
+            color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)', cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
+          }}
+                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
+          onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'#1d8a3a':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'rgba(52,199,89,0.28)':'var(--divider-soft)';}}
+          title={
+            hasOpenAI && hasAnthropic ? 'Anthropic + OpenAI configurados ✓' :
+            hasOpenAI                 ? 'OpenAI configurado ✓' :
+            hasAnthropic              ? 'Anthropic (Claude) configurado ✓' :
+                                        'Configurar API keys'
+          } aria-label="Configurações">
+            <Settings size={13}/>
+          </button>
+          {!isMobile && (
+            <button onClick={()=>setResearchOpen(true)} style={{
+              width:34, height:34, borderRadius:11, border:'1px solid var(--divider-soft)',
+              background:'var(--bg-pearl)', color:'var(--text-secondary)', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s var(--ease-smooth)',
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.background='#f0f0f3';}}
+            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.background='var(--bg-pearl)';}}
+            title="Pesquisar nicho" aria-label="Pesquisar nicho">
+              <TrendingUp size={14}/>
+            </button>
+          )}
+          <button type="button" data-vc-tour="generate" onClick={()=>setSetupOpen(true)} style={{
+            height: isMobile ? 40 : 34, padding: '0 16px',
+            borderRadius:9999, border:'none', cursor:'pointer',
+            background:'var(--accent)',
+            color:'#fff', fontSize:13, fontWeight:400, fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.016em',
+            display:'flex', alignItems:'center', gap:6,
+            transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+          }}
+          onMouseEnter={e=>e.currentTarget.style.background='var(--accent-hover)'}
+          onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
+          onMouseDown={e=>e.currentTarget.style.transform='scale(0.95)'}
+          onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
+          aria-label="Gerar carrossel com IA"
+          >
+            <Sparkles size={isMobile ? 14 : 13}/>{!isMobile && 'Gerar'}
+          </button>
+        </div>
+  );
+
   const updateSlide = useCallback(patch => {
     setSlides(s => s.map((sl,i) => i===activeIdx ? {...sl,...patch} : sl));
   }, [activeIdx]);
@@ -6889,12 +7092,78 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
       {/* ── HEADER ── */}
       <header style={{
         borderBottom:'1px solid var(--border)', background:'var(--bg-sidebar)',
-        display:'flex', alignItems:'center', justifyContent:'space-between',
-        padding:'env(safe-area-inset-top, 0) 14px 0',
-        // Altura cresce com a safe-area top (iOS notch)
-        height: `calc(${isMobile ? 56 : 52}px + env(safe-area-inset-top, 0))`,
-        flexShrink:0, gap:10,
+        flexShrink:0,
+        ...(isMobile ? {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          gap: 10,
+          padding: `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`,
+        } : {
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'space-between',
+          padding:'env(safe-area-inset-top, 0) 14px 0',
+          height: `calc(52px + env(safe-area-inset-top, 0))`,
+          gap:10,
+        }),
       }}>
+        {isMobile ? (
+          <>
+            <div style={{
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'space-between',
+              width:'100%',
+              gap:8,
+              minHeight: 44,
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
+                <button
+                  type="button"
+                  onClick={() => setShellView('home')}
+                  title="Início — projetos e conta"
+                  aria-label="Início"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 11,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Home size={15} />
+                </button>
+                <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
+                  <div style={{
+                    width:32, height:32, borderRadius:8, background:'var(--accent)',
+                    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                  }}>
+                    <Flame size={14} color="#fff"/>
+                  </div>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{
+                      fontSize:14, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em',
+                      lineHeight:1.1, fontFamily:'var(--font-display)',
+                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                    }}>
+                      Viral<span style={{ color:'var(--accent)' }}>.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {editorHeaderActions}
+            </div>
+            <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
+          </>
+        ) : (
+          <>
         {/* Brand */}
         <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
           <div style={{
@@ -6907,8 +7176,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
             <div style={{ fontSize:15, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em', lineHeight:1, fontFamily:'var(--font-display)' }}>
               Viral<span style={{ color:'var(--accent)' }}>.</span>
             </div>
-            {/* Nome do doc atual — clicável pra renomear inline (substitui o subtítulo "Carrossel Studio") */}
-            {activeEntry && !isMobile && (
+            {activeEntry && (
               <button
                 onClick={async () => {
                   const current = activeEntry.name || 'Carrossel';
@@ -6942,8 +7210,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           title="Início — projetos e conta"
           aria-label="Início"
           style={{
-            width: isMobile ? 36 : 32,
-            height: isMobile ? 36 : 32,
+            width: 32,
+            height: 32,
             borderRadius: 11,
             border: '1px solid var(--border)',
             background: 'var(--bg-card)',
@@ -6959,8 +7227,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         </button>
 
         {/* Undo/Redo */}
-        {!isMobile && (
-          <div style={{
+        <div style={{
             display:'flex', alignItems:'center', background:'var(--bg-card)',
             borderRadius:8, padding:3, gap:0, border:'1px solid var(--border)', flexShrink:0,
           }}>
@@ -6997,153 +7264,11 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
             </button>
           </div>
+
+        <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
+        {editorHeaderActions}
+          </>
         )}
-
-        {/* Format selector — visual proporções no mobile */}
-        <div style={{
-          display:'flex', alignItems:'center', background:'var(--bg-card)',
-          borderRadius:8, padding:3, gap:2, border:'1px solid var(--border)', flexShrink:0,
-        }}>
-          {Object.entries(FORMATS).map(([k,v])=>{
-            // No mobile: minirretângulo no aspect-ratio do formato + label compacta
-            const isActive = fmt === k;
-            // Aspect-ratio mini-rect (visual)
-            const ratio = v.h / v.w;
-            const miniW = 14;
-            const miniH = Math.max(10, Math.min(20, miniW * ratio));
-            return (
-              <button key={k} onClick={()=>setFmt(k)} style={{
-                padding: isMobile ? '6px 12px' : '5px 14px',
-                borderRadius:9999, fontSize:isMobile ? 12 : 13, fontWeight:isActive?600:400,
-                fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', cursor:'pointer',
-                border:'none', transition:'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
-                background: isActive ? 'var(--bg-base)' : 'transparent',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                display:'flex', alignItems:'center', gap:6,
-              }}
-              title={`${v.label} · ${v.w}×${v.h}`}
-              >
-                {isMobile && (
-                  <span style={{
-                    display:'inline-block', width:miniW, height:miniH,
-                    border:`1.5px solid ${isActive ? 'var(--text-primary)' : 'var(--text-muted)'}`,
-                    borderRadius:2, flexShrink:0,
-                  }}/>
-                )}
-                {isMobile ? v.label.split(' ')[0] : v.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Actions */}
-        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-          {!isMobile && (
-            <button onClick={()=>setTemplatesOpen(true)} style={{
-              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Templates prontos" aria-label="Abrir templates">
-              <Layout size={13}/>
-            </button>
-          )}
-          {/* Biblioteca — abre modal com lista de carrosséis salvos */}
-          <button type="button" data-vc-tour="library" onClick={()=>setLibraryOpen(true)} style={{
-            width: isMobile ? 38 : 34, height: isMobile ? 38 : 34,
-            borderRadius:8, border:'1px solid var(--border)',
-            background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            position:'relative',
-          }}
-          onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-          onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-          title={`Biblioteca · ${library.length} carrosséis`} aria-label="Abrir biblioteca">
-            <BookOpen size={13}/>
-            {library.length > 1 && (
-              <span style={{
-                position:'absolute', top:-4, right:-4,
-                fontSize:8, fontWeight:700, fontFamily:'var(--font-mono)',
-                background:'var(--accent)', color:'#fff',
-                padding:'1px 5px', borderRadius:99, lineHeight:1.2,
-                minWidth:14, textAlign:'center', pointerEvents:'none',
-              }}>{library.length}</span>
-            )}
-          </button>
-          {!empty && (
-            <button onClick={()=>setFullscreenOpen(true)} style={{
-              width: isMobile ? 38 : 34, height: isMobile ? 38 : 34,
-              borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Tela cheia (F)" aria-label="Apresentar em tela cheia">
-              <Maximize2 size={13}/>
-            </button>
-          )}
-          {!isMobile && (
-            <button onClick={()=>setHelpOpen(true)} style={{
-              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Atalhos de teclado (?)" aria-label="Ajuda e atalhos">
-              <span style={{ fontSize:14, fontWeight:600 }}>?</span>
-            </button>
-          )}
-          <button type="button" data-vc-tour="settings" onClick={()=>setKeysOpen(true)} style={{
-            width: isMobile ? 38 : 34, height: isMobile ? 38 : 34,
-            borderRadius:11, border:`1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
-            background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
-            color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-          }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-          onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'#1d8a3a':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'rgba(52,199,89,0.28)':'var(--divider-soft)';}}
-          title={
-            hasOpenAI && hasAnthropic ? 'Anthropic + OpenAI configurados ✓' :
-            hasOpenAI                 ? 'OpenAI configurado ✓' :
-            hasAnthropic              ? 'Anthropic (Claude) configurado ✓' :
-                                        'Configurar API keys'
-          } aria-label="Configurações">
-            <Settings size={13}/>
-          </button>
-          {!isMobile && (
-            <button onClick={()=>setResearchOpen(true)} style={{
-              width:34, height:34, borderRadius:11, border:'1px solid var(--divider-soft)',
-              background:'var(--bg-pearl)', color:'var(--text-secondary)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s var(--ease-smooth)',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.background='#f0f0f3';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.background='var(--bg-pearl)';}}
-            title="Pesquisar nicho" aria-label="Pesquisar nicho">
-              <TrendingUp size={14}/>
-            </button>
-          )}
-          <button type="button" data-vc-tour="generate" onClick={()=>setSetupOpen(true)} style={{
-            height: isMobile ? 38 : 34, padding: isMobile ? '0 18px' : '0 18px',
-            borderRadius:9999, border:'none', cursor:'pointer',
-            background:'var(--accent)',
-            color:'#fff', fontSize:13, fontWeight:400, fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.016em',
-            display:'flex', alignItems:'center', gap:6,
-            transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-          }}
-          onMouseEnter={e=>e.currentTarget.style.background='var(--accent-hover)'}
-          onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
-          onMouseDown={e=>e.currentTarget.style.transform='scale(0.95)'}
-          onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
-          aria-label="Gerar carrossel com IA"
-          >
-            <Sparkles size={isMobile ? 14 : 13}/>{!isMobile && 'Gerar'}
-          </button>
-        </div>
       </header>
 
       {/* ── BODY ── */}
@@ -7189,7 +7314,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
             data-vc-tour="thumbnails"
             style={{
             background:'var(--bg-sidebar)', borderBottom:'1px solid var(--border)',
-            padding:'10px 14px', flexShrink:0,
+            padding: isMobile ? '8px 10px' : '10px 14px',
+            flexShrink:0,
           }}
           >
             <div style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2 }}>
@@ -7251,38 +7377,97 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
           <div style={{ flex:1, overflow:'auto' }}>
             {empty ? (
               // Empty state
-              <div className="empty-grid" style={{ minHeight:'100%', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-                <div style={{ textAlign:'center', maxWidth:340, animation:'fadeUp 0.3s var(--ease-smooth)' }}>
+              <div className="empty-grid" style={{
+                minHeight:'100%',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                padding: isMobile ? '20px 16px 28px' : 24,
+                boxSizing: 'border-box',
+              }}>
+                <div style={{
+                  textAlign:'center',
+                  maxWidth: isMobile ? 'min(100%, 360px)' : 340,
+                  width: '100%',
+                  animation:'fadeUp 0.3s var(--ease-smooth)',
+                }}>
                   <div style={{
-                    width:72, height:72, borderRadius:18, background:'var(--accent)',
-                    display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 28px',
+                    width: isMobile ? 64 : 72,
+                    height: isMobile ? 64 : 72,
+                    borderRadius:18,
+                    background:'var(--accent)',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    margin:'0 auto 24px',
                   }}>
-                    <Sparkles size={32} color="#fff"/>
+                    <Sparkles size={isMobile ? 28 : 32} color="#fff"/>
                   </div>
-                  <div style={{ fontSize:40, fontWeight:600, fontFamily:'var(--font-display)', color:'var(--text-primary)', letterSpacing:'-0.022em', marginBottom:12, lineHeight:1.07 }}>
+                  <div style={{
+                    fontSize: isMobile ? 28 : 40,
+                    fontWeight:600,
+                    fontFamily:'var(--font-display)',
+                    color:'var(--text-primary)',
+                    letterSpacing:'-0.022em',
+                    marginBottom:12,
+                    lineHeight:1.07,
+                  }}>
                     Crie seu carrossel<br/>
                     <span style={{ color:'var(--accent)' }}>viral.</span>
                   </div>
-                  <p style={{ fontSize:17, color:'var(--text-secondary)', marginBottom:32, lineHeight:1.47, letterSpacing:'-0.011em', fontWeight:400 }}>
-                    Informe o tema e a IA gera gancho,<br/>slides e legenda prontos para postar.
+                  <p style={{
+                    fontSize:17,
+                    color:'var(--text-secondary)',
+                    marginBottom: isMobile ? 24 : 32,
+                    lineHeight:1.47,
+                    letterSpacing:'-0.011em',
+                    fontWeight:400,
+                  }}>
+                    {isMobile
+                      ? 'Informe o tema e a IA gera gancho, slides e legenda prontos para postar.'
+                      : <>Informe o tema e a IA gera gancho,<br/>slides e legenda prontos para postar.</>}
                   </p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     <button onClick={()=>setSetupOpen(true)} aria-label="Gerar carrossel com IA" style={{
-                      height:48, borderRadius:9999, border:'none', cursor:'pointer',
+                      minHeight:48,
+                      borderRadius:9999,
+                      border:'none',
+                      cursor:'pointer',
                       background:'var(--accent)',
-                      color:'#fff', fontSize:15, fontWeight:400, fontFamily:'var(--font-ui)',
+                      color:'#fff',
+                      fontSize:15,
+                      fontWeight:400,
+                      fontFamily:'var(--font-ui)',
                       letterSpacing:'-0.016em',
-                      display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      gap:10,
+                      padding: '0 20px',
                       transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                     }}>
                       <Sparkles size={16}/>Gerar carrossel com IA
                     </button>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div style={{
+                      display:'grid',
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                      gap:8,
+                    }}>
                       <button onClick={()=>setTemplatesOpen(true)} aria-label="Abrir templates" style={{
-                        height:42, borderRadius:10, cursor:'pointer',
-                        background:'var(--bg-elevated)', border:'1px solid var(--border)',
-                        color:'var(--text-secondary)', fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)',
-                        display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.12s',
+                        minHeight: isMobile ? 44 : 42,
+                        borderRadius:10,
+                        cursor:'pointer',
+                        background:'var(--bg-elevated)',
+                        border:'1px solid var(--border)',
+                        color:'var(--text-secondary)',
+                        fontSize:13,
+                        fontWeight:600,
+                        fontFamily:'var(--font-ui)',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:6,
+                        transition:'all 0.12s',
                       }}
                       onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
                       onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
@@ -7290,10 +7475,20 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                         <Layout size={12}/>Templates
                       </button>
                       <button onClick={()=>setResearchOpen(true)} aria-label="Pesquisar nicho" style={{
-                        height:42, borderRadius:10, cursor:'pointer',
-                        background:'var(--bg-elevated)', border:'1px solid var(--border)',
-                        color:'var(--text-secondary)', fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)',
-                        display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.12s',
+                        minHeight: isMobile ? 44 : 42,
+                        borderRadius:10,
+                        cursor:'pointer',
+                        background:'var(--bg-elevated)',
+                        border:'1px solid var(--border)',
+                        color:'var(--text-secondary)',
+                        fontSize:13,
+                        fontWeight:600,
+                        fontFamily:'var(--font-ui)',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:6,
+                        transition:'all 0.12s',
                       }}
                       onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
                       onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
@@ -7740,12 +7935,76 @@ function AccountHomeShell({
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-sidebar)',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        gap: 10,
-        padding: `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
+        gap: isMobile ? 12 : 10,
+        padding: isMobile
+          ? `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`
+          : `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
         flexShrink: 0,
       }}>
+        {isMobile ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: 8, background: 'var(--accent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Flame size={16} color="#fff" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
+                    fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
+                  }}>
+                    Viral<span style={{ color: 'var(--accent)' }}>.</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
+                    Dados só neste aparelho
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
+                width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+                border: `1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
+                background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
+                color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Settings size={13} />
+              </button>
+            </div>
+            <button type="button" data-vc-tour="generate" onClick={() => onGenerate()} style={{
+              width: '100%',
+              minHeight: 48,
+              padding: '0 20px',
+              borderRadius: 9999,
+              border: 'none',
+              cursor: 'pointer',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 400,
+              letterSpacing: '-0.016em',
+              fontFamily: 'var(--font-ui)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              <Sparkles size={15} /> Gerar com IA
+            </button>
+          </>
+        ) : (
+          <>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 8, background: 'var(--accent)',
@@ -7766,33 +8025,27 @@ function AccountHomeShell({
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {!isMobile && (
-            <button type="button" onClick={() => onOpenTemplates()} aria-label="Templates prontos" style={{
+          <button type="button" onClick={() => onOpenTemplates()} aria-label="Templates prontos" style={{
               width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
               background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Layout size={13} />
             </button>
-          )}
-          {!isMobile && (
-            <button type="button" onClick={() => onOpenResearch()} aria-label="Pesquisar nicho" style={{
+          <button type="button" onClick={() => onOpenResearch()} aria-label="Pesquisar nicho" style={{
               width: 36, height: 36, borderRadius: 11, border: '1px solid var(--divider-soft)',
               background: 'var(--bg-pearl)', color: 'var(--text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <TrendingUp size={14} />
             </button>
-          )}
-          {!isMobile && (
-            <button type="button" onClick={() => onOpenHelp()} aria-label="Ajuda" style={{
+          <button type="button" onClick={() => onOpenHelp()} aria-label="Ajuda" style={{
               width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
               background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <span style={{ fontSize: 15, fontWeight: 600 }}>?</span>
             </button>
-          )}
           <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
             width: 36, height: 36, borderRadius: 11,
             border: `1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
@@ -7821,9 +8074,11 @@ function AccountHomeShell({
           onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
           onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
-            <Sparkles size={13} /> {isMobile ? 'IA' : 'Gerar com IA'}
+            <Sparkles size={13} /> Gerar com IA
           </button>
         </div>
+          </>
+        )}
       </header>
 
       <div style={{
