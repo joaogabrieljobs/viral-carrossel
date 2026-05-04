@@ -4,6 +4,18 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Build do Vite usa proxy /api/anthropic (função Netlify abaixo) em produção — evita CORS no Claude.
+  VITE_ANTHROPIC_PROXY = "true"
+
+[functions]
+  directory = "netlify/functions"
+
+# Proxy Anthropic (tem de ficar ANTES do fallback SPA).
+[[redirects]]
+  from = "/api/anthropic/*"
+  to = "/.netlify/functions/anthropic-proxy"
+  status = 200
+  force = true
 
 # Ficheiros em `dist` (CSS/JS hashed) continuam servidos normalmente.
 # Esta regra só aplica quando o caminho não corresponde a nenhum ficheiro —

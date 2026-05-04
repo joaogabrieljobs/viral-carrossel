@@ -597,6 +597,38 @@ const BODY_FONTS = [
   { name:'IBM Plex Mono', val:'"IBM Plex Mono", monospace',  cat:'mono' },
 ];
 
+/** Faces CSS únicas por perfil de marca (evita colisão entre perfis e Google Fonts). */
+const vcCustomTitleFace = (brandId) => `VCBrandTitle-${brandId || 'default'}`;
+const vcCustomBodyFace = (brandId) => `VCBrandBody-${brandId || 'default'}`;
+
+function guessFontFileFormat(file) {
+  const n = (file?.name || '').toLowerCase();
+  if (n.endsWith('.woff2')) return 'woff2';
+  if (n.endsWith('.woff')) return 'woff';
+  if (n.endsWith('.ttf')) return 'truetype';
+  if (n.endsWith('.otf')) return 'opentype';
+  const t = (file?.type || '').toLowerCase();
+  if (t.includes('woff2')) return 'woff2';
+  if (t.includes('woff')) return 'woff';
+  if (t.includes('ttf')) return 'truetype';
+  if (t.includes('otf')) return 'opentype';
+  return 'woff2';
+}
+
+/** Fonte carregada primeiro; a lista Google abaixo é reserva (fallback). */
+function effectiveTitleFontFamily(brand) {
+  if (!brand) return '"Inter", sans-serif';
+  return brand.customTitleFont?.dataUrl
+    ? `${vcCustomTitleFace(brand.id)}, ${brand.titleFont}`
+    : brand.titleFont;
+}
+function effectiveBodyFontFamily(brand) {
+  if (!brand) return '"Inter Tight", sans-serif';
+  return brand.customBodyFont?.dataUrl
+    ? `${vcCustomBodyFace(brand.id)}, ${brand.bodyFont}`
+    : brand.bodyFont;
+}
+
 const LAYOUTS = [
   { id:'tl', jc:'flex-start', ai:'flex-start', label:'↖' },
   { id:'tc', jc:'flex-start', ai:'center',     label:'↑' },
@@ -1104,7 +1136,14 @@ const IS_LOCAL_DEV =
   typeof window !== 'undefined' &&
   /^(localhost|127\.|0\.0|192\.168|10\.|\[::1\])/.test(window.location.hostname);
 
-const ANTHROPIC_URL    = IS_LOCAL_DEV ? '/api/anthropic/v1/messages'           : 'https://api.anthropic.com/v1/messages';
+/** Em build de produção (ex.: Netlify com VITE_ANTHROPIC_PROXY) usa a função serverless → sem CORS. */
+const USE_ANTHROPIC_PROXY =
+  IS_LOCAL_DEV ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ANTHROPIC_PROXY === 'true');
+
+const ANTHROPIC_URL = USE_ANTHROPIC_PROXY
+  ? '/api/anthropic/v1/messages'
+  : 'https://api.anthropic.com/v1/messages';
 const OPENAI_CHAT_URL  = IS_LOCAL_DEV ? '/api/openai/v1/chat/completions'      : 'https://api.openai.com/v1/chat/completions';
 const OPENAI_IMAGE_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/generations'    : 'https://api.openai.com/v1/images/generations';
 const OPENAI_IMAGE_EDITS_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/edits'     : 'https://api.openai.com/v1/images/edits';
@@ -1124,8 +1163,12 @@ function enhanceNetworkError(err, label) {
       hint =
         '`npm run preview` não inclui o proxy /api — use `npm run dev` para IA ou gere só no ambiente de desenvolvimento.';
     } else if (hosted) {
+      const proxyHint =
+        typeof import.meta !== 'undefined' && import.meta.env?.VITE_ANTHROPIC_PROXY === 'true'
+          ? ' Confirme ANTHROPIC_API_KEY nas variáveis do Netlify e que o deploy inclui a função netlify/functions/anthropic-proxy.'
+          : ' Num deploy estático, use o proxy incluído (Netlify + VITE_ANTHROPIC_PROXY) ou a chave OpenAI em ⚙, ou sirva em localhost com `npm run dev`.';
       hint =
-        'Num site hospedado (ex.: Vercel) o navegador não pode chamar api.anthropic.com direto por CORS. Use a chave OpenAI em ⚙ (vai direto à OpenAI) ou sirva o app em localhost com `npm run dev`.';
+        `Num site hospedado o browser não pode chamar api.anthropic.com direto por CORS.${proxyHint}`;
     }
     return new Error(`${label}: falha de rede (${m}). ${hint}`);
   }
@@ -1285,11 +1328,56 @@ const loadJsPdf = () => new Promise((res, rej) => {
   document.head.appendChild(s);
 });
 
-const dlDataUrl = (url, name) => {
+/** Descarga um Blob com nome — evita data URLs gigantes (limite em alguns browsers) e falhas silenciosas. */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-};
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 400);
+}
+
+/** PNG a partir do canvas (toBlob; fallback se o browser devolver null). */
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+            return;
+          }
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64 = dataUrl.split(',')[1];
+            if (!base64) throw new Error('PNG vazio');
+            const bin = atob(base64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            resolve(new Blob([arr], { type: 'image/png' }));
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        },
+        'image/png',
+        1,
+      );
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
+async function downloadCanvasPng(canvas, filename) {
+  const blob = await canvasToPngBlob(canvas);
+  downloadBlob(blob, filename);
+}
 
 /** Migra modos antigos: `stock` (Picsum) e `ai` (FLUX) → web trend. */
 const normalizeSlideImgMode = (m) => {
@@ -2098,10 +2186,13 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
     effectivePresentationFilter = presentationImgFilter;
   }
 
+  const titleFF = effectiveTitleFontFamily(brand);
+  const bodyFF = effectiveBodyFontFamily(brand);
+
   const inner = (
     <div
       ref={ref}
-      style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily:brand.bodyFont }}
+      style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
       {/* BG Image — bgFit: cover (preenche) | contain (inteira) | custom (zoom % legado) */}
       {slide.bgImage && imgReady && !imgErr && (
@@ -2180,12 +2271,29 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
             width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
             background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
             display:'flex', alignItems:'center', justifyContent:'center',
+            flexShrink: 0,
           }}>
-            <div style={{ width:'76%', height:'76%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${brand.titleColor}` }}/>
+            <div style={{
+              width:'76%', height:'76%', borderRadius:'50%',
+              overflow:'hidden',
+              background: brand.handleAvatar ? '#0a0a0a' : bg,
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              {brand.handleAvatar ? (
+                <img
+                  src={brand.handleAvatar}
+                  alt=""
+                  draggable={false}
+                  style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                />
+              ) : (
+                <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${brand.titleColor}` }}/>
+                </div>
+              )}
             </div>
           </div>
-          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily:brand.bodyFont, letterSpacing:'-0.01em' }}>
+          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
             {brand.handle}
           </span>
         </div>
@@ -2226,7 +2334,7 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
               maxWidth:'92%',
             }}>
               <h1 style={{
-                color:brand.titleColor, fontFamily:brand.titleFont,
+                color:brand.titleColor, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
                 fontWeight:slide.titleWeight ?? 800,
@@ -2241,7 +2349,7 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
               }}>{slide.title}</h1>
               {slide.subtitle && (
                 <p style={{
-                  color:brand.subColor, fontFamily:brand.bodyFont,
+                  color:brand.subColor, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight:400, margin:0,
@@ -3458,20 +3566,17 @@ function GenerateModal({
 
 // ─── RESEARCH PANEL ───────────────────────────────────────────────────────────
 
-function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre' }) {
+function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre', openaiKey = '' }) {
   const [niche, setNiche] = useState('');
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
+  const [degraded, setDegraded] = useState(false);
 
   if (!open) return null;
 
-  const run = async () => {
-    if (!niche.trim()) { setErr('Informe o nicho'); return; }
-    setBusy(true); setErr(''); setData(null);
-    try {
-      const r = await callAIwithSearch(
-        `Atue como estrategista sênior de conteúdo, branding e cultura de mercado. Pesquise tendências REAIS e atuais na web.
+  const buildResearchUserPrompt = () =>
+    `Atue como estrategista sênior de conteúdo, branding e cultura de mercado. Pesquise tendências REAIS e atuais na web.
 
 Nicho: "${niche}"
 ${buildResearchPromptBias(narrativeMode, creativePreset)}
@@ -3487,13 +3592,35 @@ REGRAS:
 - viral_hooks: use estes formatos estratégicos — "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z.", "Quando todo mundo começa a fazer X, o valor migra para Y.", "O próximo diferencial competitivo em X será Y." — Tom assertivo, sofisticado, sem clichês, sem motivacional.
 - carousel_ideas: siga os 7 tipos de post estratégico: decodificação de marca, de comportamento, de categoria, de campanha, de erro comum, de tendência, de mercado futuro. O campo "angle" deve revelar a tese contraintuitiva.
 - trending_topics: fatos REAIS com data recente.
-- Mínimo: 5 trending_topics, 7 viral_hooks, 5 carousel_ideas. Português BR.`,
-        { json: true }
-      );
+- Mínimo: 5 trending_topics, 7 viral_hooks, 5 carousel_ideas. Português BR.`;
+
+  const run = async () => {
+    if (!niche.trim()) { setErr('Informe o nicho'); return; }
+    setBusy(true); setErr(''); setData(null); setDegraded(false);
+    try {
+      const r = await callAIwithSearch(buildResearchUserPrompt(), { json: true });
       setData(r);
       onSetNiche?.(niche);
-    } catch(e) { setErr(e.message); }
-    finally { setBusy(false); }
+    } catch (e1) {
+      if (!openaiKey?.trim()) {
+        setErr(e1.message || String(e1));
+        return;
+      }
+      try {
+        const r = await callAI(
+          `${buildResearchUserPrompt()}
+
+CONTEXTO TÉCNICO — SEM WEB AO VIVO:
+Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de 2025” verificáveis. Em trending_topics, use ângulos plausíveis do nicho e deixe "why" como leitura estratégica (não como notícia datada). Preencha "warning" com uma frase curta: resultado sem pesquisa web em tempo real.`,
+          { json: true, openaiKey },
+        );
+        setData(r);
+        setDegraded(true);
+        onSetNiche?.(niche);
+      } catch (e2) {
+        setErr(e2.message || String(e2));
+      }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -3557,6 +3684,15 @@ REGRAS:
 
           {err && (
             <div style={{ fontSize:13, color:'#c5251c', background:'rgba(255,59,48,0.10)', border:'1px solid rgba(255,59,48,0.22)', borderRadius:11, padding:'10px 14px', letterSpacing:'-0.011em' }}>{err}</div>
+          )}
+
+          {degraded && !err && (
+            <div style={{
+              fontSize:12, color:'var(--text-secondary)', background:'var(--bg-pearl)', border:'1px solid var(--hairline)',
+              borderRadius:11, padding:'10px 14px', letterSpacing:'-0.011em', lineHeight:1.45, fontFamily:'var(--font-ui)',
+            }}>
+              Sem pesquisa web ao vivo nesta sessão — resultado via OpenAI (chave em ⚙). Trate tendências como leitura estratégica, não como notícias datadas.
+            </div>
           )}
 
           {busy && (
@@ -3716,7 +3852,18 @@ function TemplatesModal({ open, onClose, onApply }) {
 
 // ─── HOOK VARIATIONS MODAL ────────────────────────────────────────────────────
 
-function HookVariationsModal({ open, onClose, onPick, slide, niche, openaiKey, narrativeMode = 'editorial', creativePreset = 'livre' }) {
+function HookVariationsModal({
+  open,
+  onClose,
+  onPick,
+  slide,
+  niche,
+  openaiKey,
+  brand,
+  material,
+  narrativeMode = 'editorial',
+  creativePreset = 'livre',
+}) {
   const [busy, setBusy] = useState(false);
   const [hooks, setHooks] = useState([]);
   const [err, setErr] = useState('');
@@ -3724,17 +3871,21 @@ function HookVariationsModal({ open, onClose, onPick, slide, niche, openaiKey, n
   const run = useCallback(async () => {
     setBusy(true); setErr(''); setHooks([]);
     try {
+      const brandBlock = buildBrandBlock(brand);
+      const materialBlock = buildMaterialBlock(material);
+      const materialPriorityBlock = buildMaterialPriorityBlock(material);
       const r = await callAI(
         `Atue como copywriter sênior. Gere 5 variações de gancho (slide 1 de carrossel Instagram) com base no contexto abaixo.
 
 ${buildNarrativeModeReminder(narrativeMode)}
-
+${brandBlock}${materialBlock}${materialPriorityBlock}
 Tema atual: "${slide?.title || ''}"
 Contexto: "${slide?.subtitle || ''}"
 ${niche ? `Nicho: ${niche}` : ''}
 
 REGRAS:
 ${buildHookVariationRules(narrativeMode, creativePreset)}
+- Se houver MATÉRIA-PRIMA, FONTES & REFERÊNCIAS ou INSTRUÇÕES acima, os ganchos devem estar alinhados a esse material (não genéricos).
 
 Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha que justifica o gancho"}]}`,
         { json: true, openaiKey }
@@ -3742,7 +3893,16 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
       setHooks(r.hooks || []);
     } catch(e) { setErr(e.message); }
     finally { setBusy(false); }
-  }, [slide?.title, slide?.subtitle, niche, openaiKey, narrativeMode, creativePreset]);
+  }, [
+    slide?.title,
+    slide?.subtitle,
+    niche,
+    openaiKey,
+    narrativeMode,
+    creativePreset,
+    brand,
+    material,
+  ]);
 
   useEffect(() => { if (open) run(); }, [open, run]);
 
@@ -4321,7 +4481,7 @@ function SidebarContent({
                     <button key={w} onClick={()=>updateSlide({titleWeight:w})}
                       style={{
                         padding:'7px 0', borderRadius:6, fontSize:11, cursor:'pointer',
-                        fontWeight:w, fontFamily:brand.titleFont, transition:'all 0.12s',
+                        fontWeight:w, fontFamily: effectiveTitleFontFamily(brand), transition:'all 0.12s',
                         background: (slide.titleWeight ?? 800) === w ? 'var(--text-primary)' : 'var(--bg-card)',
                         border: `1px solid ${(slide.titleWeight ?? 800) === w ? 'transparent' : 'var(--border)'}`,
                         color:    (slide.titleWeight ?? 800) === w ? 'var(--bg-base)'  : 'var(--text-secondary)',
@@ -4430,12 +4590,79 @@ function SidebarContent({
               </S>
             )}
 
-            <S title="Perfil Instagram">
+            <S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input value={brand.handle} onChange={e=>setBrand({...brand,handle:e.target.value})} className="vc-input"/>
               </div>
               <Toggle label="Mostrar @ nos slides" value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
+              <div style={{ marginTop: 10 }}>
+                <label className="vc-label-sm">Foto no ícone do @</label>
+                {brand.handleAvatar ? (
+                  <div style={{
+                    display:'flex', alignItems:'center', gap:10,
+                    background:'var(--bg-card)', border:'1px solid var(--border)',
+                    borderRadius:9, padding:10, marginTop:4,
+                  }}>
+                    <div style={{
+                      width:48, height:48, borderRadius:'50%', flexShrink:0,
+                      overflow:'hidden',
+                      border:'2px solid var(--hairline)',
+                      background:`conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)`,
+                      padding:2, boxSizing:'border-box',
+                    }}>
+                      <div style={{
+                        width:'100%', height:'100%', borderRadius:'50%', overflow:'hidden',
+                        background:`url(${brand.handleAvatar}) center/cover no-repeat`,
+                      }}/>
+                    </div>
+                    <div style={{ flex:1, fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
+                      Aparece dentro do anel do badge nos cards.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBrand({ ...brand, handleAvatar: null })}
+                      title="Remover foto do perfil"
+                      style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                    >
+                      <Trash2 size={11}/>
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                      height:56, borderRadius:9, cursor:'pointer', marginTop:4,
+                      background:'var(--bg-card)', border:'1px dashed var(--border)',
+                      color:'var(--text-secondary)', fontSize:12, fontWeight:600,
+                      fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                    }}
+                    onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                  >
+                    <Upload size={13}/>
+                    Carregar foto (PNG / JPG / WebP · até 2MB)
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display:'none' }}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast?.('Imagem muito grande. Máximo 2MB.', 'error');
+                          e.target.value = '';
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => setBrand({ ...brand, handleAvatar: reader.result });
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </S>
 
             <S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
@@ -4606,6 +4833,151 @@ function SidebarContent({
               <ColorRow label="Título" value={brand.titleColor} onChange={v=>setBrand({...brand,titleColor:v})}/>
               <ColorRow label="Subtítulo" value={brand.subColor} onChange={v=>setBrand({...brand,subColor:v})}/>
               <ColorRow label="Acento" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})}/>
+            </S>
+
+            <S title="Fontes próprias (ficheiro)" hint="WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o ficheiro não tiver todos os pesos.">
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div>
+                  <label className="vc-label-sm">Ficheiro — títulos da marca</label>
+                  {brand.customTitleFont?.dataUrl ? (
+                    <div style={{
+                      display:'flex', alignItems:'center', gap:10, marginTop:4,
+                      background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:9, padding:10,
+                    }}>
+                      <div
+                        style={{
+                          fontSize:18, fontWeight:600, color:'var(--text-primary)', fontFamily: effectiveTitleFontFamily(brand),
+                          letterSpacing:'-0.022em', lineHeight:1, flex:1, minWidth:0,
+                        }}
+                      >
+                        Aa
+                      </div>
+                      <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={brand.customTitleFont.fileName}>
+                        {brand.customTitleFont.fileName || 'fonte-título'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBrand({ ...brand, customTitleFont: null })}
+                        title="Remover fonte de título"
+                        style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
+                      >
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      style={{
+                        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                        height:52, borderRadius:9, cursor:'pointer', marginTop:4,
+                        background:'var(--bg-card)', border:'1px dashed var(--border)',
+                        color:'var(--text-secondary)', fontSize:12, fontWeight:600,
+                        fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                      }}
+                      onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                    >
+                      <Upload size={13}/>
+                      Carregar fonte para títulos
+                      <input
+                        type="file"
+                        accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+                        style={{ display:'none' }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const max = 5 * 1024 * 1024;
+                          if (file.size > max) {
+                            toast?.('Ficheiro demasiado grande. Máximo 5MB.', 'error');
+                            e.target.value = '';
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => setBrand({
+                            ...brand,
+                            customTitleFont: {
+                              dataUrl: reader.result,
+                              format: guessFontFileFormat(file),
+                              fileName: file.name,
+                            },
+                          });
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <div>
+                  <label className="vc-label-sm">Ficheiro — corpo / subtítulo</label>
+                  {brand.customBodyFont?.dataUrl ? (
+                    <div style={{
+                      display:'flex', alignItems:'center', gap:10, marginTop:4,
+                      background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:9, padding:10,
+                    }}>
+                      <div
+                        style={{
+                          fontSize:14, fontWeight:400, color:'var(--text-primary)', fontFamily: effectiveBodyFontFamily(brand),
+                          letterSpacing:'-0.011em', lineHeight:1.35, flex:1, minWidth:0,
+                        }}
+                      >
+                        Texto de exemplo
+                      </div>
+                      <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={brand.customBodyFont.fileName}>
+                        {brand.customBodyFont.fileName || 'fonte-corpo'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBrand({ ...brand, customBodyFont: null })}
+                        title="Remover fonte de corpo"
+                        style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
+                      >
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      style={{
+                        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                        height:52, borderRadius:9, cursor:'pointer', marginTop:4,
+                        background:'var(--bg-card)', border:'1px dashed var(--border)',
+                        color:'var(--text-secondary)', fontSize:12, fontWeight:600,
+                        fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                      }}
+                      onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                    >
+                      <Upload size={13}/>
+                      Carregar fonte para corpo
+                      <input
+                        type="file"
+                        accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+                        style={{ display:'none' }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const max = 5 * 1024 * 1024;
+                          if (file.size > max) {
+                            toast?.('Ficheiro demasiado grande. Máximo 5MB.', 'error');
+                            e.target.value = '';
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => setBrand({
+                            ...brand,
+                            customBodyFont: {
+                              dataUrl: reader.result,
+                              format: guessFontFileFormat(file),
+                              fileName: file.name,
+                            },
+                          });
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
             </S>
 
             <FontPicker title="Fonte — Título" fonts={TITLE_FONTS} active={brand.titleFont} onChange={val=>setBrand({...brand,titleFont:val})}/>
@@ -4847,7 +5219,7 @@ function SidebarContent({
 
       {/* Download footer */}
       <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
-        <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar slide ${activeIdx+1} em PNG`} style={{
+        <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
           width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
           background:'var(--text-primary)', color:'#fff',
           fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
@@ -4857,11 +5229,11 @@ function SidebarContent({
           transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
         }}>
           <Download size={13}/>
-          {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar slide ${activeIdx+1}`}
+          {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
         </button>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-          <button onClick={exportAll} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label={`Baixar ${slides.length} slides em PNG`}>
-            <Download size={11}/>PNG ({slides.length})
+          <button onClick={exportAll} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label={`Baixar todos os cards num ficheiro ZIP (${slides.length} imagens)`}>
+            <Download size={11}/>ZIP ({slides.length})
           </button>
           <button onClick={exportPDF} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label="Baixar carrossel em PDF">
             <FileText size={11}/>PDF
@@ -5462,6 +5834,12 @@ const DEFAULT_BRAND = {
   links: '',
   // Logo (data URL) — aplicado automaticamente nos slides quando setado
   logo: null,
+  /** Foto do perfil no badge @ (data URL) — substitui o ícone decorativo circular */
+  handleAvatar: null,
+  /** Fonte própria (título) — { dataUrl, format, fileName } */
+  customTitleFont: null,
+  /** Fonte própria (corpo / subtítulo) */
+  customBodyFont: null,
   logoSize: 30,           // tamanho do logo em px na escala real (1080px)
   logoPosition: 'tr',     // canto: 'tl' | 'tr' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
@@ -5903,6 +6281,36 @@ export default function App() {
     };
   }, []);
 
+  // Fontes de ficheiro (.woff2 / .ttf / …) injetadas por perfil — cards + pré-visualizações
+  useEffect(() => {
+    const id = 'vc-custom-brand-fonts';
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('style');
+      el.id = id;
+      document.head.appendChild(el);
+    }
+    const rules = [];
+    const push = (b) => {
+      if (!b?.id) return;
+      if (b.customTitleFont?.dataUrl && b.customTitleFont?.format) {
+        const u = JSON.stringify(b.customTitleFont.dataUrl);
+        rules.push(
+          `@font-face{font-family:'${vcCustomTitleFace(b.id)}';src:url(${u}) format('${b.customTitleFont.format}');font-display:swap;}`,
+        );
+      }
+      if (b.customBodyFont?.dataUrl && b.customBodyFont?.format) {
+        const u = JSON.stringify(b.customBodyFont.dataUrl);
+        rules.push(
+          `@font-face{font-family:'${vcCustomBodyFace(b.id)}';src:url(${u}) format('${b.customBodyFont.format}');font-display:swap;}`,
+        );
+      }
+    };
+    push(brand);
+    (brandRoster || []).forEach(push);
+    el.textContent = rules.join('\n');
+  }, [brand, brandRoster]);
+
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
     window.addEventListener('resize', onResize);
@@ -6324,8 +6732,8 @@ ${capRules}
       await loadHtml2Canvas();
       await waitForRender();
       const canvas = await renderSlideToCanvas(slides[idx]);
-      dlDataUrl(canvas.toDataURL('image/png'), `slide-${String(idx+1).padStart(2,'0')}.png`);
-      toast(`Slide ${idx+1} baixado`, 'success');
+      await downloadCanvasPng(canvas, `slide-${String(idx+1).padStart(2,'0')}.png`);
+      toast(`Card ${idx+1} baixado`, 'success');
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
   };
@@ -6336,13 +6744,18 @@ ${capRules}
     try {
       await loadHtml2Canvas();
       await waitForRender();
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
       for (let i=0; i<slides.length; i++) {
         setExportProgress({current:i+1,total:slides.length});
         const canvas = await renderSlideToCanvas(slides[i]);
-        dlDataUrl(canvas.toDataURL('image/png'), `slide-${String(i+1).padStart(2,'0')}.png`);
-        await new Promise(r=>setTimeout(r,250));
+        const blob = await canvasToPngBlob(canvas);
+        zip.file(`slide-${String(i+1).padStart(2,'0')}.png`, blob);
       }
-      toast(`${slides.length} slides baixados`, 'success');
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadBlob(zipBlob, `carrossel-slides-${stamp}.zip`);
+      toast(`ZIP com ${slides.length} cards pronto`, 'success');
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
   };
@@ -7213,7 +7626,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                 }}
                 onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.95)'; }}
                 onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                aria-label="Baixar slide atual"
+                aria-label="Baixar card atual"
               >
                 <Download size={14}/>Baixar
               </button>
@@ -7293,6 +7706,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         onClose={()=>setHookVarsOpen(false)}
         slide={slide}
         niche={niche}
+        brand={brand}
+        material={material}
         openaiKey={openaiKey}
         narrativeMode={mode}
         creativePreset={creativePreset}
@@ -7373,7 +7788,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         <div className="export-fab">
           <div style={{ width:28, height:28, borderRadius:'50%', border:'2px solid var(--border)', borderTopColor:'var(--accent)', animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>Exportando slides</div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>A exportar cards</div>
             <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:2, letterSpacing:'0.04em' }}>
               {exportProgress.current} / {exportProgress.total}
             </div>
@@ -8355,7 +8770,7 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
                     ))}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:b.titleFont, letterSpacing:'-0.011em' }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily: effectiveTitleFontFamily(b), letterSpacing:'-0.011em' }}>
                       {b.name || 'Sem nome'}
                     </div>
                     <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em' }}>
