@@ -17,6 +17,13 @@
   status = 200
   force = true
 
+# Extrair texto HTML de URLs (Fontes & referências → IA).
+[[redirects]]
+  from = "/api/fetch-source"
+  to = "/.netlify/functions/fetch-source"
+  status = 200
+  force = true
+
 # Ficheiros em `dist` (CSS/JS hashed) continuam servidos normalmente.
 # Esta regra só aplica quando o caminho não corresponde a nenhum ficheiro —
 # típico de SPAs quando alguém abre uma URL diretamente ou recarrega.

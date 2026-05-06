@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Sparkles, Search, Download, Trash2, Copy,
-  Plus, Palette, Layout, Wand2, Loader2,
+  Plus, Palette, Layout, Crop, Wand2, Loader2,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image,
@@ -652,6 +652,69 @@ const PALETTES = [
   { name:'Pearl',    bg:'#fafafc', title:'#1d1d1f', sub:'#515154', accent:'#0066cc' },
 ];
 
+/** Converte `#RGB`/`#RRGGBB`; retorna `{r,g,b}` ou null */
+function vcHexToRgb(hex) {
+  let s = String(hex || '').replace('#', '').trim();
+  if (!s || (s.length !== 3 && s.length !== 6)) return null;
+  if (s.length === 3) s = s.split('').map((c) => c + c).join('');
+  const n = Number.parseInt(s, 16);
+  if (!Number.isFinite(n)) return null;
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function vcNormalizeHex(hex) {
+  const rgb = vcHexToRgb(hex);
+  if (!rgb) return null;
+  return `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+}
+
+function vcRelLuminance01(rgb) {
+  const chan = (c) => {
+    const x = (c ?? 0) / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  };
+  const r = chan(rgb.r);
+  const g = chan(rgb.g);
+  const b = chan(rgb.b);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Nos slides Cultura/Tendência, a superfície «dark» alternada usava sempre #272729, ignorando
+ * paletas tipo Coral/Carbon onde `brand.bg` já é escuro. Se o utilizador define fundo escuro na marca,
+ * essa cor passa ao card em modo «dark». Fundos claros mantêm uma telha fixa institucional.
+ */
+function cultureDarkBackdropFromBrand(brandBg) {
+  const fb = vcNormalizeHex('#272729');
+  const n = vcNormalizeHex(brandBg || fb || '#272729');
+  const rgb = n ? vcHexToRgb(n) : null;
+  if (!rgb) return fb || '#272729';
+  const L = vcRelLuminance01(rgb);
+  if (L <= 0.2) return n;
+  const tile = vcHexToRgb('#272729');
+  if (!tile) return fb || '#272729';
+  const out = ['r', 'g', 'b'].map((k) => Math.round(rgb[k] * 0.32 + tile[k] * 0.68));
+  return `#${out.map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function brandMatchesPalette(brand, p) {
+  if (!brand || !p) return false;
+  const nb = vcNormalizeHex(brand.bg);
+  const nt = vcNormalizeHex(brand.titleColor);
+  const ns = vcNormalizeHex(brand.subColor);
+  const na = vcNormalizeHex(brand.accent);
+  return !!(
+    nb &&
+    nt &&
+    ns &&
+    na &&
+    nb === vcNormalizeHex(p.bg) &&
+    nt === vcNormalizeHex(p.title) &&
+    ns === vcNormalizeHex(p.sub) &&
+    na === vcNormalizeHex(p.accent)
+  );
+}
+
 // Fontes para títulos — agrupadas por categoria pra UI navegável.
 // `cat`: 'sans' | 'display' | 'serif' | 'editorial' | 'mono'
 const TITLE_FONTS = [
@@ -956,6 +1019,18 @@ const REFERENCE_PROFILES = [
 ];
 const REFERENCE_PROFILE_BY_ID = Object.fromEntries(REFERENCE_PROFILES.map(p => [p.id, p]));
 
+/** Sugestões de voz de referência por modo narrativo (opcional — serve de guia, não de regra fixa). */
+const NARRATIVE_MODE_REF_VOICE_PAIRING = {
+  editorial: 'Editorial premium · Tech didático · Finanças pop BR',
+  deep: 'Editorial premium · Tech didático · Coach sóbrio',
+  pain: 'Coach sóbrio · Clínica / estética · Microcriador BR',
+  viral: 'Microcriador BR · Gancho provocador',
+  storytelling: 'Storytelling em cena · Microcriador BR · Editorial premium',
+  how_to: 'Tech didático · Coach sóbrio · Microcriador BR',
+  jornalistico: 'Editorial premium · Tech didático',
+  sensacionalista: 'Gancho provocador · Microcriador BR',
+};
+
 const PRESET_NICHES = [
   'Marketing digital','Empreendedorismo','Finanças pessoais','Saúde mental',
   'Fitness','Nutrição','Tecnologia','IA & produtividade','Design',
@@ -1225,6 +1300,8 @@ const mkSlide = (n = 1) => ({
    * variant: 'classic' (foto full / texto) | 'sandwich' | 'stat'
    */
   canvas: null,
+  /** Slides com layout sanduíche (texto · foto · texto) como no pacote Cultura mas em modo Personalizado. */
+  useCultureLayout: false,
 });
 
 const isDefault = (slides) =>
@@ -2362,10 +2439,105 @@ function clampRect(r) {
   return { x, y, w, h };
 }
 
+/** Chaves reconhecidas em `slide.canvas.zones` para normalização de limites (% do card). */
+const CANVAS_ZONE_KEYS = ['photo', 'title', 'subtitle', 'top', 'bottom'];
+
+function rectsEqual(a, b) {
+  return a && b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+/** Heurísticas locais para «Ajuste automático»: texto calibrável, imagem inteira dentro do quadro e zonas normalizadas. */
+function slideAutoAdjustPatch(slide, { creativePreset }) {
+  const patch = {};
+
+  const titleRaw = slide.title ?? '';
+  const subtitleRaw = slide.subtitle ?? '';
+  const titleChars = String(titleRaw).trim().length;
+  const subChars = String(subtitleRaw).trim().length;
+  const titleLines = Math.max(1, String(titleRaw).split(/\n/).filter((ln) => ln.length > 0).length);
+  const subLines = Math.max(1, String(subtitleRaw).split(/\n/).length);
+
+  if (slide.bgImage) {
+    if (slide.bgFit !== 'contain') patch.bgFit = 'contain';
+    if ((slide.bgX ?? 50) !== 50) patch.bgX = 50;
+    if ((slide.bgY ?? 50) !== 50) patch.bgY = 50;
+    if ((slide.bgZoom ?? 100) !== 100) patch.bgZoom = 100;
+  }
+
+  if (slide.canvas?.enabled && slide.canvas.zones && typeof slide.canvas.zones === 'object') {
+    const z0 = slide.canvas.zones;
+    let changed = false;
+    const nextZones = { ...z0 };
+    for (const k of CANVAS_ZONE_KEYS) {
+      if (!z0[k]) continue;
+      const c = clampRect(z0[k]);
+      if (!rectsEqual(z0[k], c)) changed = true;
+      nextZones[k] = c;
+    }
+    if (changed) patch.canvas = { ...slide.canvas, zones: nextZones };
+  }
+
+  const curTitleSz = slide.titleSize ?? 100;
+  let nextTitleSz = curTitleSz;
+  if (titleChars > 150) nextTitleSz = Math.min(nextTitleSz, 70);
+  else if (titleChars > 110) nextTitleSz = Math.min(nextTitleSz, 80);
+  else if (titleChars > 75) nextTitleSz = Math.min(nextTitleSz, 90);
+  else if (titleChars > 52) nextTitleSz = Math.min(nextTitleSz, 96);
+
+  const curSubSz = slide.subSize ?? 100;
+  let nextSubSz = curSubSz;
+  if (subChars > 700) nextSubSz = Math.min(nextSubSz, 76);
+  else if (subChars > 480) nextSubSz = Math.min(nextSubSz, 84);
+  else if (subChars > 300) nextSubSz = Math.min(nextSubSz, 92);
+  else if (subChars > 200) nextSubSz = Math.min(nextSubSz, 97);
+
+  if (nextTitleSz !== curTitleSz) patch.titleSize = nextTitleSz;
+  if (nextSubSz !== curSubSz) patch.subSize = nextSubSz;
+
+  const curTLead = slide.titleLeading ?? 105;
+  let nextTLead = curTLead;
+  if (titleLines >= 4) nextTLead = Math.max(curTLead, 118);
+  else if (titleLines >= 2) nextTLead = Math.max(curTLead, 110);
+
+  const curSLead = slide.subLeading ?? 150;
+  let nextSLead = curSLead;
+  if (subLines >= 9) nextSLead = Math.max(curSLead, 168);
+  else if (subLines >= 6) nextSLead = Math.max(curSLead, 160);
+  else if (subChars > 520) nextSLead = Math.max(curSLead, 156);
+  else if (subLines >= 4) nextSLead = Math.max(curSLead, 154);
+
+  if (nextTLead !== curTLead) patch.titleLeading = nextTLead;
+  if (nextSLead !== curSLead) patch.subLeading = nextSLead;
+
+  const inset = slide.textInset ?? 7;
+  let nextInset = inset;
+  if ((titleChars > 95 || titleLines >= 3) && nextInset < 12) nextInset = Math.min(12, inset + 2);
+  if (subChars > 340 && nextInset < 14) nextInset = Math.min(14, Math.max(nextInset, inset + 2));
+  if (subChars > 540 && nextInset < 17) nextInset = Math.min(17, Math.max(nextInset, inset + 3));
+  if (nextInset !== inset) patch.textInset = nextInset;
+
+  const heavyStack =
+    creativePreset !== 'tendencia_cultura' ||
+    !String(slide.bodyAfterImage || '').trim();
+  if (heavyStack && subChars > 300 && ['mc', 'tc', 'tr', 'tl'].includes(slide.layout)) {
+    patch.layout = 'bl';
+    if (slide.align === 'center') patch.align = 'left';
+  }
+
+  return patch;
+}
+
 const DEFAULT_CANVAS_ZONES_CLASSIC = {
   photo: { x: 0, y: 0, w: 100, h: 58 },
   title: { x: 4, y: 62, w: 92, h: 14 },
   subtitle: { x: 4, y: 77, w: 92, h: 20 },
+};
+
+/** Capa / encerramento Cultura ou primeiros dois do Personalizado 1·1 · 1·2 — foto preenche o card, texto nas zonas inferiores. */
+const DEFAULT_CANVAS_ZONES_COVER_FULLBLEED = {
+  photo: { x: 0, y: 0, w: 100, h: 100 },
+  title: { x: 4, y: 52, w: 92, h: 12 },
+  subtitle: { x: 4, y: 64, w: 92, h: 30 },
 };
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
@@ -2374,17 +2546,75 @@ const DEFAULT_CANVAS_ZONES_SANDWICH = {
   bottom: { x: 4, y: 74, w: 92, h: 22 },
 };
 
+/** Rotações de zona «foto» no miolo (texto antes e depois, ordem editorial mantida pelo posicionamento). */
+const SANDWICH_ZONE_PRESETS = [
+  {
+    key: 'mid',
+    top: { x: 4, y: 7, w: 92, h: 26 },
+    photo: { x: 4, y: 34, w: 92, h: 38 },
+    bottom: { x: 4, y: 74, w: 92, h: 22 },
+  },
+  {
+    key: 'high',
+    top: { x: 4, y: 42, w: 92, h: 24 },
+    photo: { x: 4, y: 6, w: 92, h: 32 },
+    bottom: { x: 4, y: 68, w: 92, h: 28 },
+  },
+  {
+    key: 'low',
+    top: { x: 4, y: 6, w: 92, h: 26 },
+    photo: { x: 4, y: 54, w: 92, h: 38 },
+    bottom: { x: 4, y: 74, w: 92, h: 22 },
+  },
+];
+
+function sandwichZonesByRotationIndex(i) {
+  const p = SANDWICH_ZONE_PRESETS[(Math.abs(i) % SANDWICH_ZONE_PRESETS.length + SANDWICH_ZONE_PRESETS.length) % SANDWICH_ZONE_PRESETS.length];
+  return {
+    top: { ...p.top },
+    photo: { ...p.photo },
+    bottom: { ...p.bottom },
+  };
+}
+
+function slideHasPendingPhotoIntent(slide) {
+  return !!(String(slide?.imageQuery ?? '').trim());
+}
+
+/** Personalizado · densidades 1/1 ou 1/2: dois primeiros full-bleed, miolo tipo Cultura com sanduíche. */
+function isPersoHybridDensity(presetId, densityId) {
+  return presetId === 'livre' && (densityId === '1_1' || densityId === '1_2');
+}
+
+function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
+  const n = Math.min(12, Math.max(2, slideCount | 0));
+  const mid = scaledCharBand(200, 320, textDensityId || '1_1');
+  const bodyLo = Math.max(52, Math.round(mid.lo * 0.52));
+  const bodyHi = Math.max(bodyLo + 24, Math.round(mid.hi * 0.52));
+  return `
+LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
+
+- Slide 1 e Slide 2: CAPA tipo tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
+
+- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Quando incluir foto no card ("imageQuery" preenchido), "bodyAfterImage" é OBRIGATÓRIO com ${bodyLo}–${bodyHi} caracteres (proporção à densidade). Destaque lexical: UM trecho entre **asteriscos duplos**.
+- Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
+- Slide só texto SEM foto neste formato: imageQuery ""; use "subtitle" + "bodyAfterImage" em dupla coluna tipográfica (sem sanduíche de foto).
+`;
+}
+
 const DEFAULT_CANVAS_ZONES_STAT = {
   top: { x: 4, y: 8, w: 92, h: 40 },
   bottom: { x: 4, y: 52, w: 92, h: 38 },
 };
 
 function inferCanvasDefaults(slide, creativePreset) {
-  const cp = creativePreset === 'tendencia_cultura';
+  const cpPack = creativePreset === 'tendencia_cultura';
+  const skin = cpPack || !!slide.useCultureLayout;
   const bodyAfter = (slide.bodyAfterImage || '').trim();
-  const hasImg = !!slide.bgImage;
-  const sandwich = cp && !!bodyAfter && hasImg;
-  const stat = cp && !!bodyAfter && !hasImg && !!(slide.subtitle || '').trim();
+  const hasPhotoIntent = !!slide.bgImage || slideHasPendingPhotoIntent(slide);
+  const sandwich = skin && !!bodyAfter && hasPhotoIntent;
+  const stat =
+    skin && !!bodyAfter && !hasPhotoIntent && !!(slide.subtitle || '').trim();
   if (sandwich) return { variant: 'sandwich', zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH } };
   if (stat) return { variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } };
   return { variant: 'classic', zones: { ...DEFAULT_CANVAS_ZONES_CLASSIC } };
@@ -2404,11 +2634,15 @@ function pctBox(rect, f) {
 
 const VC_ZONE_DRAG_MIME = 'application/x-vc-canvas-zone';
 
-/** Contorno + arrastar / redimensionar canto SE (zonas canvas). Opcional: grip para trocar conteúdo entre slides. */
-function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys }) {
+/** Contorno + arrastar / redimensionar canto SE (zonas canvas). Opcional: grip para trocar conteúdo entre slides.
+ *  A zona `photo` fica por cima do conteúdo — `photoZoneTap` abre o import de imagem em clique simples (sem arrasto). */
+function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys, photoZoneTap = null }) {
   const dragRef = React.useRef(null);
   const zonesRef = React.useRef(zones);
   zonesRef.current = zones;
+  /** Só dispara photoZoneTap se o utilizador não moveu o rato o suficiente para ser arrasto. */
+  const photoTapOkRef = React.useRef(false);
+  const photoTouchRef = React.useRef(null);
 
   const swapKeysEffective = React.useMemo(() => {
     if (swapSlideIdx == null) return null;
@@ -2426,6 +2660,9 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
       if (!d || !onPatch) return;
       const dx = e.clientX - d.lastX;
       const dy = e.clientY - d.lastY;
+      if (d.key === 'photo' && photoZoneTap && (Math.abs(dx) + Math.abs(dy) > 4)) {
+        photoTapOkRef.current = false;
+      }
       d.lastX = e.clientX;
       d.lastY = e.clientY;
       const cur = zonesRef.current[d.key];
@@ -2456,7 +2693,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
       window.removeEventListener('mousemove', mm);
       window.removeEventListener('mouseup', mu);
     };
-  }, [f.h, f.w, onPatch]);
+  }, [f.h, f.w, onPatch, photoZoneTap]);
 
   if (!zones || !onPatch) return null;
 
@@ -2478,9 +2715,40 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
               borderRadius: 8,
               background: 'rgba(0, 102, 204, 0.04)',
             }}
+            onClick={(e) => {
+              if (k !== 'photo' || !photoZoneTap) return;
+              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              if (!photoTapOkRef.current) return;
+              e.stopPropagation();
+              photoZoneTap();
+            }}
+            onTouchStart={(e) => {
+              if (k !== 'photo' || !photoZoneTap) return;
+              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              const t = e.touches[0];
+              if (!t) return;
+              photoTouchRef.current = { x: t.clientX, y: t.clientY, moved: false };
+            }}
+            onTouchMove={(e) => {
+              const st = photoTouchRef.current;
+              if (!st || k !== 'photo' || !photoZoneTap) return;
+              const t = e.touches[0];
+              if (!t) return;
+              if (Math.abs(t.clientX - st.x) + Math.abs(t.clientY - st.y) > 14) st.moved = true;
+            }}
+            onTouchEnd={(e) => {
+              if (k !== 'photo' || !photoZoneTap) return;
+              const st = photoTouchRef.current;
+              photoTouchRef.current = null;
+              if (!st || st.moved) return;
+              e.preventDefault();
+              photoZoneTap();
+            }}
             onMouseDown={(e) => {
               if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
-              e.preventDefault();
+              const photoTap = k === 'photo' && photoZoneTap;
+              photoTapOkRef.current = photoTap;
+              if (!photoTap) e.preventDefault();
               e.stopPropagation();
               dragRef.current = {
                 key: k,
@@ -2603,6 +2871,8 @@ const ClassicCanvasInner = React.forwardRef(({
     slide.align === 'center' ? 'center' :
     slide.align === 'right' ? 'flex-end' :
     slide.align === 'justify' ? 'stretch' : 'flex-start';
+  const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage;
+  const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone));
   return (
     <div
       ref={ref}
@@ -2610,8 +2880,8 @@ const ClassicCanvasInner = React.forwardRef(({
     >
       <div
         style={{ ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' }}
-        onClick={showCanvasChrome && onPhotoZoneClick ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
-        role={showCanvasChrome ? 'button' : undefined}
+        onClick={photoZoneInteractive ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+        role={photoZoneInteractive ? 'button' : undefined}
       >
         {slide.bgImage && imgReady && !imgErr && (
           <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
@@ -2661,12 +2931,12 @@ const ClassicCanvasInner = React.forwardRef(({
             </span>
           </div>
         )}
-        {showCanvasChrome && !slide.bgImage && (
+        {(showCanvasChrome || pendingPhotoZone) && !slide.bgImage && (
           <div style={{
             position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
             color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
           }}>
-            Clique para inserir foto
+            {pendingPhotoZone ? 'Toque para inserir foto' : 'Clique para inserir foto'}
           </div>
         )}
       </div>
@@ -2869,6 +3139,7 @@ const ClassicCanvasInner = React.forwardRef(({
           onPatch={onCanvasPatch}
           swapSlideIdx={swapSlideIdx}
           swapZoneKeys={swapZoneKeys}
+          photoZoneTap={onPhotoZoneClick || null}
         />
       )}
     </div>
@@ -2899,7 +3170,7 @@ const SlideCardInner = React.forwardRef(({
     photoReqRef.current?.(slideIdx);
   }, [slideIdx]);
   const L = LAYOUTS.find(l=>l.id===slide.layout)||LAYOUTS[4];
-  const bg = slide.customBg || brand.bg;
+  const bg = resolveSlideBrandBg(brand, slideIdx, slide);
   const isBebas = brand.titleFont?.includes('Bebas');
   const imgModeNorm = normalizeSlideImgMode(slide.imgMode);
   const bgFit = slide.bgFit ?? 'custom';
@@ -2935,13 +3206,28 @@ const SlideCardInner = React.forwardRef(({
   const titleFF = effectiveTitleFontFamily(brand);
   const bodyFF = effectiveBodyFontFamily(brand);
 
-  const culture = creativePreset === 'tendencia_cultura';
+  const culturePack = creativePreset === 'tendencia_cultura';
+  const sandwichSkin = culturePack || !!slide.useCultureLayout;
+  const cultureRichText = culturePack || !!slide.useCultureLayout;
   const bodyAfterCulture = (slide.bodyAfterImage || '').trim();
-  const sandwich = culture && !!bodyAfterCulture && !!slide.bgImage;
-  const cultureStatFlat = culture && !slide.bgImage && !!bodyAfterCulture && !!(slide.subtitle || '').trim();
-  const cultureCoverOnly = culture && num === 1 && !!slide.bgImage && !sandwich && !cultureStatFlat;
-  const hideInstaBadge = culture;
-  const showCultureIdx = culture && total > 1;
+  const sandwich =
+    sandwichSkin &&
+    !!bodyAfterCulture &&
+    (!!slide.bgImage || slideHasPendingPhotoIntent(slide));
+  const cultureStatFlat =
+    sandwichSkin &&
+    !slide.bgImage &&
+    !slideHasPendingPhotoIntent(slide) &&
+    !!bodyAfterCulture &&
+    !!(slide.subtitle || '').trim();
+  const cultureCoverOnly =
+    culturePack &&
+    num === 1 &&
+    (!!slide.bgImage || slideHasPendingPhotoIntent(slide)) &&
+    !sandwich &&
+    !cultureStatFlat;
+  const hideInstaBadge = culturePack;
+  const showCultureIdx = culturePack && total > 1;
   const cultureAccentCol = brand.accent || '#0066cc';
 
   let inner;
@@ -2951,8 +3237,8 @@ const SlideCardInner = React.forwardRef(({
   if ((sandwich || cultureStatFlat) && cvEnabled && (cvVar === 'sandwich' || cvVar === 'stat')) {
     const z = slide.canvas.zones;
     const surface = cultureResolveSurface(slide, num);
-    const lightCultureBg = slide.customBg || brand.bg || '#fafafc';
-    const bgSolid = surface === 'dark' ? '#272729' : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
+    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
@@ -3044,8 +3330,10 @@ const SlideCardInner = React.forwardRef(({
               borderRadius: f.w * 0.017,
               background: surface === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
             }}
-            onClick={showCanvasChrome && onPhotoZoneClick ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
-            role={showCanvasChrome ? 'button' : undefined}
+            onClick={((showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick)
+              ? (e) => { e.stopPropagation(); onPhotoZoneClick(); }
+              : undefined}
+            role={(showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick ? 'button' : undefined}
           >
             {sandwich && imgLoading && (
               <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.2)' }}>
@@ -3067,12 +3355,12 @@ const SlideCardInner = React.forwardRef(({
                 }}
               />
             )}
-            {showCanvasChrome && !slide.bgImage && sandwich && (
+            {sandwich && !slide.bgImage && (
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
                 color:inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
               }}>
-                Toque para inserir foto
+                {slideHasPendingPhotoIntent(slide) ? 'Toque para inserir foto' : 'Área da imagem'}
               </div>
             )}
           </div>
@@ -3110,6 +3398,7 @@ const SlideCardInner = React.forwardRef(({
             onPatch={onCanvasPatch}
             swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
             swapZoneKeys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
+            photoZoneTap={onPhotoZoneClick || null}
           />
         )}
 
@@ -3136,8 +3425,8 @@ const SlideCardInner = React.forwardRef(({
     );
   } else if (sandwich || cultureStatFlat) {
     const surface = cultureResolveSurface(slide, num);
-    const lightCultureBg = slide.customBg || brand.bg || '#fafafc';
-    const bgSolid = surface === 'dark' ? '#272729' : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
+    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
@@ -3213,6 +3502,28 @@ const SlideCardInner = React.forwardRef(({
             letterSpacing="-0.018em"
             paraGap={f.h*0.012}
           />
+          {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
+            <div
+              style={{
+                width:'100%',
+                borderRadius: f.w * 0.017,
+                minHeight: f.h * 0.22,
+                flexShrink:0,
+                background: surface === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
+                border: surface === 'light' ? `1px dashed ${inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                color: inkMuted,
+                fontWeight:600,
+                fontSize: f.w * 0.024,
+                textAlign:'center',
+                padding: f.w * 0.04,
+              }}
+            >
+              Toque para inserir foto
+            </div>
+          )}
           {sandwich && imgReady && !imgErr && (
             <img
               src={slide.bgImage}
@@ -3272,7 +3583,7 @@ const SlideCardInner = React.forwardRef(({
         titleFF={titleFF}
         bodyFF={bodyFF}
         isBebas={isBebas}
-        culture={culture}
+        culture={cultureRichText}
         cultureAccentCol={cultureAccentCol}
         cultureCoverOnly={cultureCoverOnly}
         showCultureIdx={showCultureIdx}
@@ -3364,7 +3675,7 @@ const SlideCardInner = React.forwardRef(({
         </div>
       )}
 
-      {culture && (() => {
+      {sandwichSkin && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
         const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
         const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
@@ -3491,7 +3802,7 @@ const SlideCardInner = React.forwardRef(({
                   slide.titleCase === 'lower' ? 'lowercase' :
                   isBebas ? 'uppercase' : 'none',
                 textShadow: shadow,
-              }}>{culture ? (
+              }}>{cultureRichText ? (
                 <CultureInlineRich
                   text={slide.title || ''}
                   baseColor={brand.titleColor}
@@ -3504,7 +3815,7 @@ const SlideCardInner = React.forwardRef(({
                 />
               ) : slide.title}</h1>
               {slide.subtitle && (
-                culture ? (
+                cultureRichText ? (
                   <div style={{
                     margin:0,
                     maxWidth:'100%',
@@ -3565,9 +3876,9 @@ const SlideCardInner = React.forwardRef(({
   }
 
   const surfaceQuick = (sandwich || cultureStatFlat) ? cultureResolveSurface(slide, num) : null;
-  const lightCultureOuter = slide.customBg || brand.bg || '#fafafc';
+  const lightCultureOuter = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const outerBg = surfaceQuick
-    ? (surfaceQuick === 'dark' ? '#272729' : surfaceQuick === 'accent' ? (brand.accent || '#0066cc') : lightCultureOuter)
+    ? (surfaceQuick === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surfaceQuick === 'accent' ? (brand.accent || '#0066cc') : lightCultureOuter)
     : bg;
 
   return (
@@ -3806,6 +4117,90 @@ function ModePicker({ value, onChange }) {
       }}>
         <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>{active.icon} {active.label}: </span>
         {active.desc}.
+      </div>
+    </div>
+  );
+}
+
+function ReferenceProfilesCuradoria({ material, setMaterial }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div>
+        <label className="vc-label" style={{ marginBottom: 4 }}>Curadoria: voz de referência</label>
+        <div style={{
+          fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+          lineHeight: 1.5, marginTop: 2,
+        }}>
+          Inspire tom e ritmo do texto (carrosséis fortes no Instagram). Não copia posts nem nomes de perfis.
+        </div>
+      </div>
+      <div style={{
+        fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.47, letterSpacing: '-0.011em',
+        padding: '8px 10px', background: 'var(--bg-pearl)', borderRadius: 11, border: '1px solid var(--hairline)',
+      }}>
+        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          Sugestões por modo narrativo
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {GEN_MODES.map((m) => (
+            <li key={m.id}>
+              <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {m.icon} {m.label}
+              </span>
+              {' — '}
+              {NARRATIVE_MODE_REF_VOICE_PAIRING[m.id]}
+            </li>
+          ))}
+        </ul>
+        <p style={{ margin: '10px 0 0', fontSize: 11, lineHeight: 1.47 }}>
+          Você pode combinar modo e voz livremente até encontrar o tom que mais agrada — não há par obrigatório.
+        </p>
+      </div>
+      <div data-vc-tour="ref-profiles" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <button
+          type="button"
+          onClick={() => setMaterial({ ...material, refProfileId: null })}
+          style={{
+            alignSelf: 'flex-start', height: 32, padding: '0 14px', borderRadius: 9999,
+            border: `1px solid ${!material.refProfileId ? 'var(--accent)' : 'var(--border)'}`,
+            background: !material.refProfileId ? 'rgba(0,102,204,0.08)' : 'var(--bg-card)',
+            color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+            cursor: 'pointer', letterSpacing: '-0.011em',
+          }}
+        >
+          Nenhuma referência fixa
+        </button>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))',
+          gap: 8,
+        }}>
+          {REFERENCE_PROFILES.map((p) => {
+            const on = material.refProfileId === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setMaterial({ ...material, refProfileId: p.id })}
+                title={p.promptBlock.slice(0, 220) + '…'}
+                style={{
+                  textAlign: 'left', padding: '10px 10px', borderRadius: 11,
+                  border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                  background: on ? 'rgba(0,102,204,0.06)' : 'var(--bg-card)',
+                  cursor: 'pointer', transition: 'border-color 0.12s',
+                  minHeight: 72,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.011em', lineHeight: 1.25 }}>
+                  {p.label}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.35 }}>
+                  {p.desc}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -4088,6 +4483,324 @@ function PromptDialog({ open, title, defaultValue='', placeholder='', label='', 
   );
 }
 
+// ─── IMAGE CROP MODAL ─────────────────────────────────────────────────────────
+/** Recorta a imagem de fundo no canvas; proporção 4:5 opcional (feed Instagram). */
+function ImageCropModal({ open, imageSrc, onClose, onApply }) {
+  const carAr = FORMATS.carrossel.w / FORMATS.carrossel.h;
+  const [nat, setNat] = useState({ w: 0, h: 0 });
+  const [cropN, setCropN] = useState({ x: 0, y: 0, w: 0, h: 0 });
+  const [lockStory, setLockStory] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState('');
+  const dragRef = useRef(null);
+  const natRef = useRef({ w: 0, h: 0 });
+  const dispRef = useRef({ w: 0, h: 0 });
+  const lockStoryRef = useRef(true);
+  lockStoryRef.current = lockStory;
+
+  const maxWp = typeof window !== 'undefined' ? Math.min(520, window.innerWidth - 48) : 520;
+  const maxHp = typeof window !== 'undefined' ? Math.min(Math.floor(window.innerHeight * 0.46), 440) : 440;
+  const previewScale =
+    open && nat.w > 0 && nat.h > 0 ? Math.min(maxWp / nat.w, maxHp / nat.h, 1) : 1;
+  const dwPx = open && nat.w > 0 ? Math.max(1, Math.round(nat.w * previewScale)) : 1;
+  const dhPx = open && nat.h > 0 ? Math.max(1, Math.round(nat.h * previewScale)) : 1;
+  natRef.current = nat;
+  dispRef.current = { w: dwPx, h: dhPx };
+
+  const fullImageCrop = useCallback((nw, nh) => ({ x: 0, y: 0, w: nw, h: nh }), []);
+
+  const centeredLockedCrop = useCallback((nw, nh) => {
+    let iw = Math.min(nw, nh * carAr);
+    let ih = iw / carAr;
+    if (ih > nh) {
+      ih = nh;
+      iw = ih * carAr;
+    }
+    return { x: (nw - iw) / 2, y: (nh - ih) / 2, w: iw, h: ih };
+  }, [carAr]);
+
+  useEffect(() => {
+    if (!open || !imageSrc) {
+      setNat({ w: 0, h: 0 });
+      setCropN({ x: 0, y: 0, w: 0, h: 0 });
+      setHint('');
+      return;
+    }
+    setBusy(false);
+    setHint('');
+    const img = new Image();
+    img.onload = () => {
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      if (!nw || !nh) {
+        setHint('Imagem com dimensão inválida.');
+        return;
+      }
+      setNat({ w: nw, h: nh });
+      const init = lockStoryRef.current ? centeredLockedCrop(nw, nh) : fullImageCrop(nw, nh);
+      setCropN(init);
+    };
+    img.onerror = () => setHint('Não foi possível carregar esta imagem.');
+    if (!String(imageSrc).startsWith('data:')) img.crossOrigin = 'anonymous';
+    img.src = imageSrc;
+  }, [open, imageSrc, centeredLockedCrop, fullImageCrop]);
+
+  useEffect(() => {
+    if (!nat.w || !nat.h) return;
+    setCropN(lockStory ? centeredLockedCrop(nat.w, nat.h) : fullImageCrop(nat.w, nat.h));
+  }, [lockStory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const minSideNat = () => Math.max(32, Math.min(natRef.current.w, natRef.current.h) * 0.04);
+    const onMove = (e) => {
+      const st = dragRef.current;
+      if (!st || st.pointerId !== e.pointerId || !natRef.current.w || !dispRef.current.w) return;
+      const nw = natRef.current.w;
+      const nh = natRef.current.h;
+      const dw = dispRef.current.w;
+      const dh = dispRef.current.h;
+      const dxN = ((e.clientX - st.cx) / dw) * nw;
+      const dyN = ((e.clientY - st.cy) / dh) * nh;
+      if (st.kind === 'move') {
+        const min = minSideNat();
+        const w = st.cw;
+        const h = st.ch;
+        let nx = st.ox + dxN;
+        let ny = st.oy + dyN;
+        nx = Math.min(Math.max(0, nx), nw - w);
+        ny = Math.min(Math.max(0, ny), nh - h);
+        if (w < min || h < min) return;
+        setCropN({ x: nx, y: ny, w, h });
+      } else if (st.kind === 'resize-se') {
+        const mn = minSideNat();
+        const ox = st.ox;
+        const oy = st.oy;
+        let brx = Math.min(Math.max(st.brx + dxN, ox + mn), nw);
+        let bry = Math.min(Math.max(st.bry + dyN, oy + mn), nh);
+        let nwR = brx - ox;
+        let nhR = lockStoryRef.current ? nwR / carAr : bry - oy;
+        if (lockStoryRef.current) {
+          const maxW = nw - ox;
+          const maxH = nh - oy;
+          if (nwR > maxW) {
+            nwR = maxW;
+            nhR = nwR / carAr;
+          }
+          if (nhR > maxH) {
+            nhR = maxH;
+            nwR = nhR * carAr;
+          }
+        } else {
+          nwR = Math.min(Math.max(nwR, mn), nw - ox);
+          nhR = Math.min(Math.max(nhR, mn), nh - oy);
+        }
+        let minNw = nwR >= mn ? nwR : mn;
+        let minNh = lockStoryRef.current ? minNw / carAr : (nhR >= mn ? nhR : mn);
+        if (lockStoryRef.current && oy + minNh > nh) minNh = nh - oy;
+        if (!lockStoryRef.current && oy + minNh > nh) minNh = nh - oy;
+        if (ox + minNw > nw) minNw = nw - ox;
+        if (lockStoryRef.current) minNh = minNw / carAr;
+        setCropN({ x: ox, y: oy, w: minNw, h: minNh });
+      }
+    };
+    const onUp = (e) => {
+      if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [open, carAr, dwPx, dhPx]);
+
+  function badMouseButton(ev) {
+    return ev.pointerType === 'mouse' && ev.button !== 0;
+  }
+
+  const startMove = (e) => {
+    if (!nat.w || badMouseButton(e)) return;
+    e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch { /* noop */ }
+    dragRef.current = {
+      pointerId: e.pointerId,
+      kind: 'move',
+      cx: e.clientX,
+      cy: e.clientY,
+      ox: cropN.x,
+      oy: cropN.y,
+      cw: cropN.w,
+      ch: cropN.h,
+    };
+  };
+
+  const startResizeSe = (e) => {
+    e.stopPropagation();
+    if (badMouseButton(e)) return;
+    e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch { /* noop */ }
+    dragRef.current = {
+      pointerId: e.pointerId,
+      kind: 'resize-se',
+      cx: e.clientX,
+      cy: e.clientY,
+      ox: cropN.x,
+      oy: cropN.y,
+      brx: cropN.x + cropN.w,
+      bry: cropN.y + cropN.h,
+    };
+  };
+
+  const handleApply = () => {
+    if (!nat.w || !nat.h || busy || !imageSrc) return;
+    setBusy(true);
+    setHint('');
+    queueMicrotask(() => {
+      const img = new Image();
+      img.crossOrigin = String(imageSrc).startsWith('data:') ? undefined : 'anonymous';
+      img.onload = () => {
+        try {
+          const sx = Math.max(0, Math.min(Math.floor(cropN.x), img.naturalWidth - 2));
+          const sy = Math.max(0, Math.min(Math.floor(cropN.y), img.naturalHeight - 2));
+          let sw = Math.max(2, Math.floor(cropN.w));
+          let sh = Math.max(2, Math.floor(cropN.h));
+          sw = Math.min(sw, img.naturalWidth - sx);
+          sh = Math.min(sh, img.naturalHeight - sy);
+          const maxSide = 2200;
+          const ds = Math.min(1, maxSide / Math.max(sw, sh));
+          const cw = Math.max(2, Math.round(sw * ds));
+          const ch = Math.max(2, Math.round(sh * ds));
+          const canvas = document.createElement('canvas');
+          canvas.width = cw;
+          canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('no ctx');
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+          onApply(canvas.toDataURL('image/jpeg', 0.92));
+          onClose();
+        } catch {
+          setHint(
+            'Exportação falhou: URLs externas por vezes bloqueiam leitura. Use Upload neste card ou gere outra imagem.',
+          );
+        } finally {
+          setBusy(false);
+        }
+      };
+      img.onerror = () => {
+        setHint('Erro ao processar a imagem.');
+        setBusy(false);
+      };
+      img.src = imageSrc;
+    });
+  };
+
+  if (!open) return null;
+
+  const pctLeft = nat.w ? (cropN.x / nat.w) * 100 : 0;
+  const pctTop = nat.h ? (cropN.y / nat.h) * 100 : 0;
+  const pctW = nat.w ? (cropN.w / nat.w) * 100 : 100;
+  const pctH = nat.h ? (cropN.h / nat.h) * 100 : 100;
+  const cantApply = busy || !nat.w || cropN.w < 2 || cropN.h < 2;
+
+  return (
+    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
+      <div className="modal-panel vc-modal-scroll" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--hairline)',
+          flexShrink: 0,
+          background: 'var(--bg-sidebar)',
+        }}>
+          <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>
+            Recortar imagem do card
+          </div>
+          <button type="button" onClick={() => !busy && onClose()} aria-label="Fechar" disabled={busy} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: busy ? 'not-allowed' : 'pointer', padding: 4, opacity: busy ? 0.4 : 1 }}>
+            <X size={16}/>
+          </button>
+        </div>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{
+            margin: 0, fontSize: 13, lineHeight: 1.47, letterSpacing: '-0.011em', fontWeight: 400,
+            color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+          }}>
+            Arraste a moldura para posicionar; puxe o canto inferior direito para redimensionar. Opção «4:5» alinha ao feed (1080×1350).
+          </p>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            letterSpacing: '-0.011em', fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)', userSelect: 'none',
+          }}>
+            <input type="checkbox" checked={lockStory} disabled={busy} onChange={(ev) => setLockStory(ev.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: busy ? 'not-allowed' : 'pointer' }}/>
+            Travar proporção 4:5 (feed Instagram)
+          </label>
+          {hint ? (
+            <div style={{
+              fontSize: 11, lineHeight: 1.47, fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
+              color: '#c5251c', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.18)',
+              borderRadius: 11, padding: '8px 10px',
+            }}>{hint}</div>
+          ) : null}
+          <div style={{
+            position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#000', borderRadius: 11, overflow: 'hidden', border: '1px solid var(--hairline)',
+            maxHeight: 'min(52vh, 460px)', minHeight: 140,
+          }}>
+            {!nat.w ? (
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, padding: '24px 12px', fontFamily: 'var(--font-ui)' }}>A carregar…</span>
+            ) : (
+              <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, maxHeight: 'min(52vh, 460px)' }}>
+                <img
+                  src={imageSrc}
+                  alt=""
+                  draggable={false}
+                  crossOrigin={String(imageSrc).startsWith('data:') ? undefined : 'anonymous'}
+                  style={{
+                    display: 'block', maxWidth: '100%', width: 'auto', height: 'auto',
+                    maxHeight: 'min(52vh, 460px)', objectFit: 'contain',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute', left: `${pctLeft}%`, top: `${pctTop}%`, width: `${pctW}%`, height: `${pctH}%`,
+                    boxSizing: 'border-box', border: '2px solid #fff', boxShadow: '0 0 0 4096px rgba(0,0,0,0.5)',
+                    cursor: 'grab', touchAction: 'none',
+                  }}
+                  onPointerDown={startMove}
+                >
+                  <div
+                    data-crop-handle="se"
+                    title="Redimensionar"
+                    onPointerDown={startResizeSe}
+                    style={{
+                      position: 'absolute', right: -8, bottom: -8, width: 22, height: 22, borderRadius: 4,
+                      background: 'var(--accent)', border: '2px solid #fff', cursor: 'nwse-resize', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => !busy && onClose()} disabled={busy} className="vc-btn vc-btn-ghost" style={{ height: 40, padding: '0 16px' }}>Cancelar</button>
+            <button type="button" disabled={cantApply} onClick={handleApply} className="vc-btn vc-btn-primary" style={{ height: 40, padding: '0 22px', borderRadius: 9999, opacity: cantApply ? 0.42 : 1 }}>
+              {busy ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }}/> : 'Aplicar recorte'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── REFINE BUTTON ────────────────────────────────────────────────────────────
 
 function RefineBtn({ onRefine, busy }) {
@@ -4296,11 +5009,12 @@ function GenerateModal({
   onCreativePresetChange,
   slideTextDensity: defaultSlideTextDensity = '1_1',
   onSlideTextDensityChange,
+  material = { content: '', sources: '', context: '', refProfileId: null },
+  setMaterial = () => {},
 }) {
   const [topic, setTopic] = useState(defaultTopic);
   const [count, setCount] = useState(6);
   const [niche, setNiche] = useState(defaultNiche);
-  const [tone, setTone] = useState(defaultTone || 'direto e provocativo');
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
   const [packCreative, setPackCreative] = useState(defaultCreativePreset || 'livre');
@@ -4321,7 +5035,6 @@ function GenerateModal({
 
   useEffect(()=>{ if(open){ setErr(''); if(defaultTopic) setTopic(defaultTopic); } },[open,defaultTopic]);
   useEffect(()=>{ if(defaultNiche) setNiche(defaultNiche); },[defaultNiche]);
-  useEffect(()=>{ if(defaultTone) setTone(defaultTone); },[defaultTone]);
   useEffect(()=>{ if(defaultAudience) setAudience(defaultAudience); },[defaultAudience]);
 
   const hasMaterialPack =
@@ -4329,7 +5042,7 @@ function GenerateModal({
   const hasContextPack =
     (Array.isArray(brandSummary) && brandSummary.length > 0) ||
     hasMaterialPack;
-  /** Personalizado (`livre`) expõe modo narrativo, nicho, público e tom. Tendência/Cultura traz estrutura no pacote. */
+  /** Personalizado (`livre`) expõe modo narrativo, nicho e público (tom base vem da Marca). Tendência/Cultura traz estrutura no pacote. */
   const modoPersonalizado = packCreative === 'livre';
   /** Tema digitado OU nicho OU Marca/Material preenchidos — evita botão morto só com contexto injetado. */
   const resolvedGenerationTopic = (() => {
@@ -4358,11 +5071,12 @@ function GenerateModal({
       onModeChange?.(modoPersonalizado ? mode : 'editorial');
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
+      const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
         niche: modoPersonalizado ? niche : '',
-        tone: modoPersonalizado ? tone : '',
+        tone: modoPersonalizado ? toneFromBrand : '',
         audience: modoPersonalizado ? audience : '',
         imgMode: 'dalle',
         imgParams: params,
@@ -4375,8 +5089,6 @@ function GenerateModal({
     } catch(e) { setErr(e.message); }
     finally { setBusy(false); }
   };
-
-  const tones = ['direto e provocativo','educativo e calmo','autoridade técnica','storytelling','irreverente'];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -4523,6 +5235,7 @@ function GenerateModal({
           {modoPersonalizado && (
           <>
           <ModePicker value={mode} onChange={setMode}/>
+          <ReferenceProfilesCuradoria material={material} setMaterial={setMaterial} />
           <div
             aria-live="polite"
             style={{
@@ -4555,22 +5268,6 @@ function GenerateModal({
               <input value={audience} onChange={e=>setAudience(e.target.value)} placeholder="Ex: empreendedores" className="vc-input"/>
             </div>
           </div>
-
-          {/* Tone */}
-          <div>
-            <label className="vc-label">Tom de voz</label>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {tones.map(t=>(
-                <button key={t} onClick={()=>setTone(t)} style={{
-                  fontSize:11, padding:'5px 12px', borderRadius:99, cursor:'pointer',
-                  fontFamily:'var(--font-ui)', fontWeight:600, transition:'all 0.12s',
-                  background: tone===t ? 'var(--accent)' : 'var(--bg-card)',
-                  border: `1px solid ${tone===t ? 'var(--accent)' : 'var(--border)'}`,
-                  color: tone===t ? '#fff' : 'var(--text-secondary)',
-                }}>{t}</button>
-              ))}
-            </div>
-          </div>
           </>
           )}
 
@@ -4589,7 +5286,7 @@ function GenerateModal({
             }}
           >
             <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Pacote Tendência/Cultura:</span>{' '}
-            estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho, público-alvo e tom de voz do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.
+            estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho e público-alvo do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.
             {' '}
             <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>
               · {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity} ({CREATIVE_PRESET_BY_ID[packCreative]?.label})
@@ -5154,8 +5851,7 @@ function HookVariationsModal({
     setBusy(true); setErr(''); setHooks([]);
     try {
       const brandBlock = buildBrandBlock(brand);
-      const materialBlock = buildMaterialBlock(material);
-      const materialPriorityBlock = buildMaterialPriorityBlock(material);
+      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material);
       const r = await callAI(
         `Atue como copywriter sênior. Gere 5 variações de gancho (slide 1 de carrossel Instagram) com base no contexto abaixo.
 
@@ -5405,6 +6101,7 @@ function SidebarContent({
   batchPhotoInputRef = { current: null },
   enableCanvasLayout = () => {},
   disableCanvasLayout = () => {},
+  onOpenImageCrop = () => {},
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -5504,9 +6201,11 @@ function SidebarContent({
                   onClick={enableCanvasLayout}
                   style={{
                     width:'100%', minHeight:36, borderRadius:9999, cursor:'pointer',
-                    border:'1px solid var(--accent)', background:'var(--accent)', color:'#fff',
+                    border:`1px solid ${anyCanvasEnabled ? 'var(--success)' : 'var(--accent)'}`,
+                    background:anyCanvasEnabled ? 'var(--success)' : 'var(--accent)',
+                    color:'#fff',
                     fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
-                    transition:'transform 0.1s var(--ease-smooth)',
+                    transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                   }}
                   onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
                   onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
@@ -5577,7 +6276,7 @@ function SidebarContent({
                   style={{ fontSize:12, color:'var(--text-secondary)' }}
                 />
               </div>
-              {(creativePreset === 'tendencia_cultura') && (
+              {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout) && (
                 <>
                   <div>
                     <label className="vc-label-sm">Texto abaixo da imagem (sandwich)</label>
@@ -5689,20 +6388,44 @@ function SidebarContent({
               </div>
 
               {/* Action buttons */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {[
                   { icon:Upload, label:'Upload', action:()=>fileInputRef.current?.click() },
                   { icon:LinkIcon, label:'URL', action:askUrlImg },
                   { icon:Search, label:'Buscar', action:()=>replaceImg() },
-                ].map(({icon:Icon,label,action})=>(
-                  <button key={label} onClick={action} style={{
-                    background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8,
-                    padding:'8px 0', cursor:'pointer', display:'flex', flexDirection:'column',
-                    alignItems:'center', gap:4, transition:'all 0.12s',
-                    color:'var(--text-muted)',
-                  }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
+                  {
+                    icon: Crop,
+                    label: 'Recortar',
+                    action: () => onOpenImageCrop?.(),
+                    disabled: !slide.bgImage,
+                  },
+                ].map(({ icon: Icon, label, action, disabled })=>(
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={action}
+                    disabled={disabled}
+                    style={{
+                      background: disabled ? 'var(--bg-pearl)' : 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding:'8px 0',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      display:'flex', flexDirection:'column',
+                      alignItems:'center', gap:4, transition:'all 0.12s',
+                      color: 'var(--text-muted)',
+                      opacity: disabled ? 0.55 : 1,
+                    }}
+                    onMouseEnter={(e)=>{
+                      if (disabled) return;
+                      e.currentTarget.style.color='var(--text-primary)';
+                      e.currentTarget.style.borderColor='var(--accent)';
+                    }}
+                    onMouseLeave={(e)=>{
+                      if (disabled) return;
+                      e.currentTarget.style.color='var(--text-muted)';
+                      e.currentTarget.style.borderColor='var(--border)';
+                    }}
                   >
                     <Icon size={12}/><span style={{ fontSize:11, fontWeight:600, letterSpacing:'-0.011em' }}>{label}</span>
                   </button>
@@ -5803,6 +6526,45 @@ function SidebarContent({
               </div>
               {/* inset from edges */}
               <Slider label="Distância das bordas" value={slide.textInset??7} min={1} max={20} onChange={v=>updateSlide({textInset:v})}/>
+            </S>
+
+            <S
+              title="Ajuste automático"
+              hint="Analisa título, subtítulo, zonas canvas e foto: mostra a imagem inteira na área (sem cortes laterais), puxa molduras para dentro do cartão e reduz tamanhos quando o texto é muito longo."
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const p = slideAutoAdjustPatch(slide, { creativePreset });
+                  if (!Object.keys(p).length) {
+                    toast?.('Nada urgente a ajustar neste cartão.', 'info');
+                    return;
+                  }
+                  updateSlide(p);
+                  const parts = [];
+                  if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('imagem mostrada por completo');
+                  if (p.canvas) parts.push('zonas normalizadas');
+                  if (p.titleSize != null || p.subSize != null || p.titleLeading != null || p.subLeading != null || p.textInset != null) {
+                    parts.push('tipografia calibrada');
+                  }
+                  if (p.layout != null || p.align != null) parts.push('bloco de texto reposicionado');
+                  toast?.(`Ajuste aplicado: ${parts.join(' · ')}.`, 'success');
+                }}
+                style={{
+                  width:'100%', minHeight:40, borderRadius:9999, cursor:'pointer',
+                  border:'1px solid var(--accent)',
+                  background:'var(--accent)', color:'#fff',
+                  fontSize:13, fontWeight:400, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                  transition:'transform 0.1s var(--ease-smooth)',
+                }}
+                onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <SlidersHorizontal size={15} aria-hidden/>
+                Ajuste automático
+              </button>
             </S>
 
             <S title="Tamanho">
@@ -6051,7 +6813,7 @@ function SidebarContent({
               </div>
             </S>
 
-            {(creativePreset === 'tendencia_cultura') && (
+            {(creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout)) && (
               <S title="Barra editorial (opcional)" hint="Aparece fina no topo dos cards no pacote Tendência/Cultura, como nas referências tipo brandsdecoded.">
                 <div>
                   <label className="vc-label-sm">Texto à esquerda (ex.: Powered by…)</label>
@@ -6221,9 +6983,24 @@ function SidebarContent({
             <S title="Paletas prontas">
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {PALETTES.map(p=>(
-                  <button key={p.name} className="palette-swatch" onClick={()=>setBrand({...brand,bg:p.bg,titleColor:p.title,subColor:p.sub,accent:p.accent})}
+                  <button
+                    key={p.name}
+                    type="button"
+                    className="palette-swatch"
+                    onClick={() =>
+                      setBrand((b) => ({
+                        ...b,
+                        bg: p.bg,
+                        titleColor: p.title,
+                        subColor: p.sub,
+                        accent: p.accent,
+                      }))
+                    }
                     style={{
-                      background:'var(--bg-card)', border:'1px solid var(--border)',
+                      background:'var(--bg-card)',
+                      border: brandMatchesPalette(brand, p)
+                        ? '2px solid var(--accent)'
+                        : '1px solid var(--border)',
                       borderRadius:8, padding:'10px 10px 8px', textAlign:'left', cursor:'pointer',
                       transition:'all 0.15s',
                     }}
@@ -6241,6 +7018,30 @@ function SidebarContent({
 
             <S title="Cores manuais">
               <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v})}/>
+              <Toggle
+                label="Intercalar fundo entre cards"
+                value={!!brand.interleaveBg}
+                onChange={(v) => setBrand({
+                  ...brand,
+                  interleaveBg: v,
+                  ...((v && !(String(brand.bgAlternate || '').trim())) ? { bgAlternate: '#f5f5f7' } : {}),
+                })}
+              />
+              {brand.interleaveBg ? (
+                <div style={{
+                  fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
+                  color:'var(--text-muted)', marginTop:-4, marginBottom:2,
+                }}>
+                  Slides 1 e 3 usam «Fundo» · 2 e 4 usam a segunda cor. Um «Fundo por slide» substitui esta regra nesse card.
+                </div>
+              ) : null}
+              {brand.interleaveBg ? (
+                <ColorRow
+                  label="Segundo fundo"
+                  value={(brand.bgAlternate && String(brand.bgAlternate).trim()) ? brand.bgAlternate : '#f5f5f7'}
+                  onChange={v=>setBrand({ ...brand, bgAlternate: v })}
+                />
+              ) : null}
               <ColorRow label="Título" value={brand.titleColor} onChange={v=>setBrand({...brand,titleColor:v})}/>
               <ColorRow label="Subtítulo" value={brand.subColor} onChange={v=>setBrand({...brand,subColor:v})}/>
               <ColorRow label="Acento" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})}/>
@@ -6399,58 +7200,6 @@ function SidebarContent({
         {tab==='material' && (
           <>
             <S
-              title="Curadoria: voz de referência"
-              hint="Inspire tom e ritmo do texto (carrosséis fortes no Instagram). Não copia posts nem nomes de perfis."
-            >
-              <div data-vc-tour="ref-profiles" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <button
-                  type="button"
-                  onClick={() => setMaterial({ ...material, refProfileId: null })}
-                  style={{
-                    alignSelf:'flex-start', height:32, padding:'0 14px', borderRadius:9999,
-                    border:`1px solid ${!material.refProfileId ? 'var(--accent)' : 'var(--border)'}`,
-                    background: !material.refProfileId ? 'rgba(0,102,204,0.08)' : 'var(--bg-card)',
-                    color: 'var(--text-secondary)', fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)',
-                    cursor:'pointer', letterSpacing:'-0.011em',
-                  }}
-                >
-                  Nenhuma referência fixa
-                </button>
-                <div style={{
-                  display:'grid',
-                  gridTemplateColumns:'repeat(auto-fill, minmax(118px, 1fr))',
-                  gap:8,
-                }}>
-                  {REFERENCE_PROFILES.map((p) => {
-                    const on = material.refProfileId === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setMaterial({ ...material, refProfileId: p.id })}
-                        title={p.promptBlock.slice(0, 220) + '…'}
-                        style={{
-                          textAlign:'left', padding:'10px 10px', borderRadius:11,
-                          border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                          background: on ? 'rgba(0,102,204,0.06)' : 'var(--bg-card)',
-                          cursor:'pointer', transition:'border-color 0.12s',
-                          minHeight:72,
-                        }}
-                      >
-                        <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.25 }}>
-                          {p.label}
-                        </div>
-                        <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:4, lineHeight:1.35 }}>
-                          {p.desc}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </S>
-
-            <S
               title="Conteúdo base"
               hint="Texto, anotação ou rascunho que a IA usará como matéria-prima ao gerar/refinar slides. Pode ser longo."
             >
@@ -6464,16 +7213,16 @@ function SidebarContent({
                 className="vc-input vc-textarea"
                 style={{ minHeight:140, resize:'vertical', lineHeight:1.5 }}
               />
-              {material.content && (
+              {normalizeMaterialField(material.content) ? (
                 <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em', textAlign:'right' }}>
-                  {material.content.length.toLocaleString('pt-BR')} caracteres
+                  {normalizeMaterialField(material.content).length.toLocaleString('pt-BR')} caracteres
                 </div>
-              )}
+              ) : null}
             </S>
 
             <S
               title="Fontes & referências"
-              hint="URLs, papers, citações, dados. A IA pode citar/usar como apoio. Uma por linha."
+              hint="URLs (uma por linha ou várias separadas por espaço): ao gerar o carrossel, o app tenta ler o texto da página no servidor e envia esse conteúdo à IA — sem isso os modelos não abrem links. Sites com paywall, login forte ou só JavaScript podem falhar."
             >
               <textarea
                 value={material.sources || ''}
@@ -6508,27 +7257,25 @@ function SidebarContent({
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 <button
                   onClick={() => setMaterial({ ...material, content: '', sources: '', context: '', refProfileId: null })}
-                  disabled={!material.content && !material.sources && !material.context && !material.refProfileId}
+                  disabled={!materialHasUserInput(material)}
                   style={{
                     height:36, borderRadius:8, cursor:'pointer',
                     background:'var(--bg-card)', border:'1px solid var(--border)',
                     color:'var(--text-muted)', fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)',
                     display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                    opacity: (!material.content && !material.sources && !material.context && !material.refProfileId) ? 0.4 : 1,
+                    opacity: !materialHasUserInput(material) ? 0.4 : 1,
                   }}
                 >
                   <Trash2 size={11}/>Limpar tudo
                 </button>
                 <button
                   onClick={() => setSetupOpen(true)}
-                  disabled={!material.content && !material.sources && !material.context && !material.refProfileId}
                   style={{
                     height:38, borderRadius:9999, cursor:'pointer',
                     background:'var(--accent)', border:'none',
                     color:'#fff', fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
                     letterSpacing:'-0.011em',
                     display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                    opacity: (!material.content && !material.sources && !material.context && !material.refProfileId) ? 0.42 : 1,
                     transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                   }}
                 >
@@ -6718,18 +7465,170 @@ const buildImgParamsTagsEN = (p) => {
   return `\nAdditional art direction (user adjusted): ${tags.join('; ')}.`;
 };
 
-const buildMaterialBlock = (material) => {
+const VC_ZWSP = /[\u200B-\u200D\uFEFF]/g;
+function normalizeMaterialField(v) {
+  if (v == null) return '';
+  return String(v).replace(VC_ZWSP, '').trim();
+}
+
+/** Bloco é só linhas que parecem URL (ex.: link colado por engano em "Conteúdo base"). */
+function isUrlOnlyNormalizedText(n) {
+  if (!n) return false;
+  const lines = n.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return false;
+  return lines.every(
+    (line) => /^https?:\/\/.+/i.test(line) || /^www\.[^\s]+$/i.test(line),
+  );
+}
+
+/** Unifica leitura do material: URLs só em "Conteúdo base" contam como fontes no prompt. */
+function normalizedMaterialPieces(material) {
+  let c = normalizeMaterialField(material?.content);
+  let s = normalizeMaterialField(material?.sources);
+  const x = normalizeMaterialField(material?.context);
+  if (c && isUrlOnlyNormalizedText(c) && !s) {
+    s = c;
+    c = '';
+  }
+  return { c, s, x };
+}
+
+/** Recolhe até 5 URLs únicas em «Conteúdo base», «Fontes» e «Contexto». */
+function extractHttpUrlsFromMaterial(material) {
+  const { c, s, x } = normalizedMaterialPieces(material);
+  const blob = [c, s, x].filter(Boolean).join('\n');
+  const found = new Set();
+  const re = /https?:\/\/[^\s<>"'{}|\\^[\])]+/gi;
+  let m;
+  while ((m = re.exec(blob)) !== null) {
+    let u = m[0].replace(/[,.;:!?)]+$/g, '');
+    try {
+      found.add(new URL(u).toString());
+    } catch {
+      /* ignorar token inválido */
+    }
+    if (found.size >= 6) break;
+  }
+  return [...found].slice(0, 5);
+}
+
+const FETCH_SOURCE_API = '/api/fetch-source';
+
+/** Servidor (Vite dev ou Netlify) devolve JSON { text } — evita CORS do browser. */
+async function fetchPlainTextFromUrl(url) {
+  const qp = new URLSearchParams({ url });
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 22000);
+  try {
+    const res = await fetch(`${FETCH_SOURCE_API}?${qp}`, { signal: ctl.signal });
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    const j =
+      ct.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : {};
+    if (!res.ok || j.ok === false) {
+      throw new Error(j?.error || `HTTP ${res.status}`);
+    }
+    if (!ct.includes('application/json')) {
+      throw new Error(
+        'Leitura de URLs indisponível neste servidor. Use npm run dev (Vite local) ou o deploy Netlify deste projeto.',
+      );
+    }
+    return String(j.text || '').trim();
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('Tempo limite ao ler a URL');
+    throw e instanceof Error ? e : new Error(String(e));
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function fetchMaterialUrlSnippets(material) {
+  const urls = extractHttpUrlsFromMaterial(material);
+  const out = [];
+  for (const url of urls) {
+    try {
+      const text = await fetchPlainTextFromUrl(url);
+      out.push({ url, text });
+    } catch (e) {
+      out.push({ url, text: '', error: e?.message || String(e) });
+    }
+  }
+  return out;
+}
+
+/** Monta os blocos de material para o prompt da IA e, se houver URL(s), obtém texto no servidor antes. `toastCb` opcional — (msg, kind, ttl?). */
+async function resolveMaterialPromptParts(material, toastCb) {
+  const urls = extractHttpUrlsFromMaterial(material);
+  if (!urls.length) {
+    return {
+      materialBlock: buildMaterialBlock(material, []),
+      materialPriorityBlock: buildMaterialPriorityBlock(material, []),
+    };
+  }
+  toastCb?.('A ler texto das URLs em Fontes…', 'info', 2600);
+  const urlSnippets = await fetchMaterialUrlSnippets(material);
+  const ok = urlSnippets.filter((u) => String(u.text || '').trim().length >= 80).length;
+  if (toastCb) {
+    if (!ok && urls.length) {
+      toastCb(
+        'Não foi possível extrair texto da(s) URL (bloqueio, login ou formato). Cole o texto em «Conteúdo base» ou tente outro link.',
+        'warning',
+        6500,
+      );
+    } else if (ok < urls.length && urls.length > 1) {
+      toastCb('Algumas URLs não devolveram texto; a IA usará as que funcionaram.', 'warning', 4500);
+    }
+  }
+  return {
+    materialBlock: buildMaterialBlock(material, urlSnippets),
+    materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets),
+  };
+}
+
+function materialHasUserInput(material) {
+  if (!material || typeof material !== 'object') return false;
+  if (material.refProfileId) return true;
+  const { c, s, x } = normalizedMaterialPieces(material);
+  return !!(c || s || x);
+}
+
+const buildMaterialBlock = (material, urlSnippets = []) => {
   const parts = [];
-  const c = (material?.content || '').trim();
-  const s = (material?.sources || '').trim();
-  const x = (material?.context || '').trim();
+  const { c, s, x } = normalizedMaterialPieces(material);
   const refId = material?.refProfileId;
   const ref = refId && REFERENCE_PROFILE_BY_ID[refId];
+
+  const hasFetched = Array.isArray(urlSnippets) && urlSnippets.some((p) => p && (String(p.text || '').trim().length > 0 || String(p.url || '').length > 0));
+  let fetchedBody = '';
+  if (hasFetched) {
+    const blobs = [];
+    for (const p of urlSnippets) {
+      if (!p?.url) continue;
+      const body = String(p.text || '').trim()
+        ? p.text.trim()
+        : `[Não foi possível extrair texto: ${p.error || 'erro desconhecido'}]`;
+      blobs.push(`=== ORIGEM ${p.url} ===\n${body.slice(0, 13000)}`);
+    }
+    if (blobs.length) {
+      fetchedBody = blobs.join('\n\n').slice(0, 62000);
+      parts.push(
+        `TEXTO OBTIDO DAS FONTES (extraído automaticamente pelo app a partir das URL(s); use como BASE FACTUAL principal — sintetize com palavras próprias nos slides em português, sem cópia longa nem plagio):\n"""\n${fetchedBody}\n"""`,
+      );
+    }
+  }
+
   if (c) parts.push(`MATÉRIA-PRIMA (use como base de fatos antes de inventar — extraia teses, não copie literal):\n"""\n${c.slice(0, 8000)}\n"""`);
   if (s) {
-    const srcLabel = /https?:\/\//i.test(s)
-      ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) — você NÃO pode abrir links; use só o que o usuário escreveu no app + palavras visíveis no próprio endereço; não finja ter lido a página):'
-      : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
+    const fetchedFull = Array.isArray(urlSnippets)
+      ? urlSnippets.filter((u) => u.text && String(u.text).trim().length >= 120)
+      : [];
+    const srcLabel =
+      fetchedFull.length > 0
+        ? 'FONTES & REFERÊNCIAS (URL listada — o texto legível já foi transcrito para o bloco «TEXTO OBTIDO DAS FONTES» acima):'
+        : /https?:\/\//i.test(s) || /\bwww\.[^\s]+\b/i.test(s)
+          ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) sem extração bem-sucedida — use vocabulário do endereço e matéria-prima; não finja ler a página inteira):'
+          : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
     parts.push(`${srcLabel}\n${s.slice(0, 2000)}`);
   }
   if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (sobrepõem regras default — siga literalmente):\n${x.slice(0, 1500)}`);
@@ -6743,17 +7642,22 @@ const buildMaterialBlock = (material) => {
 };
 
 /** Quando há Material, o tema livre do modal não pode sobrepor o que o usuário colou. */
-function buildMaterialPriorityBlock(material) {
-  const c = (material?.content || '').trim();
-  const s = (material?.sources || '').trim();
-  const x = (material?.context || '').trim();
-  if (!c && !s && !x) return '';
+function buildMaterialPriorityBlock(material, urlSnippets = []) {
+  const { c, s, x } = normalizedMaterialPieces(material);
+  const fetchedOk = Array.isArray(urlSnippets) && urlSnippets.some((p) => p && String(p.text || '').trim().length >= 80);
+  if (!c && !s && !x && !fetchedOk) return '';
+
+  let urlClause = `- URLs sem texto transcrito: você não navega na web. Se só houver link sem extração bem-sucedida, infira o tema só do vocabulário visível no URL + instruções + matéria-prima.\n`;
+
+  if (fetchedOk) {
+    urlClause = `- TEXTO EXTRAÍDO: o bloco «TEXTO OBTIDO DAS FONTES» contém conteúdo real obtido das páginas. O carrossel DEVE alinhar factos e ângulos a esse texto (parafraseando). NÃO ignore em favor do tema livre nem de clichês virais nem de “marcas/arquétipos” genéricos se o material fala de outro assunto.\n`;
+  }
+
   return `
 PRIORIDADE ABSOLUTA — MATERIAL DO USUÁRIO:
-- O carrossel DEVE refletir o bloco MATÉRIA-PRIMA, FONTES e INSTRUÇÕES acima. O campo “sobre o que é o conteúdo” e o nicho são SECUNDÁRIOS: servem para tom ou desambiguação, NÃO para trocar o assunto.
+- O carrossel DEVE refletir o bloco MATÉRIA-PRIMA, FONTES e INSTRUÇÕES acima — e, quando existir, o TEXTO OBTIDO DAS FONTES. O campo “sobre o que é o conteúdo” e o nicho são SECUNDÁRIOS: servem para tom ou desambiguação, NÃO para trocar o assunto.
 - PROIBIDO fabricar narrativa genérica de “rotina de trabalho” (madrugada, arquivo não carrega, tela azul, escritório vazio, café, deadline) se NADA disso estiver no material — isso descola o post do que o usuário forneceu.
-- URLs: você não navega na web. Se só houver link sem texto, infira o tema só do vocabulário visível no URL + instruções + matéria-prima; não invente história como se tivesse lido o artigo.
-- Cada slide deve extrair uma linha de raciocínio do MATERIAL (não de clichês de carrossel viral).
+${urlClause}- Cada slide deve extrair uma linha de raciocínio do MATERIAL (não de clichês de carrossel viral).
 `;
 }
 
@@ -6838,6 +7742,123 @@ function isTendenciaCulturaPreset(presetId) {
   return presetId === 'tendencia_cultura';
 }
 
+/**
+ * Depois da geração com IA: define canvas ativo (zonas) para encaixar fotos pendentes mesmo sem «modo canvas» manual.
+ * Tendência/Cultura: capa e último slide full-bleed; miolo sandwich com rotação vertical da zona foto.
+ */
+function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensity }) {
+  const n = slides.length;
+  if (!n) return slides;
+  const isTC = isTendenciaCulturaPreset(creativePreset);
+  const persoHybrid = isPersoHybridDensity(creativePreset, slideTextDensity);
+
+  return slides.map((s, i) => {
+    const q = String(s.imageQuery || '').trim();
+    const bod = String(s.bodyAfterImage || '').trim();
+
+    if (isTC) {
+      const fullBleedPortrait = i === 0 || i === n - 1;
+      if (fullBleedPortrait && q) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'classic',
+            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
+          },
+        };
+      }
+      const mid = i > 0 && i < n - 1;
+      if (mid && bod && q) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'sandwich',
+            zones: sandwichZonesByRotationIndex(i + n * 31),
+          },
+        };
+      }
+      if (mid && bod && !q) {
+        return {
+          ...s,
+          canvas: { enabled: true, variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } },
+        };
+      }
+      if (mid && q && !bod) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'classic',
+            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
+          },
+        };
+      }
+      const d = inferCanvasDefaults(s, creativePreset);
+      return { ...s, canvas: { enabled: true, variant: d.variant, zones: { ...d.zones } } };
+    }
+
+    if (persoHybrid) {
+      const firstPair = i <= 1;
+      if (firstPair && q) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'classic',
+            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
+          },
+        };
+      }
+      if (firstPair && !q) {
+        const d = inferCanvasDefaults({ ...s, bodyAfterImage: '', useCultureLayout: false }, 'livre');
+        return { ...s, canvas: { enabled: false, variant: d.variant, zones: { ...d.zones } } };
+      }
+      if (s.useCultureLayout && bod && q) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'sandwich',
+            zones: sandwichZonesByRotationIndex(i + n * 41),
+          },
+        };
+      }
+      if (s.useCultureLayout && bod && !q) {
+        return {
+          ...s,
+          canvas: { enabled: true, variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } },
+        };
+      }
+      if (!s.useCultureLayout && q && i >= 2) {
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: 'classic',
+            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
+          },
+        };
+      }
+      const d = inferCanvasDefaults({ ...s }, creativePreset);
+      return { ...s, canvas: { enabled: false, variant: d.variant, zones: { ...d.zones } } };
+    }
+
+    const d = inferCanvasDefaults(s, creativePreset);
+    const needsCanvas = slideHasPendingPhotoIntent(s);
+    if (!needsCanvas) return { ...s };
+    return {
+      ...s,
+      canvas: {
+        enabled: true,
+        variant: d.variant,
+        zones: { ...d.zones },
+      },
+    };
+  });
+}
+
 /** Sobreposição estratégica do pacote Tendência/Cultura (adapta ao N de slides). */
 function buildTendenciaCulturaPackBlock(slideCount, textDensityId = '1_1') {
   const n = Math.min(12, Math.max(3, slideCount | 0));
@@ -6870,6 +7891,7 @@ Reforço contínuo: “você já percebia isso; aqui está o porquê.” Três g
 
 LAYOUT VISUAL ↔ CAMPOS DO JSON (leitura do app — siga estritamente):
 - Slide 1 (CAPA com foto full-bleed): use "title" + "subtitle" + "imageQuery". O campo "bodyAfterImage" DEVE ser "" (string vazia). Nunca sanduíche na capa.
+- Slide final (fecho) COM foto: também full-bleed — "bodyAfterImage" vazio; apenas "title", "subtitle", "imageQuery" (e cultureTone se precisar).
 - Slides intermediários e fecho COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "bodyAfterImage" com o bloco ABAIXO da imagem (${bodyLo}–${bodyHi} caracteres — alinhar à densidade global do projeto). Acima da foto ficam opcionalmente "title" + "subtitle" (prosa forte; primeira frase do subtítulo fecha o gancho). Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
 - Slide só texto (“stat”) SEM foto: deixe "imageQuery" vazio; use "subtitle" (e opcionalmente "title") no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
 - "cultureTone" (opcional): omita ou use "" para alternância automática claro/escuro; só use "light", "dark" ou "accent" quando o contraste exigir.
@@ -6882,7 +7904,7 @@ CRITICAL (texto nos slides JSON):
 
 function buildTendenciaCulturaRefineSlideHint(creativePresetId) {
   if (!isTendenciaCulturaPreset(creativePresetId)) return '';
-  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Slide 1 com foto de capa mantém bodyAfterImage vazio — não altere esse campo refinando o slide 1 nem devolva texto nele para o primeiro card.`;
+  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards.`;
 }
 
 function coerceCultureTone(v) {
@@ -7369,6 +8391,10 @@ const DEFAULT_BRAND = {
   titleFont: '"Inter", sans-serif',
   bodyFont: '"Inter Tight", sans-serif',
   bg: '#fafafc', titleColor: '#1d1d1f', subColor: '#515154', accent: '#0066cc',
+  /** Ímpar (slides 1,3…) = `bg` · Par (2,4…) = `bgAlternate` quando activo e cor definida. */
+  interleaveBg: false,
+  /** Segunda cor de fundo para intercalção (margem/pérola por defeito). */
+  bgAlternate: '#f5f5f7',
   // Identidade verbal — usada como contexto em todas as gerações de IA
   bio: '',
   positioning: '',
@@ -7392,6 +8418,18 @@ const DEFAULT_BRAND = {
   /** Ex.: 2026 — mostrado como “2026 //” à direita da barra. */
   cultureHeaderYear: '',
 };
+
+/** Fundo do card (sem foto custom por slide): ímpar → `bg`, par → `bgAlternate` quando «Intercalar fundo» está ligado. `slideIndex0` = 0 para o 1.º card. */
+function resolveSlideBrandBg(brand, slideIndex0, slide) {
+  if (slide?.customBg) return slide.customBg;
+  const alt = typeof brand?.bgAlternate === 'string' ? brand.bgAlternate.trim() : '';
+  if (brand?.interleaveBg && alt) {
+    const primary = brand.bg || '#fafafc';
+    return slideIndex0 % 2 === 0 ? primary : alt;
+  }
+  return brand?.bg || '#fafafc';
+}
+
 const DEFAULT_DOC = {
   fmt: 'carrossel',
   brand: DEFAULT_BRAND,
@@ -7514,7 +8552,16 @@ export default function App() {
 
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
-  const setBrand     = useCallback(next => history.set(d => ({ ...d, brand:     typeof next==='function' ? next(d.brand)    : next })), [history]);
+  const setBrand = useCallback(
+    (next) =>
+      history.set((d) => {
+        const cur = d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND };
+        const brandNext =
+          typeof next === 'function' ? next(cur) : { ...cur, ...next };
+        return { ...d, brand: brandNext };
+      }),
+    [history],
+  );
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     return { ...d, fmt: FORMATS[raw] ? raw : 'carrossel' };
@@ -7709,6 +8756,7 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
+  const [imageCropOpen, setImageCropOpen] = useState(false);
   const [openaiKey, setOpenaiKey] = useState(() => {
     try { return localStorage.getItem(SK.openaiKey) || ''; } catch { return ''; }
   });
@@ -7921,6 +8969,10 @@ export default function App() {
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1);
   const empty = isDefault(slides);
+
+  useEffect(() => {
+    if (!slide.bgImage && imageCropOpen) setImageCropOpen(false);
+  }, [slide.bgImage, imageCropOpen]);
 
   const editorHeaderActions = (
         <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 4 : 6, flexShrink:0 }}>
@@ -8325,8 +9377,7 @@ export default function App() {
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
     const brandBlock = buildBrandBlock(brand);
-    const materialBlock = buildMaterialBlock(material);
-    const materialPriorityBlock = buildMaterialPriorityBlock(material);
+    const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
@@ -8334,9 +9385,14 @@ export default function App() {
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
 
+    const persoHybridActive = isPersoHybridDensity(cp, td);
+    const persoHybridBlock = persoHybridActive ? buildPersoHybridLayoutBlock(count, td) : '';
+
     const jsonShapeLine = isTendenciaCulturaPreset(cp)
-      ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (regras do PACOTE Tendência/Cultura: capa vazio; com foto no miolo = obrigatório)","cultureTone":"opcional: light | dark | accent ou omita"}],"caption":"legenda…"}'
-      : '{"slides":[{"title":"…","subtitle":"…","imageQuery":"…"}],"caption":"legenda…"}';
+      ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (regras: capa + último slide vazio; miolo COM foto = obrigatório)","cultureTone":"opcional: light | dark | accent ou omita"}],"caption":"legenda…"}'
+      : persoHybridActive
+        ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (slides 1–2 vazio; desde o 3º = sanduíche se houver foto)","cultureTone":"opcional"}],"caption":"legenda…"}'
+        : '{"slides":[{"title":"…","subtitle":"…","imageQuery":"…"}],"caption":"legenda…"}';
 
     const idiomaRegra = `
 REGRA DE IDIOMA (obrigatória):
@@ -8370,6 +9426,7 @@ ${modoNarrativoBloco}
 ${tendenciaPackBlock}
 
 ${slideLayoutRules}
+${persoHybridBlock ? `${persoHybridBlock}\n` : ''}
 
 ${langLayer}
 
@@ -8382,7 +9439,10 @@ ${jsonShapeLine}`;
     if (!result?.slides?.length) throw new Error('IA não retornou slides. Tente um tema mais específico.');
 
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
-    const newSlides = result.slides.map((s, i) => {
+    const nSlides = result.slides.length;
+
+    const newSlides = attachGenerationCanvasLayouts(
+      result.slides.map((s, i) => {
       const q = ((s.imageQuery ?? s.image_query) || '').trim();
       const title = s.title || `Slide ${i + 1}`;
       const subtitle = s.subtitle || '';
@@ -8395,29 +9455,65 @@ ${jsonShapeLine}`;
         bgImage: null,
         layout: i === 0 ? 'mc' : 'bl',
         align: i === 0 ? 'center' : 'left',
+        useCultureLayout: false,
       };
-      if (!isTendenciaCulturaPreset(cp)) {
-        return { ...base, overlay: q ? 70 : 0 };
-      }
-      let rawBody = typeof s.bodyAfterImage === 'string'
-        ? s.bodyAfterImage
-        : typeof s.body_after_image === 'string'
-          ? s.body_after_image
-          : '';
-      let bodyAfterImage = rawBody.trim();
-      const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
 
-      let overlay = 0;
-      if (i === 0) {
-        bodyAfterImage = '';
-        overlay = q ? 70 : 0;
-      } else if (q && bodyAfterImage) {
-        overlay = 0;
-      } else if (q) {
-        overlay = 70;
+      if (isTendenciaCulturaPreset(cp)) {
+        let rawBody = typeof s.bodyAfterImage === 'string'
+          ? s.bodyAfterImage
+          : typeof s.body_after_image === 'string'
+            ? s.body_after_image
+            : '';
+        let bodyAfterImage = rawBody.trim();
+        const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
+
+        let overlay = 0;
+        const fullBleed = i === 0 || i === nSlides - 1;
+        if (fullBleed) {
+          bodyAfterImage = '';
+          overlay = q ? 70 : 0;
+        } else if (q && bodyAfterImage) {
+          overlay = 0;
+        } else if (q) {
+          overlay = 70;
+        }
+        return { ...base, bodyAfterImage, cultureTone: ct, overlay };
       }
-      return { ...base, bodyAfterImage, cultureTone: ct, overlay };
-    });
+
+      if (persoHybridActive) {
+        let rawBody = typeof s.bodyAfterImage === 'string'
+          ? s.bodyAfterImage
+          : typeof s.body_after_image === 'string'
+            ? s.body_after_image
+            : '';
+        let bodyAfterImage = rawBody.trim();
+        const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
+        let overlay = 0;
+        const fullBleedPair = i <= 1;
+
+        if (fullBleedPair) {
+          bodyAfterImage = '';
+          overlay = q ? 70 : 0;
+          return { ...base, bodyAfterImage, cultureTone: ct, overlay, useCultureLayout: false };
+        }
+
+        bodyAfterImage = rawBody.trim();
+        const sandwichRow = !!(q && bodyAfterImage);
+        if (sandwichRow) overlay = 0;
+        else if (q) overlay = 70;
+        return {
+          ...base,
+          bodyAfterImage,
+          cultureTone: ct,
+          overlay,
+          useCultureLayout: true,
+        };
+      }
+
+      return { ...base, overlay: q ? 70 : 0 };
+      }),
+      { creativePreset: cp, slideTextDensity: td },
+    );
     setSlides(newSlides); setActiveIdx(0); setShellView('project');
     if (n) setNiche(n);
     if (result.caption) setCaption(result.caption);
@@ -8461,7 +9557,7 @@ ${jsonShapeLine}`;
       }
     } else if (result.slides.some(s => (s.imageQuery || '').trim())) {
       toast(
-        'Imagens não foram buscadas automaticamente. Use «Gerar imagem» em cada slide quando quiser.',
+        'Imagens não foram geradas agora — já existem zonas de foto nos cards (toque na área para importar ou use «Gerar imagem»).',
         'info',
         5500,
       );
@@ -8473,10 +9569,16 @@ ${jsonShapeLine}`;
     try {
       const ctx = slides.map((s,i)=>`${i+1}. ${s.title}`).join('\n');
       const brandBlock = buildBrandBlock(brand);
-      const materialBlock = buildMaterialBlock(material);
+      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const cultureRef = buildTendenciaCulturaRefineSlideHint(creativePreset);
-      const singleJson = isTendenciaCulturaPreset(creativePreset) && activeIdx !== 0
+      const nSl = slides.length;
+      const isCultureSandwichSlide =
+        isTendenciaCulturaPreset(creativePreset) && activeIdx > 0 && activeIdx < nSl - 1;
+      const isPersoHybridRefineSlide =
+        isPersoHybridDensity(creativePreset, slideTextDensity) && activeIdx >= 2;
+      const refineNeedsBodyAfter = isCultureSandwichSlide || isPersoHybridRefineSlide;
+      const singleJson = refineNeedsBodyAfter
         ? '{"title":"...","subtitle":"...","bodyAfterImage":"..."}'
         : '{"title":"...","subtitle":"..."}';
       const r = await callAI(
@@ -8485,16 +9587,17 @@ ${jsonShapeLine}`;
 ${buildNarrativeModeReminder(mode)}
 
 Contexto do carrossel:\n${ctx}
-${brandBlock}${materialBlock}
+${brandBlock}${materialBlock}${materialPriorityBlock}
 Slide ${activeIdx+1} (atual):
 Título: "${slide.title}"
 Subtítulo: "${slide.subtitle}"
-${isTendenciaCulturaPreset(creativePreset) && activeIdx !== 0 ? `Corpo abaixo da imagem — bodyAfterImage atual (refine só se aplicável):\n${JSON.stringify(slide.bodyAfterImage ?? '')}\n` : ''}
+${refineNeedsBodyAfter ? `Corpo abaixo da imagem / bloco inferior — bodyAfterImage atual:\n${JSON.stringify(slide.bodyAfterImage ?? '')}\n` : ''}
 Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
 ${cultureRef}
+${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
 ${buildRefineSingleSlideRules(mode, slideTextDensity)}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
@@ -8506,7 +9609,7 @@ Retorne exatamente: ${singleJson}`,
         title: r.title || slide.title,
         subtitle: r.subtitle || slide.subtitle,
       };
-      if (isTendenciaCulturaPreset(creativePreset) && typeof r.bodyAfterImage === 'string' && activeIdx !== 0) {
+      if (typeof r.bodyAfterImage === 'string' && refineNeedsBodyAfter) {
         patch.bodyAfterImage = r.bodyAfterImage;
       }
       updateSlide(patch);
@@ -8519,8 +9622,7 @@ Retorne exatamente: ${singleJson}`,
     try {
       const ctx = slides.map((s,i)=>`Slide ${i+1}: ${s.title} — ${s.subtitle}`).join('\n');
       const brandBlock = buildBrandBlock(brand);
-      const materialBlock = buildMaterialBlock(material);
-      const capRules = buildCaptionVoiceRules(creativePreset, mode);
+      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const r = await callAI(
         `Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.
 
@@ -8528,7 +9630,7 @@ ${buildNarrativeModeReminder(mode)}
 
 Carrossel:
 ${ctx}
-${brandBlock}${materialBlock}
+${brandBlock}${materialBlock}${materialPriorityBlock}
 ${buildCaptionOutlineInstructions(mode)}
 
 REGRAS:
@@ -8661,8 +9763,7 @@ ${capRules}
         }`,
       ).join('\n');
       const brandBlock = buildBrandBlock(brand);
-      const materialBlock = buildMaterialBlock(material);
-      const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
+      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Reescreva TODOS os slides do carrossel abaixo aplicando a instrução do usuário, mantendo coerência narrativa entre eles.
@@ -8671,7 +9772,7 @@ ${buildNarrativeModeReminder(mode)}
 
 Carrossel atual:
 ${ctx}
-${brandBlock}${materialBlock}
+${brandBlock}${materialBlock}${materialPriorityBlock}
 Instrução: ${instruction}
 
 REGRAS DE VOZ:
@@ -8773,7 +9874,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     const onKey = (e) => {
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
-      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen;
+      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
@@ -8827,7 +9928,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
     slide, slides, activeIdx, brand, setBrand, updateSlide,
@@ -8852,6 +9953,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     batchPhotoInputRef,
     enableCanvasLayout,
     disableCanvasLayout,
+    onOpenImageCrop: () => setImageCropOpen(true),
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -9149,7 +10251,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 >
                   <div style={{
                     width:44, height:56, borderRadius:4, overflow:'hidden', position:'relative',
-                    background: s.customBg||brand.bg,
+                    background: resolveSlideBrandBg(brand, i, s),
                     backgroundImage: s.bgImage?`url(${s.bgImage})`:'none',
                     backgroundSize:'cover', backgroundPosition:'center',
                     ...(stripThumbFil ? { filter: stripThumbFil } : {}),
@@ -9593,13 +10695,16 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           brand.positioning?.trim() && 'posicionamento',
           brand.signature?.trim() && 'assinatura',
         ].filter(Boolean)}
-        materialSummary={[
-          material.content?.trim() && `conteúdo (${material.content.length} chars)`,
-          material.sources?.trim() && 'fontes',
-          material.context?.trim() && 'contexto',
-          REFERENCE_PROFILE_BY_ID[material.refProfileId]?.label &&
-            `voz ref.: ${REFERENCE_PROFILE_BY_ID[material.refProfileId].label}`,
-        ].filter(Boolean)}
+        materialSummary={(() => {
+          const { c, s, x } = normalizedMaterialPieces(material);
+          return [
+            c && `conteúdo (${c.length.toLocaleString('pt-BR')} chars)`,
+            s && 'fontes',
+            x && 'contexto',
+            REFERENCE_PROFILE_BY_ID[material.refProfileId]?.label &&
+              `voz ref.: ${REFERENCE_PROFILE_BY_ID[material.refProfileId].label}`,
+          ].filter(Boolean);
+        })()}
         imgParams={imgParams}
         onImgParamsChange={setImgParams}
         mode={mode}
@@ -9608,6 +10713,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onCreativePresetChange={setCreativePreset}
         slideTextDensity={slideTextDensity}
         onSlideTextDensityChange={setSlideTextDensity}
+        material={material}
+        setMaterial={setMaterial}
       />
       <ResearchPanel
         open={researchOpen}
@@ -9648,6 +10755,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onClose={closeImgPrompt}
         onConfirm={confirmImgPrompt}
       />
+      <ImageCropModal
+        open={imageCropOpen && !!slide.bgImage}
+        imageSrc={slide.bgImage || ''}
+        onClose={() => setImageCropOpen(false)}
+        onApply={(dataUrl) => updateSlide({ bgImage: dataUrl })}
+      />
       <OnboardingTour
         open={tourOpen}
         onDismiss={() => {
@@ -9659,6 +10772,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         setTab={setTab}
         setDrawerOpen={setDrawerOpen}
         onEnterEditor={() => setShellView('project')}
+        onPrepareRefsTourStep={() => {
+          setCreativePreset('livre');
+          setSetupOpen(true);
+        }}
       />
       <HelpModal
         open={helpOpen}
@@ -10120,7 +11237,7 @@ function AccountHomeShell({
             const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
             const slides = entry.doc?.slides || [];
             const firstSlide = slides[0];
-            const bg = firstSlide?.customBg || entry.doc?.brand?.bg || '#fafafc';
+            const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {});
             return (
               <div
                 key={entry.id}
@@ -10520,7 +11637,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
             const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
             const slides = entry.doc?.slides || [];
             const firstSlide = slides[0];
-            const bg = firstSlide?.customBg || entry.doc?.brand?.bg || '#0a0a0a';
+            const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {}) || '#0a0a0a';
             const editing = editingId === entry.id;
             return (
               <div
@@ -11168,13 +12285,13 @@ function getOnboardingSteps(isMobile, empty) {
       id: 'refs',
       title: 'Perfis de referência',
       body:
-        'Na aba Conteúdo, escolha uma voz curada para inspirar tom e ritmo — sem copiar conteúdo de terceiros.',
+        'No modal Configurar carrossel, logo abaixo dos modos narrativos (pacote Personalizado), escolha uma voz curada para inspirar tom e ritmo — sem copiar conteúdo de terceiros. A legenda sugere boas combinações com cada modo.',
       selector: '[data-vc-tour="ref-profiles"]',
     },
   ];
 }
 
-function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpen, onEnterEditor }) {
+function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpen, onEnterEditor, onPrepareRefsTourStep }) {
   const steps = useMemo(() => getOnboardingSteps(isMobile, empty), [isMobile, empty]);
   const [idx, setIdx] = useState(0);
   const [hole, setHole] = useState(null);
@@ -11189,8 +12306,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
     const stepIds = steps[idx]?.id;
     if (stepIds === 'refs') {
       if (typeof onEnterEditor === 'function') onEnterEditor();
-      setTab('material');
-      if (isMobile) setDrawerOpen(true);
+      if (typeof onPrepareRefsTourStep === 'function') onPrepareRefsTourStep();
     } else if (stepIds === 'thumbs' || stepIds === 'panel') {
       if (typeof onEnterEditor === 'function') onEnterEditor();
       if (stepIds === 'panel' && isMobile && !empty) setDrawerOpen(true);
@@ -11230,7 +12346,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
     };
 
     const delay =
-      steps[idx]?.id === 'refs' ? (isMobile ? 220 : 90)
+      steps[idx]?.id === 'refs' ? (isMobile ? 380 : 220)
         : (steps[idx]?.id === 'thumbs' || steps[idx]?.id === 'panel') ? (isMobile ? 200 : 120)
           : 0;
     const onWin = () => measure();
@@ -11244,7 +12360,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
       window.removeEventListener('resize', onWin);
       window.removeEventListener('scroll', onWin, true);
     };
-  }, [open, idx, steps, setTab, setDrawerOpen, isMobile, onEnterEditor, empty]);
+  }, [open, idx, steps, setTab, setDrawerOpen, isMobile, onEnterEditor, empty, onPrepareRefsTourStep]);
 
   useEffect(() => {
     if (!open) return undefined;
