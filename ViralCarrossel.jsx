@@ -4329,11 +4329,13 @@ function GenerateModal({
   const hasContextPack =
     (Array.isArray(brandSummary) && brandSummary.length > 0) ||
     hasMaterialPack;
+  /** Personalizado (`livre`) expõe modo narrativo, nicho, público e tom. Tendência/Cultura traz estrutura no pacote. */
+  const modoPersonalizado = packCreative === 'livre';
   /** Tema digitado OU nicho OU Marca/Material preenchidos — evita botão morto só com contexto injetado. */
   const resolvedGenerationTopic = (() => {
     const t = topic.trim();
     if (t) return t;
-    if (niche.trim()) return `Conteúdo focado no nicho: ${niche.trim()}`;
+    if (modoPersonalizado && niche.trim()) return `Conteúdo focado no nicho: ${niche.trim()}`;
     if (hasContextPack) return 'Conteúdo baseado no material de referência e na identidade da marca.';
     return '';
   })();
@@ -4342,25 +4344,29 @@ function GenerateModal({
 
   const run = async () => {
     if (!resolvedGenerationTopic) {
-      setErr('Informe o tema em “Sobre o que é o conteúdo?”, ou o nicho, ou preencha Marca e Conteúdo.');
+      setErr(
+        modoPersonalizado
+          ? 'Informe o tema em “Sobre o que é o conteúdo?”, ou o nicho, ou preencha Marca e Conteúdo.'
+          : 'Informe o tema em “Sobre o que é o conteúdo?” ou preencha Marca e Conteúdo.',
+      );
       return;
     }
     setBusy(true); setErr('');
     try {
       // Persiste direção de imagem, modo e pacote criativo antes de gerar
       onImgParamsChange?.(params);
-      onModeChange?.(mode);
+      onModeChange?.(modoPersonalizado ? mode : 'editorial');
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
-        niche,
-        tone,
-        audience,
+        niche: modoPersonalizado ? niche : '',
+        tone: modoPersonalizado ? tone : '',
+        audience: modoPersonalizado ? audience : '',
         imgMode: 'dalle',
         imgParams: params,
-        mode,
+        mode: modoPersonalizado ? mode : 'editorial',
         creativePreset: packCreative,
         slideTextDensity: textDensity,
         fetchImagesNow: autoFetchSlideImages,
@@ -4504,12 +4510,18 @@ function GenerateModal({
             />
             {hasContextPack && (
               <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
-                Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.
+                {modoPersonalizado ? (
+                  <>Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.</>
+                ) : (
+                  <>O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.</>
+                )}
               </div>
             )}
           </div>
 
-          {/* Modo narrativo — escolha da camada estratégica */}
+          {/* Modo narrativo, público-alvo e tom — só fazem parte do fluxo Personalizado */}
+          {modoPersonalizado && (
+          <>
           <ModePicker value={mode} onChange={setMode}/>
           <div
             aria-live="polite"
@@ -4551,7 +4563,7 @@ function GenerateModal({
               {tones.map(t=>(
                 <button key={t} onClick={()=>setTone(t)} style={{
                   fontSize:11, padding:'5px 12px', borderRadius:99, cursor:'pointer',
-                  fontFamily:'var(--font-ui)', fontWeight:500, transition:'all 0.12s',
+                  fontFamily:'var(--font-ui)', fontWeight:600, transition:'all 0.12s',
                   background: tone===t ? 'var(--accent)' : 'var(--bg-card)',
                   border: `1px solid ${tone===t ? 'var(--accent)' : 'var(--border)'}`,
                   color: tone===t ? '#fff' : 'var(--text-secondary)',
@@ -4559,6 +4571,31 @@ function GenerateModal({
               ))}
             </div>
           </div>
+          </>
+          )}
+
+          {!modoPersonalizado && (
+          <div
+            aria-live="polite"
+            style={{
+              fontSize:11,
+              color:'var(--text-muted)',
+              lineHeight:1.47,
+              letterSpacing:'-0.011em',
+              padding:'10px 12px',
+              background:'var(--bg-pearl)',
+              borderRadius:11,
+              border:'1px solid var(--hairline)',
+            }}
+          >
+            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Pacote Tendência/Cultura:</span>{' '}
+            estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho, público-alvo e tom de voz do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.
+            {' '}
+            <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>
+              · {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity} ({CREATIVE_PRESET_BY_ID[packCreative]?.label})
+            </span>
+          </div>
+          )}
 
           {/* Densidade de texto por card (1/1 … 1/5) */}
           <div>
@@ -6720,17 +6757,17 @@ PRIORIDADE ABSOLUTA — MATERIAL DO USUÁRIO:
 `;
 }
 
-/** Pacotes criativos da geração: “Personalizado” (id `livre`) não fixa método; “Tendência/Cultura” ativa formato viral de nomear fenômeno já percebido (skill carrossel cultura). */
+/** Pacotes criativos da geração — id `livre` = Personalizado. `tendencia_cultura` tem estrutura própria (mostrado primeiro na UI). */
 const CREATIVE_PRESETS = [
-  {
-    id: 'livre',
-    label: 'Personalizado',
-    desc: 'Modo narrativo, tom, marca, conteúdo de base e eixos de imagem — sem camada fixa “parece ser / é”. Melhor para Storytelling e quando a aba Conteúdo já está preenchida.',
-  },
   {
     id: 'tendencia_cultura',
     label: 'Tendência/Cultura',
     desc: 'Carrossel de tendência e cultura: nomeia o que o público já sente no mundo — não lista de dicas nem aula de conceito. Gatilhos: identificação, alívio, autoridade.',
+  },
+  {
+    id: 'livre',
+    label: 'Personalizado',
+    desc: 'Modo narrativo, tom, marca, conteúdo de base e eixos de imagem — sem camada fixa “parece ser / é”. Melhor para Storytelling e quando a aba Conteúdo já está preenchida.',
   },
 ];
 const CREATIVE_PRESET_BY_ID = Object.fromEntries(CREATIVE_PRESETS.map((p) => [p.id, p]));
@@ -6935,6 +6972,13 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1') {
+  if (isTendenciaCulturaPreset(creativePresetId)) {
+    return `
+REGRAS DE TAMANHO (pacote TENDÊNCIA/CULTURA):
+- Siga o arco e o layout descritos no PACOTE ativo; não misture com moldes de “modo narrativo” editorial/viral genéricos.
+${buildSlideTextDensityOverrides(textDensityId, 'editorial')}
+`;
+  }
   const hookMag = isTendenciaCulturaPreset(creativePresetId)
     ? '   - Gancho nomeia fenômeno ou tensão vivida pelo público — não título genérico de relatório (“X: uma reflexão”).'
     : '   - Hook que para o scroll: linha de cena ou tensão, não conceito abstrato de marca.';
@@ -8273,8 +8317,10 @@ export default function App() {
     fetchImagesNow = true,
   }) => {
     const effectiveAxes = axes || imgParams;
-    const effectiveMode = chosenNarrativeMode || mode || 'editorial';
     const cp = presetArg ?? creativePreset ?? 'livre';
+    const effectiveMode = isTendenciaCulturaPreset(cp)
+      ? 'editorial'
+      : (chosenNarrativeMode || mode || 'editorial');
     const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
@@ -8298,19 +8344,29 @@ REGRA DE IDIOMA (obrigatória):
 - Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
 `;
 
+    const contextoModoPerso =
+      isTendenciaCulturaPreset(cp)
+        ? ''
+        : [
+            n ? `Nicho: ${n}` : '',
+            audience ? `Público-alvo: ${audience}` : '',
+            `Tom de voz solicitado: ${tone}`,
+          ].filter(Boolean).join('\n');
+    const modoNarrativoBloco =
+      isTendenciaCulturaPreset(cp)
+        ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
+        : modeDef.method;
+
     const prompt = `${introLine}
 Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
-${n?`Nicho: ${n}`:''}
-${audience?`Público-alvo: ${audience}`:''}
-Tom de voz solicitado: ${tone}
-${brandBlock}
+${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}
 ${materialBlock}
 ${materialPriorityBlock}
 ${imgParamsBlock}
 
 ${idiomaRegra}
 
-${modeDef.method}
+${modoNarrativoBloco}
 ${tendenciaPackBlock}
 
 ${slideLayoutRules}
