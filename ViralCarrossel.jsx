@@ -376,26 +376,49 @@ const GLOBAL_STYLE = `
     display: flex; align-items: flex-end; justify-content: center;
     animation: fadeIn 0.15s;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   @media (min-width: 640px) {
     .modal-overlay { align-items: center; padding: 16px; }
   }
   .modal-panel {
     background: var(--bg-base); border-top: 1px solid var(--hairline);
-    width: 100%; max-height: calc(100vh - var(--safe-top));
+    width: 100%;
+    /* iOS: descontar topo e base da safe area; svh evita cortar atrás da barra do Safari */
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     animation: slideUp 0.2s var(--ease-smooth);
     border-top-left-radius: 18px; border-top-right-radius: 18px;
-    padding-bottom: calc(var(--safe-bottom) + 8px);
+    padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px));
     color: var(--text-primary);
+  }
+  @supports (height: 100svh) {
+    .modal-panel {
+      max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px);
+    }
   }
   @media (min-width: 640px) {
     .modal-panel {
       border: 1px solid var(--hairline); border-radius: 18px;
-      max-width: 480px; max-height: 90vh;
-      padding-bottom: 0;
+      max-width: 480px; max-height: min(90vh, 900px);
+      padding-bottom: 12px;
       animation: modalIn 0.2s var(--ease-smooth);
     }
+  }
+  /* Modal alto (ex.: Gerar): cabeçalho fixo + corpo com scroll — evita CTA escondido no mobile */
+  .modal-panel.vc-modal-scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .modal-panel.vc-modal-scroll .vc-modal-scroll-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
   }
   .modal-panel-wide { max-width: 640px; }
   @media (max-width: 639px) {
@@ -1193,6 +1216,15 @@ const mkSlide = (n = 1) => ({
   subLeading: 150,    // line-height do subtítulo (default 150 = 1.50)
   titleCase: 'normal',// 'normal' | 'upper' | 'lower' (text-transform)
   titleWeight: 800,   // 400..900
+  /** Bloco inferior (modo Tendência/Cultura — layout “sandwich”: texto · imagem inline · texto). */
+  bodyAfterImage: '',
+  /** '' = auto por índice do slide · 'light' | 'dark' | 'accent' força superfície no sandwich/stat. */
+  cultureTone: '',
+  /**
+   * Editor tipo canvas — zonas em % do card (0–100). `null` = layout fluido legado.
+   * variant: 'classic' (foto full / texto) | 'sandwich' | 'stat'
+   */
+  canvas: null,
 });
 
 const isDefault = (slides) =>
@@ -1279,11 +1311,14 @@ const getServerStatus = ({ force = false } = {}) => {
   return _serverStatusPromise;
 };
 
+const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês.';
+
 // Backend Anthropic (Claude)
 const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null } = {}) => {
   const body = {
     model: 'claude-sonnet-4-6',
     max_tokens: maxTokens,
+    system: AI_SYSTEM_PT,
     messages: [{ role: 'user', content: userMsg }],
   };
   if (tools) body.tools = tools;
@@ -1328,7 +1363,7 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
     model: 'gpt-4o',
     max_tokens: maxTokens,
     messages: [
-      { role: 'system', content: 'Você é um copywriter sênior brasileiro especializado em conteúdo estratégico para Instagram. Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.' },
+      { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.` },
       { role: 'user',   content: userMsg },
     ],
     temperature: 0.85,
@@ -2242,10 +2277,627 @@ function FullscreenImageAdjustBar({
   );
 }
 
+/** Partes de texto com trechos **destacados** na cor accent da marca. */
+function splitCultureRichText(text) {
+  if (text == null || text === '') return [];
+  const s = String(text);
+  const out = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) out.push({ type: 'text', v: s.slice(last, m.index) });
+    out.push({ type: 'accent', v: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push({ type: 'text', v: s.slice(last) });
+  return out;
+}
+
+function CultureInlineRich({ text, baseColor, accentColor, fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }) {
+  const parts = splitCultureRichText(text);
+  const wrapStyle = {
+    color: baseColor,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    fontWeight,
+    letterSpacing,
+    margin: 0,
+  };
+  if (!text) return null;
+  if (parts.length === 0) return <span style={wrapStyle}>{text}</span>;
+  return (
+    <span style={wrapStyle}>
+      {parts.map((p, i) =>
+        p.type === 'accent' ? (
+          <span key={i} style={{ color: accentColor, fontWeight: 600 }}>{p.v}</span>
+        ) : (
+          <span key={i}>{p.v}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
+function CultureRichParagraphs({ text, ink, accentColor, fontFamily, fontSize, lineHeight, fontWeight, letterSpacing, paraGap }) {
+  const paras = String(text || '').split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  if (!paras.length) return null;
+  return paras.map((para, idx) => (
+    <p
+      key={idx}
+      style={{
+        margin: 0,
+        marginBottom: idx < paras.length - 1 ? paraGap : 0,
+        textAlign: 'left',
+      }}
+    >
+      <CultureInlineRich
+        text={para}
+        baseColor={ink}
+        accentColor={accentColor}
+        fontFamily={fontFamily}
+        fontSize={fontSize}
+        lineHeight={lineHeight}
+        fontWeight={fontWeight}
+        letterSpacing={letterSpacing}
+      />
+    </p>
+  ));
+}
+
+function cultureResolveSurface(slide, num) {
+  const t = (slide.cultureTone || '').trim();
+  if (t === 'light' || t === 'dark' || t === 'accent') return t;
+  return num % 2 === 0 ? 'light' : 'dark';
+}
+
+const CANVAS_ZONE_MIN = { w: 8, h: 5 };
+
+function clampRect(r) {
+  const x = Math.max(0, Math.min(100 - CANVAS_ZONE_MIN.w, r.x));
+  const y = Math.max(0, Math.min(100 - CANVAS_ZONE_MIN.h, r.y));
+  const w = Math.max(CANVAS_ZONE_MIN.w, Math.min(100 - x, r.w));
+  const h = Math.max(CANVAS_ZONE_MIN.h, Math.min(100 - y, r.h));
+  return { x, y, w, h };
+}
+
+const DEFAULT_CANVAS_ZONES_CLASSIC = {
+  photo: { x: 0, y: 0, w: 100, h: 58 },
+  title: { x: 4, y: 62, w: 92, h: 14 },
+  subtitle: { x: 4, y: 77, w: 92, h: 20 },
+};
+
+const DEFAULT_CANVAS_ZONES_SANDWICH = {
+  top: { x: 4, y: 7, w: 92, h: 26 },
+  photo: { x: 4, y: 35, w: 92, h: 36 },
+  bottom: { x: 4, y: 74, w: 92, h: 22 },
+};
+
+const DEFAULT_CANVAS_ZONES_STAT = {
+  top: { x: 4, y: 8, w: 92, h: 40 },
+  bottom: { x: 4, y: 52, w: 92, h: 38 },
+};
+
+function inferCanvasDefaults(slide, creativePreset) {
+  const cp = creativePreset === 'tendencia_cultura';
+  const bodyAfter = (slide.bodyAfterImage || '').trim();
+  const hasImg = !!slide.bgImage;
+  const sandwich = cp && !!bodyAfter && hasImg;
+  const stat = cp && !!bodyAfter && !hasImg && !!(slide.subtitle || '').trim();
+  if (sandwich) return { variant: 'sandwich', zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH } };
+  if (stat) return { variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } };
+  return { variant: 'classic', zones: { ...DEFAULT_CANVAS_ZONES_CLASSIC } };
+}
+
+function pctBox(rect, f) {
+  const r = clampRect(rect);
+  return {
+    position: 'absolute',
+    left: (f.w * r.x) / 100,
+    top: (f.h * r.y) / 100,
+    width: (f.w * r.w) / 100,
+    height: (f.h * r.h) / 100,
+    boxSizing: 'border-box',
+  };
+}
+
+const VC_ZONE_DRAG_MIME = 'application/x-vc-canvas-zone';
+
+/** Contorno + arrastar / redimensionar canto SE (zonas canvas). Opcional: grip para trocar conteúdo entre slides. */
+function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys }) {
+  const dragRef = React.useRef(null);
+  const zonesRef = React.useRef(zones);
+  zonesRef.current = zones;
+
+  const swapKeysEffective = React.useMemo(() => {
+    if (swapSlideIdx == null) return null;
+    if (Array.isArray(swapZoneKeys) && swapZoneKeys.length === 0) return [];
+    const allow = swapZoneKeys && swapZoneKeys.length
+      ? new Set(swapZoneKeys)
+      : null;
+    return keys.filter((k) => (allow ? allow.has(k) : true));
+  }, [keys, swapSlideIdx, swapZoneKeys]);
+
+  React.useEffect(() => {
+    const mm = (e) => {
+      if (!dragRef.current || !onPatch) return;
+      const d = dragRef.current;
+      if (!d || !onPatch) return;
+      const dx = e.clientX - d.lastX;
+      const dy = e.clientY - d.lastY;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      const cur = zonesRef.current[d.key];
+      if (!cur) return;
+      const b = clampRect(cur);
+      if (d.mode === 'move') {
+        onPatch({
+          [d.key]: clampRect({
+            ...b,
+            x: b.x + (dx / f.w) * 100,
+            y: b.y + (dy / f.h) * 100,
+          }),
+        });
+      } else {
+        onPatch({
+          [d.key]: clampRect({
+            ...b,
+            w: b.w + (dx / f.w) * 100,
+            h: b.h + (dy / f.h) * 100,
+          }),
+        });
+      }
+    };
+    const mu = () => { dragRef.current = null; };
+    window.addEventListener('mousemove', mm);
+    window.addEventListener('mouseup', mu);
+    return () => {
+      window.removeEventListener('mousemove', mm);
+      window.removeEventListener('mouseup', mu);
+    };
+  }, [f.h, f.w, onPatch]);
+
+  if (!zones || !onPatch) return null;
+
+  return (
+    <>
+      {keys.map((k) => {
+        if (!zones[k]) return null;
+        const r = clampRect(zones[k]);
+        const box = pctBox(r, f);
+        const showSwapGrip = swapKeysEffective && swapKeysEffective.includes(k);
+        return (
+          <div
+            key={k}
+            style={{
+              ...box,
+              zIndex: 45,
+              pointerEvents: 'auto',
+              border: '2px dashed var(--accent)',
+              borderRadius: 8,
+              background: 'rgba(0, 102, 204, 0.04)',
+            }}
+            onMouseDown={(e) => {
+              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              e.preventDefault();
+              e.stopPropagation();
+              dragRef.current = {
+                key: k,
+                mode: 'move',
+                lastX: e.clientX,
+                lastY: e.clientY,
+              };
+            }}
+          >
+            {showSwapGrip && (
+              <div
+                data-vc-swap-grip
+                draggable
+                title="Arrastar para outro card para trocar conteúdo"
+                onMouseDown={(e) => e.stopPropagation()}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(
+                    VC_ZONE_DRAG_MIME,
+                    JSON.stringify({ slideIdx: swapSlideIdx, zone: k }),
+                  );
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }}
+                style={{
+                  position: 'absolute',
+                  left: 5,
+                  top: 5,
+                  padding: '2px 7px',
+                  borderRadius: 9999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-ui)',
+                  letterSpacing: '-0.02em',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  cursor: 'grab',
+                  zIndex: 2,
+                  lineHeight: 1.2,
+                  userSelect: 'none',
+                }}
+              >⇄</div>
+            )}
+            <div
+              data-vc-handle
+              title="Redimensionar"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragRef.current = {
+                  key: k,
+                  mode: 'se',
+                  lastX: e.clientX,
+                  lastY: e.clientY,
+                };
+              }}
+              style={{
+                position: 'absolute',
+                right: -4,
+                bottom: -4,
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                background: 'var(--accent)',
+                cursor: 'nwse-resize',
+                border: '2px solid #fff',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+              }}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** Layout canvas (variant classic): zonas foto + título + subtítulo em %. */
+const ClassicCanvasInner = React.forwardRef(({
+  f,
+  slide,
+  brand,
+  bg,
+  titleFF,
+  bodyFF,
+  isBebas,
+  culture,
+  cultureAccentCol,
+  cultureCoverOnly,
+  showCultureIdx,
+  num,
+  total,
+  hideInstaBadge,
+  imgModeNorm,
+  effectivePresentationFilter,
+  bgFit,
+  bgPos,
+  bgScale,
+  imgReady,
+  imgErr,
+  imgLoading,
+  showCanvasChrome,
+  onCanvasPatch,
+  onPhotoZoneClick,
+  swapSlideIdx = null,
+  swapZoneKeys,
+}, ref) => {
+  const zcv = slide.canvas.zones;
+  const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
+  const insetZn = slide.textInset ?? 7;
+  const padXZn = f.w * (0.012 + insetZn * 0.004);
+  const padYZn = f.h * (0.006 + insetZn * 0.002);
+  const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
+  const tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
+  const sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
+  const shadow = slide.textShadow !== false
+    ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
+    : 'none';
+  const textBgColor = slide.textBg
+    ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
+    : 'transparent';
+  const alignInner =
+    slide.align === 'center' ? 'center' :
+    slide.align === 'right' ? 'flex-end' :
+    slide.align === 'justify' ? 'stretch' : 'flex-start';
+  return (
+    <div
+      ref={ref}
+      style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
+    >
+      <div
+        style={{ ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' }}
+        onClick={showCanvasChrome && onPhotoZoneClick ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+        role={showCanvasChrome ? 'button' : undefined}
+      >
+        {slide.bgImage && imgReady && !imgErr && (
+          <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
+            <div style={{
+              position:'absolute', inset:0,
+              backgroundImage:`url(${slide.bgImage})`,
+              backgroundPosition:bgPos,
+              backgroundRepeat:'no-repeat',
+              opacity:slide.bgOpacity/100,
+              ...(bgFit === 'custom'
+                ? {
+                    backgroundSize:`${slide.bgZoom}%`,
+                    transform: slide.bgMirror ? 'scaleX(-1)' : 'none',
+                  }
+                : {
+                    backgroundSize: bgFit === 'contain' ? 'contain' : 'cover',
+                    transform: `${slide.bgMirror ? 'scaleX(-1) ' : ''}scale(${bgScale})`,
+                    transformOrigin: bgPos,
+                  }),
+              ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
+            }}/>
+          </div>
+        )}
+        {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
+          <div style={{
+            position:'absolute', inset:0,
+            background: cultureCoverOnly
+              ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
+              : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
+          }}/>
+        )}
+        {imgLoading && (
+          <div style={{
+            position:'absolute', inset:0, zIndex:5,
+            background:'rgba(10,9,8,0.92)',
+            display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:f.h*0.018,
+          }}>
+            <div style={{
+              width:f.w*0.07, height:f.w*0.07,
+              borderRadius:'50%',
+              border:`${f.w*0.006}px solid rgba(255,255,255,0.1)`,
+              borderTopColor:'var(--accent)',
+              animation:'spin 0.9s linear infinite',
+            }}/>
+            <span style={{ color:'rgba(255,255,255,0.55)', fontSize:f.w*0.026, fontWeight:600, letterSpacing:'-0.011em' }}>
+              {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
+            </span>
+          </div>
+        )}
+        {showCanvasChrome && !slide.bgImage && (
+          <div style={{
+            position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+            color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
+          }}>
+            Clique para inserir foto
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        ...pctBox(tr, f),
+        zIndex: 4,
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: Lzn.jc,
+        alignItems: Lzn.ai,
+        textAlign: slide.align,
+        background: textBgColor,
+        backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+        borderRadius: slide.textBg ? f.w * 0.022 : 0,
+        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padXZn}px`,
+      }}>
+        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: alignInner, maxWidth: '100%' }}>
+        <h1 style={{
+          color: brand.titleColor,
+          fontFamily: titleFF,
+          fontSize: f.w * 0.084 * (slide.titleSize / 100),
+          lineHeight: (slide.titleLeading ?? 105) / 100,
+          fontWeight: slide.titleWeight ?? 800,
+          letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
+          margin: 0,
+          textTransform:
+            slide.titleCase === 'upper' ? 'uppercase' :
+            slide.titleCase === 'lower' ? 'lowercase' :
+            isBebas ? 'uppercase' : 'none',
+          textShadow: shadow,
+        }}>{culture ? (
+          <CultureInlineRich
+            text={slide.title || ''}
+            baseColor={brand.titleColor}
+            accentColor={cultureAccentCol}
+            fontFamily={titleFF}
+            fontSize={f.w * 0.084 * (slide.titleSize / 100)}
+            lineHeight={(slide.titleLeading ?? 105) / 100}
+            fontWeight={slide.titleWeight ?? 800}
+            letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
+          />
+        ) : slide.title}</h1>
+        </div>
+      </div>
+
+      <div style={{
+        ...pctBox(sr, f),
+        zIndex: 4,
+        overflow: 'auto',
+        background: textBgColor,
+        backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+        borderRadius: slide.textBg ? f.w * 0.022 : 0,
+        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padXZn}px`,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: Lzn.jc,
+        alignItems: Lzn.ai,
+        textAlign: slide.align,
+      }}>
+        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: alignInner, maxWidth: '100%' }}>
+        {slide.subtitle && (
+          culture ? (
+            <div style={{ letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`, textShadow: shadow }}>
+              <CultureRichParagraphs
+                text={slide.subtitle}
+                ink={brand.subColor}
+                accentColor={cultureAccentCol}
+                fontFamily={bodyFF}
+                fontSize={f.w * 0.028 * (slide.subSize / 100)}
+                lineHeight={(slide.subLeading ?? 150) / 100}
+                fontWeight={400}
+                letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+                paraGap={f.h * 0.010}
+              />
+            </div>
+          ) : (
+            <p style={{
+              color: brand.subColor,
+              fontFamily: bodyFF,
+              fontSize: f.w * 0.028 * (slide.subSize / 100),
+              lineHeight: (slide.subLeading ?? 150) / 100,
+              fontWeight: 400,
+              margin: 0,
+              letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+              textShadow: shadow,
+            }}>{slide.subtitle}</p>
+          )
+        )}
+        </div>
+      </div>
+
+      {culture && (() => {
+        const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+        const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
+        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        return (
+          <>
+            {hasHdr && (
+              <div style={{
+                position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:24,
+                display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
+              }}>
+                <span style={{
+                  fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+                  maxWidth:'34%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{(brand.cultureHeaderLeft || '').trim()}</span>
+                <span style={{
+                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{brand.handle}</span>
+                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
+                  {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
+                </span>
+              </div>
+            )}
+            {showCultureIdx && (
+              <div style={{
+                position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:26,
+                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
+                color: onPhoto ? '#fff' : '#1d1d1f',
+                padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
+                fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+              }}>{num}/{total}</div>
+            )}
+          </>
+        );
+      })()}
+
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
+        <div style={{
+          position:'absolute', top:f.h*0.038, left:f.w*0.05,
+          display:'flex', alignItems:'center', gap:f.w*0.012,
+          background:'rgba(255,255,255,0.08)',
+          backdropFilter:'blur(12px)',
+          padding:`${f.h*0.01}px ${f.w*0.022}px`,
+          borderRadius:999,
+          border:'1px solid rgba(255,255,255,0.12)',
+          zIndex: 22,
+        }}>
+          <div style={{
+            width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
+            background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              width:'76%', height:'76%', borderRadius:'50%',
+              overflow:'hidden',
+              background: brand.handleAvatar ? '#0a0a0a' : bg,
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              {brand.handleAvatar ? (
+                <img
+                  src={brand.handleAvatar}
+                  alt=""
+                  draggable={false}
+                  style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                />
+              ) : (
+                <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${brand.titleColor}` }}/>
+                </div>
+              )}
+            </div>
+          </div>
+          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
+            {brand.handle}
+          </span>
+        </div>
+      )}
+
+      {brand.logo && (() => {
+        const handleAtTop = brand.showHandle;
+        const pos = brand.logoPosition || 'tr';
+        const margin = f.w * 0.045;
+        const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+        const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
+        const style = {
+          position:'absolute',
+          width: sizePx, height: sizePx,
+          opacity: (brand.logoOpacity ?? 90) / 100,
+          backgroundImage: `url(${brand.logo})`,
+          backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+          zIndex: 23,
+        };
+        if (pos === 'tl') Object.assign(style, { top: margin,    left: margin });
+        if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
+        if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
+        if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+        return <div style={style} aria-hidden/>;
+      })()}
+
+      {showCanvasChrome && onCanvasPatch && (
+        <CanvasZonesOverlay
+          f={f}
+          zones={slide.canvas.zones}
+          keys={['photo', 'title', 'subtitle']}
+          onPatch={onCanvasPatch}
+          swapSlideIdx={swapSlideIdx}
+          swapZoneKeys={swapZoneKeys}
+        />
+      )}
+    </div>
+  );
+});
+ClassicCanvasInner.displayName = 'ClassicCanvasInner';
+
 // ─── SLIDE CARD ───────────────────────────────────────────────────────────────
 
-const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=1, presentationImgFilter }, ref) => {
+const SlideCardInner = React.forwardRef(({
+  slide, fmt, brand, num, total, scale = 1, presentationImgFilter, creativePreset = 'livre',
+  slideIndex: slideIndexProp,
+  showCanvasChrome = false,
+  onCanvasZonePatch = null,
+  onPhotoZoneRequest = null,
+  enableZoneSwapDrag = false,
+}, ref) => {
   const f = FORMATS[fmt] || FORMATS.carrossel;
+  const slideIdx = slideIndexProp != null ? slideIndexProp : num - 1;
+  const zonePatchRef = React.useRef(onCanvasZonePatch);
+  zonePatchRef.current = onCanvasZonePatch;
+  const photoReqRef = React.useRef(onPhotoZoneRequest);
+  photoReqRef.current = onPhotoZoneRequest;
+  const onCanvasPatch = React.useCallback((p) => {
+    zonePatchRef.current?.(slideIdx, p);
+  }, [slideIdx]);
+  const onPhotoZoneClick = React.useCallback(() => {
+    photoReqRef.current?.(slideIdx);
+  }, [slideIdx]);
   const L = LAYOUTS.find(l=>l.id===slide.layout)||LAYOUTS[4];
   const bg = slide.customBg || brand.bg;
   const isBebas = brand.titleFont?.includes('Bebas');
@@ -2283,7 +2935,367 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
   const titleFF = effectiveTitleFontFamily(brand);
   const bodyFF = effectiveBodyFontFamily(brand);
 
-  const inner = (
+  const culture = creativePreset === 'tendencia_cultura';
+  const bodyAfterCulture = (slide.bodyAfterImage || '').trim();
+  const sandwich = culture && !!bodyAfterCulture && !!slide.bgImage;
+  const cultureStatFlat = culture && !slide.bgImage && !!bodyAfterCulture && !!(slide.subtitle || '').trim();
+  const cultureCoverOnly = culture && num === 1 && !!slide.bgImage && !sandwich && !cultureStatFlat;
+  const hideInstaBadge = culture;
+  const showCultureIdx = culture && total > 1;
+  const cultureAccentCol = brand.accent || '#0066cc';
+
+  let inner;
+  const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
+  const cvVar = slide.canvas?.variant;
+
+  if ((sandwich || cultureStatFlat) && cvEnabled && (cvVar === 'sandwich' || cvVar === 'stat')) {
+    const z = slide.canvas.zones;
+    const surface = cultureResolveSurface(slide, num);
+    const lightCultureBg = slide.customBg || brand.bg || '#fafafc';
+    const bgSolid = surface === 'dark' ? '#272729' : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
+    const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
+    const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+    const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
+    const insetZn = slide.textInset ?? 7;
+    const padXCv = f.w * (0.012 + insetZn * 0.004);
+    const padYCv = f.h * (0.004 + insetZn * 0.002);
+    const topR = z.top ? clampRect(z.top) : { x: 4, y: 8, w: 92, h: 28 };
+    const photoR = z.photo ? clampRect(z.photo) : { x: 4, y: 36, w: 92, h: 34 };
+    const botR = z.bottom ? clampRect(z.bottom) : { x: 4, y: 72, w: 92, h: 22 };
+    inner = (
+      <div
+        ref={ref}
+        style={{ width:f.w, height:f.h, background:bgSolid, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
+      >
+        {hasBar && (
+          <div style={{
+            position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
+            display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
+          }}>
+            <span style={{
+              fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            }}>{(brand.cultureHeaderLeft || '').trim()}</span>
+            <span style={{
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:600,
+              letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            }}>{brand.handle}</span>
+            <span style={{ fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+              {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
+            </span>
+          </div>
+        )}
+        {showCultureIdx && (
+          <div style={{
+            position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
+            background: surface === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
+            color: surface === 'light' ? '#1d1d1f' : '#ffffff',
+            padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
+            fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+          }}>{num}/{total}</div>
+        )}
+
+        <div style={{
+          ...pctBox(topR, f),
+          zIndex: 4,
+          overflow: 'auto',
+          padding: `${padYCv}px ${padXCv}px`,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: Lzn.jc,
+          alignItems: Lzn.ai,
+          textAlign: slide.align === 'justify' ? 'left' : slide.align,
+          gap: f.h * 0.008,
+        }}>
+          {(slide.title || '').trim() ? (
+            <h2 style={{
+              margin: 0,
+              color: ink,
+              fontFamily: titleFF,
+              fontSize: f.w * 0.036 * (slide.titleSize / 100),
+              fontWeight: slide.titleWeight ?? 600,
+              letterSpacing: `${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`,
+              lineHeight: (slide.titleLeading ?? 105) / 100,
+              textTransform:
+                slide.titleCase === 'upper' ? 'uppercase' :
+                slide.titleCase === 'lower' ? 'lowercase' : 'none',
+            }}>{slide.title}</h2>
+          ) : null}
+          <CultureRichParagraphs
+            text={slide.subtitle}
+            ink={ink}
+            accentColor={cultureAccentCol}
+            fontFamily={bodyFF}
+            fontSize={f.w * 0.031 * (slide.subSize / 100)}
+            lineHeight={(slide.subLeading ?? 142) / 100}
+            fontWeight={600}
+            letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+            paraGap={f.h * 0.012}
+          />
+        </div>
+
+        {cvVar === 'sandwich' && (
+          <div
+            style={{
+              ...pctBox(photoR, f),
+              zIndex:2,
+              overflow:'hidden',
+              borderRadius: f.w * 0.017,
+              background: surface === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+            }}
+            onClick={showCanvasChrome && onPhotoZoneClick ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+            role={showCanvasChrome ? 'button' : undefined}
+          >
+            {sandwich && imgLoading && (
+              <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.2)' }}>
+                <div style={{
+                  width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
+                  border:`${f.w*0.005}px solid rgba(255,255,255,0.2)`,
+                  borderTopColor: cultureAccentCol, animation:'spin 0.9s linear infinite',
+                }}/>
+              </div>
+            )}
+            {sandwich && imgReady && !imgErr && slide.bgImage && (
+              <img
+                src={slide.bgImage}
+                alt=""
+                draggable={false}
+                style={{
+                  width:'100%', height:'100%', objectFit:'cover',
+                  ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
+                }}
+              />
+            )}
+            {showCanvasChrome && !slide.bgImage && sandwich && (
+              <div style={{
+                position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                color:inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
+              }}>
+                Toque para inserir foto
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{
+          ...pctBox(botR, f),
+          zIndex: 4,
+          overflow: 'auto',
+          padding: `${padYCv}px ${padXCv}px`,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: Lzn.jc,
+          alignItems: Lzn.ai,
+          textAlign: slide.align === 'justify' ? 'left' : slide.align,
+        }}>
+          <CultureRichParagraphs
+            text={bodyAfterCulture}
+            ink={ink}
+            accentColor={cultureAccentCol}
+            fontFamily={bodyFF}
+            fontSize={f.w * 0.029 * (slide.subSize / 100)}
+            lineHeight={(slide.subLeading ?? 145) / 100}
+            fontWeight={600}
+            letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+            paraGap={f.h * 0.01}
+          />
+        </div>
+
+        {showCanvasChrome && onCanvasPatch && (
+          <CanvasZonesOverlay
+            f={f}
+            zones={slide.canvas.zones}
+            keys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
+            onPatch={onCanvasPatch}
+            swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
+            swapZoneKeys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
+          />
+        )}
+
+        {brand.logo && (() => {
+          const pos = brand.logoPosition || 'tr';
+          const margin = f.w * 0.045;
+          const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+          const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
+          const st = {
+            position:'absolute',
+            width: sizePx, height: sizePx,
+            opacity: (brand.logoOpacity ?? 90) / 100,
+            backgroundImage: `url(${brand.logo})`,
+            backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+            zIndex: 20,
+          };
+          if (pos === 'tl') Object.assign(st, { top: margin, left: margin });
+          if (pos === 'tr') Object.assign(st, { top: topOffset, right: margin });
+          if (pos === 'bl') Object.assign(st, { bottom: margin, left: margin });
+          if (pos === 'br') Object.assign(st, { bottom: margin, right: margin });
+          return <div style={st} aria-hidden/>;
+        })()}
+      </div>
+    );
+  } else if (sandwich || cultureStatFlat) {
+    const surface = cultureResolveSurface(slide, num);
+    const lightCultureBg = slide.customBg || brand.bg || '#fafafc';
+    const bgSolid = surface === 'dark' ? '#272729' : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
+    const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
+    const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+    inner = (
+      <div
+        ref={ref}
+        style={{ width:f.w, height:f.h, background:bgSolid, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
+      >
+        {hasBar && (
+          <div style={{
+            position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
+            display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
+          }}>
+            <span style={{
+              fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            }}>{(brand.cultureHeaderLeft || '').trim()}</span>
+            <span style={{
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:600,
+              letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            }}>{brand.handle}</span>
+            <span style={{ fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+              {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
+            </span>
+          </div>
+        )}
+        {showCultureIdx && (
+          <div style={{
+            position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
+            background: surface === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
+            color: surface === 'light' ? '#1d1d1f' : '#ffffff',
+            padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
+            fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+          }}>{num}/{total}</div>
+        )}
+        {sandwich && imgLoading && (
+          <div style={{
+            position:'absolute', inset:0, zIndex:6, display:'flex', alignItems:'center', justifyContent:'center',
+            background: surface === 'light' ? 'rgba(250,250,252,0.92)' : 'rgba(10,10,12,0.88)',
+          }}>
+            <div style={{
+              width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
+              border:`${f.w*0.005}px solid ${surface === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`,
+              borderTopColor: cultureAccentCol, animation:'spin 0.9s linear infinite',
+            }}/>
+          </div>
+        )}
+        <div style={{
+          position:'absolute',
+          top: f.h * (hasBar ? 0.09 : 0.065),
+          left: f.w * 0.05,
+          right: f.w * 0.05,
+          bottom: f.h * 0.05,
+          display:'flex',
+          flexDirection:'column',
+          gap: f.h * 0.02,
+          justifyContent: cultureStatFlat ? 'space-between' : 'flex-start',
+        }}>
+          {(slide.title || '').trim() ? (
+            <h2 style={{
+              margin:0, color:ink, fontFamily:titleFF, fontSize:f.w*0.036, fontWeight:600,
+              letterSpacing:'-0.024em', lineHeight:1.14,
+            }}>{slide.title}</h2>
+          ) : null}
+          <CultureRichParagraphs
+            text={slide.subtitle}
+            ink={ink}
+            accentColor={cultureAccentCol}
+            fontFamily={bodyFF}
+            fontSize={f.w*0.031}
+            lineHeight={1.42}
+            fontWeight={600}
+            letterSpacing="-0.018em"
+            paraGap={f.h*0.012}
+          />
+          {sandwich && imgReady && !imgErr && (
+            <img
+              src={slide.bgImage}
+              alt=""
+              draggable={false}
+              style={{
+                width:'100%',
+                borderRadius: f.w * 0.017,
+                objectFit:'cover',
+                maxHeight: f.h * 0.36,
+                flexShrink:0,
+                ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
+              }}
+            />
+          )}
+          <CultureRichParagraphs
+            text={bodyAfterCulture}
+            ink={ink}
+            accentColor={cultureAccentCol}
+            fontFamily={bodyFF}
+            fontSize={f.w*0.029}
+            lineHeight={1.45}
+            fontWeight={600}
+            letterSpacing="-0.016em"
+            paraGap={f.h*0.01}
+          />
+        </div>
+        {brand.logo && (() => {
+          const pos = brand.logoPosition || 'tr';
+          const margin = f.w * 0.045;
+          const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+          const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
+          const style = {
+            position:'absolute',
+            width: sizePx, height: sizePx,
+            opacity: (brand.logoOpacity ?? 90) / 100,
+            backgroundImage: `url(${brand.logo})`,
+            backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+            zIndex: 20,
+          };
+          if (pos === 'tl') Object.assign(style, { top: margin,    left: margin });
+          if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
+          if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
+          if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+          return <div style={style} aria-hidden/>;
+        })()}
+      </div>
+    );
+  } else if (cvEnabled && cvVar === 'classic') {
+    inner = (
+      <ClassicCanvasInner
+        ref={ref}
+        f={f}
+        slide={slide}
+        brand={brand}
+        bg={bg}
+        titleFF={titleFF}
+        bodyFF={bodyFF}
+        isBebas={isBebas}
+        culture={culture}
+        cultureAccentCol={cultureAccentCol}
+        cultureCoverOnly={cultureCoverOnly}
+        showCultureIdx={showCultureIdx}
+        num={num}
+        total={total}
+        hideInstaBadge={hideInstaBadge}
+        imgModeNorm={imgModeNorm}
+        effectivePresentationFilter={effectivePresentationFilter}
+        bgFit={bgFit}
+        bgPos={bgPos}
+        bgScale={bgScale}
+        imgReady={imgReady}
+        imgErr={imgErr}
+        imgLoading={imgLoading}
+        showCanvasChrome={showCanvasChrome}
+        onCanvasPatch={onCanvasPatch}
+        onPhotoZoneClick={onPhotoZoneClick}
+        swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
+        swapZoneKeys={undefined}
+      />
+    );
+  } else {
+    inner = (
     <div
       ref={ref}
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
@@ -2314,7 +3326,9 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
       {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
         <div style={{
           position:'absolute', inset:0,
-          background:`linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
+          background: cultureCoverOnly
+            ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
+            : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
         }}/>
       )}
 
@@ -2350,8 +3364,45 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
         </div>
       )}
 
+      {culture && (() => {
+        const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+        const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
+        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        return (
+          <>
+            {hasHdr && (
+              <div style={{
+                position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:24,
+                display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
+              }}>
+                <span style={{
+                  fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+                  maxWidth:'34%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{(brand.cultureHeaderLeft || '').trim()}</span>
+                <span style={{
+                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{brand.handle}</span>
+                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
+                  {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
+                </span>
+              </div>
+            )}
+            {showCultureIdx && (
+              <div style={{
+                position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:26,
+                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
+                color: onPhoto ? '#fff' : '#1d1d1f',
+                padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
+                fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+              }}>{num}/{total}</div>
+            )}
+          </>
+        );
+      })()}
+
       {/* Handle badge */}
-      {brand.showHandle && slide.showHandle && (
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
         <div style={{
           position:'absolute', top:f.h*0.038, left:f.w*0.05,
           display:'flex', alignItems:'center', gap:f.w*0.012,
@@ -2440,8 +3491,39 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
                   slide.titleCase === 'lower' ? 'lowercase' :
                   isBebas ? 'uppercase' : 'none',
                 textShadow: shadow,
-              }}>{slide.title}</h1>
+              }}>{culture ? (
+                <CultureInlineRich
+                  text={slide.title || ''}
+                  baseColor={brand.titleColor}
+                  accentColor={cultureAccentCol}
+                  fontFamily={titleFF}
+                  fontSize={f.w*0.084*(slide.titleSize/100)}
+                  lineHeight={(slide.titleLeading ?? 105)/100}
+                  fontWeight={slide.titleWeight ?? 800}
+                  letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
+                />
+              ) : slide.title}</h1>
               {slide.subtitle && (
+                culture ? (
+                  <div style={{
+                    margin:0,
+                    maxWidth:'100%',
+                    letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+                    textShadow: shadow,
+                  }}>
+                    <CultureRichParagraphs
+                      text={slide.subtitle}
+                      ink={brand.subColor}
+                      accentColor={cultureAccentCol}
+                      fontFamily={bodyFF}
+                      fontSize={f.w*0.028*(slide.subSize/100)}
+                      lineHeight={(slide.subLeading ?? 150)/100}
+                      fontWeight={400}
+                      letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+                      paraGap={f.h*0.010}
+                    />
+                  </div>
+                ) : (
                 <p style={{
                   color:brand.subColor, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
@@ -2450,7 +3532,7 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
                   letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                   textShadow: shadow,
                 }}>{slide.subtitle}</p>
-              )}
+              ))}
             </div>
           </div>
         );
@@ -2480,13 +3562,20 @@ const SlideCardInner = React.forwardRef(({ slide, fmt, brand, num, total, scale=
       })()}
     </div>
   );
+  }
+
+  const surfaceQuick = (sandwich || cultureStatFlat) ? cultureResolveSurface(slide, num) : null;
+  const lightCultureOuter = slide.customBg || brand.bg || '#fafafc';
+  const outerBg = surfaceQuick
+    ? (surfaceQuick === 'dark' ? '#272729' : surfaceQuick === 'accent' ? (brand.accent || '#0066cc') : lightCultureOuter)
+    : bg;
 
   return (
     <div style={{
       width:f.w*scale, height:f.h*scale,
       position:'relative', overflow:'hidden',
       borderRadius: scale < 0.9 ? 10 : 0,
-      flexShrink:0, background:bg,
+      flexShrink:0, background: outerBg,
     }}>
       <div style={{ transform:`scale(${scale})`, transformOrigin:'top left', width:f.w, height:f.h }}>
         {inner}
@@ -2503,6 +3592,12 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.brand !== next.brand) return false;
   if (prev.slide !== next.slide) return false;
   if (prev.presentationImgFilter !== next.presentationImgFilter) return false;
+  if (prev.creativePreset !== next.creativePreset) return false;
+  if (prev.showCanvasChrome !== next.showCanvasChrome) return false;
+  if (prev.enableZoneSwapDrag !== next.enableZoneSwapDrag) return false;
+  if (prev.slideIndex !== next.slideIndex) return false;
+  if (prev.onCanvasZonePatch !== next.onCanvasZonePatch) return false;
+  if (prev.onPhotoZoneRequest !== next.onPhotoZoneRequest) return false;
   return true;
 });
 
@@ -3199,6 +4294,8 @@ function GenerateModal({
   onModeChange,
   creativePreset: defaultCreativePreset = 'livre',
   onCreativePresetChange,
+  slideTextDensity: defaultSlideTextDensity = '1_1',
+  onSlideTextDensityChange,
 }) {
   const [topic, setTopic] = useState(defaultTopic);
   const [count, setCount] = useState(6);
@@ -3207,8 +4304,10 @@ function GenerateModal({
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
   const [packCreative, setPackCreative] = useState(defaultCreativePreset || 'livre');
+  const [textDensity, setTextDensity] = useState(defaultSlideTextDensity || '1_1');
   useEffect(() => { if (open) setMode(defaultMode); }, [open, defaultMode]);
   useEffect(() => { if (open) setPackCreative(defaultCreativePreset || 'livre'); }, [open, defaultCreativePreset]);
+  useEffect(() => { if (open) setTextDensity(defaultSlideTextDensity || '1_1'); }, [open, defaultSlideTextDensity]);
   // Cópia local mutável dos eixos da imagem (commit no doc só ao gerar)
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
@@ -3252,6 +4351,7 @@ function GenerateModal({
       onImgParamsChange?.(params);
       onModeChange?.(mode);
       onCreativePresetChange?.(packCreative);
+      onSlideTextDensityChange?.(textDensity);
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
@@ -3262,6 +4362,7 @@ function GenerateModal({
         imgParams: params,
         mode,
         creativePreset: packCreative,
+        slideTextDensity: textDensity,
         fetchImagesNow: autoFetchSlideImages,
       });
       onClose();
@@ -3273,12 +4374,12 @@ function GenerateModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={e=>e.stopPropagation()}>
+      <div className="modal-panel vc-modal-scroll" onClick={e=>e.stopPropagation()}>
         {/* Header */}
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
-          position:'sticky', top:0, background:'var(--bg-sidebar)', zIndex:1,
+          flexShrink: 0, background:'var(--bg-sidebar)', zIndex: 1,
         }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{
@@ -3298,7 +4399,16 @@ function GenerateModal({
           ><X size={16}/></button>
         </div>
 
-        <div style={{ padding:20, display:'flex', flexDirection:'column', gap:18 }}>
+        <div
+          className="vc-modal-scroll-body"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 18,
+            padding: '16px 20px',
+            paddingBottom: 'max(36px, env(safe-area-inset-bottom, 0px))',
+          }}
+        >
           {onGoToMaterial && (
             <div
               role="region"
@@ -3418,6 +4528,8 @@ function GenerateModal({
             <span>{GEN_MODE_BY_ID[mode]?.icon} {GEN_MODE_BY_ID[mode]?.label}</span>
             {' · '}
             <span>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
+            {' · '}
+            <span>Densidade {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity}</span>
           </div>
 
           {/* Niche + Audience */}
@@ -3445,6 +4557,59 @@ function GenerateModal({
                   color: tone===t ? '#fff' : 'var(--text-secondary)',
                 }}>{t}</button>
               ))}
+            </div>
+          </div>
+
+          {/* Densidade de texto por card (1/1 … 1/5) */}
+          <div>
+            <label className="vc-label" id="slide-text-density-label">Texto por card</label>
+            <div
+              role="group"
+              aria-labelledby="slide-text-density-label"
+              style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}
+            >
+              {SLIDE_TEXT_DENSITY_OPTIONS.map((opt) => {
+                const on = textDensity === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setTextDensity(opt.id)}
+                    style={{
+                      minWidth: 44,
+                      height: 44,
+                      padding: '0 12px',
+                      borderRadius: 11,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-ui)',
+                      letterSpacing: '-0.014em',
+                      fontVariantNumeric: 'tabular-nums',
+                      transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                      background: on ? 'var(--accent)' : 'var(--bg-pearl)',
+                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                      color: on ? '#fff' : 'var(--text-primary)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                lineHeight: 1.47,
+                letterSpacing: '-0.011em',
+                marginTop: 4,
+              }}
+            >
+              {SLIDE_TEXT_DENSITY_OPTIONS.find(o => o.id === textDensity)?.desc}
+              {' '}
+              Valores menores geram menos caracteres nos subtítulos ao usar IA (geração e refinamento).
             </div>
           </div>
 
@@ -4193,6 +5358,16 @@ function SidebarContent({
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
+  creativePreset = 'livre',
+  applyTypographyToAllCards,
+  canvasEditMode = false, setCanvasEditMode = () => {},
+  anyCanvasEnabled = false,
+  patchCanvasZonesAt = () => {},
+  openPhotoZoneImport = () => {},
+  handleBatchPhotos = () => {},
+  batchPhotoInputRef = { current: null },
+  enableCanvasLayout = () => {},
+  disableCanvasLayout = () => {},
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -4271,7 +5446,86 @@ function SidebarContent({
 
         {tab==='slide' && (
           <>
-            <S title={`Card ${activeIdx+1} / ${slides.length}`}>
+            <S
+              title="Layout canvas"
+              hint="Ative zonas redimensionáveis na arte. Em seguida use o toggle para ver molduras no card; clique na área da foto para importar só ali. Arraste ⇄ para trocar texto ou foto entre cards."
+            >
+              <Toggle
+                label="Modo edição de zonas (molduras no card)"
+                value={canvasEditMode}
+                onChange={(v) => {
+                  if (!anyCanvasEnabled) {
+                    toast?.('Ative primeiro o layout canvas com o botão abaixo.', 'info');
+                    return;
+                  }
+                  setCanvasEditMode(v);
+                }}
+              />
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <button
+                  type="button"
+                  onClick={enableCanvasLayout}
+                  style={{
+                    width:'100%', minHeight:36, borderRadius:9999, cursor:'pointer',
+                    border:'1px solid var(--accent)', background:'var(--accent)', color:'#fff',
+                    fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                    transition:'transform 0.1s var(--ease-smooth)',
+                  }}
+                  onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  Ativar layout canvas em todos os cards
+                </button>
+                <button
+                  type="button"
+                  onClick={disableCanvasLayout}
+                  style={{
+                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
+                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
+                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
+                  }}
+                >
+                  Desativar layout canvas
+                </button>
+              </div>
+            </S>
+
+            <S
+              title="Imagem — zona canvas"
+              hint="Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do card. O primeiro ficheiro vai para o slide 1, o segundo para o slide 2, e assim por diante."
+            >
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <button
+                  type="button"
+                  onClick={() => batchPhotoInputRef.current?.click()}
+                  style={{
+                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
+                    border:'1px solid var(--hairline)', background:'var(--bg-card)',
+                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  }}
+                >
+                  <Upload size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
+                  Importar em lote (slide 1 … N)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPhotoZoneImport?.(activeIdx)}
+                  style={{
+                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
+                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
+                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  }}
+                >
+                  <Image size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
+                  Importar foto só neste slide (zona imagem)
+                </button>
+              </div>
+            </S>
+
+            <S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
               <div>
                 <label className="vc-label-sm">Título</label>
                 <textarea value={slide.title} onChange={e=>updateSlide({title:e.target.value})} rows={2}
@@ -4286,6 +5540,35 @@ function SidebarContent({
                   style={{ fontSize:12, color:'var(--text-secondary)' }}
                 />
               </div>
+              {(creativePreset === 'tendencia_cultura') && (
+                <>
+                  <div>
+                    <label className="vc-label-sm">Texto abaixo da imagem (sandwich)</label>
+                    <textarea
+                      value={slide.bodyAfterImage ?? ''}
+                      onChange={e=>updateSlide({ bodyAfterImage: e.target.value })}
+                      rows={4}
+                      placeholder={'Parágrafo que aparece abaixo da foto (layout editorial). Use **trecho** para destacar na cor accent.'}
+                      className="vc-input vc-textarea"
+                      style={{ fontSize:12, color:'var(--text-secondary)' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="vc-label-sm">Superfície (auto = claro/escuro alternado)</label>
+                    <select
+                      value={slide.cultureTone || ''}
+                      onChange={e=>updateSlide({ cultureTone: e.target.value })}
+                      className="vc-input"
+                      style={{ fontSize:12, height:36 }}
+                    >
+                      <option value="">Automático</option>
+                      <option value="light">Claro</option>
+                      <option value="dark">Escuro</option>
+                      <option value="accent">Cor accent (marca)</option>
+                    </select>
+                  </div>
+                </>
+              )}
               <RefineBtn onRefine={refineSlide} busy={refining}/>
               <button
                 onClick={()=>setHookVarsOpen(true)}
@@ -4317,7 +5600,7 @@ function SidebarContent({
               }
             />
 
-            <S title="Imagem de fundo">
+            <S title={slide.canvas?.enabled ? 'Imagem na zona foto (canvas)' : 'Imagem de fundo'}>
               {slide.bgImage && (
                 <div style={{ position:'relative', marginBottom:2, borderRadius:8, overflow:'hidden' }}>
                   <img
@@ -4448,6 +5731,18 @@ function SidebarContent({
             </S>
 
             <S title="Posição do texto">
+              {slide.canvas?.enabled && (
+                <div style={{
+                  fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
+                  color:'var(--text-muted)',
+                  background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
+                  padding:'8px 10px',
+                }}>
+                  Com layout canvas ativo, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
+                  das zonas de texto do preview (junto com «Distância das bordas»).
+                  Para mover o quadro inteiro no card, use o modo edição de zonas no preview e arraste a moldura.
+                </div>
+              )}
               {/* 3×3 position grid */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
                 {LAYOUTS.map(l=>(
@@ -4534,6 +5829,51 @@ function SidebarContent({
               {slide.textBg && (
                 <Slider label="Opacidade do fundo" value={slide.textBgOpacity??55} min={10} max={90} onChange={v=>updateSlide({textBgOpacity:v})}/>
               )}
+              <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
+                <button
+                  type="button"
+                  disabled={!applyTypographyToAllCards || slides.length <= 1}
+                  onClick={() => applyTypographyToAllCards?.()}
+                  title={slides.length <= 1 ? 'Precisa de pelo menos dois cards' : 'Copia tamanhos, espaçamento e legibilidade para todos os slides'}
+                  aria-label="Aplicar tipografia deste card a todos os slides"
+                  style={{
+                    width:'100%', minHeight:44,
+                    padding:'0 16px',
+                    borderRadius:9999,
+                    border:'1px solid var(--accent)',
+                    background:'var(--accent)',
+                    color:'#fff',
+                    fontSize:12,
+                    fontWeight:600,
+                    fontFamily:'var(--font-ui)',
+                    letterSpacing:'-0.011em',
+                    cursor: (!applyTypographyToAllCards || slides.length <= 1) ? 'not-allowed' : 'pointer',
+                    opacity: (!applyTypographyToAllCards || slides.length <= 1) ? 0.45 : 1,
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:8,
+                    transition:'transform 0.1s var(--ease-smooth), opacity 0.12s',
+                  }}
+                  onMouseDown={e => { if (slides.length > 1 && applyTypographyToAllCards) e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <Layers size={14} strokeWidth={2}/>
+                  Aplicar em todos os cards
+                </button>
+                <p style={{
+                  margin:'8px 0 0',
+                  fontSize:11,
+                  lineHeight:1.47,
+                  letterSpacing:'-0.011em',
+                  color:'var(--text-muted)',
+                }}>
+                  Usa os ajustes de <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Tamanho</strong>,{' '}
+                  <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Espaçamento</strong> e{' '}
+                  <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste card em todos os slides (não altera textos nem posição no grid).
+                </p>
+              </div>
             </S>
 
             <S title="Operações">
@@ -4673,6 +6013,31 @@ function SidebarContent({
                 )}
               </div>
             </S>
+
+            {(creativePreset === 'tendencia_cultura') && (
+              <S title="Barra editorial (opcional)" hint="Aparece fina no topo dos cards no pacote Tendência/Cultura, como nas referências tipo brandsdecoded.">
+                <div>
+                  <label className="vc-label-sm">Texto à esquerda (ex.: Powered by…)</label>
+                  <input
+                    value={brand.cultureHeaderLeft ?? ''}
+                    onChange={e=>setBrand({ ...brand, cultureHeaderLeft: e.target.value })}
+                    className="vc-input"
+                    placeholder="Powered by Content Machine"
+                    style={{ fontSize:12 }}
+                  />
+                </div>
+                <div>
+                  <label className="vc-label-sm">Ano (direita)</label>
+                  <input
+                    value={brand.cultureHeaderYear ?? ''}
+                    onChange={e=>setBrand({ ...brand, cultureHeaderYear: e.target.value })}
+                    className="vc-input"
+                    placeholder="2026"
+                    style={{ fontSize:12 }}
+                  />
+                </div>
+              </S>
+            )}
 
             <S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
               {brand.logo ? (
@@ -5355,7 +6720,7 @@ PRIORIDADE ABSOLUTA — MATERIAL DO USUÁRIO:
 `;
 }
 
-/** Pacotes criativos da geração: “Personalizado” (id `livre`) não injeta camada editorial-analítica fixa; “Estúdio editorial” ativa esse pacote sob demanda. */
+/** Pacotes criativos da geração: “Personalizado” (id `livre`) não fixa método; “Tendência/Cultura” ativa formato viral de nomear fenômeno já percebido (skill carrossel cultura). */
 const CREATIVE_PRESETS = [
   {
     id: 'livre',
@@ -5363,16 +6728,134 @@ const CREATIVE_PRESETS = [
     desc: 'Modo narrativo, tom, marca, conteúdo de base e eixos de imagem — sem camada fixa “parece ser / é”. Melhor para Storytelling e quando a aba Conteúdo já está preenchida.',
   },
   {
-    id: 'estudio_editorial',
-    label: 'Estúdio editorial',
-    desc: 'Camada extra opcional: contraste estratégico e léxico de categoria + direção visual sóbria. Nos modos Storytelling, Dor ou Viral, o arco desse modo continua a mandar.',
+    id: 'tendencia_cultura',
+    label: 'Tendência/Cultura',
+    desc: 'Carrossel de tendência e cultura: nomeia o que o público já sente no mundo — não lista de dicas nem aula de conceito. Gatilhos: identificação, alívio, autoridade.',
   },
 ];
 const CREATIVE_PRESET_BY_ID = Object.fromEntries(CREATIVE_PRESETS.map((p) => [p.id, p]));
 
+/** Fração de volume de texto nos cards (persistido): 1/1 ≈ método padrão; menores → mais enxuto. */
+const SLIDE_TEXT_DENSITY_OPTIONS = [
+  { id: '1_1', label: '1/1', desc: 'Padrão do método — mais texto útil onde couber.' },
+  { id: '1_2', label: '1/2', desc: '~Metade da densidade típica; frases proporcionalmente curtas.' },
+  { id: '1_3', label: '1/3', desc: '~Um terço da densidade; telegráfico com substância.' },
+  { id: '1_4', label: '1/4', desc: 'Mínimo corrido — batidas curtas.' },
+  { id: '1_5', label: '1/5', desc: 'Mais esparso — quase só o essencial por card.' },
+];
+const SLIDE_TEXT_DENSITY_BY_ID = Object.fromEntries(SLIDE_TEXT_DENSITY_OPTIONS.map((o) => [o.id, o]));
+/** Multiplicador sobre faixas “típicas” de caracteres do modo / editorial. */
+const TEXT_DENSITY_TARGET_MULT = Object.freeze({
+  1_1: 1,
+  1_2: 0.72,
+  1_3: 0.55,
+  1_4: 0.38,
+  1_5: 0.26,
+});
+
+function scaledCharBand(lo, hi, densityId) {
+  const m = TEXT_DENSITY_TARGET_MULT[densityId];
+  if (m == null || m >= 0.995) return { lo, hi };
+  const nlo = Math.max(36, Math.round(lo * m));
+  const nhi = Math.max(nlo + 16, Math.round(hi * m));
+  return { lo: nlo, hi: nhi };
+}
+
+function scaledCeiling(ceiling, densityId) {
+  const m = TEXT_DENSITY_TARGET_MULT[densityId];
+  if (m == null || m >= 0.995) return ceiling;
+  return Math.max(24, Math.round(ceiling * m));
+}
+
+/** Instrução explícita de volume — só quando ≠ 1/1. */
+function buildSlideTextDensityOverrides(densityId, narrativeModeId) {
+  if (!densityId || densityId === '1_1') return '';
+  const label = SLIDE_TEXT_DENSITY_BY_ID[densityId]?.label || densityId;
+  let baseMid = [200, 320];
+  if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') baseMid = [120, 280];
+  else if (narrativeModeId === 'viral') baseMid = [90, 220];
+  else if (narrativeModeId === 'how_to') baseMid = [160, 280];
+  else if (narrativeModeId === 'sensacionalista') baseMid = [85, 210];
+  else if (narrativeModeId === 'jornalistico') baseMid = [140, 300];
+
+  const mid = scaledCharBand(baseMid[0], baseMid[1], densityId);
+  const hookMax = scaledCeiling(80, densityId);
+  const finMax = scaledCeiling(140, densityId);
+
+  return `
+▶ DENSIDADE DE TEXTO (${label}) — SUBSTITUI proporcionalmente as faixas “típicas” do método / blocos acima:
+- Slides intermediários: subtítulo com algo entre ~${mid.lo} e ~${mid.hi} caracteres (não estique além).
+- Slide 1: subtítulo no máximo ~${hookMax} caracteres (além do título curto já pedido).
+- Último slide: subtítulo no máximo ~${finMax} caracteres.
+- Quanto menor a fração (1/4, 1/5), menos frases paralelas e menos exemplo redundante — sem esvaziar o significado obrigatório do slide.
+`;
+}
+
+function buildSlideTextDensityRefineHint(densityId) {
+  if (!densityId || densityId === '1_1') return '';
+  const label = SLIDE_TEXT_DENSITY_BY_ID[densityId]?.label || densityId;
+  return `- Volume do projeto: densidade ${label} — não alongue o subtítulo; comprima mantendo gancho ou argumento intacto.\n`;
+}
+
+function isTendenciaCulturaPreset(presetId) {
+  return presetId === 'tendencia_cultura';
+}
+
+/** Sobreposição estratégica do pacote Tendência/Cultura (adapta ao N de slides). */
+function buildTendenciaCulturaPackBlock(slideCount, textDensityId = '1_1') {
+  const n = Math.min(12, Math.max(3, slideCount | 0));
+  const mid = scaledCharBand(200, 320, textDensityId || '1_1');
+  const bodyLo = Math.max(52, Math.round(mid.lo * 0.52));
+  const bodyHi = Math.max(bodyLo + 24, Math.round(mid.hi * 0.52));
+  return `
+PACOTE ATIVO — TENDÊNCIA/CULTURA (prioridade quando colidir com clichês genéricos de “dicas virais”):
+Este formato NÃO é post de dicas soltas nem explicação de conceito novo. É nomear e ORGANIZAR o que o leitor já percebia no comportamento, na cultura, na polêmica ou na mudança de mercado.
+
+Validação obrigatória do tema antes de escrever:
+- O público já está sentindo esse fenômeno no cotidiano ou no feed?
+- O texto nomeia e organiza a percepção — ou só ensina algo que o leitor nem sentia falta?
+
+Tipos úteis (escolha o que casa com o material): A) Tendência interpretada B) Tese contraintuitiva C) Case/Benchmark cultural D) Previsão/Futuro sentido mas não nomeado.
+
+Arco editorial de referência (distribua as FUNÇÕES abaixo pelos ${n} slides — se N < 9, una etapas adjacentes; se N > 9, expanda com mais evidência ou contraste mantendo o propósito de cada função):
+
+S1 CAPA · hook que soe como “finalmente alguém falou isso” — teses tipo: fenômeno inesperado + consequência; obsessão comportamental + geração; grupo/categoria em mudança surpreendente; dado de mercado em tensão com narrativa óbvia; “por que X prova Y”.
+S2 CONTEXTO · dado ou situação histórica; abre espaço factual.
+S3 MECANISMO · síntese densa — princípio central do fenômeno (prosa forte, primeira frase = gancho do slide).
+S4 DISSONÂNCIA · conflito que o mecanismo cria; consequência vivida.
+S5 LIMITE · teto do comportamento atual; por que as pessoas travam ou param.
+S6 (se N≥6) STAT/PARADOXO · UM slide pode ser só insight em tipografia mental: afirmação grande + linha menor com dado ou contrassenso (sem clichê motivacional).
+S7 (se N≥7) MECANISMO DUPLO · contraste A vs B nos dois sentidos do fenômeno.
+S8 (se N≥8) REFRAME · ângulo que muda como se lê o comportamento (pode citar pesquisa só se plausible ao material — não invente fonte).
+S9 FECHO · meta-pergunta que organiza o que o leitor já sentia + CTA orgânico (comentário, save, síntese).
+
+Reforço contínuo: “você já percebia isso; aqui está o porquê.” Três gatilhos ao longo do fio: identificação, alívio (não sou só eu), autoridade sobria.
+
+LAYOUT VISUAL ↔ CAMPOS DO JSON (leitura do app — siga estritamente):
+- Slide 1 (CAPA com foto full-bleed): use "title" + "subtitle" + "imageQuery". O campo "bodyAfterImage" DEVE ser "" (string vazia). Nunca sanduíche na capa.
+- Slides intermediários e fecho COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "bodyAfterImage" com o bloco ABAIXO da imagem (${bodyLo}–${bodyHi} caracteres — alinhar à densidade global do projeto). Acima da foto ficam opcionalmente "title" + "subtitle" (prosa forte; primeira frase do subtítulo fecha o gancho). Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
+- Slide só texto (“stat”) SEM foto: deixe "imageQuery" vazio; use "subtitle" (e opcionalmente "title") no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
+- "cultureTone" (opcional): omita ou use "" para alternância automática claro/escuro; só use "light", "dark" ou "accent" quando o contraste exigir.
+
+CRITICAL (texto nos slides JSON):
+- Sem título de seção tipo “Slide 3 — Mecânismo”: use título+subtítulo como no app; primeira frase do subtítulo faz o trabalho do gancho.
+- PROIBIDO abrir miolo como manual (“5 passos”, “dica número”) quando o tema for cultura/tendência — salvo modo narrativo Passo-a-passo pedido pelo usuário em outra camada.
+`;
+}
+
+function buildTendenciaCulturaRefineSlideHint(creativePresetId) {
+  if (!isTendenciaCulturaPreset(creativePresetId)) return '';
+  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Slide 1 com foto de capa mantém bodyAfterImage vazio — não altere esse campo refinando o slide 1 nem devolva texto nele para o primeiro card.`;
+}
+
+function coerceCultureTone(v) {
+  const t = (v == null ? '' : String(v)).trim().toLowerCase();
+  return t === 'light' || t === 'dark' || t === 'accent' ? t : '';
+}
+
 function buildGenerationIntroLine(presetId) {
-  if (presetId === 'estudio_editorial') {
-    return 'Atue como estrategista sênior de conteúdo, branding e cultura de mercado. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
+  if (isTendenciaCulturaPreset(presetId)) {
+    return 'Atue como estrategista de cultura digital e comportamento em rede. Produza um carrossel que NOMEIE um fenômeno que o público já percebia — não lista de dicas nem aula solta de conceito. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
   }
   return 'Crie conteúdo para Instagram alinhado ao contexto abaixo. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
 }
@@ -5383,42 +6866,39 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
   const journalMode = narrativeMode === 'jornalistico';
   const howToMode = narrativeMode === 'how_to';
 
-  // Storytelling/Odisseia colidem com o pacote “Estúdio editorial”: priorizar instruções narrativas.
-  if (presetId === 'estudio_editorial' && storyLike) {
-    return `REGRAS DE LINGUAGEM (pacote Estúdio editorial + modo narrativo "${narrativeMode}"):
-- O MÉTODO narrativo acima MANDA a estrutura. Use só sobriedade lexical e precisão — NÃO impor “parece ser / realmente é”, contraste binário de marca ou raciocínio de consultoria em cada slide.
-- PROIBIDO soar como relatório de posicionamento ou headline + subtítulo “tese/antítese” repetidos (ex.: “Inovação X: uma reflexão” + “quem incorpora Y ganha credibilidade”).
-- Prosa de narrador: tempo, gesto, sensação, consequência — não slogan analítico.
+  // Storytelling/Odisseia + pacote cultura: narrativa manda forma; cultura acrescenta “fenômeno já sentido”.
+  if (isTendenciaCulturaPreset(presetId) && storyLike) {
+    return `REGRAS DE LINGUAGEM (pacote Tendência/Cultura + modo narrativo "${narrativeMode}"):
+- O MÉTODO narrativo acima MANDA a estrutura. Acrescente do pacote cultural: fenômeno que o público já percebia — nomeie e organize, não vire palestra nem deck “parece ser / é” genérico.
+- PROIBIDO soar como relatório institucional; mantenha cena, dor ou tempo — com tensão cultural visível.
 - Tom base: "${tone}".`;
   }
-  if (presetId === 'estudio_editorial' && viralMode && narrativeMode === 'sensacionalista') {
-    return `REGRAS DE LINGUAGEM (Estúdio editorial + Sensacionalista):
-- O MÉTODO SENSACIONALISTA manda tensão forte e cortes rápidos. O pacote editorial empresta precisão de palavra — PROIBIDO engrossar cada slide em parágrafo de consultoria.
-- Ritmo tablóide moderno SEM clickbait desonesto: tensão lexical sim, factualidade obrigatória.
+  if (isTendenciaCulturaPreset(presetId) && viralMode && narrativeMode === 'sensacionalista') {
+    return `REGRAS DE LINGUAGEM (Tendência/Cultura + Sensacionalista):
+- O MÉTODO SENSACIONALISTA manda tensão forte e cortes rápidos. O pacote cultura exige payoff honesto nomeando fenômeno real — SEM clickbait que o miolo não sustenta.
 - Tom "${tone}".`;
   }
-  if (presetId === 'estudio_editorial' && viralMode) {
-    return `REGRAS DE LINGUAGEM (Estúdio editorial + Viral Trends):
-- O MÉTODO VIRAL acima manda ritmo, loops e parada de scroll. O pacote editorial empresta só sobriedade lexical — NÃO impor “parece ser / realmente é” nem subtítulo denso de relatório slide a slide.
+  if (isTendenciaCulturaPreset(presetId) && viralMode) {
+    return `REGRAS DE LINGUAGEM (Tendência/Cultura + Viral Trends):
+- O MÉTODO VIRAL acima manda ritmo, loops e parada de scroll. O pacote cultura reforça: identificação com algo que já circula (“eu também vi isso”), sem virar relatório slide a slide.
 - Tom "${tone}", preferindo frases curtas e cortantes nos slides de tensão.`;
   }
-  if (presetId === 'estudio_editorial' && journalMode) {
-    return `REGRAS DE LINGUAGEM (Estúdio editorial + Jornalístico):
-- Hierarquia de matéria: selo/editoria → manchete → lead factual. O método jornalístico prevalece sobre o molde binário “parece ser / realmente é” em todos os slides.
-- Vocabulário de analítico e consequência — não slogan de marca.
+  if (isTendenciaCulturaPreset(presetId) && journalMode) {
+    return `REGRAS DE LINGUAGEM (Tendência/Cultura + Jornalístico):
+- Hierarquia de matéria: selo/editoria → manchete → lead factual. Ângulos de comportamento mercado ou cultura em curso — não coluna motivacional.
 - Tom "${tone}", factual e adulto.`;
   }
-  if (presetId === 'estudio_editorial' && howToMode) {
-    return `REGRAS DE LINGUAGEM (Estúdio editorial + Passo-a-passo):
-- O tutorial imperativo do MÉTODO acima prevalece. O pacote editorial não transforma passos em análise de mercado nem em contraste estratégico genérico.
+  if (isTendenciaCulturaPreset(presetId) && howToMode) {
+    return `REGRAS DE LINGUAGEM (Tendência/Cultura + Passo-a-passo):
+- O tutorial imperativo do MÉTODO acima prevalece. Não empacote cada passo como “tese de mercado”; mantenha utilidade líquida.
 - Tom "${tone}" em modo instrução clara, não keynote.`;
   }
-  if (presetId === 'estudio_editorial') {
-    return `REGRAS DE LINGUAGEM OBRIGATÓRIAS (todos os slides):
-- Frases assertivas. Zero clichês de marketing, zero tom de guru, zero motivacional.
-- Cada slide = 1 ideia única. Contraste entre "parece ser" e "realmente é".
-- Transforme informação em interpretação estratégica.
-- O ritmo do carrossel deve ser: hook curto → conteúdo denso (vários slides) → fechamento curto.`;
+  if (isTendenciaCulturaPreset(presetId)) {
+    return `REGRAS DE LINGUAGEM — PACOTE TENDÊNCIA/CULTURA (todos os slides):
+- Tom jornalístico-analítico calmo; frases que soem como “finalmente alguém articulou o que eu sentia”.
+- Cada slide = 1 batida nova no fenômeno; evite repetir o mesmo clichê viral (“5 hacks”, “ninguém te conta” vazio).
+- Primeira linha forte do subtítulo é o gancho do slide — sem subdividir em “mini-títulos” artificiais.
+- Zero guru, zero motivacional genérico; autoridade vem da clareza sobre o fenômeno já em curso.`;
   }
   if (storyLike) {
     return `REGRAS DE TEXTO (modo narrativo "${narrativeMode}" — prioridade sobre tom genérico):
@@ -5454,9 +6934,9 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 }
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
-function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId) {
-  const hookMag = creativePresetId === 'estudio_editorial'
-    ? '   - Peso de capa sim, mas em modo narrativo o hook é CENA ou momento — não título de relatório (“X: uma reflexão”).'
+function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1') {
+  const hookMag = isTendenciaCulturaPreset(creativePresetId)
+    ? '   - Gancho nomeia fenômeno ou tensão vivida pelo público — não título genérico de relatório (“X: uma reflexão”).'
     : '   - Hook que para o scroll: linha de cena ou tensão, não conceito abstrato de marca.';
 
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
@@ -5478,6 +6958,7 @@ ${hookMag}
    - Subtítulo: microcena ou sequência de causas; ritmo de narrador, não de slide de pitch.
 
 🔚 SLIDE FINAL — fechamento narrativo ou convite à conversa.
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
   }
 
@@ -5495,6 +6976,7 @@ O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras 
 📖 MEIO — tensão → prova → payoff (distribuído conforme N).
 
 🔚 FINAL — pergunta ou save com motivo concreto (sem CTA preguiçoso).
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
   }
 
@@ -5512,6 +6994,7 @@ O MÉTODO acima manda: um passo por slide com "Passo N · …".
 📖 MEIO — instruções numeradas.
 
 🔚 FINAL — save + pergunta sobre qual passo testar.
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
   }
 
@@ -5528,6 +7011,7 @@ O método sensacionalista acima manda cortes rápidos e micro-ganchos.
 📖 MEIO — viradas e fechos de mini-loop (distribuído conforme N); um slide pode carregar frase quotável chocante-mas-verdadeira.
 
 🔚 FINAL — revelação ou síntese real + provocação factual / save útil — sem clichê de "segue pra parte 2".
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
   }
 
@@ -5545,11 +7029,12 @@ O método jornalístico prevalece. Slides devem ler como sequência de fio ou ca
    - Subtítulo: 2-4 frases curtas OU um parágrafo denso factual: tipicamente ENTRE 140 E 300 caracteres; informação primeiro, ornamentação zero.
 
 🔚 FINAL — editorial curto ou o que falta saber próximo — sem CTA influencer vazio.
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
   }
 
-  const hookVisualHint = creativePresetId === 'estudio_editorial'
-    ? '   - Pense no hook como uma capa de revista — pouco texto, muito peso.'
+  const hookVisualHint = isTendenciaCulturaPreset(creativePresetId)
+    ? '   - Capa com peso de manchete cultural: fenômeno ou paradoxo já no ar — pouco texto, frase memorável.'
     : '   - Hook com impacto visual forte; não precisa parecer “capa de revista de mercado” se outro formato servir melhor ao modo.';
 
   return `
@@ -5568,14 +7053,15 @@ ${hookVisualHint}
 🔚 SLIDE FINAL (CTA) — concisão elegante:
    - Título: 5-9 palavras. Conclusão ou convite.
    - Subtítulo: 1-2 frases curtas, máx 140 caracteres. Fechamento limpo, sem repetir o título.
+${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 `;
 }
 
 function buildGenerationImageLayer(presetId, topic, n, audience) {
   const nicheStr = n ? ` (nicho: ${n})` : '';
   const audStr = audience ? ` (público: ${audience})` : '';
-  if (presetId === 'estudio_editorial') {
-    return `imageQuery — DIREÇÃO DE ARTE EDITORIAL (a IA do gerador de imagem aplicará realismo, luz natural e estética premium em cima — você só precisa descrever a CENA):
+  if (isTendenciaCulturaPreset(presetId)) {
+    return `imageQuery — DIREÇÃO DE ARTE “CULTURA EM CURSO” (a IA do gerador de imagem aplicará realismo, luz natural e estética premium em cima — você só precisa descrever a CENA):
 • Idioma: INGLÊS, 8-15 palavras descritivas.
 • Estrutura: [sujeito real] + [ação cotidiana ou estado] + [ambiente específico observado] + [detalhe de luz/atmosfera].
 • OBRIGATÓRIO — relação INDIRETA e inteligente com o tema "${topic}"${nicheStr}${audStr}. NUNCA escolha a representação mais óbvia. A imagem deve sugerir o conceito por atmosfera, gesto, contexto, objeto ou tensão visual — não ser uma "legenda" do título.
@@ -5583,13 +7069,14 @@ function buildGenerationImageLayer(presetId, topic, n, audience) {
 • EVITE: pessoas posando como modelo, sorriso publicitário, diversidade encenada, expressões artificiais, fundo de estúdio, luz dramática teatral, paisagens aleatórias desconectadas, animais decorativos.
 • PREFIRA cenas reais e bem observadas: escritórios contemporâneos, ruas urbanas, cafés, casas, lojas, bastidores, mãos manuseando objeto, detalhes de processo, espaços culturais, mesas com objetos, interiores residenciais.
 • Composição: espaço negativo para texto, fundo levemente desfocado, foco claro em UM elemento, poucos objetos, silêncio visual.
+• Slides de miolo no layout sanduíche mostram a foto como retângulo horizontal com cantos arredondados entre dois blocos de texto — prefira enquadramento horizontal (panorâmico ou ~3:2) com protagonista reconhecível no centro da largura.
 • Exemplos BONS (note como sugerem o tema sem ilustrá-lo literalmente):
   - tema "produtividade" → "open notebook beside cooling coffee on wooden desk, late afternoon window light"
   - tema "estratégia"   → "hands rearranging objects on a quiet meeting room table, soft overhead light"
   - tema "longevidade"  → "older woman walking slowly through tree-lined street, soft morning haze"
   - tema "marca pessoal"→ "person reflected on storefront glass at dusk, warm street lights blurred behind"
   - tema "tecnologia"   → "single hand resting on closed laptop on minimal desk, quiet morning light through curtain"
-• Cada slide: imageQuery DIFERENTE, todas dentro do mesmo universo visual sóbrio e silencioso.`;
+• Cada slide: imageQuery DIFERENTE, todas dentro do mesmo universo visual sóbrio — sinais de tempo, grupo, consumo ou tensão social, nunca “stock genérico de negócios”.`;
   }
   return `imageQuery — uma por slide (INGLÊS, 8-15 palavras). O pipeline de imagem da aplicação aplica realismo; você descreve a CENA:
 • Alinhe cada imageQuery ao argumento DAQUELE slide e ao tema "${topic}"${nicheStr}${audStr}.
@@ -5620,25 +7107,26 @@ function buildNarrativeModeReminder(modeId) {
   return `Modo narrativo do carrossel (persistido no documento): "${m.label}" — ${m.desc}.`;
 }
 
-/** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo. */
-function buildRefineSingleSlideRules(narrativeModeId) {
+/** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo + densidade de texto. */
+function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1') {
+  const denHint = buildSlideTextDensityRefineHint(textDensityId);
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
-    return `- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
+    return `${denHint}- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
 - Título pode ser fragmento de cena ou virada; subtítulo em prosa coerente com o modo, sem forçar três frases analíticas se uma batida basta.`;
   }
   if (narrativeModeId === 'viral') {
-    return `- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
+    return `${denHint}- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
   }
   if (narrativeModeId === 'sensacionalista') {
-    return `- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
+    return `${denHint}- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
   }
   if (narrativeModeId === 'jornalistico') {
-    return `- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
+    return `${denHint}- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
   }
   if (narrativeModeId === 'how_to') {
-    return `- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
+    return `${denHint}- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
   }
-  return `- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
+  return `${denHint}- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
 }
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
@@ -5697,7 +7185,7 @@ function buildCaptionOutlineInstructions(narrativeModeId) {
 
 /** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */
 function buildHookVariationRules(narrativeModeId, creativePresetId) {
-  const baseEditorial = creativePresetId === 'estudio_editorial';
+  const tendenciaCulture = isTendenciaCulturaPreset(creativePresetId);
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
     return `- Priorize entrada em CENA ou identificação emocional imediata (in medias res / "é exatamente isso") — não só fórmulas "X não é Y".
 - Subtítulo: uma linha que prolonga a tensão ou o momento, não pitch analítico.
@@ -5729,9 +7217,12 @@ function buildHookVariationRules(narrativeModeId, creativePresetId) {
 - 5 hooks em cadências bem diferentes — tablóide moderno honesto — sem "você vai se arrepender" vazio nem ALL CAPS exagerado em todas.`;
   }
   const editorialFormats = `- Use formatos contraintuitivos: "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z."`;
-  if (baseEditorial) {
-    return `${editorialFormats}
-- Tom assertivo, sofisticado, leitura estratégica — sem clichê motivacional.
+  const tendenciaPatterns = `
+- Patterns extra (Tendência/Cultura — soe como "finalmente alguém falou isso"): "[Substantivo] muda [algo inesperado]: como [fenômeno] provou [tese]", "A nova obsessão é [comportamento]: como uma geração [consequência]", "[Grupo] está [verbo surpreendente] — e o que isso revela sobre [tensão]", "o que cresceu enquanto [contexto contrário] mudava", "por que [fenômeno] é prova de [tese provocadora]".`;
+  if (tendenciaCulture) {
+    return `${editorialFormats}${tendenciaPatterns}
+- Âncoras no fenômeno JÁ EM CURSO (comportamento, cultura, polêmica, mercado) — não promessa de "aulinha".
+- Tom assertivo e adulto — sem clichê motivacional nem guru.
 - Cada gancho: 4-12 palavras de impacto.
 - 5 variações DIFERENTES entre si (formatos diferentes).`;
   }
@@ -5747,27 +7238,27 @@ function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
   const journalMode = narrativeMode === 'jornalistico';
   const howToMode = narrativeMode === 'how_to';
 
-  if (presetId === 'estudio_editorial' && storyLike) {
-    return `- Refinamento: o modo narrativo "${narrativeMode}" manda — use o pacote editorial só para precisão de palavra, não para virar cada slide em "parece ser / realmente é".
-- Não substitua cena ou dor por análise de mercado genérica.`;
+  if (isTendenciaCulturaPreset(presetId) && storyLike) {
+    return `- Refinamento: o modo narrativo "${narrativeMode}" manda — use Tendência/Cultura só para nomear fenômeno vivido com precisão, não para virar cada slide em "parece ser / realmente é" nem pitch de categoria.
+- Não substitua cena ou dor por análise genérica de mercado.`;
   }
-  if (presetId === 'estudio_editorial' && viralMode && narrativeMode === 'sensacionalista') {
-    return `- Refinamento sensacionalista: tensão máxima e cortes rápidos; payoff honesto. O pacote editorial afina léxico sem esvaziar o drama nem engrossar em relatório corporativo.
+  if (isTendenciaCulturaPreset(presetId) && viralMode && narrativeMode === 'sensacionalista') {
+    return `- Refinamento sensacionalista: tensão máxima e cortes rápidos; payoff honesto. O pacote cultura afina léxico sem esvaziar o drama nem engrossar em relatório corporativo.
 - Zero clickbait falso: pode ser incômodo, não mentiroso.`;
   }
-  if (presetId === 'estudio_editorial' && viralMode) {
-    return `- Refinamento viral: frases curtas e tensão; o pacote editorial não deve densificar em parágrafo de consultoria.`;
+  if (isTendenciaCulturaPreset(presetId) && viralMode) {
+    return `- Refinamento viral: frases curtas e tensão; o pacote cultura não deve densificar cada slide em parágrafo de consultoria.`;
   }
-  if (presetId === 'estudio_editorial' && howToMode) {
-    return `- Refinamento tutorial: imperativo e claro; sem transformar passos em keynote estratégico.`;
+  if (isTendenciaCulturaPreset(presetId) && howToMode) {
+    return `- Refinamento tutorial: imperativo e claro; sem transformar passos em keynote de “tendência” vazia.`;
   }
-  if (presetId === 'estudio_editorial' && journalMode) {
+  if (isTendenciaCulturaPreset(presetId) && journalMode) {
     return `- Refinamento jornalístico: hierarquia de capa onde couber ao slide; factual e preciso — sem soar como pitch institucional.
 - Preserve selo/editoria vs manchete vs lead quando o método pedir.`;
   }
-  if (presetId === 'estudio_editorial') {
+  if (isTendenciaCulturaPreset(presetId)) {
     return `- Tom assertivo, direto, sofisticado. Sem clichês, sem linguagem motivacional, sem guru.
-- Use vocabulário de mercado quando pertinente: categoria, posicionamento, percepção, distribuição, comportamento, narrativa, diferenciação.`;
+- Vocabulário de comportamento, cultura e mercado quando pertinente: categoria, percepção, narrativa em curso, tensão social, sinal, consequência.`;
   }
   if (storyLike) {
     return `- Refinar mantendo coerência com modo "${narrativeMode}" (narrativa empática ou em cena).
@@ -5790,8 +7281,8 @@ function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
 
 function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
   let presetLine;
-  if (presetId === 'estudio_editorial') {
-    presetLine = `- Tom: direto, analítico quando couber ao tema; sem emojis em excesso (máx 2-3). Sem guru nem motivacional vazio.`;
+  if (isTendenciaCulturaPreset(presetId)) {
+    presetLine = `- Tom: jornalístico-analítico (expande o insight como algo que o leitor já sentia); sem emojis em excesso (máx 2-3). Bloco 2: pergunta que ativa identificação + CTA orgânico. Hashtags: 5-8 específicas ao nicho.`;
   } else {
     presetLine = `- Tom: alinhado à marca e ao material; natural — sem forçar frieza analítica se o modo narrativo pedir calor humano. Emojis com moderação.`;
   }
@@ -5820,7 +7311,7 @@ function buildResearchPromptBias(narrativeModeId, creativePresetId) {
 Preferências do usuário (viés suave — continue a pesquisar fatos REAIS na web):
 - Modo narrativo alvo: "${m.label}" — ${m.desc}
 - Pacote criativo de referência: "${p.label}" — ${p.desc}
-Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (ex.: storytelling → arco em cena; passo-a-passo → passos numerados; viral → tensão e payoff; profundo → padrão/mecanismo). Em "viral_hooks", combine formatos estratégicos com variações compatíveis com o modo.
+Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (ex.: storytelling → arco em cena; passo-a-passo → passos numerados; viral → tensão e payoff; profundo → padrão/mecanismo; pacote Tendência/Cultura → fenômeno de comportamento ou cultura já em curso que o público sente no feed, não “lista de dicas”). Em "viral_hooks", combine formatos estratégicos com variações compatíveis com o modo.
 `;
 }
 
@@ -5852,6 +7343,10 @@ const DEFAULT_BRAND = {
   logoSize: 30,           // tamanho do logo em px na escala real (1080px)
   logoPosition: 'tr',     // canto: 'tl' | 'tr' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
+  /** Barra editorial fina no topo dos cards (modo Tendência/Cultura) — opcional. */
+  cultureHeaderLeft: '',
+  /** Ex.: 2026 — mostrado como “2026 //” à direita da barra. */
+  cultureHeaderYear: '',
 };
 const DEFAULT_DOC = {
   fmt: 'carrossel',
@@ -5875,8 +7370,10 @@ const DEFAULT_DOC = {
   // Modo narrativo padrão. Persistido entre sessões pra que o usuário
   // não precise reescolher toda vez. Um dos GEN_MODES.id.
   mode: 'editorial',
-  // Pacote criativo da IA — default personalizado (id interno `livre`) ou estúdio editorial.
+  // Pacote criativo da IA — default personalizado (id interno `livre`) ou Tendência/Cultura.
   creativePreset: 'livre',
+  /** Volume de texto alvo nos cards ao gerar/refinar — 1/1 … 1/5 (fracionado). */
+  slideTextDensity: '1_1',
 };
 
 /** Evita ecrã em branco quando `vc_library` ou import JSON tem doc incompleto (sem slides, etc.). */
@@ -5897,6 +7394,10 @@ function ensureDocShape(d) {
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';
   if (!out.mode) out.mode = 'editorial';
   if (out.creativePreset == null) out.creativePreset = 'livre';
+  if (out.creativePreset === 'estudio_editorial') out.creativePreset = 'tendencia_cultura';
+  if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';
+  if (out.slideTextDensity == null) out.slideTextDensity = '1_1';
+  if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';
   if (typeof out.caption !== 'string') out.caption = '';
   return out;
 }
@@ -5955,6 +7456,8 @@ export default function App() {
   const doc = (history.state && typeof history.state === 'object') ? history.state : DEFAULT_DOC;
   // Nunca deixar slides vazio: senão `slide` fica undefined e a árvore inteira rebenta (tela branca).
   const slides = (Array.isArray(doc.slides) && doc.slides.length > 0) ? doc.slides : [mkSlide(1)];
+  const slidesLiveRef = useRef(slides);
+  slidesLiveRef.current = slides;
   const brand = doc.brand && typeof doc.brand === 'object' ? doc.brand : DEFAULT_BRAND;
   const fmt = doc.fmt && FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
   const caption = typeof doc.caption === 'string' ? doc.caption : '';
@@ -5962,6 +7465,8 @@ export default function App() {
   const imgParams = doc.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 };
   const mode      = doc.mode      || 'editorial';
   const creativePreset = doc.creativePreset ?? 'livre';
+  const slideTextDensityRaw = doc.slideTextDensity ?? '1_1';
+  const slideTextDensity = SLIDE_TEXT_DENSITY_BY_ID[slideTextDensityRaw] ? slideTextDensityRaw : '1_1';
 
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
@@ -5990,6 +7495,10 @@ export default function App() {
   const setCreativePreset = useCallback(next => history.set(d => ({
     ...d,
     creativePreset: typeof next==='function' ? next(d.creativePreset ?? 'livre') : next,
+  })), [history]);
+  const setSlideTextDensity = useCallback(next => history.set(d => ({
+    ...d,
+    slideTextDensity: typeof next==='function' ? next(d.slideTextDensity ?? '1_1') : next,
   })), [history]);
 
   // ── BIBLIOTECA: handlers ────────────────────────────────────────────────────
@@ -6144,6 +7653,7 @@ export default function App() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [tab, setTab] = useState('brand');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [canvasEditMode, setCanvasEditMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -6191,6 +7701,9 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const fileInputRef = useRef(null);
+  const batchPhotoInputRef = useRef(null);
+  const photoZoneInputRef = useRef(null);
+  const photoZoneTargetIdxRef = useRef(null);
   const refImageInputRef = useRef(null);
   const refImageTargetIdxRef = useRef(null);
   const slideRefs = useRef({});
@@ -6482,6 +7995,165 @@ export default function App() {
     setSlides(s => s.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)));
   }, []);
 
+  const patchCanvasZonesAt = useCallback((idx, zonePatch) => {
+    setSlides((prev) => {
+      const sl = prev[idx];
+      if (!sl?.canvas?.enabled || !sl.canvas.zones) return prev;
+      const nextZones = { ...sl.canvas.zones };
+      for (const [k, rect] of Object.entries(zonePatch)) {
+        if (rect && typeof rect === 'object') nextZones[k] = clampRect(rect);
+      }
+      return prev.map((s, i) =>
+        i === idx ? { ...s, canvas: { ...s.canvas, zones: nextZones } } : s,
+      );
+    });
+  }, []);
+
+  const openPhotoZoneImport = useCallback((idx) => {
+    photoZoneTargetIdxRef.current = idx;
+    photoZoneInputRef.current?.click();
+  }, []);
+
+  const handlePhotoZoneBgFile = useCallback((e) => {
+    const file = e.target.files?.[0];
+    const idx = photoZoneTargetIdxRef.current;
+    photoZoneTargetIdxRef.current = null;
+    e.target.value = '';
+    if (!file || idx == null) return;
+    const reader = new FileReader();
+    reader.onload = () => updateSlideAt(idx, { bgImage: reader.result });
+    reader.readAsDataURL(file);
+  }, [updateSlideAt]);
+
+  const handleBatchPhotos = useCallback((e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+
+    const readOne = (file) =>
+      new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(file);
+      });
+
+    void (async () => {
+      const urls = await Promise.all(files.map(readOne));
+      const slideCount = slidesLiveRef.current.length;
+      const n = Math.min(urls.length, slideCount);
+
+      setSlides((prev) => {
+        const cap = Math.min(urls.length, prev.length);
+        return prev.map((sl, j) => {
+          if (j >= cap) return sl;
+          const data = urls[j];
+          return data ? { ...sl, bgImage: data } : sl;
+        });
+      });
+
+      const extraFiles = urls.length > slideCount;
+      const leftoverSlides = slideCount > urls.length;
+      if (extraFiles || leftoverSlides) {
+        toast(
+          extraFiles
+            ? `Foram aplicadas ${n} fotos (até ao slide ${n}). Mais ${urls.length - n} ficheiros extra ignorados.`
+            : `Foram aplicadas ${n} fotos aos primeiros slides; ${slideCount - n} cards ficaram sem ficheiro novo.`,
+          'info',
+        );
+      } else {
+        toast(`${n} fotos aplicadas (slide 1 a ${n}).`, 'success');
+      }
+    })();
+  }, [setSlides, toast]);
+
+  const enableCanvasLayout = useCallback(() => {
+    setSlides((prev) =>
+      prev.map((s) => {
+        const d = inferCanvasDefaults(s, creativePreset);
+        return {
+          ...s,
+          canvas: {
+            enabled: true,
+            variant: d.variant,
+            zones: { ...d.zones },
+          },
+        };
+      }),
+    );
+    setCanvasEditMode(true);
+    toast('Layout canvas ativado em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
+  }, [creativePreset, setSlides, toast]);
+
+  const disableCanvasLayout = useCallback(() => {
+    setSlides((prev) => prev.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false } } : s)));
+    setCanvasEditMode(false);
+    toast('Layout canvas desligado (as zonas ficam guardadas).', 'info');
+  }, [setSlides, toast]);
+
+  const swapCanvasZoneContent = useCallback((toIdx, raw) => {
+    let parsed;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      return;
+    }
+    const fromIdx = parsed?.slideIdx;
+    const zone = parsed?.zone;
+    if (!Number.isFinite(fromIdx) || typeof zone !== 'string') return;
+    if (fromIdx === toIdx) return;
+    setSlides((prev) => {
+      const a = prev[fromIdx];
+      const b = prev[toIdx];
+      if (!a || !b) return prev;
+      const next = [...prev];
+      if (zone === 'photo') {
+        next[fromIdx] = { ...a, bgImage: b.bgImage };
+        next[toIdx] = { ...b, bgImage: a.bgImage };
+      } else if (zone === 'title') {
+        next[fromIdx] = { ...a, title: b.title };
+        next[toIdx] = { ...b, title: a.title };
+      } else if (zone === 'subtitle') {
+        next[fromIdx] = { ...a, subtitle: b.subtitle };
+        next[toIdx] = { ...b, subtitle: a.subtitle };
+      } else if (zone === 'top') {
+        next[fromIdx] = { ...a, title: b.title, subtitle: b.subtitle };
+        next[toIdx] = { ...b, title: a.title, subtitle: a.subtitle };
+      } else if (zone === 'bottom') {
+        next[fromIdx] = { ...a, bodyAfterImage: b.bodyAfterImage };
+        next[toIdx] = { ...b, bodyAfterImage: a.bodyAfterImage };
+      } else {
+        return prev;
+      }
+      return next;
+    });
+    toast('Conteúdo da zona trocado entre os cards.', 'success');
+  }, [setSlides, toast]);
+
+  /** Replica tamanhos, espaçamento e legibilidade do card ativo para todos os slides. */
+  const applyTypographyToAllCards = useCallback(() => {
+    setSlides((list) => {
+      const src = list[activeIdx];
+      if (!src) return list;
+      const patch = {
+        titleSize: src.titleSize ?? 100,
+        subSize: src.subSize ?? 100,
+        titleTracking: src.titleTracking ?? 0,
+        titleLeading: src.titleLeading ?? 105,
+        titleWeight: src.titleWeight ?? 800,
+        titleCase: src.titleCase ?? 'normal',
+        subTracking: src.subTracking ?? 0,
+        subLeading: src.subLeading ?? 150,
+        textShadow: src.textShadow !== false,
+        textBg: !!src.textBg,
+        textBgOpacity: src.textBgOpacity ?? 55,
+        textInset: src.textInset ?? 7,
+      };
+      return list.map((sl) => ({ ...sl, ...patch }));
+    });
+    toast('Tipografia deste card aplicada a todos os slides', 'success');
+  }, [activeIdx, setSlides, toast]);
+
   const persistFullscreenPresentationAdjustDraft = useCallback((draftBySlideId) => {
     if (!draftBySlideId || typeof draftBySlideId !== 'object') return;
     setSlides((prev) =>
@@ -6597,11 +8269,14 @@ export default function App() {
     imgParams: axes,
     mode: chosenNarrativeMode,
     creativePreset: presetArg,
+    slideTextDensity: densityArg,
     fetchImagesNow = true,
   }) => {
     const effectiveAxes = axes || imgParams;
     const effectiveMode = chosenNarrativeMode || mode || 'editorial';
     const cp = presetArg ?? creativePreset ?? 'livre';
+    const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
+    const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
     const brandBlock = buildBrandBlock(brand);
     const materialBlock = buildMaterialBlock(material);
@@ -6610,7 +8285,18 @@ export default function App() {
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience);
-    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp);
+    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td);
+    const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
+
+    const jsonShapeLine = isTendenciaCulturaPreset(cp)
+      ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (regras do PACOTE Tendência/Cultura: capa vazio; com foto no miolo = obrigatório)","cultureTone":"opcional: light | dark | accent ou omita"}],"caption":"legenda…"}'
+      : '{"slides":[{"title":"…","subtitle":"…","imageQuery":"…"}],"caption":"legenda…"}';
+
+    const idiomaRegra = `
+REGRA DE IDIOMA (obrigatória):
+- Redija em português brasileiro: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
+- Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
+`;
 
     const prompt = `${introLine}
 Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
@@ -6622,7 +8308,10 @@ ${materialBlock}
 ${materialPriorityBlock}
 ${imgParamsBlock}
 
+${idiomaRegra}
+
 ${modeDef.method}
+${tendenciaPackBlock}
 
 ${slideLayoutRules}
 
@@ -6631,23 +8320,48 @@ ${langLayer}
 ${imageLayer}
 
 JSON exato a retornar (sem mais nada):
-{"slides":[{"title":"...","subtitle":"...","imageQuery":"..."}],"caption":"legenda estratégica 8-12 linhas + CTA reflexivo + 8-12 hashtags relevantes ao nicho"}`;
+${jsonShapeLine}`;
 
     const result = await callAI(prompt, { json:true, maxTokens:4096, openaiKey });
     if (!result?.slides?.length) throw new Error('IA não retornou slides. Tente um tema mais específico.');
 
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
-    const newSlides = result.slides.map((s,i) => ({
-      ...mkSlide(i+1),
-      title: s.title || `Slide ${i+1}`,
-      subtitle: s.subtitle || '',
-      imageQuery: s.imageQuery || '',
-      imgMode: resolvedImgMode,
-      bgImage: null,
-      overlay: s.imageQuery ? 70 : 0,
-      layout: i===0 ? 'mc' : 'bl',
-      align: i===0 ? 'center' : 'left',
-    }));
+    const newSlides = result.slides.map((s, i) => {
+      const q = ((s.imageQuery ?? s.image_query) || '').trim();
+      const title = s.title || `Slide ${i + 1}`;
+      const subtitle = s.subtitle || '';
+      const base = {
+        ...mkSlide(i + 1),
+        title,
+        subtitle,
+        imageQuery: q,
+        imgMode: resolvedImgMode,
+        bgImage: null,
+        layout: i === 0 ? 'mc' : 'bl',
+        align: i === 0 ? 'center' : 'left',
+      };
+      if (!isTendenciaCulturaPreset(cp)) {
+        return { ...base, overlay: q ? 70 : 0 };
+      }
+      let rawBody = typeof s.bodyAfterImage === 'string'
+        ? s.bodyAfterImage
+        : typeof s.body_after_image === 'string'
+          ? s.body_after_image
+          : '';
+      let bodyAfterImage = rawBody.trim();
+      const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
+
+      let overlay = 0;
+      if (i === 0) {
+        bodyAfterImage = '';
+        overlay = q ? 70 : 0;
+      } else if (q && bodyAfterImage) {
+        overlay = 0;
+      } else if (q) {
+        overlay = 70;
+      }
+      return { ...base, bodyAfterImage, cultureTone: ct, overlay };
+    });
     setSlides(newSlides); setActiveIdx(0); setShellView('project');
     if (n) setNiche(n);
     if (result.caption) setCaption(result.caption);
@@ -6705,6 +8419,10 @@ JSON exato a retornar (sem mais nada):
       const brandBlock = buildBrandBlock(brand);
       const materialBlock = buildMaterialBlock(material);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
+      const cultureRef = buildTendenciaCulturaRefineSlideHint(creativePreset);
+      const singleJson = isTendenciaCulturaPreset(creativePreset) && activeIdx !== 0
+        ? '{"title":"...","subtitle":"...","bodyAfterImage":"..."}'
+        : '{"title":"...","subtitle":"..."}';
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Responda APENAS com JSON.
 
@@ -6715,19 +8433,27 @@ ${brandBlock}${materialBlock}
 Slide ${activeIdx+1} (atual):
 Título: "${slide.title}"
 Subtítulo: "${slide.subtitle}"
-
+${isTendenciaCulturaPreset(creativePreset) && activeIdx !== 0 ? `Corpo abaixo da imagem — bodyAfterImage atual (refine só se aplicável):\n${JSON.stringify(slide.bodyAfterImage ?? '')}\n` : ''}
 Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
-${buildRefineSingleSlideRules(mode)}
+${cultureRef}
+${buildRefineSingleSlideRules(mode, slideTextDensity)}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
 
-Retorne exatamente: {"title":"...","subtitle":"..."}`,
+Retorne exatamente: ${singleJson}`,
         { json:true, openaiKey }
       );
-      updateSlide({ title:r.title||slide.title, subtitle:r.subtitle||slide.subtitle });
+      const patch = {
+        title: r.title || slide.title,
+        subtitle: r.subtitle || slide.subtitle,
+      };
+      if (isTendenciaCulturaPreset(creativePreset) && typeof r.bodyAfterImage === 'string' && activeIdx !== 0) {
+        patch.bodyAfterImage = r.bodyAfterImage;
+      }
+      updateSlide(patch);
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
   };
@@ -6873,11 +8599,15 @@ ${capRules}
     if (!slides.length) return;
     setRefining(true);
     try {
-      const ctx = slides.map((s,i)=>`${i+1}. Título: "${s.title}" | Subtítulo: "${s.subtitle}"`).join('\n');
+      const ctx = slides.map((s, i) =>
+        `${i + 1}. Título: "${s.title}" | Subtítulo: "${s.subtitle}"${
+          isTendenciaCulturaPreset(creativePreset) ? ` | bodyAfterImage: ${JSON.stringify(s.bodyAfterImage ?? '')}` : ''
+        }`,
+      ).join('\n');
       const brandBlock = buildBrandBlock(brand);
       const materialBlock = buildMaterialBlock(material);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
-      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset);
+      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Reescreva TODOS os slides do carrossel abaixo aplicando a instrução do usuário, mantendo coerência narrativa entre eles.
 
@@ -6890,24 +8620,30 @@ Instrução: ${instruction}
 
 REGRAS DE VOZ:
 ${voiceBulk}
+${buildTendenciaCulturaRefineSlideHint(creativePreset)}
 - Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
 ${layoutBulk}
 
-Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
+Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
+          ? '{"slides":[{"title":"...","subtitle":"...","bodyAfterImage":"..."}]}'
+          : '{"slides":[{"title":"...","subtitle":"..."}]}'}`,
         { json:true, openaiKey }
       );
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
       setSlides(prev => prev.map((s, i) => ({
         ...s,
-        title:    r.slides[i]?.title    || s.title,
+        title: r.slides[i]?.title || s.title,
         subtitle: r.slides[i]?.subtitle || s.subtitle,
+        ...(isTendenciaCulturaPreset(creativePreset) && typeof r.slides[i]?.bodyAfterImage === 'string' && i !== 0
+          ? { bodyAfterImage: r.slides[i].bodyAfterImage }
+          : {}),
       })));
       toast('Todos os slides refinados', 'success');
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
-  }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset, mode]);
+  }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset, mode, slideTextDensity]);
 
   // Aplica um template pronto (preenche slides + brand)
   const applyTemplate = useCallback((tpl) => {
@@ -7050,6 +8786,16 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
     openRefImagePicker,
     slideImgGenBusy,
     generateSlideImageAt,
+    creativePreset,
+    applyTypographyToAllCards,
+    canvasEditMode, setCanvasEditMode,
+    anyCanvasEnabled: slides.some((s) => s.canvas?.enabled),
+    patchCanvasZonesAt,
+    openPhotoZoneImport,
+    handleBatchPhotos,
+    batchPhotoInputRef,
+    enableCanvasLayout,
+    disableCanvasLayout,
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -7302,6 +9048,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
               key={`exp-${s.id}`}
               ref={el=>slideRefs.current[s.id]=el}
               slide={s} fmt={fmt} brand={brand} num={i+1} total={slides.length} scale={1}
+              creativePreset={creativePreset}
+              showCanvasChrome={false}
             />
           ))}
         </div>
@@ -7524,7 +9272,20 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                 }}
               >
                 <div style={{ animation:'fadeUp 0.2s var(--ease-smooth)', position:'relative' }}>
-                  <SlideCard slide={slide} fmt={fmt} brand={brand} num={activeIdx+1} total={slides.length} scale={previewScale}/>
+                  <SlideCard
+                    slide={slide}
+                    fmt={fmt}
+                    brand={brand}
+                    num={activeIdx+1}
+                    total={slides.length}
+                    scale={previewScale}
+                    creativePreset={creativePreset}
+                    slideIndex={activeIdx}
+                    showCanvasChrome={canvasEditMode && !!(slide.canvas?.enabled && slide.canvas?.zones)}
+                    onCanvasZonePatch={patchCanvasZonesAt}
+                    onPhotoZoneRequest={openPhotoZoneImport}
+                    enableZoneSwapDrag={canvasEditMode}
+                  />
 
                   {/* Setas flutuantes */}
                   {activeIdx > 0 && (
@@ -7597,7 +9358,23 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
               // Desktop: all slides row
               <div style={{ padding:'28px 24px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%' }}>
                 {slides.map((s,i)=>(
-                  <div key={s.id} style={{ flexShrink:0, animation:`fadeUp 0.2s ${i*0.04}s both var(--ease-smooth)` }}>
+                  <div
+                    key={s.id}
+                    style={{ flexShrink:0, animation:`fadeUp 0.2s ${i*0.04}s both var(--ease-smooth)` }}
+                    onDragOver={(e) => {
+                      if (!canvasEditMode) return;
+                      if (Array.from(e.dataTransfer.types || []).includes(VC_ZONE_DRAG_MIME)) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }
+                    }}
+                    onDrop={(e) => {
+                      if (!canvasEditMode) return;
+                      e.preventDefault();
+                      const raw = e.dataTransfer.getData(VC_ZONE_DRAG_MIME);
+                      if (raw) swapCanvasZoneContent(i, raw);
+                    }}
+                  >
                     <div
                       onClick={()=>setActiveIdx(i)}
                       style={{
@@ -7612,7 +9389,20 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
                       onMouseLeave={e=>{ if(i!==activeIdx) e.currentTarget.style.opacity='0.65'; }}
                     >
                       <SlideCard
-                        slide={s} fmt={fmt} brand={brand} num={i+1} total={slides.length} scale={previewScale}
+                        slide={s}
+                        fmt={fmt}
+                        brand={brand}
+                        num={i+1}
+                        total={slides.length}
+                        scale={previewScale}
+                        creativePreset={creativePreset}
+                        slideIndex={i}
+                        showCanvasChrome={
+                          canvasEditMode && !!(s.canvas?.enabled && s.canvas?.zones) && i === activeIdx
+                        }
+                        onCanvasZonePatch={patchCanvasZonesAt}
+                        onPhotoZoneRequest={openPhotoZoneImport}
+                        enableZoneSwapDrag={canvasEditMode}
                       />
                     </div>
                     <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 2px' }}>
@@ -7711,6 +9501,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
 
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageUpload}/>
+      <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple hidden onChange={handleBatchPhotos}/>
+      <input ref={photoZoneInputRef} type="file" accept="image/*" hidden onChange={handlePhotoZoneBgFile}/>
       <input ref={refImageInputRef} type="file" accept="image/*" hidden onChange={handleRefImageFile}/>
 
       {/* Toast notifications */}
@@ -7758,6 +9550,8 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         onModeChange={setMode}
         creativePreset={creativePreset}
         onCreativePresetChange={setCreativePreset}
+        slideTextDensity={slideTextDensity}
+        onSlideTextDensityChange={setSlideTextDensity}
       />
       <ResearchPanel
         open={researchOpen}
@@ -7820,6 +9614,7 @@ Retorne APENAS JSON: {"slides":[{"title":"...","subtitle":"..."}]}`,
         slides={slides} fmt={fmt} brand={brand}
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
+        creativePreset={creativePreset}
       />
       <LibraryModal
         open={libraryOpen}
@@ -8964,7 +10759,7 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
   );
 }
 
-function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust }) {
+function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust, creativePreset = 'livre' }) {
   const touchRef = useRef({ x:0, y:0 });
   const [size, setSize] = useState({ w:0, h:0 });
   const [photoAdjustOpen, setPhotoAdjustOpen] = useState(false);
@@ -9127,6 +10922,8 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
         <SlideCard
           slide={activeSlideFs} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
+          creativePreset={creativePreset}
+          showCanvasChrome={false}
           {...(overlayDraftFs !== undefined
             ? { presentationImgFilter: presentationImgFilterFs }
             : {})}
