@@ -55,64 +55,71 @@ function readInitialShellView() {
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
 
 const GLOBAL_STYLE = `
-  /* Apple Design System — fonts: SF Pro is system-resolved on Apple devices.
-     Inter is loaded as the cross-platform fallback (closest open-source equivalent),
-     and JetBrains Mono provides a clean monospace for the rare technical labels. */
-  /* Google Fonts injetadas via <link> no useEffect — evita bloqueio de render do @import */
+  /* Figma Design System (GetDesign figma/) — monocromático + Inter + JetBrains Mono.
+     Google Fonts injectadas via <link> no useEffect. DESIGN.md na raíz = fonte normativa. */
 
   :root {
-    /* — Surfaces (light-first, the Apple default) — */
+    /* — Surfaces — */
     --bg-base: #ffffff;
-    --bg-parchment: #f5f5f7;
-    --bg-pearl: #fafafc;
-    --bg-sidebar: #f5f5f7;
+    --bg-parchment: #f7f7f5;       /* surface-soft */
+    --bg-pearl: #f1f1f1;           /* hairline-soft */
+    --bg-sidebar: #f7f7f5;
     --bg-elevated: #ffffff;
     --bg-card: #ffffff;
 
-    /* — Dark surfaces (used in nav, fullscreen viewer, alternating tiles) — */
     --bg-tile-1: #272729;
     --bg-tile-2: #2a2a2c;
     --bg-tile-3: #252527;
     --bg-black: #000000;
 
-    /* — Hairlines — */
-    --border: #e0e0e0;
-    --border-muted: #f0f0f0;
-    --hairline: #e0e0e0;
+    --border: #e6e6e6;
+    --border-muted: #f1f1f1;
+    --hairline: #e6e6e6;
     --divider-soft: rgba(0,0,0,0.04);
     --border-on-dark: rgba(255,255,255,0.10);
 
-    /* — Text — */
-    --text-primary: #1d1d1f;       /* Ink */
-    --text-secondary: #333333;     /* Ink Muted 80 */
-    --text-muted: #7a7a7a;         /* Ink Muted 48 — disabled, fine print */
+    --text-primary: #000000;
+    --text-secondary: #363636;
+    --text-muted: #5c5c5c;
     --text-on-dark: #ffffff;
-    --text-on-dark-muted: #cccccc;
+    --text-on-dark-muted: rgba(255,255,255,0.72);
 
-    /* — Accent (the only chromatic color in the system) — */
-    --accent: #0066cc;             /* Action Blue */
-    --accent-hover: #0071e3;       /* Slightly brighter on press/focus */
-    --accent-focus: #0071e3;       /* Focus ring */
-    --accent-on-dark: #2997ff;     /* Sky Link Blue (dark surfaces only) */
-    --accent-glow: rgba(0, 102, 204, 0.14);
+    /* Chromatic primary chrome = black pill (DESIGN.md); marca no doc pode usar outra tinta nos slides */
+    --accent: #000000;
+    --accent-hover: #1a1a1a;
+    --accent-focus: #000000;
+    --accent-on-dark: #ffffff;
+    --accent-promo-magenta: #ff3d8b;
+    --accent-surface: rgba(0, 0, 0, 0.06);
+    --accent-surface-strong: rgba(0, 0, 0, 0.10);
+    --accent-glow: rgba(0, 0, 0, 0.10);
 
-    /* — Status — */
-    --success: #34c759;            /* Apple system green */
-    --danger:  #ff3b30;            /* Apple system red */
-    --warning: #ff9500;            /* Apple system orange */
+    --success: #1ea64a;
+    --success-surface: rgba(30, 166, 74, 0.12);
+    --success-border: rgba(30, 166, 74, 0.28);
+    --success-text: #146c31;
+    --danger: #ff3b30;
+    --warning: #ff9500;
 
-    /* — Typography — */
-    --font-ui: 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif;
-    --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, 'Inter', sans-serif;
+    --font-ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-    --font-serif: 'SF Pro Display', -apple-system, system-ui, serif;
+    --font-serif: 'Inter', system-ui, serif;
 
-    /* — Motion — */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 24px;
+    --radius-pill: 50px;
+
     --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    /* — Single product-shadow, reserved for product imagery only — */
     --shadow-product: 0 5px 30px rgba(0, 0, 0, 0.22);
+
+    --safe-top:    env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left:   env(safe-area-inset-left, 0px);
+    --safe-right:  env(safe-area-inset-right, 0px);
   }
 
   * { box-sizing: border-box; }
@@ -120,24 +127,18 @@ const GLOBAL_STYLE = `
   body {
     background: var(--bg-base); color: var(--text-primary);
     font-family: var(--font-ui);
-    font-size: 17px;
-    line-height: 1.47;
-    letter-spacing: -0.011em;
+    font-size: 18px;
+    line-height: 1.45;
+    letter-spacing: -0.014em;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: 'ss03', 'cv01';
+    font-feature-settings: 'kern' 1;
     overscroll-behavior-x: none;
     padding-top: env(safe-area-inset-top, 0);
   }
 
-  :root {
-    --safe-top:    env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left:   env(safe-area-inset-left, 0px);
-    --safe-right:  env(safe-area-inset-right, 0px);
-  }
-
-  /* Display headlines: tight, weight 600 (the "Apple tight" cadence) */
+  /* Headlines — peso marca hierarquia (Figma usa display weight forte; UI compacta mantém 600) */
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     font-weight: 600;
@@ -231,7 +232,7 @@ const GLOBAL_STYLE = `
     border: 2px solid rgba(255,255,255,0.22);
   }
 
-  /* — Buttons (Apple grammar: pill primary + sm utility) — */
+  /* — Buttons (Figma DS: pill primário preto + capsule secundária) — */
   .vc-btn {
     display: inline-flex; align-items: center; justify-content: center;
     gap: 8px; font-family: var(--font-ui); font-weight: 400;
@@ -245,21 +246,21 @@ const GLOBAL_STYLE = `
   .vc-btn:focus-visible { outline: 2px solid var(--accent-focus); outline-offset: 2px; }
   .vc-btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
-  /* Primary blue pill — the signature Apple action */
+  /* Primary pill — preto / branco (DESIGN.md components.button-primary) */
   .vc-btn-primary {
     background: var(--accent); color: #fff;
     padding: 0 22px; height: 38px; font-size: 14px; font-weight: 400;
   }
-  .vc-btn-primary:hover { background: var(--accent-hover); }
+  .vc-btn-primary:hover { background: var(--accent-hover); color: #fff; }
 
   /* Ghost capsule — pearl fill, soft ring */
   .vc-btn-ghost {
     background: var(--bg-pearl); color: var(--text-secondary);
     border: 1px solid var(--divider-soft);
     padding: 0 16px; height: 34px; font-size: 13px; font-weight: 400;
-    border-radius: 11px;
+    border-radius: var(--radius-md);
   }
-  .vc-btn-ghost:hover { color: var(--text-primary); background: #f0f0f3; }
+  .vc-btn-ghost:hover { color: var(--text-primary); background: #ebebeb; }
 
   /* Inputs — pill, white, hairline border */
   .vc-input {
@@ -271,21 +272,25 @@ const GLOBAL_STYLE = `
     -webkit-appearance: none; appearance: none;
   }
   .vc-input::placeholder { color: var(--text-muted); }
-  .vc-input:focus { border-color: var(--accent-focus); box-shadow: 0 0 0 3px rgba(0,113,227,0.18); }
+  .vc-input:focus { border-color: var(--accent-focus); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08); }
   @media (max-width: 767px) {
     .vc-input { font-size: 16px; padding: 12px 18px; }
   }
 
   .vc-textarea {
-    resize: none; line-height: 1.47;
-    border-radius: 11px;
+    resize: none; line-height: 1.45;
+    border-radius: var(--radius-md);
     padding: 12px 16px;
   }
 
-  /* Section labels — quiet, near-black, tight tracking. No more all-caps mono noise. */
+  /* Section labels — taxonomy mono (DESIGN.md eyebrow cadence, adaptado ao PT) */
   .section-label {
-    font-size: 12px; letter-spacing: -0.01em; text-transform: none;
-    color: var(--text-muted); font-weight: 600; font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 400;
+    font-family: var(--font-mono);
     display: flex; align-items: center; gap: 8px;
   }
   .section-label::before {
@@ -293,7 +298,7 @@ const GLOBAL_STYLE = `
     flex-shrink: 0;
   }
 
-  /* Tab bar — Apple sub-nav grammar (no all-caps, blue underline) */
+  /* Tab bar — sub-nav monocromático (underline = primário preto) */
   .tab-bar-item {
     flex: 1; padding: 12px 0; font-size: 13px; font-weight: 400;
     letter-spacing: -0.016em; text-transform: none;
@@ -309,7 +314,7 @@ const GLOBAL_STYLE = `
   }
   .tab-bar-item:hover:not(.active) { color: var(--text-secondary); }
 
-  /* Slide thumbs — the only place we use the focus blue ring */
+  /* Slide thumbs — foco com anel de primário (--accent-focus) */
   .slide-thumb {
     position: relative; overflow: hidden; border-radius: 8px;
     transition: opacity 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth);
@@ -324,10 +329,10 @@ const GLOBAL_STYLE = `
   .palette-swatch:hover { transform: scale(1.04); }
   .palette-swatch:active { transform: scale(0.95); }
 
-  /* Cards — utility chassis: hairline border, 18px radius, no shadow */
+  /* Cards — utility chassis: hairline border, lg radius Design System Figma */
   .idea-card {
     background: var(--bg-base); border: 1px solid var(--hairline);
-    border-radius: 18px; padding: 16px; text-align: left; cursor: pointer;
+    border-radius: var(--radius-lg); padding: 16px; text-align: left; cursor: pointer;
     transition: border-color 0.15s, background-color 0.15s, transform 0.1s var(--ease-smooth);
     display: block; width: 100%;
     color: var(--text-primary);
@@ -338,7 +343,7 @@ const GLOBAL_STYLE = `
   .hook-row {
     display: flex; align-items: flex-start; gap: 12px;
     background: var(--bg-pearl); border: 1px solid var(--hairline);
-    border-radius: 11px; padding: 12px 14px;
+    border-radius: var(--radius-md); padding: 12px 14px;
   }
 
   .empty-grid {
@@ -354,7 +359,7 @@ const GLOBAL_STYLE = `
     animation: shimmer 1.5s infinite;
   }
 
-  /* Floating sticky bar — Apple's frosted parchment grammar */
+  /* Floating sticky bar — fondo pergamino + desfoque (tokens Figma `--bg-parchment`). */
   .export-fab {
     position: fixed; bottom: 24px; right: 20px; z-index: 50;
     background: rgba(245, 245, 247, 0.82);
@@ -458,7 +463,7 @@ const GLOBAL_STYLE = `
     line-height: 1.4;
   }
   .toast-item.toast-error  { background: rgba(255, 59, 48, 0.92);   color: #ffffff; border-color: transparent; }
-  .toast-item.toast-success{ background: rgba(52, 199, 89, 0.92);   color: #ffffff; border-color: transparent; }
+  .toast-item.toast-success{ background: rgba(30, 166, 74, 0.92); color: #ffffff; border-color: transparent; }
   .toast-item.toast-info   { background: rgba(245, 245, 247, 0.92); color: var(--text-primary); }
   .toast-item button {
     background: none; border: none; cursor: pointer; color: inherit;
@@ -474,7 +479,7 @@ const GLOBAL_STYLE = `
     font-family: var(--font-mono); font-size: 11px; font-weight: 500;
   }
 
-  /* — Apple form-label grammar: SF Pro tight, NO uppercase, NO mono — */
+  /* Labels de formulário — Inter, sem caps forçadas — */
   .vc-label {
     display: block;
     font-size: 13px;
@@ -517,7 +522,7 @@ const GLOBAL_STYLE = `
     text-transform: none;
   }
 
-  /* Focus-visible: Apple's keyboard focus signal — used everywhere a button doesn't override */
+  /* Focus-visible: anel `--accent-focus` (primário preto) nos controlos interativos — */
   button:focus-visible,
   [role="button"]:focus-visible,
   a:focus-visible {
@@ -592,7 +597,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     letterSpacing: '-0.011em',
                     cursor: 'pointer',
                     border: `1px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
-                    background: isActive ? 'rgba(0, 102, 204, 0.08)' : 'var(--bg-base)',
+                    background: isActive ? 'var(--accent-surface-strong)' : 'var(--bg-base)',
                     color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -650,7 +655,7 @@ const PALETTES = [
   { name:'Mono',     bg:'#171717', title:'#fafafa', subtitle:'#d4d4d4', text:'#737373', accent:'#ffffff' },
   { name:'Cream',    bg:'#fef9e7', title:'#1a1a1a', subtitle:'#57534e', text:'#78716c', accent:'#b45309' },
   /* Neutro institucional — alinhado ao DEFAULT_BRAND e ao token --accent; índice fixo no final pra não quebrar templates (palette: 0–7). */
-  { name:'Pearl',    bg:'#fafafc', title:'#1d1d1f', subtitle:'#636366', text:'#515154', accent:'#0066cc' },
+  { name:'Pearl',    bg:'#fafafc', title:'#000000', subtitle:'#363636', text:'#363636', accent:'#000000' },
 ];
 
 /** Converte `#RGB`/`#RRGGBB`; retorna `{r,g,b}` ou null */
@@ -3640,7 +3645,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
               touchAction: 'none',
               border: '2px dashed var(--accent)',
               borderRadius: 8,
-              background: 'rgba(0, 102, 204, 0.04)',
+              background: 'var(--accent-surface)',
             }}
             onTouchStart={(e) => {
               if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
@@ -4171,7 +4176,7 @@ const SlideCardInner = React.forwardRef(({
     !cultureStatFlat;
   const hideInstaBadge = culturePack;
   const showCultureIdx = culturePack && total > 1;
-  const cultureAccentCol = brand.accent || '#0066cc';
+  const cultureAccentCol = brand.accent || '#000000';
 
   let inner;
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
@@ -4181,7 +4186,7 @@ const SlideCardInner = React.forwardRef(({
     const z = slide.canvas.zones;
     const surface = cultureResolveSurface(slide, num);
     const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
-    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
     const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
@@ -4414,7 +4419,7 @@ const SlideCardInner = React.forwardRef(({
   } else if (sandwich || cultureStatFlat) {
     const surface = cultureResolveSurface(slide, num);
     const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
-    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
+    const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
     const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
@@ -4908,7 +4913,7 @@ const SlideCardInner = React.forwardRef(({
   const surfaceQuick = (sandwich || cultureStatFlat) ? cultureResolveSurface(slide, num) : null;
   const lightCultureOuter = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const outerBg = surfaceQuick
-    ? (surfaceQuick === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surfaceQuick === 'accent' ? (brand.accent || '#0066cc') : lightCultureOuter)
+    ? (surfaceQuick === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surfaceQuick === 'accent' ? (brand.accent || '#000000') : lightCultureOuter)
     : bg;
 
   return (
@@ -5121,7 +5126,7 @@ function ModePicker({ value, onChange }) {
               style={{
                 padding:'10px 10px 9px', borderRadius:10, cursor:'pointer', textAlign:'left',
                 border:`1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
-                background: on ? 'rgba(0,102,204,0.08)' : 'var(--bg-card)',
+                background: on ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
                 transition:'all 0.12s',
                 display:'flex', flexDirection:'column', gap:3, minHeight:60,
               }}
@@ -5199,7 +5204,7 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
           style={{
             alignSelf: 'flex-start', height: 32, padding: '0 14px', borderRadius: 9999,
             border: `1px solid ${!material.refProfileId ? 'var(--accent)' : 'var(--border)'}`,
-            background: !material.refProfileId ? 'rgba(0,102,204,0.08)' : 'var(--bg-card)',
+            background: !material.refProfileId ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
             color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
             cursor: 'pointer', letterSpacing: '-0.011em',
           }}
@@ -5222,7 +5227,7 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
                 style={{
                   textAlign: 'left', padding: '10px 10px', borderRadius: 11,
                   border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                  background: on ? 'rgba(0,102,204,0.06)' : 'var(--bg-card)',
+                  background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
                   cursor: 'pointer', transition: 'border-color 0.12s',
                   minHeight: 72,
                 }}
@@ -5954,8 +5959,8 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
                 <span style={{ color:'var(--text-secondary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>Anthropic (Claude · web search)</span>
                 <span style={{
                   fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999,
-                  background: status.anthropic ? 'rgba(52,199,89,0.14)' : 'rgba(255,59,48,0.10)',
-                  color:    status.anthropic ? '#1d8a3a'              : '#c5251c',
+                  background: status.anthropic ? 'var(--success-surface)' : 'rgba(255,59,48,0.10)',
+                  color:    status.anthropic ? 'var(--success-text)'              : '#c5251c',
                   letterSpacing:'-0.011em',
                 }}>{status.anthropic ? 'Conectada' : 'Não configurada'}</span>
               </div>
@@ -5963,8 +5968,8 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
                 <span style={{ color:'var(--text-secondary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>OpenAI (gpt-4o · GPT Image 2)</span>
                 <span style={{
                   fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999,
-                  background: (val || status.openai) ? 'rgba(52,199,89,0.14)' : 'rgba(255,59,48,0.10)',
-                  color:    (val || status.openai) ? '#1d8a3a'              : '#c5251c',
+                  background: (val || status.openai) ? 'var(--success-surface)' : 'rgba(255,59,48,0.10)',
+                  color:    (val || status.openai) ? 'var(--success-text)'              : '#c5251c',
                   letterSpacing:'-0.011em',
                 }}>{val ? 'Via navegador' : status.openai ? 'Via .env' : 'Não configurada'}</span>
               </div>
@@ -6008,11 +6013,11 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
           </div>
           {val && val.startsWith('sk-') && (
             <div style={{
-              fontSize:13, color:'#1d8a3a', background:'rgba(52,199,89,0.10)',
-              border:'1px solid rgba(52,199,89,0.22)', borderRadius:11, padding:'10px 12px', letterSpacing:'-0.011em',
+              fontSize:13, color:'var(--success-text)', background:'var(--success-surface)',
+              border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
               fontFamily:'var(--font-mono)',
             }}>
-              ✓ Chave detectada — GPT Image 2{status?.dev && !status.anthropic ? ' + gpt-4o (texto)' : ''} disponíveis.
+              Chave detectada — GPT Image 2{status?.dev && !status.anthropic ? ' + gpt-4o (texto)' : ''} disponíveis.
             </div>
           )}
           <div style={{ display:'flex', gap:8 }}>
@@ -6234,7 +6239,7 @@ function GenerateModal({
                     style={{
                       textAlign:'left', padding:'12px 14px', borderRadius:11,
                       border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                      background: on ? 'rgba(0,102,204,0.06)' : 'var(--bg-card)',
+                      background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
                       cursor:'pointer', transition:'border-color 0.12s',
                     }}
                   >
@@ -6406,16 +6411,16 @@ function GenerateModal({
             <label className="vc-label">Imagens dos Cards</label>
             {hasOpenAI ? (
               <div style={{
-                padding:'10px 12px', borderRadius:11, border:'1.5px solid var(--accent)',
-                background:'rgba(0,113,227,0.08)', position:'relative',
+                padding:'10px 12px', borderRadius:8, border:'1.5px solid var(--accent)',
+                background:'var(--accent-surface-strong)', position:'relative',
               }}>
                 <span style={{
                   position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
                   background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
                   letterSpacing:'-0.011em',
                 }}>Ativo</span>
-                <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--accent)', marginBottom:3, letterSpacing:'-0.011em' }}>
-                  ⬡ GPT Image 2
+                <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
+                  GPT Image 2
                 </div>
                 <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
                   OpenAI · geração a partir do tema e das palavras-chave de cada slide
@@ -6432,13 +6437,13 @@ function GenerateModal({
             )}
             {!hasOpenAI && (
               <div style={{
-                marginTop:8, fontSize:13, color:'var(--text-secondary)', background:'rgba(0,113,227,0.06)',
-                border:'1px solid rgba(0,113,227,0.18)', borderRadius:11, padding:'10px 12px',
+                marginTop:8, fontSize:13, color:'var(--text-secondary)', background:'var(--accent-surface)',
+                border:'1px solid rgba(0,0,0,0.14)', borderRadius:8, padding:'10px 12px',
                 fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', lineHeight:1.47,
                 display:'flex', flexDirection:'column', gap:8,
               }}>
                 <div>
-                  💡 Para liberar <b>GPT Image 2</b> (modelo flagship da OpenAI lançado em abril/2026 — foto-realismo de verdade) cole sua chave OpenAI agora.
+                  Para libertar <b>GPT Image 2</b> (OpenAI · foto-realismo) cole a chave OpenAI nas definições.
                   Custo aproximado: ~US$0.13 por imagem em qualidade <code>high</code>.
                 </div>
                 {onOpenKeys && (
@@ -6527,12 +6532,12 @@ function GenerateModal({
           {/* Resumo de contexto que será injetado no prompt — feedback claro pro user */}
           {((brandSummary && brandSummary.length) || (materialSummary && materialSummary.length)) && (
             <div style={{
-              fontSize:13, color:'var(--text-secondary)', background:'rgba(52,199,89,0.08)',
-              border:'1px solid rgba(52,199,89,0.22)', borderRadius:11, padding:'10px 12px', letterSpacing:'-0.011em',
+              fontSize:13, color:'var(--text-secondary)', background:'var(--success-surface)',
+              border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
               fontFamily:'var(--font-ui)', lineHeight:1.5,
             }}>
-              <div style={{ fontWeight:600, color:'#1d8a3a', marginBottom:6, fontSize:12, letterSpacing:'-0.011em' }}>
-                ✓ Contexto aplicado nesta geração
+              <div style={{ fontWeight:600, color:'var(--success-text)', marginBottom:6, fontSize:12, letterSpacing:'-0.011em' }}>
+                Contexto aplicado nesta geração
               </div>
               {brandSummary && brandSummary.length > 0 && (
                 <div>Marca: {brandSummary.join(', ')}</div>
@@ -7663,10 +7668,10 @@ function SidebarContent({
               {slide.imageQuery && (
                 <div style={{
                   fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-mono)',
-                  background:'rgba(0,113,227,0.05)', border:'1px solid rgba(0,113,227,0.14)',
+                  background:'var(--accent-surface)', border:'1px solid rgba(0,0,0,0.1)',
                   borderRadius:8, padding:'6px 10px', lineHeight:1.5,
                 }}>
-                  {hasOpenAI ? '⬡ ' : ''}Palavras-chave · &quot;{slide.imageQuery}&quot;
+                  {hasOpenAI ? 'GPT · ' : ''}Palavras-chave · &quot;{slide.imageQuery}&quot;
                 </div>
               )}
 
@@ -7687,9 +7692,9 @@ function SidebarContent({
                             type="button"
                             onClick={() => updateSlide({ bgFit: opt.id })}
                             style={{
-                              padding:'7px 4px', borderRadius:11, border:'1px solid',
+                              padding:'7px 4px', borderRadius:8, border:'1px solid',
                               borderColor: on ? 'var(--accent)' : 'var(--hairline)',
-                              background: on ? 'rgba(0,113,227,0.08)' : 'var(--bg-base)',
+                              background: on ? 'var(--accent-surface-strong)' : 'var(--bg-base)',
                               cursor:'pointer', transition:'all 0.12s', textAlign:'center',
                             }}
                           >
@@ -9636,16 +9641,16 @@ const DEFAULT_BRAND = {
   id: 'default',
   name: 'Padrão',
   handle: '@seu.perfil', showHandle: true,
-  /* Visual neutro no primeiro uso: superfície clara + tinta + único acento Action Blue (DESIGN.md). */
+  /* Visual neutro: quadro Figma (preto/branco); realces no slide vêm do perfil de marca. */
   titleFont: '"Inter", sans-serif',
   bodyFont: '"Inter Tight", sans-serif',
   bg: '#fafafc',
-  titleColor: '#1d1d1f',
+  titleColor: '#000000',
   /** Linha curta sob o título nos cards do meio (nem capa nem fecho). */
-  subtitleColor: '#636366',
+  subtitleColor: '#363636',
   /** Parágrafos / corpo (ex-bloco «Subtítulo» da marca). */
-  textColor: '#515154',
-  accent: '#0066cc',
+  textColor: '#363636',
+  accent: '#000000',
   /** Ímpar (slides 1,3…) = `bg` · Par (2,4…) = `bgAlternate` quando activo e cor definida. */
   interleaveBg: false,
   /** Segunda cor de fundo para intercalção (margem/pérola por defeito). */
@@ -10301,13 +10306,13 @@ export default function App() {
           )}
           <button type="button" data-vc-tour="settings" onClick={()=>setKeysOpen(true)} style={{
             width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
-            borderRadius:11, border:`1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
-            background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
-            color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)', cursor:'pointer',
+            borderRadius:8, border:`1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
+            background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
+            color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)', cursor:'pointer',
             display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
           }}
                   onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-          onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'#1d8a3a':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'rgba(52,199,89,0.28)':'var(--divider-soft)';}}
+          onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'var(--success-text)':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'var(--success-border)':'var(--divider-soft)';}}
           title={
             hasOpenAI && hasAnthropic ? 'Anthropic + OpenAI configurados ✓' :
             hasOpenAI                 ? 'OpenAI configurado ✓' :
@@ -12255,10 +12260,10 @@ function AccountHomeShell({
                 </div>
               </div>
               <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
-                width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-                border: `1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
-                background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
-                color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)',
+                width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                border: `1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
+                background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -12335,10 +12340,10 @@ function AccountHomeShell({
               <span style={{ fontSize: 15, fontWeight: 600 }}>?</span>
             </button>
           <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
-            width: 36, height: 36, borderRadius: 11,
-            border: `1px solid ${hasAnyAI ? 'rgba(52,199,89,0.28)' : 'var(--divider-soft)'}`,
-            background: hasAnyAI ? 'rgba(52,199,89,0.10)' : 'var(--bg-pearl)',
-            color: hasAnyAI ? '#1d8a3a' : 'var(--text-secondary)',
+            width: 36, height: 36, borderRadius: 8,
+            border: `1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
+            background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
+            color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -12562,7 +12567,7 @@ function AccountHomeShell({
               <div
                 key={entry.id}
                 style={{
-                  background: isActive ? 'rgba(0,102,204,0.06)' : 'var(--bg-pearl)',
+                  background: isActive ? 'var(--accent-surface)' : 'var(--bg-pearl)',
                   border: `1px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
                   borderRadius: 18,
                   padding: 14,

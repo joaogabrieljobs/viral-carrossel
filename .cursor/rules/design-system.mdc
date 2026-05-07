@@ -1,5 +1,5 @@
 ---
-description: Apple-inspired design system for the Viral Carrossel app. Always read DESIGN.md before any UI work and obey its tokens strictly.
+description: Figma-inspired design system (getdesign) for the Viral Carrossel app. Read DESIGN.md before UI changes and prefer CSS tokens in GLOBAL_STYLE.
 globs:
   - "**/*.jsx"
   - "**/*.tsx"
@@ -8,88 +8,74 @@ globs:
 alwaysApply: true
 ---
 
-# Design System: Apple (via DESIGN.md)
+# Design System: Figma (via DESIGN.md)
 
-This project follows an **Apple-inspired design system** documented in `/DESIGN.md` (sourced from `npx getdesign add apple`). Read that file before any UI change. Treat its tokens as law.
+O projeto segue o **design system inspirado na Figma** em `/DESIGN.md` (`npx getdesign add figma` → também em `figma/DESIGN.md`). O chrome da app usa **quadro monocromático** preto/branco + tipografia Inter (substituto opensource de figmaSans) e JetBrains Mono (substituto de figmaMono). Os **pastéis `{colors.block-*}`** são para ritmo editorial em secções destacadas quando fizer sentido; **não** substituem o preto como ação principal.
 
-## Mandatory Rules
+## Cores — chrome da aplicação
 
-### Color
-- Single accent color: **Action Blue `#0066cc`** for every interactive element (links, primary CTAs, focus rings). Do NOT introduce a second accent.
-- Focus state: `#0071e3` (2px solid outline).
-- Sky blue `#2997ff` ONLY on dark surfaces (would disappear on light).
-- Light surfaces: `#ffffff` (canvas), `#f5f5f7` (parchment), `#fafafc` (pearl).
-- Dark surfaces: `#272729` / `#2a2a2c` / `#252527` / `#000000` (nav only).
-- Text: `#1d1d1f` (ink, on light) / `#ffffff` (on dark) / `#7a7a7a` (muted/disabled).
-- Hairlines: `#e0e0e0` solid OR `rgba(0,0,0,0.04)` soft.
+- **Primário**: `#000000` — CTAs principais (`--accent`), contorno de foco, tabs ativas.
+- **Canvas**: `#ffffff` (`--bg-base`).
+- **Superfícies suaves**: `#f7f7f5` (surface-soft, sidebar/parchment), `#f1f1f1` (hairline-soft / pearl).
+- **Contorno**: `#e6e6e6` (`--hairline` / `--border`).
+- **Tinta**: `#000000` no corpo quando possível; hierarquia por **peso**, não cinza ornamental (tokens `--text-muted` / `--text-secondary` são só para UI metadados e cumprimento acessível).
+- **Sucesso**: `#1ea64a` (`--success`) — glyphs / estados configurados OK.
+- **Magenta promo** (`#ff3d8b` — em `DESIGN.md`): só momentos promocionais pontuais, nunca como segundo cor de produto paralela ao preto.
+- **Slides / marca**: a cor `--accent` da **marca** no doc (realces no carrossel) pode ser definida pelo utilizador; o default da app alinha ao preto; evitar segundo arco‑íris fora dos `block-*` documentados.
 
-### Typography
-- Font family: `SF Pro Display, SF Pro Text, system-ui, -apple-system, sans-serif`.
-- Headline weight: **600** (never 700 except taglines).
-- Body weight: **400**. Strong inline: **600**. Weight **500 is forbidden** (Apple's ladder is 300/400/600/700).
-- Body copy: **17px / 1.47 / -0.374px tracking** (NOT 16px).
-- Display sizes: negative letter-spacing (-0.28 to -0.374px) — the "Apple tight" cadence.
-- Weight 300 reserved for `button-large` (18px) and airy lead text (24px).
+## Tipografia
 
-### Shape & Radius
-- `rounded-pill` (9999px) → primary blue CTAs, search inputs, configurator chips, sticky bars.
-- `rounded.lg` (18px) → utility cards.
-- `rounded.md` (11px) → pearl ghost capsules.
-- `rounded.sm` (8px) → dark utility buttons.
-- `rounded.none` (0px) → full-bleed product tiles.
-- Don't mix radii grammars.
+- **UI sans**: `'Inter'` + sistema (equivalente a figmaSans no guia GetDesign).
+- **Mono**: `'JetBrains Mono'` para rótulos de secção curtos (equivalente a figmaMono).
+- **Corpo**: **18px**, `line-height: 1.45`, tracking próximo ao token `body` da Figma.
+- **Strong inline**: peso **600**; headlines UI **600**; evitar peso **500** — usar **480/540** apenas se `--font-variation-settings` explícitos com Inter variable.
+- **Eyebrows / captions** (rótulos de painel): mono, **uppercase**, letter-spacing positivo discreto — ver `.section-label` em GLOBAL_STYLE.
 
-### Spacing
-- Base 8px. Scale: 4 / 8 / 12 / 17 / 24 / 32 / 48 / 80px.
-- Section vertical padding: **80px** inside product tiles.
-- Card padding: **24px**.
-- Button padding: 8–11px V × 15–22px H.
+## Formas
 
-### Elevation
-- **Exactly ONE drop-shadow** in the entire system: `rgba(0,0,0,0.22) 3px 5px 30px` — applied **only** to product imagery resting on a surface. NEVER to cards, buttons, or text.
-- Elevation comes from surface-color change (light ↔ dark) and `backdrop-filter: blur()` on sticky bars.
+- **Pill**: CTAs principais e inputs tipo pílula → `border-radius` ~`50px` ou `9999px` (equiv. `{rounded.pill}`).
+- **md** (**8px**): inputs multilinha, chips pequenos, molduras médias (`{rounded.md}`).
+- **lg** (**24px**): cartões utilitários (`.idea-card`) (`{rounded.lg}`).
 
-### Interaction
-- All buttons: **`transform: scale(0.95)`** on active/press (system-wide micro-interaction).
-- No hover-state coloring documented — keep it subtle.
+Não misturar gramáticas de raio dentro do mesmo grupo de componentes.
 
-### Layout Philosophy
-- Photography-first: UI recedes so content can speak.
-- Alternate light/dark full-bleed sections — the color change IS the divider.
-- No decorative gradients. Atmosphere comes from imagery, not CSS.
-- Whitespace is generous: 64px+ above headlines.
+## Espaçamento
 
-## Anti-patterns — NEVER do these
-- ❌ Introduce a second brand color (orange, purple, etc.).
-- ❌ Add shadows to cards, buttons, text, or UI chrome.
-- ❌ Use decorative gradients as backgrounds.
-- ❌ Set body copy at 16px or weight 500.
-- ❌ Round full-bleed tiles.
-- ❌ Tighten body line-height below 1.47.
-- ❌ Mix multiple radius grammars in the same component group.
+- Base **8px**: escala 4 / 8 / 12 / 16 / 24 / 32 / 48 / 96 conforme DESIGN.md (`spacing.*`).
 
-## Token Reference (CSS Variables defined in `ViralCarrossel.jsx` GLOBAL_STYLE)
+## Elevação
 
-When editing styles, prefer using the variables already declared in `:root` rather than hex literals. Token map:
+- **Sem sombra** como padrão em cartões/chrome — superfície e contraste fazem divisão (Figma marketing).
+- **Sombra soft excecional**: `0 4px 16px rgba(0,0,0,0.06)` só onde o documento da Figma antecipa tiles flutuantes (usar com parcimonia).
+- A **única sombra forte** herdada para **imagens de produto** nos slides (`--shadow-product`) mantém‑se apenas sobre fotografia/export, não sobre botões nem texto.
 
-| Token | Value | Use |
-|---|---|---|
-| `--bg-base` | `#ffffff` | Page canvas |
-| `--bg-parchment` | `#f5f5f7` | Alternate light surfaces, footer |
-| `--bg-pearl` | `#fafafc` | Ghost button fill |
-| `--bg-tile-dark` | `#272729` | Dark tiles |
-| `--bg-black` | `#000000` | Global nav, video |
-| `--text-primary` | `#1d1d1f` | Ink |
-| `--text-secondary` | `#333333` | Muted body |
-| `--text-muted` | `#7a7a7a` | Disabled, fine print |
-| `--text-on-dark` | `#ffffff` | Text on dark surfaces |
-| `--accent` | `#0066cc` | Action Blue (the ONLY accent) |
-| `--accent-focus` | `#0071e3` | Focus ring |
-| `--accent-on-dark` | `#2997ff` | Sky blue on dark surfaces only |
-| `--hairline` | `#e0e0e0` | Card borders |
-| `--divider-soft` | `rgba(0,0,0,0.04)` | Soft separators |
+## Interação
 
-## When in doubt
-1. Re-read `DESIGN.md`.
-2. Alternate surface color (light ↔ dark) before adding chrome.
-3. Default to `#ffffff` background, `#1d1d1f` text, `#0066cc` accent. That trio handles 90% of cases.
+- Botões `.vc-btn:active` / equivalentes: **`transform: scale(0.95)`** no press.
+- Foco visível: anel usando `--accent-focus` / contorno neutro forte.
+
+## Tokens CSS (`GLOBAL_STYLE`)
+
+Preferir sempre variáveis `--*` já declaradas antes de hex literais. Mapa atual (síntese):
+
+| Token | Valor típico | Uso |
+|-------|----------------|-----|
+| `--bg-base` | `#ffffff` | Canvas |
+| `--bg-parchment` | `#f7f7f5` | Fundos alternados / sidebar |
+| `--bg-pearl` | `#f1f1f1` | capsulas fantasmas |
+| `--text-primary` | `#000000` | Título/corpo principal |
+| `--text-muted` | `#5c5c5c` | Metadados / secundário acessível |
+| `--accent` | `#000000` | Primário chrome |
+| `--accent-hover` | `#1a1a1a` | Hover CTAs |
+| `--accent-focus` | `#000000` | Foco |
+| `--accent-on-dark` | `#ffffff` | Link/acento sobre escuro |
+| `--accent-surface` | `rgba(0,0,0,0.06)` | Chips / seleções suaves |
+| `--hairline` | `#e6e6e6` | Contornos |
+| `--success` | `#1ea64a` | OK / Anthropic configurado |
+
+## Anti‑padrões
+
+- ❌ Voltar ao azul Apple `#0066cc` como único sistema no chrome (é cor de marca legada nos slides apenas se o utilizador quiser).
+- ❌ Gradientes decorativos de fundo.
+- ❌ Sombras pesadas em toda a UI.
+- ❌ Corpo em `16px` como default global (preferir **18px** DS Figma nesta app UI).
