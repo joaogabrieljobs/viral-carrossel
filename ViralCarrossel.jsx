@@ -55,15 +55,24 @@ function readInitialShellView() {
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
 
 const GLOBAL_STYLE = `
-  /* Figma Design System (GetDesign figma/) — monocromático + Inter + JetBrains Mono.
-     Google Fonts injectadas via <link> no useEffect. DESIGN.md na raíz = fonte normativa. */
+  /* Figma Design System — pastéis marketing + magenta CTA (+ Inter / JetBrains Mono). */
 
   :root {
+    /* — Pastéis FIGMA ({colors.block-*}) — */
+    --figma-lime: #dceeb1;
+    --figma-lilac: #c5b0f4;
+    --figma-cream: #f4ecd6;
+    --figma-pink: #efd4d4;
+    --figma-mint: #c8e6cd;
+    --figma-coral: #f3c9b6;
+    --figma-navy: #1f1d3d;
+    --figma-magenta: #ff3d8b;
+
     /* — Surfaces — */
     --bg-base: #ffffff;
-    --bg-parchment: #f7f7f5;       /* surface-soft */
-    --bg-pearl: #f1f1f1;           /* hairline-soft */
-    --bg-sidebar: #f7f7f5;
+    --bg-parchment: #f0f7f2;      /* wash menta Figma */
+    --bg-pearl: #f6f3fc;           /* wash lilás Figma */
+    --bg-sidebar: var(--figma-cream);
     --bg-elevated: #ffffff;
     --bg-card: #ffffff;
 
@@ -73,9 +82,9 @@ const GLOBAL_STYLE = `
     --bg-black: #000000;
 
     --border: #e6e6e6;
-    --border-muted: #f1f1f1;
+    --border-muted: #ede9f7;
     --hairline: #e6e6e6;
-    --divider-soft: rgba(0,0,0,0.04);
+    --divider-soft: rgba(31, 29, 61, 0.06);
     --border-on-dark: rgba(255,255,255,0.10);
 
     --text-primary: #000000;
@@ -84,15 +93,19 @@ const GLOBAL_STYLE = `
     --text-on-dark: #ffffff;
     --text-on-dark-muted: rgba(255,255,255,0.72);
 
-    /* Chromatic primary chrome = black pill (DESIGN.md); marca no doc pode usar outra tinta nos slides */
-    --accent: #000000;
-    --accent-hover: #1a1a1a;
-    --accent-focus: #000000;
+    /* Ação principal = magenta Figma; links secundários / molduras = lilás */
+    --accent: var(--figma-magenta);
+    --accent-hover: #e6327a;
+    --accent-focus: var(--figma-navy);
+    --accent-secondary: var(--figma-lilac);
     --accent-on-dark: #ffffff;
-    --accent-promo-magenta: #ff3d8b;
-    --accent-surface: rgba(0, 0, 0, 0.06);
-    --accent-surface-strong: rgba(0, 0, 0, 0.10);
-    --accent-glow: rgba(0, 0, 0, 0.10);
+    --accent-surface: rgba(197, 176, 244, 0.28);
+    --accent-surface-strong: rgba(197, 176, 244, 0.42);
+    --accent-magenta-surface: rgba(255, 61, 139, 0.10);
+    --accent-glow: rgba(255, 61, 139, 0.22);
+
+    --logo-mark-bg: var(--figma-coral);
+    --logo-mark-fg: var(--figma-navy);
 
     --success: #1ea64a;
     --success-surface: rgba(30, 166, 74, 0.12);
@@ -272,7 +285,7 @@ const GLOBAL_STYLE = `
     -webkit-appearance: none; appearance: none;
   }
   .vc-input::placeholder { color: var(--text-muted); }
-  .vc-input:focus { border-color: var(--accent-focus); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08); }
+  .vc-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 61, 139, 0.2); }
   @media (max-width: 767px) {
     .vc-input { font-size: 16px; padding: 12px 18px; }
   }
@@ -320,7 +333,7 @@ const GLOBAL_STYLE = `
     transition: opacity 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth);
     cursor: pointer; flex-shrink: 0;
   }
-  .slide-thumb.active { box-shadow: 0 0 0 2px var(--accent-focus); }
+  .slide-thumb.active { box-shadow: 0 0 0 2px var(--accent); }
   .slide-thumb:not(.active) { opacity: 0.5; }
   .slide-thumb:not(.active):hover { opacity: 0.9; }
   .slide-thumb:active { transform: scale(0.95); }
@@ -337,7 +350,7 @@ const GLOBAL_STYLE = `
     display: block; width: 100%;
     color: var(--text-primary);
   }
-  .idea-card:hover { border-color: var(--accent); background: var(--bg-pearl); }
+  .idea-card:hover { border-color: var(--accent-secondary); background: var(--bg-pearl); }
   .idea-card:active { transform: scale(0.98); }
 
   .hook-row {
@@ -359,7 +372,7 @@ const GLOBAL_STYLE = `
     animation: shimmer 1.5s infinite;
   }
 
-  /* Floating sticky bar — fondo pergamino + desfoque (tokens Figma `--bg-parchment`). */
+  /* Floating sticky bar — pergamino + desfoque (token CSS --bg-parchment). */
   .export-fab {
     position: fixed; bottom: 24px; right: 20px; z-index: 50;
     background: rgba(245, 245, 247, 0.82);
@@ -522,7 +535,7 @@ const GLOBAL_STYLE = `
     text-transform: none;
   }
 
-  /* Focus-visible: anel `--accent-focus` (primário preto) nos controlos interativos — */
+  /* Focus-visible: anel --accent-focus nos controlos interativos */
   button:focus-visible,
   [role="button"]:focus-visible,
   a:focus-visible {
@@ -11361,10 +11374,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 </button>
                 <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
                   <div style={{
-                    width:32, height:32, borderRadius:8, background:'var(--accent)',
+                    width:32, height:32, borderRadius:8, background:'var(--logo-mark-bg)',
                     display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                   }}>
-                    <Flame size={14} color="#fff"/>
+                    <Flame size={14} color="var(--logo-mark-fg)"/>
                   </div>
                   <div style={{ minWidth:0, flex:1 }}>
                     <div style={{
@@ -11386,10 +11399,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         {/* Brand */}
         <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
           <div style={{
-            width:30, height:30, borderRadius:8, background:'var(--accent)',
+            width:30, height:30, borderRadius:8, background:'var(--logo-mark-bg)',
             display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
           }}>
-            <Flame size={14} color="#fff"/>
+            <Flame size={14} color="var(--logo-mark-fg)"/>
           </div>
           <div style={{ minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em', lineHeight:1, fontFamily:'var(--font-display)' }}>
@@ -12242,10 +12255,10 @@ function AccountHomeShell({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                 <div style={{
-                  width: 34, height: 34, borderRadius: 8, background: 'var(--accent)',
+                  width: 34, height: 34, borderRadius: 8, background: 'var(--logo-mark-bg)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <Flame size={16} color="#fff" />
+                  <Flame size={16} color="var(--logo-mark-fg)" />
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{
@@ -12300,10 +12313,10 @@ function AccountHomeShell({
           <>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 8, background: 'var(--accent)',
+            width: 34, height: 34, borderRadius: 8, background: 'var(--logo-mark-bg)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <Flame size={16} color="#fff" />
+            <Flame size={16} color="var(--logo-mark-fg)" />
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{
