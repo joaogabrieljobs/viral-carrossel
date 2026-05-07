@@ -216,7 +216,7 @@ const GLOBAL_STYLE = `
     border: 2px solid var(--bg-base);
   }
   @media (max-width: 767px) {
-    input[type="range"] { height: 22px; }
+    input[type="range"] { height: 36px; touch-action: pan-x; min-height: 44px; }
     input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
     input[type="range"]::-moz-range-thumb     { width: 22px; height: 22px; }
   }
@@ -1126,6 +1126,59 @@ const lsGet = (key, fallback) => {
     return JSON.parse(raw);
   } catch { return fallback; }
 };
+// Evita spam de toast quando cada debounce de gravação volta a bater no limite.
+let VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
+let VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
+
+const VC_BG_SAVE_MAX_PX = 1536;
+const VC_BG_SAVE_JPEG_Q = 0.88;
+/** Só comprime fotos base64 «pesadas» — HEIC do iPhone passa quase sempre. */
+const VC_BG_COMPRESS_MIN_CHARS = 380_000;
+
+/** Redimensiona/recomprime data URLs de fundo antes de meter no localStorage (alivia quota). */
+function vcShrinkDataUrlForStorage(dataUrl) {
+  return new Promise((resolve) => {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+      resolve(dataUrl);
+      return;
+    }
+    if (dataUrl.length < VC_BG_COMPRESS_MIN_CHARS) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (!w || !h) {
+          resolve(dataUrl);
+          return;
+        }
+        const fac = VC_BG_SAVE_MAX_PX / Math.max(w, h);
+        const scale = fac < 1 ? fac : 1;
+        const nw = Math.max(2, Math.round(w * scale));
+        const nh = Math.max(2, Math.round(h * scale));
+        const c = document.createElement('canvas');
+        c.width = nw;
+        c.height = nh;
+        const ctx = c.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, nw, nh);
+        const jpeg = c.toDataURL('image/jpeg', VC_BG_SAVE_JPEG_Q);
+        resolve(jpeg.length < dataUrl.length ? jpeg : dataUrl);
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 // lsSet retorna true em sucesso, false em falha.
 // Em caso de QuotaExceededError dispara evento customizado que o App escuta para exibir toast.
 const lsSet = (key, value) => {
@@ -1146,15 +1199,21 @@ const lsSet = (key, value) => {
             (entry.doc?.slides || []).forEach(s => { delete s.bgImage; });
           });
           localStorage.setItem(key, JSON.stringify(slim));
-          window.dispatchEvent(new CustomEvent('vc:quota-warning', {
-            detail: 'Limite de armazenamento quase atingido. Imagens de fundo foram omitidas do cache. Exporte seus projetos como JSON para não perder dados.',
-          }));
+          if (!VC_QUOTA_SLIM_ALREADY_NOTIFIED) {
+            VC_QUOTA_SLIM_ALREADY_NOTIFIED = true;
+            window.dispatchEvent(new CustomEvent('vc:quota-warning', {
+              detail: 'Limite de armazenamento quase atingido. Imagens de fundo foram omitidas do cache. Exporte seus projetos como JSON para não perder dados.',
+            }));
+          }
           return true;
         }
       } catch { /* fallback falhou também */ }
-      window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-        detail: 'Limite de armazenamento do browser atingido. Exporte seus projetos como JSON antes que dados sejam perdidos.',
-      }));
+      if (!VC_QUOTA_HARD_ALREADY_NOTIFIED) {
+        VC_QUOTA_HARD_ALREADY_NOTIFIED = true;
+        window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
+          detail: 'Limite de armazenamento do browser atingido. Exporte seus projetos como JSON antes que dados sejam perdidos.',
+        }));
+      }
     }
     return false;
   }
@@ -1302,6 +1361,8 @@ const mkSlide = (n = 1) => ({
   bgFit: 'cover',
   bgOpacity: 100, bgMirror: false,
   overlay: 60, titleSize: 100, subSize: 100,
+  /** Tamanho do bloco de texto abaixo da foto (sanduíche / Cultura). Default = subtítulo. */
+  bodyAfterSize: 100,
   customBg: null, showHandle: true,
   // text-on-image controls
   textShadow: false,  // drop shadow — desligado por defeito (toggle «Sombra no texto»)
@@ -1564,7 +1625,7 @@ const loadJsPdf = () => new Promise((res, rej) => {
  */
 const VC_TRIGGERABLE_FILE_INPUT_STYLE = {
   position: 'fixed',
-  left: 0,
+  left: -9999,
   top: 0,
   width: '1px',
   height: '1px',
@@ -1574,7 +1635,9 @@ const VC_TRIGGERABLE_FILE_INPUT_STYLE = {
   overflow: 'hidden',
   clipPath: 'inset(50%)',
   border: 'none',
-  pointerEvents: 'none',
+  /** `none` quebra `.click()` sintético no Safari iOS em vários casos. */
+  pointerEvents: 'auto',
+  zIndex: 2,
 };
 
 function vcIsCoarseTouchDevice() {
@@ -2834,9 +2897,9 @@ const DEFAULT_CANVAS_ZONES_COVER_FULLBLEED = {
 };
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
-  top: { x: 6, y: 7, w: 88, h: 26 },
-  photo: { x: 6, y: 35, w: 88, h: 36 },
-  bottom: { x: 6, y: 74, w: 88, h: 22 },
+  top: { x: 6, y: 7, w: 88, h: 24 },
+  photo: { x: 6, y: 33, w: 88, h: 40 },
+  bottom: { x: 6, y: 76, w: 88, h: 21 },
 };
 
 /** Rotações de zona «foto» no miolo (texto antes e depois, ordem editorial mantida pelo posicionamento). */
@@ -2965,6 +3028,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
 
   const ts = mergedSlide.titleSize ?? 100;
   const ss = mergedSlide.subSize ?? 100;
+  const bs = mergedSlide.bodyAfterSize ?? mergedSlide.subSize ?? 100;
   const tLeadClassic = (mergedSlide.titleLeading ?? 105) / 100;
   const sLeadClassic = (mergedSlide.subLeading ?? 150) / 100;
   const tLeadCv = (mergedSlide.titleLeading ?? 105) / 100;
@@ -3118,7 +3182,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     );
     blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
 
-    const bodyFs = f.w * 0.029 * (ss / 100);
+    const bodyFs = f.w * 0.029 * (bs / 100);
     const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
     const bodyEffLines = estimateWrappedLines(bodyChars, Math.max(bodyLinesNl, bodyParas), innerUw, bodyFs, 0.45);
     let blkBotH = Math.min(
@@ -3175,7 +3239,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     );
     blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
 
-    const bodyFsStat = f.w * 0.029 * (ss / 100);
+    const bodyFsStat = f.w * 0.029 * (bs / 100);
     const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
     const bodyEffLines = estimateWrappedLines(bodyChars, Math.max(bodyLinesNl, bodyParas), innerUw, bodyFsStat, 0.45);
     let blkBotH = Math.min(
@@ -3274,7 +3338,7 @@ function canvasCultureSandwichBottomPaddingXPx(f, slide) {
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const ls = ((-1 + (slide.subTracking ?? 0)) / 100);
-  const fsPx = f.w * 0.029 * ((slide.subSize ?? 100) / 100);
+  const fsPx = f.w * 0.029 * (((slide.bodyAfterSize ?? slide.subSize) ?? 100) / 100);
   const bleed = ls < 0 ? (-ls) * fsPx * 1.45 : fsPx * 0.055;
   return Math.max(base, (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.28, base + bleed, f.w * 0.021);
 }
@@ -3286,11 +3350,18 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
 
   const oldT = prevSlide.titleSize ?? 100;
   const oldS = prevSlide.subSize ?? 100;
+  const oldB = prevSlide.bodyAfterSize ?? prevSlide.subSize ?? 100;
   const newT = mergedSlide.titleSize ?? 100;
   const newS = mergedSlide.subSize ?? 100;
+  const newB = mergedSlide.bodyAfterSize ?? mergedSlide.subSize ?? 100;
   const rT = newT / oldT;
   const rS = newS / oldS;
-  if (Math.abs(rT - 1) < 0.003 && Math.abs(rS - 1) < 0.003) return null;
+  const rB = newB / oldB;
+  if (
+    Math.abs(rT - 1) < 0.003 &&
+    Math.abs(rS - 1) < 0.003 &&
+    Math.abs(rB - 1) < 0.003
+  ) return null;
 
   const zIn = mergedSlide.canvas.zones;
 
@@ -3332,7 +3403,7 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
     const gapTP = Math.max(0.5, photo.y - (top.y + top.h));
     const gapPB = Math.max(0.5, bottom.y - (photo.y + photo.h));
     const newTopH = Math.max(CANVAS_ZONE_MIN.h, top.h * Math.max(rT, rS));
-    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bottom.h * rS);
+    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bottom.h * rB);
     const photoY = top.y + newTopH + gapTP;
     let botY = bottom.y;
     let botHAdj = newBotH;
@@ -3367,7 +3438,7 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
     const bot = clampRect(zIn.bottom || DEFAULT_CANVAS_ZONES_STAT.bottom);
     const gapTB = Math.max(0.5, bot.y - (top.y + top.h));
     const newTopH = Math.max(CANVAS_ZONE_MIN.h, top.h * Math.max(rT, rS));
-    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bot.h * rS);
+    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bot.h * Math.max(rS, rB));
     const botY = top.y + newTopH + gapTB;
     const overflow = botY + newBotH - 98;
     const adjBotH = overflow > 0
@@ -3397,6 +3468,47 @@ function pctBox(rect, f) {
     width: (f.w * r.w) / 100,
     height: (f.h * r.h) / 100,
     boxSizing: 'border-box',
+  };
+}
+
+/** `<img>` na zona foto (canvas sanduíche/stat) — mesmo raciocínio que `background-*` no modo classic (X/Y, zoom, fit, espelho, opacidade). */
+function sandwichPhotoZoneImgStyle(slide, presentationFilter) {
+  const bgFit = slide.bgFit ?? 'cover';
+  const bx = slide.bgX ?? 50;
+  const by = slide.bgY ?? 50;
+  const origin = `${bx}% ${by}%`;
+  const zoom = (slide.bgZoom ?? 100) / 100;
+  const mirror = slide.bgMirror ? 'scaleX(-1) ' : '';
+  const filt = presentationFilter ? { filter: presentationFilter } : {};
+  const op = (slide.bgOpacity ?? 100) / 100;
+  const transform = `${mirror}${zoom !== 1 ? `scale(${zoom})` : ''}`.trim() || undefined;
+
+  if (bgFit === 'contain') {
+    return {
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
+      objectFit: 'contain',
+      objectPosition: origin,
+      transform,
+      transformOrigin: origin,
+      opacity: op,
+      ...filt,
+    };
+  }
+
+  return {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: origin,
+    transform,
+    transformOrigin: origin,
+    opacity: op,
+    ...filt,
   };
 }
 
@@ -3464,7 +3576,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
       const d = dragRef.current;
       dragRef.current = null;
       if (!d?.key || !photoZoneTap) return;
-      const tapSlop = d.key === 'photo' ? (vcIsCoarseTouchDevice() ? 96 : 18) : 18;
+      const tapSlop = d.key === 'photo' ? (vcIsCoarseTouchDevice() ? 140 : 18) : 18;
       if (d.key === 'photo' && (d.dist ?? 0) < tapSlop) photoZoneTap();
     };
 
@@ -4208,15 +4320,25 @@ const SlideCardInner = React.forwardRef(({
               </div>
             )}
             {sandwich && imgReady && !imgErr && slide.bgImage && (
-              <img
-                src={slide.bgImage}
-                alt=""
-                draggable={false}
-                style={{
-                  width:'100%', height:'100%', objectFit:'cover',
-                  ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
-                }}
-              />
+              <>
+                <img
+                  src={slide.bgImage}
+                  alt=""
+                  draggable={false}
+                  style={sandwichPhotoZoneImgStyle(slide, effectivePresentationFilter)}
+                />
+                {slide.overlay > 0 ? (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                      background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay / 100 * 0.4}) 0%, rgba(0,0,0,${slide.overlay / 100}) 100%)`,
+                    }}
+                  />
+                ) : null}
+              </>
             )}
             {sandwich && !slide.bgImage && (
               <div style={{
@@ -4247,7 +4369,7 @@ const SlideCardInner = React.forwardRef(({
             ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
-            fontSize={f.w * 0.029 * (slide.subSize / 100)}
+            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
             lineHeight={(slide.subLeading ?? 145) / 100}
             fontWeight={600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
@@ -4372,7 +4494,7 @@ const SlideCardInner = React.forwardRef(({
                 baseColor={carouselTitleInk}
                 accentColor={cultureAccentCol}
                 fontFamily={titleFF}
-                fontSize={f.w * 0.036}
+                fontSize={f.w * 0.036 * ((slide.titleSize ?? 100) / 100)}
                 lineHeight={1.14}
                 fontWeight={600}
                 letterSpacing="-0.024em"
@@ -4385,7 +4507,7 @@ const SlideCardInner = React.forwardRef(({
             ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
-            fontSize={f.w*0.031}
+            fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100)}
             lineHeight={1.42}
             fontWeight={600}
             letterSpacing="-0.018em"
@@ -4413,20 +4535,31 @@ const SlideCardInner = React.forwardRef(({
               Toque para inserir foto
             </div>
           )}
-          {sandwich && imgReady && !imgErr && (
-            <img
-              src={slide.bgImage}
-              alt=""
-              draggable={false}
-              style={{
-                width:'100%',
-                borderRadius: f.w * 0.017,
-                objectFit:'cover',
-                maxHeight: f.h * 0.36,
-                flexShrink:0,
-                ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
-              }}
-            />
+          {sandwich && imgReady && !imgErr && slide.bgImage && (
+            <div style={{
+              width:'100%',
+              flex: '1 1 auto',
+              minHeight: f.h * 0.26,
+              maxHeight: f.h * 0.42,
+              borderRadius: f.w * 0.017,
+              overflow:'hidden',
+              flexShrink:0,
+              position:'relative',
+              background: surface === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+            }}>
+              <img
+                src={slide.bgImage}
+                alt=""
+                draggable={false}
+                style={sandwichPhotoZoneImgStyle(slide, effectivePresentationFilter)}
+              />
+              {slide.overlay > 0 ? (
+                <div style={{
+                  position:'absolute', inset:0, pointerEvents:'none', zIndex:1,
+                  background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
+                }}/>
+              ) : null}
+            </div>
           )}
           <CultureRichParagraphs
             text={bodyAfterCulture}
@@ -4434,7 +4567,7 @@ const SlideCardInner = React.forwardRef(({
             ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
-            fontSize={f.w*0.029}
+            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
             lineHeight={1.45}
             fontWeight={600}
             letterSpacing="-0.016em"
@@ -4883,6 +5016,11 @@ const S = ({ title, children, className='', hint }) => (
 // Slider with dynamic fill
 const Slider = ({ label, value, min, max, onChange }) => {
   const pct = ((value - min) / (max - min)) * 100;
+  const apply = (v) => {
+    const n = +v;
+    if (Number.isNaN(n)) return;
+    onChange(Math.min(max, Math.max(min, n)));
+  };
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
@@ -4891,8 +5029,9 @@ const Slider = ({ label, value, min, max, onChange }) => {
       </div>
       <input
         type="range" min={min} max={max} value={value}
-        onChange={e=>onChange(+e.target.value)}
-        style={{ '--pct': `${pct}%` }}
+        onChange={(e) => apply(e.target.value)}
+        onInput={(e) => apply(e.target.value)}
+        style={{ '--pct': `${pct}%`, touchAction: 'pan-x', minHeight: 32 }}
       />
     </div>
   );
@@ -7633,7 +7772,7 @@ function SidebarContent({
                   const parts = [];
                   if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('foto a preencher a zona (cover)');
                   if (p.canvas) parts.push('zonas normalizadas');
-                  if (p.titleSize != null || p.subSize != null || p.titleLeading != null || p.subLeading != null || p.textInset != null) {
+                  if (p.titleSize != null || p.subSize != null || p.bodyAfterSize != null || p.titleLeading != null || p.subLeading != null || p.textInset != null) {
                     parts.push('tipografia calibrada');
                   }
                   if (p.layout != null || p.align != null) parts.push('bloco de texto reposicionado');
@@ -7659,6 +7798,15 @@ function SidebarContent({
             <S title="Tamanho">
               <Slider label="Tamanho título"    value={slide.titleSize} min={50} max={180} onChange={v=>updateSlide({titleSize:v})}/>
               <Slider label="Tamanho subtítulo" value={slide.subSize}   min={50} max={180} onChange={v=>updateSlide({subSize:v})}/>
+              {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout || !!(String(slide.bodyAfterImage || '').trim())) ? (
+                <Slider
+                  label="Tamanho — texto abaixo da foto"
+                  value={slide.bodyAfterSize ?? slide.subSize ?? 100}
+                  min={50}
+                  max={180}
+                  onChange={(v) => updateSlide({ bodyAfterSize: v })}
+                />
+              ) : null}
             </S>
 
             <S title="Espaçamento — Título">
@@ -10205,7 +10353,7 @@ export default function App() {
       if (i !== activeIdx) return sl;
       const next = { ...sl, ...patch };
       const mayScaleZones =
-        (patch.titleSize != null || patch.subSize != null) &&
+        (patch.titleSize != null || patch.subSize != null || patch.bodyAfterSize != null) &&
         !!next.canvas?.enabled &&
         next.canvas?.zones &&
         typeof next.canvas.zones === 'object';
@@ -10235,7 +10383,10 @@ export default function App() {
 
   const openPhotoZoneImport = useCallback((idx) => {
     photoZoneTargetIdxRef.current = idx;
-    photoZoneInputRef.current?.click();
+    const el = photoZoneInputRef.current;
+    if (!el) return;
+    el.value = '';
+    el.click();
   }, []);
 
   const handlePhotoZoneBgFile = useCallback((e) => {
@@ -10245,9 +10396,14 @@ export default function App() {
     e.target.value = '';
     if (!file || idx == null) return;
     const reader = new FileReader();
-    reader.onload = () => updateSlideAt(idx, { bgImage: reader.result });
+    reader.onload = () => {
+      void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
+        updateSlideAt(idx, { bgImage: url });
+      });
+    };
+    reader.onerror = () => toast('Não foi possível ler a imagem. Tente outro ficheiro.', 'error', 4500);
     reader.readAsDataURL(file);
-  }, [updateSlideAt]);
+  }, [updateSlideAt, toast]);
 
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
@@ -10257,7 +10413,9 @@ export default function App() {
     const readOne = (file) =>
       new Promise((resolve) => {
         const r = new FileReader();
-        r.onload = () => resolve(r.result);
+        r.onload = () => {
+          void vcShrinkDataUrlForStorage(String(r.result || '')).then(resolve);
+        };
         r.onerror = () => resolve(null);
         r.readAsDataURL(file);
       });
@@ -10362,6 +10520,7 @@ export default function App() {
       const patch = {
         titleSize: src.titleSize ?? 100,
         subSize: src.subSize ?? 100,
+        bodyAfterSize: src.bodyAfterSize ?? src.subSize ?? 100,
         titleTracking: src.titleTracking ?? 0,
         titleLeading: src.titleLeading ?? 105,
         titleWeight: src.titleWeight ?? 800,
@@ -10883,8 +11042,14 @@ ${capRules}
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => updateSlide({ bgImage:reader.result });
-    reader.readAsDataURL(file); e.target.value='';
+    reader.onload = () => {
+      void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
+        updateSlide({ bgImage: url });
+      });
+    };
+    reader.onerror = () => toast('Não foi possível ler a imagem.', 'error', 4500);
+    reader.readAsDataURL(file);
+    e.target.value='';
   };
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
