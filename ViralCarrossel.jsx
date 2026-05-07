@@ -6443,7 +6443,7 @@ function GenerateModal({
                 display:'flex', flexDirection:'column', gap:8,
               }}>
                 <div>
-                  Para libertar <b>GPT Image 2</b> (OpenAI · foto-realismo) cole a chave OpenAI nas definições.
+                  Para usar <b>GPT Image 2</b> (OpenAI · foto-realismo), defina a chave OpenAI nas definições.
                   Custo aproximado: ~US$0.13 por imagem em qualidade <code>high</code>.
                 </div>
                 {onOpenKeys && (
