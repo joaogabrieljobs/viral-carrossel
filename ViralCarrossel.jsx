@@ -5,7 +5,7 @@ import {
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image,
-  ArrowUp, ArrowDown, Zap, Flame, Lightbulb,
+  ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
   ChevronRight, ChevronLeft, Instagram, Settings, Maximize2, Minus,
   Home, Layers, SlidersHorizontal,
 } from 'lucide-react';
@@ -640,16 +640,17 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
 }
 
 const PALETTES = [
-  { name:'Carbon',   bg:'#0a0a0a', title:'#ffffff', sub:'#a3a3a3', accent:'#ff5736' },
-  { name:'Midnight', bg:'#0c1220', title:'#ffffff', sub:'#94a3b8', accent:'#6366f1' },
-  { name:'Ivory',    bg:'#f5f1ea', title:'#0a0a0a', sub:'#52525b', accent:'#dc2626' },
-  { name:'Forest',   bg:'#0d1f17', title:'#a3e635', sub:'#86efac', accent:'#a3e635' },
-  { name:'Coral',    bg:'#1c0f0f', title:'#ff6b4a', sub:'#fbbf24', accent:'#ff6b4a' },
-  { name:'Royal',    bg:'#1e1b4b', title:'#fde047', sub:'#a5b4fc', accent:'#fde047' },
-  { name:'Mono',     bg:'#171717', title:'#fafafa', sub:'#737373', accent:'#ffffff' },
-  { name:'Cream',    bg:'#fef9e7', title:'#1a1a1a', sub:'#78716c', accent:'#b45309' },
+  /** `subtitle`: cards do meio (linha curta sob o título) · `text`: corpo / blocos maiores · `accent`: Destaques. */
+  { name:'Carbon',   bg:'#0a0a0a', title:'#ffffff', subtitle:'#cfcfcf', text:'#a3a3a3', accent:'#ff5736' },
+  { name:'Midnight', bg:'#0c1220', title:'#ffffff', subtitle:'#cbd5e1', text:'#94a3b8', accent:'#6366f1' },
+  { name:'Ivory',    bg:'#f5f1ea', title:'#0a0a0a', subtitle:'#3f3f46', text:'#52525b', accent:'#dc2626' },
+  { name:'Forest',   bg:'#0d1f17', title:'#a3e635', subtitle:'#bef264', text:'#86efac', accent:'#a3e635' },
+  { name:'Coral',    bg:'#1c0f0f', title:'#ff6b4a', subtitle:'#c9b8b4', text:'#d17a7a', accent:'#ff5736' },
+  { name:'Royal',    bg:'#1e1b4b', title:'#fde047', subtitle:'#e8eafd', text:'#a5b4fc', accent:'#fcd34d' },
+  { name:'Mono',     bg:'#171717', title:'#fafafa', subtitle:'#d4d4d4', text:'#737373', accent:'#ffffff' },
+  { name:'Cream',    bg:'#fef9e7', title:'#1a1a1a', subtitle:'#57534e', text:'#78716c', accent:'#b45309' },
   /* Neutro institucional — alinhado ao DEFAULT_BRAND e ao token --accent; índice fixo no final pra não quebrar templates (palette: 0–7). */
-  { name:'Pearl',    bg:'#fafafc', title:'#1d1d1f', sub:'#515154', accent:'#0066cc' },
+  { name:'Pearl',    bg:'#fafafc', title:'#1d1d1f', subtitle:'#636366', text:'#515154', accent:'#0066cc' },
 ];
 
 /** Converte `#RGB`/`#RRGGBB`; retorna `{r,g,b}` ou null */
@@ -697,20 +698,40 @@ function cultureDarkBackdropFromBrand(brandBg) {
   return `#${out.map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** Normaliza marca: campo legado `subColor` migra para `textColor` e `subtitleColor` quando omitidos; remove `subColor` gravado para evitar duplicidade. */
+function hydrateBrandTextColors(b) {
+  if (!b || typeof b !== 'object') return b;
+  const legacySub =
+    typeof b.subColor === 'string' && b.subColor.trim() ? String(b.subColor).trim() : '';
+  const textRaw = typeof b.textColor === 'string' && b.textColor.trim() ? String(b.textColor).trim() : '';
+  const subLineRaw =
+    typeof b.subtitleColor === 'string' && b.subtitleColor.trim()
+      ? String(b.subtitleColor).trim()
+      : '';
+  const textColor = textRaw || legacySub || '#515154';
+  const subtitleColor = subLineRaw || legacySub || textColor;
+  const { subColor: _, ...rest } = b;
+  return { ...rest, textColor, subtitleColor };
+}
+
 function brandMatchesPalette(brand, p) {
   if (!brand || !p) return false;
-  const nb = vcNormalizeHex(brand.bg);
-  const nt = vcNormalizeHex(brand.titleColor);
-  const ns = vcNormalizeHex(brand.subColor);
-  const na = vcNormalizeHex(brand.accent);
+  const h = hydrateBrandTextColors(brand);
+  const nb = vcNormalizeHex(h.bg);
+  const nt = vcNormalizeHex(h.titleColor);
+  const nSub = vcNormalizeHex(h.subtitleColor);
+  const nTx = vcNormalizeHex(h.textColor);
+  const na = vcNormalizeHex(h.accent);
   return !!(
     nb &&
     nt &&
-    ns &&
+    nSub &&
+    nTx &&
     na &&
     nb === vcNormalizeHex(p.bg) &&
     nt === vcNormalizeHex(p.title) &&
-    ns === vcNormalizeHex(p.sub) &&
+    nSub === vcNormalizeHex(p.subtitle) &&
+    nTx === vcNormalizeHex(p.text) &&
     na === vcNormalizeHex(p.accent)
   );
 }
@@ -1261,6 +1282,9 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
   return { state, set: push, setSilent, undo, redo, reset, canUndo, canRedo };
 }
 
+/** Padding multiplicador por defeito (slider «Distância das bordas»); slides antigos sem campo usam o mesmo fallback na renderização. */
+const DEFAULT_SLIDE_TEXT_INSET = 10;
+
 const mkSlide = (n = 1) => ({
   id: uid(), num: n,
   title: 'Seu título aqui',
@@ -1280,10 +1304,10 @@ const mkSlide = (n = 1) => ({
   overlay: 60, titleSize: 100, subSize: 100,
   customBg: null, showHandle: true,
   // text-on-image controls
-  textShadow: true,   // drop shadow behind title/subtitle
+  textShadow: false,  // drop shadow — desligado por defeito (toggle «Sombra no texto»)
   textBg: false,      // pill/box background behind text block
   textBgOpacity: 55,  // opacity of that box (0-100)
-  textInset: 7,       // padding multiplier — how far from edges (1-20)
+  textInset: DEFAULT_SLIDE_TEXT_INSET, // padding multiplier — how far from edges (1-20)
   // typography controls (overrides do brand quando definidos por slide)
   titleTracking: 0,   // letter-spacing extra do título em em*0.01 (-10..30 → -0.10em..+0.30em)
   subTracking: 0,     // letter-spacing extra do subtítulo
@@ -1300,8 +1324,8 @@ const mkSlide = (n = 1) => ({
    * variant: 'classic' (foto full / texto) | 'sandwich' | 'stat'
    */
   canvas: null,
-  /** Slides com layout sanduíche (texto · foto · texto) como no pacote Cultura mas em modo Personalizado. */
-  useCultureLayout: false,
+  /** Intervalos UTF-16 [início,fim exclusivo) na cor Destaques — texto bruto sem marcadores asterisco. */
+  destaqueSpans: undefined,
 });
 
 const isDefault = (slides) =>
@@ -2354,25 +2378,178 @@ function FullscreenImageAdjustBar({
   );
 }
 
-/** Partes de texto com trechos **destacados** na cor accent da marca. */
-function splitCultureRichText(text) {
-  if (text == null || text === '') return [];
-  const s = String(text);
+/** Junta intervalos UTF-16 [lo, hi) ordenados sem sobrepor. */
+function mergeUtf16AccentIntervals(intervals) {
+  if (!intervals?.length) return [];
+  const xs = intervals.filter(([a, b]) => b > a).map(([a, b]) => [a, b]).sort((x, y) => x[0] - y[0]);
   const out = [];
-  const re = /\*\*([^*]+)\*\*/g;
-  let last = 0;
-  let m;
-  while ((m = re.exec(s)) !== null) {
-    if (m.index > last) out.push({ type: 'text', v: s.slice(last, m.index) });
-    out.push({ type: 'accent', v: m[1] });
-    last = m.index + m[0].length;
+  let cs = xs[0][0];
+  let ce = xs[0][1];
+  for (let i = 1; i < xs.length; i++) {
+    const [a, b] = xs[i];
+    if (a <= ce) ce = Math.max(ce, b);
+    else {
+      out.push([cs, ce]);
+      cs = a;
+      ce = b;
+    }
   }
-  if (last < s.length) out.push({ type: 'text', v: s.slice(last) });
+  out.push([cs, ce]);
   return out;
 }
 
-function CultureInlineRich({ text, baseColor, accentColor, fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }) {
-  const parts = splitCultureRichText(text);
+function normalizeDestaqueSpansForLen(spans, len) {
+  if (!len || len < 1) return [];
+  const n = spans || [];
+  return mergeUtf16AccentIntervals(
+    n.map((pair) => {
+      const a = typeof pair?.[0] === 'number' ? pair[0] : Number(pair?.[0]);
+      const b = typeof pair?.[1] === 'number' ? pair[1] : Number(pair?.[1]);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return [-1, -1];
+      const lo = Math.max(0, Math.min(len, Math.floor(a)));
+      const hi = Math.max(0, Math.min(len, Math.floor(b)));
+      return lo < hi ? [lo, hi] : [-1, -1];
+    }).filter(([a, b]) => b > a),
+  );
+}
+
+/** Regiões “acento” apenas no interior de `\*\*…\*\*` (asteriscos não pintados). */
+function markdownBoldAccentIntervalsUtf16(full) {
+  const s = String(full ?? '');
+  const iv = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let m;
+  while ((m = re.exec(s)) !== null) iv.push([m.index + 2, m.index + m[0].length - 2]);
+  return mergeUtf16AccentIntervals(iv);
+}
+
+function unifyAccentIntervalsUtf16(full, explicitSpans) {
+  const len = full.length;
+  const md = markdownBoldAccentIntervalsUtf16(full);
+  const ex = normalizeDestaqueSpansForLen(explicitSpans, len);
+  return mergeUtf16AccentIntervals([...md, ...ex]);
+}
+
+/** Trechos `{ type:'base'|'accent', v }` na ordem do texto. */
+function cultureAccentRenderablePieces(fullText, explicitSpans) {
+  const full = String(fullText ?? '');
+  const len = full.length;
+  if (!len) return [];
+  const iv = unifyAccentIntervalsUtf16(full, explicitSpans);
+  const pieces = [];
+  let ptr = 0;
+  for (const [a, b] of iv) {
+    const lo = Math.max(0, a);
+    const hi = Math.min(len, b);
+    if (hi <= lo) continue;
+    if (ptr < lo) pieces.push({ type: 'base', v: full.slice(ptr, lo) });
+    pieces.push({ type: 'accent', v: full.slice(lo, hi) });
+    ptr = hi;
+  }
+  if (ptr < len) pieces.push({ type: 'base', v: full.slice(ptr) });
+  return pieces.length ? pieces : [{ type: 'base', v: full }];
+}
+
+/** Parágrafos separados por `\n\n+` como no preview; devolve intervalos globais UTF-16 do texto trimmed. */
+function listCultureParagraphWindows(fullRaw) {
+  const raw = String(fullRaw ?? '');
+  const windows = [];
+  const reSep = /\n\n+/g;
+  let chunkStartGlob = 0;
+  let m;
+  while ((m = reSep.exec(raw)) !== null) {
+    pushTrimmedParagraphWindow(raw, chunkStartGlob, m.index, windows);
+    chunkStartGlob = m.index + m[0].length;
+  }
+  pushTrimmedParagraphWindow(raw, chunkStartGlob, raw.length, windows);
+  return windows;
+}
+
+function pushTrimmedParagraphWindow(raw, globFrom, globTo, out) {
+  const chunk = raw.slice(globFrom, globTo);
+  let lead = 0;
+  while (lead < chunk.length && /\s/.test(chunk[lead])) lead++;
+  let trail = chunk.length - 1;
+  while (trail >= lead && /\s/.test(chunk[trail])) trail--;
+  if (trail < lead) return;
+  const display = chunk.slice(lead, trail + 1);
+  out.push({ globStart: globFrom + lead, globEnd: globFrom + trail + 1, display });
+}
+
+function clipAccentIntervalsToWindow(intervalsGlob, ws, we) {
+  if (!intervalsGlob?.length) return [];
+  const clipped = [];
+  for (const [s, e] of intervalsGlob) {
+    const a = Math.max(s, ws);
+    const b = Math.min(e, we);
+    if (b > a) clipped.push([a - ws, b - ws]);
+  }
+  return mergeUtf16AccentIntervals(clipped);
+}
+
+function contiguousTextEditBounds(prevStr, nextStr) {
+  const p = String(prevStr ?? '');
+  const n = String(nextStr ?? '');
+  if (p === n) return null;
+  const L0 = p.length;
+  const L1 = n.length;
+  let a = 0;
+  while (a < L0 && a < L1 && p[a] === n[a]) a++;
+  let b = 0;
+  while (b < L0 - a && b < L1 - a && p[L0 - 1 - b] === n[L1 - 1 - b]) b++;
+  const delStart = a;
+  const delEndEx = L0 - b;
+  const newMidEndEx = L1 - b;
+  const oldMid = p.slice(delStart, delEndEx);
+  const newMid = n.slice(delStart, newMidEndEx);
+  const rebuiltOld = p.slice(0, delStart) + oldMid + p.slice(L0 - b);
+  const rebuiltNew = n.slice(0, delStart) + newMid + n.slice(L1 - b);
+  if (rebuiltOld !== p || rebuiltNew !== n) return null;
+  return { delStart, delEndEx, oldMidLen: oldMid.length, newMidLen: newMid.length };
+}
+
+/** Ajusta intervalos quando o texto do campo é editado por uma substituição contígua. */
+function remapDestaqueSpansOnEdit(prevText, nextText, spansIn) {
+  const prev = String(prevText ?? '');
+  const next = String(nextText ?? '');
+  if (prev === next) return normalizeDestaqueSpansForLen(spansIn, next.length);
+  const bounds = contiguousTextEditBounds(prev, next);
+  let nextSpans = [...(spansIn || [])];
+  if (!bounds) {
+    return [];
+  }
+  const delta = bounds.newMidLen - bounds.oldMidLen;
+  const delStart = bounds.delStart;
+  const delEndEx = bounds.delEndEx;
+  const adjusted = [];
+  for (const [s, e] of nextSpans) {
+    const lo = typeof s === 'number' ? s : 0;
+    const hi = typeof e === 'number' ? e : 0;
+    if (hi <= lo) continue;
+    if (hi <= delStart) adjusted.push([lo, hi]);
+    else if (lo >= delEndEx) adjusted.push([lo + delta, hi + delta]);
+  }
+  return normalizeDestaqueSpansForLen(adjusted, next.length);
+}
+
+function unionDestaqueRangeIntoSpans(spansIn, selA, selB, len) {
+  const lo = Math.max(0, Math.min(len, Math.min(selA, selB)));
+  const hi = Math.max(0, Math.min(len, Math.max(selA, selB)));
+  if (hi <= lo || !len) return normalizeDestaqueSpansForLen(spansIn, len);
+  return normalizeDestaqueSpansForLen([...(spansIn || []), [lo, hi]], len);
+}
+
+function CultureInlineRich({
+  text,
+  baseColor,
+  accentColor,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  fontWeight,
+  letterSpacing,
+  destaqueSpans,
+}) {
   const wrapStyle = {
     color: baseColor,
     fontFamily,
@@ -2381,9 +2558,14 @@ function CultureInlineRich({ text, baseColor, accentColor, fontFamily, fontSize,
     fontWeight,
     letterSpacing,
     margin: 0,
+    display: 'block',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
   };
-  if (!text) return null;
-  if (parts.length === 0) return <span style={wrapStyle}>{text}</span>;
+  if (text == null || text === '') return null;
+  const parts = cultureAccentRenderablePieces(text, destaqueSpans);
   return (
     <span style={wrapStyle}>
       {parts.map((p, i) =>
@@ -2397,20 +2579,37 @@ function CultureInlineRich({ text, baseColor, accentColor, fontFamily, fontSize,
   );
 }
 
-function CultureRichParagraphs({ text, ink, accentColor, fontFamily, fontSize, lineHeight, fontWeight, letterSpacing, paraGap }) {
-  const paras = String(text || '').split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-  if (!paras.length) return null;
-  return paras.map((para, idx) => (
+function CultureRichParagraphs({
+  text,
+  ink,
+  accentColor,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  fontWeight,
+  letterSpacing,
+  paraGap,
+  destaqueSpans = null,
+}) {
+  const full = text ?? '';
+  const windows = listCultureParagraphWindows(full);
+  const globSpans = unifyAccentIntervalsUtf16(full, destaqueSpans);
+  if (!windows.length) return null;
+  return windows.map((w, idx) => (
     <p
       key={idx}
       style={{
         margin: 0,
-        marginBottom: idx < paras.length - 1 ? paraGap : 0,
+        marginBottom: idx < windows.length - 1 ? paraGap : 0,
         textAlign: 'left',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
       <CultureInlineRich
-        text={para}
+        text={w.display}
+        destaqueSpans={clipAccentIntervalsToWindow(globSpans, w.globStart, w.globEnd)}
         baseColor={ink}
         accentColor={accentColor}
         fontFamily={fontFamily}
@@ -2439,42 +2638,40 @@ function clampRect(r) {
   return { x, y, w, h };
 }
 
-/** Chaves reconhecidas em `slide.canvas.zones` para normalização de limites (% do card). */
-const CANVAS_ZONE_KEYS = ['photo', 'title', 'subtitle', 'top', 'bottom'];
+/** Quebra de linha segura em zonas estreitas (mobile / canvas). */
+const VC_TEXT_ZONE_STYLE = {
+  wordBreak: 'break-word',
+  overflowWrap: 'anywhere',
+  hyphens: 'auto',
+  boxSizing: 'border-box',
+};
 
 function rectsEqual(a, b) {
   return a && b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
 
-/** Heurísticas locais para «Ajuste automático»: texto calibrável, imagem inteira dentro do quadro e zonas normalizadas. */
-function slideAutoAdjustPatch(slide, { creativePreset }) {
+/** Heurísticas para «Ajuste automático»: texto, foto cover, e com canvas — molduras dentro da margem e alturas compatíveis com o tipo. */
+function slideAutoAdjustPatch(slide, { creativePreset, fmt = 'carrossel' }) {
   const patch = {};
 
   const titleRaw = slide.title ?? '';
   const subtitleRaw = slide.subtitle ?? '';
+  const bodyRaw = slide.bodyAfterImage ?? '';
   const titleChars = String(titleRaw).trim().length;
   const subChars = String(subtitleRaw).trim().length;
+  const bodyChars = String(bodyRaw).trim().length;
+  /** Volume útil quando há bloco inferior (sandwich / Cultura). */
+  const stackedTextChars = subChars + Math.round(bodyChars * 0.92);
   const titleLines = Math.max(1, String(titleRaw).split(/\n/).filter((ln) => ln.length > 0).length);
   const subLines = Math.max(1, String(subtitleRaw).split(/\n/).length);
+  const bodyLines = Math.max(1, String(bodyRaw).split(/\n/).length);
+  const maxStackLines = Math.max(subLines, bodyLines);
 
   if (slide.bgImage) {
-    if (slide.bgFit !== 'contain') patch.bgFit = 'contain';
+    if (slide.bgFit !== 'cover') patch.bgFit = 'cover';
     if ((slide.bgX ?? 50) !== 50) patch.bgX = 50;
     if ((slide.bgY ?? 50) !== 50) patch.bgY = 50;
     if ((slide.bgZoom ?? 100) !== 100) patch.bgZoom = 100;
-  }
-
-  if (slide.canvas?.enabled && slide.canvas.zones && typeof slide.canvas.zones === 'object') {
-    const z0 = slide.canvas.zones;
-    let changed = false;
-    const nextZones = { ...z0 };
-    for (const k of CANVAS_ZONE_KEYS) {
-      if (!z0[k]) continue;
-      const c = clampRect(z0[k]);
-      if (!rectsEqual(z0[k], c)) changed = true;
-      nextZones[k] = c;
-    }
-    if (changed) patch.canvas = { ...slide.canvas, zones: nextZones };
   }
 
   const curTitleSz = slide.titleSize ?? 100;
@@ -2486,10 +2683,12 @@ function slideAutoAdjustPatch(slide, { creativePreset }) {
 
   const curSubSz = slide.subSize ?? 100;
   let nextSubSz = curSubSz;
-  if (subChars > 700) nextSubSz = Math.min(nextSubSz, 76);
-  else if (subChars > 480) nextSubSz = Math.min(nextSubSz, 84);
-  else if (subChars > 300) nextSubSz = Math.min(nextSubSz, 92);
-  else if (subChars > 200) nextSubSz = Math.min(nextSubSz, 97);
+  const subHeuristicChars = Math.max(subChars, stackedTextChars);
+  if (subHeuristicChars > 950) nextSubSz = Math.min(nextSubSz, 68);
+  else if (subHeuristicChars > 700) nextSubSz = Math.min(nextSubSz, 76);
+  else if (subHeuristicChars > 480) nextSubSz = Math.min(nextSubSz, 84);
+  else if (subHeuristicChars > 300) nextSubSz = Math.min(nextSubSz, 92);
+  else if (subHeuristicChars > 200) nextSubSz = Math.min(nextSubSz, 97);
 
   if (nextTitleSz !== curTitleSz) patch.titleSize = nextTitleSz;
   if (nextSubSz !== curSubSz) patch.subSize = nextSubSz;
@@ -2501,27 +2700,44 @@ function slideAutoAdjustPatch(slide, { creativePreset }) {
 
   const curSLead = slide.subLeading ?? 150;
   let nextSLead = curSLead;
-  if (subLines >= 9) nextSLead = Math.max(curSLead, 168);
-  else if (subLines >= 6) nextSLead = Math.max(curSLead, 160);
-  else if (subChars > 520) nextSLead = Math.max(curSLead, 156);
-  else if (subLines >= 4) nextSLead = Math.max(curSLead, 154);
+  if (maxStackLines >= 9) nextSLead = Math.max(curSLead, 168);
+  else if (maxStackLines >= 6) nextSLead = Math.max(curSLead, 160);
+  else if (stackedTextChars > 520) nextSLead = Math.max(curSLead, 156);
+  else if (maxStackLines >= 4) nextSLead = Math.max(curSLead, 154);
 
   if (nextTLead !== curTLead) patch.titleLeading = nextTLead;
   if (nextSLead !== curSLead) patch.subLeading = nextSLead;
 
-  const inset = slide.textInset ?? 7;
+  const inset = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   let nextInset = inset;
   if ((titleChars > 95 || titleLines >= 3) && nextInset < 12) nextInset = Math.min(12, inset + 2);
-  if (subChars > 340 && nextInset < 14) nextInset = Math.min(14, Math.max(nextInset, inset + 2));
-  if (subChars > 540 && nextInset < 17) nextInset = Math.min(17, Math.max(nextInset, inset + 3));
+  if (stackedTextChars > 340 && nextInset < 14) nextInset = Math.min(14, Math.max(nextInset, inset + 2));
+  if (stackedTextChars > 540 && nextInset < 17) nextInset = Math.min(17, Math.max(nextInset, inset + 3));
+  if (bodyChars > 400 && nextInset < 18) nextInset = Math.min(18, Math.max(nextInset, inset + 4));
   if (nextInset !== inset) patch.textInset = nextInset;
 
+  const hasSandwichBody = bodyChars > 0;
   const heavyStack =
-    creativePreset !== 'tendencia_cultura' ||
-    !String(slide.bodyAfterImage || '').trim();
-  if (heavyStack && subChars > 300 && ['mc', 'tc', 'tr', 'tl'].includes(slide.layout)) {
+    (creativePreset !== 'tendencia_cultura' && !slide.useCultureLayout) ||
+    !hasSandwichBody;
+  if (heavyStack && stackedTextChars > 300 && ['mc', 'tc', 'tr', 'tl'].includes(slide.layout)) {
     patch.layout = 'bl';
     if (slide.align === 'center') patch.align = 'left';
+  }
+
+  const fFmt = FORMATS[fmt] || FORMATS.carrossel;
+  const merged = { ...slide, ...patch };
+  if (merged.canvas?.enabled && merged.canvas.zones && typeof merged.canvas.zones === 'object') {
+    const fin = finalizeCanvasMarginsForAutoAdjust(merged, fFmt);
+    if (fin?.zones) {
+      patch.canvas = { ...slide.canvas, ...(patch.canvas || {}), zones: fin.zones };
+      if (fin.textInsetAdvice != null) {
+        const curIns = merged.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+        if (fin.textInsetAdvice > curIns) {
+          patch.textInset = Math.max(patch.textInset ?? curIns, fin.textInsetAdvice);
+        }
+      }
+    }
   }
 
   return patch;
@@ -2529,42 +2745,42 @@ function slideAutoAdjustPatch(slide, { creativePreset }) {
 
 const DEFAULT_CANVAS_ZONES_CLASSIC = {
   photo: { x: 0, y: 0, w: 100, h: 58 },
-  title: { x: 4, y: 62, w: 92, h: 14 },
-  subtitle: { x: 4, y: 77, w: 92, h: 20 },
+  title: { x: 6, y: 62, w: 88, h: 14 },
+  subtitle: { x: 6, y: 77, w: 88, h: 20 },
 };
 
 /** Capa / encerramento Cultura ou primeiros dois do Personalizado 1·1 · 1·2 — foto preenche o card, texto nas zonas inferiores. */
 const DEFAULT_CANVAS_ZONES_COVER_FULLBLEED = {
   photo: { x: 0, y: 0, w: 100, h: 100 },
-  title: { x: 4, y: 52, w: 92, h: 12 },
-  subtitle: { x: 4, y: 64, w: 92, h: 30 },
+  title: { x: 6, y: 52, w: 88, h: 12 },
+  subtitle: { x: 6, y: 64, w: 88, h: 30 },
 };
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
-  top: { x: 4, y: 7, w: 92, h: 26 },
-  photo: { x: 4, y: 35, w: 92, h: 36 },
-  bottom: { x: 4, y: 74, w: 92, h: 22 },
+  top: { x: 6, y: 7, w: 88, h: 26 },
+  photo: { x: 6, y: 35, w: 88, h: 36 },
+  bottom: { x: 6, y: 74, w: 88, h: 22 },
 };
 
 /** Rotações de zona «foto» no miolo (texto antes e depois, ordem editorial mantida pelo posicionamento). */
 const SANDWICH_ZONE_PRESETS = [
   {
     key: 'mid',
-    top: { x: 4, y: 7, w: 92, h: 26 },
-    photo: { x: 4, y: 34, w: 92, h: 38 },
-    bottom: { x: 4, y: 74, w: 92, h: 22 },
+    top: { x: 6, y: 7, w: 88, h: 26 },
+    photo: { x: 6, y: 34, w: 88, h: 38 },
+    bottom: { x: 6, y: 74, w: 88, h: 22 },
   },
   {
     key: 'high',
-    top: { x: 4, y: 42, w: 92, h: 24 },
-    photo: { x: 4, y: 6, w: 92, h: 32 },
-    bottom: { x: 4, y: 68, w: 92, h: 28 },
+    top: { x: 6, y: 42, w: 88, h: 24 },
+    photo: { x: 6, y: 6, w: 88, h: 32 },
+    bottom: { x: 6, y: 68, w: 88, h: 28 },
   },
   {
     key: 'low',
-    top: { x: 4, y: 6, w: 92, h: 26 },
-    photo: { x: 4, y: 54, w: 92, h: 38 },
-    bottom: { x: 4, y: 74, w: 92, h: 22 },
+    top: { x: 6, y: 6, w: 88, h: 26 },
+    photo: { x: 6, y: 54, w: 88, h: 38 },
+    bottom: { x: 6, y: 74, w: 88, h: 22 },
   },
 ];
 
@@ -2603,8 +2819,8 @@ LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[te
 }
 
 const DEFAULT_CANVAS_ZONES_STAT = {
-  top: { x: 4, y: 8, w: 92, h: 40 },
-  bottom: { x: 4, y: 52, w: 92, h: 38 },
+  top: { x: 6, y: 8, w: 88, h: 40 },
+  bottom: { x: 6, y: 52, w: 88, h: 38 },
 };
 
 function inferCanvasDefaults(slide, creativePreset) {
@@ -2618,6 +2834,481 @@ function inferCanvasDefaults(slide, creativePreset) {
   if (sandwich) return { variant: 'sandwich', zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH } };
   if (stat) return { variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } };
   return { variant: 'classic', zones: { ...DEFAULT_CANVAS_ZONES_CLASSIC } };
+}
+
+/** Margem lateral mínima do card para molduras de texto no «Ajuste automático». */
+const CANVAS_AUTO_EDGE_PCT = 6;
+/** Padding interno (`textInset`) mínimo com canvas quando se corre o ajuste — evita tipo colado na moldura azul. */
+const CANVAS_AUTO_TEXT_INSET_MIN = 13;
+
+/** Limita zonas texto à faixa lateral [EDGE,100-EDGE]; foto mantém proporções usuário (clamp só segurança). */
+function tightenCanvasTextZoneRect(r) {
+  const g = CANVAS_AUTO_EDGE_PCT;
+  const b = clampRect(r);
+  let x = Math.max(g, Math.min(b.x, 100 - g - CANVAS_ZONE_MIN.w));
+  let w = Math.max(CANVAS_ZONE_MIN.w, Math.min(b.w, 100 - x - g));
+  if (x + w > 100 - g) w = Math.max(CANVAS_ZONE_MIN.w, 100 - g - x);
+  x = Math.max(g, Math.min(x, 100 - g - w));
+  let y = Math.max(g, Math.min(b.y, 100 - g - CANVAS_ZONE_MIN.h));
+  let h = Math.max(CANVAS_ZONE_MIN.h, Math.min(b.h, 100 - y - g));
+  if (y + h > 100 - g) h = Math.max(CANVAS_ZONE_MIN.h, 100 - g - y);
+  y = Math.max(g, Math.min(y, 100 - g - h));
+  return clampRect({ x, y, w, h });
+}
+
+function estimateWrappedLines(chars, nlLines, availW_px, fsPx, charWidthFactor = 0.5) {
+  if ((chars ?? 0) <= 0) return Math.max(1, nlLines);
+  const cpl = Math.max(8, Math.floor(availW_px / Math.max(fsPx * 0.35, fsPx * charWidthFactor)));
+  return Math.max(nlLines, Math.ceil(chars / cpl));
+}
+
+/**
+ * Mantém zonas dentro da margem do canvas e aumenta molduras até o texto caber (~ClassicCanvasInner + sanduíche canvas).
+ */
+function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
+  const cv = mergedSlide.canvas;
+  if (!cv?.enabled || !cv.zones || typeof cv.zones !== 'object' || !cv.variant) return null;
+
+  const baselineInsetPad = mergedSlide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const insetCalc = Math.max(CANVAS_AUTO_TEXT_INSET_MIN, baselineInsetPad);
+  const padXpx = f.w * (0.012 + insetCalc * 0.004);
+  const padYpx = f.h * (0.006 + insetCalc * 0.004);
+  const padYMarg = padYpx * 2;
+
+  const titleChars = String(mergedSlide.title ?? '').trim().length;
+  const subChars = String(mergedSlide.subtitle ?? '').trim().length;
+  const bodyChars = String(mergedSlide.bodyAfterImage ?? '').trim().length;
+
+  const titleLinesNl = Math.max(
+    1,
+    String(mergedSlide.title ?? '').split('\n').filter((ln) => String(ln).trim().length > 0).length,
+  );
+  const subLinesNl = Math.max(1, String(mergedSlide.subtitle ?? '').split('\n').length);
+  const bodyLinesNl = Math.max(1, String(mergedSlide.bodyAfterImage ?? '').split(/\n/).length);
+
+  const ts = mergedSlide.titleSize ?? 100;
+  const ss = mergedSlide.subSize ?? 100;
+  const tLeadClassic = (mergedSlide.titleLeading ?? 105) / 100;
+  const sLeadClassic = (mergedSlide.subLeading ?? 150) / 100;
+  const tLeadCv = (mergedSlide.titleLeading ?? 105) / 100;
+  const subLeadCv = (mergedSlide.subLeading ?? 142) / 100;
+  const bodyLeadCv = (mergedSlide.subLeading ?? 145) / 100;
+
+  const bottomLim = Math.min(100 - CANVAS_AUTO_EDGE_PCT, 99);
+  const TOP_SAFE_PCT = 11;
+  /** Espaços verticais harmónicos (% da altura do card) entre molduras. */
+  const gapTitleSub = 1.35;
+  const gapPhotoTitle = 1.6;
+
+  let zones = { ...cv.zones };
+
+  if (cv.variant === 'classic') {
+    const prevP = clampRect(zones.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
+    const prevT = clampRect(zones.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
+    const prevS = clampRect(zones.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
+    /** Foto atrás tipo capa (`h`≈100%): texto reorganiza como bloco inferior. */
+    const fullBleedPhoto = prevP.h >= 89 && prevP.y <= 2 && prevP.w >= 92;
+    /** Foto só na faixa superior: título vinha logo abaixo da foto. */
+    const bandPhoto = prevP.y + prevP.h <= prevT.y + 1.5;
+
+    const ux = CANVAS_AUTO_EDGE_PCT;
+    const uw = Math.max(CANVAS_ZONE_MIN.w * 4, 100 - 2 * CANVAS_AUTO_EDGE_PCT);
+
+    const titleFs = f.w * 0.084 * (ts / 100);
+    const innerTW = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
+    const titleLinesEff = estimateWrappedLines(titleChars, titleLinesNl, innerTW, titleFs, 0.52);
+    let needTitlePct = Math.min(
+      44,
+      ((titleLinesEff * titleFs * tLeadClassic + padYMarg + titleFs * 0.38) / f.h) * 100,
+    );
+    needTitlePct = Math.max(CANVAS_ZONE_MIN.h, needTitlePct);
+
+    const subFs = f.w * 0.028 * (ss / 100);
+    const innerSW = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
+    const paras = Math.max(subLinesNl, String(mergedSlide.subtitle ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
+    const subLinesEff = estimateWrappedLines(subChars, Math.max(subLinesNl, paras), innerSW, subFs, 0.47);
+    let needSubPct = Math.min(
+      52,
+      ((subLinesEff * subFs * sLeadClassic + padYMarg + subFs * 0.28) / f.h) * 100,
+    );
+    needSubPct = Math.max(CANVAS_ZONE_MIN.h, needSubPct);
+
+    let photo = { ...prevP };
+    let title = { ...tightenCanvasTextZoneRect(prevT), x: ux, w: uw };
+    let subtitle = { ...tightenCanvasTextZoneRect(prevS), x: ux, w: uw };
+
+    if (fullBleedPhoto) {
+      photo = clampRect({ x: 0, y: 0, w: 100, h: 100 });
+      let subY = bottomLim - needSubPct;
+      let titY = subY - gapTitleSub - needTitlePct;
+      if (titY < TOP_SAFE_PCT) {
+        const shortfall = TOP_SAFE_PCT - titY;
+        const roomFromSub = Math.max(0, needSubPct - CANVAS_ZONE_MIN.h - 1.2);
+        const roomFromTit = Math.max(0, needTitlePct - CANVAS_ZONE_MIN.h - 1.2);
+        const takeS = Math.min(roomFromSub, shortfall * 0.45);
+        const takeT = Math.min(roomFromTit, shortfall - takeS);
+        needSubPct = Math.max(CANVAS_ZONE_MIN.h, needSubPct - takeS);
+        needTitlePct = Math.max(CANVAS_ZONE_MIN.h, needTitlePct - takeT);
+        subY = bottomLim - needSubPct;
+        titY = subY - Math.max(0.65, gapTitleSub * 0.65) - needTitlePct;
+        if (titY < TOP_SAFE_PCT) titY = TOP_SAFE_PCT;
+      }
+      title = { ...title, y: titY, h: needTitlePct };
+      subtitle = { ...subtitle, y: subY, h: needSubPct };
+    } else if (bandPhoto) {
+      let photoTop = Math.max(0, prevP.y);
+      let photoH = Math.max(CANVAS_ZONE_MIN.h, prevP.h);
+      let titY = photoTop + photoH + gapPhotoTitle;
+      let subY = titY + needTitlePct + gapTitleSub;
+      let over = subY + needSubPct - bottomLim;
+      if (over > 0) {
+        photoH = Math.max(CANVAS_ZONE_MIN.h, photoH - Math.min(over + 1, photoH - CANVAS_ZONE_MIN.h));
+        titY = photoTop + photoH + gapPhotoTitle;
+        subY = titY + needTitlePct + gapTitleSub;
+        over = subY + needSubPct - bottomLim;
+        if (over > 0) {
+          needSubPct = Math.max(CANVAS_ZONE_MIN.h, needSubPct - over);
+          subY = Math.min(subY, bottomLim - needSubPct);
+          titY = subY - gapTitleSub - needTitlePct;
+        }
+      }
+      if (titY < TOP_SAFE_PCT) titY = TOP_SAFE_PCT;
+      photo = clampRect({
+        ...prevP,
+        y: photoTop,
+        h: photoH,
+        x: prevP.x,
+        w: prevP.w,
+      });
+      title = { ...title, y: titY, h: needTitlePct };
+      subtitle = { ...subtitle, y: subY, h: needSubPct };
+    } else {
+      /** Caso intermediário ou molduras livres — ancora subtítulo ao fundo e sobe o título, alinhando larguras. */
+      let subY = bottomLim - needSubPct;
+      let titY = subY - gapTitleSub - needTitlePct;
+      if (titY < TOP_SAFE_PCT) titY = TOP_SAFE_PCT;
+      if (titY + needTitlePct + gapTitleSub + needSubPct > bottomLim + 0.2) {
+        needSubPct = Math.max(CANVAS_ZONE_MIN.h, bottomLim - (titY + needTitlePct + gapTitleSub));
+        subY = bottomLim - needSubPct;
+      }
+      title = { ...title, y: titY, h: needTitlePct };
+      subtitle = { ...subtitle, y: subY, h: needSubPct };
+      let over = subtitle.y + subtitle.h - bottomLim;
+      if (over > 0.12) {
+        subtitle = { ...subtitle, h: Math.max(CANVAS_ZONE_MIN.h, subtitle.h - over) };
+      }
+      over = Math.max(0, subtitle.y + subtitle.h - bottomLim);
+      if (photo.h < 99) {
+        const shave = Math.min(
+          over + 0.85,
+          Math.max(0, photo.h - CANVAS_ZONE_MIN.h),
+        );
+        if (shave > 0) {
+          photo = {
+            ...photo,
+            h: Math.max(CANVAS_ZONE_MIN.h, photo.h - shave),
+          };
+        }
+      }
+    }
+
+    zones = { ...zones, photo: clampRect(photo), title: clampRect(title), subtitle: clampRect(subtitle) };
+  } else if (cv.variant === 'sandwich') {
+    const ux = CANVAS_AUTO_EDGE_PCT;
+    const uw = Math.max(CANVAS_ZONE_MIN.w * 4, 100 - 2 * CANVAS_AUTO_EDGE_PCT);
+    const prevTp = clampRect(zones.top || DEFAULT_CANVAS_ZONES_SANDWICH.top);
+    const prevPh = clampRect(zones.photo || DEFAULT_CANVAS_ZONES_SANDWICH.photo);
+    const prevBt = clampRect(zones.bottom || DEFAULT_CANVAS_ZONES_SANDWICH.bottom);
+
+    const gapTP = Math.max(1.1, prevPh.y - (prevTp.y + prevTp.h));
+    const gapPB = Math.max(1.1, prevBt.y - (prevPh.y + prevPh.h));
+
+    const innerUw = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
+    const titFs = f.w * 0.036 * (ts / 100);
+    const subFsTop = f.w * 0.031 * (ss / 100);
+    const titleStackLines = estimateWrappedLines(titleChars, titleLinesNl, innerUw, titFs, 0.48);
+    const subStackLines = estimateWrappedLines(subChars, subLinesNl, innerUw, subFsTop, 0.45);
+    const stackGapPx = Math.max(f.h * 0.012, titFs * 0.22);
+    let blkTopH = Math.min(
+      55,
+      ((padYMarg +
+        titleStackLines * titFs * tLeadCv +
+        stackGapPx +
+        subStackLines * subFsTop * subLeadCv +
+        titFs * 0.22) /
+        f.h) *
+        100,
+    );
+    blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
+
+    const bodyFs = f.w * 0.029 * (ss / 100);
+    const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
+    const bodyEffLines = estimateWrappedLines(bodyChars, Math.max(bodyLinesNl, bodyParas), innerUw, bodyFs, 0.45);
+    let blkBotH = Math.min(
+      54,
+      ((bodyEffLines * bodyFs * bodyLeadCv + padYMarg + bodyFs * 0.26) / f.h) * 100,
+    );
+    blkBotH = Math.max(CANVAS_ZONE_MIN.h, Math.max(prevBt.h, blkBotH));
+
+    const topY = CANVAS_AUTO_EDGE_PCT;
+    let photoY = topY + blkTopH + gapTP;
+    let botY = bottomLim - blkBotH;
+    let photoH = botY - gapPB - photoY;
+
+    for (let iter = 0; iter < 10 && photoH < CANVAS_ZONE_MIN.h; iter++) {
+      if (blkBotH > CANVAS_ZONE_MIN.h + 1.2) blkBotH -= 1.5;
+      else if (blkTopH > CANVAS_ZONE_MIN.h + 1.2) blkTopH -= 1.5;
+      photoY = topY + blkTopH + gapTP;
+      botY = bottomLim - blkBotH;
+      photoH = botY - gapPB - photoY;
+    }
+    if (photoH < CANVAS_ZONE_MIN.h) {
+      photoH = CANVAS_ZONE_MIN.h;
+      botY = photoY + photoH + gapPB;
+      blkBotH = Math.max(CANVAS_ZONE_MIN.h, bottomLim - botY);
+    }
+
+    const top = clampRect({ ...prevTp, x: ux, w: uw, y: topY, h: blkTopH });
+    const photo = clampRect({ ...prevPh, x: ux, w: uw, y: photoY, h: photoH });
+    const bottom = clampRect({ ...prevBt, x: ux, w: uw, y: botY, h: blkBotH });
+
+    zones = { ...zones, top, photo, bottom };
+  } else if (cv.variant === 'stat') {
+    const ux = CANVAS_AUTO_EDGE_PCT;
+    const uw = Math.max(CANVAS_ZONE_MIN.w * 4, 100 - 2 * CANVAS_AUTO_EDGE_PCT);
+    const prevTp = clampRect(zones.top || DEFAULT_CANVAS_ZONES_STAT.top);
+    const prevBt = clampRect(zones.bottom || DEFAULT_CANVAS_ZONES_STAT.bottom);
+    const gapTB = Math.max(1.1, prevBt.y - (prevTp.y + prevTp.h));
+
+    const innerUw = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
+    const titFs = f.w * 0.036 * (ts / 100);
+    const subFsTop = f.w * 0.031 * (ss / 100);
+    const titleStackLines = estimateWrappedLines(titleChars, titleLinesNl, innerUw, titFs, 0.48);
+    const subStackLines = estimateWrappedLines(subChars, subLinesNl, innerUw, subFsTop, 0.45);
+    const stackGapPx = Math.max(f.h * 0.012, titFs * 0.22);
+    let blkTopH = Math.min(
+      62,
+      ((padYMarg +
+        titleStackLines * titFs * tLeadCv +
+        stackGapPx +
+        subStackLines * subFsTop * subLeadCv +
+        titFs * 0.22) /
+        f.h) *
+        100,
+    );
+    blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
+
+    const bodyFsStat = f.w * 0.029 * (ss / 100);
+    const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
+    const bodyEffLines = estimateWrappedLines(bodyChars, Math.max(bodyLinesNl, bodyParas), innerUw, bodyFsStat, 0.45);
+    let blkBotH = Math.min(
+      58,
+      ((bodyEffLines * bodyFsStat * bodyLeadCv + padYMarg + bodyFsStat * 0.26) / f.h) * 100,
+    );
+    blkBotH = Math.max(CANVAS_ZONE_MIN.h, Math.max(prevBt.h, blkBotH));
+
+    const topY = CANVAS_AUTO_EDGE_PCT;
+    let botY = topY + blkTopH + gapTB;
+    let space = bottomLim - botY;
+    if (blkBotH > space - 0.35) blkBotH = Math.max(CANVAS_ZONE_MIN.h, space - 0.35);
+    if (topY + blkTopH + gapTB + blkBotH > bottomLim) {
+      blkTopH = Math.max(CANVAS_ZONE_MIN.h, bottomLim - gapTB - blkBotH - topY);
+    }
+
+    const top = clampRect({ ...prevTp, x: ux, w: uw, y: topY, h: blkTopH });
+    botY = top.y + top.h + gapTB;
+    blkBotH = Math.min(blkBotH, Math.max(CANVAS_ZONE_MIN.h, bottomLim - botY - 0.35));
+    const bot = clampRect({ ...prevBt, x: ux, w: uw, y: botY, h: blkBotH });
+
+    zones = { ...zones, top, bottom: bot };
+  }
+
+  return {
+    zones,
+    textInsetAdvice: insetCalc > baselineInsetPad ? insetCalc : null,
+  };
+}
+
+/**
+ * Igual ao trato do botão «Ajuste automático»: aplica zonas já calibradas e `textInset` se preciso.
+ * Usado após IA gerar layouts (caps full-bleed 1º/último + canvas) para evitar texto fora das margens.
+ */
+function applyFinalizeCanvasMarginsToSlides(slides, fmt = 'carrossel') {
+  const fFmt = FORMATS[fmt] || FORMATS.carrossel;
+  return slides.map((slide) => {
+    if (!slide.canvas?.enabled || !slide.canvas.zones || typeof slide.canvas.zones !== 'object' || !slide.canvas.variant)
+      return slide;
+    const fin = finalizeCanvasMarginsForAutoAdjust(slide, fFmt);
+    if (!fin?.zones) return slide;
+    const next = {
+      ...slide,
+      canvas: { ...slide.canvas, zones: fin.zones },
+    };
+    const insetAdv = fin.textInsetAdvice;
+    if (insetAdv != null) {
+      const cur = next.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+      if (insetAdv > cur) next.textInset = insetAdv;
+    }
+    if (next.canvas.variant === 'classic') {
+      const ph = clampRect(next.canvas.zones.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
+      const fullBleed = ph.h >= 89 && ph.y <= 2 && ph.w >= 92;
+      if (fullBleed && next.layout === 'mc') {
+        next.layout = next.align === 'center' || next.align === 'justify' ? 'bc' : 'bl';
+      }
+    }
+    return next;
+  });
+}
+
+/** Reforço de padding lateral em zonas texto canvas — tracking negativo + fontes grandes “comem” a margem antes do padding nominal. */
+function canvasClassicTitlePaddingXPx(f, slide) {
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const base = f.w * (0.012 + insetZn * 0.004);
+  const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.34;
+  const lsEm = ((-3 + (slide.titleTracking ?? 0)) / 100);
+  const fsPx = f.w * 0.084 * ((slide.titleSize ?? 100) / 100);
+  const bleed = lsEm < 0 ? (-lsEm) * fsPx * 1.75 : fsPx * 0.048;
+  return Math.max(base, gutter + base * 0.12, base + bleed, f.w * 0.024);
+}
+
+function canvasClassicSubtitlePaddingXPx(f, slide) {
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const base = f.w * (0.012 + insetZn * 0.004);
+  const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.3;
+  const lsEm = ((-1 + (slide.subTracking ?? 0)) / 100);
+  const fsPx = f.w * 0.028 * ((slide.subSize ?? 100) / 100);
+  const bleed = lsEm < 0 ? (-lsEm) * fsPx * 1.6 : fsPx * 0.058;
+  return Math.max(base, gutter + base * 0.1, base + bleed, f.w * 0.021);
+}
+
+function canvasCultureSandwichPaddingXPx(f, slide) {
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const base = f.w * (0.012 + insetZn * 0.004);
+  const tLs = ((-2.4 + (slide.titleTracking ?? 0)) / 100);
+  const tFs = f.w * 0.036 * ((slide.titleSize ?? 100) / 100);
+  const sLs = ((-1 + (slide.subTracking ?? 0)) / 100);
+  const sFs = f.w * 0.031 * ((slide.subSize ?? 100) / 100);
+  const bT = tLs < 0 ? (-tLs) * tFs * 1.55 + tFs * 0.05 : tFs * 0.048;
+  const bS = sLs < 0 ? (-sLs) * sFs * 1.35 + sFs * 0.052 : sFs * 0.048;
+  return Math.max(base, (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.32, base + Math.max(bT, bS * 0.75), f.w * 0.022);
+}
+
+function canvasCultureSandwichBottomPaddingXPx(f, slide) {
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const base = f.w * (0.012 + insetZn * 0.004);
+  const ls = ((-1 + (slide.subTracking ?? 0)) / 100);
+  const fsPx = f.w * 0.029 * ((slide.subSize ?? 100) / 100);
+  const bleed = ls < 0 ? (-ls) * fsPx * 1.45 : fsPx * 0.055;
+  return Math.max(base, (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.28, base + bleed, f.w * 0.021);
+}
+
+/** Ao mudar `titleSize` / `subSize` com canvas ativo: escala alturas das molduras de texto (~tamanho do tipo); a zona foto cede espaço até ao mínimo. */
+function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
+  const canvas = mergedSlide.canvas;
+  if (!canvas?.enabled || !canvas.zones || typeof canvas.zones !== 'object' || !canvas.variant) return null;
+
+  const oldT = prevSlide.titleSize ?? 100;
+  const oldS = prevSlide.subSize ?? 100;
+  const newT = mergedSlide.titleSize ?? 100;
+  const newS = mergedSlide.subSize ?? 100;
+  const rT = newT / oldT;
+  const rS = newS / oldS;
+  if (Math.abs(rT - 1) < 0.003 && Math.abs(rS - 1) < 0.003) return null;
+
+  const zIn = mergedSlide.canvas.zones;
+
+  if (canvas.variant === 'classic') {
+    const photo = clampRect(zIn.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
+    const title = clampRect(zIn.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
+    const sub = clampRect(zIn.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
+    const gapTS = Math.max(0.5, sub.y - (title.y + title.h));
+    const newTitleH = Math.max(CANVAS_ZONE_MIN.h, title.h * rT);
+    const newSubH = Math.max(CANVAS_ZONE_MIN.h, sub.h * rS);
+    const subY = title.y + newTitleH + gapTS;
+    let overflow = subY + newSubH - 98;
+    let photoNext = { ...photo };
+    if (overflow > 0) {
+      const shrink = Math.min(overflow + 0.75, Math.max(0, photoNext.h - CANVAS_ZONE_MIN.h));
+      photoNext.h = Math.max(CANVAS_ZONE_MIN.h, photoNext.h - shrink);
+      overflow -= shrink;
+    }
+    const adjSubH = overflow > 0
+      ? Math.max(CANVAS_ZONE_MIN.h, newSubH - overflow)
+      : newSubH;
+    return {
+      canvas: {
+        ...canvas,
+        zones: {
+          ...zIn,
+          photo: clampRect(photoNext),
+          title: clampRect({ ...title, h: newTitleH }),
+          subtitle: clampRect({ ...sub, y: subY, h: adjSubH }),
+        },
+      },
+    };
+  }
+
+  if (canvas.variant === 'sandwich') {
+    const top = clampRect(zIn.top || DEFAULT_CANVAS_ZONES_SANDWICH.top);
+    const photo = clampRect(zIn.photo || DEFAULT_CANVAS_ZONES_SANDWICH.photo);
+    const bottom = clampRect(zIn.bottom || DEFAULT_CANVAS_ZONES_SANDWICH.bottom);
+    const gapTP = Math.max(0.5, photo.y - (top.y + top.h));
+    const gapPB = Math.max(0.5, bottom.y - (photo.y + photo.h));
+    const newTopH = Math.max(CANVAS_ZONE_MIN.h, top.h * Math.max(rT, rS));
+    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bottom.h * rS);
+    const photoY = top.y + newTopH + gapTP;
+    let botY = bottom.y;
+    let botHAdj = newBotH;
+    if (botY + botHAdj > 98) botY = 98 - botHAdj;
+    let photoH = botY - gapPB - photoY;
+    if (photoH < CANVAS_ZONE_MIN.h) {
+      const shortage = CANVAS_ZONE_MIN.h - photoH;
+      botHAdj = Math.max(CANVAS_ZONE_MIN.h, botHAdj - shortage);
+      botY = Math.min(bottom.y, 98 - botHAdj);
+      photoH = Math.max(CANVAS_ZONE_MIN.h, botY - gapPB - photoY);
+      if (photoH < CANVAS_ZONE_MIN.h) {
+        botY = Math.min(98 - CANVAS_ZONE_MIN.h, photoY + gapPB + CANVAS_ZONE_MIN.h);
+        botHAdj = Math.max(CANVAS_ZONE_MIN.h, 98 - botY);
+        photoH = Math.max(CANVAS_ZONE_MIN.h, botY - gapPB - photoY);
+      }
+    }
+    return {
+      canvas: {
+        ...canvas,
+        zones: {
+          ...zIn,
+          top: clampRect({ ...top, h: newTopH }),
+          photo: clampRect({ ...photo, y: photoY, h: photoH }),
+          bottom: clampRect({ ...bottom, y: botY, h: botHAdj }),
+        },
+      },
+    };
+  }
+
+  if (canvas.variant === 'stat') {
+    const top = clampRect(zIn.top || DEFAULT_CANVAS_ZONES_STAT.top);
+    const bot = clampRect(zIn.bottom || DEFAULT_CANVAS_ZONES_STAT.bottom);
+    const gapTB = Math.max(0.5, bot.y - (top.y + top.h));
+    const newTopH = Math.max(CANVAS_ZONE_MIN.h, top.h * Math.max(rT, rS));
+    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bot.h * rS);
+    const botY = top.y + newTopH + gapTB;
+    const overflow = botY + newBotH - 98;
+    const adjBotH = overflow > 0
+      ? Math.max(CANVAS_ZONE_MIN.h, newBotH - overflow)
+      : newBotH;
+    return {
+      canvas: {
+        ...canvas,
+        zones: {
+          ...zIn,
+          top: clampRect({ ...top, h: newTopH }),
+          bottom: clampRect({ ...bot, y: botY, h: adjBotH }),
+        },
+      },
+    };
+  }
+
+  return null;
 }
 
 function pctBox(rect, f) {
@@ -2636,13 +3327,11 @@ const VC_ZONE_DRAG_MIME = 'application/x-vc-canvas-zone';
 
 /** Contorno + arrastar / redimensionar canto SE (zonas canvas). Opcional: grip para trocar conteúdo entre slides.
  *  A zona `photo` fica por cima do conteúdo — `photoZoneTap` abre o import de imagem em clique simples (sem arrasto). */
-function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys, photoZoneTap = null }) {
+/** `interactionScale` = `transform: scale()` aplicado ao card na pré-visualização; sem isto o arrasto em ecrã fica «lento/errado» no telemóvel. */
+function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys, photoZoneTap = null, interactionScale = 1 }) {
   const dragRef = React.useRef(null);
   const zonesRef = React.useRef(zones);
   zonesRef.current = zones;
-  /** Só dispara photoZoneTap se o utilizador não moveu o rato o suficiente para ser arrasto. */
-  const photoTapOkRef = React.useRef(false);
-  const photoTouchRef = React.useRef(null);
 
   const swapKeysEffective = React.useMemo(() => {
     if (swapSlideIdx == null) return null;
@@ -2654,46 +3343,66 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
   }, [keys, swapSlideIdx, swapZoneKeys]);
 
   React.useEffect(() => {
-    const mm = (e) => {
-      if (!dragRef.current || !onPatch) return;
+    const sPx = Math.max(0.05, interactionScale || 1);
+    const step = (clientX, clientY) => {
       const d = dragRef.current;
       if (!d || !onPatch) return;
-      const dx = e.clientX - d.lastX;
-      const dy = e.clientY - d.lastY;
-      if (d.key === 'photo' && photoZoneTap && (Math.abs(dx) + Math.abs(dy) > 4)) {
-        photoTapOkRef.current = false;
-      }
-      d.lastX = e.clientX;
-      d.lastY = e.clientY;
+      const dx = clientX - d.lastX;
+      const dy = clientY - d.lastY;
+      d.dist = (d.dist ?? 0) + Math.abs(dx) + Math.abs(dy);
+      d.lastX = clientX;
+      d.lastY = clientY;
       const cur = zonesRef.current[d.key];
       if (!cur) return;
       const b = clampRect(cur);
+      const nx = dx / (f.w * sPx);
+      const ny = dy / (f.h * sPx);
       if (d.mode === 'move') {
         onPatch({
           [d.key]: clampRect({
             ...b,
-            x: b.x + (dx / f.w) * 100,
-            y: b.y + (dy / f.h) * 100,
+            x: b.x + nx * 100,
+            y: b.y + ny * 100,
           }),
         });
       } else {
         onPatch({
           [d.key]: clampRect({
             ...b,
-            w: b.w + (dx / f.w) * 100,
-            h: b.h + (dy / f.h) * 100,
+            w: b.w + nx * 100,
+            h: b.h + ny * 100,
           }),
         });
       }
     };
-    const mu = () => { dragRef.current = null; };
+
+    const mm = (e) => step(e.clientX, e.clientY);
+    const tm = (e) => {
+      if (!dragRef.current || !e.touches?.[0]) return;
+      step(e.touches[0].clientX, e.touches[0].clientY);
+      e.preventDefault();
+    };
+    /** Toque rápido sem arrasto relevante na zona foto = import. */
+    const finish = () => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      if (!d?.key || !photoZoneTap) return;
+      if (d.key === 'photo' && (d.dist ?? 0) < 18) photoZoneTap();
+    };
+
     window.addEventListener('mousemove', mm);
-    window.addEventListener('mouseup', mu);
+    window.addEventListener('mouseup', finish);
+    window.addEventListener('touchmove', tm, { passive: false });
+    window.addEventListener('touchend', finish);
+    window.addEventListener('touchcancel', finish);
     return () => {
       window.removeEventListener('mousemove', mm);
-      window.removeEventListener('mouseup', mu);
+      window.removeEventListener('mouseup', finish);
+      window.removeEventListener('touchmove', tm);
+      window.removeEventListener('touchend', finish);
+      window.removeEventListener('touchcancel', finish);
     };
-  }, [f.h, f.w, onPatch, photoZoneTap]);
+  }, [f.h, f.w, onPatch, photoZoneTap, interactionScale]);
 
   if (!zones || !onPatch) return null;
 
@@ -2704,6 +3413,33 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
         const r = clampRect(zones[k]);
         const box = pctBox(r, f);
         const showSwapGrip = swapKeysEffective && swapKeysEffective.includes(k);
+
+        const startResizeTouch = (e) => {
+          const t = e.touches?.[0];
+          if (!t) return;
+          e.preventDefault();
+          e.stopPropagation();
+          dragRef.current = {
+            key: k,
+            mode: 'se',
+            lastX: t.clientX,
+            lastY: t.clientY,
+            dist: 0,
+          };
+        };
+
+        const startMove = (clientX, clientY, ev) => {
+          ev.preventDefault?.();
+          ev.stopPropagation?.();
+          dragRef.current = {
+            key: k,
+            mode: 'move',
+            lastX: clientX,
+            lastY: clientY,
+            dist: 0,
+          };
+        };
+
         return (
           <div
             key={k}
@@ -2711,51 +3447,20 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
               ...box,
               zIndex: 45,
               pointerEvents: 'auto',
+              touchAction: 'none',
               border: '2px dashed var(--accent)',
               borderRadius: 8,
               background: 'rgba(0, 102, 204, 0.04)',
             }}
-            onClick={(e) => {
-              if (k !== 'photo' || !photoZoneTap) return;
-              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
-              if (!photoTapOkRef.current) return;
-              e.stopPropagation();
-              photoZoneTap();
-            }}
             onTouchStart={(e) => {
-              if (k !== 'photo' || !photoZoneTap) return;
               if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               const t = e.touches[0];
               if (!t) return;
-              photoTouchRef.current = { x: t.clientX, y: t.clientY, moved: false };
-            }}
-            onTouchMove={(e) => {
-              const st = photoTouchRef.current;
-              if (!st || k !== 'photo' || !photoZoneTap) return;
-              const t = e.touches[0];
-              if (!t) return;
-              if (Math.abs(t.clientX - st.x) + Math.abs(t.clientY - st.y) > 14) st.moved = true;
-            }}
-            onTouchEnd={(e) => {
-              if (k !== 'photo' || !photoZoneTap) return;
-              const st = photoTouchRef.current;
-              photoTouchRef.current = null;
-              if (!st || st.moved) return;
-              e.preventDefault();
-              photoZoneTap();
+              startMove(t.clientX, t.clientY, e);
             }}
             onMouseDown={(e) => {
               if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
-              const photoTap = k === 'photo' && photoZoneTap;
-              photoTapOkRef.current = photoTap;
-              if (!photoTap) e.preventDefault();
-              e.stopPropagation();
-              dragRef.current = {
-                key: k,
-                mode: 'move',
-                lastX: e.clientX,
-                lastY: e.clientY,
-              };
+              startMove(e.clientX, e.clientY, e);
             }}
           >
             {showSwapGrip && (
@@ -2764,6 +3469,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                 draggable
                 title="Arrastar para outro card para trocar conteúdo"
                 onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onDragStart={(e) => {
                   e.dataTransfer.setData(
                     VC_ZONE_DRAG_MIME,
@@ -2780,7 +3486,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                   fontSize: 11,
                   fontWeight: 600,
                   fontFamily: 'var(--font-ui)',
-                  letterSpacing: '-0.02em',
+                  letterSpacing: '-0.022em',
                   background: 'var(--accent)',
                   color: '#fff',
                   cursor: 'grab',
@@ -2801,14 +3507,16 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                   mode: 'se',
                   lastX: e.clientX,
                   lastY: e.clientY,
+                  dist: 0,
                 };
               }}
+              onTouchStart={startResizeTouch}
               style={{
                 position: 'absolute',
                 right: -4,
                 bottom: -4,
-                width: 14,
-                height: 14,
+                width: 18,
+                height: 18,
                 borderRadius: 3,
                 background: 'var(--accent)',
                 cursor: 'nwse-resize',
@@ -2839,6 +3547,10 @@ const ClassicCanvasInner = React.forwardRef(({
   num,
   total,
   hideInstaBadge,
+  /** Cor do campo título (1.º / último vs meio já resolvida no pai). */
+  titleInk,
+  /** Corpo: subtítulo «texto», parágrafos, etc. */
+  bodyInk,
   imgModeNorm,
   effectivePresentationFilter,
   bgFit,
@@ -2852,11 +3564,13 @@ const ClassicCanvasInner = React.forwardRef(({
   onPhotoZoneClick,
   swapSlideIdx = null,
   swapZoneKeys,
+  interactionScale = 1,
 }, ref) => {
   const zcv = slide.canvas.zones;
   const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
-  const insetZn = slide.textInset ?? 7;
-  const padXZn = f.w * (0.012 + insetZn * 0.004);
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const padTitleXp = canvasClassicTitlePaddingXPx(f, slide);
+  const padSubtitleXp = canvasClassicSubtitlePaddingXPx(f, slide);
   const padYZn = f.h * (0.006 + insetZn * 0.002);
   const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
   const tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
@@ -2943,6 +3657,7 @@ const ClassicCanvasInner = React.forwardRef(({
 
       <div style={{
         ...pctBox(tr, f),
+        ...VC_TEXT_ZONE_STYLE,
         zIndex: 4,
         overflow: 'auto',
         display: 'flex',
@@ -2953,17 +3668,32 @@ const ClassicCanvasInner = React.forwardRef(({
         background: textBgColor,
         backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
         borderRadius: slide.textBg ? f.w * 0.022 : 0,
-        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padXZn}px`,
+        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
       }}>
-        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: alignInner, maxWidth: '100%' }}>
+        <div
+          style={{
+            width: '100%',
+            minWidth: 0,
+            alignSelf: 'stretch',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: alignInner,
+          }}
+        >
         <h1 style={{
-          color: brand.titleColor,
+          color: titleInk,
           fontFamily: titleFF,
           fontSize: f.w * 0.084 * (slide.titleSize / 100),
           lineHeight: (slide.titleLeading ?? 105) / 100,
           fontWeight: slide.titleWeight ?? 800,
           letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
           margin: 0,
+          overflowWrap: 'break-word',
+          wordBreak: 'normal',
+          maxWidth: '100%',
+          width: '100%',
+          boxSizing: 'border-box',
           textTransform:
             slide.titleCase === 'upper' ? 'uppercase' :
             slide.titleCase === 'lower' ? 'lowercase' :
@@ -2972,7 +3702,8 @@ const ClassicCanvasInner = React.forwardRef(({
         }}>{culture ? (
           <CultureInlineRich
             text={slide.title || ''}
-            baseColor={brand.titleColor}
+            destaqueSpans={slide.destaqueSpans?.title}
+            baseColor={titleInk}
             accentColor={cultureAccentCol}
             fontFamily={titleFF}
             fontSize={f.w * 0.084 * (slide.titleSize / 100)}
@@ -2986,25 +3717,37 @@ const ClassicCanvasInner = React.forwardRef(({
 
       <div style={{
         ...pctBox(sr, f),
+        ...VC_TEXT_ZONE_STYLE,
         zIndex: 4,
         overflow: 'auto',
         background: textBgColor,
         backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
         borderRadius: slide.textBg ? f.w * 0.022 : 0,
-        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padXZn}px`,
+        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: Lzn.jc,
         alignItems: Lzn.ai,
         textAlign: slide.align,
       }}>
-        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: alignInner, maxWidth: '100%' }}>
+        <div
+          style={{
+            width: '100%',
+            minWidth: 0,
+            alignSelf: 'stretch',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: alignInner,
+          }}
+        >
         {slide.subtitle && (
           culture ? (
-            <div style={{ letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`, textShadow: shadow }}>
+            <div style={{ letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`, textShadow: shadow, width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
               <CultureRichParagraphs
                 text={slide.subtitle}
-                ink={brand.subColor}
+                destaqueSpans={slide.destaqueSpans?.subtitle}
+                ink={bodyInk}
                 accentColor={cultureAccentCol}
                 fontFamily={bodyFF}
                 fontSize={f.w * 0.028 * (slide.subSize / 100)}
@@ -3016,12 +3759,17 @@ const ClassicCanvasInner = React.forwardRef(({
             </div>
           ) : (
             <p style={{
-              color: brand.subColor,
+              color: bodyInk,
               fontFamily: bodyFF,
               fontSize: f.w * 0.028 * (slide.subSize / 100),
               lineHeight: (slide.subLeading ?? 150) / 100,
               fontWeight: 400,
               margin: 0,
+              overflowWrap: 'break-word',
+              wordBreak: 'normal',
+              maxWidth: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
               letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
               textShadow: shadow,
             }}>{slide.subtitle}</p>
@@ -3140,6 +3888,7 @@ const ClassicCanvasInner = React.forwardRef(({
           swapSlideIdx={swapSlideIdx}
           swapZoneKeys={swapZoneKeys}
           photoZoneTap={onPhotoZoneClick || null}
+          interactionScale={interactionScale}
         />
       )}
     </div>
@@ -3160,6 +3909,10 @@ const SlideCardInner = React.forwardRef(({
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const slideIdx = slideIndexProp != null ? slideIndexProp : num - 1;
   const zonePatchRef = React.useRef(onCanvasZonePatch);
+  const brandPal = hydrateBrandTextColors(brand);
+  const carouselEdgeSlide = total >= 1 && (slideIdx === 0 || slideIdx === total - 1);
+  const carouselTitleInk = carouselEdgeSlide ? brandPal.titleColor : brandPal.subtitleColor;
+  const carouselBodyInk = brandPal.textColor;
   zonePatchRef.current = onCanvasZonePatch;
   const photoReqRef = React.useRef(onPhotoZoneRequest);
   photoReqRef.current = onPhotoZoneRequest;
@@ -3241,14 +3994,20 @@ const SlideCardInner = React.forwardRef(({
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
+    const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
     const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
-    const insetZn = slide.textInset ?? 7;
-    const padXCv = f.w * (0.012 + insetZn * 0.004);
+    const alignInner =
+      slide.align === 'center' ? 'center' :
+      slide.align === 'right' ? 'flex-end' :
+      slide.align === 'justify' ? 'stretch' : 'flex-start';
+    const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+    const padXCvTop = canvasCultureSandwichPaddingXPx(f, slide);
+    const padXCvBottom = canvasCultureSandwichBottomPaddingXPx(f, slide);
     const padYCv = f.h * (0.004 + insetZn * 0.002);
-    const topR = z.top ? clampRect(z.top) : { x: 4, y: 8, w: 92, h: 28 };
-    const photoR = z.photo ? clampRect(z.photo) : { x: 4, y: 36, w: 92, h: 34 };
-    const botR = z.bottom ? clampRect(z.bottom) : { x: 4, y: 72, w: 92, h: 22 };
+    const topR = z.top ? clampRect(z.top) : { x: 6, y: 8, w: 88, h: 28 };
+    const photoR = z.photo ? clampRect(z.photo) : { x: 6, y: 36, w: 88, h: 34 };
+    const botR = z.bottom ? clampRect(z.bottom) : { x: 6, y: 72, w: 88, h: 22 };
     inner = (
       <div
         ref={ref}
@@ -3284,33 +4043,58 @@ const SlideCardInner = React.forwardRef(({
 
         <div style={{
           ...pctBox(topR, f),
+          ...VC_TEXT_ZONE_STYLE,
           zIndex: 4,
           overflow: 'auto',
-          padding: `${padYCv}px ${padXCv}px`,
+          padding: `${padYCv}px ${padXCvTop}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: Lzn.jc,
           alignItems: Lzn.ai,
           textAlign: slide.align === 'justify' ? 'left' : slide.align,
-          gap: f.h * 0.008,
         }}>
+          <div
+            style={{
+              width: '100%',
+              minWidth: 0,
+              alignSelf: 'stretch',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: alignInner,
+              gap: f.h * 0.008,
+            }}
+          >
           {(slide.title || '').trim() ? (
             <h2 style={{
               margin: 0,
-              color: ink,
               fontFamily: titleFF,
-              fontSize: f.w * 0.036 * (slide.titleSize / 100),
-              fontWeight: slide.titleWeight ?? 600,
-              letterSpacing: `${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`,
-              lineHeight: (slide.titleLeading ?? 105) / 100,
+              overflowWrap: 'break-word',
+              wordBreak: 'normal',
+              maxWidth: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
               textTransform:
                 slide.titleCase === 'upper' ? 'uppercase' :
                 slide.titleCase === 'lower' ? 'lowercase' : 'none',
-            }}>{slide.title}</h2>
+            }}>
+              <CultureInlineRich
+                text={slide.title || ''}
+                destaqueSpans={slide.destaqueSpans?.title}
+                baseColor={carouselTitleInk}
+                accentColor={cultureAccentCol}
+                fontFamily={titleFF}
+                fontSize={f.w * 0.036 * (slide.titleSize / 100)}
+                lineHeight={(slide.titleLeading ?? 105) / 100}
+                fontWeight={slide.titleWeight ?? 600}
+                letterSpacing={`${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`}
+              />
+            </h2>
           ) : null}
           <CultureRichParagraphs
             text={slide.subtitle}
-            ink={ink}
+            destaqueSpans={slide.destaqueSpans?.subtitle}
+            ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
             fontSize={f.w * 0.031 * (slide.subSize / 100)}
@@ -3319,6 +4103,7 @@ const SlideCardInner = React.forwardRef(({
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
             paraGap={f.h * 0.012}
           />
+          </div>
         </div>
 
         {cvVar === 'sandwich' && (
@@ -3368,9 +4153,10 @@ const SlideCardInner = React.forwardRef(({
 
         <div style={{
           ...pctBox(botR, f),
+          ...VC_TEXT_ZONE_STYLE,
           zIndex: 4,
           overflow: 'auto',
-          padding: `${padYCv}px ${padXCv}px`,
+          padding: `${padYCv}px ${padXCvBottom}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: Lzn.jc,
@@ -3379,7 +4165,8 @@ const SlideCardInner = React.forwardRef(({
         }}>
           <CultureRichParagraphs
             text={bodyAfterCulture}
-            ink={ink}
+            destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
+            ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
             fontSize={f.w * 0.029 * (slide.subSize / 100)}
@@ -3399,6 +4186,7 @@ const SlideCardInner = React.forwardRef(({
             swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
             swapZoneKeys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
             photoZoneTap={onPhotoZoneClick || null}
+            interactionScale={scale}
           />
         )}
 
@@ -3429,6 +4217,7 @@ const SlideCardInner = React.forwardRef(({
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#0066cc') : lightCultureBg;
     const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
     const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
+    const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
     inner = (
       <div
@@ -3484,16 +4273,38 @@ const SlideCardInner = React.forwardRef(({
           flexDirection:'column',
           gap: f.h * 0.02,
           justifyContent: cultureStatFlat ? 'space-between' : 'flex-start',
+          ...VC_TEXT_ZONE_STYLE,
+          overflow: 'hidden',
+          minWidth: 0,
         }}>
           {(slide.title || '').trim() ? (
             <h2 style={{
-              margin:0, color:ink, fontFamily:titleFF, fontSize:f.w*0.036, fontWeight:600,
-              letterSpacing:'-0.024em', lineHeight:1.14,
-            }}>{slide.title}</h2>
+              margin: 0,
+              fontFamily: titleFF,
+              overflowWrap: 'break-word',
+              wordBreak: 'normal',
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+            }}>
+              <CultureInlineRich
+                text={slide.title || ''}
+                destaqueSpans={slide.destaqueSpans?.title}
+                baseColor={carouselTitleInk}
+                accentColor={cultureAccentCol}
+                fontFamily={titleFF}
+                fontSize={f.w * 0.036}
+                lineHeight={1.14}
+                fontWeight={600}
+                letterSpacing="-0.024em"
+              />
+            </h2>
           ) : null}
           <CultureRichParagraphs
             text={slide.subtitle}
-            ink={ink}
+            destaqueSpans={slide.destaqueSpans?.subtitle}
+            ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
             fontSize={f.w*0.031}
@@ -3541,7 +4352,8 @@ const SlideCardInner = React.forwardRef(({
           )}
           <CultureRichParagraphs
             text={bodyAfterCulture}
-            ink={ink}
+            destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
+            ink={subtitleInk}
             accentColor={cultureAccentCol}
             fontFamily={bodyFF}
             fontSize={f.w*0.029}
@@ -3590,6 +4402,8 @@ const SlideCardInner = React.forwardRef(({
         num={num}
         total={total}
         hideInstaBadge={hideInstaBadge}
+        titleInk={carouselTitleInk}
+        bodyInk={carouselBodyInk}
         imgModeNorm={imgModeNorm}
         effectivePresentationFilter={effectivePresentationFilter}
         bgFit={bgFit}
@@ -3603,6 +4417,7 @@ const SlideCardInner = React.forwardRef(({
         onPhotoZoneClick={onPhotoZoneClick}
         swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
         swapZoneKeys={undefined}
+        interactionScale={scale}
       />
     );
   } else {
@@ -3757,7 +4572,7 @@ const SlideCardInner = React.forwardRef(({
 
       {/* Main content */}
       {(() => {
-        const inset = (slide.textInset ?? 7);
+        const inset = (slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET);
         const padH = f.w * (0.04 + inset * 0.004);
         const padVTop = f.h * (0.09 + inset * 0.003);
         const padVBot = f.h * (0.06 + inset * 0.003);
@@ -3774,6 +4589,8 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', flexDirection:'column',
             justifyContent:L.jc, alignItems:L.ai,
             textAlign:slide.align,
+            overflow: 'hidden',
+            ...VC_TEXT_ZONE_STYLE,
           }}>
             <div style={{
               background:textBgColor,
@@ -3790,7 +4607,7 @@ const SlideCardInner = React.forwardRef(({
               maxWidth:'92%',
             }}>
               <h1 style={{
-                color:brand.titleColor, fontFamily: titleFF,
+                color: carouselTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
                 fontWeight:slide.titleWeight ?? 800,
@@ -3805,7 +4622,8 @@ const SlideCardInner = React.forwardRef(({
               }}>{cultureRichText ? (
                 <CultureInlineRich
                   text={slide.title || ''}
-                  baseColor={brand.titleColor}
+                  destaqueSpans={slide.destaqueSpans?.title}
+                  baseColor={carouselTitleInk}
                   accentColor={cultureAccentCol}
                   fontFamily={titleFF}
                   fontSize={f.w*0.084*(slide.titleSize/100)}
@@ -3824,7 +4642,8 @@ const SlideCardInner = React.forwardRef(({
                   }}>
                     <CultureRichParagraphs
                       text={slide.subtitle}
-                      ink={brand.subColor}
+                      destaqueSpans={slide.destaqueSpans?.subtitle}
+                      ink={carouselBodyInk}
                       accentColor={cultureAccentCol}
                       fontFamily={bodyFF}
                       fontSize={f.w*0.028*(slide.subSize/100)}
@@ -3836,7 +4655,7 @@ const SlideCardInner = React.forwardRef(({
                   </div>
                 ) : (
                 <p style={{
-                  color:brand.subColor, fontFamily: bodyFF,
+                  color: carouselBodyInk, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight:400, margin:0,
@@ -6092,6 +6911,7 @@ function SidebarContent({
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
   creativePreset = 'livre',
+  fmt = 'carrossel',
   applyTypographyToAllCards,
   canvasEditMode = false, setCanvasEditMode = () => {},
   anyCanvasEnabled = false,
@@ -6158,6 +6978,131 @@ function SidebarContent({
 
   const bgFitKey = slide.bgFit ?? 'custom';
   const sidebarBgPreviewFilter = slide.bgImage ? slideStoredPresentationCssFilter(slide) : undefined;
+
+  const titleTaRef = React.useRef(null);
+  const subtitleTaRef = React.useRef(null);
+  const sandwichBodyTaRef = React.useRef(null);
+  const lastTextFieldRef = React.useRef('title');
+  const pendTitleSel = React.useRef(null);
+  const pendSubtitleSel = React.useRef(null);
+  const pendSandwichBodySel = React.useRef(null);
+
+  React.useLayoutEffect(() => {
+    const p = pendTitleSel.current;
+    pendTitleSel.current = null;
+    if (!p) return;
+    const el = titleTaRef.current;
+    if (!el) return;
+    el.selectionStart = p.s;
+    el.selectionEnd = p.e;
+  }, [slide.title]);
+
+  React.useLayoutEffect(() => {
+    const p = pendSubtitleSel.current;
+    pendSubtitleSel.current = null;
+    if (!p) return;
+    const el = subtitleTaRef.current;
+    if (!el) return;
+    el.selectionStart = p.s;
+    el.selectionEnd = p.e;
+  }, [slide.subtitle]);
+
+  React.useLayoutEffect(() => {
+    const p = pendSandwichBodySel.current;
+    pendSandwichBodySel.current = null;
+    if (!p) return;
+    const el = sandwichBodyTaRef.current;
+    if (!el) return;
+    el.selectionStart = p.s;
+    el.selectionEnd = p.e;
+  }, [slide.bodyAfterImage]);
+
+  const marcarDestaque = React.useCallback(() => {
+    const ae = typeof document !== 'undefined' ? document.activeElement : null;
+    const cultureBody = creativePreset === 'tendencia_cultura' || slide.useCultureLayout;
+    const resolve = () => {
+      if (ae === titleTaRef.current && titleTaRef.current) {
+        return {
+          fieldKey: 'title',
+          pend: pendTitleSel,
+          get: () => slide.title ?? '',
+          set: (t) => updateSlide({ title: t }),
+          ta: titleTaRef.current,
+        };
+      }
+      if (ae === subtitleTaRef.current && subtitleTaRef.current) {
+        return {
+          fieldKey: 'subtitle',
+          pend: pendSubtitleSel,
+          get: () => slide.subtitle ?? '',
+          set: (t) => updateSlide({ subtitle: t }),
+          ta: subtitleTaRef.current,
+        };
+      }
+      if (cultureBody && ae === sandwichBodyTaRef.current && sandwichBodyTaRef.current) {
+        return {
+          fieldKey: 'bodyAfterImage',
+          pend: pendSandwichBodySel,
+          get: () => slide.bodyAfterImage ?? '',
+          set: (t) => updateSlide({ bodyAfterImage: t }),
+          ta: sandwichBodyTaRef.current,
+        };
+      }
+      const k = lastTextFieldRef.current;
+      if (k === 'subtitle' && subtitleTaRef.current) {
+        return {
+          fieldKey: 'subtitle',
+          pend: pendSubtitleSel,
+          get: () => slide.subtitle ?? '',
+          set: (t) => updateSlide({ subtitle: t }),
+          ta: subtitleTaRef.current,
+        };
+      }
+      if (k === 'bodyAfter' && cultureBody && sandwichBodyTaRef.current) {
+        return {
+          fieldKey: 'bodyAfterImage',
+          pend: pendSandwichBodySel,
+          get: () => slide.bodyAfterImage ?? '',
+          set: (t) => updateSlide({ bodyAfterImage: t }),
+          ta: sandwichBodyTaRef.current,
+        };
+      }
+      if (titleTaRef.current) {
+        return {
+          fieldKey: 'title',
+          pend: pendTitleSel,
+          get: () => slide.title ?? '',
+          set: (t) => updateSlide({ title: t }),
+          ta: titleTaRef.current,
+        };
+      }
+      return null;
+    };
+    const ctx = resolve();
+    if (!ctx) {
+      toast?.('Sem campo de texto ativo.', 'info');
+      return;
+    }
+    const raw = ctx.get();
+    const sta = ctx.ta.selectionStart;
+    const en = ctx.ta.selectionEnd;
+    const lo = Math.min(sta, en);
+    const hi = Math.max(sta, en);
+    if (!String(raw.slice(lo, hi)).trim()) {
+      toast?.('Selecione um trecho primeiro.', 'info');
+      return;
+    }
+    const len = raw.length;
+    const dsPrev = slide.destaqueSpans && typeof slide.destaqueSpans === 'object' ? slide.destaqueSpans : {};
+    const curField = dsPrev[ctx.fieldKey] ?? [];
+    const merged = unionDestaqueRangeIntoSpans(curField, lo, hi, len);
+    updateSlide({
+      destaqueSpans: {
+        ...dsPrev,
+        [ctx.fieldKey]: merged,
+      },
+    });
+  }, [slide.title, slide.subtitle, slide.bodyAfterImage, slide.destaqueSpans, creativePreset, slide.useCultureLayout, updateSlide, toast]);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
@@ -6264,16 +7209,44 @@ function SidebarContent({
             <S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
               <div>
                 <label className="vc-label-sm">Título</label>
-                <textarea value={slide.title} onChange={e=>updateSlide({title:e.target.value})} rows={2}
+                <textarea
+                  ref={titleTaRef}
+                  onFocus={() => { lastTextFieldRef.current = 'title'; }}
+                  value={slide.title}
+                  onChange={(e) => {
+                    const nw = e.target.value;
+                    const old = slide.title ?? '';
+                    const ds = slide.destaqueSpans && typeof slide.destaqueSpans === 'object' ? slide.destaqueSpans : {};
+                    const nextTitleSpans = remapDestaqueSpansOnEdit(old, nw, ds.title ?? []);
+                    updateSlide({
+                      title: nw,
+                      destaqueSpans: { ...ds, title: nextTitleSpans },
+                    });
+                  }}
+                  rows={2}
                   className="vc-input vc-textarea"
-                  style={{ fontSize:13, fontWeight:500 }}
+                  style={{ fontSize:17, fontWeight:600 }}
                 />
               </div>
               <div>
                 <label className="vc-label-sm">Subtítulo</label>
-                <textarea value={slide.subtitle} onChange={e=>updateSlide({subtitle:e.target.value})} rows={3}
+                <textarea
+                  ref={subtitleTaRef}
+                  onFocus={() => { lastTextFieldRef.current = 'subtitle'; }}
+                  value={slide.subtitle}
+                  onChange={(e) => {
+                    const nw = e.target.value;
+                    const old = slide.subtitle ?? '';
+                    const ds = slide.destaqueSpans && typeof slide.destaqueSpans === 'object' ? slide.destaqueSpans : {};
+                    const nextSubSpans = remapDestaqueSpansOnEdit(old, nw, ds.subtitle ?? []);
+                    updateSlide({
+                      subtitle: nw,
+                      destaqueSpans: { ...ds, subtitle: nextSubSpans },
+                    });
+                  }}
+                  rows={3}
                   className="vc-input vc-textarea"
-                  style={{ fontSize:12, color:'var(--text-secondary)' }}
+                  style={{ fontSize:17, color:'var(--text-secondary)', fontWeight:400 }}
                 />
               </div>
               {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout) && (
@@ -6281,12 +7254,25 @@ function SidebarContent({
                   <div>
                     <label className="vc-label-sm">Texto abaixo da imagem (sandwich)</label>
                     <textarea
+                      ref={sandwichBodyTaRef}
+                      onFocus={() => { lastTextFieldRef.current = 'bodyAfter'; }}
                       value={slide.bodyAfterImage ?? ''}
-                      onChange={e=>updateSlide({ bodyAfterImage: e.target.value })}
+                      onChange={(e) => {
+                        const nw = e.target.value;
+                        const old = slide.bodyAfterImage ?? '';
+                        const ds = slide.destaqueSpans && typeof slide.destaqueSpans === 'object' ? slide.destaqueSpans : {};
+                        const nextB = remapDestaqueSpansOnEdit(old, nw, ds.bodyAfterImage ?? []);
+                        updateSlide({
+                          bodyAfterImage: nw,
+                          destaqueSpans: { ...ds, bodyAfterImage: nextB },
+                        });
+                      }}
                       rows={4}
-                      placeholder={'Parágrafo que aparece abaixo da foto (layout editorial). Use **trecho** para destacar na cor accent.'}
+                      placeholder={
+                        'Parágrafo abaixo da foto no layout editorial. Marque Destaque na barra lateral ou mantenha **trecho** nos slides antigos.'
+                      }
                       className="vc-input vc-textarea"
-                      style={{ fontSize:12, color:'var(--text-secondary)' }}
+                      style={{ fontSize:17, color:'var(--text-secondary)', fontWeight:400 }}
                     />
                   </div>
                   <div>
@@ -6300,11 +7286,36 @@ function SidebarContent({
                       <option value="">Automático</option>
                       <option value="light">Claro</option>
                       <option value="dark">Escuro</option>
-                      <option value="accent">Cor accent (marca)</option>
+                      <option value="accent">Cor Destaques da marca (superfície)</option>
                     </select>
                   </div>
                 </>
               )}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  if (refining) return;
+                  e.preventDefault();
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                onClick={marcarDestaque}
+                disabled={refining}
+                title="Aplica a cor Destaques da marca ao trecho selecionado (sem alterar o texto). Use no título, subtítulo ou bloco inferior."
+                aria-label="Marcar destaque no texto selecionado"
+                style={{
+                  width:'100%', minHeight:36, borderRadius:9999, cursor: refining ? 'not-allowed' : 'pointer',
+                  border:'1px solid var(--accent)', background:'var(--bg-pearl)', color:'var(--accent)',
+                  fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  opacity: refining ? 0.5 : 1,
+                  transition:'transform 0.1s var(--ease-smooth)',
+                }}
+              >
+                <Highlighter size={15} aria-hidden />
+                Marcar Destaque
+              </button>
               <RefineBtn onRefine={refineSlide} busy={refining}/>
               <button
                 onClick={()=>setHookVarsOpen(true)}
@@ -6525,24 +7536,24 @@ function SidebarContent({
                 ))}
               </div>
               {/* inset from edges */}
-              <Slider label="Distância das bordas" value={slide.textInset??7} min={1} max={20} onChange={v=>updateSlide({textInset:v})}/>
+              <Slider label="Distância das bordas" value={slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET} min={1} max={20} onChange={v=>updateSlide({textInset:v})}/>
             </S>
 
             <S
               title="Ajuste automático"
-              hint="Analisa título, subtítulo, zonas canvas e foto: mostra a imagem inteira na área (sem cortes laterais), puxa molduras para dentro do cartão e reduz tamanhos quando o texto é muito longo."
+              hint="Cover e tipografia; com canvas reorganiza foto e todas as zonas de texto em conjunto (largura útil ~6%, espaçamentos entre foto/título/subtítulo ou topo/foto/rodapé) para caber dentro da margem do cartão e evitar cortes."
             >
               <button
                 type="button"
                 onClick={() => {
-                  const p = slideAutoAdjustPatch(slide, { creativePreset });
+                  const p = slideAutoAdjustPatch(slide, { creativePreset, fmt });
                   if (!Object.keys(p).length) {
                     toast?.('Nada urgente a ajustar neste cartão.', 'info');
                     return;
                   }
                   updateSlide(p);
                   const parts = [];
-                  if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('imagem mostrada por completo');
+                  if (p.bgFit != null || p.bgX != null || p.bgY != null || p.bgZoom != null) parts.push('foto a preencher a zona (cover)');
                   if (p.canvas) parts.push('zonas normalizadas');
                   if (p.titleSize != null || p.subSize != null || p.titleLeading != null || p.subLeading != null || p.textInset != null) {
                     parts.push('tipografia calibrada');
@@ -6720,7 +7731,10 @@ function SidebarContent({
                 >
                   <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
                     <div style={{ display:'flex', gap:2, flexShrink:0 }}>
-                      {[brand.bg, brand.titleColor, brand.accent].map((c,i)=>(
+                      {(() => {
+                        const sw = hydrateBrandTextColors(brand);
+                        return [brand.bg, brand.titleColor, sw.subtitleColor, sw.textColor, brand.accent];
+                      })().map((c,i)=>(
                         <div key={i} style={{ width:14, height:14, borderRadius:3, background:c, border:'1px solid rgba(255,255,255,0.08)' }}/>
                       ))}
                     </div>
@@ -6992,7 +8006,8 @@ function SidebarContent({
                         ...b,
                         bg: p.bg,
                         titleColor: p.title,
-                        subColor: p.sub,
+                        subtitleColor: p.subtitle,
+                        textColor: p.text,
                         accent: p.accent,
                       }))
                     }
@@ -7005,8 +8020,8 @@ function SidebarContent({
                       transition:'all 0.15s',
                     }}
                   >
-                    <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-                      {[p.bg, p.title, p.accent].map((c,i)=>(
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+                      {[p.bg, p.title, p.subtitle, p.text, p.accent].map((c,i)=>(
                         <div key={i} style={{ width:18, height:18, borderRadius:4, background:c, border:'1px solid rgba(255,255,255,0.08)', flexShrink:0 }}/>
                       ))}
                     </div>
@@ -7016,7 +8031,7 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Cores manuais">
+            <S title="Cores manuais" hint="Título = primeira e última folha · Subtítulo = linha curta nos slides do meio · Texto = parágrafos e blocos de corpo (sanduíche inclusive). Destaques = trechos marcados no editor.">
               <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v})}/>
               <Toggle
                 label="Intercalar fundo entre cards"
@@ -7042,9 +8057,17 @@ function SidebarContent({
                   onChange={v=>setBrand({ ...brand, bgAlternate: v })}
                 />
               ) : null}
-              <ColorRow label="Título" value={brand.titleColor} onChange={v=>setBrand({...brand,titleColor:v})}/>
-              <ColorRow label="Subtítulo" value={brand.subColor} onChange={v=>setBrand({...brand,subColor:v})}/>
-              <ColorRow label="Acento" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})}/>
+              {(() => {
+                const bh = hydrateBrandTextColors(brand);
+                return (
+                  <>
+                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v})}/>
+                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v})}/>
+                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v})}/>
+                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})}/>
+                  </>
+                );
+              })()}
             </S>
 
             <S title="Fontes próprias (ficheiro)" hint="WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o ficheiro não tiver todos os pesos.">
@@ -8390,7 +9413,13 @@ const DEFAULT_BRAND = {
   /* Visual neutro no primeiro uso: superfície clara + tinta + único acento Action Blue (DESIGN.md). */
   titleFont: '"Inter", sans-serif',
   bodyFont: '"Inter Tight", sans-serif',
-  bg: '#fafafc', titleColor: '#1d1d1f', subColor: '#515154', accent: '#0066cc',
+  bg: '#fafafc',
+  titleColor: '#1d1d1f',
+  /** Linha curta sob o título nos cards do meio (nem capa nem fecho). */
+  subtitleColor: '#636366',
+  /** Parágrafos / corpo (ex-bloco «Subtítulo» da marca). */
+  textColor: '#515154',
+  accent: '#0066cc',
   /** Ímpar (slides 1,3…) = `bg` · Par (2,4…) = `bgAlternate` quando activo e cor definida. */
   interleaveBg: false,
   /** Segunda cor de fundo para intercalção (margem/pérola por defeito). */
@@ -8466,7 +9495,7 @@ function ensureDocShape(d) {
   const out = {
     ...DEFAULT_DOC,
     ...d,
-    brand: { ...DEFAULT_BRAND, ...(d.brand && typeof d.brand === 'object' ? d.brand : {}) },
+    brand: hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(d.brand && typeof d.brand === 'object' ? d.brand : {}) }),
     material: { ...DEFAULT_DOC.material, ...(d.material && typeof d.material === 'object' ? d.material : {}) },
     imgParams: { ...DEFAULT_DOC.imgParams, ...(d.imgParams && typeof d.imgParams === 'object' ? d.imgParams : {}) },
   };
@@ -8506,13 +9535,30 @@ export default function App() {
   });
   const [brandRoster, setBrandRoster] = useState(() => {
     const stored = lsGet(SK.brands, null);
-    if (Array.isArray(stored) && stored.length) return stored;
-    return [DEFAULT_BRAND];
+    if (Array.isArray(stored) && stored.length) return stored.map(hydrateBrandTextColors);
+    return [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
   });
   const [activeBrandId, setActiveBrandId] = useState(() => lsGet(SK.activeBrandId, 'default'));
 
-  // Persiste os 3 stores (debounced)
-  useEffect(() => { const t = setTimeout(() => lsSet(SK.library, library), 250); return () => clearTimeout(t); }, [library]);
+  const libraryPersistRef = useRef(library);
+  libraryPersistRef.current = library;
+
+  /** Evita perder fotos (base64) ao puxar-para-atualizar no telemóvel antes do debounce. */
+  useEffect(() => {
+    const flushLibrary = () => lsSet(SK.library, libraryPersistRef.current);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flushLibrary();
+    };
+    window.addEventListener('pagehide', flushLibrary);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      window.removeEventListener('pagehide', flushLibrary);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, []);
+
+  // Persiste os 3 stores (debounced — sincronização imediata acima nos eventos do sistema)
+  useEffect(() => { const t = setTimeout(() => lsSet(SK.library, library), 100); return () => clearTimeout(t); }, [library]);
   useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
   useEffect(() => { lsSet(SK.brands, brandRoster); }, [brandRoster]);
   useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
@@ -8555,9 +9601,10 @@ export default function App() {
   const setBrand = useCallback(
     (next) =>
       history.set((d) => {
-        const cur = d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND };
-        const brandNext =
+        const cur = hydrateBrandTextColors(d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND });
+        const brandNextRaw =
           typeof next === 'function' ? next(cur) : { ...cur, ...next };
+        const brandNext = hydrateBrandTextColors(brandNextRaw);
         return { ...d, brand: brandNext };
       }),
     [history],
@@ -8612,7 +9659,7 @@ export default function App() {
   const newDoc = useCallback((seedDoc = null, name = 'Novo carrossel') => {
     // Aplica brand ativo no doc novo
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
-    const baseDoc = { ...DEFAULT_DOC, ...(seedDoc || {}), brand: { ...activeBrand } };
+    const baseDoc = { ...DEFAULT_DOC, ...(seedDoc || {}), brand: hydrateBrandTextColors({ ...activeBrand }) };
     const entry = mkLibEntry(baseDoc, name);
     setLibrary(prev => [entry, ...prev]);
     setActiveDocId(entry.id);
@@ -8704,19 +9751,20 @@ export default function App() {
     const b = brandRoster.find(x => x.id === brandId);
     if (!b) return;
     setActiveBrandId(brandId);
-    history.set(d => ({ ...d, brand: { ...b } }));
+    history.set(d => ({ ...d, brand: hydrateBrandTextColors({ ...b }) }));
   }, [brandRoster, history]);
   const upsertBrand = useCallback((brandObj) => {
-    setBrandRoster(prev => {
-      const exists = prev.find(b => b.id === brandObj.id);
-      if (exists) return prev.map(b => b.id === brandObj.id ? brandObj : b);
-      return [...prev, brandObj];
+    const norm = hydrateBrandTextColors(brandObj);
+    setBrandRoster((prev) => {
+      const exists = prev.find((b) => b.id === norm.id);
+      if (exists) return prev.map((b) => (b.id === norm.id ? norm : b));
+      return [...prev, norm];
     });
   }, []);
   const deleteBrand = useCallback((brandId) => {
     setBrandRoster(prev => {
       const next = prev.filter(b => b.id !== brandId);
-      if (!next.length) return [DEFAULT_BRAND];
+      if (!next.length) return [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
       return next;
     });
     if (brandId === activeBrandId) setActiveBrandId('default');
@@ -8960,8 +10008,9 @@ export default function App() {
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const previewScale = useMemo(() => {
     if (isMobile) {
-      // Mobile: usa praticamente a largura inteira (24px de margem total).
-      return Math.min((vw - 24) / f.w, 0.9);
+      /* Margens laterais maiores para o texto não “escorrer” junto ao bezel / overscroll */
+      const side = Math.max(16, vw * 0.04);
+      return Math.min((vw - side * 2) / f.w, 0.92);
     }
     // Desktop: thumbnail compacta na faixa horizontal.
     return Math.min(360 / f.w, 0.44);
@@ -9084,7 +10133,18 @@ export default function App() {
   );
 
   const updateSlide = useCallback(patch => {
-    setSlides(s => s.map((sl,i) => i===activeIdx ? {...sl,...patch} : sl));
+    setSlides(s => s.map((sl, i) => {
+      if (i !== activeIdx) return sl;
+      const next = { ...sl, ...patch };
+      const mayScaleZones =
+        (patch.titleSize != null || patch.subSize != null) &&
+        !!next.canvas?.enabled &&
+        next.canvas?.zones &&
+        typeof next.canvas.zones === 'object';
+      if (!mayScaleZones) return next;
+      const cz = canvasZonesFontScalePatch(sl, next);
+      return cz ? { ...next, ...cz } : next;
+    }));
   }, [activeIdx]);
 
   const updateSlideAt = useCallback((idx, patch) => {
@@ -9243,7 +10303,7 @@ export default function App() {
         textShadow: src.textShadow !== false,
         textBg: !!src.textBg,
         textBgOpacity: src.textBgOpacity ?? 55,
-        textInset: src.textInset ?? 7,
+        textInset: src.textInset ?? DEFAULT_SLIDE_TEXT_INSET,
       };
       return list.map((sl) => ({ ...sl, ...patch }));
     });
@@ -9441,7 +10501,8 @@ ${jsonShapeLine}`;
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
-    const newSlides = attachGenerationCanvasLayouts(
+    const newSlides = applyFinalizeCanvasMarginsToSlides(
+      attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       const q = ((s.imageQuery ?? s.image_query) || '').trim();
       const title = s.title || `Slide ${i + 1}`;
@@ -9513,8 +10574,14 @@ ${jsonShapeLine}`;
       return { ...base, overlay: q ? 70 : 0 };
       }),
       { creativePreset: cp, slideTextDensity: td },
+      ),
+      fmt,
     );
     setSlides(newSlides); setActiveIdx(0); setShellView('project');
+    if (isMobile) {
+      setTab('slide');
+      setDrawerOpen(true);
+    }
     if (n) setNiche(n);
     if (result.caption) setCaption(result.caption);
 
@@ -9821,7 +10888,16 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     history.set(d => ({
       ...d,
       slides: newSlides,
-      brand: { ...d.brand, bg:palette.bg, titleColor:palette.title, subColor:palette.sub, accent:palette.accent, titleFont:titleFont.val, bodyFont:bodyFont.val },
+      brand: {
+        ...d.brand,
+        bg: palette.bg,
+        titleColor: palette.title,
+        subtitleColor: palette.subtitle,
+        textColor: palette.text,
+        accent: palette.accent,
+        titleFont: titleFont.val,
+        bodyFont: bodyFont.val,
+      },
     }));
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
@@ -9944,6 +11020,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     slideImgGenBusy,
     generateSlideImageAt,
     creativePreset,
+    fmt,
     applyTypographyToAllCards,
     canvasEditMode, setCanvasEditMode,
     anyCanvasEnabled: slides.some((s) => s.canvas?.enabled),
@@ -10412,15 +11489,19 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 </div>
               </div>
             ) : isMobile ? (
-              // Mobile: single slide with floating arrows + swipe
+              // Mobile: single slide with floating arrows + swipe — com modo canvas, reduzimos conflito com o swipe lateral
               <div
                 style={{
                   display:'flex', flexDirection:'column', alignItems:'center',
                   padding:'16px 12px calc(80px + env(safe-area-inset-bottom, 0))',
                   minHeight:'100%', position:'relative',
                 }}
-                onTouchStart={e => { e.currentTarget.dataset.tx = String(e.touches[0].clientX); }}
+                onTouchStart={e => {
+                  if (canvasEditMode) return;
+                  e.currentTarget.dataset.tx = String(e.touches[0].clientX);
+                }}
                 onTouchEnd={e => {
+                  if (canvasEditMode) return;
                   const start = parseFloat(e.currentTarget.dataset.tx || '0');
                   const dx = e.changedTouches[0].clientX - start;
                   if (Math.abs(dx) > 50) {
@@ -10429,7 +11510,13 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   }
                 }}
               >
-                <div style={{ animation:'fadeUp 0.2s var(--ease-smooth)', position:'relative' }}>
+                <div
+                  style={{
+                    animation:'fadeUp 0.2s var(--ease-smooth)',
+                    position:'relative',
+                    ...(canvasEditMode ? { touchAction: 'none' } : {}),
+                  }}
+                >
                   <SlideCard
                     slide={slide}
                     fmt={fmt}
@@ -11865,7 +12952,10 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
                 >
                   {/* Swatches */}
                   <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-                    {[b.bg, b.titleColor, b.accent].map((c,i)=>(
+                    {(() => {
+                      const sw = hydrateBrandTextColors(b);
+                      return [b.bg, b.titleColor, sw.subtitleColor, sw.textColor, b.accent];
+                    })().map((c,i)=>(
                       <div key={i} style={{ width:18, height:18, borderRadius:4, background:c, border:'1px solid rgba(255,255,255,0.08)' }}/>
                     ))}
                   </div>
