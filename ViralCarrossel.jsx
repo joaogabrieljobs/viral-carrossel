@@ -1558,19 +1558,76 @@ const loadJsPdf = () => new Promise((res, rej) => {
   document.head.appendChild(s);
 });
 
-/** Descarga um Blob com nome — evita data URLs gigantes (limite em alguns browsers) e falhas silenciosas. */
-function downloadBlob(blob, filename) {
+/**
+ * Safari iOS ignora `.click()` em `<input type="file" hidden>`. Mantém elemento ativo mas fora da vista.
+ * @see https://bugs.webkit.org/show_bug.cgi?id=22261 (padrões semelhantes)
+ */
+const VC_TRIGGERABLE_FILE_INPUT_STYLE = {
+  position: 'fixed',
+  left: 0,
+  top: 0,
+  width: '1px',
+  height: '1px',
+  margin: 0,
+  padding: 0,
+  opacity: 0.02,
+  overflow: 'hidden',
+  clipPath: 'inset(50%)',
+  border: 'none',
+  pointerEvents: 'none',
+};
+
+function vcIsCoarseTouchDevice() {
+  return typeof window !== 'undefined' &&
+    ('ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0);
+}
+
+/** Telemóveis / Safari: após awaits o gesto já não abre âncoras — Web Share API (ficheiro) costuma funcionar. */
+function vcPreferFileShareForDownloads() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
+  try {
+    if ((navigator.maxTouchPoints ?? 0) > 0 && window.matchMedia('(max-width: 768px)').matches)
+      return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+/** Descarga um Blob; em mobile tenta primeiro partilhar ficheiro, depois `<a download>`. */
+async function downloadBlob(blob, filename) {
+  const mime = blob.type || 'application/octet-stream';
+  const tryShare =
+    vcPreferFileShareForDownloads() &&
+    typeof navigator.share === 'function' &&
+    typeof File !== 'undefined' &&
+    typeof navigator.canShare === 'function';
+
+  if (tryShare) {
+    try {
+      const file = new File([blob], filename, { type: mime });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return;
+      /* continua para âncora */
+    }
+  }
+
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
     a.remove();
-    URL.revokeObjectURL(url);
-  }, 400);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
 }
 
 /** PNG a partir do canvas (toBlob; fallback se o browser devolver null). */
@@ -1606,7 +1663,7 @@ function canvasToPngBlob(canvas) {
 
 async function downloadCanvasPng(canvas, filename) {
   const blob = await canvasToPngBlob(canvas);
-  downloadBlob(blob, filename);
+  await downloadBlob(blob, filename);
 }
 
 /** Migra modos antigos e `web_trend` (desativado na UI) → GPT Image. */
@@ -2430,6 +2487,18 @@ function unifyAccentIntervalsUtf16(full, explicitSpans) {
   return mergeUtf16AccentIntervals([...md, ...ex]);
 }
 
+/** Remove pares `**` colados às zonas accent (marcadores Markdown — não aparecem no cartão). */
+function stripAdjacentMarkdownBoldFences(fragment) {
+  let s = String(fragment ?? '');
+  let prev = null;
+  while (prev !== s) {
+    prev = s;
+    if (s.startsWith('**')) s = s.slice(2);
+    if (s.endsWith('**')) s = s.slice(0, -2);
+  }
+  return s;
+}
+
 /** Trechos `{ type:'base'|'accent', v }` na ordem do texto. */
 function cultureAccentRenderablePieces(fullText, explicitSpans) {
   const full = String(fullText ?? '');
@@ -2442,12 +2511,20 @@ function cultureAccentRenderablePieces(fullText, explicitSpans) {
     const lo = Math.max(0, a);
     const hi = Math.min(len, b);
     if (hi <= lo) continue;
-    if (ptr < lo) pieces.push({ type: 'base', v: full.slice(ptr, lo) });
+    if (ptr < lo) {
+      const rawBase = full.slice(ptr, lo);
+      const cleaned = stripAdjacentMarkdownBoldFences(rawBase);
+      if (cleaned.length) pieces.push({ type: 'base', v: cleaned });
+    }
     pieces.push({ type: 'accent', v: full.slice(lo, hi) });
     ptr = hi;
   }
-  if (ptr < len) pieces.push({ type: 'base', v: full.slice(ptr) });
-  return pieces.length ? pieces : [{ type: 'base', v: full }];
+  if (ptr < len) {
+    const rawTail = full.slice(ptr);
+    const cleaned = stripAdjacentMarkdownBoldFences(rawTail);
+    if (cleaned.length) pieces.push({ type: 'base', v: cleaned });
+  }
+  return pieces.length ? pieces : [{ type: 'base', v: stripAdjacentMarkdownBoldFences(full) || full }];
 }
 
 /** Parágrafos separados por `\n\n+` como no preview; devolve intervalos globais UTF-16 do texto trimmed. */
@@ -3382,12 +3459,13 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
       step(e.touches[0].clientX, e.touches[0].clientY);
       e.preventDefault();
     };
-    /** Toque rápido sem arrasto relevante na zona foto = import. */
+    /** Toque rápido sem arrasto relevante na zona foto = import (telemóveis: jitter do dedo aumenta tolerância). */
     const finish = () => {
       const d = dragRef.current;
       dragRef.current = null;
       if (!d?.key || !photoZoneTap) return;
-      if (d.key === 'photo' && (d.dist ?? 0) < 18) photoZoneTap();
+      const tapSlop = d.key === 'photo' ? (vcIsCoarseTouchDevice() ? 96 : 18) : 18;
+      if (d.key === 'photo' && (d.dist ?? 0) < tapSlop) photoZoneTap();
     };
 
     window.addEventListener('mousemove', mm);
@@ -9690,27 +9768,17 @@ export default function App() {
 
   // ── EXPORT / IMPORT de projetos ─────────────────────────────────────────────
   // Exporta UMA entrada da biblioteca como arquivo .json
-  const exportDoc = useCallback((docId) => {
+  const exportDoc = useCallback(async (docId) => {
     const entry = library.find(e => e.id === docId);
     if (!entry) return;
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [entry] }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${entry.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadBlob(blob, `${entry.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`);
   }, [library]);
 
   // Exporta TODA a biblioteca de uma vez
-  const exportAllDocs = useCallback(() => {
+  const exportAllDocs = useCallback(async () => {
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: library }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadBlob(blob, `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`);
   }, [library]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
@@ -10784,7 +10852,7 @@ ${capRules}
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadBlob(zipBlob, `carrossel-slides-${stamp}.zip`);
+      await downloadBlob(zipBlob, `carrossel-slides-${stamp}.zip`);
       toast(`ZIP com ${slides.length} cards pronto`, 'success');
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
@@ -11744,11 +11812,11 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       </>
       )}
 
-      {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageUpload}/>
-      <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple hidden onChange={handleBatchPhotos}/>
-      <input ref={photoZoneInputRef} type="file" accept="image/*" hidden onChange={handlePhotoZoneBgFile}/>
-      <input ref={refImageInputRef} type="file" accept="image/*" hidden onChange={handleRefImageFile}/>
+      {/* File inputs: evitar hidden (Safari iOS bloqueia .click() via JS). */}
+      <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
+      <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
+      <input ref={photoZoneInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
+      <input ref={refImageInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
 
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
