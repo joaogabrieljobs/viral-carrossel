@@ -716,6 +716,55 @@ function cultureDarkBackdropFromBrand(brandBg) {
   return `#${out.map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * Cores de texto / destaque a partir da luminância REAL do fundo do card Cultura/Tendência.
+ * O modo «par/ímpar» (surface light/dark) não garante fundo claro em «light» quando `brand.bg` é cinza‑carvão —
+ * antes aplicava‑se texto #515154 e sumia no fundo escuro.
+ */
+function cultureReadableInks(bgSolidHex, carouselTitleInk, carouselBodyInk, brandAccentHex) {
+  const fb = vcNormalizeHex(bgSolidHex);
+  const rgb = fb ? vcHexToRgb(fb) : null;
+  const L = rgb ? vcRelLuminance01(rgb) : 0.35;
+  const accentStr = typeof brandAccentHex === 'string' ? brandAccentHex.trim() : '';
+  const accentHex = accentStr || '#000000';
+
+  const darkBG = L <= 0.45;
+  const lightBG = L >= 0.58;
+
+  if (darkBG) {
+    const aRgb = vcHexToRgb(vcNormalizeHex(accentHex) || '#000000');
+    const aL = aRgb ? vcRelLuminance01(aRgb) : 0;
+    const accentInk = !aRgb || aL < 0.42 ? '#dceeb1' : accentHex;
+    return {
+      titleInk: '#f5f5f7',
+      subtitleInk: 'rgba(245,245,247,0.9)',
+      bodyInk: 'rgba(245,245,247,0.82)',
+      inkMuted: 'rgba(245,245,247,0.54)',
+      accentInk,
+      solidBgIsLight: false,
+    };
+  }
+  if (lightBG) {
+    return {
+      titleInk: carouselTitleInk,
+      subtitleInk: carouselBodyInk,
+      bodyInk: carouselBodyInk,
+      inkMuted: 'rgba(29,29,31,0.48)',
+      accentInk: accentHex,
+      solidBgIsLight: true,
+    };
+  }
+  /* Fundos de luminância intermédia (ex.: acento saturado) — texto sempre claro + destaque pastel Figma */
+  return {
+    titleInk: '#ffffff',
+    subtitleInk: 'rgba(255,255,255,0.92)',
+    bodyInk: 'rgba(255,255,255,0.82)',
+    inkMuted: 'rgba(255,255,255,0.62)',
+    accentInk: '#dceeb1',
+    solidBgIsLight: false,
+  };
+}
+
 /** Normaliza marca: campo legado `subColor` migra para `textColor` e `subtitleColor` quando omitidos; remove `subColor` gravado para evitar duplicidade. */
 function hydrateBrandTextColors(b) {
   if (!b || typeof b !== 'object') return b;
@@ -1131,6 +1180,35 @@ const TEMPLATES = [
     ],
   },
 ];
+
+/** Modo narrativo interno por arquétipo (template) — utilizador não escolhe (só em Personalizado). */
+const QUICK_TEMPLATE_NARRATIVE_MODE = {
+  erro_comum: 'editorial',
+  tendencia: 'editorial',
+  decodificacao: 'deep',
+  comportamento: 'storytelling',
+};
+
+function quickTemplateIdFromPreset(presetId) {
+  if (presetId == null || typeof presetId !== 'string') return null;
+  if (!presetId.startsWith('quick_')) return null;
+  const tid = presetId.slice('quick_'.length);
+  return TEMPLATES.some((t) => t.id === tid) ? tid : null;
+}
+
+function isQuickTemplatePreset(presetId) {
+  return quickTemplateIdFromPreset(presetId) != null;
+}
+
+/** Entradas «Carbon / Midnight …» no seletor de pacote — mesmos arquétipos que Templates prontos. */
+const QUICK_TEMPLATE_CREATIVE_PRESET_ENTRIES = TEMPLATES.map((t) => {
+  const pal = PALETTES[t.palette] || PALETTES[0];
+  return {
+    id: `quick_${t.id}`,
+    label: t.name,
+    desc: `${t.desc} · Paleta ${pal.name} · arco fixo (sem modo narrativo, nicho ou público — como Templates prontos).`,
+  };
+});
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 
@@ -1627,6 +1705,57 @@ const loadHtml2Canvas = () => new Promise((res, rej) => {
   document.head.appendChild(s);
 });
 
+/**
+ * html2canvas 1.4.x rasteriza mal `<img>` com `object-fit` + `transform` (sanduíche Cultura) — faixa achatada/larga.
+ * Substituir por `div` com `background-*` replica o enquadramento sem distorcer no PNG/PDF.
+ */
+function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
+  if (!clonedSlideRoot?.querySelectorAll) return;
+  const view = clonedDoc.defaultView;
+  if (!view?.getComputedStyle) return;
+  const list = Array.from(clonedSlideRoot.querySelectorAll('img'));
+  list.forEach((img) => {
+    const src = img.getAttribute('src');
+    if (!src) return;
+    const parent = img.parentElement;
+    if (!parent) return;
+
+    const computed = view.getComputedStyle(img);
+    const fit = (computed.objectFit || 'fill').trim();
+    const pos = computed.objectPosition || '50% 50%';
+    let bgSize = '100% 100%';
+    if (fit === 'cover') bgSize = 'cover';
+    else if (fit === 'contain') bgSize = 'contain';
+
+    const stub = clonedDoc.createElement('div');
+    stub.setAttribute('data-vc-html2canvas-img', '');
+    const cssUrl = `url("${src.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+    stub.style.position = computed.position === 'static' ? 'absolute' : computed.position;
+    stub.style.top = computed.top;
+    stub.style.left = computed.left;
+    stub.style.right = computed.right;
+    stub.style.bottom = computed.bottom;
+    stub.style.width = computed.width;
+    stub.style.height = computed.height;
+    stub.style.margin = computed.margin;
+    stub.style.padding = computed.padding;
+    stub.style.border = computed.border;
+    stub.style.boxSizing = computed.boxSizing || 'border-box';
+    stub.style.display = 'block';
+    stub.style.transform = 'none';
+    stub.style.filter = computed.filter;
+    stub.style.opacity = computed.opacity;
+    stub.style.borderRadius = computed.borderRadius;
+    stub.style.pointerEvents = 'none';
+    stub.style.backgroundImage = cssUrl;
+    stub.style.backgroundRepeat = 'no-repeat';
+    stub.style.backgroundSize = bgSize;
+    stub.style.backgroundPosition = pos;
+
+    parent.replaceChild(stub, img);
+  });
+}
+
 // Carrega jsPDF on-demand (UMD) — só baixa quando o usuário pedir export PDF
 const loadJsPdf = () => new Promise((res, rej) => {
   if (window.jspdf?.jsPDF) return res(window.jspdf.jsPDF);
@@ -1658,9 +1787,28 @@ const VC_TRIGGERABLE_FILE_INPUT_STYLE = {
   zIndex: 2,
 };
 
+/** Input dedicado à zona foto — WebKit iOS costuma bloquear menos sem `clipPath` agressivo. */
+const VC_PHOTO_ZONE_FILE_INPUT_STYLE = {
+  ...VC_TRIGGERABLE_FILE_INPUT_STYLE,
+  clipPath: 'none',
+  width: 4,
+  height: 4,
+  opacity: 0.05,
+};
+
 function vcIsCoarseTouchDevice() {
   return typeof window !== 'undefined' &&
     ('ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0);
+}
+
+/** Distância máx. (Manhattan em px) para contar «toque» na zona foto — 18px era pouco com rato em card escalado. */
+function vcPhotoZoneTapSlopPx() {
+  if (typeof window === 'undefined') return 72;
+  try {
+    if (window.matchMedia?.('(pointer: coarse)').matches) return 140;
+  } catch { /* ignore */ }
+  if (vcIsCoarseTouchDevice()) return 140;
+  return 72;
 }
 
 /** Telemóveis / Safari: após awaits o gesto já não abre âncoras — Web Share API (ficheiro) costuma funcionar. */
@@ -2915,30 +3063,30 @@ const DEFAULT_CANVAS_ZONES_COVER_FULLBLEED = {
 };
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
-  top: { x: 6, y: 7, w: 88, h: 24 },
-  photo: { x: 6, y: 33, w: 88, h: 40 },
-  bottom: { x: 6, y: 76, w: 88, h: 21 },
+  top: { x: 6, y: 7, w: 88, h: 22 },
+  photo: { x: 6, y: 31, w: 88, h: 41 },
+  bottom: { x: 6, y: 74, w: 88, h: 23 },
 };
 
 /** Rotações de zona «foto» no miolo (texto antes e depois, ordem editorial mantida pelo posicionamento). */
 const SANDWICH_ZONE_PRESETS = [
   {
     key: 'mid',
-    top: { x: 6, y: 7, w: 88, h: 26 },
-    photo: { x: 6, y: 34, w: 88, h: 38 },
-    bottom: { x: 6, y: 74, w: 88, h: 22 },
+    top: { x: 6, y: 7, w: 88, h: 24 },
+    photo: { x: 6, y: 33, w: 88, h: 39 },
+    bottom: { x: 6, y: 74, w: 88, h: 23 },
   },
   {
     key: 'high',
-    top: { x: 6, y: 42, w: 88, h: 24 },
-    photo: { x: 6, y: 6, w: 88, h: 32 },
-    bottom: { x: 6, y: 68, w: 88, h: 28 },
+    top: { x: 6, y: 40, w: 88, h: 22 },
+    photo: { x: 6, y: 6, w: 88, h: 34 },
+    bottom: { x: 6, y: 68, w: 88, h: 29 },
   },
   {
     key: 'low',
-    top: { x: 6, y: 6, w: 88, h: 26 },
-    photo: { x: 6, y: 54, w: 88, h: 38 },
-    bottom: { x: 6, y: 74, w: 88, h: 22 },
+    top: { x: 6, y: 6, w: 88, h: 24 },
+    photo: { x: 6, y: 32, w: 88, h: 40 },
+    bottom: { x: 6, y: 74, w: 88, h: 23 },
   },
 ];
 
@@ -3592,10 +3740,25 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
     /** Toque rápido sem arrasto relevante na zona foto = import (telemóveis: jitter do dedo aumenta tolerância). */
     const finish = () => {
       const d = dragRef.current;
+      if (!d?.key || !photoZoneTap) {
+        dragRef.current = null;
+        return;
+      }
+      const tapSlop = d.key === 'photo' ? vcPhotoZoneTapSlopPx() : 18;
+      /*
+       * Toque na zona foto: `el.click()` no input file tem de correr no mesmo turno que o toque do utilizador
+       * (Safari iOS). `tryPhotoZoneTapOnTouch` no `onTouchEnd` da zona faz isso.
+       * O `touchend` no window pode disparar *antes* do handler da zona com delegação React — não esvaziar
+       * `dragRef` aqui, senão o tap perde o estado. Limpa num microtask se a zona não consumiu.
+       */
+      if (d.key === 'photo' && d.fromTouch) {
+        queueMicrotask(() => {
+          if (dragRef.current === d) dragRef.current = null;
+        });
+        return;
+      }
       dragRef.current = null;
-      if (!d?.key || !photoZoneTap) return;
-      const tapSlop = d.key === 'photo' ? (vcIsCoarseTouchDevice() ? 140 : 18) : 18;
-      if (d.key === 'photo' && (d.dist ?? 0) < tapSlop) photoZoneTap();
+      if (d.key === 'photo' && d.mode === 'move' && (d.dist ?? 0) < tapSlop) photoZoneTap();
     };
 
     window.addEventListener('mousemove', mm);
@@ -3639,13 +3802,42 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
         const startMove = (clientX, clientY, ev) => {
           ev.preventDefault?.();
           ev.stopPropagation?.();
+          const fromTouch = !!(ev && String(ev.type || '').startsWith('touch'));
           dragRef.current = {
             key: k,
             mode: 'move',
             lastX: clientX,
             lastY: clientY,
             dist: 0,
+            fromTouch,
           };
+        };
+
+        /** Safari/iOS: `input.click()` tem de correr na mesma cadeia do toque do utilizador.
+         *  Abre o import aqui no `onTouchEnd` da zona; o fallback no `window` (`finish`) cobre rato. */
+        const photoTapSlop = k === 'photo' ? vcPhotoZoneTapSlopPx() : 18;
+        const tryPhotoZoneTapOnTouch = (e) => {
+          if (k !== 'photo' || !photoZoneTap) return;
+          const d = dragRef.current;
+          if (!d || d.key !== 'photo' || d.mode !== 'move') return;
+          if ((d.dist ?? 0) >= photoTapSlop) {
+            dragRef.current = null;
+            return;
+          }
+          e.stopPropagation();
+          photoZoneTap();
+          dragRef.current = null;
+        };
+        /** Rato: abre o ficheiro no `mouseup` da própria zona (mais fiável com delegação React / escalado). */
+        const tryPhotoZoneTapOnMouseUp = (e) => {
+          if (k !== 'photo' || !photoZoneTap) return;
+          if (e.button !== 0) return;
+          const d = dragRef.current;
+          if (!d || d.key !== 'photo' || d.mode !== 'move' || d.fromTouch) return;
+          if ((d.dist ?? 0) >= photoTapSlop) return;
+          e.stopPropagation();
+          photoZoneTap();
+          dragRef.current = null;
         };
 
         return (
@@ -3666,9 +3858,17 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
               if (!t) return;
               startMove(t.clientX, t.clientY, e);
             }}
+            onTouchEnd={(e) => {
+              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              tryPhotoZoneTapOnTouch(e);
+            }}
             onMouseDown={(e) => {
               if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               startMove(e.clientX, e.clientY, e);
+            }}
+            onMouseUp={(e) => {
+              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              tryPhotoZoneTapOnMouseUp(e);
             }}
           >
             {showSwapGrip && (
@@ -4200,9 +4400,7 @@ const SlideCardInner = React.forwardRef(({
     const surface = cultureResolveSurface(slide, num);
     const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
-    const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
-    const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
-    const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
+    const cr = cultureReadableInks(bgSolid, carouselTitleInk, carouselBodyInk, cultureAccentCol);
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
     const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
     const alignInner =
@@ -4214,8 +4412,8 @@ const SlideCardInner = React.forwardRef(({
     const padXCvBottom = canvasCultureSandwichBottomPaddingXPx(f, slide);
     const padYCv = f.h * (0.004 + insetZn * 0.002);
     const topR = z.top ? clampRect(z.top) : { x: 6, y: 8, w: 88, h: 28 };
-    const photoR = z.photo ? clampRect(z.photo) : { x: 6, y: 36, w: 88, h: 34 };
-    const botR = z.bottom ? clampRect(z.bottom) : { x: 6, y: 72, w: 88, h: 22 };
+    const photoR = z.photo ? clampRect(z.photo) : { x: 6, y: 30, w: 88, h: 42 };
+    const botR = z.bottom ? clampRect(z.bottom) : { x: 6, y: 74, w: 88, h: 23 };
     inner = (
       <div
         ref={ref}
@@ -4227,14 +4425,14 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           }}>
             <span style={{
-              fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{(brand.cultureHeaderLeft || '').trim()}</span>
             <span style={{
-              flex:1, textAlign:'center', fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:600,
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{brand.handle}</span>
-            <span style={{ fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
           </div>
@@ -4242,8 +4440,8 @@ const SlideCardInner = React.forwardRef(({
         {showCultureIdx && (
           <div style={{
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
-            background: surface === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
-            color: surface === 'light' ? '#1d1d1f' : '#ffffff',
+            background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
+            color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
             fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
           }}>{num}/{total}</div>
@@ -4270,7 +4468,7 @@ const SlideCardInner = React.forwardRef(({
               display: 'flex',
               flexDirection: 'column',
               alignItems: alignInner,
-              gap: f.h * 0.008,
+              gap: f.h * 0.012,
             }}
           >
           {(slide.title || '').trim() ? (
@@ -4289,8 +4487,8 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={carouselTitleInk}
-                accentColor={cultureAccentCol}
+                baseColor={cr.titleInk}
+                accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * (slide.titleSize / 100)}
                 lineHeight={(slide.titleLeading ?? 105) / 100}
@@ -4302,8 +4500,8 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={slide.subtitle}
             destaqueSpans={slide.destaqueSpans?.subtitle}
-            ink={subtitleInk}
-            accentColor={cultureAccentCol}
+            ink={cr.subtitleInk}
+            accentColor={cr.accentInk}
             fontFamily={bodyFF}
             fontSize={f.w * 0.031 * (slide.subSize / 100)}
             lineHeight={(slide.subLeading ?? 142) / 100}
@@ -4321,7 +4519,7 @@ const SlideCardInner = React.forwardRef(({
               zIndex:2,
               overflow:'hidden',
               borderRadius: f.w * 0.017,
-              background: surface === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+              background: cr.solidBgIsLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
             }}
             onClick={((showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick)
               ? (e) => { e.stopPropagation(); onPhotoZoneClick(); }
@@ -4333,7 +4531,7 @@ const SlideCardInner = React.forwardRef(({
                 <div style={{
                   width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
                   border:`${f.w*0.005}px solid rgba(255,255,255,0.2)`,
-                  borderTopColor: cultureAccentCol, animation:'spin 0.9s linear infinite',
+                  borderTopColor: cr.accentInk, animation:'spin 0.9s linear infinite',
                 }}/>
               </div>
             )}
@@ -4361,7 +4559,7 @@ const SlideCardInner = React.forwardRef(({
             {sandwich && !slide.bgImage && (
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                color:inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
+                color:cr.inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
               }}>
                 {slideHasPendingPhotoIntent(slide) ? 'Toque para inserir foto' : 'Área da imagem'}
               </div>
@@ -4384,8 +4582,8 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={bodyAfterCulture}
             destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
-            ink={subtitleInk}
-            accentColor={cultureAccentCol}
+            ink={cr.bodyInk}
+            accentColor={cr.accentInk}
             fontFamily={bodyFF}
             fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
             lineHeight={(slide.subLeading ?? 145) / 100}
@@ -4433,9 +4631,7 @@ const SlideCardInner = React.forwardRef(({
     const surface = cultureResolveSurface(slide, num);
     const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
-    const ink = surface === 'dark' ? '#f2ede4' : surface === 'accent' ? '#ffffff' : '#1d1d1f';
-    const inkMuted = surface === 'dark' ? 'rgba(242,237,228,0.55)' : surface === 'accent' ? 'rgba(255,255,255,0.72)' : 'rgba(29,29,31,0.5)';
-    const subtitleInk = surface === 'light' ? carouselBodyInk : ink;
+    const cr = cultureReadableInks(bgSolid, carouselTitleInk, carouselBodyInk, cultureAccentCol);
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
     inner = (
       <div
@@ -4448,14 +4644,14 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           }}>
             <span style={{
-              fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{(brand.cultureHeaderLeft || '').trim()}</span>
             <span style={{
-              flex:1, textAlign:'center', fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, fontWeight:600,
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{brand.handle}</span>
-            <span style={{ fontSize:f.w*0.022, color:inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
           </div>
@@ -4463,8 +4659,8 @@ const SlideCardInner = React.forwardRef(({
         {showCultureIdx && (
           <div style={{
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
-            background: surface === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
-            color: surface === 'light' ? '#1d1d1f' : '#ffffff',
+            background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
+            color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
             fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
           }}>{num}/{total}</div>
@@ -4472,12 +4668,12 @@ const SlideCardInner = React.forwardRef(({
         {sandwich && imgLoading && (
           <div style={{
             position:'absolute', inset:0, zIndex:6, display:'flex', alignItems:'center', justifyContent:'center',
-            background: surface === 'light' ? 'rgba(250,250,252,0.92)' : 'rgba(10,10,12,0.88)',
+            background: cr.solidBgIsLight ? 'rgba(250,250,252,0.92)' : 'rgba(10,10,12,0.88)',
           }}>
             <div style={{
               width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
-              border:`${f.w*0.005}px solid ${surface === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`,
-              borderTopColor: cultureAccentCol, animation:'spin 0.9s linear infinite',
+              border:`${f.w*0.005}px solid ${cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`,
+              borderTopColor: cr.accentInk, animation:'spin 0.9s linear infinite',
             }}/>
           </div>
         )}
@@ -4489,7 +4685,7 @@ const SlideCardInner = React.forwardRef(({
           bottom: f.h * 0.05,
           display:'flex',
           flexDirection:'column',
-          gap: f.h * 0.02,
+          gap: f.h * 0.024,
           justifyContent: cultureStatFlat ? 'space-between' : 'flex-start',
           ...VC_TEXT_ZONE_STYLE,
           overflow: 'hidden',
@@ -4509,8 +4705,8 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={carouselTitleInk}
-                accentColor={cultureAccentCol}
+                baseColor={cr.titleInk}
+                accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * ((slide.titleSize ?? 100) / 100)}
                 lineHeight={1.14}
@@ -4522,8 +4718,8 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={slide.subtitle}
             destaqueSpans={slide.destaqueSpans?.subtitle}
-            ink={subtitleInk}
-            accentColor={cultureAccentCol}
+            ink={cr.subtitleInk}
+            accentColor={cr.accentInk}
             fontFamily={bodyFF}
             fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100)}
             lineHeight={1.42}
@@ -4536,14 +4732,17 @@ const SlideCardInner = React.forwardRef(({
               style={{
                 width:'100%',
                 borderRadius: f.w * 0.017,
-                minHeight: f.h * 0.22,
+                height: f.h * 0.31,
+                minHeight: f.h * 0.27,
+                maxHeight: f.h * 0.34,
+                flex:'0 0 auto',
                 flexShrink:0,
-                background: surface === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
-                border: surface === 'light' ? `1px dashed ${inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
+                background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
+                border: cr.solidBgIsLight ? `1px dashed ${cr.inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
                 display:'flex',
                 alignItems:'center',
                 justifyContent:'center',
-                color: inkMuted,
+                color: cr.inkMuted,
                 fontWeight:600,
                 fontSize: f.w * 0.024,
                 textAlign:'center',
@@ -4556,14 +4755,15 @@ const SlideCardInner = React.forwardRef(({
           {sandwich && imgReady && !imgErr && slide.bgImage && (
             <div style={{
               width:'100%',
-              flex: '1 1 auto',
-              minHeight: f.h * 0.26,
-              maxHeight: f.h * 0.42,
+              flex: '0 0 auto',
+              height: f.h * 0.31,
+              minHeight: f.h * 0.27,
+              maxHeight: f.h * 0.36,
               borderRadius: f.w * 0.017,
               overflow:'hidden',
               flexShrink:0,
               position:'relative',
-              background: surface === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+              background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
             }}>
               <img
                 src={slide.bgImage}
@@ -4582,8 +4782,8 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={bodyAfterCulture}
             destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
-            ink={subtitleInk}
-            accentColor={cultureAccentCol}
+            ink={cr.bodyInk}
+            accentColor={cr.accentInk}
             fontFamily={bodyFF}
             fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
             lineHeight={1.45}
@@ -6096,8 +6296,12 @@ function GenerateModal({
   const hasContextPack =
     (Array.isArray(brandSummary) && brandSummary.length > 0) ||
     hasMaterialPack;
-  /** Personalizado (`livre`) expõe modo narrativo, nicho e público (tom base vem da Marca). Tendência/Cultura traz estrutura no pacote. */
+  /** Personalizado (`livre`) expõe modo narrativo, nicho e público (tom base vem da Marca). Demais pacotes trazem estrutura fixa. */
   const modoPersonalizado = packCreative === 'livre';
+  const narrativeLockedForPack =
+    !modoPersonalizado && isQuickTemplatePreset(packCreative)
+      ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(packCreative)] || 'editorial')
+      : null;
   /** Tema digitado OU nicho OU Marca/Material preenchidos — evita botão morto só com contexto injetado. */
   const resolvedGenerationTopic = (() => {
     const t = topic.trim();
@@ -6120,21 +6324,24 @@ function GenerateModal({
     }
     setBusy(true); setErr('');
     try {
+      const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
+      const narrativeForGenerate = modoPersonalizado
+        ? mode
+        : (narrativeLockedForPack ?? 'editorial');
       // Persiste direção de imagem, modo e pacote criativo antes de gerar
       onImgParamsChange?.(params);
-      onModeChange?.(modoPersonalizado ? mode : 'editorial');
+      onModeChange?.(narrativeForGenerate);
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
-      const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
         niche: modoPersonalizado ? niche : '',
-        tone: modoPersonalizado ? toneFromBrand : '',
+        tone: toneFromBrand,
         audience: modoPersonalizado ? audience : '',
         imgMode: 'dalle',
         imgParams: params,
-        mode: modoPersonalizado ? mode : 'editorial',
+        mode: narrativeForGenerate,
         creativePreset: packCreative,
         slideTextDensity: textDensity,
         fetchImagesNow: autoFetchSlideImages,
@@ -6279,7 +6486,17 @@ function GenerateModal({
                 {modoPersonalizado ? (
                   <>Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.</>
                 ) : (
-                  <>O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.</>
+                  <>
+                    {isQuickTemplatePreset(packCreative) ? (
+                      <>
+                        O pacote <span style={{ fontWeight:600 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span> segue o arco dos Templates prontos — use este campo ou Marca/Conteúdo como fonte do tema.
+                      </>
+                    ) : (
+                      <>
+                        O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -6339,8 +6556,14 @@ function GenerateModal({
               border:'1px solid var(--hairline)',
             }}
           >
-            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Pacote Tendência/Cultura:</span>{' '}
-            estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho e público-alvo do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.
+            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>
+              {isQuickTemplatePreset(packCreative)
+                ? `Pacote ${CREATIVE_PRESET_BY_ID[packCreative]?.label}:`
+                : 'Pacote Tendência/Cultura:'}
+            </span>{' '}
+            {isQuickTemplatePreset(packCreative)
+              ? 'estrutura de arco fixa (Templates prontos). Modo narrativo, nicho e público não são escolhidos — ajuste o tema acima, tom na Marca e a densidade abaixo.'
+              : 'estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho e público-alvo do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.'}
             {' '}
             <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>
               · {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity} ({CREATIVE_PRESET_BY_ID[packCreative]?.label})
@@ -8642,20 +8865,22 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Download footer */}
+      {/* Download footer — PNG por card omitido na aba Conteúdo (ZIP/PDF mantidos). */}
       <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
-        <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
-          width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
-          background:'var(--text-primary)', color:'#fff',
-          fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
-          letterSpacing:'-0.011em',
-          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-          opacity:exporting?0.5:1,
-          transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-        }}>
-          <Download size={13}/>
-          {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
-        </button>
+        {tab !== 'material' && (
+          <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
+            width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
+            background:'var(--text-primary)', color:'#fff',
+            fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.011em',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+            opacity:exporting?0.5:1,
+            transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+          }}>
+            <Download size={13}/>
+            {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
+          </button>
+        )}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <button onClick={exportAll} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label={`Baixar todos os cards num ficheiro ZIP (${slides.length} imagens)`}>
             <Download size={11}/>ZIP ({slides.length})
@@ -8928,13 +9153,14 @@ ${urlClause}- Cada slide deve extrair uma linha de raciocínio do MATERIAL (não
 `;
 }
 
-/** Pacotes criativos da geração — id `livre` = Personalizado. `tendencia_cultura` tem estrutura própria (mostrado primeiro na UI). */
+/** Pacotes criativos da geração — id `livre` = Personalizado. Entre T/C e Personalizado: arquétipos «Templates prontos» (Erro Comum, Tendência de Mercado, …). */
 const CREATIVE_PRESETS = [
   {
     id: 'tendencia_cultura',
     label: 'Tendência/Cultura',
     desc: 'Carrossel de tendência e cultura: nomeia o que o público já sente no mundo — não lista de dicas nem aula de conceito. Gatilhos: identificação, alívio, autoridade.',
   },
+  ...QUICK_TEMPLATE_CREATIVE_PRESET_ENTRIES,
   {
     id: 'livre',
     label: 'Personalizado',
@@ -9169,6 +9395,30 @@ CRITICAL (texto nos slides JSON):
 `;
 }
 
+/** Arquétipos «Templates prontos» no fluxo de geração (Erro Comum, Tendência de Mercado, …). */
+function buildQuickTemplatePackBlock(templateId, slideCount) {
+  const t = TEMPLATES.find((x) => x.id === templateId);
+  if (!t) return '';
+  const n = Math.min(12, Math.max(3, slideCount | 0));
+  const refs = t.slides
+    .map(
+      (s, i) =>
+        `   • Slide ${i + 1} — função no arco: título de referência «${s.title}» · subtítulo «${s.subtitle}» · imageQuery (inglês) «${s.q}».`,
+    )
+    .join('\n');
+  return `
+PACOTE ATIVO — ARQUÉTIPO "${t.name}" (mesmo molde que «Templates prontos» no app):
+${t.desc}
+
+Regras:
+- Adapte títulos, subtítulos e imageQuery ao TEMA do utilizador; NÃO copie texto literal dos exemplos — preserve só a FUNÇÃO de cada posição no arco.
+- Cada imageQuery: inglês, 8–15 palavras, alinhada ao argumento do slide (pode inspirar-se na família visual dos exemplos).
+
+Distribuição para ${n} slides (o template original tem ${t.slides.length} passos — estique ou una passos adjacentes se N for diferente):
+${refs}
+`;
+}
+
 function buildTendenciaCulturaRefineSlideHint(creativePresetId) {
   if (!isTendenciaCulturaPreset(creativePresetId)) return '';
   return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards.`;
@@ -9182,6 +9432,11 @@ function coerceCultureTone(v) {
 function buildGenerationIntroLine(presetId) {
   if (isTendenciaCulturaPreset(presetId)) {
     return 'Atue como estrategista de cultura digital e comportamento em rede. Produza um carrossel que NOMEIE um fenômeno que o público já percebia — não lista de dicas nem aula solta de conceito. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
+  }
+  if (isQuickTemplatePreset(presetId)) {
+    const tid = quickTemplateIdFromPreset(presetId);
+    const t = TEMPLATES.find((x) => x.id === tid);
+    return `Atue como criador de carrosséis editoriais para Instagram. Produza um carrossel no arquétipo «${t?.name || 'template'}» — ${t?.desc || 'estrutura fixa de leitura'}. Responda APENAS com JSON válido, sem markdown, sem texto extra.`;
   }
   return 'Crie conteúdo para Instagram alinhado ao contexto abaixo. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
 }
@@ -10404,7 +10659,22 @@ export default function App() {
     const el = photoZoneInputRef.current;
     if (!el) return;
     el.value = '';
-    el.click();
+    try {
+      if (typeof el.showPicker === 'function') {
+        const r = el.showPicker();
+        if (r != null && typeof r.then === 'function') {
+          void r.catch(() => {
+            try { el.click(); } catch (_) { /* ignore */ }
+          });
+        }
+        return;
+      }
+    } catch (_) {
+      /* Safari antigo / restrições — tenta click */
+    }
+    try {
+      el.click();
+    } catch (_) { /* ignore */ }
   }, []);
 
   const handlePhotoZoneBgFile = useCallback((e) => {
@@ -10677,7 +10947,9 @@ export default function App() {
     const cp = presetArg ?? creativePreset ?? 'livre';
     const effectiveMode = isTendenciaCulturaPreset(cp)
       ? 'editorial'
-      : (chosenNarrativeMode || mode || 'editorial');
+      : isQuickTemplatePreset(cp)
+        ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(cp)] || 'editorial')
+        : (chosenNarrativeMode || mode || 'editorial');
     const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
@@ -10689,6 +10961,8 @@ export default function App() {
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience);
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
+    const quickTid = quickTemplateIdFromPreset(cp);
+    const quickPackBlock = quickTid ? buildQuickTemplatePackBlock(quickTid, count) : '';
 
     const persoHybridActive = isPersoHybridDensity(cp, td);
     const persoHybridBlock = persoHybridActive ? buildPersoHybridLayoutBlock(count, td) : '';
@@ -10708,11 +10982,17 @@ REGRA DE IDIOMA (obrigatória):
     const contextoModoPerso =
       isTendenciaCulturaPreset(cp)
         ? ''
-        : [
-            n ? `Nicho: ${n}` : '',
-            audience ? `Público-alvo: ${audience}` : '',
-            `Tom de voz solicitado: ${tone}`,
-          ].filter(Boolean).join('\n');
+        : isQuickTemplatePreset(cp)
+          ? [
+              n ? `Nicho: ${n}` : '',
+              audience ? `Público-alvo: ${audience}` : '',
+              `Tom de voz (marca): ${tone}`,
+            ].filter(Boolean).join('\n')
+          : [
+              n ? `Nicho: ${n}` : '',
+              audience ? `Público-alvo: ${audience}` : '',
+              `Tom de voz solicitado: ${tone}`,
+            ].filter(Boolean).join('\n');
     const modoNarrativoBloco =
       isTendenciaCulturaPreset(cp)
         ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
@@ -10729,6 +11009,7 @@ ${idiomaRegra}
 
 ${modoNarrativoBloco}
 ${tendenciaPackBlock}
+${quickPackBlock ? `${quickPackBlock}\n` : ''}
 
 ${slideLayoutRules}
 ${persoHybridBlock ? `${persoHybridBlock}\n` : ''}
@@ -10989,15 +11270,21 @@ ${capRules}
     const el = slideRefs.current[slideObj.id];
     if (!el) throw new Error('Elemento de export não encontrado');
     const f = FORMATS[fmt] || FORMATS.carrossel;
+    const w = Math.max(1, Math.round(el.offsetWidth || el.scrollWidth || f.w));
+    const h = Math.max(1, Math.round(el.offsetHeight || el.scrollHeight || f.h));
     return h2c(el, {
       scale: 2,                 // 2× resolução final pra ficar nítido
       useCORS: true,
       allowTaint: true,
       logging: false,
       backgroundColor: null,
-      width: f.w, height: f.h,  // força dimensões corretas, ignora qualquer transform do pai
-      windowWidth: f.w,
-      windowHeight: f.h,
+      width: w,
+      height: h,
+      windowWidth: w,
+      windowHeight: h,
+      onclone: (clonedDoc, clonedEl) => {
+        vcFixHtml2CanvasImages(clonedDoc, clonedEl);
+      },
     });
   };
 
@@ -11998,7 +12285,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       {/* File inputs: evitar hidden (Safari iOS bloqueia .click() via JS). */}
       <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
       <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
-      <input ref={photoZoneInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
+      <input ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
       <input ref={refImageInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
 
       {/* Toast notifications */}
