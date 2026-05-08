@@ -20,6 +20,17 @@ When the user's request matches a skill's trigger conditions (described in each 
 
 **Important:** This skill explicitly references `/frontend-design` and `/teach-impeccable` as preparation steps. Those slash-commands are Claude Code conventions and may not exist in Cursor — when not available here, treat them as informational and proceed with the skill body, while substituting the project's existing design-system context (read `DESIGN.md` and `.cursor/rules/design-system.mdc` first to anchor the polish pass to the project's actual visual language).
 
+### `carrossel-cultura`
+**Path:** `.agents/skills/carrossel-cultura/SKILL.md`
+
+**Auxiliary:** `.agents/skills/carrossel-cultura/html-template.md` (checklist HTML estático / export PNG fora da app).
+
+**Triggers:** Tendência/Cultura, pacote criativo cultura, brandsdecoded, carrossel editorial viral, Instagram cultura, fenómeno cultural, triagem editorial, arco S1–S9, preset `tendencia_cultura`, alinhar prompts/copy ao formato editorial “fenómeno já percebido”, ou pedidos explícitos de carrossel viral no estilo deste pacote.
+
+**What it does:** Valida tema como tendência/cultura (não “dica solta”); coleta inputs; triagem + 8 headlines; arco 9 slides (adaptável 6–12); liga o fluxo ao código em `ViralCarrossel.jsx` ou a HTML estático conforme `html-template.md`.
+
 ## How to invoke
 
 If the user explicitly types `/polish`, `polish this`, "passa um polish", "dá uma polida", "finaliza", or similar, READ `.agents/skills/polish/SKILL.md` in full and execute its protocol against the target the user named (or the most-recently-edited UI surface if no target is given).
+
+For **Tendência/Cultura** / editorial brandsdecoded, READ `.agents/skills/carrossel-cultura/SKILL.md` in full (and `html-template.md` when gerar HTML estático ou export fora da app). When trabalhar **dentro da app**, cruzar com `creativePreset === 'tendencia_cultura'` e funções relacionadas em `ViralCarrossel.jsx`.

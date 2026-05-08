@@ -1796,6 +1796,26 @@ const VC_PHOTO_ZONE_FILE_INPUT_STYLE = {
   opacity: 0.05,
 };
 
+/** Cobre a zona foto: toque direto no `<input>` (WebKit/iOS). Opacidade > 0 — alguns motores ignoram camada totalmente invisível. */
+const VC_PHOTO_ZONE_HIT_LAYER_STYLE = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  margin: 0,
+  padding: 0,
+  border: 'none',
+  opacity: 0.03,
+  cursor: 'pointer',
+  fontSize: 28,
+  zIndex: 4,
+  display: 'block',
+  boxSizing: 'border-box',
+};
+
+/** `id` do input global (sidebar / fallback). */
+const VC_PHOTO_ZONE_FILE_INPUT_ID = 'vc-photo-zone-file';
+
 function vcIsCoarseTouchDevice() {
   return typeof window !== 'undefined' &&
     ('ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0);
@@ -3110,15 +3130,13 @@ function isPersoHybridDensity(presetId, densityId) {
 
 function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
   const n = Math.min(12, Math.max(2, slideCount | 0));
-  const mid = scaledCharBand(200, 320, textDensityId || '1_1');
-  const bodyLo = Math.max(52, Math.round(mid.lo * 0.52));
-  const bodyHi = Math.max(bodyLo + 24, Math.round(mid.hi * 0.52));
+  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
   return `
 LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
 
 - Slide 1 e Slide 2: CAPA tipo tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
 
-- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Quando incluir foto no card ("imageQuery" preenchido), "bodyAfterImage" é OBRIGATÓRIO com ${bodyLo}–${bodyHi} caracteres (proporção à densidade). Destaque lexical: UM trecho entre **asteriscos duplos**.
+- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Quando incluir foto no card ("imageQuery" preenchido), preencha **subtitle** com **${subLo}–${subHi}** caracteres (prosa de várias frases, não headline solta) e **bodyAfterImage** com **${bodyLo}–${bodyHi}** caracteres. Destaque lexical: UM trecho entre **asteriscos duplos**.
 - Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
 - Slide só texto SEM foto neste formato: imageQuery ""; use "subtitle" + "bodyAfterImage" em dupla coluna tipográfica (sem sanduíche de foto).
 `;
@@ -3683,7 +3701,7 @@ const VC_ZONE_DRAG_MIME = 'application/x-vc-canvas-zone';
 /** Contorno + arrastar / redimensionar canto SE (zonas canvas). Opcional: grip para trocar conteúdo entre slides.
  *  A zona `photo` fica por cima do conteúdo — `photoZoneTap` abre o import de imagem em clique simples (sem arrasto). */
 /** `interactionScale` = `transform: scale()` aplicado ao card na pré-visualização; sem isto o arrasto em ecrã fica «lento/errado» no telemóvel. */
-function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys, photoZoneTap = null, interactionScale = 1 }) {
+function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swapZoneKeys, photoZoneTap = null, photoZoneFileChange = null, interactionScale = 1 }) {
   const dragRef = React.useRef(null);
   const zonesRef = React.useRef(zones);
   zonesRef.current = zones;
@@ -3853,24 +3871,48 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
               background: 'var(--accent-surface)',
             }}
             onTouchStart={(e) => {
-              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              if (e.target.closest('input[type="file"]') || e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               const t = e.touches[0];
               if (!t) return;
               startMove(t.clientX, t.clientY, e);
             }}
             onTouchEnd={(e) => {
-              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              if (e.target.closest('input[type="file"]') || e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               tryPhotoZoneTapOnTouch(e);
             }}
             onMouseDown={(e) => {
-              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              if (e.target.closest('input[type="file"]') || e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               startMove(e.clientX, e.clientY, e);
             }}
             onMouseUp={(e) => {
-              if (e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
+              if (e.target.closest('input[type="file"]') || e.target.closest('[data-vc-handle]') || e.target.closest('[data-vc-swap-grip]')) return;
               tryPhotoZoneTapOnMouseUp(e);
             }}
           >
+            {k === 'photo' && photoZoneFileChange ? (
+              <input
+                type="file"
+                accept="image/*"
+                onChange={photoZoneFileChange}
+                onTouchStart={(e) => e.stopPropagation()}
+                style={{
+                  position: 'absolute',
+                  left: '10%',
+                  top: '10%',
+                  width: '80%',
+                  height: '80%',
+                  opacity: 0.03,
+                  zIndex: 1,
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  boxSizing: 'border-box',
+                }}
+                aria-label="Importar imagem — toque no centro; arraste pelas bordas da moldura para mover"
+              />
+            ) : null}
             {showSwapGrip && (
               <div
                 data-vc-swap-grip
@@ -3970,6 +4012,7 @@ const ClassicCanvasInner = React.forwardRef(({
   showCanvasChrome,
   onCanvasPatch,
   onPhotoZoneClick,
+  onPhotoZoneFileChange = null,
   swapSlideIdx = null,
   swapZoneKeys,
   interactionScale = 1,
@@ -3995,16 +4038,10 @@ const ClassicCanvasInner = React.forwardRef(({
     slide.align === 'justify' ? 'stretch' : 'flex-start';
   const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage;
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone));
-  return (
-    <div
-      ref={ref}
-      style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
-    >
-      <div
-        style={{ ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' }}
-        onClick={photoZoneInteractive ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
-        role={photoZoneInteractive ? 'button' : undefined}
-      >
+  const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
+  const photoZoneBoxStyle = { ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' };
+  const photoZoneChildren = (
+    <>
         {slide.bgImage && imgReady && !imgErr && (
           <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
             <div style={{
@@ -4061,6 +4098,30 @@ const ClassicCanvasInner = React.forwardRef(({
             {pendingPhotoZone ? 'Toque para inserir foto' : 'Clique para inserir foto'}
           </div>
         )}
+    </>
+  );
+
+  return (
+    <div
+      ref={ref}
+      style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
+    >
+      <div
+        style={photoZoneBoxStyle}
+        onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+        role={photoZoneInteractive && !photoZoneNativeHit ? 'button' : undefined}
+      >
+        {photoZoneChildren}
+        {photoZoneNativeHit ? (
+          <input
+            type="file"
+            accept="image/*"
+            onChange={onPhotoZoneFileChange}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
+            aria-label="Importar imagem na zona da foto"
+          />
+        ) : null}
       </div>
 
       <div style={{
@@ -4295,7 +4356,8 @@ const ClassicCanvasInner = React.forwardRef(({
           onPatch={onCanvasPatch}
           swapSlideIdx={swapSlideIdx}
           swapZoneKeys={swapZoneKeys}
-          photoZoneTap={onPhotoZoneClick || null}
+          photoZoneTap={onPhotoZoneFileChange ? null : (onPhotoZoneClick || null)}
+          photoZoneFileChange={onPhotoZoneFileChange}
           interactionScale={interactionScale}
         />
       )}
@@ -4312,6 +4374,8 @@ const SlideCardInner = React.forwardRef(({
   showCanvasChrome = false,
   onCanvasZonePatch = null,
   onPhotoZoneRequest = null,
+  /** `(slideIdx, ev) => void` — `<input type=file>` sobre a zona (WebKit/iOS). */
+  onPhotoZoneNativeFile = null,
   enableZoneSwapDrag = false,
 }, ref) => {
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -4324,11 +4388,16 @@ const SlideCardInner = React.forwardRef(({
   zonePatchRef.current = onCanvasZonePatch;
   const photoReqRef = React.useRef(onPhotoZoneRequest);
   photoReqRef.current = onPhotoZoneRequest;
+  const photoNativeRef = React.useRef(onPhotoZoneNativeFile);
+  photoNativeRef.current = onPhotoZoneNativeFile;
   const onCanvasPatch = React.useCallback((p) => {
     zonePatchRef.current?.(slideIdx, p);
   }, [slideIdx]);
   const onPhotoZoneClick = React.useCallback(() => {
     photoReqRef.current?.(slideIdx);
+  }, [slideIdx]);
+  const onPhotoZoneFileInputChange = React.useCallback((e) => {
+    photoNativeRef.current?.(slideIdx, e);
   }, [slideIdx]);
   const L = LAYOUTS.find(l=>l.id===slide.layout)||LAYOUTS[4];
   const bg = resolveSlideBrandBg(brand, slideIdx, slide);
@@ -4414,6 +4483,15 @@ const SlideCardInner = React.forwardRef(({
     const topR = z.top ? clampRect(z.top) : { x: 6, y: 8, w: 88, h: 28 };
     const photoR = z.photo ? clampRect(z.photo) : { x: 6, y: 30, w: 88, h: 42 };
     const botR = z.bottom ? clampRect(z.bottom) : { x: 6, y: 74, w: 88, h: 23 };
+    const sandwichPhotoInteractive = !!((showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick);
+    const sandwichPhotoNativeHit = !!(sandwichPhotoInteractive && onPhotoZoneNativeFile);
+    const sandwichPhotoBoxStyle = {
+      ...pctBox(photoR, f),
+      zIndex: 2,
+      overflow: 'hidden',
+      borderRadius: f.w * 0.017,
+      background: cr.solidBgIsLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+    };
     inner = (
       <div
         ref={ref}
@@ -4515,16 +4593,11 @@ const SlideCardInner = React.forwardRef(({
         {cvVar === 'sandwich' && (
           <div
             style={{
-              ...pctBox(photoR, f),
-              zIndex:2,
-              overflow:'hidden',
-              borderRadius: f.w * 0.017,
-              background: cr.solidBgIsLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+              ...sandwichPhotoBoxStyle,
+              cursor: sandwichPhotoInteractive ? 'pointer' : undefined,
             }}
-            onClick={((showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick)
-              ? (e) => { e.stopPropagation(); onPhotoZoneClick(); }
-              : undefined}
-            role={(showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick ? 'button' : undefined}
+            onClick={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+            role={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? 'button' : undefined}
           >
             {sandwich && imgLoading && (
               <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.2)' }}>
@@ -4564,6 +4637,16 @@ const SlideCardInner = React.forwardRef(({
                 {slideHasPendingPhotoIntent(slide) ? 'Toque para inserir foto' : 'Área da imagem'}
               </div>
             )}
+            {sandwichPhotoNativeHit ? (
+              <input
+                type="file"
+                accept="image/*"
+                onChange={onPhotoZoneFileInputChange}
+                onTouchStart={(e) => e.stopPropagation()}
+                style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
+                aria-label="Importar imagem na zona da foto"
+              />
+            ) : null}
           </div>
         )}
 
@@ -4601,7 +4684,8 @@ const SlideCardInner = React.forwardRef(({
             onPatch={onCanvasPatch}
             swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
             swapZoneKeys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
-            photoZoneTap={onPhotoZoneClick || null}
+            photoZoneTap={onPhotoZoneNativeFile ? null : (onPhotoZoneClick || null)}
+            photoZoneFileChange={onPhotoZoneNativeFile ? onPhotoZoneFileInputChange : null}
             interactionScale={scale}
           />
         )}
@@ -4633,6 +4717,32 @@ const SlideCardInner = React.forwardRef(({
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
     const cr = cultureReadableInks(bgSolid, carouselTitleInk, carouselBodyInk, cultureAccentCol);
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+    const flatPhotoNativeHit = !!(
+      sandwich &&
+      !slide.bgImage &&
+      slideHasPendingPhotoIntent(slide) &&
+      onPhotoZoneClick &&
+      onPhotoZoneNativeFile
+    );
+    const flatPhotoPlaceholderStyle = {
+      width: '100%',
+      borderRadius: f.w * 0.017,
+      height: f.h * 0.31,
+      minHeight: f.h * 0.27,
+      maxHeight: f.h * 0.34,
+      flex: '0 0 auto',
+      flexShrink: 0,
+      background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
+      border: cr.solidBgIsLight ? `1px dashed ${cr.inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: cr.inkMuted,
+      fontWeight: 600,
+      fontSize: f.w * 0.024,
+      textAlign: 'center',
+      padding: f.w * 0.04,
+    };
     inner = (
       <div
         ref={ref}
@@ -4730,26 +4840,34 @@ const SlideCardInner = React.forwardRef(({
           {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
             <div
               style={{
-                width:'100%',
-                borderRadius: f.w * 0.017,
-                height: f.h * 0.31,
-                minHeight: f.h * 0.27,
-                maxHeight: f.h * 0.34,
-                flex:'0 0 auto',
-                flexShrink:0,
-                background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
-                border: cr.solidBgIsLight ? `1px dashed ${cr.inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
-                display:'flex',
-                alignItems:'center',
-                justifyContent:'center',
-                color: cr.inkMuted,
-                fontWeight:600,
-                fontSize: f.w * 0.024,
-                textAlign:'center',
-                padding: f.w * 0.04,
+                ...flatPhotoPlaceholderStyle,
+                position: 'relative',
+                cursor: onPhotoZoneClick ? 'pointer' : undefined,
               }}
+              role={onPhotoZoneClick && !flatPhotoNativeHit ? 'button' : undefined}
+              onClick={
+                onPhotoZoneClick && !flatPhotoNativeHit
+                  ? (ev) => {
+                    ev.stopPropagation();
+                    onPhotoZoneClick();
+                  }
+                  : undefined
+              }
             >
               Toque para inserir foto
+              {flatPhotoNativeHit ? (
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onPhotoZoneFileInputChange}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  style={{
+                    ...VC_PHOTO_ZONE_HIT_LAYER_STYLE,
+                    borderRadius: f.w * 0.017,
+                  }}
+                  aria-label="Importar imagem na zona da foto"
+                />
+              ) : null}
             </div>
           )}
           {sandwich && imgReady && !imgErr && slide.bgImage && (
@@ -4844,6 +4962,7 @@ const SlideCardInner = React.forwardRef(({
         showCanvasChrome={showCanvasChrome}
         onCanvasPatch={onCanvasPatch}
         onPhotoZoneClick={onPhotoZoneClick}
+        onPhotoZoneFileChange={onPhotoZoneNativeFile ? onPhotoZoneFileInputChange : undefined}
         swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
         swapZoneKeys={undefined}
         interactionScale={scale}
@@ -5157,6 +5276,7 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.slideIndex !== next.slideIndex) return false;
   if (prev.onCanvasZonePatch !== next.onCanvasZonePatch) return false;
   if (prev.onPhotoZoneRequest !== next.onPhotoZoneRequest) return false;
+  if (prev.onPhotoZoneNativeFile !== next.onPhotoZoneNativeFile) return false;
   return true;
 });
 
@@ -9171,7 +9291,7 @@ const CREATIVE_PRESET_BY_ID = Object.fromEntries(CREATIVE_PRESETS.map((p) => [p.
 
 /** Fração de volume de texto nos cards (persistido): 1/1 ≈ método padrão; menores → mais enxuto. */
 const SLIDE_TEXT_DENSITY_OPTIONS = [
-  { id: '1_1', label: '1/1', desc: 'Padrão do método — mais texto útil onde couber.' },
+  { id: '1_1', label: '1/1', desc: 'Padrão do método — sanduíche com duas zonas de prosa densa (acima e abaixo da foto).' },
   { id: '1_2', label: '1/2', desc: '~Metade da densidade típica; frases proporcionalmente curtas.' },
   { id: '1_3', label: '1/3', desc: '~Um terço da densidade; telegráfico com substância.' },
   { id: '1_4', label: '1/4', desc: 'Mínimo corrido — batidas curtas.' },
@@ -9193,6 +9313,19 @@ function scaledCharBand(lo, hi, densityId) {
   const nlo = Math.max(36, Math.round(lo * m));
   const nhi = Math.max(nlo + 16, Math.round(hi * m));
   return { lo: nlo, hi: nhi };
+}
+
+/**
+ * Faixas de caracteres para miolo sanduíche T/C & híbrido personalizado (subtitle acima da foto + bodyAfterImage abaixo).
+ * 1/1 segue referências editoriais densas (~50–90 palavras por zona quando o tema der), não resumo telegráfico.
+ */
+function tendenciaStyleSandwichCharBands(textDensityId = '1_1') {
+  const mid = scaledCharBand(400, 620, textDensityId || '1_1');
+  const subLo = Math.max(200, Math.round(mid.lo * 0.65));
+  const subHi = Math.max(subLo + 60, Math.round(mid.hi * 0.65));
+  const bodyLo = Math.max(200, Math.round(mid.lo * 0.62));
+  const bodyHi = Math.max(bodyLo + 60, Math.round(mid.hi * 0.62));
+  return { subLo, subHi, bodyLo, bodyHi };
 }
 
 function scaledCeiling(ceiling, densityId) {
@@ -9229,6 +9362,22 @@ function buildSlideTextDensityRefineHint(densityId) {
   if (!densityId || densityId === '1_1') return '';
   const label = SLIDE_TEXT_DENSITY_BY_ID[densityId]?.label || densityId;
   return `- Volume do projeto: densidade ${label} — não alongue o subtítulo; comprima mantendo gancho ou argumento intacto.\n`;
+}
+
+/**
+ * Remove prefixos tipo "Slide 2", "Card 01 —" no início do texto — o app já mostra o índice do card.
+ */
+function stripLeadingSlideCardLabel(text) {
+  if (text == null || typeof text !== 'string') return '';
+  let t = text.replace(/^\uFEFF/, '').trim();
+  let prev;
+  do {
+    prev = t;
+    t = t
+      .replace(/^(?:slide|card)(?![a-záàâãéêíóôõúç])\s*0*\d{1,2}\s*(?:[.:–—\-]|\.{3})?\s*/i, '')
+      .trim();
+  } while (t !== prev);
+  return t;
 }
 
 function isTendenciaCulturaPreset(presetId) {
@@ -9355,9 +9504,7 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
 /** Sobreposição estratégica do pacote Tendência/Cultura (adapta ao N de slides). */
 function buildTendenciaCulturaPackBlock(slideCount, textDensityId = '1_1') {
   const n = Math.min(12, Math.max(3, slideCount | 0));
-  const mid = scaledCharBand(200, 320, textDensityId || '1_1');
-  const bodyLo = Math.max(52, Math.round(mid.lo * 0.52));
-  const bodyHi = Math.max(bodyLo + 24, Math.round(mid.hi * 0.52));
+  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
   return `
 PACOTE ATIVO — TENDÊNCIA/CULTURA (prioridade quando colidir com clichês genéricos de “dicas virais”):
 Este formato NÃO é post de dicas soltas nem explicação de conceito novo. É nomear e ORGANIZAR o que o leitor já percebia no comportamento, na cultura, na polêmica ou na mudança de mercado.
@@ -9385,12 +9532,14 @@ Reforço contínuo: “você já percebia isso; aqui está o porquê.” Três g
 LAYOUT VISUAL ↔ CAMPOS DO JSON (leitura do app — siga estritamente):
 - Slide 1 (CAPA com foto full-bleed): use "title" + "subtitle" + "imageQuery". O campo "bodyAfterImage" DEVE ser "" (string vazia). Nunca sanduíche na capa.
 - Slide final (fecho) COM foto: também full-bleed — "bodyAfterImage" vazio; apenas "title", "subtitle", "imageQuery" (e cultureTone se precisar).
-- Slides intermediários e fecho COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "bodyAfterImage" com o bloco ABAIXO da imagem (${bodyLo}–${bodyHi} caracteres — alinhar à densidade global do projeto). Acima da foto ficam opcionalmente "title" + "subtitle" (prosa forte; primeira frase do subtítulo fecha o gancho). Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
+- Slides intermediários e fecho COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "subtitle" ACIMA da foto com **${subLo}–${subHi} caracteres** (parágrafo(s) corrido(s); primeira frase fecha o gancho) e "bodyAfterImage" ABAIXO da imagem com **${bodyLo}–${bodyHi} caracteres** — duas zonas distintas de prosa editorial, **não** uma headline + frase única nem bullets telegráficos salvo densidade 1/4–1/5. Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
 - Slide só texto (“stat”) SEM foto: deixe "imageQuery" vazio; use "subtitle" (e opcionalmente "title") no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
 - "cultureTone" (opcional): omita ou use "" para alternância automática claro/escuro; só use "light", "dark" ou "accent" quando o contraste exigir.
 
 CRITICAL (texto nos slides JSON):
 - Sem título de seção tipo “Slide 3 — Mecânismo”: use título+subtítulo como no app; primeira frase do subtítulo faz o trabalho do gancho.
+- PROIBIDO usar “Slide N”, “Card N” ou número ordinal de card como "title" — só copy editorial; o app numera os cards na UI.
+${textDensityId === '1_1' || !textDensityId ? '- Com densidade 1/1, o miolo sanduíche deve calibrar como referências editoriais densas (capacidade de **~50–85 palavras por zona de texto** quando o material suportar); **proibido** entregar miolo resumido tipo “capa de LinkedIn”.\n' : ''}
 - PROIBIDO abrir miolo como manual (“5 passos”, “dica número”) quando o tema for cultura/tendência — salvo modo narrativo Passo-a-passo pedido pelo usuário em outra camada.
 `;
 }
@@ -9419,9 +9568,14 @@ ${refs}
 `;
 }
 
-function buildTendenciaCulturaRefineSlideHint(creativePresetId) {
+function buildTendenciaCulturaRefineSlideHint(creativePresetId, textDensityId = '1_1') {
   if (!isTendenciaCulturaPreset(creativePresetId)) return '';
-  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards.`;
+  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
+  const dense =
+    textDensityId === '1_1' || !textDensityId
+      ? ' Com 1/1, se estiver curto, expanda até prosa completa por zona (método editorial), sem factos novos fora do material.'
+      : '';
+  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards. Alvo miolo sanduíche: subtitle ~${subLo}–${subHi} car.; bodyAfterImage ~${bodyLo}–${bodyHi} car.${dense}`;
 }
 
 function coerceCultureTone(v) {
@@ -9517,10 +9671,20 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1') {
   if (isTendenciaCulturaPreset(creativePresetId)) {
+    const bands = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
+    const sandwichVol = `
+▶ VOLUME NO MIOLO SANDUÍCHE (texto · foto · texto) — prevalece sobre faixas genéricas de “subtítulo único”:
+- **subtitle** (acima da foto) e **bodyAfterImage** (abaixo) são blocos separados; cada um = parágrafo(s) corrido(s) com múltiplas frases — não substituir por headline + uma linha nem bullets soltos.
+- Faixas-alvo neste projeto: subtitle ~${bands.subLo}–${bands.subHi} caracteres; bodyAfterImage ~${bands.bodyLo}–${bands.bodyHi} caracteres.${
+      textDensityId === '1_1' || !textDensityId
+        ? ' Densidade 1/1 = padrão do método: calibre editorial denso (~50–85 palavras por zona quando o tema der), como referências tipo miolo sanduíche longo.'
+        : ''
+    }
+`;
     return `
 REGRAS DE TAMANHO (pacote TENDÊNCIA/CULTURA):
 - Siga o arco e o layout descritos no PACOTE ativo; não misture com moldes de “modo narrativo” editorial/viral genéricos.
-${buildSlideTextDensityOverrides(textDensityId, 'editorial')}
+${sandwichVol}${buildSlideTextDensityOverrides(textDensityId, 'editorial')}
 `;
   }
   const hookMag = isTendenciaCulturaPreset(creativePresetId)
@@ -9698,23 +9862,24 @@ function buildNarrativeModeReminder(modeId) {
 /** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo + densidade de texto. */
 function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1') {
   const denHint = buildSlideTextDensityRefineHint(textDensityId);
+  const refNoEnum = '- PROIBIDO "Slide N" / "Card N" como título — o app já numera o card.\n';
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
-    return `${denHint}- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
+    return `${denHint}${refNoEnum}- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
 - Título pode ser fragmento de cena ou virada; subtítulo em prosa coerente com o modo, sem forçar três frases analíticas se uma batida basta.`;
   }
   if (narrativeModeId === 'viral') {
-    return `${denHint}- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
+    return `${denHint}${refNoEnum}- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
   }
   if (narrativeModeId === 'sensacionalista') {
-    return `${denHint}- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
+    return `${denHint}${refNoEnum}- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
   }
   if (narrativeModeId === 'jornalistico') {
-    return `${denHint}- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
+    return `${denHint}${refNoEnum}- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
   }
   if (narrativeModeId === 'how_to') {
-    return `${denHint}- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
+    return `${denHint}${refNoEnum}- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
   }
-  return `${denHint}- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
+  return `${denHint}${refNoEnum}- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
 }
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
@@ -10654,45 +10819,70 @@ export default function App() {
     });
   }, []);
 
-  const openPhotoZoneImport = useCallback((idx) => {
-    photoZoneTargetIdxRef.current = idx;
-    const el = photoZoneInputRef.current;
-    if (!el) return;
-    el.value = '';
-    const trigger = () => {
-      try {
-        el.click();
-      } catch (_) { /* ignore */ }
-    };
-    try {
-      if (typeof el.showPicker === 'function') {
-        const r = el.showPicker();
-        if (r != null && typeof r.then === 'function') {
-          void r.then(() => {}, () => trigger());
-          return;
-        }
-      }
-    } catch (_) {
-      /* NotAllowedError / não suportado em alguns browsers */
+  const consumePhotoZoneFileForSlide = useCallback((slideIdx, file) => {
+    if (!file) return;
+    const sIdx = Math.trunc(Number(slideIdx));
+    if (!Number.isFinite(sIdx) || sIdx < 0 || sIdx >= slidesLiveRef.current.length) {
+      toast('Não foi possível aplicar a foto a este slide.', 'error', 4000);
+      return;
     }
-    trigger();
-  }, []);
-
-  const handlePhotoZoneBgFile = useCallback((e) => {
-    const file = e.target.files?.[0];
-    const idx = photoZoneTargetIdxRef.current;
-    photoZoneTargetIdxRef.current = null;
-    e.target.value = '';
-    if (!file || idx == null) return;
     const reader = new FileReader();
     reader.onload = () => {
       void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
-        updateSlideAt(idx, { bgImage: url });
+        if (typeof url !== 'string' || url.length < 32) {
+          toast('Ficheiro vazio ou formato não reconhecido. Tente JPEG/PNG.', 'error', 4500);
+          return;
+        }
+        if (!url.startsWith('data:')) {
+          toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
+          return;
+        }
+        updateSlideAt(sIdx, { bgImage: url });
       });
     };
     reader.onerror = () => toast('Não foi possível ler a imagem. Tente outro ficheiro.', 'error', 4500);
     reader.readAsDataURL(file);
   }, [updateSlideAt, toast]);
+
+  const handlePhotoZoneNativeFile = useCallback((slideIdx, e) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    consumePhotoZoneFileForSlide(slideIdx, file);
+  }, [consumePhotoZoneFileForSlide]);
+
+  const preparePhotoZoneImportTarget = useCallback((idx) => {
+    if (idx == null || !Number.isFinite(Number(idx))) return;
+    const slideIdx = Math.trunc(Number(idx));
+    photoZoneTargetIdxRef.current = slideIdx;
+    const el = photoZoneInputRef.current;
+    if (!el) return;
+    el.setAttribute('data-vc-photo-zone-idx', String(slideIdx));
+    el.value = '';
+  }, []);
+
+  const openPhotoZoneImport = useCallback((idx) => {
+    preparePhotoZoneImportTarget(idx);
+    try {
+      photoZoneInputRef.current?.click();
+    } catch (_) { /* ignore */ }
+  }, [preparePhotoZoneImportTarget]);
+
+  const handlePhotoZoneBgFile = useCallback((e) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    const fromAttr = input.getAttribute('data-vc-photo-zone-idx');
+    let idx =
+      fromAttr != null && fromAttr !== ''
+        ? Number(fromAttr)
+        : photoZoneTargetIdxRef.current;
+    photoZoneTargetIdxRef.current = null;
+    input.removeAttribute('data-vc-photo-zone-idx');
+    input.value = '';
+    if (!file || idx == null || !Number.isFinite(idx)) return;
+    consumePhotoZoneFileForSlide(Math.trunc(idx), file);
+  }, [consumePhotoZoneFileForSlide]);
 
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
@@ -10978,6 +11168,9 @@ export default function App() {
 REGRA DE IDIOMA (obrigatória):
 - Redija em português brasileiro: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
 - Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
+
+PROIBIDO RÓTULO DE ENUMERAÇÃO DO CARROSSEL NOS CAMPOS DE TEXTO:
+- Não escreva "Slide 1", "Slide 01", "Slide 2 —", "Card 3", "SLIDE 6:" nem equivalentes em "title", "subtitle" ou "bodyAfterImage". O utilizador já vê o número do card na interface — o copy deve ser só conteúdo editorial (gancho, tese, prosa).
 `;
 
     const contextoModoPerso =
@@ -11032,8 +11225,8 @@ ${jsonShapeLine}`;
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       const q = ((s.imageQuery ?? s.image_query) || '').trim();
-      const title = s.title || `Slide ${i + 1}`;
-      const subtitle = s.subtitle || '';
+      const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
+      const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
       const base = {
         ...mkSlide(i + 1),
         title,
@@ -11052,7 +11245,7 @@ ${jsonShapeLine}`;
           : typeof s.body_after_image === 'string'
             ? s.body_after_image
             : '';
-        let bodyAfterImage = rawBody.trim();
+        let bodyAfterImage = stripLeadingSlideCardLabel(rawBody.trim());
         const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
 
         let overlay = 0;
@@ -11074,7 +11267,7 @@ ${jsonShapeLine}`;
           : typeof s.body_after_image === 'string'
             ? s.body_after_image
             : '';
-        let bodyAfterImage = rawBody.trim();
+        let bodyAfterImage = stripLeadingSlideCardLabel(rawBody.trim());
         const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
         let overlay = 0;
         const fullBleedPair = i <= 1;
@@ -11085,7 +11278,6 @@ ${jsonShapeLine}`;
           return { ...base, bodyAfterImage, cultureTone: ct, overlay, useCultureLayout: false };
         }
 
-        bodyAfterImage = rawBody.trim();
         const sandwichRow = !!(q && bodyAfterImage);
         if (sandwichRow) overlay = 0;
         else if (q) overlay = 70;
@@ -11165,7 +11357,7 @@ ${jsonShapeLine}`;
       const brandBlock = buildBrandBlock(brand);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
-      const cultureRef = buildTendenciaCulturaRefineSlideHint(creativePreset);
+      const cultureRef = buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity);
       const nSl = slides.length;
       const isCultureSandwichSlide =
         isTendenciaCulturaPreset(creativePreset) && activeIdx > 0 && activeIdx < nSl - 1;
@@ -11191,6 +11383,7 @@ Instrução de refinamento: ${instruction}
 REGRAS:
 ${voiceRefine}
 ${cultureRef}
+- PROIBIDO devolver "Slide N", "Card N" ou "01." como título; só copy editorial (o app mostra o índice do card).
 ${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
 ${buildRefineSingleSlideRules(mode, slideTextDensity)}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
@@ -11200,11 +11393,11 @@ Retorne exatamente: ${singleJson}`,
         { json:true, openaiKey }
       );
       const patch = {
-        title: r.title || slide.title,
-        subtitle: r.subtitle || slide.subtitle,
+        title: stripLeadingSlideCardLabel(String(r.title ?? slide.title ?? '').trim()),
+        subtitle: stripLeadingSlideCardLabel(String(r.subtitle ?? slide.subtitle ?? '').trim()),
       };
       if (typeof r.bodyAfterImage === 'string' && refineNeedsBodyAfter) {
-        patch.bodyAfterImage = r.bodyAfterImage;
+        patch.bodyAfterImage = stripLeadingSlideCardLabel(String(r.bodyAfterImage).trim());
       }
       updateSlide(patch);
     } catch(e) { setError(e.message); }
@@ -11383,7 +11576,8 @@ Instrução: ${instruction}
 
 REGRAS DE VOZ:
 ${voiceBulk}
-${buildTendenciaCulturaRefineSlideHint(creativePreset)}
+${buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity)}
+- PROIBIDO "Slide N" / "Card N" como título ou abertura de texto — só conteúdo editorial.
 - Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
@@ -11397,10 +11591,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
       setSlides(prev => prev.map((s, i) => ({
         ...s,
-        title: r.slides[i]?.title || s.title,
-        subtitle: r.slides[i]?.subtitle || s.subtitle,
+        title: stripLeadingSlideCardLabel(String(r.slides[i]?.title ?? s.title ?? '').trim()),
+        subtitle: stripLeadingSlideCardLabel(String(r.slides[i]?.subtitle ?? s.subtitle ?? '').trim()),
         ...(isTendenciaCulturaPreset(creativePreset) && typeof r.slides[i]?.bodyAfterImage === 'string' && i !== 0
-          ? { bodyAfterImage: r.slides[i].bodyAfterImage }
+          ? { bodyAfterImage: stripLeadingSlideCardLabel(String(r.slides[i].bodyAfterImage).trim()) }
           : {}),
       })));
       toast('Todos os slides refinados', 'success');
@@ -12068,6 +12262,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     showCanvasChrome={canvasEditMode && !!(slide.canvas?.enabled && slide.canvas?.zones)}
                     onCanvasZonePatch={patchCanvasZonesAt}
                     onPhotoZoneRequest={openPhotoZoneImport}
+                    onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                     enableZoneSwapDrag={canvasEditMode}
                   />
 
@@ -12186,6 +12381,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                         }
                         onCanvasZonePatch={patchCanvasZonesAt}
                         onPhotoZoneRequest={openPhotoZoneImport}
+                        onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                         enableZoneSwapDrag={canvasEditMode}
                       />
                     </div>
@@ -12286,7 +12482,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       {/* File inputs: evitar hidden (Safari iOS bloqueia .click() via JS). */}
       <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
       <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
-      <input ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
+      <input id={VC_PHOTO_ZONE_FILE_INPUT_ID} ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
       <input ref={refImageInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
 
       {/* Toast notifications */}

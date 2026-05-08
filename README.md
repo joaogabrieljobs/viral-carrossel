@@ -2,9 +2,21 @@
 
 Gerador profissional de carrosséis para Instagram com IA integrada.
 
+## Skills do agente (Cursor)
+
+Skills em `.agents/skills/` são registadas em `.cursor/rules/skills-bridge.mdc` (sempre aplicadas ao agente).
+
+| Skill | Ficheiro | Uso |
+| ----- | -------- | --- |
+| **polish** | `.agents/skills/polish/SKILL.md` | Pass final de UI (alinhamento, tipografia, estados, responsivo). |
+| **carrossel-cultura** | `.agents/skills/carrossel-cultura/SKILL.md` | Formato editorial **Tendência/Cultura** (brandsdecoded): validação de tema, triagem, headlines, arco de slides; alinha com o preset `tendencia_cultura` em `ViralCarrossel.jsx`. Ver também `html-template.md` na mesma pasta para HTML estático / export fora da app. |
+
+Cópia legada fora desta árvore: `../SKILL coded carroceis .md` (pasta parental do clone). A versão mantida para o Cursor é **carrossel-cultura** em `.agents/skills/`.
+
 ## Como usar
 
 ### Opção 1: Claude.ai (Artifact)
+
 1. Abra o Claude.ai
 2. Cole o conteúdo de `ViralCarrossel.jsx` num artifact React
 3. Use direto no browser
@@ -25,10 +37,12 @@ Como o navegador bloqueia chamada direta para `api.anthropic.com` e `api.openai.
 
 **Você só precisa de UMA das duas chaves**:
 
-| Provider     | Como configurar                                                                                                          | O que habilita                                |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| OpenAI       | Cole a chave `sk-proj-...` no app via ⚙ no header (fica no localStorage do navegador)                                    | Geração de texto via `gpt-4o` + GPT Image / DALL·E (imagens) |
-| Anthropic    | Crie `.env.local` na raiz com `ANTHROPIC_API_KEY=sk-ant-...` e reinicie `npm run dev` (veja `.env.example`)              | Geração via Claude + **pesquisa de nicho** com `web_search` |
+
+| Provider  | Como configurar                                                                                             | O que habilita                                               |
+| --------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| OpenAI    | Cole a chave `sk-proj-...` no app via ⚙ no header (fica no localStorage do navegador)                       | Geração de texto via `gpt-4o` + GPT Image / DALL·E (imagens) |
+| Anthropic | Crie `.env.local` na raiz com `ANTHROPIC_API_KEY=sk-ant-...` e reinicie `npm run dev` (veja `.env.example`) | Geração via Claude + **pesquisa de nicho** com `web_search`  |
+
 
 Se você tem a chave Anthropic configurada, ela é usada por padrão (qualidade premium para o tom editorial). Sem ela, o app usa `gpt-4o` da OpenAI automaticamente para a geração de texto.
 
@@ -37,6 +51,7 @@ A pesquisa de nicho com tendências da web ao vivo só funciona com a chave Anth
 ## Funcionalidades
 
 ### Geração & estratégia
+
 - **Gerador IA**: gera carrossel inteiro (gancho + slides + legenda) com um tema
 - **Pesquisa de nicho**: busca tendências reais na web ao vivo (web_search)
 - **Templates prontos**: 4 carrosséis arquetípicos (Erro Comum, Tendência, Decodificação de Marca, Mudança de Comportamento) — clique e preencha
@@ -45,6 +60,7 @@ A pesquisa de nicho com tendências da web ao vivo só funciona com a chave Anth
 - **Refinar TODOS os slides**: aplica uma instrução ao carrossel inteiro mantendo coerência narrativa
 
 ### Editor
+
 - **Visual completo**: título, subtítulo, imagem de fundo, layout 3×3, tipografia, cores
 - **Imagens**: **Web trend** — em desenvolvimento: servidor tenta **Unsplash** ou **Pexels** se você configurar chaves em `.env.local`; senão **Wikimedia Commons**. A query combina título do slide, hints temáticos (ex.: IA→data center) e `imageQuery` da IA · **GPT Image** (OpenAI, com chave)
 - **Encaixe da foto**: cobrir o cartão (padrão novo), ver imagem inteira, ou zoom manual (%)
@@ -52,11 +68,13 @@ A pesquisa de nicho com tendências da web ao vivo só funciona com a chave Anth
 - **Reordenação por drag-and-drop**: arraste as miniaturas dos slides
 
 ### Histórico & persistência
+
 - **Undo / Redo** com `⌘Z` / `⌘⇧Z` (mudanças próximas são agrupadas)
 - **Autosave em localStorage**: seu carrossel não se perde ao recarregar
 - **Toasts não-bloqueantes**: feedback claro de sucesso e erro
 
 ### Atalhos de teclado
+
 - `⌘Z` / `⌘⇧Z` — desfazer / refazer
 - `⌘D` — duplicar slide
 - `⌘E` / `⌘S` — exportar slide / todos
@@ -66,6 +84,7 @@ A pesquisa de nicho com tendências da web ao vivo só funciona com a chave Anth
 - `?` — abrir ajuda
 
 ### Export
+
 - **PNG**: slide individual ou batch dos N slides
 - **PDF**: todos os slides em um único arquivo (multipage, dimensões reais)
 - **Mobile-first**: drawer bottom-sheet, navegação por slides, barra inferior
@@ -85,8 +104,11 @@ Usa `claude-sonnet-4-6` via Anthropic API (autenticado automaticamente no Claude
 
 ## Formatos suportados
 
-| Formato   | Dimensões  | Uso              |
-|-----------|------------|------------------|
-| Feed 4:5  | 1080×1350  | Carrossel padrão |
-| Quadrado  | 1080×1080  | Feed quadrado    |
-| Stories   | 1080×1920  | Stories/Reels    |
+
+| Formato  | Dimensões | Uso              |
+| -------- | --------- | ---------------- |
+| Feed 4:5 | 1080×1350 | Carrossel padrão |
+| Quadrado | 1080×1080 | Feed quadrado    |
+| Stories  | 1080×1920 | Stories/Reels    |
+
+

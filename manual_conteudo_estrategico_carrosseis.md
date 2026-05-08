@@ -1480,3 +1480,4 @@ O caminho não é copiar formatos prontos.
 menos conteúdo sobre marketing;
 mais inteligência sobre percepção, validação e comportamento de mercado.
 ```
+

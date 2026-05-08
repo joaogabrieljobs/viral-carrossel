@@ -1,9 +1,10 @@
 ---
-name: polish
+
+## name: polish
+
 description: Performs a final quality pass fixing alignment, spacing, consistency, and micro-detail issues before shipping. Use when the user mentions polish, finishing touches, pre-launch review, something looks off, or wants to go from good to great.
 user-invocable: true
 argument-hint: "[target]"
----
 
 ## MANDATORY PREPARATION
 
@@ -18,18 +19,17 @@ Perform a meticulous final pass to catch all the small details that separate goo
 Understand the current state and goals:
 
 1. **Review completeness**:
-   - Is it functionally complete?
-   - Are there known issues to preserve (mark with TODOs)?
-   - What's the quality bar? (MVP vs flagship feature?)
-   - When does it ship? (How much time for polish?)
-
+  - Is it functionally complete?
+  - Are there known issues to preserve (mark with TODOs)?
+  - What's the quality bar? (MVP vs flagship feature?)
+  - When does it ship? (How much time for polish?)
 2. **Identify polish areas**:
-   - Visual inconsistencies
-   - Spacing and alignment issues
-   - Interaction state gaps
-   - Copy inconsistencies
-   - Edge cases and error states
-   - Loading and transition smoothness
+  - Visual inconsistencies
+  - Spacing and alignment issues
+  - Interaction state gaps
+  - Copy inconsistencies
+  - Edge cases and error states
+  - Loading and transition smoothness
 
 **CRITICAL**: Polish is the last step, not the first. Don't polish work that's not functionally complete.
 
@@ -46,6 +46,7 @@ Work through these dimensions methodically:
 - **Grid adherence**: Elements snap to baseline grid
 
 **Check**:
+
 - Enable grid overlay and verify alignment
 - Check spacing with browser inspector
 - Test at multiple viewport sizes
@@ -159,30 +160,31 @@ Every interactive element needs all states:
 
 Go through systematically:
 
-- [ ] Visual alignment perfect at all breakpoints
-- [ ] Spacing uses design tokens consistently
-- [ ] Typography hierarchy consistent
-- [ ] All interactive states implemented
-- [ ] All transitions smooth (60fps)
-- [ ] Copy is consistent and polished
-- [ ] Icons are consistent and properly sized
-- [ ] All forms properly labeled and validated
-- [ ] Error states are helpful
-- [ ] Loading states are clear
-- [ ] Empty states are welcoming
-- [ ] Touch targets are 44x44px minimum
-- [ ] Contrast ratios meet WCAG AA
-- [ ] Keyboard navigation works
-- [ ] Focus indicators visible
-- [ ] No console errors or warnings
-- [ ] No layout shift on load
-- [ ] Works in all supported browsers
-- [ ] Respects reduced motion preference
-- [ ] Code is clean (no TODOs, console.logs, commented code)
+- Visual alignment perfect at all breakpoints
+- Spacing uses design tokens consistently
+- Typography hierarchy consistent
+- All interactive states implemented
+- All transitions smooth (60fps)
+- Copy is consistent and polished
+- Icons are consistent and properly sized
+- All forms properly labeled and validated
+- Error states are helpful
+- Loading states are clear
+- Empty states are welcoming
+- Touch targets are 44x44px minimum
+- Contrast ratios meet WCAG AA
+- Keyboard navigation works
+- Focus indicators visible
+- No console errors or warnings
+- No layout shift on load
+- Works in all supported browsers
+- Respects reduced motion preference
+- Code is clean (no TODOs, console.logs, commented code)
 
 **IMPORTANT**: Polish is about details. Zoom in. Squint at it. Use it yourself. The little things add up.
 
 **NEVER**:
+
 - Polish before it's functionally complete
 - Spend hours on polish if it ships in 30 minutes (triage)
 - Introduce bugs while polishing (test thoroughly)
