@@ -10659,22 +10659,23 @@ export default function App() {
     const el = photoZoneInputRef.current;
     if (!el) return;
     el.value = '';
+    const trigger = () => {
+      try {
+        el.click();
+      } catch (_) { /* ignore */ }
+    };
     try {
       if (typeof el.showPicker === 'function') {
         const r = el.showPicker();
         if (r != null && typeof r.then === 'function') {
-          void r.catch(() => {
-            try { el.click(); } catch (_) { /* ignore */ }
-          });
+          void r.then(() => {}, () => trigger());
+          return;
         }
-        return;
       }
     } catch (_) {
-      /* Safari antigo / restrições — tenta click */
+      /* NotAllowedError / não suportado em alguns browsers */
     }
-    try {
-      el.click();
-    } catch (_) { /* ignore */ }
+    trigger();
   }, []);
 
   const handlePhotoZoneBgFile = useCallback((e) => {
