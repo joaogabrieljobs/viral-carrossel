@@ -659,13 +659,13 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
 
 const PALETTES = [
   /** `subtitle`: cards do meio (linha curta sob o título) · `text`: corpo / blocos maiores · `accent`: Destaques. */
-  { name:'Carbon',   bg:'#0a0a0a', title:'#ffffff', subtitle:'#cfcfcf', text:'#a3a3a3', accent:'#ff5736' },
-  { name:'Midnight', bg:'#0c1220', title:'#ffffff', subtitle:'#cbd5e1', text:'#94a3b8', accent:'#6366f1' },
+  { name:'Carbon',   bg:'#0a0a0a', title:'#ffffff', subtitle:'#e8e8e8', text:'#cfcfcf', accent:'#ff5736' },
+  { name:'Midnight', bg:'#0c1220', title:'#ffffff', subtitle:'#dbeafe', text:'#b8c5d6', accent:'#6366f1' },
   { name:'Ivory',    bg:'#f5f1ea', title:'#0a0a0a', subtitle:'#3f3f46', text:'#52525b', accent:'#dc2626' },
   { name:'Forest',   bg:'#0d1f17', title:'#a3e635', subtitle:'#bef264', text:'#86efac', accent:'#a3e635' },
-  { name:'Coral',    bg:'#1c0f0f', title:'#ff6b4a', subtitle:'#c9b8b4', text:'#d17a7a', accent:'#ff5736' },
-  { name:'Royal',    bg:'#1e1b4b', title:'#fde047', subtitle:'#e8eafd', text:'#a5b4fc', accent:'#fcd34d' },
-  { name:'Mono',     bg:'#171717', title:'#fafafa', subtitle:'#d4d4d4', text:'#737373', accent:'#ffffff' },
+  { name:'Coral',    bg:'#1c0f0f', title:'#ff6b4a', subtitle:'#e8dcd8', text:'#e8b4b4', accent:'#ff5736' },
+  { name:'Royal',    bg:'#1e1b4b', title:'#fde047', subtitle:'#eef0ff', text:'#c7d2fe', accent:'#fcd34d' },
+  { name:'Mono',     bg:'#171717', title:'#fafafa', subtitle:'#e5e5e5', text:'#c8c8c8', accent:'#ffffff' },
   { name:'Cream',    bg:'#fef9e7', title:'#1a1a1a', subtitle:'#57534e', text:'#78716c', accent:'#b45309' },
   /* Neutro institucional — alinhado ao DEFAULT_BRAND e ao token --accent; índice fixo no final pra não quebrar templates (palette: 0–7). */
   { name:'Pearl',    bg:'#fafafc', title:'#000000', subtitle:'#363636', text:'#363636', accent:'#000000' },
@@ -1272,6 +1272,136 @@ function vcShrinkDataUrlForStorage(dataUrl) {
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
+  });
+}
+
+/**
+ * Importação de ficheiro → JPEG (~max VC_BG_SAVE_MAX_PX).
+ * Ordem: createImageBitmap (melhor com Blob/File) → Image + object URL → FileReader + shrink.
+ * Evita depender só de data URLs gigantes no Image (Safari/iOS) e cobre browsers sem createObjectURL estável.
+ */
+function vcImageFileToStorageDataUrl(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    let settled = false;
+    const finish = (url) => {
+      if (settled) return;
+      settled = true;
+      resolve(typeof url === 'string' && url.length >= 32 ? url : '');
+    };
+
+    const tryDataUrlFallback = () => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) =>
+          finish(url),
+        );
+      };
+      reader.onerror = () => finish('');
+      reader.readAsDataURL(file);
+    };
+
+    const encodeFromWidthHeight = (drawable, w, h, closeFn) => {
+      try {
+        if (!w || !h) {
+          closeFn?.();
+          tryDataUrlFallback();
+          return;
+        }
+        const fac = VC_BG_SAVE_MAX_PX / Math.max(w, h);
+        const scale = fac < 1 ? fac : 1;
+        const nw = Math.max(2, Math.round(w * scale));
+        const nh = Math.max(2, Math.round(h * scale));
+        const c = document.createElement('canvas');
+        c.width = nw;
+        c.height = nh;
+        const ctx = c.getContext('2d');
+        if (!ctx) {
+          closeFn?.();
+          tryDataUrlFallback();
+          return;
+        }
+        ctx.drawImage(drawable, 0, 0, w, h, 0, 0, nw, nh);
+        closeFn?.();
+        const jpeg = c.toDataURL('image/jpeg', VC_BG_SAVE_JPEG_Q);
+        if (typeof jpeg === 'string' && jpeg.startsWith('data:') && jpeg.length >= 32) {
+          finish(jpeg);
+          return;
+        }
+        tryDataUrlFallback();
+      } catch {
+        try {
+          closeFn?.();
+        } catch {
+          /* */
+        }
+        tryDataUrlFallback();
+      }
+    };
+
+    const tryImageWithObjectUrl = () => {
+      let objUrl = '';
+      try {
+        objUrl = URL.createObjectURL(file);
+      } catch {
+        tryDataUrlFallback();
+        return;
+      }
+      const img = new Image();
+      const cleanup = () => {
+        if (objUrl) {
+          try {
+            URL.revokeObjectURL(objUrl);
+          } catch {
+            /* */
+          }
+          objUrl = '';
+        }
+      };
+
+      const runDraw = () => {
+        encodeFromWidthHeight(img, img.naturalWidth, img.naturalHeight, cleanup);
+      };
+
+      img.onload = () => {
+        if (typeof img.decode === 'function') {
+          img.decode().then(runDraw).catch(() => {
+            cleanup();
+            tryDataUrlFallback();
+          });
+        } else {
+          requestAnimationFrame(() => requestAnimationFrame(runDraw));
+        }
+      };
+      img.onerror = () => {
+        cleanup();
+        tryDataUrlFallback();
+      };
+      img.src = objUrl;
+    };
+
+    if (typeof createImageBitmap === 'function') {
+      createImageBitmap(file)
+        .then((bmp) => {
+          encodeFromWidthHeight(bmp, bmp.width, bmp.height, () => {
+            try {
+              bmp.close();
+            } catch {
+              /* */
+            }
+          });
+        })
+        .catch(() => {
+          tryImageWithObjectUrl();
+        });
+      return;
+    }
+
+    tryImageWithObjectUrl();
   });
 }
 
@@ -4460,6 +4590,27 @@ const SlideCardInner = React.forwardRef(({
   const showCultureIdx = culturePack && total > 1;
   const cultureAccentCol = brand.accent || '#000000';
 
+  const slideCardBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
+  let displayTitleInk = carouselTitleInk;
+  let displayBodyInk = carouselBodyInk;
+  if (culturePack || sandwichSkin) {
+    const cr = cultureReadableInks(slideCardBg, carouselTitleInk, carouselBodyInk, cultureAccentCol);
+    displayTitleInk = cr.titleInk;
+    displayBodyInk = cr.bodyInk;
+    if (
+      cultureCoverOnly &&
+      (slide.bgImage || slideHasPendingPhotoIntent(slide)) &&
+      (slide.overlay ?? 0) >= 38
+    ) {
+      const rgbBg = vcHexToRgb(vcNormalizeHex(slideCardBg) || '#fafafc');
+      const Lbg = rgbBg ? vcRelLuminance01(rgbBg) : 0.96;
+      if (Lbg >= 0.55) {
+        displayTitleInk = '#f5f5f7';
+        displayBodyInk = 'rgba(245,245,247,0.92)';
+      }
+    }
+  }
+
   let inner;
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
   const cvVar = slide.canvas?.variant;
@@ -4949,8 +5100,8 @@ const SlideCardInner = React.forwardRef(({
         num={num}
         total={total}
         hideInstaBadge={hideInstaBadge}
-        titleInk={carouselTitleInk}
-        bodyInk={carouselBodyInk}
+        titleInk={displayTitleInk}
+        bodyInk={displayBodyInk}
         imgModeNorm={imgModeNorm}
         effectivePresentationFilter={effectivePresentationFilter}
         bgFit={bgFit}
@@ -5155,7 +5306,7 @@ const SlideCardInner = React.forwardRef(({
               maxWidth:'92%',
             }}>
               <h1 style={{
-                color: carouselTitleInk, fontFamily: titleFF,
+                color: displayTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
                 fontWeight:slide.titleWeight ?? 800,
@@ -5171,7 +5322,7 @@ const SlideCardInner = React.forwardRef(({
                 <CultureInlineRich
                   text={slide.title || ''}
                   destaqueSpans={slide.destaqueSpans?.title}
-                  baseColor={carouselTitleInk}
+                  baseColor={displayTitleInk}
                   accentColor={cultureAccentCol}
                   fontFamily={titleFF}
                   fontSize={f.w*0.084*(slide.titleSize/100)}
@@ -5191,7 +5342,7 @@ const SlideCardInner = React.forwardRef(({
                     <CultureRichParagraphs
                       text={slide.subtitle}
                       destaqueSpans={slide.destaqueSpans?.subtitle}
-                      ink={carouselBodyInk}
+                      ink={displayBodyInk}
                       accentColor={cultureAccentCol}
                       fontFamily={bodyFF}
                       fontSize={f.w*0.028*(slide.subSize/100)}
@@ -5203,7 +5354,7 @@ const SlideCardInner = React.forwardRef(({
                   </div>
                 ) : (
                 <p style={{
-                  color: carouselBodyInk, fontFamily: bodyFF,
+                  color: displayBodyInk, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight:400, margin:0,
@@ -6858,7 +7009,7 @@ function GenerateModal({
                     lineHeight: 1.35,
                   }}
                 >
-                  Buscar imagens de fundo ao gerar
+                  Criar imagens de fundo ao gerar
                 </span>
                 <span
                   style={{
@@ -9563,6 +9714,11 @@ Regras:
 - Adapte títulos, subtítulos e imageQuery ao TEMA do utilizador; NÃO copie texto literal dos exemplos — preserve só a FUNÇÃO de cada posição no arco.
 - Cada imageQuery: inglês, 8–15 palavras, alinhada ao argumento do slide (pode inspirar-se na família visual dos exemplos).
 
+CRITICAL — ABA «CONTEÚDO» (MATÉRIA-PRIMA / FONTES / TEXTO EXTRAÍDO / INSTRUÇÕES):
+- Se o prompt trouxer esses blocos, o assunto factual do carrossel é **o material colado**, não uma história genérica (escritório, cliente, terça-feira, deadline, etc.) inventada para encaixar no arquétipo.
+- O arquétipo «${t.name}» define só a **estrutura** do arco (gancho, prova, virada…): os exemplos abaixo com «título de referência» são **ilustrativos** — reescreva tudo ao tema real do utilizador.
+- A linha «sobre: "…"» do formulário é **secundária** quando existe material; use-a só se bater com o material ou para tom/desambiguação — nunca para trocar o assunto.
+
 Distribuição para ${n} slides (o template original tem ${t.slides.length} passos — estique ou una passos adjacentes se N for diferente):
 ${refs}
 `;
@@ -10151,6 +10307,36 @@ const DEFAULT_DOC = {
   slideTextDensity: '1_1',
 };
 
+/** URLs de demo que ficaram presas em docs persistidos — removidas de «Fontes & referências» ao hidratar. */
+const STALE_MATERIAL_SOURCE_MARKERS = [
+  'scielo.br/j/csc/a/dYG5hm6GvzMT6pLXVySYSyv',
+];
+
+function tokenLooksLikeStaleMaterialSource(tok) {
+  const t = String(tok).trim().toLowerCase();
+  if (!t) return false;
+  return STALE_MATERIAL_SOURCE_MARKERS.some((m) => t.includes(m.toLowerCase()));
+}
+
+/** Retira tokens de URL legadas (linhas ou espaço-separados) sem mexer no resto do texto. */
+function scrubStaleMaterialSources(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return typeof raw === 'string' ? raw : '';
+  const lines = raw.split(/\r?\n/);
+  const out = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      out.push('');
+      continue;
+    }
+    const tokens = trimmed.split(/\s+/).filter((tok) => !tokenLooksLikeStaleMaterialSource(tok));
+    const joined = tokens.join(' ').trim();
+    if (joined) out.push(joined);
+  }
+  let s = out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+  return s;
+}
+
 /** Evita ecrã em branco quando `vc_library` ou import JSON tem doc incompleto (sem slides, etc.). */
 function ensureDocShape(d) {
   if (!d || typeof d !== 'object') {
@@ -10163,6 +10349,9 @@ function ensureDocShape(d) {
     material: { ...DEFAULT_DOC.material, ...(d.material && typeof d.material === 'object' ? d.material : {}) },
     imgParams: { ...DEFAULT_DOC.imgParams, ...(d.imgParams && typeof d.imgParams === 'object' ? d.imgParams : {}) },
   };
+  out.material.sources = scrubStaleMaterialSources(
+    typeof out.material.sources === 'string' ? out.material.sources : ''
+  );
   if (!Array.isArray(out.slides) || out.slides.length === 0) {
     out.slides = [mkSlide(1)];
   }
@@ -10183,11 +10372,13 @@ export default function App() {
   // legado se existir e a biblioteca estiver vazia.
   const [library, setLibrary] = useState(() => {
     const lib = lsGet(SK.library, null);
-    if (Array.isArray(lib) && lib.length) return lib;
+    if (Array.isArray(lib) && lib.length) {
+      return lib.map((e) => ({ ...e, doc: ensureDocShape(e.doc || {}) }));
+    }
     const legacy = lsGet(SK.legacyDoc, null);
     if (legacy && legacy.slides?.length) {
       // Migra o doc antigo pra primeira entrada da biblioteca
-      return [mkLibEntry({ ...DEFAULT_DOC, ...legacy }, 'Carrossel')];
+      return [mkLibEntry(ensureDocShape({ ...DEFAULT_DOC, ...legacy }), 'Carrossel')];
     }
     return [mkLibEntry(DEFAULT_DOC, 'Carrossel')];
   });
@@ -10826,22 +11017,17 @@ export default function App() {
       toast('Não foi possível aplicar a foto a este slide.', 'error', 4000);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
-        if (typeof url !== 'string' || url.length < 32) {
-          toast('Ficheiro vazio ou formato não reconhecido. Tente JPEG/PNG.', 'error', 4500);
-          return;
-        }
-        if (!url.startsWith('data:')) {
-          toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
-          return;
-        }
-        updateSlideAt(sIdx, { bgImage: url });
-      });
-    };
-    reader.onerror = () => toast('Não foi possível ler a imagem. Tente outro ficheiro.', 'error', 4500);
-    reader.readAsDataURL(file);
+    void vcImageFileToStorageDataUrl(file).then((url) => {
+      if (typeof url !== 'string' || url.length < 32) {
+        toast('Não foi possível processar a imagem. Tente JPEG ou PNG.', 'error', 4500);
+        return;
+      }
+      if (!url.startsWith('data:')) {
+        toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
+        return;
+      }
+      updateSlideAt(sIdx, { bgImage: url });
+    });
   }, [updateSlideAt, toast]);
 
   const handlePhotoZoneNativeFile = useCallback((slideIdx, e) => {
@@ -10890,14 +11076,9 @@ export default function App() {
     if (!files.length) return;
 
     const readOne = (file) =>
-      new Promise((resolve) => {
-        const r = new FileReader();
-        r.onload = () => {
-          void vcShrinkDataUrlForStorage(String(r.result || '')).then(resolve);
-        };
-        r.onerror = () => resolve(null);
-        r.readAsDataURL(file);
-      });
+      vcImageFileToStorageDataUrl(file).then((url) =>
+        typeof url === 'string' && url.length >= 32 ? url : null,
+      );
 
     void (async () => {
       const urls = await Promise.all(files.map(readOne));
@@ -11192,12 +11373,15 @@ PROIBIDO RÓTULO DE ENUMERAÇÃO DO CARROSSEL NOS CAMPOS DE TEXTO:
         ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
         : modeDef.method;
 
+    const hasPromptMaterial = !!(
+      String(materialBlock || '').trim() ||
+      String(materialPriorityBlock || '').trim()
+    );
+
     const prompt = `${introLine}
-Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
+${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
 ${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}
-${materialBlock}
-${materialPriorityBlock}
-${imgParamsBlock}
+${hasPromptMaterial ? '' : `${materialBlock}${materialPriorityBlock}`}${imgParamsBlock}
 
 ${idiomaRegra}
 
@@ -11297,6 +11481,18 @@ ${jsonShapeLine}`;
       fmt,
     );
     setSlides(newSlides); setActiveIdx(0); setShellView('project');
+    const quickTplSynced = isQuickTemplatePreset(cp) ? TEMPLATES.find((x) => x.id === quickTemplateIdFromPreset(cp)) : null;
+    if (quickTplSynced) {
+      const pal = PALETTES[quickTplSynced.palette] || PALETTES[0];
+      setBrand((b) => ({
+        ...b,
+        bg: pal.bg,
+        titleColor: pal.title,
+        subtitleColor: pal.subtitle,
+        textColor: pal.text,
+        accent: pal.accent,
+      }));
+    }
     if (isMobile) {
       setTab('slide');
       setDrawerOpen(true);
@@ -11539,16 +11735,16 @@ ${capRules}
   };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
-        updateSlide({ bgImage: url });
-      });
-    };
-    reader.onerror = () => toast('Não foi possível ler a imagem.', 'error', 4500);
-    reader.readAsDataURL(file);
-    e.target.value='';
+    const file = e.target.files?.[0];
+    if (!file) return;
+    void vcImageFileToStorageDataUrl(file).then((url) => {
+      if (typeof url !== 'string' || url.length < 32) {
+        toast('Não foi possível processar a imagem.', 'error', 4500);
+        return;
+      }
+      updateSlide({ bgImage: url });
+    });
+    e.target.value = '';
   };
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
