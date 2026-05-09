@@ -442,7 +442,7 @@ Figma's marketing system is shadow-light by design — the color blocks substitu
 
 - Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.button}`, padding 8px 18px 10px (asymmetric vertical to optically center the type), rounded `{rounded.pill}`. No border.
 
-`**button-tertiary-text**` — Plain text link styled as a button hit target inside top nav and footer.
+`**button-tertiary-text`** — Plain text link styled as a button hit target inside top nav and footer.
 
 - Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.link}`, rounded `{rounded.full}` (hit target only), padding `{spacing.xs}` `{spacing.sm}`.
 

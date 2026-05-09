@@ -4,10 +4,12 @@ import {
   Plus, Palette, Layout, Crop, Wand2, Loader2,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Type, Quote, BookOpen, Image,
+  Type, Quote, BookOpen, Image as ImageIcon,
   ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
-  ChevronRight, ChevronLeft, Instagram, Settings, Maximize2, Minus,
+  ChevronRight, ChevronLeft, ChevronDown, Instagram, Settings, Maximize2, Minus,
   Home, Layers, SlidersHorizontal,
+  Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
+  Target, Camera,
 } from 'lucide-react';
 
 // ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
@@ -21,6 +23,8 @@ const SK = {
   openaiKey:     'vc_openai_key',
   onboarding:    'vc_onboarding_done',
   shellView:     'vc_shell_view',
+  /** Lista no editor: grelha de alinhamento sobre o preview (não exportada). */
+  previewGrid:   'vc_preview_align_grid',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */
@@ -553,6 +557,13 @@ const GLOBAL_STYLE = `
       scroll-behavior: auto !important;
     }
   }
+
+  .vc-adjust-details > summary {
+    list-style: none;
+  }
+  .vc-adjust-details > summary::-webkit-details-marker {
+    display: none;
+  }
 `;
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -897,17 +908,283 @@ function effectiveBodyFontFamily(brand) {
     : brand.bodyFont;
 }
 
-const LAYOUTS = [
-  { id:'tl', jc:'flex-start', ai:'flex-start', label:'↖' },
-  { id:'tc', jc:'flex-start', ai:'center',     label:'↑' },
-  { id:'tr', jc:'flex-start', ai:'flex-end',   label:'↗' },
-  { id:'ml', jc:'center',     ai:'flex-start', label:'←' },
-  { id:'mc', jc:'center',     ai:'center',     label:'⊕' },
-  { id:'mr', jc:'center',     ai:'flex-end',   label:'→' },
-  { id:'bl', jc:'flex-end',   ai:'flex-start', label:'↙' },
-  { id:'bc', jc:'flex-end',   ai:'center',     label:'↓' },
-  { id:'br', jc:'flex-end',   ai:'flex-end',   label:'↘' },
+const LAYOUT_POS_LAB_ROWS = [
+  ['SUP.', 'ESQ.'], ['SUP.', 'CENTRO'], ['SUP.', 'DIR.'],
+  ['MEIO', 'ESQ.'], ['MEIO', 'CENTRO'], ['MEIO', 'DIR.'],
+  ['INF.', 'ESQ.'], ['INF.', 'CENTRO'], ['INF.', 'DIR.'],
 ];
+
+const LAYOUTS = [
+  { id:'tl', jc:'flex-start', ai:'flex-start', label:'↖', posLab: LAYOUT_POS_LAB_ROWS[0] },
+  { id:'tc', jc:'flex-start', ai:'center',     label:'↑', posLab: LAYOUT_POS_LAB_ROWS[1] },
+  { id:'tr', jc:'flex-start', ai:'flex-end',   label:'↗', posLab: LAYOUT_POS_LAB_ROWS[2] },
+  { id:'ml', jc:'center',     ai:'flex-start', label:'←', posLab: LAYOUT_POS_LAB_ROWS[3] },
+  { id:'mc', jc:'center',     ai:'center',     label:'⊕', posLab: LAYOUT_POS_LAB_ROWS[4] },
+  { id:'mr', jc:'center',     ai:'flex-end',   label:'→', posLab: LAYOUT_POS_LAB_ROWS[5] },
+  { id:'bl', jc:'flex-end',   ai:'flex-start', label:'↙', posLab: LAYOUT_POS_LAB_ROWS[6] },
+  { id:'bc', jc:'flex-end',   ai:'center',     label:'↓', posLab: LAYOUT_POS_LAB_ROWS[7] },
+  { id:'br', jc:'flex-end',   ai:'flex-end',   label:'↘', posLab: LAYOUT_POS_LAB_ROWS[8] },
+];
+
+function layoutMiniBars(layoutId) {
+  const yByRow = { t: 10, m: 21.5, b: 33 };
+  const row = layoutId[0];
+  const col = layoutId[1];
+  const y = yByRow[row] ?? 21.5;
+  const anchor = col === 'l' ? 'start' : col === 'c' ? 'center' : 'end';
+  const tw = 17;
+  const th = 4;
+  const sw = 22;
+  const sh = 3;
+  const g = 1.5;
+  const totalH = th + g + sh;
+  const y0 = y - totalH / 2;
+  const pad = 6;
+  const W = 44;
+  let tx;
+  let sx;
+  if (anchor === 'start') { tx = pad; sx = pad; }
+  else if (anchor === 'center') { tx = (W - tw) / 2; sx = (W - sw) / 2; }
+  else { tx = W - pad - tw; sx = W - pad - sw; }
+  return {
+    frame: { x: 4, y: 4, w: 36, h: 36, r: 5 },
+    title: { x: tx, y: y0, w: tw, h: th },
+    sub: { x: sx, y: y0 + th + g, w: sw, h: sh },
+  };
+}
+
+function LayoutMiniIcon({ layoutId, active }) {
+  const { frame, title: t, sub: s } = layoutMiniBars(layoutId);
+  const frameStroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
+  const barFill = active ? 'rgba(255,255,255,0.95)' : '#6e6e73';
+  return (
+    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.w}
+        height={frame.h}
+        rx={frame.r}
+        ry={frame.r}
+        fill="none"
+        stroke={frameStroke}
+        strokeWidth="1.25"
+      />
+      <rect x={t.x} y={t.y} width={t.w} height={t.h} rx="1.5" fill={barFill} />
+      <rect x={s.x} y={s.y} width={s.w} height={s.h} rx="1.25" fill={barFill} opacity="0.82" />
+    </svg>
+  );
+}
+
+/** Ponto de ancoragem da foto (background-position % por slide). — Mesmos ids que LAYOUTS (tl…br). */
+const IMAGE_FOCAL_XY = {
+  tl: [20, 24], tc: [50, 24], tr: [80, 24],
+  ml: [20, 50], mc: [50, 50], mr: [80, 50],
+  bl: [20, 76], bc: [50, 76], br: [80, 76],
+};
+
+/** Presets de «modo» da imagem (encaixe + zoom). */
+const IMAGE_MODE_PRESETS = [
+  { id: 'full', label: 'Preencher', sub: 'cobre a zona · sem barras', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100 } },
+  { id: 'show_all', label: 'Mais quadrado', sub: 'foto toda visível · vãos com fundo do card', patch: { bgFit: 'contain', bgX: 50, bgY: 50, bgZoom: 100 } },
+  { id: 'vertical', label: 'Mais vertical', sub: 'recorte lateral', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 132 } },
+  { id: 'wide', label: 'Mais largo', sub: 'vê mais da cena', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 86 } },
+  { id: 'manual', label: 'Manual', sub: 'zoom % · tamanho livre', patch: { bgFit: 'custom' } },
+];
+
+function activeImageModePresetId(slide) {
+  const fit = slide.bgFit ?? 'cover';
+  const z = slide.bgZoom ?? 100;
+  const x = slide.bgX ?? 50;
+  const y = slide.bgY ?? 50;
+  const nearCenter = Math.abs(x - 50) < 4 && Math.abs(y - 50) < 4;
+  const zNear = (t) => Math.abs(z - t) < 3;
+  if (fit === 'custom') return 'manual';
+  if (fit === 'contain' && zNear(100) && nearCenter) return 'show_all';
+  if (fit === 'cover' && zNear(100) && nearCenter) return 'full';
+  if (fit === 'cover' && z >= 124) return 'vertical';
+  if (fit === 'cover' && z <= 90) return 'wide';
+  return null;
+}
+
+/** Qual célula da grelha 3×3 melhor corresponde a bgX/bgY (null se fora do molde). */
+function activeImageFocalLayoutId(slide) {
+  const x = slide.bgX ?? 50;
+  const y = slide.bgY ?? 50;
+  let best = null;
+  let bestD = Infinity;
+  for (const l of LAYOUTS) {
+    const [px, py] = IMAGE_FOCAL_XY[l.id];
+    const d = (x - px) ** 2 + (y - py) ** 2;
+    if (d < bestD) { bestD = d; best = l.id; }
+  }
+  return bestD < 12 * 12 ? best : null;
+}
+
+function ImageFocalMiniIcon({ layoutId, active }) {
+  const frame = { x: 4, y: 4, w: 36, h: 36, r: 5 };
+  const centers = {
+    tl: [12, 13], tc: [22, 13], tr: [32, 13],
+    ml: [12, 22], mc: [22, 22], mr: [32, 22],
+    bl: [12, 31], bc: [22, 31], br: [32, 31],
+  };
+  const [cx, cy] = centers[layoutId] || [22, 22];
+  const bw = 15;
+  const bh = 10;
+  const frameStroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
+  const blobFill = active ? 'rgba(255,255,255,0.92)' : '#6e6e73';
+  return (
+    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.w}
+        height={frame.h}
+        rx={frame.r}
+        ry={frame.r}
+        fill="none"
+        stroke={frameStroke}
+        strokeWidth="1.25"
+      />
+      <rect
+        x={cx - bw / 2}
+        y={cy - bh / 2}
+        width={bw}
+        height={bh}
+        rx="2"
+        fill={blobFill}
+        opacity="0.95"
+      />
+    </svg>
+  );
+}
+
+/** Região da foto no layout clássico (sem canvas / sem sanduíche cultura). */
+const PHOTO_REGION_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom', 'inset_h_narrow_mid']);
+
+function normalizePhotoRegion(slide) {
+  const r = slide?.photoRegion ?? 'full';
+  return PHOTO_REGION_IDS.has(r) ? r : 'full';
+}
+
+const PHOTO_REGION_GRID = [
+  { id: 'full', lab1: 'FUNDO', lab2: 'CHEIO' },
+  { id: 'inset_h_top', lab1: 'FAIXA', lab2: 'TOPO' },
+  { id: 'inset_h_middle', lab1: 'FAIXA', lab2: 'MEIO' },
+  { id: 'inset_h_bottom', lab1: 'FAIXA', lab2: 'BASE' },
+  { id: 'inset_h_narrow_mid', lab1: 'FAIXA', lab2: 'FINA' },
+];
+
+/** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
+const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
+
+function normalizeCardVisualStyle(v) {
+  const r = typeof v === 'string' ? v : 'full';
+  return CARD_VISUAL_STYLE_IDS.has(r) ? r : 'full';
+}
+
+const CARD_VISUAL_STYLE_OPTIONS = [
+  { id: 'full', short: 'FUNDO', desc: 'Imagem em tela cheia com texto por cima.' },
+  { id: 'inset_h_top', short: 'FOTO ↑', desc: 'Faixa de foto no topo, texto abaixo.' },
+  { id: 'inset_h_middle', short: 'MEIO', desc: 'Título, faixa de foto no meio e subtítulo.' },
+  { id: 'inset_h_bottom', short: 'FOTO ↓', desc: 'Texto no topo, faixa de foto em baixo.' },
+];
+
+function PhotoRegionMiniIcon({ regionId, active }) {
+  const frame = { x: 4, y: 4, w: 36, h: 36, r: 5 };
+  const stroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
+  const fill = active ? 'rgba(255,255,255,0.9)' : '#6e6e73';
+  let inner = null;
+  if (regionId === 'full') {
+    inner = <rect x="9" y="9" width="26" height="26" rx="3" fill={fill} opacity={0.4} />;
+  } else if (regionId === 'inset_h_top') {
+    inner = <rect x="8" y="8" width="28" height="10" rx="2" fill={fill} />;
+  } else if (regionId === 'inset_h_middle') {
+    inner = <rect x="8" y="17" width="28" height="10" rx="2" fill={fill} />;
+  } else if (regionId === 'inset_h_bottom') {
+    inner = <rect x="8" y="26" width="28" height="10" rx="2" fill={fill} />;
+  } else if (regionId === 'inset_h_narrow_mid') {
+    inner = <rect x="10" y="19" width="24" height="7" rx="2" fill={fill} />;
+  }
+  return (
+    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
+      <rect
+        x={frame.x}
+        y={frame.y}
+        width={frame.w}
+        height={frame.h}
+        rx={frame.r}
+        ry={frame.r}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.25"
+      />
+      {inner}
+    </svg>
+  );
+}
+
+const BG_PATTERN_IDS = new Set(['none', 'grid', 'dots', 'hlines', 'dlines', 'diag_grid']);
+
+const BG_PATTERN_OPTIONS = [
+  { id: 'none', label: 'Nenhum' },
+  { id: 'grid', label: 'Grade (quadriculado)' },
+  { id: 'dots', label: 'Bolinhas' },
+  { id: 'hlines', label: 'Linhas horizontais' },
+  { id: 'dlines', label: 'Linhas diagonais' },
+  { id: 'diag_grid', label: 'Xadrez diagonal' },
+];
+
+function vcBgPatternDivStyle(pattern) {
+  if (!pattern || pattern === 'none') return null;
+  const a = 'rgba(128,128,128,0.16)';
+  const b = 'rgba(128,128,128,0.09)';
+  switch (pattern) {
+    case 'grid':
+      return {
+        backgroundImage: `linear-gradient(${a} 1px, transparent 1px), linear-gradient(90deg, ${a} 1px, transparent 1px)`,
+        backgroundSize: '20px 20px',
+      };
+    case 'dots':
+      return {
+        backgroundImage: `radial-gradient(circle, ${a} 1px, transparent 1.5px)`,
+        backgroundSize: '14px 14px',
+      };
+    case 'hlines':
+      return {
+        backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 8px, ${a} 8px, ${a} 9px)`,
+      };
+    case 'dlines':
+      return {
+        backgroundImage: `repeating-linear-gradient(-45deg, transparent, transparent 6px, ${b} 6px, ${b} 7px)`,
+      };
+    case 'diag_grid':
+      return {
+        backgroundImage: `
+          repeating-linear-gradient(45deg, transparent, transparent 9px, ${b} 9px, ${b} 10px),
+          repeating-linear-gradient(-45deg, transparent, transparent 9px, ${b} 9px, ${b} 10px)`,
+      };
+    default:
+      return null;
+  }
+}
+
+function VcBgPatternLayer({ pattern, style: extra }) {
+  const st = vcBgPatternDivStyle(pattern);
+  if (!st) return null;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        ...st,
+        ...(extra || {}),
+      }}
+    />
+  );
+}
 
 // ─── MODOS DE GERAÇÃO ─────────────────────────────────────────────────────────
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
@@ -915,7 +1192,7 @@ const LAYOUTS = [
 const GEN_MODES = [
   {
     id: 'editorial',
-    icon: '📰',
+    Icon: Newspaper,
     label: 'Editorial',
     desc: 'Tese forte, camadas de mercado e leitura que desmonta o óbvio',
     method: `MÉTODO EDITORIAL — leitura estratégica (escala ao número total de slides):
@@ -927,7 +1204,7 @@ EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos e
   },
   {
     id: 'deep',
-    icon: '🔬',
+    Icon: Brain,
     label: 'Profundo',
     desc: 'Autopsia do tema — variáveis, padrão escondido, o que muda na prática',
     method: `MÉTODO PROFUNDO — anatomia do fenômeno (modo "patologista"; escala ao N de slides):
@@ -943,7 +1220,7 @@ Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento
   },
   {
     id: 'pain',
-    icon: '💔',
+    Icon: HeartHandshake,
     label: 'Odisseia da Dor',
     desc: 'Nomeia a dor, valida, mostra o que falhou e uma saída honesta',
     method: `MÉTODO ODISSEIA DA DOR — jornada empática (escala ao N de slides):
@@ -960,7 +1237,7 @@ Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EV
   },
   {
     id: 'viral',
-    icon: '🚀',
+    Icon: TrendingUp,
     label: 'Viral Trends',
     desc: 'Parada de scroll, loop de tensão, prova e frase para guardar ou mandar',
     method: `MÉTODO VIRAL TRENDS — retenção e clareza algorítmica (escala ao N de slides):
@@ -981,7 +1258,7 @@ Tom: curto, rápido, confiante; urgência sem sensacionalismo.`,
   },
   {
     id: 'storytelling',
-    icon: '📖',
+    Icon: BookOpen,
     label: 'Storytelling',
     desc: 'História com arco — cena, tempo e virada (não headline de pitch)',
     method: `MÉTODO STORYTELLING — narrativa em cena (escala ao N de slides):
@@ -998,7 +1275,7 @@ Use verbos no passado/presente; EVITE "muitas pessoas", "em geral", gerúndio em
   },
   {
     id: 'how_to',
-    icon: '🎓',
+    Icon: GraduationCap,
     label: 'Passo-a-passo',
     desc: 'Manual — um passo por slide, imperativo e verificável',
     method: `MÉTODO PASSO-A-PASSO — tutorial replicável (escala ao N de slides):
@@ -1014,7 +1291,7 @@ Se houver mais slides que passos necessários: acrescente slide de checklist rá
   },
   {
     id: 'jornalistico',
-    icon: '🗞',
+    Icon: ScrollText,
     label: 'Jornalístico',
     desc: 'Fio tipo capa digital: selo de editoria, manchete e texto em pirâmide invertida',
     method: `MÉTODO JORNALÍSTICO — fio editorial / digital first (escala ao N de slides):
@@ -1029,7 +1306,7 @@ EVITE: "X mudou tudo" sem nuance; clickbait que o miolo não sustenta; tom de re
   },
   {
     id: 'sensacionalista',
-    icon: '📣',
+    Icon: Megaphone,
     label: 'Sensacionalista',
     desc: 'Ganchos tipo tablóide, tensão extrema e viradas — sem mentir nem prometer miragem',
     method: `MÉTODO SENSACIONALISTA — alto impacto, tom de tablóide moderno (escala ao N de slides):
@@ -1570,7 +1847,31 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
 /** Padding multiplicador por defeito (slider «Distância das bordas»); slides antigos sem campo usam o mesmo fallback na renderização. */
 const DEFAULT_SLIDE_TEXT_INSET = 10;
 
-const mkSlide = (n = 1) => ({
+/** Tipografia padrão da marca (`text*` no doc). Slides novos herdam via `mkSlide(n, brand)`. */
+function typographyPatchFromBrand(brand) {
+  const b = brand && typeof brand === 'object' ? brand : {};
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const tc = b.textTitleCase;
+  const titleCase = tc === 'upper' || tc === 'lower' || tc === 'normal' ? tc : 'normal';
+  let w = num(b.textTitleWeight, 800);
+  if (w < 400) w = 400;
+  if (w > 900) w = 900;
+  return {
+    titleSize: num(b.textTitleSize, 100),
+    subSize: num(b.textSubSize, 100),
+    bodyAfterSize: num(b.textBodyAfterSize, 100),
+    titleTracking: num(b.textTitleTracking, 0),
+    subTracking: num(b.textSubTracking, 0),
+    titleLeading: num(b.textTitleLeading, 105),
+    subLeading: num(b.textSubLeading, 150),
+    titleWeight: w,
+    titleCase,
+  };
+}
+
+const mkSlide = (n = 1, brand = null) => {
+  const t = typographyPatchFromBrand(brand);
+  return {
   id: uid(), num: n,
   title: 'Seu título aqui',
   subtitle: 'Subtítulo descritivo que reforça o gancho principal do carrossel.',
@@ -1586,22 +1887,29 @@ const mkSlide = (n = 1) => ({
   /** 'cover' = preenche o card | 'contain' = imagem inteira visível | 'custom' = zoom % legado */
   bgFit: 'cover',
   bgOpacity: 100, bgMirror: false,
-  overlay: 60, titleSize: 100, subSize: 100,
+  /**
+   * Layout clássico: `full` = foto a fundo atrás do texto.
+   * `inset_h_*` = faixa com margens e cantos arredondados (só sem canvas e sem sanduíche cultura).
+   */
+  photoRegion: 'full',
+  overlay: 60, titleSize: t.titleSize, subSize: t.subSize,
+  /** Textura opcional sobre cor/foto do card (exportada). */
+  bgPattern: 'none',
   /** Tamanho do bloco de texto abaixo da foto (sanduíche / Cultura). Default = subtítulo. */
-  bodyAfterSize: 100,
+  bodyAfterSize: t.bodyAfterSize,
   customBg: null, showHandle: true,
   // text-on-image controls
   textShadow: false,  // drop shadow — desligado por defeito (toggle «Sombra no texto»)
   textBg: false,      // pill/box background behind text block
   textBgOpacity: 55,  // opacity of that box (0-100)
   textInset: DEFAULT_SLIDE_TEXT_INSET, // padding multiplier — how far from edges (1-20)
-  // typography controls (overrides do brand quando definidos por slide)
-  titleTracking: 0,   // letter-spacing extra do título em em*0.01 (-10..30 → -0.10em..+0.30em)
-  subTracking: 0,     // letter-spacing extra do subtítulo
-  titleLeading: 105,  // line-height do título em % (default 105 = 1.05)
-  subLeading: 150,    // line-height do subtítulo (default 150 = 1.50)
-  titleCase: 'normal',// 'normal' | 'upper' | 'lower' (text-transform)
-  titleWeight: 800,   // 400..900
+  // typography controls (valores iniciais da marca; por slide em Cards)
+  titleTracking: t.titleTracking,
+  subTracking: t.subTracking,
+  titleLeading: t.titleLeading,
+  subLeading: t.subLeading,
+  titleCase: t.titleCase,
+  titleWeight: t.titleWeight,
   /** Bloco inferior (modo Tendência/Cultura — layout “sandwich”: texto · imagem inline · texto). */
   bodyAfterImage: '',
   /** '' = auto por índice do slide · 'light' | 'dark' | 'accent' força superfície no sandwich/stat. */
@@ -1613,7 +1921,8 @@ const mkSlide = (n = 1) => ({
   canvas: null,
   /** Intervalos UTF-16 [início,fim exclusivo) na cor Destaques — texto bruto sem marcadores asterisco. */
   destaqueSpans: undefined,
-});
+};
+};
 
 const isDefault = (slides) =>
   Array.isArray(slides) &&
@@ -3085,6 +3394,12 @@ function cultureResolveSurface(slide, num) {
 }
 
 const CANVAS_ZONE_MIN = { w: 8, h: 5 };
+/** Miolo sanduíche: altura-alvo mínima da zona foto (% do card), alinhada ao layout flat (~31%). */
+const SANDWICH_PHOTO_ZONE_MIN_H_PCT = 32;
+/** Se não couber com texto legível, a foto pode descer até este piso (%). */
+const SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT = 20;
+/** Altura mínima das zonas de texto topo/fundo no sanduíche — evita molduras tipo faixa que cortam parágrafos. */
+const SANDWICH_TEXT_ZONE_MIN_H_PCT = 14;
 
 function clampRect(r) {
   const x = Math.max(0, Math.min(100 - CANVAS_ZONE_MIN.w, r.x));
@@ -3183,7 +3498,7 @@ function slideAutoAdjustPatch(slide, { creativePreset, fmt = 'carrossel' }) {
 
   const fFmt = FORMATS[fmt] || FORMATS.carrossel;
   const merged = { ...slide, ...patch };
-  if (merged.canvas?.enabled && merged.canvas.zones && typeof merged.canvas.zones === 'object') {
+  if (merged.canvas?.zones && typeof merged.canvas.zones === 'object' && merged.canvas.variant) {
     const fin = finalizeCanvasMarginsForAutoAdjust(merged, fFmt);
     if (fin?.zones) {
       patch.canvas = { ...slide.canvas, ...(patch.canvas || {}), zones: fin.zones };
@@ -3321,7 +3636,7 @@ function estimateWrappedLines(chars, nlLines, availW_px, fsPx, charWidthFactor =
  */
 function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
   const cv = mergedSlide.canvas;
-  if (!cv?.enabled || !cv.zones || typeof cv.zones !== 'object' || !cv.variant) return null;
+  if (!cv?.zones || typeof cv.zones !== 'object' || !cv.variant) return null;
 
   const baselineInsetPad = mergedSlide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const insetCalc = Math.max(CANVAS_AUTO_TEXT_INSET_MIN, baselineInsetPad);
@@ -3478,6 +3793,11 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     const gapTP = Math.max(1.1, prevPh.y - (prevTp.y + prevTp.h));
     const gapPB = Math.max(1.1, prevBt.y - (prevPh.y + prevPh.h));
 
+    const needTopMin =
+      titleChars > 0 || subChars > 0 ? SANDWICH_TEXT_ZONE_MIN_H_PCT : CANVAS_ZONE_MIN.h;
+    const needBotMin =
+      bodyChars > 0 ? SANDWICH_TEXT_ZONE_MIN_H_PCT : CANVAS_ZONE_MIN.h;
+
     const innerUw = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
     const titFs = f.w * 0.036 * (ts / 100);
     const subFsTop = f.w * 0.031 * (ss / 100);
@@ -3485,7 +3805,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     const subStackLines = estimateWrappedLines(subChars, subLinesNl, innerUw, subFsTop, 0.45);
     const stackGapPx = Math.max(f.h * 0.012, titFs * 0.22);
     let blkTopH = Math.min(
-      55,
+      58,
       ((padYMarg +
         titleStackLines * titFs * tLeadCv +
         stackGapPx +
@@ -3494,34 +3814,63 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
         f.h) *
         100,
     );
-    blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
+    blkTopH = Math.max(needTopMin, blkTopH);
 
     const bodyFs = f.w * 0.029 * (bs / 100);
     const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
     const bodyEffLines = estimateWrappedLines(bodyChars, Math.max(bodyLinesNl, bodyParas), innerUw, bodyFs, 0.45);
     let blkBotH = Math.min(
-      54,
+      58,
       ((bodyEffLines * bodyFs * bodyLeadCv + padYMarg + bodyFs * 0.26) / f.h) * 100,
     );
-    blkBotH = Math.max(CANVAS_ZONE_MIN.h, Math.max(prevBt.h, blkBotH));
+    blkBotH = Math.max(needBotMin, Math.max(prevBt.h, blkBotH));
 
     const topY = CANVAS_AUTO_EDGE_PCT;
+    const photoFloor = SANDWICH_PHOTO_ZONE_MIN_H_PCT;
+    const photoAbsMin = SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT;
     let photoY = topY + blkTopH + gapTP;
     let botY = bottomLim - blkBotH;
     let photoH = botY - gapPB - photoY;
 
-    for (let iter = 0; iter < 10 && photoH < CANVAS_ZONE_MIN.h; iter++) {
-      if (blkBotH > CANVAS_ZONE_MIN.h + 1.2) blkBotH -= 1.5;
-      else if (blkTopH > CANVAS_ZONE_MIN.h + 1.2) blkTopH -= 1.5;
+    for (let iter = 0; iter < 120 && photoH < photoFloor; iter++) {
+      if (blkBotH > needBotMin + 0.6) blkBotH -= 1.2;
+      else if (blkTopH > needTopMin + 0.6) blkTopH -= 1.2;
+      else break;
       photoY = topY + blkTopH + gapTP;
       botY = bottomLim - blkBotH;
       photoH = botY - gapPB - photoY;
     }
-    if (photoH < CANVAS_ZONE_MIN.h) {
-      photoH = CANVAS_ZONE_MIN.h;
+    if (photoH < photoFloor) {
+      photoH = photoFloor;
+      const maxPhotoY = bottomLim - needBotMin - gapPB - photoH;
+      if (photoY > maxPhotoY) {
+        blkTopH = Math.max(needTopMin, blkTopH - (photoY - maxPhotoY));
+        photoY = topY + blkTopH + gapTP;
+      }
       botY = photoY + photoH + gapPB;
-      blkBotH = Math.max(CANVAS_ZONE_MIN.h, bottomLim - botY);
+      blkBotH = bottomLim - botY;
     }
+
+    /** Garante altura útil mínima para o texto inferior (encolhe foto e só depois o topo). */
+    const rebalanceForTextMin = () => {
+      botY = photoY + photoH + gapPB;
+      blkBotH = bottomLim - botY;
+      let guard = 0;
+      while (blkBotH + 0.08 < needBotMin && guard < 90) {
+        guard += 1;
+        if (photoH > photoAbsMin + 0.35) {
+          photoH -= 0.95;
+        } else if (blkTopH > needTopMin + 0.35) {
+          blkTopH -= 0.95;
+          photoY = topY + blkTopH + gapTP;
+        } else {
+          break;
+        }
+        botY = photoY + photoH + gapPB;
+        blkBotH = bottomLim - botY;
+      }
+    };
+    rebalanceForTextMin();
 
     const top = clampRect({ ...prevTp, x: ux, w: uw, y: topY, h: blkTopH });
     const photo = clampRect({ ...prevPh, x: ux, w: uw, y: photoY, h: photoH });
@@ -3534,6 +3883,11 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     const prevTp = clampRect(zones.top || DEFAULT_CANVAS_ZONES_STAT.top);
     const prevBt = clampRect(zones.bottom || DEFAULT_CANVAS_ZONES_STAT.bottom);
     const gapTB = Math.max(1.1, prevBt.y - (prevTp.y + prevTp.h));
+
+    const statNeedTop =
+      titleChars > 0 || subChars > 0 ? SANDWICH_TEXT_ZONE_MIN_H_PCT : CANVAS_ZONE_MIN.h;
+    const statNeedBot =
+      bodyChars > 0 ? SANDWICH_TEXT_ZONE_MIN_H_PCT : CANVAS_ZONE_MIN.h;
 
     const innerUw = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
     const titFs = f.w * 0.036 * (ts / 100);
@@ -3551,7 +3905,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
         f.h) *
         100,
     );
-    blkTopH = Math.max(CANVAS_ZONE_MIN.h, blkTopH);
+    blkTopH = Math.max(statNeedTop, blkTopH);
 
     const bodyFsStat = f.w * 0.029 * (bs / 100);
     const bodyParas = Math.max(bodyLinesNl, String(mergedSlide.bodyAfterImage ?? '').split(/\n\n+/).filter((p) => p.trim()).length);
@@ -3560,19 +3914,19 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
       58,
       ((bodyEffLines * bodyFsStat * bodyLeadCv + padYMarg + bodyFsStat * 0.26) / f.h) * 100,
     );
-    blkBotH = Math.max(CANVAS_ZONE_MIN.h, Math.max(prevBt.h, blkBotH));
+    blkBotH = Math.max(statNeedBot, Math.max(prevBt.h, blkBotH));
 
     const topY = CANVAS_AUTO_EDGE_PCT;
     let botY = topY + blkTopH + gapTB;
     let space = bottomLim - botY;
-    if (blkBotH > space - 0.35) blkBotH = Math.max(CANVAS_ZONE_MIN.h, space - 0.35);
+    if (blkBotH > space - 0.35) blkBotH = Math.max(statNeedBot, space - 0.35);
     if (topY + blkTopH + gapTB + blkBotH > bottomLim) {
-      blkTopH = Math.max(CANVAS_ZONE_MIN.h, bottomLim - gapTB - blkBotH - topY);
+      blkTopH = Math.max(statNeedTop, bottomLim - gapTB - blkBotH - topY);
     }
 
     const top = clampRect({ ...prevTp, x: ux, w: uw, y: topY, h: blkTopH });
     botY = top.y + top.h + gapTB;
-    blkBotH = Math.min(blkBotH, Math.max(CANVAS_ZONE_MIN.h, bottomLim - botY - 0.35));
+    blkBotH = Math.min(blkBotH, Math.max(statNeedBot, bottomLim - botY - 0.35));
     const bot = clampRect({ ...prevBt, x: ux, w: uw, y: botY, h: blkBotH });
 
     zones = { ...zones, top, bottom: bot };
@@ -3591,7 +3945,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
 function applyFinalizeCanvasMarginsToSlides(slides, fmt = 'carrossel') {
   const fFmt = FORMATS[fmt] || FORMATS.carrossel;
   return slides.map((slide) => {
-    if (!slide.canvas?.enabled || !slide.canvas.zones || typeof slide.canvas.zones !== 'object' || !slide.canvas.variant)
+    if (!slide.canvas?.zones || typeof slide.canvas.zones !== 'object' || !slide.canvas.variant)
       return slide;
     const fin = finalizeCanvasMarginsForAutoAdjust(slide, fFmt);
     if (!fin?.zones) return slide;
@@ -3711,29 +4065,48 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
   }
 
   if (canvas.variant === 'sandwich') {
+    const photoFloor = SANDWICH_PHOTO_ZONE_MIN_H_PCT;
+    const photoAbsMin = SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT;
+    const needTopMin =
+      String(mergedSlide.title ?? '').trim().length > 0 || String(mergedSlide.subtitle ?? '').trim().length > 0
+        ? SANDWICH_TEXT_ZONE_MIN_H_PCT
+        : CANVAS_ZONE_MIN.h;
+    const needBotMin =
+      String(mergedSlide.bodyAfterImage ?? '').trim().length > 0 ? SANDWICH_TEXT_ZONE_MIN_H_PCT : CANVAS_ZONE_MIN.h;
     const top = clampRect(zIn.top || DEFAULT_CANVAS_ZONES_SANDWICH.top);
     const photo = clampRect(zIn.photo || DEFAULT_CANVAS_ZONES_SANDWICH.photo);
     const bottom = clampRect(zIn.bottom || DEFAULT_CANVAS_ZONES_SANDWICH.bottom);
     const gapTP = Math.max(0.5, photo.y - (top.y + top.h));
     const gapPB = Math.max(0.5, bottom.y - (photo.y + photo.h));
-    const newTopH = Math.max(CANVAS_ZONE_MIN.h, top.h * Math.max(rT, rS));
-    const newBotH = Math.max(CANVAS_ZONE_MIN.h, bottom.h * rB);
+    const newTopH = Math.max(needTopMin, top.h * Math.max(rT, rS));
+    const newBotH = Math.max(needBotMin, bottom.h * rB);
     const photoY = top.y + newTopH + gapTP;
     let botY = bottom.y;
     let botHAdj = newBotH;
     if (botY + botHAdj > 98) botY = 98 - botHAdj;
     let photoH = botY - gapPB - photoY;
-    if (photoH < CANVAS_ZONE_MIN.h) {
-      const shortage = CANVAS_ZONE_MIN.h - photoH;
-      botHAdj = Math.max(CANVAS_ZONE_MIN.h, botHAdj - shortage);
+    if (photoH < photoFloor) {
+      const shortage = photoFloor - photoH;
+      botHAdj = Math.max(needBotMin, botHAdj - shortage);
       botY = Math.min(bottom.y, 98 - botHAdj);
-      photoH = Math.max(CANVAS_ZONE_MIN.h, botY - gapPB - photoY);
-      if (photoH < CANVAS_ZONE_MIN.h) {
-        botY = Math.min(98 - CANVAS_ZONE_MIN.h, photoY + gapPB + CANVAS_ZONE_MIN.h);
-        botHAdj = Math.max(CANVAS_ZONE_MIN.h, 98 - botY);
-        photoH = Math.max(CANVAS_ZONE_MIN.h, botY - gapPB - photoY);
+      photoH = Math.max(photoAbsMin, botY - gapPB - photoY);
+      if (photoH < photoFloor) {
+        botY = Math.min(98 - needBotMin, photoY + gapPB + photoFloor);
+        botHAdj = Math.max(needBotMin, 98 - botY);
+        photoH = Math.max(photoAbsMin, botY - gapPB - photoY);
       }
     }
+    botY = photoY + photoH + gapPB;
+    let spaceForBottom = 98 - botY;
+    let guardFs = 0;
+    while (spaceForBottom + 0.08 < needBotMin && photoH > photoAbsMin + 0.35 && guardFs < 90) {
+      guardFs += 1;
+      photoH -= 0.95;
+      botY = photoY + photoH + gapPB;
+      spaceForBottom = 98 - botY;
+    }
+    botHAdj = 98 - botY;
+
     return {
       canvas: {
         ...canvas,
@@ -4202,6 +4575,7 @@ const ClassicCanvasInner = React.forwardRef(({
               : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
           }}/>
         )}
+        <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
         {imgLoading && (
           <div style={{
             position:'absolute', inset:0, zIndex:5,
@@ -4236,6 +4610,7 @@ const ClassicCanvasInner = React.forwardRef(({
       ref={ref}
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
+      <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <div
         style={photoZoneBoxStyle}
         onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
@@ -4416,14 +4791,13 @@ const ClassicCanvasInner = React.forwardRef(({
 
       {brand.showHandle && slide.showHandle && !hideInstaBadge && (
         <div style={{
-          position:'absolute', top:f.h*0.038, left:f.w*0.05,
+          ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
           background:'rgba(255,255,255,0.08)',
           backdropFilter:'blur(12px)',
           padding:`${f.h*0.01}px ${f.w*0.022}px`,
           borderRadius:999,
           border:'1px solid rgba(255,255,255,0.12)',
-          zIndex: 22,
         }}>
           <div style={{
             width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
@@ -4442,7 +4816,7 @@ const ClassicCanvasInner = React.forwardRef(({
                   src={brand.handleAvatar}
                   alt=""
                   draggable={false}
-                  style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                  style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
                 <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -4495,6 +4869,407 @@ const ClassicCanvasInner = React.forwardRef(({
   );
 });
 ClassicCanvasInner.displayName = 'ClassicCanvasInner';
+
+/** Clássico: foto em faixa horizontal com margens (sem canvas / sem sanduíche cultura no card). */
+const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
+  f,
+  slide,
+  brand,
+  bg,
+  L,
+  isBebas,
+  titleFF,
+  bodyFF,
+  displayTitleInk,
+  displayBodyInk,
+  cultureRichText,
+  cultureAccentCol,
+  sandwichSkin,
+  showCultureIdx,
+  num,
+  total,
+  hideInstaBadge,
+  imgReady,
+  imgErr,
+  imgLoading,
+  imgModeNorm,
+  effectivePresentationFilter,
+  bgFit,
+  bgPos,
+  bgScale,
+  photoRegionId,
+  onPhotoZoneClick,
+  showCanvasChrome,
+}, ref) => {
+  const pr = photoRegionId;
+  const bandFrac = pr === 'inset_h_narrow_mid' ? 0.28 : 0.36;
+  const sideM = f.w * 0.06;
+  const rad = f.w * 0.022;
+  const bandH = f.h * bandFrac;
+  const inset = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  const padH = f.w * (0.04 + inset * 0.004);
+  const shadow = slide.textShadow !== false
+    ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
+    : 'none';
+  const textBgColor = slide.textBg
+    ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
+    : 'transparent';
+  const alignItemsBox =
+    slide.align === 'center' ? 'center' :
+    slide.align === 'right' ? 'flex-end' :
+    slide.align === 'justify' ? 'stretch' : 'flex-start';
+
+  const textGlass = (children) => (
+    <div style={{
+      background: textBgColor,
+      backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+      borderRadius: slide.textBg ? f.w * 0.025 : 0,
+      padding: slide.textBg ? `${f.h * 0.022}px ${f.w * 0.04}px` : 0,
+      display: 'inline-flex',
+      flexDirection: 'column',
+      alignItems: alignItemsBox,
+      gap: f.h * 0.018,
+      maxWidth: '100%',
+    }}>{children}</div>
+  );
+
+  const titleEl = (
+    <h1 style={{
+      color: displayTitleInk, fontFamily: titleFF,
+      fontSize: f.w * 0.084 * (slide.titleSize / 100),
+      lineHeight: (slide.titleLeading ?? 105) / 100,
+      fontWeight: slide.titleWeight ?? 800,
+      letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
+      margin: 0,
+      textTransform:
+        slide.titleCase === 'upper' ? 'uppercase' :
+        slide.titleCase === 'lower' ? 'lowercase' :
+        isBebas ? 'uppercase' : 'none',
+      textShadow: shadow,
+    }}>{cultureRichText ? (
+      <CultureInlineRich
+        text={slide.title || ''}
+        destaqueSpans={slide.destaqueSpans?.title}
+        baseColor={displayTitleInk}
+        accentColor={cultureAccentCol}
+        fontFamily={titleFF}
+        fontSize={f.w * 0.084 * (slide.titleSize / 100)}
+        lineHeight={(slide.titleLeading ?? 105) / 100}
+        fontWeight={slide.titleWeight ?? 800}
+        letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
+      />
+    ) : slide.title}</h1>
+  );
+
+  const subtitleEl = slide.subtitle ? (
+    cultureRichText ? (
+      <div style={{
+        margin: 0,
+        maxWidth: '100%',
+        letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+        textShadow: shadow,
+      }}>
+        <CultureRichParagraphs
+          text={slide.subtitle}
+          destaqueSpans={slide.destaqueSpans?.subtitle}
+          ink={displayBodyInk}
+          accentColor={cultureAccentCol}
+          fontFamily={bodyFF}
+          fontSize={f.w * 0.028 * (slide.subSize / 100)}
+          lineHeight={(slide.subLeading ?? 150) / 100}
+          fontWeight={400}
+          letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+          paraGap={f.h * 0.010}
+        />
+      </div>
+    ) : (
+      <p style={{
+        color: displayBodyInk, fontFamily: bodyFF,
+        fontSize: f.w * 0.028 * (slide.subSize / 100),
+        lineHeight: (slide.subLeading ?? 150) / 100,
+        fontWeight: 400, margin: 0,
+        letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+        textShadow: shadow,
+      }}>{slide.subtitle}</p>
+    )
+  ) : null;
+
+  const bothText = textGlass(<>{titleEl}{subtitleEl}</>);
+  const titleOnlyWrapped = textGlass(<>{titleEl}</>);
+  const subOnlyWrapped = textGlass(<>{subtitleEl}</>);
+
+  const bandClickable = !!(onPhotoZoneClick && (showCanvasChrome || slideHasPendingPhotoIntent(slide)) && !slide.bgImage);
+
+  const photoBand = (
+    <div
+      role={bandClickable ? 'button' : undefined}
+      onClick={bandClickable ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+      style={{
+        flex: '0 0 auto',
+        height: bandH,
+        marginLeft: sideM,
+        marginRight: sideM,
+        borderRadius: rad,
+        overflow: 'hidden',
+        position: 'relative',
+        background: bg,
+        zIndex: 2,
+        cursor: bandClickable ? 'pointer' : undefined,
+      }}
+    >
+      {slide.bgImage && imgReady && !imgErr ? (
+        <>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${slide.bgImage})`,
+            backgroundPosition: bgPos,
+            backgroundRepeat: 'no-repeat',
+            opacity: slide.bgOpacity / 100,
+            ...(bgFit === 'custom'
+              ? {
+                  backgroundSize: `${slide.bgZoom}%`,
+                  transform: slide.bgMirror ? 'scaleX(-1)' : 'none',
+                }
+              : {
+                  backgroundSize: bgFit === 'contain' ? 'contain' : 'cover',
+                  transform: `${slide.bgMirror ? 'scaleX(-1) ' : ''}scale(${bgScale})`,
+                  transformOrigin: bgPos,
+                }),
+            ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
+          }}/>
+          {slide.overlay > 0 ? (
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+              background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay / 100 * 0.35}) 0%, rgba(0,0,0,${slide.overlay / 100 * 0.88}) 100%)`,
+            }}/>
+          ) : null}
+        </>
+      ) : slideHasPendingPhotoIntent(slide) ? (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-muted)', fontSize: f.w * 0.024, fontWeight: 600, textAlign: 'center', padding: f.w * 0.04,
+        }}>Toque para inserir foto</div>
+      ) : null}
+    </div>
+  );
+
+  const textColBase = {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: L.jc,
+    alignItems: L.ai,
+    overflow: 'hidden',
+    textAlign: slide.align,
+    ...VC_TEXT_ZONE_STYLE,
+  };
+
+  let mainColumn = null;
+  if (pr === 'inset_h_top') {
+    mainColumn = (
+      <>
+        {photoBand}
+        <div style={{ ...textColBase, padding: `${f.h * 0.014}px ${padH}px ${f.h * 0.02}px`, gap: f.h * 0.01 }}>
+          {bothText}
+        </div>
+      </>
+    );
+  } else if (pr === 'inset_h_bottom') {
+    mainColumn = (
+      <>
+        <div style={{ ...textColBase, padding: `${f.h * 0.04}px ${padH}px ${f.h * 0.012}px` }}>
+          {bothText}
+        </div>
+        {photoBand}
+      </>
+    );
+  } else {
+    mainColumn = (
+      <>
+        <div style={{
+          ...textColBase,
+          flex: '1 1 0',
+          justifyContent: 'center',
+          padding: `${f.h * 0.02}px ${padH}px ${f.h * 0.01}px`,
+        }}>
+          {titleOnlyWrapped}
+        </div>
+        {photoBand}
+        <div style={{
+          ...textColBase,
+          flex: '1 1 0',
+          justifyContent: 'center',
+          padding: `${f.h * 0.01}px ${padH}px ${f.h * 0.02}px`,
+        }}>
+          {subOnlyWrapped}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: f.w,
+        height: f.h,
+        background: bg,
+        position: 'relative',
+        overflow: 'hidden',
+        fontFamily: bodyFF,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
+
+      {imgLoading && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 5,
+          background: 'rgba(10,9,8,0.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: f.h * 0.018,
+        }}>
+          <div style={{
+            width: f.w * 0.07, height: f.w * 0.07,
+            borderRadius: '50%',
+            border: `${f.w * 0.006}px solid rgba(255,255,255,0.1)`,
+            borderTopColor: 'var(--accent)',
+            animation: 'spin 0.9s linear infinite',
+          }}/>
+          <span style={{
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: f.w * 0.026,
+            fontWeight: 600,
+            letterSpacing: '-0.011em',
+          }}>
+            {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
+          </span>
+          {imgModeNorm === 'dalle' && (
+            <span style={{
+              color: 'rgba(255,255,255,0.32)',
+              fontSize: f.w * 0.02,
+              letterSpacing: '-0.011em',
+            }}>GPT Image 2 · OpenAI · ~30s por slide</span>
+          )}
+        </div>
+      )}
+
+      {sandwichSkin && (() => {
+        const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
+        const onPhoto = !!(slide.bgImage && imgReady && !imgErr);
+        const barMuted = onPhoto ? 'rgba(255,255,255,0.62)' : 'rgba(29,29,31,0.45)';
+        return (
+          <>
+            {hasHdr && (
+              <div style={{
+                position: 'absolute', top: f.h * 0.028, left: f.w * 0.05, right: f.w * 0.16, zIndex: 24,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: f.w * 0.02,
+              }}>
+                <span style={{
+                  fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF, fontWeight: 400, letterSpacing: '-0.011em',
+                  maxWidth: '34%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{(brand.cultureHeaderLeft || '').trim()}</span>
+                <span style={{
+                  flex: 1, textAlign: 'center', fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF, fontWeight: 600,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{brand.handle}</span>
+                <span style={{ fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF }}>
+                  {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
+                </span>
+              </div>
+            )}
+            {showCultureIdx && (
+              <div style={{
+                position: 'absolute', top: f.h * 0.032, right: f.w * 0.05, zIndex: 26,
+                background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
+                color: onPhoto ? '#fff' : '#1d1d1f',
+                padding: `${f.h * 0.006}px ${f.w * 0.022}px`, borderRadius: 999,
+                fontSize: f.w * 0.026, fontWeight: 600, fontFamily: bodyFF, letterSpacing: '-0.02em',
+              }}>{num}/{total}</div>
+            )}
+          </>
+        );
+      })()}
+
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 3,
+        paddingTop: sandwichSkin ? f.h * 0.052 : f.h * 0.02,
+        gap: f.h * 0.012,
+      }}>
+        {mainColumn}
+      </div>
+
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
+        <div style={{
+          ...vcHandleBadgeBoxPositionStyle(brand),
+          display: 'flex', alignItems: 'center', gap: f.w * 0.012,
+          background: 'rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(12px)',
+          padding: `${f.h * 0.01}px ${f.w * 0.022}px`,
+          borderRadius: 999,
+          border: '1px solid rgba(255,255,255,0.12)',
+        }}>
+          <div style={{
+            width: f.w * 0.034, height: f.w * 0.034, borderRadius: '50%',
+            background: 'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              width: '76%', height: '76%', borderRadius: '50%',
+              overflow: 'hidden',
+              background: brand.handleAvatar ? '#0a0a0a' : bg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {brand.handleAvatar ? (
+                <img
+                  src={brand.handleAvatar}
+                  alt=""
+                  draggable={false}
+                  style={vcHandleAvatarImgStyle(brand)}
+                />
+              ) : (
+                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '54%', height: '54%', borderRadius: '50%', border: `${f.w * 0.004}px solid ${brand.titleColor}` }}/>
+                </div>
+              )}
+            </div>
+          </div>
+          <span style={{ color: brand.titleColor, fontSize: f.w * 0.022, fontWeight: 600, fontFamily: bodyFF, letterSpacing: '-0.01em' }}>
+            {brand.handle}
+          </span>
+        </div>
+      )}
+
+      {brand.logo && (() => {
+        const handleAtTop = brand.showHandle;
+        const pos = brand.logoPosition || 'tr';
+        const margin = f.w * 0.045;
+        const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+        const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
+        const style = {
+          position: 'absolute',
+          width: sizePx, height: sizePx,
+          opacity: (brand.logoOpacity ?? 90) / 100,
+          backgroundImage: `url(${brand.logo})`,
+          backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+          zIndex: 23,
+        };
+        if (pos === 'tl') Object.assign(style, { top: margin, left: margin });
+        if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
+        if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
+        if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+        return <div style={style} aria-hidden />;
+      })()}
+    </div>
+  );
+});
+ClassicLegadoInsetPhotoColumn.displayName = 'ClassicLegadoInsetPhotoColumn';
 
 // ─── SLIDE CARD ───────────────────────────────────────────────────────────────
 
@@ -4614,9 +5389,18 @@ const SlideCardInner = React.forwardRef(({
   let inner;
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
   const cvVar = slide.canvas?.variant;
+  const cultureLayoutInferred = inferCanvasDefaults(slide, creativePreset);
+  const cultureVariantForLayout = slide.canvas?.variant ?? cultureLayoutInferred.variant;
+  const cultureZonesForLayout =
+    slide.canvas?.zones && typeof slide.canvas.zones === 'object'
+      ? slide.canvas.zones
+      : cultureLayoutInferred.zones;
+  const useCultureCanvasZones =
+    (sandwich || cultureStatFlat) &&
+    (cultureVariantForLayout === 'sandwich' || cultureVariantForLayout === 'stat');
 
-  if ((sandwich || cultureStatFlat) && cvEnabled && (cvVar === 'sandwich' || cvVar === 'stat')) {
-    const z = slide.canvas.zones;
+  if (useCultureCanvasZones) {
+    const z = cultureZonesForLayout;
     const surface = cultureResolveSurface(slide, num);
     const lightCultureBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
@@ -4648,6 +5432,7 @@ const SlideCardInner = React.forwardRef(({
         ref={ref}
         style={{ width:f.w, height:f.h, background:bgSolid, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
       >
+        <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
           <div style={{
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
@@ -4741,7 +5526,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
         </div>
 
-        {cvVar === 'sandwich' && (
+        {cultureVariantForLayout === 'sandwich' && (
           <div
             style={{
               ...sandwichPhotoBoxStyle,
@@ -4778,6 +5563,7 @@ const SlideCardInner = React.forwardRef(({
                     }}
                   />
                 ) : null}
+                <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
               </>
             )}
             {sandwich && !slide.bgImage && (
@@ -4827,14 +5613,14 @@ const SlideCardInner = React.forwardRef(({
           />
         </div>
 
-        {showCanvasChrome && onCanvasPatch && (
+        {showCanvasChrome && onCanvasPatch && cvEnabled && (
           <CanvasZonesOverlay
             f={f}
             zones={slide.canvas.zones}
-            keys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
+            keys={cultureVariantForLayout === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
             onPatch={onCanvasPatch}
             swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
-            swapZoneKeys={cvVar === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
+            swapZoneKeys={cultureVariantForLayout === 'stat' ? ['top', 'bottom'] : ['top', 'photo', 'bottom']}
             photoZoneTap={onPhotoZoneNativeFile ? null : (onPhotoZoneClick || null)}
             photoZoneFileChange={onPhotoZoneNativeFile ? onPhotoZoneFileInputChange : null}
             interactionScale={scale}
@@ -4878,9 +5664,9 @@ const SlideCardInner = React.forwardRef(({
     const flatPhotoPlaceholderStyle = {
       width: '100%',
       borderRadius: f.w * 0.017,
-      height: f.h * 0.31,
-      minHeight: f.h * 0.27,
-      maxHeight: f.h * 0.34,
+      height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
+      minHeight: f.h * 0.26,
+      maxHeight: f.h * 0.38,
       flex: '0 0 auto',
       flexShrink: 0,
       background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
@@ -4899,6 +5685,7 @@ const SlideCardInner = React.forwardRef(({
         ref={ref}
         style={{ width:f.w, height:f.h, background:bgSolid, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
       >
+        <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
           <div style={{
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
@@ -5025,9 +5812,9 @@ const SlideCardInner = React.forwardRef(({
             <div style={{
               width:'100%',
               flex: '0 0 auto',
-              height: f.h * 0.31,
-              minHeight: f.h * 0.27,
-              maxHeight: f.h * 0.36,
+              height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
+              minHeight: f.h * 0.26,
+              maxHeight: f.h * 0.38,
               borderRadius: f.w * 0.017,
               overflow:'hidden',
               flexShrink:0,
@@ -5046,6 +5833,7 @@ const SlideCardInner = React.forwardRef(({
                   background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
                 }}/>
               ) : null}
+              <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
             </div>
           )}
           <CultureRichParagraphs
@@ -5119,6 +5907,40 @@ const SlideCardInner = React.forwardRef(({
         interactionScale={scale}
       />
     );
+  } else if (normalizePhotoRegion(slide) !== 'full' && !cvEnabled && !(sandwich || cultureStatFlat)) {
+    inner = (
+      <ClassicLegadoInsetPhotoColumn
+        ref={ref}
+        f={f}
+        slide={slide}
+        brand={brand}
+        bg={bg}
+        L={L}
+        isBebas={isBebas}
+        titleFF={titleFF}
+        bodyFF={bodyFF}
+        displayTitleInk={displayTitleInk}
+        displayBodyInk={displayBodyInk}
+        cultureRichText={cultureRichText}
+        cultureAccentCol={cultureAccentCol}
+        sandwichSkin={sandwichSkin}
+        showCultureIdx={showCultureIdx}
+        num={num}
+        total={total}
+        hideInstaBadge={hideInstaBadge}
+        imgReady={imgReady}
+        imgErr={imgErr}
+        imgLoading={imgLoading}
+        imgModeNorm={imgModeNorm}
+        effectivePresentationFilter={effectivePresentationFilter}
+        bgFit={bgFit}
+        bgPos={bgPos}
+        bgScale={bgScale}
+        photoRegionId={normalizePhotoRegion(slide)}
+        onPhotoZoneClick={onPhotoZoneClick}
+        showCanvasChrome={showCanvasChrome}
+      />
+    );
   } else {
     inner = (
     <div
@@ -5156,6 +5978,7 @@ const SlideCardInner = React.forwardRef(({
             : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
         }}/>
       )}
+      <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
 
       {/* Loading até a URL da imagem terminar de baixar */}
       {imgLoading && (
@@ -5229,7 +6052,7 @@ const SlideCardInner = React.forwardRef(({
       {/* Handle badge */}
       {brand.showHandle && slide.showHandle && !hideInstaBadge && (
         <div style={{
-          position:'absolute', top:f.h*0.038, left:f.w*0.05,
+          ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
           background:'rgba(255,255,255,0.08)',
           backdropFilter:'blur(12px)',
@@ -5254,7 +6077,7 @@ const SlideCardInner = React.forwardRef(({
                   src={brand.handleAvatar}
                   alt=""
                   draggable={false}
-                  style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                  style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
                 <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -5620,9 +6443,17 @@ function ModePicker({ value, onChange }) {
                 fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
                 color: on ? 'var(--accent)' : 'var(--text-primary)',
                 letterSpacing:'-0.011em',
-                display:'flex', alignItems:'center', gap:6,
+                display:'flex', alignItems:'center', gap:8,
               }}>
-                <span aria-hidden style={{ fontSize:14 }}>{m.icon}</span>
+                <m.Icon
+                  size={17}
+                  strokeWidth={2}
+                  aria-hidden
+                  style={{
+                    flexShrink:0,
+                    color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                  }}
+                />
                 {m.label}
               </div>
               <div style={{
@@ -5639,9 +6470,18 @@ function ModePicker({ value, onChange }) {
         fontFamily:'var(--font-ui)', lineHeight:1.5,
         padding:'7px 10px', background:'var(--bg-card)',
         border:'1px dashed var(--border)', borderRadius:8,
+        display:'flex', alignItems:'flex-start', gap:8,
       }}>
-        <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>{active.icon} {active.label}: </span>
-        {active.desc}.
+        <active.Icon
+          size={16}
+          strokeWidth={2}
+          aria-hidden
+          style={{ flexShrink:0, marginTop:1, color:'var(--accent)' }}
+        />
+        <span>
+          <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>{active.label}: </span>
+          {active.desc}.
+        </span>
       </div>
     </div>
   );
@@ -5668,12 +6508,18 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
         </div>
         <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {GEN_MODES.map((m) => (
-            <li key={m.id}>
-              <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                {m.icon} {m.label}
+            <li key={m.id} style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+              <m.Icon
+                size={15}
+                strokeWidth={2}
+                aria-hidden
+                style={{ flexShrink:0, marginTop:2, color:'var(--text-secondary)' }}
+              />
+              <span>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{m.label}</span>
+                {' — '}
+                {NARRATIVE_MODE_REF_VOICE_PAIRING[m.id]}
               </span>
-              {' — '}
-              {NARRATIVE_MODE_REF_VOICE_PAIRING[m.id]}
             </li>
           ))}
         </ul>
@@ -5737,10 +6583,10 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
 // (persistem entre re-aberturas) e só viram instrução de prompt fora da faixa
 // neutra (35..65) — assim "centro" significa "deixa a IA decidir".
 const IMG_AXES = [
-  { key:'fidelity',    icon:'🎯', label:'Fidelidade ao tema', left:'Metafórico', right:'Literal',     hint:'Quão direto a imagem retrata o assunto' },
-  { key:'creativity',  icon:'✦',  label:'Criatividade',       left:'Convencional', right:'Inusitado',  hint:'Composições clássicas vs inesperadas' },
-  { key:'irreverence', icon:'😏', label:'Irreverência',       left:'Sério',     right:'Cheeky',        hint:'Tom contemplativo vs bem-humorado' },
-  { key:'objectivity', icon:'📷', label:'Objetividade',       left:'Atmosférico', right:'Documental',  hint:'Atmosfera/emoção vs ação/fato' },
+  { key:'fidelity',    Icon: Target,   label:'Fidelidade ao tema', left:'Metafórico', right:'Literal',     hint:'Quão direto a imagem retrata o assunto' },
+  { key:'creativity',  Icon: Sparkles, label:'Criatividade',       left:'Convencional', right:'Inusitado',  hint:'Composições clássicas vs inesperadas' },
+  { key:'irreverence', Icon: Flame,    label:'Irreverência',       left:'Sério',     right:'Cheeky',        hint:'Tom contemplativo vs bem-humorado' },
+  { key:'objectivity', Icon: Camera,   label:'Objetividade',       left:'Atmosférico', right:'Documental',  hint:'Atmosfera/emoção vs ação/fato' },
 ];
 function ImgParamsPanel({ value, onChange }) {
   const reset = () => IMG_AXES.forEach(a => onChange(a.key, 50));
@@ -5781,9 +6627,9 @@ function ImgParamsPanel({ value, onChange }) {
               }}>
                 <span style={{
                   fontSize:12, fontWeight:600, color:'var(--text-secondary)',
-                  letterSpacing:'-0.011em', display:'flex', alignItems:'center', gap:6,
+                  letterSpacing:'-0.011em', display:'flex', alignItems:'center', gap:8,
                 }}>
-                  <span aria-hidden style={{ fontSize:13 }}>{axis.icon}</span>
+                  <axis.Icon size={16} strokeWidth={2} aria-hidden style={{ flexShrink:0, color:'var(--text-secondary)' }} />
                   {axis.label}
                 </span>
                 <span style={{
@@ -6534,6 +7380,8 @@ function GenerateModal({
   onCreativePresetChange,
   slideTextDensity: defaultSlideTextDensity = '1_1',
   onSlideTextDensityChange,
+  cardVisualStyle: defaultCardVisualStyle = 'full',
+  onCardVisualStyleChange,
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
 }) {
@@ -6547,6 +7395,10 @@ function GenerateModal({
   useEffect(() => { if (open) setMode(defaultMode); }, [open, defaultMode]);
   useEffect(() => { if (open) setPackCreative(defaultCreativePreset || 'livre'); }, [open, defaultCreativePreset]);
   useEffect(() => { if (open) setTextDensity(defaultSlideTextDensity || '1_1'); }, [open, defaultSlideTextDensity]);
+  const [cardStyle, setCardStyle] = useState(() => normalizeCardVisualStyle(defaultCardVisualStyle));
+  useEffect(() => {
+    if (open) setCardStyle(normalizeCardVisualStyle(defaultCardVisualStyle));
+  }, [open, defaultCardVisualStyle]);
   // Cópia local mutável dos eixos da imagem (commit no doc só ao gerar)
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
@@ -6604,6 +7456,7 @@ function GenerateModal({
       onModeChange?.(narrativeForGenerate);
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
+      onCardVisualStyleChange?.(cardStyle);
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
@@ -6615,6 +7468,7 @@ function GenerateModal({
         mode: narrativeForGenerate,
         creativePreset: packCreative,
         slideTextDensity: textDensity,
+        cardVisualStyle: cardStyle,
         fetchImagesNow: autoFetchSlideImages,
       });
       onClose();
@@ -6792,7 +7646,13 @@ function GenerateModal({
             }}
           >
             <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Será aplicado ao gerar:</span>{' '}
-            <span>{GEN_MODE_BY_ID[mode]?.icon} {GEN_MODE_BY_ID[mode]?.label}</span>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:6, verticalAlign:'middle' }}>
+              {(() => {
+                const ModeIc = GEN_MODE_BY_ID[mode]?.Icon;
+                return ModeIc ? <ModeIc size={13} strokeWidth={2} style={{ color:'var(--text-secondary)', flexShrink:0 }} /> : null;
+              })()}
+              {GEN_MODE_BY_ID[mode]?.label}
+            </span>
             {' · '}
             <span>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
             {' · '}
@@ -6892,6 +7752,75 @@ function GenerateModal({
               {SLIDE_TEXT_DENSITY_OPTIONS.find(o => o.id === textDensity)?.desc}
               {' '}
               Valores menores geram menos caracteres nos subtítulos ao usar IA (geração e refinamento).
+            </div>
+          </div>
+
+          {/* Estilo visual da foto vs texto (layout clássico) */}
+          <div>
+            <label className="vc-label" id="card-visual-style-label">
+              Estilo dos cards
+            </label>
+            <div
+              role="group"
+              aria-labelledby="card-visual-style-label"
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}
+            >
+              {CARD_VISUAL_STYLE_OPTIONS.map((opt) => {
+                const on = cardStyle === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    aria-pressed={on}
+                    title={`${opt.short}: ${opt.desc}`}
+                    onClick={() => setCardStyle(opt.id)}
+                    style={{
+                      minWidth: 72,
+                      minHeight: 76,
+                      padding: '8px 6px',
+                      borderRadius: 11,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                      background: on ? 'var(--accent)' : 'var(--bg-pearl)',
+                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                      color: on ? '#fff' : 'var(--text-primary)',
+                    }}
+                  >
+                    <PhotoRegionMiniIcon regionId={opt.id} active={on} />
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-mono)',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        lineHeight: 1.15,
+                        maxWidth: 68,
+                      }}
+                    >
+                      {opt.short}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                lineHeight: 1.47,
+                letterSpacing: '-0.011em',
+                marginTop: 4,
+              }}
+            >
+              {CARD_VISUAL_STYLE_OPTIONS.find((o) => o.id === cardStyle)?.desc}{' '}
+              Aplica-se ao layout clássico (sem canvas no card). Pacotes Cultura podem alterar alguns slides (sanduíche / tela cheia).
             </div>
           </div>
 
@@ -7544,7 +8473,7 @@ function PerSlideImageRefBlock({
           {ref ? (
             <img src={ref} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
           ) : (
-            <Image size={20} strokeWidth={1.75} />
+            <ImageIcon size={20} strokeWidth={1.75} />
           )}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -7642,7 +8571,9 @@ function SidebarContent({
   creativePreset = 'livre',
   fmt = 'carrossel',
   applyTypographyToAllCards,
+  applyBrandTypographyToAllSlides,
   canvasEditMode = false, setCanvasEditMode = () => {},
+  showPreviewAlignGrid = false, setShowPreviewAlignGrid = () => {},
   anyCanvasEnabled = false,
   patchCanvasZonesAt = () => {},
   openPhotoZoneImport = () => {},
@@ -7929,7 +8860,7 @@ function SidebarContent({
                     display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   }}
                 >
-                  <Image size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
+                  <ImageIcon size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
                   Importar foto só neste slide (zona imagem)
                 </button>
               </div>
@@ -8127,6 +9058,78 @@ function SidebarContent({
                   : 'Para gerar fundos por IA, configure a chave OpenAI (⚙). Até lá: Upload ou URL.'}
               </div>
 
+              {(() => {
+                const bodyCv = (String(slide.bodyAfterImage || '')).trim();
+                const sandwichLike =
+                  (creativePreset === 'tendencia_cultura' || slide.useCultureLayout) &&
+                  !!bodyCv &&
+                  (!!slide.bgImage || slideHasPendingPhotoIntent(slide));
+                const cultureStatFlatLike =
+                  (creativePreset === 'tendencia_cultura' || slide.useCultureLayout) &&
+                  !slide.bgImage &&
+                  !slideHasPendingPhotoIntent(slide) &&
+                  !!bodyCv &&
+                  !!(String(slide.subtitle || '').trim());
+                const photoInsetBlocked = !!slide.canvas?.enabled || sandwichLike || cultureStatFlatLike;
+                const pr = normalizePhotoRegion(slide);
+                return (
+                  <div>
+                    <div style={{
+                      fontFamily:'var(--font-mono)',
+                      fontSize:10,
+                      letterSpacing:'0.06em',
+                      fontWeight:600,
+                      color:'var(--text-muted)',
+                      textTransform:'uppercase',
+                      marginBottom:6,
+                    }}>Área da foto no card</div>
+                    {photoInsetBlocked ? (
+                      <div style={{
+                        fontSize:11, lineHeight:1.47, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
+                        background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11, padding:'8px 10px',
+                      }}>
+                        Faixa com margens e cantos arredondados só no <strong style={{ fontWeight:600 }}>layout clássico</strong>
+                        {' '}(sem canvas e sem sanduíche cultura neste card).
+                      </div>
+                    ) : (
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                        {PHOTO_REGION_GRID.map((row) => {
+                          const active = pr === row.id;
+                          return (
+                            <button
+                              key={row.id}
+                              type="button"
+                              onClick={() => updateSlide({ photoRegion: row.id })}
+                              style={{
+                                ...btnStyle(active),
+                                flexDirection: 'column',
+                                gap: 4,
+                                padding: '8px 4px 6px',
+                                minHeight: 72,
+                              }}
+                              aria-label={`${row.lab1} ${row.lab2}`}
+                            >
+                              <PhotoRegionMiniIcon regionId={row.id} active={active} />
+                              <span style={{
+                                fontSize:8,
+                                fontWeight:600,
+                                fontFamily:'var(--font-mono)',
+                                letterSpacing:'0.04em',
+                                lineHeight:1.15,
+                                textAlign:'center',
+                                color: active ? '#fff' : 'var(--text-muted)',
+                              }}>
+                                {row.lab1}<br />{row.lab2}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Action buttons */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {[
@@ -8184,38 +9187,100 @@ function SidebarContent({
 
               {slide.bgImage && (
                 <>
+                  {slide.canvas?.enabled && (
+                    <div style={{
+                      fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
+                      color:'var(--text-muted)',
+                      background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
+                      padding:'8px 10px',
+                    }}>
+                      Com <strong style={{ fontWeight:600 }}>canvas</strong> ativo, o modo e o foco aplicam-se à{' '}
+                      <strong style={{ fontWeight:600 }}>foto dentro da zona de imagem</strong> — arraste a moldura no preview para mudar o quadro.
+                    </div>
+                  )}
                   <div>
-                    <label className="vc-label-sm">Encaixe no card</label>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginTop:6 }}>
-                      {[
-                        { id:'cover', label:'Cobrir', sub:'preenche' },
-                        { id:'contain', label:'Inteira', sub:'sem cortar' },
-                        { id:'custom', label:'Manual', sub:'zoom %' },
-                      ].map((opt) => {
-                        const on = bgFitKey === opt.id;
+                    <div style={{
+                      fontFamily:'var(--font-mono)',
+                      fontSize:10,
+                      letterSpacing:'0.06em',
+                      fontWeight:600,
+                      color:'var(--text-muted)',
+                      textTransform:'uppercase',
+                      marginBottom:6,
+                    }}>Modo da imagem</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                      {IMAGE_MODE_PRESETS.map((m) => {
+                        const on = activeImageModePresetId(slide) === m.id;
                         return (
                           <button
-                            key={opt.id}
+                            key={m.id}
                             type="button"
-                            onClick={() => updateSlide({ bgFit: opt.id })}
+                            onClick={() => updateSlide(m.patch)}
                             style={{
-                              padding:'7px 4px', borderRadius:8, border:'1px solid',
-                              borderColor: on ? 'var(--accent)' : 'var(--hairline)',
-                              background: on ? 'var(--accent-surface-strong)' : 'var(--bg-base)',
-                              cursor:'pointer', transition:'all 0.12s', textAlign:'center',
+                              ...btnStyle(on),
+                              flexDirection: 'column',
+                              gap: 2,
+                              padding: '8px 6px',
+                              minHeight: 52,
+                              textAlign: 'center',
                             }}
+                            aria-label={`${m.label}: ${m.sub}`}
                           >
-                            <div style={{ fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)', color: on ? 'var(--accent)' : 'var(--text-primary)', letterSpacing:'-0.011em' }}>
-                              {opt.label}
-                            </div>
-                            <div style={{ fontSize:10, fontFamily:'var(--font-ui)', color:'var(--text-muted)', marginTop:2 }}>{opt.sub}</div>
+                            <span style={{ fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>{m.label}</span>
+                            <span style={{ fontSize:9, fontFamily:'var(--font-ui)', opacity: on ? 0.92 : 1, color: on ? 'rgba(255,255,255,0.92)' : 'var(--text-muted)' }}>{m.sub}</span>
                           </button>
                         );
                       })}
                     </div>
                   </div>
-                  <Slider label="Posição X" value={slide.bgX} min={0} max={100} onChange={v=>updateSlide({bgX:v})}/>
-                  <Slider label="Posição Y" value={slide.bgY} min={0} max={100} onChange={v=>updateSlide({bgY:v})}/>
+                  <div>
+                    <div style={{
+                      fontFamily:'var(--font-mono)',
+                      fontSize:10,
+                      letterSpacing:'0.06em',
+                      fontWeight:600,
+                      color:'var(--text-muted)',
+                      textTransform:'uppercase',
+                      marginBottom:6,
+                    }}>Foco no recorte</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                      {LAYOUTS.map((l) => {
+                        const active = activeImageFocalLayoutId(slide) === l.id;
+                        const [px, py] = IMAGE_FOCAL_XY[l.id];
+                        return (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => updateSlide({ bgX: px, bgY: py })}
+                            style={{
+                              ...btnStyle(active),
+                              flexDirection: 'column',
+                              gap: 4,
+                              padding: '8px 4px 6px',
+                              minHeight: 76,
+                            }}
+                            aria-label={`Foco da imagem ${l.posLab[0]} ${l.posLab[1]}`}
+                            title={`Ancorar recorte: ${l.posLab.join(' ')}`}
+                          >
+                            <ImageFocalMiniIcon layoutId={l.id} active={active} />
+                            <span style={{
+                              fontSize:8,
+                              fontWeight:600,
+                              fontFamily:'var(--font-mono)',
+                              letterSpacing:'0.04em',
+                              lineHeight:1.15,
+                              textAlign:'center',
+                              color: active ? '#fff' : 'var(--text-muted)',
+                            }}>
+                              {l.posLab[0]}<br />{l.posLab[1]}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <Slider label="Posição X fina" value={slide.bgX} min={0} max={100} onChange={v=>updateSlide({bgX:v})}/>
+                  <Slider label="Posição Y fina" value={slide.bgY} min={0} max={100} onChange={v=>updateSlide({bgY:v})}/>
                   <Slider
                     label={bgFitKey === 'custom' ? 'Zoom (%)' : 'Escala do recorte'}
                     value={slide.bgZoom}
@@ -8230,43 +9295,195 @@ function SidebarContent({
               )}
             </S>
 
-            <S title="Posição do texto">
-              {slide.canvas?.enabled && (
-                <div style={{
-                  fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
-                  color:'var(--text-muted)',
-                  background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
-                  padding:'8px 10px',
-                }}>
-                  Com layout canvas ativo, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
-                  das zonas de texto do preview (junto com «Distância das bordas»).
-                  Para mover o quadro inteiro no card, use o modo edição de zonas no preview e arraste a moldura.
-                </div>
-              )}
-              {/* 3×3 position grid */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-                {LAYOUTS.map(l=>(
-                  <button key={l.id} onClick={()=>updateSlide({layout:l.id})} style={btnStyle(slide.layout===l.id)}>
-                    {l.label}
-                  </button>
-                ))}
+            <S title="Padrão sobre o fundo" hint="Textura discreta por cima da cor e da foto (incluída nas exportações).">
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {BG_PATTERN_OPTIONS.map((opt) => {
+                  const on = (slide.bgPattern ?? 'none') === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => updateSlide({ bgPattern: opt.id })}
+                      style={{
+                        width:'100%',
+                        textAlign:'left',
+                        padding:'10px 12px',
+                        borderRadius:10,
+                        cursor:'pointer',
+                        border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                        background: on ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
+                        fontSize:12,
+                        fontWeight:600,
+                        fontFamily:'var(--font-ui)',
+                        color:'var(--text-primary)',
+                        letterSpacing:'-0.011em',
+                        transition:'border-color 0.12s, background 0.12s',
+                      }}
+                    >{opt.label}</button>
+                  );
+                })}
               </div>
-              {/* alignment */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
-                {[
-                  {id:'left',    icon:AlignLeft,    title:'Esquerda'},
-                  {id:'center',  icon:AlignCenter,  title:'Centro'},
-                  {id:'right',   icon:AlignRight,   title:'Direita'},
-                  {id:'justify', icon:AlignJustify, title:'Justificar'},
-                ].map(a=>(
-                  <button key={a.id} onClick={()=>updateSlide({align:a.id})} style={btnStyle(slide.align===a.id)} title={a.title} aria-label={a.title}>
-                    <a.icon size={13}/>
-                  </button>
-                ))}
-              </div>
-              {/* inset from edges */}
-              <Slider label="Distância das bordas" value={slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET} min={1} max={20} onChange={v=>updateSlide({textInset:v})}/>
             </S>
+
+            <details className="vc-adjust-details" style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
+              <summary style={{
+                padding:'10px 12px',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'space-between',
+                fontFamily:'var(--font-mono)',
+                fontSize:10,
+                letterSpacing:'0.06em',
+                fontWeight:600,
+                color:'var(--text-secondary)',
+                textTransform:'uppercase',
+                userSelect:'none',
+              }}>
+                Grade de imagens
+                <ChevronDown size={14} strokeWidth={2} style={{ opacity:0.45, flexShrink:0 }} aria-hidden />
+              </summary>
+              <div style={{ padding:'0 12px 12px' }}>
+                <Toggle label="Mostrar grade" value={showPreviewAlignGrid} onChange={setShowPreviewAlignGrid} />
+                <p style={{
+                  margin:'8px 0 0',
+                  fontSize:11,
+                  lineHeight:1.47,
+                  color:'var(--text-muted)',
+                  fontFamily:'var(--font-ui)',
+                  letterSpacing:'-0.011em',
+                }}>
+                  Grelha só no preview do editor — não entra nas exportações.
+                </p>
+              </div>
+            </details>
+
+            <details className="vc-adjust-details" open style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
+              <summary style={{
+                padding:'10px 12px',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'space-between',
+                fontFamily:'var(--font-mono)',
+                fontSize:10,
+                letterSpacing:'0.06em',
+                fontWeight:600,
+                color:'var(--text-secondary)',
+                textTransform:'uppercase',
+                userSelect:'none',
+              }}>
+                Título & subtítulo
+                <ChevronDown size={14} strokeWidth={2} style={{ opacity:0.45, flexShrink:0 }} aria-hidden />
+              </summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:12 }}>
+                {slide.canvas?.enabled && (
+                  <div style={{
+                    fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
+                    color:'var(--text-muted)',
+                    background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
+                    padding:'8px 10px',
+                  }}>
+                    Com layout canvas ativo, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
+                    {' '}das zonas de texto do preview (junto com «Distância das bordas»).
+                    Para mover o quadro inteiro no card, use o modo edição de zonas no preview e arraste a moldura.
+                  </div>
+                )}
+                <div>
+                  <div style={{
+                    fontFamily:'var(--font-mono)',
+                    fontSize:10,
+                    letterSpacing:'0.06em',
+                    fontWeight:600,
+                    color:'var(--text-muted)',
+                    textTransform:'uppercase',
+                    marginBottom:6,
+                  }}>Layout & posição</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                    {LAYOUTS.map((l) => {
+                      const active = slide.layout === l.id;
+                      return (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => updateSlide({ layout: l.id })}
+                          style={{
+                            ...btnStyle(active),
+                            flexDirection: 'column',
+                            gap: 4,
+                            padding: '8px 4px 6px',
+                            minHeight: 76,
+                          }}
+                          aria-label={`${l.posLab[0]} ${l.posLab[1]}`}
+                          title={`${l.posLab[0]} ${l.posLab[1]}`}
+                        >
+                          <LayoutMiniIcon layoutId={l.id} active={active} />
+                          <span style={{
+                            fontSize:8,
+                            fontWeight:600,
+                            fontFamily:'var(--font-mono)',
+                            letterSpacing:'0.04em',
+                            lineHeight:1.15,
+                            textAlign:'center',
+                            color: active ? '#fff' : 'var(--text-muted)',
+                          }}>
+                            {l.posLab[0]}<br />{l.posLab[1]}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{
+                    fontFamily:'var(--font-mono)',
+                    fontSize:10,
+                    letterSpacing:'0.06em',
+                    fontWeight:600,
+                    color:'var(--text-muted)',
+                    textTransform:'uppercase',
+                    marginBottom:6,
+                  }}>Alinhamento</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4 }}>
+                    {[
+                      { id:'left', icon:AlignLeft, title:'Esquerda', short:'ESQ.' },
+                      { id:'center', icon:AlignCenter, title:'Centro', short:'CENTRO' },
+                      { id:'right', icon:AlignRight, title:'Direita', short:'DIR.' },
+                      { id:'justify', icon:AlignJustify, title:'Justificar', short:'JUST.' },
+                    ].map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => updateSlide({ align: a.id })}
+                        style={{
+                          ...btnStyle(slide.align === a.id),
+                          flexDirection: 'column',
+                          gap: 4,
+                          padding: '8px 2px',
+                          minHeight: 52,
+                        }}
+                        title={a.title}
+                        aria-label={a.title}
+                      >
+                        <a.icon size={13} />
+                        <span style={{
+                          fontSize:8,
+                          fontWeight:600,
+                          fontFamily:'var(--font-mono)',
+                          letterSpacing:'0.03em',
+                          color: slide.align === a.id ? '#fff' : 'var(--text-muted)',
+                        }}>{a.short}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Toggle label="Glass ao redor do conteúdo" value={!!slide.textBg} onChange={(v) => updateSlide({ textBg: v })} />
+                {slide.textBg && (
+                  <Slider label="Opacidade do glass" value={slide.textBgOpacity ?? 55} min={10} max={90} onChange={(v) => updateSlide({ textBgOpacity: v })} />
+                )}
+                <Slider label="Distância das bordas" value={slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET} min={1} max={20} onChange={(v) => updateSlide({ textInset: v })} />
+              </div>
+            </details>
 
             <S
               title="Ajuste automático"
@@ -8373,10 +9590,6 @@ function SidebarContent({
 
             <S title="Legibilidade">
               <Toggle label="Sombra no texto" value={slide.textShadow!==false} onChange={v=>updateSlide({textShadow:v})}/>
-              <Toggle label="Fundo atrás do texto" value={!!slide.textBg} onChange={v=>updateSlide({textBg:v})}/>
-              {slide.textBg && (
-                <Slider label="Opacidade do fundo" value={slide.textBgOpacity??55} min={10} max={90} onChange={v=>updateSlide({textBgOpacity:v})}/>
-              )}
               <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
                 <button
                   type="button"
@@ -8418,8 +9631,9 @@ function SidebarContent({
                   color:'var(--text-muted)',
                 }}>
                   Usa os ajustes de <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Tamanho</strong>,{' '}
-                  <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Espaçamento</strong> e{' '}
-                  <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste card em todos os slides (não altera textos nem posição no grid).
+                  <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Espaçamento</strong>,
+                  {' '}<strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Título &amp; subtítulo</strong>{' '}
+                  e <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste card em todos os slides (não altera textos nem posição no grid).
                 </p>
               </div>
             </S>
@@ -8490,15 +9704,197 @@ function SidebarContent({
               </S>
             )}
 
+            <S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
+              <div>
+                <div style={{
+                  fontFamily:'var(--font-mono)',
+                  fontSize:10,
+                  letterSpacing:'0.06em',
+                  fontWeight:600,
+                  color:'var(--text-muted)',
+                  textTransform:'uppercase',
+                  marginBottom:6,
+                }}>Tamanho</div>
+                <Slider label="Tamanho título" value={brand.textTitleSize ?? 100} min={50} max={180} onChange={v => setBrand({ ...brand, textTitleSize: v })} />
+                <Slider label="Tamanho subtítulo" value={brand.textSubSize ?? 100} min={50} max={180} onChange={v => setBrand({ ...brand, textSubSize: v })} />
+                {(creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout || !!(String(s.bodyAfterImage || '').trim()))) ? (
+                  <Slider
+                    label="Tamanho — texto abaixo da foto"
+                    value={brand.textBodyAfterSize ?? brand.textSubSize ?? 100}
+                    min={50}
+                    max={180}
+                    onChange={(v) => setBrand({ ...brand, textBodyAfterSize: v })}
+                  />
+                ) : null}
+              </div>
+              <div style={{ marginTop: 4 }}>
+                <div style={{
+                  fontFamily:'var(--font-mono)',
+                  fontSize:10,
+                  letterSpacing:'0.06em',
+                  fontWeight:600,
+                  color:'var(--text-muted)',
+                  textTransform:'uppercase',
+                  marginBottom:6,
+                }}>Espaçamento — Título</div>
+                <Slider label="Entre letras (tracking)" value={brand.textTitleTracking ?? 0} min={-10} max={30} onChange={v => setBrand({ ...brand, textTitleTracking: v })} />
+                <Slider label="Entre linhas (leading)" value={brand.textTitleLeading ?? 105} min={80} max={180} onChange={v => setBrand({ ...brand, textTitleLeading: v })} />
+                <div>
+                  <label className="vc-label-sm">Peso da fonte</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4 }}>
+                    {[400, 600, 700, 800].map(w => (
+                      <button key={w} type="button" onClick={()=>setBrand({ ...brand, textTitleWeight: w })}
+                        style={{
+                          padding:'7px 0', borderRadius:6, fontSize:11, cursor:'pointer',
+                          fontWeight:w, fontFamily: effectiveTitleFontFamily(brand), transition:'all 0.12s',
+                          background: (brand.textTitleWeight ?? 800) === w ? 'var(--text-primary)' : 'var(--bg-card)',
+                          border: `1px solid ${(brand.textTitleWeight ?? 800) === w ? 'transparent' : 'var(--border)'}`,
+                          color:    (brand.textTitleWeight ?? 800) === w ? 'var(--bg-base)'  : 'var(--text-secondary)',
+                        }}
+                      >{w}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="vc-label-sm">Caixa</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                    {[
+                      { id:'normal', label:'Normal' },
+                      { id:'upper',  label:'AaA → AAA' },
+                      { id:'lower',  label:'AaA → aaa' },
+                    ].map(c => (
+                      <button key={c.id} type="button" onClick={()=>setBrand({ ...brand, textTitleCase: c.id })}
+                        style={{
+                          padding:'7px 4px', borderRadius:6, fontSize:10, cursor:'pointer',
+                          fontWeight:600, fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                          background: (brand.textTitleCase ?? 'normal') === c.id ? 'var(--text-primary)' : 'var(--bg-card)',
+                          border: `1px solid ${(brand.textTitleCase ?? 'normal') === c.id ? 'transparent' : 'var(--border)'}`,
+                          color:    (brand.textTitleCase ?? 'normal') === c.id ? 'var(--bg-base)'  : 'var(--text-secondary)',
+                        }}
+                      >{c.label}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                <div style={{
+                  fontFamily:'var(--font-mono)',
+                  fontSize:10,
+                  letterSpacing:'0.06em',
+                  fontWeight:600,
+                  color:'var(--text-muted)',
+                  textTransform:'uppercase',
+                  marginBottom:6,
+                }}>Espaçamento — Subtítulo</div>
+                <Slider label="Entre letras (tracking)" value={brand.textSubTracking ?? 0} min={-10} max={30} onChange={v => setBrand({ ...brand, textSubTracking: v })} />
+                <Slider label="Entre linhas (leading)" value={brand.textSubLeading ?? 150} min={100} max={220} onChange={v => setBrand({ ...brand, textSubLeading: v })} />
+              </div>
+              <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
+                <button
+                  type="button"
+                  onClick={() => applyBrandTypographyToAllSlides?.()}
+                  aria-label="Aplicar tipografia da marca a todos os slides"
+                  style={{
+                    width:'100%', minHeight:44,
+                    padding:'0 16px',
+                    borderRadius:9999,
+                    border:'1px solid var(--accent)',
+                    background:'var(--accent)',
+                    color:'#fff',
+                    fontSize:12,
+                    fontWeight:600,
+                    fontFamily:'var(--font-ui)',
+                    letterSpacing:'-0.011em',
+                    cursor:'pointer',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:8,
+                    transition:'transform 0.1s var(--ease-smooth)',
+                  }}
+                  onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <Layers size={14} strokeWidth={2}/>
+                  Aplicar tipografia a todos os slides
+                </button>
+                <p style={{
+                  margin:'8px 0 0',
+                  fontSize:11,
+                  lineHeight:1.47,
+                  letterSpacing:'-0.011em',
+                  color:'var(--text-muted)',
+                }}>
+                  Não altera textos nem layout — só copia os valores acima para cada card (como em Cards → Legibilidade → Aplicar em todos).
+                </p>
+              </div>
+            </S>
+
             <S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input value={brand.handle} onChange={e=>setBrand({...brand,handle:e.target.value})} className="vc-input"/>
               </div>
               <Toggle label="Mostrar @ nos slides" value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
+              <details
+                className="vc-adjust-details"
+                style={{
+                  marginTop: 10,
+                  border: '1px solid var(--hairline)',
+                  borderRadius: 11,
+                  background: 'var(--bg-pearl)',
+                }}
+              >
+                <summary style={{
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.06em',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  userSelect: 'none',
+                }}>
+                  Posição do @ no card
+                  <ChevronDown size={14} strokeWidth={2} style={{ opacity: 0.45, flexShrink: 0 }} aria-hidden />
+                </summary>
+                <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.45, margin: 0, fontFamily: 'var(--font-ui)' }}>
+                    Percentagem da largura e da altura do cartão — referência no canto superior esquerdo da pílula. Pode alinhar ao texto ou ao fundo.
+                  </p>
+                  <Slider label="Da esquerda (%)" value={brand.handleBadgeX ?? 5} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleBadgeX: v })} />
+                  <Slider label="Do topo (%)" value={brand.handleBadgeY ?? 4} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleBadgeY: v })} />
+                  <button
+                    type="button"
+                    onClick={() => setBrand({ ...brand, handleBadgeX: 5, handleBadgeY: 4 })}
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 2,
+                      fontSize: 11,
+                      padding: '7px 14px',
+                      borderRadius: 9999,
+                      border: '1px solid var(--hairline)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-secondary)',
+                      fontFamily: 'var(--font-ui)',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      letterSpacing: '-0.011em',
+                    }}
+                  >
+                    Repor posição padrão
+                  </button>
+                </div>
+              </details>
               <div style={{ marginTop: 10 }}>
                 <label className="vc-label-sm">Foto no ícone do @</label>
                 {brand.handleAvatar ? (
+                  <>
                   <div style={{
                     display:'flex', alignItems:'center', gap:10,
                     background:'var(--bg-card)', border:'1px solid var(--border)',
@@ -8511,23 +9907,102 @@ function SidebarContent({
                       background:`conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)`,
                       padding:2, boxSizing:'border-box',
                     }}>
-                      <div style={{
-                        width:'100%', height:'100%', borderRadius:'50%', overflow:'hidden',
-                        background:`url(${brand.handleAvatar}) center/cover no-repeat`,
-                      }}/>
+                    <div style={{
+                      width:'100%', height:'100%', borderRadius:'50%', overflow:'hidden',
+                      background:'#0a0a0a',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>
+                      <img
+                        src={brand.handleAvatar}
+                        alt=""
+                        draggable={false}
+                        style={vcHandleAvatarImgStyle(brand)}
+                      />
                     </div>
+                  </div>
                     <div style={{ flex:1, fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
                       Aparece dentro do anel do badge nos cards.
                     </div>
                     <button
                       type="button"
-                      onClick={() => setBrand({ ...brand, handleAvatar: null })}
+                      onClick={() => setBrand({
+                        ...brand,
+                        handleAvatar: null,
+                        handleAvatarPosX: 50,
+                        handleAvatarPosY: 50,
+                        handleAvatarRotate: 0,
+                        handleAvatarZoom: 100,
+                      })}
                       title="Remover foto do perfil"
                       style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
                       <Trash2 size={11}/>
                     </button>
                   </div>
+                  <details
+                    className="vc-adjust-details"
+                    open
+                    style={{
+                      marginTop: 10,
+                      border: '1px solid var(--hairline)',
+                      borderRadius: 11,
+                      background: 'var(--bg-pearl)',
+                    }}
+                  >
+                    <summary style={{
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      letterSpacing: '0.06em',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      userSelect: 'none',
+                    }}>
+                      Enquadramento 360° no círculo
+                      <ChevronDown size={14} strokeWidth={2} style={{ opacity: 0.45, flexShrink: 0 }} aria-hidden />
+                    </summary>
+                    <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.45, margin: 0, fontFamily: 'var(--font-ui)' }}>
+                        Posição, rotação e zoom valem só para a foto dentro do anel do @ nos cards.
+                      </p>
+                      <Slider label="Esquerda → direita" value={brand.handleAvatarPosX ?? 50} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleAvatarPosX: v })} />
+                      <Slider label="Topo → base" value={brand.handleAvatarPosY ?? 50} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleAvatarPosY: v })} />
+                      <Slider label="Rotação (°)" value={brand.handleAvatarRotate ?? 0} min={0} max={360} onChange={(v) => setBrand({ ...brand, handleAvatarRotate: v })} />
+                      <Slider label="Zoom no círculo" value={brand.handleAvatarZoom ?? 100} min={85} max={200} onChange={(v) => setBrand({ ...brand, handleAvatarZoom: v })} />
+                      <button
+                        type="button"
+                        onClick={() => setBrand({
+                          ...brand,
+                          handleAvatarPosX: 50,
+                          handleAvatarPosY: 50,
+                          handleAvatarRotate: 0,
+                          handleAvatarZoom: 100,
+                        })}
+                        style={{
+                          alignSelf: 'flex-start',
+                          marginTop: 2,
+                          fontSize: 11,
+                          padding: '7px 14px',
+                          borderRadius: 9999,
+                          border: '1px solid var(--hairline)',
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-secondary)',
+                          fontFamily: 'var(--font-ui)',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          letterSpacing: '-0.011em',
+                        }}
+                      >
+                        Repor enquadramento
+                      </button>
+                    </div>
+                  </details>
+                  </>
                 ) : (
                   <label
                     style={{
@@ -10226,10 +11701,44 @@ Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
+/** Posição absoluta da pílula @ no card — % do cartão (canto superior esquerdo do badge). */
+function vcHandleBadgeBoxPositionStyle(brand) {
+  const x = typeof brand?.handleBadgeX === 'number' ? Math.min(100, Math.max(0, brand.handleBadgeX)) : 5;
+  const y = typeof brand?.handleBadgeY === 'number' ? Math.min(100, Math.max(0, brand.handleBadgeY)) : 4;
+  return {
+    position: 'absolute',
+    left: `${x}%`,
+    top: `${y}%`,
+    zIndex: 22,
+  };
+}
+
+/** Foto do @ no badge: posição, rotação completa e zoom dentro do círculo (object-fit + transform). */
+function vcHandleAvatarImgStyle(brand) {
+  const x = typeof brand?.handleAvatarPosX === 'number' ? Math.min(100, Math.max(0, brand.handleAvatarPosX)) : 50;
+  const y = typeof brand?.handleAvatarPosY === 'number' ? Math.min(100, Math.max(0, brand.handleAvatarPosY)) : 50;
+  const rotRaw = typeof brand?.handleAvatarRotate === 'number' ? brand.handleAvatarRotate : 0;
+  const rot = ((rotRaw % 360) + 360) % 360;
+  const zoomPct = typeof brand?.handleAvatarZoom === 'number' ? Math.min(220, Math.max(85, brand.handleAvatarZoom)) : 100;
+  const sc = zoomPct / 100;
+  return {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: `${x}% ${y}%`,
+    display: 'block',
+    transform: `rotate(${rot}deg) scale(${sc})`,
+    transformOrigin: `${x}% ${y}%`,
+  };
+}
+
 const DEFAULT_BRAND = {
   id: 'default',
   name: 'Padrão',
   handle: '@seu.perfil', showHandle: true,
+  /** Posição da pílula @ no card (0–100% da largura / altura; referência = canto sup. esq. do badge). */
+  handleBadgeX: 5,
+  handleBadgeY: 4,
   /* Visual neutro: quadro Figma (preto/branco); realces no slide vêm do perfil de marca. */
   titleFont: '"Inter", sans-serif',
   bodyFont: '"Inter Tight", sans-serif',
@@ -10255,6 +11764,23 @@ const DEFAULT_BRAND = {
   logo: null,
   /** Foto do perfil no badge @ (data URL) — substitui o ícone decorativo circular */
   handleAvatar: null,
+  /** Enquadramento da foto dentro do círculo do badge (0–100 = object-position %). */
+  handleAvatarPosX: 50,
+  handleAvatarPosY: 50,
+  /** Rotação da foto no badge (graus, 0–360). */
+  handleAvatarRotate: 0,
+  /** Zoom dentro do círculo (100 = neutro; >100 aproxima). */
+  handleAvatarZoom: 100,
+  /** Tipografia padrão dos slides (aba Marca → Texto nos slides). */
+  textTitleSize: 100,
+  textSubSize: 100,
+  textBodyAfterSize: 100,
+  textTitleTracking: 0,
+  textSubTracking: 0,
+  textTitleLeading: 105,
+  textSubLeading: 150,
+  textTitleWeight: 800,
+  textTitleCase: 'normal',
   /** Fonte própria (título) — { dataUrl, format, fileName } */
   customTitleFont: null,
   /** Fonte própria (corpo / subtítulo) */
@@ -10282,7 +11808,7 @@ function resolveSlideBrandBg(brand, slideIndex0, slide) {
 const DEFAULT_DOC = {
   fmt: 'carrossel',
   brand: DEFAULT_BRAND,
-  slides: [mkSlide(1)],
+  slides: [mkSlide(1, DEFAULT_BRAND)],
   caption: '',
   // Material de referência usado pela IA na geração e refinamento de slides
   material: {
@@ -10305,6 +11831,8 @@ const DEFAULT_DOC = {
   creativePreset: 'livre',
   /** Volume de texto alvo nos cards ao gerar/refinar — 1/1 … 1/5 (fracionado). */
   slideTextDensity: '1_1',
+  /** Região da foto por defeito nos slides gerados / novos (`photoRegion`). */
+  cardVisualStyle: 'full',
 };
 
 /** URLs de demo que ficaram presas em docs persistidos — removidas de «Fontes & referências» ao hidratar. */
@@ -10353,7 +11881,13 @@ function ensureDocShape(d) {
     typeof out.material.sources === 'string' ? out.material.sources : ''
   );
   if (!Array.isArray(out.slides) || out.slides.length === 0) {
-    out.slides = [mkSlide(1)];
+    out.slides = [mkSlide(1, out.brand)];
+  } else {
+    out.slides = out.slides.map((sl) => {
+      if (!sl || typeof sl !== 'object') return mkSlide(1, out.brand);
+      const bp = sl.bgPattern;
+      return { ...sl, bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none' };
+    });
   }
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';
   if (!out.mode) out.mode = 'editorial';
@@ -10362,6 +11896,8 @@ function ensureDocShape(d) {
   if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';
   if (out.slideTextDensity == null) out.slideTextDensity = '1_1';
   if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';
+  if (out.cardVisualStyle == null) out.cardVisualStyle = 'full';
+  if (!CARD_VISUAL_STYLE_IDS.has(out.cardVisualStyle)) out.cardVisualStyle = 'full';
   if (typeof out.caption !== 'string') out.caption = '';
   return out;
 }
@@ -10437,11 +11973,11 @@ export default function App() {
   }, [activeDocId]);
 
   const doc = (history.state && typeof history.state === 'object') ? history.state : DEFAULT_DOC;
+  const brand = doc.brand && typeof doc.brand === 'object' ? doc.brand : DEFAULT_BRAND;
   // Nunca deixar slides vazio: senão `slide` fica undefined e a árvore inteira rebenta (tela branca).
-  const slides = (Array.isArray(doc.slides) && doc.slides.length > 0) ? doc.slides : [mkSlide(1)];
+  const slides = (Array.isArray(doc.slides) && doc.slides.length > 0) ? doc.slides : [mkSlide(1, brand)];
   const slidesLiveRef = useRef(slides);
   slidesLiveRef.current = slides;
-  const brand = doc.brand && typeof doc.brand === 'object' ? doc.brand : DEFAULT_BRAND;
   const fmt = doc.fmt && FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
   const caption = typeof doc.caption === 'string' ? doc.caption : '';
   const material  = doc.material  || { content:'', sources:'', context:'' };
@@ -10450,6 +11986,7 @@ export default function App() {
   const creativePreset = doc.creativePreset ?? 'livre';
   const slideTextDensityRaw = doc.slideTextDensity ?? '1_1';
   const slideTextDensity = SLIDE_TEXT_DENSITY_BY_ID[slideTextDensityRaw] ? slideTextDensityRaw : '1_1';
+  const cardVisualStyle = normalizeCardVisualStyle(doc.cardVisualStyle);
 
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
@@ -10493,6 +12030,12 @@ export default function App() {
     ...d,
     slideTextDensity: typeof next==='function' ? next(d.slideTextDensity ?? '1_1') : next,
   })), [history]);
+  const setCardVisualStyle = useCallback(next => history.set(d => ({
+    ...d,
+    cardVisualStyle: typeof next === 'function'
+      ? next(normalizeCardVisualStyle(d.cardVisualStyle))
+      : normalizeCardVisualStyle(next),
+  })), [history]);
 
   // ── BIBLIOTECA: handlers ────────────────────────────────────────────────────
   const renameDoc = useCallback((docId, newName) => {
@@ -10514,7 +12057,16 @@ export default function App() {
   const newDoc = useCallback((seedDoc = null, name = 'Novo carrossel') => {
     // Aplica brand ativo no doc novo
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
-    const baseDoc = { ...DEFAULT_DOC, ...(seedDoc || {}), brand: hydrateBrandTextColors({ ...activeBrand }) };
+    const hydratedBrand = hydrateBrandTextColors({ ...activeBrand });
+    const seeded = seedDoc || {};
+    const baseDoc = {
+      ...DEFAULT_DOC,
+      ...seeded,
+      brand: hydratedBrand,
+      slides: Array.isArray(seeded.slides) && seeded.slides.length
+        ? seeded.slides
+        : [mkSlide(1, hydratedBrand)],
+    };
     const entry = mkLibEntry(baseDoc, name);
     setLibrary(prev => [entry, ...prev]);
     setActiveDocId(entry.id);
@@ -10638,6 +12190,9 @@ export default function App() {
   const [tab, setTab] = useState('brand');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [canvasEditMode, setCanvasEditMode] = useState(false);
+  const [showPreviewAlignGrid, setShowPreviewAlignGrid] = useState(() => {
+    try { return localStorage.getItem(SK.previewGrid) === '1'; } catch { return false; }
+  });
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -10657,6 +12212,9 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(SK.openaiKey, openaiKey); } catch { /* privado / bloqueado */ }
   }, [openaiKey]);
+  useEffect(() => {
+    try { localStorage.setItem(SK.previewGrid, showPreviewAlignGrid ? '1' : '0'); } catch { /* */ }
+  }, [showPreviewAlignGrid]);
   // Ref para cancelar loops de geração de imagem órfãos (race-condition guard)
   const imgGenAbortRef = useRef(null);
   const slideImgGenIdsRef = useRef(new Set());
@@ -10861,7 +12419,7 @@ export default function App() {
     return Math.min(360 / f.w, 0.44);
   }, [isMobile, vw, f]);
 
-  const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1);
+  const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const empty = isDefault(slides);
 
   useEffect(() => {
@@ -11197,6 +12755,12 @@ export default function App() {
     toast('Tipografia deste card aplicada a todos os slides', 'success');
   }, [activeIdx, setSlides, toast]);
 
+  const applyBrandTypographyToAllSlides = useCallback(() => {
+    const patch = typographyPatchFromBrand(brand);
+    setSlides((list) => list.map((sl) => ({ ...sl, ...patch })));
+    toast('Tipografia da marca aplicada a todos os slides.', 'success');
+  }, [brand, setSlides, toast]);
+
   const persistFullscreenPresentationAdjustDraft = useCallback((draftBySlideId) => {
     if (!draftBySlideId || typeof draftBySlideId !== 'object') return;
     setSlides((prev) =>
@@ -11277,15 +12841,19 @@ export default function App() {
   useLayoutEffect(() => {
     const raw = history.state?.slides;
     if (Array.isArray(raw) && raw.length > 0) return;
-    history.setSilent(d => ({ ...d, slides: [mkSlide(1)] }));
+    history.setSilent(d => ({
+      ...d,
+      slides: [mkSlide(1, d.brand && typeof d.brand === 'object' ? d.brand : DEFAULT_BRAND)],
+    }));
     // history omitido de propósito — só repara ao trocar de doc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDocId]);
 
   const addSlide = useCallback(() => {
-    const n = {...mkSlide(slides.length+1), layout:'bl', align:'left'};
+    const pr = normalizeCardVisualStyle(doc.cardVisualStyle);
+    const n = { ...mkSlide(slides.length + 1, brand), layout: 'bl', align: 'left', photoRegion: pr };
     setSlides([...slides, n]); setActiveIdx(slides.length);
-  }, [slides]);
+  }, [slides, brand, doc.cardVisualStyle, setSlides]);
   const deleteSlide = useCallback((i) => {
     if (slides.length<=1) return;
     const next = slides.filter((_,j)=>j!==i).map((s,j)=>({...s,num:j+1}));
@@ -11313,6 +12881,7 @@ export default function App() {
     mode: chosenNarrativeMode,
     creativePreset: presetArg,
     slideTextDensity: densityArg,
+    cardVisualStyle: cardStyleArg,
     fetchImagesNow = true,
   }) => {
     const effectiveAxes = axes || imgParams;
@@ -11324,6 +12893,7 @@ export default function App() {
         : (chosenNarrativeMode || mode || 'editorial');
     const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
+    const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
     const brandBlock = buildBrandBlock(brand);
     const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
@@ -11412,7 +12982,7 @@ ${jsonShapeLine}`;
       const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
       const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
       const base = {
-        ...mkSlide(i + 1),
+        ...mkSlide(i + 1, brand),
         title,
         subtitle,
         imageQuery: q,
@@ -11421,6 +12991,7 @@ ${jsonShapeLine}`;
         layout: i === 0 ? 'mc' : 'bl',
         align: i === 0 ? 'center' : 'left',
         useCultureLayout: false,
+        photoRegion: cvStyle,
       };
 
       if (isTendenciaCulturaPreset(cp)) {
@@ -11803,21 +13374,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     const palette = PALETTES[tpl.palette] || PALETTES[0];
     const titleFont = TITLE_FONTS[tpl.titleFont] || TITLE_FONTS[0];
     const bodyFont = BODY_FONTS[tpl.bodyFont] || BODY_FONTS[0];
-    const newSlides = tpl.slides.map((s, i) => ({
-      ...mkSlide(i+1),
-      title: s.title,
-      subtitle: s.subtitle,
-      imageQuery: s.q,
-      imgMode: 'dalle',
-      bgImage: null,
-      overlay: 65,
-      layout: i === 0 ? 'mc' : 'bl',
-      align:  i === 0 ? 'center' : 'left',
-    }));
-    history.set(d => ({
-      ...d,
-      slides: newSlides,
-      brand: {
+    let newSlides = [];
+    history.set((d) => {
+      const nextBrand = {
         ...d.brand,
         bg: palette.bg,
         titleColor: palette.title,
@@ -11826,8 +13385,21 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         accent: palette.accent,
         titleFont: titleFont.val,
         bodyFont: bodyFont.val,
-      },
-    }));
+      };
+      const hb = hydrateBrandTextColors(nextBrand);
+      newSlides = tpl.slides.map((s, i) => ({
+        ...mkSlide(i + 1, hb),
+        title: s.title,
+        subtitle: s.subtitle,
+        imageQuery: s.q,
+        imgMode: 'dalle',
+        bgImage: null,
+        overlay: 65,
+        layout: i === 0 ? 'mc' : 'bl',
+        align: i === 0 ? 'center' : 'left',
+      }));
+      return { ...d, slides: newSlides, brand: hb };
+    });
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
     // Guard contra race-condition (mesmo padrão do handleGenerate)
@@ -11951,7 +13523,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     creativePreset,
     fmt,
     applyTypographyToAllCards,
+    applyBrandTypographyToAllSlides,
     canvasEditMode, setCanvasEditMode,
+    showPreviewAlignGrid, setShowPreviewAlignGrid,
     anyCanvasEnabled: slides.some((s) => s.canvas?.enabled),
     patchCanvasZonesAt,
     openPhotoZoneImport,
@@ -12461,6 +14035,20 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                     enableZoneSwapDrag={canvasEditMode}
                   />
+                  {showPreviewAlignGrid ? (
+                    <div
+                      aria-hidden
+                      style={{
+                        position:'absolute',
+                        inset:0,
+                        zIndex:6,
+                        pointerEvents:'none',
+                        borderRadius:10,
+                        backgroundImage: 'linear-gradient(rgba(99,102,241,0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.14) 1px, transparent 1px)',
+                        backgroundSize: '10% 10%',
+                      }}
+                    />
+                  ) : null}
 
                   {/* Setas flutuantes */}
                   {activeIdx > 0 && (
@@ -12553,6 +14141,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     <div
                       onClick={()=>setActiveIdx(i)}
                       style={{
+                        position:'relative',
                         cursor:'pointer', borderRadius:10, overflow:'hidden',
                         transition:'all 0.15s var(--ease-smooth)',
                         boxShadow: i===activeIdx
@@ -12580,6 +14169,20 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                         onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                         enableZoneSwapDrag={canvasEditMode}
                       />
+                      {showPreviewAlignGrid ? (
+                        <div
+                          aria-hidden
+                          style={{
+                            position:'absolute',
+                            inset:0,
+                            zIndex:40,
+                            pointerEvents:'none',
+                            borderRadius:10,
+                            backgroundImage: 'linear-gradient(rgba(99,102,241,0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.14) 1px, transparent 1px)',
+                            backgroundSize: '10% 10%',
+                          }}
+                        />
+                      ) : null}
                     </div>
                     <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 2px' }}>
                       <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em' }}>
@@ -12731,6 +14334,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onCreativePresetChange={setCreativePreset}
         slideTextDensity={slideTextDensity}
         onSlideTextDensityChange={setSlideTextDensity}
+        cardVisualStyle={cardVisualStyle}
+        onCardVisualStyleChange={setCardVisualStyle}
         material={material}
         setMaterial={setMaterial}
       />
