@@ -9204,6 +9204,7 @@ function SidebarContent({
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
+  setLibraryOpen = () => {}, libraryCount = 0,
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
@@ -11425,6 +11426,29 @@ function SidebarContent({
 
       {/* Download footer — PNG por card omitido na aba Conteúdo (ZIP/PDF mantidos). */}
       <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
+        {/* Salvar / abrir biblioteca — visível pra dar feedback de que projeto está salvo */}
+        <button
+          onClick={() => setLibraryOpen(true)}
+          aria-label="Abrir biblioteca de projetos salvos"
+          style={{
+            width:'100%', minHeight:38, borderRadius:11, cursor:'pointer',
+            border:'1px solid var(--accent)', background:'var(--success-surface)',
+            color:'var(--text-primary)', fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.011em',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 12px',
+            transition:'background 0.12s, border-color 0.12s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--success-surface)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+        >
+          <BookOpen size={14}/>
+          {libraryCount > 1
+            ? `Meus projetos (${libraryCount} salvos)`
+            : 'Salvar projeto / abrir salvos'}
+        </button>
+        <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', textAlign:'center', marginBottom:4, lineHeight:1.4 }}>
+          ✓ Salvando automaticamente · clique pra nomear, duplicar ou voltar a um anterior
+        </div>
         {tab !== 'material' && (
           <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
             width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
@@ -14554,6 +14578,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     material, setMaterial,
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
+    setLibraryOpen, libraryCount: library.length,
     openRefImagePicker,
     slideImgGenBusy,
     generateSlideImageAt,
