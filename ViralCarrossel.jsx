@@ -13119,6 +13119,8 @@ export default function App() {
   const imgGenAbortRef = useRef(null);
   const slideImgGenIdsRef = useRef(new Set());
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
+  // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
+  const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const hasOpenAI    = !!openaiKey || (IS_LOCAL_DEV && serverStatus.openai);
   const hasAnthropic = serverStatus.anthropic || !!anthropicKey;
@@ -13812,6 +13814,7 @@ export default function App() {
       cardVisualStyle: cardStyleArg,
     };
     setHasLastGenerate(true);
+    try {
     const effectiveAxes = axes || imgParams;
     const cp = presetArg ?? creativePreset ?? 'livre';
     const effectiveMode = isTendenciaCulturaPreset(cp)
@@ -13897,8 +13900,10 @@ ${imageLayer}
 JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;
 
+    setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Escrevendo texto dos slides…' });
     const result = await callAI(prompt, { json:true, maxTokens:4096, openaiKey });
-    if (!result?.slides?.length) throw new Error('IA não retornou slides. Tente um tema mais específico.');
+    if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
+    setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
@@ -13906,9 +13911,20 @@ ${jsonShapeLine}`;
     const newSlides = applyFinalizeCanvasMarginsToSlides(
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
-      const q = ((s.imageQuery ?? s.image_query) || '').trim();
+      let q = ((s.imageQuery ?? s.image_query) || '').trim();
       const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
       const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
+      // Fallback: capa e encerramento de Cultura/Perso Hybrid SEMPRE devem ter foto
+      // (full-bleed). Se a IA omitiu imageQuery, gera uma a partir do título+subtitle
+      // em inglês básico — o pipeline DALL·E ainda passa.
+      const isFullBleedSlot =
+        (isTendenciaCulturaPreset(cp) && (i === 0 || i === nSlides - 1)) ||
+        (isPersoHybridDensity(cp, td) && i <= 1);
+      if (!q && isFullBleedSlot && (title || subtitle)) {
+        const seed = `${title} ${subtitle}`.trim().slice(0, 120);
+        q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
+        console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
+      }
       const base = {
         ...mkSlide(i + 1, brand),
         title,
@@ -14009,10 +14025,14 @@ ${jsonShapeLine}`;
 
     if (fetchImagesNow) {
       if (hasOpenAI) {
-        for (let i = 0; i < result.slides.length; i++) {
+        const slidesWithImage = newSlides.map((sl, i) => ({ sl, i, q: result.slides[i]?.imageQuery || sl.imageQuery }))
+                                          .filter(x => !!(x.q && String(x.q).trim()));
+        const totalImgs = slidesWithImage.length;
+        let doneImgs = 0;
+        setGenProgress({ phase: 'images', current: 0, total: totalImgs, label: `Gerando imagens (0/${totalImgs})…` });
+        for (const { i, q } of slidesWithImage) {
           if (abort.cancelled) break;
-          const q = result.slides[i]?.imageQuery;
-          if (!q) continue;
+          setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagem do card ${i+1} (${doneImgs+1}/${totalImgs})…` });
           try {
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               refImage: newSlides[i]?.refImage,
@@ -14026,6 +14046,8 @@ ${jsonShapeLine}`;
             if (!abort.cancelled)
               setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImageFailed: true } : sl));
           }
+          doneImgs++;
+          setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
         }
       }
 
@@ -14044,6 +14066,9 @@ ${jsonShapeLine}`;
         'info',
         5500,
       );
+    }
+    } finally {
+      setGenProgress(null);
     }
   };
 
@@ -15302,6 +15327,52 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
 
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
+
+      {/* Barra de progresso fixa no rodapé durante geração de carrossel */}
+      {genProgress && (() => {
+        const pct = genProgress.total > 0
+          ? Math.min(100, Math.max(0, (genProgress.current / genProgress.total) * 100))
+          : (genProgress.phase === 'text' ? 30 : 0);
+        return (
+          <div style={{
+            position:'fixed', left:0, right:0, bottom:0, zIndex:9999,
+            pointerEvents:'none',
+          }}>
+            <div style={{
+              maxWidth: 560, margin:'0 auto 16px', padding:'12px 16px',
+              background:'rgba(20,20,22,0.95)', color:'#fff',
+              backdropFilter:'blur(18px)', WebkitBackdropFilter:'blur(18px)',
+              borderRadius: 14, border:'1px solid rgba(255,255,255,0.1)',
+              boxShadow:'0 12px 40px rgba(0,0,0,0.32)',
+              fontFamily:'var(--font-ui)',
+              pointerEvents:'auto',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite', color:'var(--accent)', flexShrink:0 }}/>
+                <span style={{ fontSize:13, fontWeight:600, letterSpacing:'-0.011em', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {genProgress.label || 'Gerando…'}
+                </span>
+                {genProgress.total > 0 && (
+                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                    {genProgress.current}/{genProgress.total}
+                  </span>
+                )}
+              </div>
+              <div style={{
+                height: 4, background:'rgba(255,255,255,0.12)', borderRadius:9999, overflow:'hidden',
+              }}>
+                <div style={{
+                  height:'100%',
+                  width: `${pct}%`,
+                  background: 'linear-gradient(90deg, var(--accent), #ffb3d1)',
+                  borderRadius: 9999,
+                  transition: 'width 0.35s ease-out',
+                }}/>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modals */}
       <KeysModal

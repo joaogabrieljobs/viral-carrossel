@@ -6,7 +6,7 @@ const TARGET = 'https://api.anthropic.com/v1/messages';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, anthropic-version, x-api-key, Anthropic-Version',
+  'Access-Control-Allow-Headers': 'Content-Type, anthropic-version, x-api-key, x-anthropic-key, Anthropic-Version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -23,15 +23,19 @@ export const handler = async (event) => {
     };
   }
 
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || !key.trim()) {
+  // Chave do usuário via header (UI no app) tem prioridade. Fallback: env do Netlify.
+  const userKey =
+    (event.headers['x-anthropic-key'] || event.headers['X-Anthropic-Key'] || '').trim();
+  const envKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+  const key = userKey || envKey;
+  if (!key) {
     return {
       statusCode: 503,
       headers: { ...cors, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         error: {
           message:
-            'ANTHROPIC_API_KEY não definida no Netlify. Site → Environment variables → adicione a chave e volte a publicar.',
+            'Chave Anthropic não configurada. Adicione sua chave no ícone de chaves (⚙) no header do app, ou peça ao admin pra definir ANTHROPIC_API_KEY no Netlify.',
         },
       }),
     };

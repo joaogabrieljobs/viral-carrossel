@@ -31,3 +31,25 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# index.html NUNCA cacheia — assim o browser sempre puxa a versão nova que
+# referencia os chunks JS/CSS atuais. Sem isso, deploy novo deixa browsers com
+# HTML antigo apontando pra chunks que já não existem ("Failed to fetch...").
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+
+# Assets com hash (CSS/JS/imagens) podem cachear longo — o hash no nome
+# invalida automaticamente quando muda.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
