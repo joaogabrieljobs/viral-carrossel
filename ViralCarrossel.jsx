@@ -9131,10 +9131,6 @@ function PerSlideImageRefBlock({
             className="vc-input vc-textarea"
             style={{ fontSize: 13, lineHeight: 1.47, letterSpacing: '-0.011em', width: '100%', resize: 'vertical', minHeight: 56 }}
           />
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
-            Com <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>GPT Image</span>, a referência vai para a API de edição. No{' '}
-            <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Web trend</span>, só o texto reforça a busca.
-          </div>
         </div>
       </div>
       {typeof onGenerateImage === 'function' && (
@@ -15229,17 +15225,54 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                         />
                       ) : null}
                     </div>
-                    <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 2px' }}>
-                      <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em' }}>
+                    <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 2px', gap:6 }}>
+                      <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.06em', flexShrink:0 }}>
                         {String(i+1).padStart(2,'0')}
                       </span>
-                      <button onClick={()=>exportSlide(i)} disabled={exporting} style={{
-                        background:'none', border:'none', color:'var(--text-muted)',
-                        cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
-                      }}
-                      onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
-                      onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
-                      ><Download size={11}/></button>
+                      <div style={{ display:'flex', alignItems:'center', gap:2 }}>
+                        <button
+                          onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setFullscreenOpen(true); }}
+                          title="Visualizar em tela cheia"
+                          aria-label={`Visualizar card ${i+1} em tela cheia`}
+                          style={{
+                            background:'none', border:'none', color:'var(--text-muted)',
+                            cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            minWidth:24, minHeight:24,
+                          }}
+                          onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
+                          onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
+                        ><Maximize2 size={11}/></button>
+                        {s.bgImage ? (
+                          <button
+                            onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setPhotoPositionOpen(true); }}
+                            title="Editar / reposicionar foto"
+                            aria-label={`Editar foto do card ${i+1}`}
+                            style={{
+                              background:'none', border:'none', color:'var(--text-muted)',
+                              cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
+                              display:'inline-flex', alignItems:'center', justifyContent:'center',
+                              minWidth:24, minHeight:24,
+                            }}
+                            onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
+                            onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
+                          ><Crop size={11}/></button>
+                        ) : null}
+                        <button
+                          onClick={(e)=>{ e.stopPropagation(); exportSlide(i); }}
+                          disabled={exporting}
+                          title="Baixar card em PNG"
+                          aria-label={`Baixar card ${i+1}`}
+                          style={{
+                            background:'none', border:'none', color:'var(--text-muted)',
+                            cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            minWidth:24, minHeight:24,
+                          }}
+                          onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
+                          onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
+                        ><Download size={11}/></button>
+                      </div>
                     </div>
                     <PerSlideImageRefBlock
                       slide={s}
