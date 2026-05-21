@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Sparkles, Search, Download, Trash2, Copy,
-  Plus, Palette, Layout, Crop, Wand2, Loader2,
+  Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image as ImageIcon,
@@ -15268,6 +15268,22 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
                         ><Maximize2 size={11}/></button>
+                        <button
+                          onClick={(e)=>{ e.stopPropagation(); setShowPreviewAlignGrid(g => !g); }}
+                          title={showPreviewAlignGrid ? 'Esconder grade de alinhamento' : 'Mostrar grade de alinhamento em todos os cards'}
+                          aria-label={showPreviewAlignGrid ? 'Esconder grade' : 'Mostrar grade'}
+                          aria-pressed={showPreviewAlignGrid}
+                          style={{
+                            background: showPreviewAlignGrid ? 'var(--success-surface)' : 'none',
+                            border: showPreviewAlignGrid ? '1px solid var(--accent)' : '1px solid transparent',
+                            color: showPreviewAlignGrid ? 'var(--accent)' : 'var(--text-muted)',
+                            cursor:'pointer', padding:4, borderRadius:4, transition:'all 0.12s',
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            minWidth:24, minHeight:24,
+                          }}
+                          onMouseEnter={e=>{ if(!showPreviewAlignGrid) e.currentTarget.style.color='var(--text-primary)'; }}
+                          onMouseLeave={e=>{ if(!showPreviewAlignGrid) e.currentTarget.style.color='var(--text-muted)'; }}
+                        ><LayoutGrid size={11}/></button>
                         {s.bgImage ? (
                           <button
                             onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setPhotoPositionOpen(true); }}
