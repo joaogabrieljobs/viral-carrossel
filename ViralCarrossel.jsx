@@ -2015,28 +2015,32 @@ const OPENAI_IMAGE_EDITS_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/edits'     
 /** Converte "Failed to fetch" numa mensagem acionável (CORS, preview sem proxy, rede). */
 function enhanceNetworkError(err, label) {
   const m = (err && err.message) ? err.message : String(err);
-  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
-    const hosted = typeof window !== 'undefined' && !IS_LOCAL_DEV;
-    const preview =
-      typeof window !== 'undefined' &&
-      /^(localhost|127\.|\[::1\])/.test(window.location.hostname) &&
-      (window.location.port === '4173' || window.location.port === '4174');
-    let hint =
-      'Mantenha `npm run dev` ativo e `.env.local` com ANTHROPIC_API_KEY ou OPENAI_API_KEY (o proxy /api só existe no dev server).';
-    if (preview) {
-      hint =
-        '`npm run preview` não inclui o proxy /api — use `npm run dev` para IA ou gere só no ambiente de desenvolvimento.';
-    } else if (hosted) {
-      const proxyHint =
-        typeof import.meta !== 'undefined' && import.meta.env?.VITE_ANTHROPIC_PROXY === 'true'
-          ? ' Confirme ANTHROPIC_API_KEY nas variáveis do Netlify e que o deploy inclui a função netlify/functions/anthropic-proxy.'
-          : ' Num deploy estático, use o proxy incluído (Netlify + VITE_ANTHROPIC_PROXY) ou a chave OpenAI em ⚙, ou sirva em localhost com `npm run dev`.';
-      hint =
-        `Num site hospedado o browser não pode chamar api.anthropic.com direto por CORS.${proxyHint}`;
-    }
-    return new Error(`${label}: falha de rede (${m}). ${hint}`);
+  if (!/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
+    return err instanceof Error ? err : new Error(m);
   }
-  return err instanceof Error ? err : new Error(m);
+  const hosted = typeof window !== 'undefined' && !IS_LOCAL_DEV;
+  const isClaude = /claude|anthropic/i.test(label);
+  const isOpenAI = /openai|gpt|dall/i.test(label);
+  let hint;
+  if (!hosted) {
+    // Dev local: provavelmente o proxy /api não está respondendo
+    hint = 'Verifique se `npm run dev` está rodando e se há internet. Em local dev, o proxy /api precisa do servidor Vite ativo.';
+  } else if (isClaude) {
+    hint =
+      'Em produção, Claude passa pelo proxy /api/anthropic (Netlify Function). ' +
+      'Verifique se: (a) sua chave Anthropic está preenchida no ⚙ no header, OU ' +
+      '(b) o admin do site configurou ANTHROPIC_API_KEY no Netlify. ' +
+      'Como atalho, adicione apenas a chave OpenAI no ⚙ — ela cobre texto (GPT-4o) e imagens (DALL·E).';
+  } else if (isOpenAI) {
+    hint =
+      'Sua chave OpenAI pode estar inválida, expirada ou sem saldo. ' +
+      'Verifique em platform.openai.com/api-keys e platform.openai.com/account/billing. ' +
+      'Se nunca configurou, adicione a chave no ícone ⚙ no header.';
+  } else {
+    hint =
+      'Erro de rede ao chamar a API de IA. Verifique sua conexão e se as chaves no ⚙ estão corretas.';
+  }
+  return new Error(`${label}: falha de rede. ${hint}`);
 }
 
 // Cache do health-check do servidor (quais providers tem chave configurada)
