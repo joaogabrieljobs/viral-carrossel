@@ -11,6 +11,12 @@ import {
   Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
   Target, Camera,
 } from 'lucide-react';
+import { extractDominantColor } from './src/utils/color-extraction.js';
+import { extractJSON } from './src/utils/parsers.js';
+import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
+import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
+import AutoFitText from './src/components/AutoFitText.jsx';
+import WcagBadge from './src/components/WcagBadge.jsx';
 
 // ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
 // Chaves centralizadas — nunca use string literal de localStorage diretamente.
@@ -21,6 +27,15 @@ const SK = {
   brands:        'vc_brands',
   activeBrandId: 'vc_active_brand_id',
   openaiKey:     'vc_openai_key',
+  /** Toggle: usuário escolheu manter chave persistida (true) ou apenas na sessão (false / ausente). */
+  openaiKeyPersist: 'vc_openai_key_persist',
+  /** Chave Anthropic do navegador (em local dev, vai via proxy). */
+  anthropicKey:  'vc_anthropic_key',
+  anthropicKeyPersist: 'vc_anthropic_key_persist',
+  /** Modelo Claude preferido: 'sonnet' (default, rápido) ou 'opus' (qualidade máxima). */
+  claudeModel:   'vc_claude_model',
+  /** Biblioteca de hooks (capas) que o usuário aprovou — sugerida em novas gerações do mesmo nicho. */
+  hookLibrary:   'vc_hook_library',
   onboarding:    'vc_onboarding_done',
   shellView:     'vc_shell_view',
   /** Lista no editor: grelha de alinhamento sobre o preview (não exportada). */
@@ -279,6 +294,17 @@ const GLOBAL_STYLE = `
   }
   .vc-btn-ghost:hover { color: var(--text-primary); background: #ebebeb; }
 
+  /* Botão de ícone (close X de modal, controles minor) — touch target WCAG min 36px */
+  .vc-icon-btn {
+    background: none; border: none; cursor: pointer; color: var(--text-muted);
+    min-width: 36px; min-height: 36px; padding: 8px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .vc-icon-btn:hover { color: var(--text-primary); background: rgba(0,0,0,0.06); }
+  .vc-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   /* Inputs — pill, white, hairline border */
   .vc-input {
     width: 100%; background: var(--bg-base); border: 1px solid var(--hairline);
@@ -484,9 +510,12 @@ const GLOBAL_STYLE = `
   .toast-item.toast-info   { background: rgba(245, 245, 247, 0.92); color: var(--text-primary); }
   .toast-item button {
     background: none; border: none; cursor: pointer; color: inherit;
-    opacity: 0.7; padding: 2px; flex-shrink: 0;
+    opacity: 0.7; padding: 10px; flex-shrink: 0;
+    min-width: 36px; min-height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 6px;
   }
-  .toast-item button:hover { opacity: 1; }
+  .toast-item button:hover { opacity: 1; background: rgba(0,0,0,0.08); }
 
   .kbd {
     display: inline-flex; align-items: center; justify-content: center;
@@ -925,6 +954,8 @@ const LAYOUTS = [
   { id:'bc', jc:'flex-end',   ai:'center',     label:'↓', posLab: LAYOUT_POS_LAB_ROWS[7] },
   { id:'br', jc:'flex-end',   ai:'flex-end',   label:'↘', posLab: LAYOUT_POS_LAB_ROWS[8] },
 ];
+/** Fallback de layout quando o slide tem id inválido / legacy — middle-center é o mais neutro. */
+const DEFAULT_LAYOUT = LAYOUTS.find(l => l.id === 'mc') || LAYOUTS[4];
 
 function layoutMiniBars(layoutId) {
   const yByRow = { t: 10, m: 21.5, b: 33 };
@@ -1755,15 +1786,34 @@ const mkLibEntry = (doc, name = 'Sem título') => {
   };
 };
 
-// Hook: state que sincroniza com localStorage (debounced)
+// Hook: state que sincroniza com localStorage (debounced) + sync entre abas
+// via evento `storage` (que só dispara em OUTRAS abas — não na que escreveu).
 function usePersistedState(key, initial) {
   const [val, setVal] = React.useState(() => lsGet(key, initial));
   const tRef = React.useRef(null);
+  const lastWrittenRef = React.useRef(null);
   React.useEffect(() => {
     if (tRef.current) clearTimeout(tRef.current);
-    tRef.current = setTimeout(() => lsSet(key, val), 300);
+    tRef.current = setTimeout(() => {
+      lastWrittenRef.current = JSON.stringify(val);
+      lsSet(key, val);
+    }, 300);
     return () => { if (tRef.current) clearTimeout(tRef.current); };
   }, [key, val]);
+  React.useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== key || e.newValue == null) return;
+      // Ignora eco da própria escrita (alguns browsers reentram)
+      if (e.newValue === lastWrittenRef.current) return;
+      try {
+        setVal(JSON.parse(e.newValue));
+      } catch (err) {
+        console.warn(`[usePersistedState] storage event JSON inválido para "${key}":`, err.message);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key]);
   return [val, setVal];
 }
 
@@ -1777,6 +1827,11 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
   const future = React.useRef([]);
   const skipNext = React.useRef(false);
   const lastPushAt = React.useRef(0);
+  // Guards contra StrictMode double-invoke: React 18 roda o updater 2× em dev
+  // pra detectar side-effects. Sem isso, push duplica entradas e undo/redo pulam steps.
+  const lastPushedPrev = React.useRef(null);
+  const lastUndoPrev = React.useRef(null);
+  const lastRedoPrev = React.useRef(null);
   // Versão incremental: muda sempre que o histórico muda → permite derivar canUndo/canRedo reativos
   const [histVer, setHistVer] = React.useState(0);
   const bumpHist = React.useCallback(() => setHistVer(v => v + 1), []);
@@ -1786,6 +1841,9 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       if (next === prev) return prev;
       if (skipNext.current) { skipNext.current = false; return next; }
+      // Guard StrictMode: se já empurramos exatamente este prev no último ciclo, é re-invoke
+      if (lastPushedPrev.current === prev) return next;
+      lastPushedPrev.current = prev;
       const now = Date.now();
       const coalesce = (now - lastPushAt.current) < coalesceMs;
       lastPushAt.current = now;
@@ -1793,7 +1851,6 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
         past.current.push(prev);
         if (past.current.length > limit) past.current.shift();
         future.current = [];
-        // Agenda bump fora do setState (não pode chamar setHistVer dentro de outro setState)
         Promise.resolve().then(bumpHist);
       } else {
         future.current = [];
@@ -1810,7 +1867,9 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
 
   const undo = React.useCallback(() => {
     setStateInternal((prev) => {
+      if (lastUndoPrev.current === prev) return prev; // StrictMode guard
       if (!past.current.length) return prev;
+      lastUndoPrev.current = prev;
       const previous = past.current.pop();
       future.current.push(prev);
       Promise.resolve().then(bumpHist);
@@ -1820,7 +1879,9 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
 
   const redo = React.useCallback(() => {
     setStateInternal((prev) => {
+      if (lastRedoPrev.current === prev) return prev; // StrictMode guard
       if (!future.current.length) return prev;
+      lastRedoPrev.current = prev;
       const next = future.current.pop();
       past.current.push(prev);
       Promise.resolve().then(bumpHist);
@@ -1929,27 +1990,7 @@ const isDefault = (slides) =>
   slides.length === 1 &&
   slides[0]?.title === 'Seu título aqui';
 
-const extractJSON = (raw) => {
-  if (!raw) throw new Error('IA retornou resposta vazia. Tente novamente.');
-  let s = raw.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
-  try { return JSON.parse(s); } catch {}
-  let depth=0, start=-1, inStr=false, esc=false;
-  for (let i=0; i<s.length; i++) {
-    const c=s[i];
-    if(esc){esc=false;continue;}
-    if(c==='\\'){esc=true;continue;}
-    if(c==='"'){inStr=!inStr;continue;}
-    if(inStr)continue;
-    if(c==='{'){if(depth===0)start=i;depth++;}
-    else if(c==='}'){
-      depth--;
-      if(depth===0&&start>=0){
-        try{return JSON.parse(s.slice(start,i+1));}catch{}
-      }
-    }
-  }
-  throw new Error('Formato de resposta inválido. Tente novamente.');
-};
+// extractJSON foi extraído para src/utils/parsers.js
 
 // ─── AI BACKENDS ──────────────────────────────────────────────────────────────
 // Detecta se está rodando localmente (Vite dev) — nesse caso usa o proxy
@@ -2011,19 +2052,39 @@ const getServerStatus = ({ force = false } = {}) => {
 const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês.';
 
 // Backend Anthropic (Claude)
+// Mutável em runtime via setClaudeModelPref — React component sincroniza via useEffect.
+// Defaults para Sonnet (rápido); usuário pode trocar para Opus em ⚙ para qualidade máxima.
+const CLAUDE_MODELS = {
+  sonnet: 'claude-sonnet-4-6',
+  opus:   'claude-opus-4-7',
+};
+let _claudeModelPref = 'sonnet';
+const setClaudeModelPref = (v) => { _claudeModelPref = (v === 'opus' ? 'opus' : 'sonnet'); };
+const getClaudeModelId = () => CLAUDE_MODELS[_claudeModelPref] || CLAUDE_MODELS.sonnet;
+
+// Mutável em runtime — App.useEffect sincroniza após mudança no input do KeysModal.
+let _anthropicUserKey = '';
+const setAnthropicUserKey = (k) => { _anthropicUserKey = String(k || '').trim(); };
+
 const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null } = {}) => {
   const body = {
-    model: 'claude-sonnet-4-6',
+    model: getClaudeModelId(),
     max_tokens: maxTokens,
     system: AI_SYSTEM_PT,
     messages: [{ role: 'user', content: userMsg }],
   };
   if (tools) body.tools = tools;
+  const headers = { 'Content-Type': 'application/json' };
+  // Local dev: chave do usuário (se preenchida) é injetada via header pro proxy usar
+  // como x-api-key no Anthropic. Sem chave do usuário, proxy usa ANTHROPIC_API_KEY do .env.local.
+  if (IS_LOCAL_DEV && _anthropicUserKey) {
+    headers['x-anthropic-key'] = _anthropicUserKey;
+  }
   let res;
   try {
     res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
   } catch (e) {
@@ -2103,19 +2164,39 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
 // `openaiKey` é a chave configurada pelo usuário no UI (KeysModal).
 // Em local dev, OpenAI também funciona sem chave do user se o servidor tiver
 // `OPENAI_API_KEY` no .env.local (o proxy usa ela como fallback).
+//
+// Estratégia de erro: erros transitórios (429, 5xx, timeout, rede) no Anthropic
+// recebem retry com backoff exponencial antes de cair para OpenAI — evita queimar
+// crédito OpenAI quando o Claude está só sobrecarregado por uns segundos.
 const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
   const status = await getServerStatus();
   const openaiAvailable = !!openaiKey || (IS_LOCAL_DEV && status.openai);
-  // Tenta Anthropic se servidor tem chave (ou se estamos no Claude artifact, onde IS_LOCAL_DEV=false)
-  if (status.anthropic) {
-    try {
-      return await callAnthropic(userMsg, { json, maxTokens });
-    } catch (e) {
-      if (openaiAvailable) {
-        return await callOpenAIChat(userMsg, { json, maxTokens, key: openaiKey });
+  // Anthropic disponível se: prod (Claude artifact, sempre) || env.local tem key || user forneceu key via UI
+  const anthropicAvailable = status.anthropic || !!_anthropicUserKey;
+  const isTransient = (e) => {
+    const msg = String(e?.message || '');
+    return e instanceof TypeError ||
+      e?.status === 429 || e?.status >= 500 ||
+      /HTTP\s*(429|5\d\d)|rate.?limit|timeout|network|fetch failed/i.test(msg);
+  };
+  if (anthropicAvailable) {
+    const backoffs = [0, 1000, 3000]; // 3 tentativas no Claude (imediata, +1s, +3s)
+    let lastErr;
+    for (let i = 0; i < backoffs.length; i++) {
+      if (backoffs[i] > 0) await new Promise(r => setTimeout(r, backoffs[i]));
+      try {
+        return await callAnthropic(userMsg, { json, maxTokens });
+      } catch (e) {
+        lastErr = e;
+        if (!isTransient(e) || i === backoffs.length - 1) break;
+        console.warn(`[callAI] Claude transitório (tentativa ${i+1}/${backoffs.length}):`, e.message);
       }
-      throw e;
     }
+    if (openaiAvailable) {
+      console.warn('[callAI] Claude esgotou tentativas, caindo para OpenAI:', lastErr?.message);
+      return await callOpenAIChat(userMsg, { json, maxTokens, key: openaiKey });
+    }
+    throw lastErr;
   }
   if (openaiAvailable) {
     return await callOpenAIChat(userMsg, { json, maxTokens, key: openaiKey });
@@ -2719,6 +2800,26 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
   );
 };
 
+/** Wrapper que tenta `generateDALLE` até N+1 vezes com backoff curto. Útil para rate-limits transitórios.
+ *  Erros 4xx persistentes (auth, conteúdo, modelo indisponível) NÃO retentam — só rede / 5xx / 429. */
+const generateDALLEWithRetry = async (q, apiKey, imgParams = null, options = {}, { retries = 1, backoffMs = 1200 } = {}) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await generateDALLE(q, apiKey, imgParams, options);
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e?.message || '');
+      const isRetriable =
+        e instanceof TypeError ||
+        /HTTP\s*5\d\d|429|rate.?limit|timeout|network|fetch/i.test(msg);
+      if (!isRetriable || attempt === retries) throw e;
+      await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+};
+
 /** Ajustes de imagem apenas para preview (ex.: tela cheia); valores típicos −50…+50, 0 = neutro. */
 const PRESENTATION_IMG_ADJ_KEYS = ['exposure', 'brightness', 'contrast', 'color', 'blacks', 'tonalidade'];
 
@@ -2730,6 +2831,15 @@ const DEFAULT_PRESENTATION_IMG_ADJUST = Object.freeze({
   blacks: 0,
   tonalidade: 0,
 });
+
+/** Presets de filtro pré-configurados — atalho pra ajuste rápido na sidebar.
+ *  Aplicados via `updateSlide({ presentationImgAdjust: PRESET[id] })`. */
+const PRESENTATION_IMG_FILTER_PRESETS = [
+  { id: 'neutro',    label: 'Neutro',    desc: 'Sem filtro', vals: { ...DEFAULT_PRESENTATION_IMG_ADJUST } },
+  { id: 'editorial', label: 'Editorial', desc: 'Contraste +, cor sutil', vals: { exposure:0, brightness:-3, contrast:14, color:-6, blacks:6, tonalidade:0 } },
+  { id: 'vintage',   label: 'Vintage',   desc: 'Quente + suave',           vals: { exposure:4, brightness:2, contrast:-6, color:10, blacks:-8, tonalidade:12 } },
+  { id: 'bw',        label: 'P&B',       desc: 'Preto e branco contrastado', vals: { exposure:0, brightness:0, contrast:18, color:-50, blacks:8, tonalidade:0 } },
+];
 
 function normalizePresentationImgAdjust(raw) {
   const o = typeof raw === 'object' && raw ? raw : {};
@@ -3335,7 +3445,14 @@ function CultureInlineRich({
     <span style={wrapStyle}>
       {parts.map((p, i) =>
         p.type === 'accent' ? (
-          <span key={i} style={{ color: accentColor, fontWeight: 600 }}>{p.v}</span>
+          // Accent: SEMPRE visualmente distinto do base, mesmo quando a cor está washout.
+          // - fontWeight 800 garante destaque acima de base 400/500/600 padrão
+          // - se a cor accent estiver muito próxima do base (washout em fundos com baixo contraste),
+          //   o weight extra ainda permite o usuário ver o destaque
+          <span key={i} style={{
+            color: accentColor,
+            fontWeight: 800,
+          }}>{p.v}</span>
         ) : (
           <span key={i}>{p.v}</span>
         ),
@@ -3520,11 +3637,13 @@ const DEFAULT_CANVAS_ZONES_CLASSIC = {
   subtitle: { x: 6, y: 77, w: 88, h: 20 },
 };
 
-/** Capa / encerramento Cultura ou primeiros dois do Personalizado 1·1 · 1·2 — foto preenche o card, texto nas zonas inferiores. */
+/** Capa / encerramento Cultura ou primeiros dois do Personalizado 1·1 · 1·2 — foto preenche o card,
+ *  texto nas zonas inferiores (estilo "manchete sobre foto"). Título com altura ampla pra
+ *  acomodar 2-3 linhas de copy editorial sem cortar. */
 const DEFAULT_CANVAS_ZONES_COVER_FULLBLEED = {
   photo: { x: 0, y: 0, w: 100, h: 100 },
-  title: { x: 6, y: 52, w: 88, h: 12 },
-  subtitle: { x: 6, y: 64, w: 88, h: 30 },
+  title: { x: 6, y: 62, w: 88, h: 22 },
+  subtitle: { x: 6, y: 85, w: 88, h: 10 },
 };
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
@@ -3602,6 +3721,11 @@ function inferCanvasDefaults(slide, creativePreset) {
     skin && !!bodyAfter && !hasPhotoIntent && !!(slide.subtitle || '').trim();
   if (sandwich) return { variant: 'sandwich', zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH } };
   if (stat) return { variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } };
+  // Cultura: capa/encerramento (slide sem bodyAfterImage com foto) usa full-bleed pra
+  // título ter espaço amplo. Outros casos usam classic.
+  if (skin && hasPhotoIntent) {
+    return { variant: 'classic', zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED } };
+  }
   return { variant: 'classic', zones: { ...DEFAULT_CANVAS_ZONES_CLASSIC } };
 }
 
@@ -4434,9 +4558,11 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                   position: 'absolute',
                   left: 5,
                   top: 5,
-                  padding: '2px 7px',
+                  padding: '6px 12px',
+                  minWidth: 36,
+                  minHeight: 32,
                   borderRadius: 9999,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: 600,
                   fontFamily: 'var(--font-ui)',
                   letterSpacing: '-0.022em',
@@ -4446,6 +4572,9 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                   zIndex: 2,
                   lineHeight: 1.2,
                   userSelect: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >⇄</div>
             )}
@@ -4521,7 +4650,7 @@ const ClassicCanvasInner = React.forwardRef(({
   interactionScale = 1,
 }, ref) => {
   const zcv = slide.canvas.zones;
-  const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
+  const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || DEFAULT_LAYOUT;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const padTitleXp = canvasClassicTitlePaddingXPx(f, slide);
   const padSubtitleXp = canvasClassicSubtitlePaddingXPx(f, slide);
@@ -4629,21 +4758,26 @@ const ClassicCanvasInner = React.forwardRef(({
         ) : null}
       </div>
 
-      <div style={{
-        ...pctBox(tr, f),
-        ...VC_TEXT_ZONE_STYLE,
-        zIndex: 4,
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: Lzn.jc,
-        alignItems: Lzn.ai,
-        textAlign: slide.align,
-        background: textBgColor,
-        backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-        borderRadius: slide.textBg ? f.w * 0.022 : 0,
-        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
-      }}>
+      <OverflowScaler
+        containerStyle={{
+          ...pctBox(tr, f),
+          ...VC_TEXT_ZONE_STYLE,
+          zIndex: 4,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: Lzn.jc,
+          alignItems: Lzn.ai,
+          textAlign: slide.align,
+          background: textBgColor,
+          backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+          borderRadius: slide.textBg ? f.w * 0.022 : 0,
+          padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
+        }}
+        deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
+        minScale={0.45}
+      >
+        {(titleScale) => (
         <div
           style={{
             width: '100%',
@@ -4658,7 +4792,7 @@ const ClassicCanvasInner = React.forwardRef(({
         <h1 style={{
           color: titleInk,
           fontFamily: titleFF,
-          fontSize: f.w * 0.084 * (slide.titleSize / 100),
+          fontSize: f.w * 0.084 * (slide.titleSize / 100) * titleScale,
           lineHeight: (slide.titleLeading ?? 105) / 100,
           fontWeight: slide.titleWeight ?? 800,
           letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
@@ -4680,30 +4814,36 @@ const ClassicCanvasInner = React.forwardRef(({
             baseColor={titleInk}
             accentColor={cultureAccentCol}
             fontFamily={titleFF}
-            fontSize={f.w * 0.084 * (slide.titleSize / 100)}
+            fontSize={f.w * 0.084 * (slide.titleSize / 100) * titleScale}
             lineHeight={(slide.titleLeading ?? 105) / 100}
             fontWeight={slide.titleWeight ?? 800}
             letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
           />
         ) : slide.title}</h1>
         </div>
-      </div>
+        )}
+      </OverflowScaler>
 
-      <div style={{
-        ...pctBox(sr, f),
-        ...VC_TEXT_ZONE_STYLE,
-        zIndex: 4,
-        overflow: 'auto',
-        background: textBgColor,
-        backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-        borderRadius: slide.textBg ? f.w * 0.022 : 0,
-        padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: Lzn.jc,
-        alignItems: Lzn.ai,
-        textAlign: slide.align,
-      }}>
+      <OverflowScaler
+        containerStyle={{
+          ...pctBox(sr, f),
+          ...VC_TEXT_ZONE_STYLE,
+          zIndex: 4,
+          overflow: 'hidden',
+          background: textBgColor,
+          backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+          borderRadius: slide.textBg ? f.w * 0.022 : 0,
+          padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: Lzn.jc,
+          alignItems: Lzn.ai,
+          textAlign: slide.align,
+        }}
+        deps={[slide.subtitle, slide.subSize, sr.w, sr.h, f.w, f.h, slide.subLeading]}
+        minScale={0.78}
+      >
+        {(subScale) => (
         <div
           style={{
             width: '100%',
@@ -4724,18 +4864,18 @@ const ClassicCanvasInner = React.forwardRef(({
                 ink={bodyInk}
                 accentColor={cultureAccentCol}
                 fontFamily={bodyFF}
-                fontSize={f.w * 0.028 * (slide.subSize / 100)}
+                fontSize={f.w * 0.028 * (slide.subSize / 100) * subScale}
                 lineHeight={(slide.subLeading ?? 150) / 100}
                 fontWeight={400}
                 letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
-                paraGap={f.h * 0.010}
+                paraGap={f.h * 0.010 * subScale}
               />
             </div>
           ) : (
             <p style={{
               color: bodyInk,
               fontFamily: bodyFF,
-              fontSize: f.w * 0.028 * (slide.subSize / 100),
+              fontSize: f.w * 0.028 * (slide.subSize / 100) * subScale,
               lineHeight: (slide.subLeading ?? 150) / 100,
               fontWeight: 400,
               margin: 0,
@@ -4750,7 +4890,8 @@ const ClassicCanvasInner = React.forwardRef(({
           )
         )}
         </div>
-      </div>
+        )}
+      </OverflowScaler>
 
       {culture && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
@@ -5271,6 +5412,74 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
 });
 ClassicLegadoInsetPhotoColumn.displayName = 'ClassicLegadoInsetPhotoColumn';
 
+// AutoFitText foi extraído para src/components/AutoFitText.jsx
+
+// ─── OVERFLOW SCALER ──────────────────────────────────────────────────────────
+// Mede o próprio container e fornece um scale factor (via render-prop) que pode
+// ser aplicado uniformemente aos fontSize dos textos filhos.
+// Diferente do AutoFitText (que envolve UM elemento de texto), o OverflowScaler
+// permite que MÚLTIPLOS elementos (title + subtitle + body + photo zone) coexistam
+// dentro dele, e o scale uniforme garante hierarquia tipográfica preservada.
+//
+// Uso:
+//   <OverflowScaler containerStyle={{...}} deps={[title, subtitle, body]} minScale={0.7}>
+//     {(scale) => (<>... fontSize={baseSize * scale} ...</>)}
+//   </OverflowScaler>
+function OverflowScaler({ containerStyle, deps = [], minScale = 0.55, children }) {
+  const ref = React.useRef(null);
+  const [scale, setScale] = React.useState(1);
+  const iterationsRef = React.useRef(0);
+  // Reset ao trocar conteúdo
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useLayoutEffect(() => {
+    setScale(1);
+    iterationsRef.current = 0;
+  }, deps);
+  // Mede e reduz se transbordou — converge em ≤6 frames
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Hard limit pra evitar loop infinito em casos patológicos
+    if (iterationsRef.current > 8) return;
+    iterationsRef.current++;
+    const clientH = el.clientHeight;
+    if (clientH <= 0) return;
+    const contentH = el.scrollHeight;
+    if (contentH <= clientH + 1) return;
+    // Desconta photo zone (altura fixa, não escala)
+    const photoEl = el.querySelector('[data-vc-photo-zone="1"]');
+    const photoH = photoEl ? photoEl.getBoundingClientRect().height : 0;
+    const textContentH = Math.max(1, contentH - photoH);
+    const availForText = Math.max(1, clientH - photoH);
+    // Estimativa: scale precisa ajustar pela razão de área (h escalada ≈ h × scale)
+    // Safety factor 0.98: tira um pequeno respiro pra evitar ficar exatamente no limite,
+    // mas suficientemente conservador pra não encolher demais.
+    const target = Math.max(minScale, scale * (availForText / textContentH) * 0.98);
+    if (target < scale - 0.003) {
+      setScale(target);
+    }
+  });
+  // Fallback: re-medir após fontes carregarem (1s) — corrige casos onde a primeira
+  // medida foi tirada antes de a fonte web aplicar
+  React.useEffect(() => {
+    let cancelled = false;
+    const id = setTimeout(() => {
+      if (cancelled) return;
+      iterationsRef.current = 0;
+      // Force uma re-medida resetando pra 1 (vai re-disparar o ciclo de encolhimento)
+      setScale((s) => (s < 1 ? 1 : s));
+    }, 600);
+    return () => { cancelled = true; clearTimeout(id); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return (
+    <div ref={ref} style={containerStyle}>
+      {children(scale)}
+    </div>
+  );
+}
+
 // ─── SLIDE CARD ───────────────────────────────────────────────────────────────
 
 const SlideCardInner = React.forwardRef(({
@@ -5304,7 +5513,7 @@ const SlideCardInner = React.forwardRef(({
   const onPhotoZoneFileInputChange = React.useCallback((e) => {
     photoNativeRef.current?.(slideIdx, e);
   }, [slideIdx]);
-  const L = LAYOUTS.find(l=>l.id===slide.layout)||LAYOUTS[4];
+  const L = LAYOUTS.find(l=>l.id===slide.layout) || DEFAULT_LAYOUT;
   const bg = resolveSlideBrandBg(brand, slideIdx, slide);
   const isBebas = brand.titleFont?.includes('Bebas');
   const imgModeNorm = normalizeSlideImgMode(slide.imgMode);
@@ -5361,8 +5570,14 @@ const SlideCardInner = React.forwardRef(({
     (!!slide.bgImage || slideHasPendingPhotoIntent(slide)) &&
     !sandwich &&
     !cultureStatFlat;
-  const hideInstaBadge = culturePack;
-  const showCultureIdx = culturePack && total > 1;
+  // Badge classic (com avatar circular + handle) deve aparecer em TODOS os modos —
+  // o usuário controla via toggle "Mostrar @ nos slides" e posição via sliders handleBadgeX/Y.
+  // (Antes era escondido em culturePack assumindo que o handle iria na editorial bar,
+  // mas isso ignorava os sliders de posição.)
+  const hideInstaBadge = false;
+  // Desligado: contador "N/M" no canto superior direito do card foi removido a pedido.
+  // (UI já mostra o número do card via tabs/navegação fora do canvas.)
+  const showCultureIdx = false;
   const cultureAccentCol = brand.accent || '#000000';
 
   const slideCardBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
@@ -5406,7 +5621,7 @@ const SlideCardInner = React.forwardRef(({
     const bgSolid = surface === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surface === 'accent' ? (brand.accent || '#000000') : lightCultureBg;
     const cr = cultureReadableInks(bgSolid, carouselTitleInk, carouselBodyInk, cultureAccentCol);
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
-    const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || LAYOUTS[4];
+    const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || DEFAULT_LAYOUT;
     const alignInner =
       slide.align === 'center' ? 'center' :
       slide.align === 'right' ? 'flex-end' :
@@ -5461,18 +5676,23 @@ const SlideCardInner = React.forwardRef(({
           }}>{num}/{total}</div>
         )}
 
-        <div style={{
-          ...pctBox(topR, f),
-          ...VC_TEXT_ZONE_STYLE,
-          zIndex: 4,
-          overflow: 'auto',
-          padding: `${padYCv}px ${padXCvTop}px`,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: Lzn.jc,
-          alignItems: Lzn.ai,
-          textAlign: slide.align === 'justify' ? 'left' : slide.align,
-        }}>
+        <OverflowScaler
+          containerStyle={{
+            ...pctBox(topR, f),
+            ...VC_TEXT_ZONE_STYLE,
+            zIndex: 4,
+            overflow: 'hidden',
+            padding: `${padYCv}px ${padXCvTop}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: Lzn.ai,
+            textAlign: slide.align === 'justify' ? 'left' : slide.align,
+          }}
+          deps={[slide.title, slide.subtitle, slide.titleSize, slide.subSize, topR.w, topR.h, f.w, f.h]}
+          minScale={0.6}
+        >
+          {(topScale) => (
           <div
             style={{
               width: '100%',
@@ -5482,7 +5702,7 @@ const SlideCardInner = React.forwardRef(({
               display: 'flex',
               flexDirection: 'column',
               alignItems: alignInner,
-              gap: f.h * 0.012,
+              gap: f.h * 0.012 * topScale,
             }}
           >
           {(slide.title || '').trim() ? (
@@ -5504,7 +5724,7 @@ const SlideCardInner = React.forwardRef(({
                 baseColor={cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
-                fontSize={f.w * 0.036 * (slide.titleSize / 100)}
+                fontSize={f.w * 0.036 * (slide.titleSize / 100) * topScale}
                 lineHeight={(slide.titleLeading ?? 105) / 100}
                 fontWeight={slide.titleWeight ?? 600}
                 letterSpacing={`${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`}
@@ -5517,14 +5737,15 @@ const SlideCardInner = React.forwardRef(({
             ink={cr.subtitleInk}
             accentColor={cr.accentInk}
             fontFamily={bodyFF}
-            fontSize={f.w * 0.031 * (slide.subSize / 100)}
+            fontSize={f.w * 0.031 * (slide.subSize / 100) * topScale}
             lineHeight={(slide.subLeading ?? 142) / 100}
             fontWeight={600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
-            paraGap={f.h * 0.012}
+            paraGap={f.h * 0.012 * topScale}
           />
           </div>
-        </div>
+          )}
+        </OverflowScaler>
 
         {cultureVariantForLayout === 'sandwich' && (
           <div
@@ -5587,31 +5808,37 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
 
-        <div style={{
-          ...pctBox(botR, f),
-          ...VC_TEXT_ZONE_STYLE,
-          zIndex: 4,
-          overflow: 'auto',
-          padding: `${padYCv}px ${padXCvBottom}px`,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: Lzn.jc,
-          alignItems: Lzn.ai,
-          textAlign: slide.align === 'justify' ? 'left' : slide.align,
-        }}>
+        <OverflowScaler
+          containerStyle={{
+            ...pctBox(botR, f),
+            ...VC_TEXT_ZONE_STYLE,
+            zIndex: 4,
+            overflow: 'hidden',
+            padding: `${padYCv}px ${padXCvBottom}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: Lzn.ai,
+            textAlign: slide.align === 'justify' ? 'left' : slide.align,
+          }}
+          deps={[bodyAfterCulture, slide.bodyAfterSize, slide.subSize, botR.w, botR.h, f.w, f.h]}
+          minScale={0.6}
+        >
+          {(botScale) => (
           <CultureRichParagraphs
             text={bodyAfterCulture}
             destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
             ink={cr.bodyInk}
             accentColor={cr.accentInk}
             fontFamily={bodyFF}
-            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
+            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * botScale}
             lineHeight={(slide.subLeading ?? 145) / 100}
             fontWeight={600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
-            paraGap={f.h * 0.01}
+            paraGap={f.h * 0.01 * botScale}
           />
-        </div>
+          )}
+        </OverflowScaler>
 
         {showCanvasChrome && onCanvasPatch && cvEnabled && (
           <CanvasZonesOverlay
@@ -5665,10 +5892,10 @@ const SlideCardInner = React.forwardRef(({
       width: '100%',
       borderRadius: f.w * 0.017,
       height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
-      minHeight: f.h * 0.26,
-      maxHeight: f.h * 0.38,
-      flex: '0 0 auto',
-      flexShrink: 0,
+      minHeight: f.h * 0.22,
+      maxHeight: f.h * 0.32,
+      flex: '0 1 auto',
+      flexShrink: 1,
       background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
       border: cr.solidBgIsLight ? `1px dashed ${cr.inkMuted}` : '1px dashed rgba(255,255,255,0.25)',
       display: 'flex',
@@ -5725,20 +5952,33 @@ const SlideCardInner = React.forwardRef(({
             }}/>
           </div>
         )}
-        <div style={{
-          position:'absolute',
-          top: f.h * (hasBar ? 0.09 : 0.065),
-          left: f.w * 0.05,
-          right: f.w * 0.05,
-          bottom: f.h * 0.05,
-          display:'flex',
-          flexDirection:'column',
-          gap: f.h * 0.024,
-          justifyContent: cultureStatFlat ? 'space-between' : 'flex-start',
-          ...VC_TEXT_ZONE_STYLE,
-          overflow: 'hidden',
-          minWidth: 0,
-        }}>
+        <OverflowScaler
+          containerStyle={{
+            position:'absolute',
+            top: f.h * (hasBar ? 0.09 : 0.065),
+            left: f.w * 0.05,
+            right: f.w * 0.05,
+            bottom: f.h * 0.05,
+            display:'flex',
+            flexDirection:'column',
+            gap: f.h * 0.024,
+            // Sempre flex-start: space-between empurrava o primeiro item PRA CIMA quando havia
+            // overflow (causa do bug "texto cortado no topo"). Com flex-start, overflow vai pra
+            // baixo onde overflow:hidden corta sem comprometer leitura do começo.
+            justifyContent: 'flex-start',
+            ...VC_TEXT_ZONE_STYLE,
+            overflow: 'hidden',
+            minWidth: 0,
+            minHeight: 0,
+          }}
+          deps={[
+            slide.title, slide.subtitle, bodyAfterCulture,
+            f.w, f.h, slide.titleSize, slide.subSize, slide.bodyAfterSize,
+            sandwich, !!slide.bgImage,
+          ]}
+          minScale={0.78}
+        >
+          {(scale) => (<>
           {(slide.title || '').trim() ? (
             <h2 style={{
               margin: 0,
@@ -5756,7 +5996,7 @@ const SlideCardInner = React.forwardRef(({
                 baseColor={cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
-                fontSize={f.w * 0.036 * ((slide.titleSize ?? 100) / 100)}
+                fontSize={f.w * 0.036 * ((slide.titleSize ?? 100) / 100) * scale}
                 lineHeight={1.14}
                 fontWeight={600}
                 letterSpacing="-0.024em"
@@ -5769,7 +6009,7 @@ const SlideCardInner = React.forwardRef(({
             ink={cr.subtitleInk}
             accentColor={cr.accentInk}
             fontFamily={bodyFF}
-            fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100)}
+            fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
             lineHeight={1.42}
             fontWeight={600}
             letterSpacing="-0.018em"
@@ -5777,10 +6017,15 @@ const SlideCardInner = React.forwardRef(({
           />
           {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
             <div
+              data-vc-photo-zone="1"
               style={{
                 ...flatPhotoPlaceholderStyle,
                 position: 'relative',
                 cursor: onPhotoZoneClick ? 'pointer' : undefined,
+                ...(slide.bgImageFailed ? {
+                  borderColor: cr.accentInk,
+                  color: cr.accentInk,
+                } : null),
               }}
               role={onPhotoZoneClick && !flatPhotoNativeHit ? 'button' : undefined}
               onClick={
@@ -5792,7 +6037,7 @@ const SlideCardInner = React.forwardRef(({
                   : undefined
               }
             >
-              Toque para inserir foto
+              {slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto'}
               {flatPhotoNativeHit ? (
                 <input
                   type="file"
@@ -5809,15 +6054,15 @@ const SlideCardInner = React.forwardRef(({
             </div>
           )}
           {sandwich && imgReady && !imgErr && slide.bgImage && (
-            <div style={{
+            <div data-vc-photo-zone="1" style={{
               width:'100%',
-              flex: '0 0 auto',
+              flex: '0 1 auto',
               height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
-              minHeight: f.h * 0.26,
-              maxHeight: f.h * 0.38,
+              minHeight: f.h * 0.22,
+              maxHeight: f.h * 0.32,
               borderRadius: f.w * 0.017,
               overflow:'hidden',
-              flexShrink:0,
+              flexShrink:1,
               position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
             }}>
@@ -5834,21 +6079,48 @@ const SlideCardInner = React.forwardRef(({
                 }}/>
               ) : null}
               <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
+              {slide.bgImageSource === 'ai' ? (
+                <span
+                  title="Imagem gerada por IA"
+                  style={{
+                    position: 'absolute',
+                    top: f.h * 0.012,
+                    right: f.w * 0.018,
+                    zIndex: 3,
+                    fontSize: f.w * 0.018,
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: '0.04em',
+                    color: '#ffffff',
+                    background: 'rgba(0,0,0,0.48)',
+                    padding: `${f.h * 0.004}px ${f.w * 0.012}px`,
+                    borderRadius: 9999,
+                    backdropFilter: 'blur(6px)',
+                    WebkitBackdropFilter: 'blur(6px)',
+                    pointerEvents: 'none',
+                  }}
+                >✨ IA</span>
+              ) : null}
             </div>
           )}
-          <CultureRichParagraphs
-            text={bodyAfterCulture}
-            destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
-            ink={cr.bodyInk}
-            accentColor={cr.accentInk}
-            fontFamily={bodyFF}
-            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100)}
-            lineHeight={1.45}
-            fontWeight={600}
-            letterSpacing="-0.016em"
-            paraGap={f.h*0.01}
-          />
-        </div>
+          {/* Body sem AutoFitText: deixa OverflowScaler medir a altura real e escalar
+              uniformemente. Wrapper com width 100% pro CultureRichParagraphs ocupar a largura. */}
+          <div style={{ width: '100%' }}>
+            <CultureRichParagraphs
+              text={bodyAfterCulture}
+              destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
+              ink={cr.bodyInk}
+              accentColor={cr.accentInk}
+              fontFamily={bodyFF}
+              fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * scale}
+              lineHeight={1.45}
+              fontWeight={600}
+              letterSpacing="-0.016em"
+              paraGap={f.h*0.01}
+            />
+          </div>
+          </>)}
+        </OverflowScaler>
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
@@ -5868,6 +6140,47 @@ const SlideCardInner = React.forwardRef(({
           if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
           return <div style={style} aria-hidden/>;
         })()}
+        {brand.showHandle && slide.showHandle && !hideInstaBadge && (brand.handle || '').trim() && (
+          <div style={{
+            ...vcHandleBadgeBoxPositionStyle(brand),
+            display:'flex', alignItems:'center', gap:f.w*0.012,
+            background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+            backdropFilter:'blur(12px)',
+            padding:`${f.h*0.01}px ${f.w*0.022}px`,
+            borderRadius:999,
+            border: cr.solidBgIsLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.12)',
+          }}>
+            <div style={{
+              width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
+              background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              flexShrink: 0,
+            }}>
+              <div style={{
+                width:'76%', height:'76%', borderRadius:'50%',
+                overflow:'hidden',
+                background: brand.handleAvatar ? '#0a0a0a' : bgSolid,
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>
+                {brand.handleAvatar ? (
+                  <img
+                    src={brand.handleAvatar}
+                    alt=""
+                    draggable={false}
+                    style={vcHandleAvatarImgStyle(brand)}
+                  />
+                ) : (
+                  <div style={{ width:'100%', height:'100%', borderRadius:'50%', background: bgSolid, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${cr.titleInk}` }}/>
+                  </div>
+                )}
+              </div>
+            </div>
+            <span style={{ color: cr.titleInk, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
+              {brand.handle}
+            </span>
+          </div>
+        )}
       </div>
     );
   } else if (cvEnabled && cvVar === 'classic') {
@@ -6378,7 +6691,11 @@ const Toggle = ({ label, value, onChange }) => (
 );
 
 // Color row
-const ColorRow = ({ label, value, onChange }) => (
+// Biblioteca de hooks foi extraída para src/utils/hooks-library.js
+
+// WcagBadge foi extraído para src/components/WcagBadge.jsx
+
+const ColorRow = ({ label, value, onChange, contrastBg, contrastKind }) => (
   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
     <div style={{ position:'relative', flexShrink:0 }}>
       <div style={{
@@ -6394,6 +6711,7 @@ const ColorRow = ({ label, value, onChange }) => (
       value={value} onChange={e=>onChange(e.target.value)}
       className="vc-input" style={{ fontSize:13, fontFamily:'var(--font-mono)', flex:1 }}
     />
+    {contrastBg ? <WcagBadge fg={value} bg={contrastBg} kind={contrastKind || 'body'} /> : null}
     <span style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'var(--font-ui)', flexShrink:0, width:60, textAlign:'right', letterSpacing:'-0.011em', fontWeight:600 }}>
       {label}
     </span>
@@ -6821,7 +7139,7 @@ function PromptDialog({ open, title, defaultValue='', placeholder='', label='', 
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
         }}>
           <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>{title}</div>
-          <button onClick={onClose} aria-label="Fechar" style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>
@@ -7095,7 +7413,7 @@ function ImageCropModal({ open, imageSrc, onClose, onApply }) {
           <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>
             Recortar imagem do card
           </div>
-          <button type="button" onClick={() => !busy && onClose()} aria-label="Fechar" disabled={busy} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: busy ? 'not-allowed' : 'pointer', padding: 4, opacity: busy ? 0.4 : 1 }}>
+          <button type="button" onClick={() => !busy && onClose()} aria-label="Fechar" disabled={busy} className="vc-icon-btn" style={{ cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.4 : 1 }}>
             <X size={16}/>
           </button>
         </div>
@@ -7172,6 +7490,182 @@ function ImageCropModal({ open, imageSrc, onClose, onApply }) {
   );
 }
 
+// ─── PHOTO POSITION MODAL ─────────────────────────────────────────────────────
+// Modal grande para reposicionar/zoomar a foto dentro do card sem CROP destrutivo.
+// Edita slide.bgX / slide.bgY (0..100, % do objectPosition) + slide.bgZoom (50..300%).
+// Drag direto no preview = atualiza bgX/bgY em tempo real. Espelhamento e reset rápidos.
+function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
+  const dragRef = React.useRef(null);
+  const previewRef = React.useRef(null);
+  const f = FORMATS[fmt] || FORMATS.carrossel;
+  const aspect = f.w / f.h;
+  if (!open || !slide?.bgImage) return null;
+  const bgX = slide.bgX ?? 50;
+  const bgY = slide.bgY ?? 50;
+  const bgZoom = slide.bgZoom ?? 100;
+  const bgMirror = !!slide.bgMirror;
+  const onPointerDown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const el = previewRef.current;
+    if (!el) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startBgX: bgX,
+      startBgY: bgY,
+      rect: el.getBoundingClientRect(),
+    };
+  };
+  const onPointerMove = (e) => {
+    const st = dragRef.current;
+    if (!st || st.pointerId !== e.pointerId) return;
+    const dxPx = e.clientX - st.startClientX;
+    const dyPx = e.clientY - st.startClientY;
+    // Mover a foto pra direita visualmente = bgX diminui (objectPosition mostra o lado esquerdo da foto)
+    // Inversão dx/dy x sinal pra UX intuitiva (arrasta foto = foto vai junto):
+    const factor = 100 / Math.max(1, bgZoom / 100);
+    let nextX = st.startBgX - (dxPx / st.rect.width) * 100 * factor;
+    let nextY = st.startBgY - (dyPx / st.rect.height) * 100 * factor;
+    nextX = Math.max(0, Math.min(100, nextX));
+    nextY = Math.max(0, Math.min(100, nextY));
+    onChange({ bgX: Math.round(nextX), bgY: Math.round(nextY) });
+  };
+  const onPointerUp = (e) => {
+    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
+  };
+  const previewW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 48 : 520);
+  const previewH = Math.round(previewW / aspect);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: previewW + 48 }}>
+        <div style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'16px 20px', borderBottom:'1px solid var(--border)',
+          position:'sticky', top:0, background:'var(--bg-sidebar)', zIndex:1,
+        }}>
+          <div>
+            <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Posicionar foto</div>
+            <div className="vc-eyebrow">Arraste a foto para mover · use o zoom abaixo</div>
+          </div>
+          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+            <X size={16}/>
+          </button>
+        </div>
+        <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
+          <div
+            ref={previewRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              width: previewW, height: previewH,
+              borderRadius: 10, overflow:'hidden', position:'relative',
+              background:'#0a0a0c',
+              cursor: dragRef.current ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.32)',
+              margin: '0 auto',
+            }}
+          >
+            <img
+              src={slide.bgImage}
+              alt=""
+              draggable={false}
+              style={{
+                position:'absolute', inset:0, width:'100%', height:'100%',
+                objectFit:'cover',
+                objectPosition:`${bgX}% ${bgY}%`,
+                transform: `${bgMirror ? 'scaleX(-1) ' : ''}${bgZoom !== 100 ? `scale(${bgZoom/100})` : ''}`.trim() || undefined,
+                transformOrigin: `${bgX}% ${bgY}%`,
+                pointerEvents:'none', userSelect:'none',
+              }}
+            />
+            {/* Grade rule-of-thirds + crosshair central pra ajudar centralização */}
+            <svg
+              width={previewW} height={previewH}
+              style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:0.42 }}
+            >
+              <line x1={previewW/3} y1={0} x2={previewW/3} y2={previewH} stroke="#fff" strokeWidth="1" strokeDasharray="4 4"/>
+              <line x1={2*previewW/3} y1={0} x2={2*previewW/3} y2={previewH} stroke="#fff" strokeWidth="1" strokeDasharray="4 4"/>
+              <line x1={0} y1={previewH/3} x2={previewW} y2={previewH/3} stroke="#fff" strokeWidth="1" strokeDasharray="4 4"/>
+              <line x1={0} y1={2*previewH/3} x2={previewW} y2={2*previewH/3} stroke="#fff" strokeWidth="1" strokeDasharray="4 4"/>
+              <circle cx={previewW/2} cy={previewH/2} r="6" fill="none" stroke="#fff" strokeWidth="1.5"/>
+              <line x1={previewW/2-12} y1={previewH/2} x2={previewW/2+12} y2={previewH/2} stroke="#fff" strokeWidth="1.5"/>
+              <line x1={previewW/2} y1={previewH/2-12} x2={previewW/2} y2={previewH/2+12} stroke="#fff" strokeWidth="1.5"/>
+            </svg>
+            <div style={{
+              position:'absolute', top:8, left:8,
+              background:'rgba(0,0,0,0.5)', color:'#fff', backdropFilter:'blur(6px)',
+              fontSize:10, fontFamily:'var(--font-mono)', padding:'4px 8px', borderRadius:6,
+              letterSpacing:'0.04em',
+            }}>
+              X:{bgX}% · Y:{bgY}% · {bgZoom}%
+            </div>
+          </div>
+
+          <div>
+            <label className="vc-label-sm" style={{ display:'flex', justifyContent:'space-between' }}>
+              <span>Zoom</span>
+              <span style={{ color:'var(--text-muted)', fontFamily:'var(--font-mono)' }}>{bgZoom}%</span>
+            </label>
+            <input
+              type="range"
+              min={50}
+              max={300}
+              value={bgZoom}
+              onChange={(e) => onChange({ bgZoom: Number(e.target.value) })}
+              style={{ width:'100%', accentColor:'var(--accent)' }}
+            />
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+            <button
+              type="button"
+              onClick={() => onChange({ bgX: 50, bgY: 50, bgZoom: 100, bgMirror: false })}
+              className="vc-btn vc-btn-ghost"
+              style={{ height: 36, fontSize: 12 }}
+              title="Resetar pra valores neutros"
+            >
+              ↺ Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ bgX: 50, bgY: 50 })}
+              className="vc-btn vc-btn-ghost"
+              style={{ height: 36, fontSize: 12 }}
+              title="Apenas centralizar (mantém zoom e espelho)"
+            >
+              ⊕ Centralizar
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ bgMirror: !bgMirror })}
+              className="vc-btn vc-btn-ghost"
+              style={{
+                height: 36, fontSize: 12,
+                background: bgMirror ? 'var(--success-surface)' : undefined,
+                borderColor: bgMirror ? 'var(--accent)' : undefined,
+              }}
+              title="Espelhar horizontalmente"
+            >
+              ⇄ Espelhar
+            </button>
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:4 }}>
+            <button type="button" onClick={onClose} className="vc-btn vc-btn-primary" style={{ height:40, padding:'0 22px', borderRadius:9999 }}>
+              Pronto
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── REFINE BUTTON ────────────────────────────────────────────────────────────
 
 function RefineBtn({ onRefine, busy }) {
@@ -7231,23 +7725,37 @@ function RefineBtn({ onRefine, busy }) {
 
 // ─── KEYS MODAL ───────────────────────────────────────────────────────────────
 
-function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
+function KeysModal({
+  open, onClose, openaiKey, onSave, onRefreshStatus,
+  openaiKeyPersist, onChangePersist, claudeModel, onChangeClaudeModel,
+  anthropicKey, onSaveAnthropic, anthropicKeyPersist, onChangeAnthropicPersist,
+}) {
   const [val, setVal] = useState(openaiKey || '');
+  const [persist, setPersist] = useState(!!openaiKeyPersist);
+  const [model, setModel] = useState(claudeModel || 'sonnet');
+  const [anthropicVal, setAnthropicVal] = useState(anthropicKey || '');
+  const [anthropicPersistVal, setAnthropicPersistVal] = useState(!!anthropicKeyPersist);
   const [status, setStatus] = useState(null);
   useEffect(() => {
     if (open) {
       setVal(openaiKey || '');
-      // Força refetch — se o user editou .env.local e reiniciou o vite,
-      // queremos refletir isso imediatamente.
+      setPersist(!!openaiKeyPersist);
+      setModel(claudeModel || 'sonnet');
+      setAnthropicVal(anthropicKey || '');
+      setAnthropicPersistVal(!!anthropicKeyPersist);
       getServerStatus({ force: true }).then(s => {
         setStatus(s);
         onRefreshStatus?.(s);
       });
     }
-  }, [open, openaiKey, onRefreshStatus]);
+  }, [open, openaiKey, openaiKeyPersist, claudeModel, anthropicKey, anthropicKeyPersist, onRefreshStatus]);
   if (!open) return null;
   const save = () => {
     onSave(val.trim());
+    onChangePersist?.(persist);
+    onChangeClaudeModel?.(model);
+    onSaveAnthropic?.(anthropicVal.trim());
+    onChangeAnthropicPersist?.(anthropicPersistVal);
     onClose();
   };
   return (
@@ -7271,54 +7779,119 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
               <div className="vc-eyebrow">Conecte suas chaves de IA</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4, borderRadius:6 }}>
+          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
             <X size={16}/>
           </button>
         </div>
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:18 }}>
-          {/* Status dos providers (modo dev local) */}
-          {status?.dev && (
-            <div style={{
-              background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, padding:12,
-              display:'flex', flexDirection:'column', gap:8,
-            }}>
-              <div className="vc-label" style={{ marginBottom:0 }}>
-                Status do servidor (modo dev)
+          {/* Intro — explica o quê, por quê, como obter */}
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div>
+              <div style={{ fontSize:15, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.018em', marginBottom:4 }}>
+                Conecte uma chave pra começar
               </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13 }}>
-                <span style={{ color:'var(--text-secondary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>Anthropic (Claude · web search)</span>
-                <span style={{
-                  fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999,
-                  background: status.anthropic ? 'var(--success-surface)' : 'rgba(255,59,48,0.10)',
-                  color:    status.anthropic ? 'var(--success-text)'              : '#c5251c',
-                  letterSpacing:'-0.011em',
-                }}>{status.anthropic ? 'Conectada' : 'Não configurada'}</span>
+              <div style={{ fontSize:12, lineHeight:1.5, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+                A IA escreve o copy dos cards e gera as fotos. Você só precisa de uma chave — duas dão o melhor resultado.
               </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13 }}>
-                <span style={{ color:'var(--text-secondary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>OpenAI (gpt-4o · GPT Image 2)</span>
-                <span style={{
-                  fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:9999,
-                  background: (val || status.openai) ? 'var(--success-surface)' : 'rgba(255,59,48,0.10)',
-                  color:    (val || status.openai) ? 'var(--success-text)'              : '#c5251c',
-                  letterSpacing:'-0.011em',
-                }}>{val ? 'Via navegador' : status.openai ? 'Via .env' : 'Não configurada'}</span>
-              </div>
-              {!status.anthropic && !val && !status.openai && (
-                <div style={{
-                  marginTop:4, fontSize:11, color:'#fcd34d',
-                  background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)',
-                  borderRadius:6, padding:'8px 10px', fontFamily:'var(--font-ui)', lineHeight:1.5,
-                }}>
-                  Configure ao menos a chave OpenAI abaixo para gerar carrosséis. Sem chave nenhuma, a IA não funciona.
-                </div>
-              )}
-              {!status.anthropic && (
-                <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5 }}>
-                  Para ativar Claude + pesquisa web: crie <code style={{ color:'var(--text-secondary)', fontFamily:'var(--font-mono)' }}>.env.local</code> na raiz com <code style={{ color:'var(--text-secondary)', fontFamily:'var(--font-mono)' }}>ANTHROPIC_API_KEY=sk-ant-...</code> e reinicie o <code style={{ color:'var(--text-secondary)', fontFamily:'var(--font-mono)' }}>npm run dev</code>.
-                </div>
-              )}
             </div>
-          )}
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {/* OpenAI — recomendado (border accent) */}
+              <div style={{
+                position:'relative',
+                border:'1.5px solid var(--accent)',
+                background:'var(--success-surface)',
+                borderRadius:11, padding:'12px 12px 14px',
+                display:'flex', flexDirection:'column', gap:6,
+              }}>
+                <div style={{
+                  position:'absolute', top:-9, left:10,
+                  fontSize:9, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+                  background:'var(--accent)', color:'#fff',
+                  padding:'3px 8px', borderRadius:9999, fontFamily:'var(--font-ui)',
+                }}>Recomendado</div>
+                <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.014em' }}>OpenAI</span>
+                  <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.02em' }}>GPT-4o · DALL·E</span>
+                </div>
+                <div style={{ fontSize:11, lineHeight:1.5, color:'var(--text-secondary)', fontFamily:'var(--font-ui)' }}>
+                  Texto <strong>e</strong> imagens numa chave só. Mais simples pra começar.
+                </div>
+                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"
+                   style={{ marginTop:'auto', fontSize:11, color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}
+                   onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                   onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                  Obter chave →
+                </a>
+              </div>
+
+              {/* Anthropic — opcional */}
+              <div style={{
+                border:'1px solid var(--border)',
+                background:'var(--bg-card)',
+                borderRadius:11, padding:'12px 12px 14px',
+                display:'flex', flexDirection:'column', gap:6,
+              }}>
+                <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.014em' }}>Anthropic</span>
+                  <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.02em' }}>Claude · web search</span>
+                </div>
+                <div style={{ fontSize:11, lineHeight:1.5, color:'var(--text-secondary)', fontFamily:'var(--font-ui)' }}>
+                  Copy mais editorial e profundo. Com OpenAI junto = melhor combo.
+                </div>
+                <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"
+                   style={{ marginTop:'auto', fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-mono)', textDecoration:'none', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}
+                   onMouseEnter={e=>{ e.currentTarget.style.color='var(--accent)'; e.currentTarget.style.textDecoration='underline'; }}
+                   onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.textDecoration='none'; }}>
+                  Obter chave →
+                </a>
+              </div>
+            </div>
+
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5, padding:'8px 2px 0' }}>
+              <span style={{ fontSize:12, lineHeight:1, marginTop:1 }}>🔒</span>
+              <span>
+                As chaves ficam <strong style={{ color:'var(--text-secondary)' }}>só no seu navegador</strong>. Custos vão direto pra sua conta da Anthropic/OpenAI — você controla o uso.
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="vc-label">
+              Anthropic API Key — Claude (texto + web search)
+            </label>
+            <input
+              type="password"
+              value={anthropicVal}
+              onChange={e=>setAnthropicVal(e.target.value)}
+              placeholder="sk-ant-..."
+              className="vc-input"
+              onKeyDown={e=>e.key==='Enter'&&save()}
+            />
+            <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:8, lineHeight:1.5 }}>
+              Obtenha em{' '}
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"
+                 style={{ color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none' }}
+                 onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                 onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                console.anthropic.com/settings/keys
+              </a>
+              . A chave fica salva apenas no seu navegador.
+            </div>
+            <label style={{
+              display:'flex', alignItems:'center', gap:8, marginTop:10, fontSize:12,
+              color:'var(--text-secondary)', fontFamily:'var(--font-ui)', cursor:'pointer',
+              userSelect:'none',
+            }}>
+              <input
+                type="checkbox"
+                checked={anthropicPersistVal}
+                onChange={(e) => setAnthropicPersistVal(e.target.checked)}
+                style={{ accentColor:'var(--accent)', width:14, height:14 }}
+              />
+              <span>Manter chave Anthropic salva entre sessões (localStorage)</span>
+            </label>
+          </div>
 
           <div>
             <label className="vc-label">
@@ -7334,22 +7907,91 @@ function KeysModal({ open, onClose, openaiKey, onSave, onRefreshStatus }) {
             />
             <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:8, lineHeight:1.5 }}>
               Obtenha em{' '}
-              <span style={{ color:'var(--accent)', fontFamily:'var(--font-mono)' }}>platform.openai.com/api-keys</span>
-              . A chave fica salva apenas no seu navegador (localStorage).
-              {status?.dev && !status.anthropic && (
-                <> Como Anthropic não está configurada, esta chave será usada também para a geração de texto via gpt-4o.</>
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"
+                 style={{ color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none' }}
+                 onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                 onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                platform.openai.com/api-keys
+              </a>
+              {!anthropicVal && (
+                <> Sem chave Anthropic, esta também é usada para gerar texto (GPT-4o).</>
               )}
             </div>
-          </div>
-          {val && val.startsWith('sk-') && (
-            <div style={{
-              fontSize:13, color:'var(--success-text)', background:'var(--success-surface)',
-              border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
-              fontFamily:'var(--font-mono)',
+            <label style={{
+              display:'flex', alignItems:'center', gap:8, marginTop:10, fontSize:12,
+              color:'var(--text-secondary)', fontFamily:'var(--font-ui)', cursor:'pointer',
+              userSelect:'none',
             }}>
-              Chave detectada — GPT Image 2{status?.dev && !status.anthropic ? ' + gpt-4o (texto)' : ''} disponíveis.
+              <input
+                type="checkbox"
+                checked={persist}
+                onChange={(e) => setPersist(e.target.checked)}
+                style={{ accentColor:'var(--accent)', width:14, height:14 }}
+              />
+              <span>Manter chave salva entre sessões (localStorage)</span>
+            </label>
+            <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, lineHeight:1.5, marginLeft:22 }}>
+              {persist
+                ? 'A chave fica no localStorage e sobrevive ao fechar a aba — mais conveniente, menos seguro.'
+                : 'A chave fica só nesta sessão e some quando fechar a aba — mais seguro contra scripts maliciosos.'}
             </div>
-          )}
+          </div>
+
+          {/* Selector de modelo Claude — sempre visível */}
+          <div>
+            <label className="vc-label">Modelo Claude (geração de texto)</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {[
+                  { id:'sonnet', label:'Sonnet 4.6', desc:'Rápido + barato' },
+                  { id:'opus',   label:'Opus 4.7',   desc:'Máxima qualidade' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setModel(opt.id)}
+                    style={{
+                      flex:1, padding:'10px 12px', borderRadius:8, cursor:'pointer',
+                      border: model === opt.id ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      background: model === opt.id ? 'var(--success-surface)' : 'transparent',
+                      color: model === opt.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontSize:12, fontFamily:'var(--font-ui)', textAlign:'left',
+                      display:'flex', flexDirection:'column', gap:2,
+                    }}
+                  >
+                    <span style={{ fontWeight:600 }}>{opt.label}</span>
+                    <span style={{ fontSize:10, color:'var(--text-muted)' }}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          {/* Status compacto das duas chaves — visual claro do que está ativado */}
+          {(() => {
+            const anthropicOK = !!(anthropicVal && anthropicVal.trim().startsWith('sk-ant-'));
+            const openaiOK = !!(val && val.trim().startsWith('sk-'));
+            if (!anthropicOK && !openaiOK) return null;
+            const Row = ({ ok, label, detail }) => (
+              <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, fontFamily:'var(--font-ui)' }}>
+                <span style={{
+                  width:8, height:8, borderRadius:'50%',
+                  background: ok ? '#30b352' : 'var(--text-muted)',
+                  flexShrink:0,
+                }}/>
+                <span style={{ color: ok ? 'var(--success-text)' : 'var(--text-muted)', fontWeight:600 }}>{label}</span>
+                <span style={{ color:'var(--text-muted)', fontSize:11 }}>{detail}</span>
+              </div>
+            );
+            return (
+              <div style={{
+                background:'var(--success-surface)',
+                border:'1px solid var(--success-border)',
+                borderRadius:8, padding:'10px 12px',
+                display:'flex', flexDirection:'column', gap:6,
+              }}>
+                <Row ok={anthropicOK} label="Claude" detail={anthropicOK ? '— texto + web search ativos' : '— não configurado, GPT-4o vai gerar texto'} />
+                <Row ok={openaiOK} label="OpenAI" detail={openaiOK ? '— imagens (DALL·E) ativas' : '— sem geração automática de imagens'} />
+              </div>
+            );
+          })()}
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={onClose} className="vc-btn vc-btn-ghost" style={{ height:40, padding:'0 16px' }}>Cancelar</button>
             <button onClick={save} style={{
@@ -7384,6 +8026,7 @@ function GenerateModal({
   onCardVisualStyleChange,
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
+  hookLibrary = [],
 }) {
   const [topic, setTopic] = useState(defaultTopic);
   const [count, setCount] = useState(6);
@@ -7405,10 +8048,6 @@ function GenerateModal({
   const setAxis = (key, val) => setParams(p => ({ ...p, [key]: val }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [autoFetchSlideImages, setAutoFetchSlideImages] = useState(true);
-  useEffect(() => {
-    if (open) setAutoFetchSlideImages(true);
-  }, [open]);
 
   useEffect(()=>{ if(open){ setErr(''); if(defaultTopic) setTopic(defaultTopic); } },[open,defaultTopic]);
   useEffect(()=>{ if(defaultNiche) setNiche(defaultNiche); },[defaultNiche]);
@@ -7436,7 +8075,7 @@ function GenerateModal({
 
   if (!open) return null;
 
-  const run = async () => {
+  const run = async ({ withImages } = { withImages: true }) => {
     if (!resolvedGenerationTopic) {
       setErr(
         modoPersonalizado
@@ -7451,7 +8090,6 @@ function GenerateModal({
       const narrativeForGenerate = modoPersonalizado
         ? mode
         : (narrativeLockedForPack ?? 'editorial');
-      // Persiste direção de imagem, modo e pacote criativo antes de gerar
       onImgParamsChange?.(params);
       onModeChange?.(narrativeForGenerate);
       onCreativePresetChange?.(packCreative);
@@ -7469,7 +8107,7 @@ function GenerateModal({
         creativePreset: packCreative,
         slideTextDensity: textDensity,
         cardVisualStyle: cardStyle,
-        fetchImagesNow: autoFetchSlideImages,
+        fetchImagesNow: !!withImages,
       });
       onClose();
     } catch(e) { setErr(e.message); }
@@ -7497,10 +8135,9 @@ function GenerateModal({
               <div className="vc-eyebrow">Geração com IA</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4, borderRadius:6, transition:'color 0.12s' }}
-            onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
-            onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
-          ><X size={16}/></button>
+          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+            <X size={16}/>
+          </button>
         </div>
 
         <div
@@ -7606,6 +8243,39 @@ function GenerateModal({
               placeholder="Ex: como freelancers usam IA para triplicar a produtividade sem estresse"
               className="vc-input vc-textarea"
             />
+            {/* B2: Hooks salvos pra este nicho — clicar preenche o tema */}
+            {(() => {
+              const suggestions = getHooksForNiche(hookLibrary, niche, 3);
+              if (suggestions.length === 0) return null;
+              return (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>
+                    💾 Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {suggestions.map(h => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => setTopic(h.hook)}
+                        title={`Usado ${h.usageCount}× · salvo ${new Date(h.savedAt).toLocaleDateString('pt-BR')}`}
+                        style={{
+                          textAlign: 'left', padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                          background: 'var(--bg-card)', border: '1px solid var(--border)',
+                          color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
+                          letterSpacing: '-0.011em', lineHeight: 1.4,
+                          transition: 'border-color 0.12s, color 0.12s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      >
+                        {h.hook}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {hasContextPack && (
               <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
                 {modoPersonalizado ? (
@@ -7899,65 +8569,6 @@ function GenerateModal({
                 )}
               </div>
             )}
-            <label
-              style={{
-                marginTop: 10,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 10,
-                cursor: 'pointer',
-                padding: '10px 12px',
-                borderRadius: 11,
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-pearl)',
-                boxSizing: 'border-box',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={autoFetchSlideImages}
-                onChange={(e) => setAutoFetchSlideImages(e.target.checked)}
-                style={{
-                  width: 17,
-                  height: 17,
-                  marginTop: 2,
-                  flexShrink: 0,
-                  accentColor: 'var(--accent)',
-                  cursor: 'pointer',
-                }}
-              />
-              <span style={{ minWidth: 0 }}>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-ui)',
-                    letterSpacing: '-0.011em',
-                    display: 'block',
-                    lineHeight: 1.35,
-                  }}
-                >
-                  Criar imagens de fundo ao gerar
-                </span>
-                <span
-                  style={{
-                    marginTop: 4,
-                    fontSize: 11,
-                    fontWeight: 400,
-                    color: 'var(--text-muted)',
-                    fontFamily: 'var(--font-ui)',
-                    letterSpacing: '-0.011em',
-                    lineHeight: 1.47,
-                    display: 'block',
-                  }}
-                >
-                  Desligado, ficam só o texto e as palavras-chave da imagem; use depois{' '}
-                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Gerar imagem</span>{' '}
-                  em cada slide (uma a uma ou na ordem que preferir).
-                </span>
-              </span>
-            </label>
           </div>
 
           {/* Direção da imagem — eixos só alteram prompts do GPT Image (geração). */}
@@ -7992,26 +8603,55 @@ function GenerateModal({
             }}>{err}</div>
           )}
 
-          <div style={{ display:'flex', gap:10 }}>
-            <button onClick={onClose} className="vc-btn vc-btn-ghost" style={{ height:44, padding:'0 16px' }}>Voltar</button>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'stretch' }}>
+            <button onClick={onClose} disabled={busy} className="vc-btn vc-btn-ghost" style={{ height:44, padding:'0 16px' }}>Voltar</button>
+            {/* Botão primário: gera texto + imagens DALL-E. Disabled se sem OpenAI. */}
             <button
               type="button"
-              onClick={run} disabled={busy||!resolvedGenerationTopic}
+              onClick={() => run({ withImages: true })}
+              disabled={busy || !resolvedGenerationTopic || !hasOpenAI}
+              title={!hasOpenAI ? 'Configure a chave OpenAI em ⚙ pra gerar imagens' : 'Gera texto E imagens IA (mais lento, custa créditos OpenAI)'}
               style={{
-                flex:1, height:44, borderRadius:9999, border:'none', cursor:'pointer',
-                background: (busy||!resolvedGenerationTopic) ? 'var(--bg-pearl)' : 'var(--accent)',
-                color: (busy||!resolvedGenerationTopic) ? 'var(--text-muted)' : '#fff',
-                fontSize:15, fontWeight:400, fontFamily:'var(--font-ui)',
-                letterSpacing:'-0.016em',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-                opacity: (busy||!resolvedGenerationTopic) ? 0.6 : 1,
+                flex: '1 1 200px', height: 44, borderRadius: 9999, border: 'none',
+                cursor: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'not-allowed' : 'pointer',
+                background: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--bg-pearl)' : 'var(--accent)',
+                color: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--text-muted)' : '#fff',
+                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                letterSpacing: '-0.014em',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'background-color 0.15s var(--ease-smooth)',
+                opacity: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 0.6 : 1,
+                padding: '0 14px',
               }}
             >
               {busy
-                ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando slides...</>
-                : <><Sparkles size={15}/>Gerar carrossel</>
+                ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
+                : <><Sparkles size={15}/>Gerar (texto + imagem)</>
               }
+            </button>
+            {/* Botão secundário: só texto + imageQuery. Mais rápido e barato. */}
+            <button
+              type="button"
+              onClick={() => run({ withImages: false })}
+              disabled={busy || !resolvedGenerationTopic}
+              title="Gera só texto e palavras-chave da imagem (rápido). Você pode gerar cada imagem depois no botão «Gerar imagem» do card."
+              style={{
+                flex: '1 1 180px', height: 44, borderRadius: 9999,
+                cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
+                background: 'var(--bg-pearl)',
+                color: 'var(--text-primary)',
+                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                letterSpacing: '-0.014em',
+                border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'border-color 0.15s, background 0.15s',
+                opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
+                padding: '0 14px',
+              }}
+              onMouseEnter={e => { if (!busy && resolvedGenerationTopic) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <Sparkles size={15} style={{ color: 'var(--text-muted)' }}/>Gerar (só texto)
             </button>
           </div>
         </div>
@@ -8101,10 +8741,9 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
               <div className="vc-eyebrow">Pesquisa com IA + web ao vivo</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4, borderRadius:6, transition:'color 0.12s' }}
-            onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
-            onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
-          ><X size={16}/></button>
+          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+            <X size={16}/>
+          </button>
         </div>
 
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
@@ -8195,9 +8834,9 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
                       <div key={i} className="hook-row">
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:1, width:16, flexShrink:0 }}>{String(i+1).padStart(2,'0')}</span>
                         <span style={{ flex:1, fontSize:12, color:'var(--text-secondary)', lineHeight:1.5, fontFamily:'var(--font-ui)' }}>{h}</span>
-                        <button onClick={()=>navigator.clipboard?.writeText(h)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:2, borderRadius:4, transition:'color 0.12s', flexShrink:0 }}
-                          onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
-                          onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
+                        <button onClick={()=>navigator.clipboard?.writeText(h)} aria-label="Copiar gancho" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:8, borderRadius:6, transition:'color 0.12s, background 0.12s', flexShrink:0, minWidth:32, minHeight:32, display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                          onMouseEnter={e=>{ e.currentTarget.style.color='var(--text-primary)'; e.currentTarget.style.background='rgba(0,0,0,0.04)'; }}
+                          onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.background='none'; }}
                         ><Copy size={11}/></button>
                       </div>
                     ))}
@@ -8253,7 +8892,7 @@ function TemplatesModal({ open, onClose, onApply }) {
               <div className="vc-eyebrow">Quick start · comece em 1 clique</div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>
@@ -8382,7 +9021,7 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
               <div className="vc-eyebrow">5 alternativas · escolha a melhor</div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>
@@ -8558,7 +9197,7 @@ function SidebarContent({
   slide, slides, activeIdx, brand, setBrand, updateSlide,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
-  exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
+  exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
   openaiKey, hasOpenAI=false, setKeysOpen,
   setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
   material = { content:'', sources:'', context:'' }, setMaterial = () => {},
@@ -8582,6 +9221,9 @@ function SidebarContent({
   enableCanvasLayout = () => {},
   disableCanvasLayout = () => {},
   onOpenImageCrop = () => {},
+  onOpenPhotoPosition = () => {},
+  remixWithTone = () => {},
+  hasLastGenerate = false,
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -8594,7 +9236,7 @@ function SidebarContent({
         refImage: slide.refImage,
         imgExtraPrompt: slide.imgExtraPrompt,
       });
-      updateSlide({ bgImage: url });
+      updateSlide({ bgImage: url, bgImageSource: 'ai' });
     } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
     finally { setDalleLoading(false); }
   };
@@ -8646,6 +9288,17 @@ function SidebarContent({
   const pendTitleSel = React.useRef(null);
   const pendSubtitleSel = React.useRef(null);
   const pendSandwichBodySel = React.useRef(null);
+  // Captura a última seleção feita em qualquer textarea — usada como source-of-truth pelo
+  // botão "Marcar Destaque" (mais robusto que document.activeElement, que pode mudar em
+  // mobile quando o user toca o botão).
+  const lastSelectionRef = React.useRef({ field: null, start: 0, end: 0, text: '' });
+  const captureSelection = React.useCallback((field, ta) => {
+    if (!ta) return;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+    if (end <= start) return; // só guarda quando há seleção real (range > 0)
+    lastSelectionRef.current = { field, start, end, text: (ta.value || '').slice(start, end) };
+  }, []);
 
   React.useLayoutEffect(() => {
     const p = pendTitleSel.current;
@@ -8678,91 +9331,87 @@ function SidebarContent({
   }, [slide.bodyAfterImage]);
 
   const marcarDestaque = React.useCallback(() => {
-    const ae = typeof document !== 'undefined' ? document.activeElement : null;
     const cultureBody = creativePreset === 'tendencia_cultura' || slide.useCultureLayout;
-    const resolve = () => {
-      if (ae === titleTaRef.current && titleTaRef.current) {
-        return {
-          fieldKey: 'title',
-          pend: pendTitleSel,
-          get: () => slide.title ?? '',
-          set: (t) => updateSlide({ title: t }),
-          ta: titleTaRef.current,
-        };
-      }
-      if (ae === subtitleTaRef.current && subtitleTaRef.current) {
-        return {
-          fieldKey: 'subtitle',
-          pend: pendSubtitleSel,
-          get: () => slide.subtitle ?? '',
-          set: (t) => updateSlide({ subtitle: t }),
-          ta: subtitleTaRef.current,
-        };
-      }
-      if (cultureBody && ae === sandwichBodyTaRef.current && sandwichBodyTaRef.current) {
-        return {
-          fieldKey: 'bodyAfterImage',
-          pend: pendSandwichBodySel,
-          get: () => slide.bodyAfterImage ?? '',
-          set: (t) => updateSlide({ bodyAfterImage: t }),
-          ta: sandwichBodyTaRef.current,
-        };
-      }
-      const k = lastTextFieldRef.current;
-      if (k === 'subtitle' && subtitleTaRef.current) {
-        return {
-          fieldKey: 'subtitle',
-          pend: pendSubtitleSel,
-          get: () => slide.subtitle ?? '',
-          set: (t) => updateSlide({ subtitle: t }),
-          ta: subtitleTaRef.current,
-        };
-      }
-      if (k === 'bodyAfter' && cultureBody && sandwichBodyTaRef.current) {
-        return {
-          fieldKey: 'bodyAfterImage',
-          pend: pendSandwichBodySel,
-          get: () => slide.bodyAfterImage ?? '',
-          set: (t) => updateSlide({ bodyAfterImage: t }),
-          ta: sandwichBodyTaRef.current,
-        };
-      }
-      if (titleTaRef.current) {
-        return {
-          fieldKey: 'title',
-          pend: pendTitleSel,
-          get: () => slide.title ?? '',
-          set: (t) => updateSlide({ title: t }),
-          ta: titleTaRef.current,
-        };
-      }
-      return null;
+    const sel = lastSelectionRef.current;
+    // Lista de candidatos de campo onde a seleção pode estar — ordenada pela prioridade
+    // (campo capturado no onSelect primeiro). Cada candidato é {key, text}.
+    const candidates = [];
+    const pushCand = (key, text) => {
+      if (typeof text === 'string') candidates.push({ key, text });
     };
-    const ctx = resolve();
-    if (!ctx) {
-      toast?.('Sem campo de texto ativo.', 'info');
+    if (sel.field === 'title') pushCand('title', slide.title);
+    else if (sel.field === 'subtitle') pushCand('subtitle', slide.subtitle);
+    else if (sel.field === 'bodyAfterImage' && cultureBody) pushCand('bodyAfterImage', slide.bodyAfterImage);
+    // Fallback: tenta os outros campos também, por se o sel.field estiver stale (raro mas possível)
+    if (slide.title != null) pushCand('title', slide.title);
+    if (slide.subtitle != null) pushCand('subtitle', slide.subtitle);
+    if (cultureBody && slide.bodyAfterImage != null) pushCand('bodyAfterImage', slide.bodyAfterImage);
+
+    // Tenta achar o trecho selecionado em cada candidato. Critério:
+    //  1. preferir match exato nos índices capturados (mais rápido + preserva intenção)
+    //  2. fallback: substring search (text contains sel.text) — se houver, calcular offset
+    //  3. CRÍTICO: usar índices contra a versão TRIMMED do texto, pois o renderer trima
+    //     antes de aplicar os spans (linha 5449: bodyAfterCulture = slide.bodyAfterImage.trim())
+    let resolved = null;
+    const wanted = (sel.text || '').trim();
+    if (!wanted) {
+      toast?.('Selecione um trecho de texto antes de marcar.', 'info');
       return;
     }
-    const raw = ctx.get();
-    const sta = ctx.ta.selectionStart;
-    const en = ctx.ta.selectionEnd;
-    const lo = Math.min(sta, en);
-    const hi = Math.max(sta, en);
-    if (!String(raw.slice(lo, hi)).trim()) {
-      toast?.('Selecione um trecho primeiro.', 'info');
+    // Renderer trata cada campo diferente:
+    //  - title:          text={slide.title || ''}                — usa RAW
+    //  - subtitle:       text={slide.subtitle}                   — usa RAW
+    //  - bodyAfterImage: text={(slide.bodyAfterImage||'').trim()} — usa TRIMMED
+    // Spans precisam ser armazenados contra a versão que o renderer recebe.
+    const renderedTextFor = (key, raw) => key === 'bodyAfterImage' ? String(raw || '').trim() : String(raw || '');
+    for (const c of candidates) {
+      const raw = c.text || '';
+      const rendered = renderedTextFor(c.key, raw);
+      const renderOffset = rendered ? raw.indexOf(rendered) : 0;
+      // Tentativa 1: índices capturados batem (texto identico no raw na faixa selecionada)
+      const liveAtIdx = raw.slice(sel.start, sel.end);
+      if (liveAtIdx === sel.text) {
+        const renderStart = Math.max(0, sel.start - Math.max(0, renderOffset));
+        const renderEnd = Math.min(rendered.length, sel.end - Math.max(0, renderOffset));
+        if (renderEnd > renderStart && rendered.slice(renderStart, renderEnd) === sel.text) {
+          resolved = { key: c.key, text: rendered, start: renderStart, end: renderEnd };
+          break;
+        }
+      }
+      // Tentativa 2: substring search no texto que o renderer realmente recebe
+      const found = rendered.indexOf(wanted);
+      if (found >= 0) {
+        resolved = { key: c.key, text: rendered, start: found, end: found + wanted.length };
+        break;
+      }
+    }
+
+    if (!resolved) {
+      toast?.('Não encontrei o trecho selecionado em nenhum campo. Selecione de novo e tente.', 'info');
       return;
     }
-    const len = raw.length;
+
     const dsPrev = slide.destaqueSpans && typeof slide.destaqueSpans === 'object' ? slide.destaqueSpans : {};
-    const curField = dsPrev[ctx.fieldKey] ?? [];
-    const merged = unionDestaqueRangeIntoSpans(curField, lo, hi, len);
+    const curField = dsPrev[resolved.key] ?? [];
+    const merged = unionDestaqueRangeIntoSpans(curField, resolved.start, resolved.end, resolved.text.length);
+    console.log('[Destaque]', {
+      field: resolved.key,
+      selectedText: wanted,
+      indexRange: [resolved.start, resolved.end],
+      textInRender: resolved.text.slice(resolved.start, resolved.end),
+      mergedSpans: merged,
+      brandAccentHex: brand?.accent,
+    });
     updateSlide({
       destaqueSpans: {
         ...dsPrev,
-        [ctx.fieldKey]: merged,
+        [resolved.key]: merged,
       },
     });
-  }, [slide.title, slide.subtitle, slide.bodyAfterImage, slide.destaqueSpans, creativePreset, slide.useCultureLayout, updateSlide, toast]);
+    const preview = wanted.length > 30 ? wanted.slice(0, 30) + '…' : wanted;
+    const fieldLabel = resolved.key === 'title' ? 'título' : resolved.key === 'subtitle' ? 'subtítulo' : 'texto';
+    toast?.(`Destaque aplicado em "${preview}" (${fieldLabel}). Cor: ${brand?.accent || 'auto'}`, 'success', 3500);
+  }, [slide.title, slide.subtitle, slide.bodyAfterImage, slide.destaqueSpans, creativePreset, slide.useCultureLayout, updateSlide, toast, brand?.accent]);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
@@ -8866,12 +9515,101 @@ function SidebarContent({
               </div>
             </S>
 
+            {slide.bgImage ? (
+              <S title="Posicionar foto" hint="Arraste a foto livremente num preview grande pra centralizar. Usa o mesmo bgX/bgY já existente, só a UX é melhor.">
+                <button
+                  type="button"
+                  onClick={() => onOpenPhotoPosition()}
+                  style={{
+                    width: '100%', minHeight: 40, borderRadius: 11, cursor: 'pointer',
+                    border: '1px solid var(--accent)', background: 'var(--success-surface)',
+                    color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  🎯 Abrir preview grande pra arrastar
+                </button>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
+                  Tem grade de rule-of-thirds + crosshair pra centralizar com precisão.
+                </div>
+              </S>
+            ) : null}
+
+            {/* D4: Filtros pré-configurados — só faz sentido se há foto no slide ativo */}
+            {slide.bgImage ? (
+              <S title="Filtro da foto (preset)" hint="Atalho rápido. Pra ajuste fino use o painel «Ajustes da foto» em tela cheia.">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  {PRESENTATION_IMG_FILTER_PRESETS.map((p) => {
+                    const isActive = (() => {
+                      if (p.id === 'neutro') return presentationAdjustIsNeutral(slide.presentationImgAdjust);
+                      return presentationImgAdjustEquivalent(slide.presentationImgAdjust, p.vals);
+                    })();
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          if (p.id === 'neutro') {
+                            const next = { ...slide };
+                            delete next.presentationImgAdjust;
+                            updateSlide({ presentationImgAdjust: undefined });
+                          } else {
+                            updateSlide({ presentationImgAdjust: { ...p.vals } });
+                          }
+                        }}
+                        style={{
+                          padding:'10px 12px', borderRadius:8, cursor:'pointer',
+                          border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
+                          background: isActive ? 'var(--success-surface)' : 'var(--bg-card)',
+                          color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          fontSize:12, fontFamily:'var(--font-ui)', textAlign:'left',
+                          display:'flex', flexDirection:'column', gap:2, letterSpacing:'-0.011em',
+                        }}
+                      >
+                        <span style={{ fontWeight:600 }}>{p.label}</span>
+                        <span style={{ fontSize:10, color:'var(--text-muted)' }}>{p.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </S>
+            ) : null}
+
             <S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
               <div>
-                <label className="vc-label-sm">Título</label>
+                <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                  <span>Título</span>
+                  {(slide.title || '').trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHookLibrary(prev => saveHookToLibrary(prev, {
+                          hook: slide.title,
+                          niche,
+                          tone: brand.tone,
+                        }));
+                        toast('Hook salvo na biblioteca — vai aparecer em futuras gerações do mesmo nicho.', 'success');
+                      }}
+                      title="Salvar este título na biblioteca de hooks para reutilizar em novos carrosséis"
+                      style={{
+                        background:'none', border:'none', cursor:'pointer',
+                        color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-ui)',
+                        padding:'4px 8px', borderRadius:6, letterSpacing:'-0.011em',
+                        display:'inline-flex', alignItems:'center', gap:4,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <span style={{ fontSize:11 }}>💾</span> Salvar como hook
+                    </button>
+                  ) : null}
+                </label>
                 <textarea
                   ref={titleTaRef}
                   onFocus={() => { lastTextFieldRef.current = 'title'; }}
+                  onSelect={(e) => captureSelection('title', e.currentTarget)}
+                  onKeyUp={(e) => captureSelection('title', e.currentTarget)}
                   value={slide.title}
                   onChange={(e) => {
                     const nw = e.target.value;
@@ -8893,6 +9631,8 @@ function SidebarContent({
                 <textarea
                   ref={subtitleTaRef}
                   onFocus={() => { lastTextFieldRef.current = 'subtitle'; }}
+                  onSelect={(e) => captureSelection('subtitle', e.currentTarget)}
+                  onKeyUp={(e) => captureSelection('subtitle', e.currentTarget)}
                   value={slide.subtitle}
                   onChange={(e) => {
                     const nw = e.target.value;
@@ -8916,6 +9656,8 @@ function SidebarContent({
                     <textarea
                       ref={sandwichBodyTaRef}
                       onFocus={() => { lastTextFieldRef.current = 'bodyAfter'; }}
+                      onSelect={(e) => captureSelection('bodyAfterImage', e.currentTarget)}
+                      onKeyUp={(e) => captureSelection('bodyAfterImage', e.currentTarget)}
                       value={slide.bodyAfterImage ?? ''}
                       onChange={(e) => {
                         const nw = e.target.value;
@@ -8955,11 +9697,21 @@ function SidebarContent({
                 type="button"
                 onMouseDown={(e) => {
                   if (refining) return;
-                  e.preventDefault();
+                  e.preventDefault(); // mantém foco no textarea (desktop)
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onTouchStart={(e) => {
+                  if (refining) return;
+                  // Em touch o blur do textarea acontece ANTES do click — captura a seleção viva agora
+                  const ae = typeof document !== 'undefined' ? document.activeElement : null;
+                  if (ae === titleTaRef.current) captureSelection('title', titleTaRef.current);
+                  else if (ae === subtitleTaRef.current) captureSelection('subtitle', subtitleTaRef.current);
+                  else if (ae === sandwichBodyTaRef.current) captureSelection('bodyAfterImage', sandwichBodyTaRef.current);
                   e.currentTarget.style.transform = 'scale(0.95)';
                 }}
                 onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 onClick={marcarDestaque}
                 disabled={refining}
                 title="Aplica a cor Destaques da marca ao trecho selecionado (sem alterar o texto). Use no título, subtítulo ou bloco inferior."
@@ -9834,7 +10586,12 @@ function SidebarContent({
             <S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
               <div>
                 <label className="vc-label-sm">@ Username</label>
-                <input value={brand.handle} onChange={e=>setBrand({...brand,handle:e.target.value})} className="vc-input"/>
+                <input
+                  value={brand.handle || ''}
+                  onChange={e=>setBrand({...brand,handle:e.target.value})}
+                  placeholder="@seu.perfil"
+                  className="vc-input"
+                />
               </div>
               <Toggle label="Mostrar @ nos slides" value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
               <details
@@ -10272,12 +11029,37 @@ function SidebarContent({
               ) : null}
               {(() => {
                 const bh = hydrateBrandTextColors(brand);
+                const activeBgImage = slides[activeIdx]?.bgImage;
                 return (
                   <>
-                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v})}/>
-                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v})}/>
-                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v})}/>
-                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})}/>
+                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v})} contrastBg={brand.bg} contrastKind="large"/>
+                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v})} contrastBg={brand.bg} contrastKind="body"/>
+                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v})} contrastBg={brand.bg} contrastKind="body"/>
+                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})} contrastBg={brand.bg} contrastKind="body"/>
+                    {activeBgImage ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const hex = await extractDominantColor(activeBgImage);
+                          if (hex) {
+                            setBrand({ ...brand, accent: hex });
+                            toast(`Cor de destaque extraída da foto: ${hex}`, 'success');
+                          } else {
+                            toast('Não consegui extrair cor dominante (imagem muito uniforme?).', 'warning');
+                          }
+                        }}
+                        style={{
+                          marginTop: 6, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                          background: 'var(--bg-card)', border: '1px solid var(--border)',
+                          color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
+                          letterSpacing: '-0.011em', textAlign: 'left',
+                          display: 'flex', alignItems: 'center', gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>✨</span>
+                        <span>Usar cor dominante da foto do card atual como «Destaques»</span>
+                      </button>
+                    ) : null}
                   </>
                 );
               })()}
@@ -10575,6 +11357,36 @@ function SidebarContent({
               </div>
             </S>
 
+            {hasLastGenerate ? (
+              <S title="🔀 Refazer com tom alternativo" hint="Usa o mesmo tema/material da última geração mas com inflexão de tom diferente. O carrossel atual fica em Cmd+Z (undo) pra você comparar.">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                  {[
+                    { id:'analitico',  label:'Analítico',   hint:'mais analítico-editorial, conceitual e calmo, com profundidade de raciocínio' },
+                    { id:'provocador', label:'Provocador',  hint:'mais provocador e contraintuitivo, virando a tese óbvia do avesso sem deixar de sustentar' },
+                    { id:'leve',       label:'Leve',        hint:'mais leve, conversacional e direto, com humor sutil e frases curtas' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => remixWithTone(opt.hint, opt.label)}
+                      disabled={refining}
+                      style={{
+                        padding:'10px 8px', borderRadius:8, cursor: refining ? 'not-allowed' : 'pointer',
+                        background:'var(--bg-card)', border:'1px solid var(--border)',
+                        color:'var(--text-secondary)', fontSize:11, fontWeight:600,
+                        fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                        opacity: refining ? 0.5 : 1, transition:'border-color 0.12s',
+                      }}
+                      onMouseEnter={e => { if (!refining) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </S>
+            ) : null}
+
             <S title="Legenda do post">
               {caption ? (
                 <>
@@ -10635,6 +11447,26 @@ function SidebarContent({
             <FileText size={11}/>PDF
           </button>
         </div>
+        {(() => {
+          const photoCount = slides.filter(s => !!s.bgImage).length;
+          if (photoCount === 0) return null;
+          const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
+          return (
+            <button
+              onClick={exportPhotosOnly}
+              disabled={exporting}
+              className="vc-btn vc-btn-ghost"
+              style={{ height:34, fontSize:11, width:'100%' }}
+              aria-label={`Baixar ${photoCount} fotos limpas em ZIP (sem texto sobreposto)`}
+              title="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA"
+            >
+              <ImageIcon size={11}/>
+              {aiCount > 0
+                ? `Fotos limpas — ${photoCount} ZIP (${aiCount} IA)`
+                : `Fotos limpas — ${photoCount} ZIP`}
+            </button>
+          );
+        })()}
       </div>
     </div>
   );
@@ -11043,7 +11875,9 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
           canvas: {
             enabled: true,
             variant: 'sandwich',
-            zones: sandwichZonesByRotationIndex(i + n * 31),
+            // Usa o mesmo layout do botão "Ativar Layout Canvas" (zonas + amplas)
+            // em vez de rotação variável que dava zonas pequenas pra texto denso.
+            zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH },
           },
         };
       }
@@ -11089,7 +11923,8 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
           canvas: {
             enabled: true,
             variant: 'sandwich',
-            zones: sandwichZonesByRotationIndex(i + n * 41),
+            // Mesmo do botão (zonas amplas) — evita corte de texto denso
+            zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH },
           },
         };
       }
@@ -11735,7 +12570,7 @@ function vcHandleAvatarImgStyle(brand) {
 const DEFAULT_BRAND = {
   id: 'default',
   name: 'Padrão',
-  handle: '@seu.perfil', showHandle: true,
+  handle: '', showHandle: false,
   /** Posição da pílula @ no card (0–100% da largura / altura; referência = canto sup. esq. do badge). */
   handleBadgeX: 5,
   handleBadgeY: 4,
@@ -11866,16 +12701,20 @@ function scrubStaleMaterialSources(raw) {
 }
 
 /** Evita ecrã em branco quando `vc_library` ou import JSON tem doc incompleto (sem slides, etc.). */
+// SCHEMA_VERSION + migrateDoc foram extraídos para src/utils/schema-migration.js
+
 function ensureDocShape(d) {
   if (!d || typeof d !== 'object') {
-    return JSON.parse(JSON.stringify(DEFAULT_DOC));
+    return { ...JSON.parse(JSON.stringify(DEFAULT_DOC)), __v: SCHEMA_VERSION };
   }
+  const migrated = migrateDoc(d);
   const out = {
     ...DEFAULT_DOC,
-    ...d,
-    brand: hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(d.brand && typeof d.brand === 'object' ? d.brand : {}) }),
-    material: { ...DEFAULT_DOC.material, ...(d.material && typeof d.material === 'object' ? d.material : {}) },
-    imgParams: { ...DEFAULT_DOC.imgParams, ...(d.imgParams && typeof d.imgParams === 'object' ? d.imgParams : {}) },
+    ...migrated,
+    __v: SCHEMA_VERSION,
+    brand: hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(migrated.brand && typeof migrated.brand === 'object' ? migrated.brand : {}) }),
+    material: { ...DEFAULT_DOC.material, ...(migrated.material && typeof migrated.material === 'object' ? migrated.material : {}) },
+    imgParams: { ...DEFAULT_DOC.imgParams, ...(migrated.imgParams && typeof migrated.imgParams === 'object' ? migrated.imgParams : {}) },
   };
   out.material.sources = scrubStaleMaterialSources(
     typeof out.material.sources === 'string' ? out.material.sources : ''
@@ -12205,13 +13044,74 @@ export default function App() {
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
   const [imageCropOpen, setImageCropOpen] = useState(false);
-  const [openaiKey, setOpenaiKey] = useState(() => {
-    try { return localStorage.getItem(SK.openaiKey) || ''; } catch { return ''; }
+  const [photoPositionOpen, setPhotoPositionOpen] = useState(false);
+  // Estratégia de persistência da chave OpenAI:
+  // - default = sessionStorage (apaga ao fechar aba, mitiga XSS de longa duração)
+  // - se usuário marcar "manter salvo entre sessões", migra para localStorage
+  // Sem botão = comportamento legado preservado ao carregar (se localStorage tinha, mantém)
+  const [openaiKeyPersist, setOpenaiKeyPersist] = useState(() => {
+    try { return localStorage.getItem(SK.openaiKeyPersist) === '1'; } catch { return false; }
   });
-  // Persiste a chave na mesma camada que os outros stores (App é o dono, modal só chama setOpenaiKey)
+  const [openaiKey, setOpenaiKey] = useState(() => {
+    try {
+      const ls = localStorage.getItem(SK.openaiKey) || '';
+      if (ls) return ls; // legacy: já estava em localStorage, preserva
+      return sessionStorage.getItem(SK.openaiKey) || '';
+    } catch { return ''; }
+  });
   useEffect(() => {
-    try { localStorage.setItem(SK.openaiKey, openaiKey); } catch { /* privado / bloqueado */ }
-  }, [openaiKey]);
+    try {
+      if (openaiKeyPersist) {
+        localStorage.setItem(SK.openaiKey, openaiKey);
+        sessionStorage.removeItem(SK.openaiKey);
+      } else {
+        sessionStorage.setItem(SK.openaiKey, openaiKey);
+        localStorage.removeItem(SK.openaiKey);
+      }
+      localStorage.setItem(SK.openaiKeyPersist, openaiKeyPersist ? '1' : '0');
+    } catch { /* privado / bloqueado */ }
+  }, [openaiKey, openaiKeyPersist]);
+  // Chave Anthropic (mesmo padrão da OpenAI: session por default, localStorage se user marcar)
+  const [anthropicKeyPersist, setAnthropicKeyPersist] = useState(() => {
+    try { return localStorage.getItem(SK.anthropicKeyPersist) === '1'; } catch { return false; }
+  });
+  const [anthropicKey, setAnthropicKey] = useState(() => {
+    try {
+      const ls = localStorage.getItem(SK.anthropicKey) || '';
+      if (ls) return ls;
+      return sessionStorage.getItem(SK.anthropicKey) || '';
+    } catch { return ''; }
+  });
+  useEffect(() => {
+    try {
+      if (anthropicKeyPersist) {
+        localStorage.setItem(SK.anthropicKey, anthropicKey);
+        sessionStorage.removeItem(SK.anthropicKey);
+      } else {
+        sessionStorage.setItem(SK.anthropicKey, anthropicKey);
+        localStorage.removeItem(SK.anthropicKey);
+      }
+      localStorage.setItem(SK.anthropicKeyPersist, anthropicKeyPersist ? '1' : '0');
+    } catch { /* */ }
+    setAnthropicUserKey(anthropicKey);
+  }, [anthropicKey, anthropicKeyPersist]);
+  // Modelo Claude preferido
+  const [claudeModel, setClaudeModel] = useState(() => {
+    try {
+      const v = localStorage.getItem(SK.claudeModel);
+      return v === 'opus' ? 'opus' : 'sonnet';
+    } catch { return 'sonnet'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SK.claudeModel, claudeModel); } catch { /* */ }
+    setClaudeModelPref(claudeModel);
+  }, [claudeModel]);
+  // Biblioteca de hooks aprovados (B2)
+  const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
+  useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
+  // Últimos args passados a handleGenerate — permite remix com tom alternativo sem reabrir modal (B1)
+  const lastGenerateArgsRef = useRef(null);
+  const [hasLastGenerate, setHasLastGenerate] = useState(false);
   useEffect(() => {
     try { localStorage.setItem(SK.previewGrid, showPreviewAlignGrid ? '1' : '0'); } catch { /* */ }
   }, [showPreviewAlignGrid]);
@@ -12221,7 +13121,7 @@ export default function App() {
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const hasOpenAI    = !!openaiKey || (IS_LOCAL_DEV && serverStatus.openai);
-  const hasAnthropic = serverStatus.anthropic;
+  const hasAnthropic = serverStatus.anthropic || !!anthropicKey;
   const hasAnyAI     = hasOpenAI || hasAnthropic;
   const [niche, setNiche] = useState('');
 
@@ -12424,7 +13324,8 @@ export default function App() {
 
   useEffect(() => {
     if (!slide.bgImage && imageCropOpen) setImageCropOpen(false);
-  }, [slide.bgImage, imageCropOpen]);
+    if (!slide.bgImage && photoPositionOpen) setPhotoPositionOpen(false);
+  }, [slide.bgImage, imageCropOpen, photoPositionOpen]);
 
   const editorHeaderActions = (
         <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 4 : 6, flexShrink:0 }}>
@@ -12584,7 +13485,7 @@ export default function App() {
         toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
         return;
       }
-      updateSlideAt(sIdx, { bgImage: url });
+      updateSlideAt(sIdx, { bgImage: url, bgImageSource: 'imported' });
     });
   }, [updateSlideAt, toast]);
 
@@ -12648,7 +13549,7 @@ export default function App() {
         return prev.map((sl, j) => {
           if (j >= cap) return sl;
           const data = urls[j];
-          return data ? { ...sl, bgImage: data } : sl;
+          return data ? { ...sl, bgImage: data, bgImageSource: 'imported' } : sl;
         });
       });
 
@@ -12761,6 +13662,24 @@ export default function App() {
     toast('Tipografia da marca aplicada a todos os slides.', 'success');
   }, [brand, setSlides, toast]);
 
+  // Auto-aplica tipografia da marca em TODOS os slides quando user mexe nos sliders
+  // do painel "Texto nos slides". Antes precisava apertar o botão "Aplicar a todos".
+  // Skip primeira renderização (evita sobrescrever per-card overrides no boot).
+  const brandTypoFirstRunRef = useRef(true);
+  useEffect(() => {
+    if (brandTypoFirstRunRef.current) {
+      brandTypoFirstRunRef.current = false;
+      return;
+    }
+    const patch = typographyPatchFromBrand(brand);
+    setSlides((list) => list.map((sl) => ({ ...sl, ...patch })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    brand.textTitleSize, brand.textSubSize, brand.textBodyAfterSize,
+    brand.textTitleTracking, brand.textTitleLeading, brand.textTitleWeight, brand.textTitleCase,
+    brand.textSubTracking, brand.textSubLeading,
+  ]);
+
   const persistFullscreenPresentationAdjustDraft = useCallback((draftBySlideId) => {
     if (!draftBySlideId || typeof draftBySlideId !== 'object') return;
     setSlides((prev) =>
@@ -12799,13 +13718,13 @@ export default function App() {
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     try {
-      const url = await generateDALLE(q, openaiKey, imgParams, {
+      const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
         refImage: snap.refImage,
         imgExtraPrompt: snap.imgExtraPrompt,
       });
       setSlides(prev => {
         const j = prev.findIndex(sl => sl.id === slideId);
-        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, imgMode: 'dalle', overlay: 70 } : sl));
+        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, imgMode: 'dalle', overlay: 70, bgImageFailed: false, bgImageSource: 'ai' } : sl));
       });
       toast(`Slide ${idx + 1}: imagem gerada`, 'success');
     } catch (e) {
@@ -12884,6 +13803,15 @@ export default function App() {
     cardVisualStyle: cardStyleArg,
     fetchImagesNow = true,
   }) => {
+    // Captura args pra Remix com tom alternativo (B1) — não inclui fetchImagesNow nem chosenMode
+    // pra que o remix herde os defaults atuais.
+    lastGenerateArgsRef.current = {
+      topic, count, niche: n, tone, audience,
+      imgParams: axes, mode: chosenNarrativeMode,
+      creativePreset: presetArg, slideTextDensity: densityArg,
+      cardVisualStyle: cardStyleArg,
+    };
+    setHasLastGenerate(true);
     const effectiveAxes = axes || imgParams;
     const cp = presetArg ?? creativePreset ?? 'livre';
     const effectiveMode = isTendenciaCulturaPreset(cp)
@@ -13086,15 +14014,17 @@ ${jsonShapeLine}`;
           const q = result.slides[i]?.imageQuery;
           if (!q) continue;
           try {
-            const url = await generateDALLE(q, openaiKey, effectiveAxes, {
+            const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               refImage: newSlides[i]?.refImage,
               imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
             });
             if (!abort.cancelled)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url } : sl));
+              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url, bgImageFailed: false, bgImageSource: 'ai' } : sl));
           } catch(e) {
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
+            if (!abort.cancelled)
+              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImageFailed: true } : sl));
           }
         }
       }
@@ -13102,10 +14032,10 @@ ${jsonShapeLine}`;
       if (!abort.cancelled && imgFailCount > 0) {
         toast(
           imgFailCount === 1
-            ? '1 imagem não carregou — o slide ficou sem fundo.'
-            : `${imgFailCount} imagens não carregaram — os slides ficaram sem fundo.`,
+            ? '1 imagem não carregou após retry — toque na área da foto para tentar de novo.'
+            : `${imgFailCount} imagens não carregaram após retry — toque nas áreas das fotos para tentar de novo.`,
           'warning',
-          5000,
+          6000,
         );
       }
     } else if (result.slides.some(s => (s.imageQuery || '').trim())) {
@@ -13195,7 +14125,14 @@ ${capRules}
 - Apenas a legenda e as hashtags, nada mais.`,
         { openaiKey }
       );
-      setCaption(r.trim());
+      const INSTAGRAM_CAPTION_LIMIT = 2200;
+      let finalCaption = r.trim();
+      if (finalCaption.length > INSTAGRAM_CAPTION_LIMIT) {
+        const over = finalCaption.length - INSTAGRAM_CAPTION_LIMIT;
+        finalCaption = finalCaption.slice(0, INSTAGRAM_CAPTION_LIMIT - 1).trimEnd() + '…';
+        toast(`Legenda excedia o limite do Instagram em ${over} caracteres — cortei o final.`, 'warning', 5000);
+      }
+      setCaption(finalCaption);
     } catch(e) { setError(e.message); }
     finally { setGenCaption(false); }
   };
@@ -13283,6 +14220,55 @@ ${capRules}
     finally { setExporting(false); }
   };
 
+  // Baixa as imagens RAW (sem texto/overlay) — útil pra guardar geração IA paga.
+  // Filtra slides com bgImage; nomeia ia-NN.png pra geradas, foto-NN.png pra importadas.
+  const exportPhotosOnly = async () => {
+    const withPhotos = slides
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => !!s.bgImage);
+    if (withPhotos.length === 0) {
+      toast('Nenhum card tem foto pra baixar.', 'info');
+      return;
+    }
+    setExporting(true);
+    setExportProgress({ current: 0, total: withPhotos.length });
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+      let aiCount = 0;
+      for (let k = 0; k < withPhotos.length; k++) {
+        setExportProgress({ current: k + 1, total: withPhotos.length });
+        const { s, i } = withPhotos[k];
+        try {
+          const blob = await blobFromSlideRef(s.bgImage);
+          const ext = blob.type.includes('png') ? 'png'
+            : blob.type.includes('jpeg') ? 'jpg'
+            : blob.type.includes('webp') ? 'webp'
+            : 'png';
+          const tag = s.bgImageSource === 'ai' ? 'ia' : 'foto';
+          if (s.bgImageSource === 'ai') aiCount++;
+          zip.file(`${tag}-${String(i + 1).padStart(2, '0')}.${ext}`, blob);
+        } catch (e) {
+          console.warn(`Falha ao empacotar foto do slide ${i + 1}:`, e.message);
+        }
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const stamp = new Date().toISOString().slice(0, 10);
+      await downloadBlob(zipBlob, `carrossel-fotos-${stamp}.zip`);
+      toast(
+        aiCount > 0
+          ? `${withPhotos.length} fotos baixadas (${aiCount} geradas por IA — guarde pra reuso!)`
+          : `${withPhotos.length} fotos baixadas no ZIP`,
+        'success',
+        5000,
+      );
+    } catch (e) {
+      setError('Erro ao baixar fotos: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Exporta todos os slides em UM único PDF (1 slide por página, dimensões reais)
   const exportPDF = async () => {
     setExporting(true);
@@ -13313,10 +14299,26 @@ ${capRules}
         toast('Não foi possível processar a imagem.', 'error', 4500);
         return;
       }
-      updateSlide({ bgImage: url });
+      updateSlide({ bgImage: url, bgImageSource: 'imported' });
     });
     e.target.value = '';
   };
+
+  // B1: Remix com tom alternativo — re-roda handleGenerate com os mesmos args mas
+  // adicionando um hint de tom. Usuário pode comparar com Cmd+Z (undo) depois.
+  const remixWithTone = useCallback(async (toneHint, hintLabel) => {
+    const prev = lastGenerateArgsRef.current;
+    if (!prev) {
+      toast('Gere um carrossel primeiro — depois use o remix para variar o tom.', 'info');
+      return;
+    }
+    toast(`Refazendo com tom «${hintLabel}»… o atual fica em Cmd+Z.`, 'info', 4000);
+    const blendedTone = (prev.tone || '').trim()
+      ? `${prev.tone} — variação solicitada: ${toneHint}`
+      : `Variação solicitada: ${toneHint}`;
+    await handleGenerate({ ...prev, tone: blendedTone });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
   const refineAll = useCallback(async (instruction) => {
@@ -13356,14 +14358,22 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         { json:true, openaiKey }
       );
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
-      setSlides(prev => prev.map((s, i) => ({
-        ...s,
-        title: stripLeadingSlideCardLabel(String(r.slides[i]?.title ?? s.title ?? '').trim()),
-        subtitle: stripLeadingSlideCardLabel(String(r.slides[i]?.subtitle ?? s.subtitle ?? '').trim()),
-        ...(isTendenciaCulturaPreset(creativePreset) && typeof r.slides[i]?.bodyAfterImage === 'string' && i !== 0
-          ? { bodyAfterImage: stripLeadingSlideCardLabel(String(r.slides[i].bodyAfterImage).trim()) }
-          : {}),
-      })));
+      setSlides(prev => prev.map((s, i) => {
+        const total = prev.length;
+        const isCultureSandwich =
+          isTendenciaCulturaPreset(creativePreset) && i !== 0 && i !== total - 1;
+        const isHybridSandwich =
+          isPersoHybridDensity(creativePreset, slideTextDensity) && i >= 2;
+        const allowBodyAfter = isCultureSandwich || isHybridSandwich;
+        return {
+          ...s,
+          title: stripLeadingSlideCardLabel(String(r.slides[i]?.title ?? s.title ?? '').trim()),
+          subtitle: stripLeadingSlideCardLabel(String(r.slides[i]?.subtitle ?? s.subtitle ?? '').trim()),
+          ...(allowBodyAfter && typeof r.slides[i]?.bodyAfterImage === 'string'
+            ? { bodyAfterImage: stripLeadingSlideCardLabel(String(r.slides[i].bodyAfterImage).trim()) }
+            : {}),
+        };
+      }));
       toast('Todos os slides refinados', 'success');
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
@@ -13414,15 +14424,17 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         const q = tpl.slides[i]?.q;
         if (!q) continue;
         try {
-          const url = await generateDALLE(q, openaiKey, imgParams, {
+          const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
             refImage: newSlides[i]?.refImage,
             imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
           });
           if (!abort.cancelled)
-            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url } : sl));
+            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url, bgImageFailed: false, bgImageSource: 'ai' } : sl));
         } catch (e) {
           failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
+          if (!abort.cancelled)
+            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImageFailed: true } : sl));
         }
       }
       if (!abort.cancelled && failCount > 0)
@@ -13451,7 +14463,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     const onKey = (e) => {
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
-      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen;
+      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
@@ -13534,6 +14546,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     enableCanvasLayout,
     disableCanvasLayout,
     onOpenImageCrop: () => setImageCropOpen(true),
+    onOpenPhotoPosition: () => setPhotoPositionOpen(true),
+    remixWithTone,
+    hasLastGenerate,
+    exportPhotosOnly,
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -14294,6 +15310,14 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         openaiKey={openaiKey}
         onSave={setOpenaiKey}
         onRefreshStatus={setServerStatus}
+        openaiKeyPersist={openaiKeyPersist}
+        onChangePersist={setOpenaiKeyPersist}
+        claudeModel={claudeModel}
+        onChangeClaudeModel={setClaudeModel}
+        anthropicKey={anthropicKey}
+        onSaveAnthropic={setAnthropicKey}
+        anthropicKeyPersist={anthropicKeyPersist}
+        onChangeAnthropicPersist={setAnthropicKeyPersist}
       />
       <GenerateModal
         open={setupOpen}
@@ -14338,6 +15362,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onCardVisualStyleChange={setCardVisualStyle}
         material={material}
         setMaterial={setMaterial}
+        hookLibrary={hookLibrary}
       />
       <ResearchPanel
         open={researchOpen}
@@ -14383,6 +15408,13 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         imageSrc={slide.bgImage || ''}
         onClose={() => setImageCropOpen(false)}
         onApply={(dataUrl) => updateSlide({ bgImage: dataUrl })}
+      />
+      <PhotoPositionModal
+        open={photoPositionOpen}
+        slide={slide}
+        fmt={fmt}
+        onClose={() => setPhotoPositionOpen(false)}
+        onChange={(patch) => updateSlide(patch)}
       />
       <OnboardingTour
         open={tourOpen}
@@ -15166,7 +16198,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
               <div style={{ fontSize:11, color:'var(--text-muted)' }}>{counts.all} projetos salvos</div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:6, borderRadius:6 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>
@@ -15434,7 +16466,7 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
               <div style={{ fontSize:11, color:'var(--text-muted)' }}>{brands.length} {brands.length === 1 ? 'perfil' : 'perfis'} salvos</div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:6, borderRadius:6 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>
@@ -16128,7 +17160,7 @@ function HelpModal({ open, onClose, onStartTour }) {
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
         }}>
           <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Atalhos de teclado</div>
-          <button onClick={onClose} aria-label="Fechar" style={{ color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:4 }}>
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>
         </div>

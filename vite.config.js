@@ -72,8 +72,13 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
           configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              if (env.ANTHROPIC_API_KEY) {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const userKey = req.headers['x-anthropic-key'];
+              if (userKey) {
+                proxyReq.setHeader('x-api-key', String(userKey));
+                proxyReq.setHeader('anthropic-version', '2023-06-01');
+                proxyReq.removeHeader('x-anthropic-key');
+              } else if (env.ANTHROPIC_API_KEY) {
                 proxyReq.setHeader('x-api-key', env.ANTHROPIC_API_KEY);
                 proxyReq.setHeader('anthropic-version', '2023-06-01');
               }
