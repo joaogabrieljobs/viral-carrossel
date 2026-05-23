@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import {
   Sparkles, Search, Download, Trash2, Copy,
   Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2,
+  Bookmark, Shuffle, Lock, Move, FlipHorizontal2, RotateCcw,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image as ImageIcon,
@@ -17,6 +18,17 @@ import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.j
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
+
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+// Plausible (carregado via index.html). Helper que é no-op se ad blocker bloquear
+// ou se window.plausible não estiver disponível (dev local, etc.).
+function trackEvent(name, props) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (typeof window.plausible !== 'function') return;
+    window.plausible(name, props ? { props } : undefined);
+  } catch { /* never break app por causa de analytics */ }
+}
 
 // ─── STORAGE KEYS ─────────────────────────────────────────────────────────────
 // Chaves centralizadas — nunca use string literal de localStorage diretamente.
@@ -210,6 +222,37 @@ const GLOBAL_STYLE = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
+  }
+
+  /* A11Y — Focus rings globais. Pegando todos os elementos interativos que não
+     tem ring explícito (botões inline com style={{ background:'none', border:'none' }}). */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* Inputs/textareas — focus já manipulado via box-shadow, mas garantia */
+  input:focus-visible:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* A11Y — Reduced motion: respeita preferência do sistema (Mac/iOS/Windows).
+     Reduz animações drasticamente sem desabilitá-las (mantém feedback de estado). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
   @keyframes shimmer {
     0%   { background-position: -200% 0; }
@@ -7099,20 +7142,64 @@ function MobileDrawer({ open, onClose, children }) {
   );
 }
 
+// ─── SCROLL LOCK (modais grandes) ────────────────────────────────────────────
+// Trava scroll do body enquanto modal está aberto + preserva scroll position no close.
+// Conta abertura simultânea de múltiplos modais (caso raro de modal sobre modal).
+let __vcScrollLockCount = 0;
+let __vcSavedScrollY = 0;
+function useScrollLock(active) {
+  React.useEffect(() => {
+    if (!active) return undefined;
+    if (__vcScrollLockCount === 0) {
+      __vcSavedScrollY = window.scrollY || 0;
+      const body = document.body;
+      body.style.position = 'fixed';
+      body.style.top = `-${__vcSavedScrollY}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.overflow = 'hidden';
+    }
+    __vcScrollLockCount++;
+    return () => {
+      __vcScrollLockCount--;
+      if (__vcScrollLockCount <= 0) {
+        __vcScrollLockCount = 0;
+        const body = document.body;
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.overflow = '';
+        window.scrollTo(0, __vcSavedScrollY);
+      }
+    };
+  }, [active]);
+}
+
 // ─── TOAST STACK ──────────────────────────────────────────────────────────────
 
 function ToastStack({ toasts, onDismiss }) {
   if (!toasts.length) return null;
+  // Container "polite" não rouba o foco. Item de error usa role="alert" pra anúncio
+  // imediato em screen readers (warning também pra não passar despercebido).
   return (
-    <div className="toast-stack" role="status" aria-live="polite">
-      {toasts.map(t => (
-        <div key={t.id} className={`toast-item toast-${t.kind}`}>
-          <span style={{ flex:1 }}>{t.message}</span>
-          <button onClick={()=>onDismiss(t.id)} aria-label="Fechar notificação">
-            <X size={12}/>
-          </button>
-        </div>
-      ))}
+    <div className="toast-stack" aria-live="polite" aria-atomic="false">
+      {toasts.map(t => {
+        const isUrgent = t.kind === 'error' || t.kind === 'warning';
+        return (
+          <div
+            key={t.id}
+            className={`toast-item toast-${t.kind}`}
+            role={isUrgent ? 'alert' : 'status'}
+            aria-live={isUrgent ? 'assertive' : 'polite'}
+          >
+            <span style={{ flex:1 }}>{t.message}</span>
+            <button onClick={()=>onDismiss(t.id)} aria-label="Fechar notificação">
+              <X size={12}/>
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -7179,6 +7266,7 @@ function PromptDialog({ open, title, defaultValue='', placeholder='', label='', 
 // ─── IMAGE CROP MODAL ─────────────────────────────────────────────────────────
 /** Recorta a imagem de fundo no canvas; proporção 4:5 opcional (feed Instagram). */
 function ImageCropModal({ open, imageSrc, onClose, onApply }) {
+  useScrollLock(open);
   const carAr = FORMATS.carrossel.w / FORMATS.carrossel.h;
   const [nat, setNat] = useState({ w: 0, h: 0 });
   const [cropN, setCropN] = useState({ x: 0, y: 0, w: 0, h: 0 });
@@ -7499,6 +7587,7 @@ function ImageCropModal({ open, imageSrc, onClose, onApply }) {
 // Edita slide.bgX / slide.bgY (0..100, % do objectPosition) + slide.bgZoom (50..300%).
 // Drag direto no preview = atualiza bgX/bgY em tempo real. Espelhamento e reset rápidos.
 function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
+  useScrollLock(open);
   const dragRef = React.useRef(null);
   const previewRef = React.useRef(null);
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -7630,19 +7719,19 @@ function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
               type="button"
               onClick={() => onChange({ bgX: 50, bgY: 50, bgZoom: 100, bgMirror: false })}
               className="vc-btn vc-btn-ghost"
-              style={{ height: 36, fontSize: 12 }}
+              style={{ height: 36, fontSize: 12, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
               title="Resetar pra valores neutros"
             >
-              ↺ Reset
+              <RotateCcw size={12} aria-hidden/> Reset
             </button>
             <button
               type="button"
               onClick={() => onChange({ bgX: 50, bgY: 50 })}
               className="vc-btn vc-btn-ghost"
-              style={{ height: 36, fontSize: 12 }}
+              style={{ height: 36, fontSize: 12, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
               title="Apenas centralizar (mantém zoom e espelho)"
             >
-              ⊕ Centralizar
+              <Move size={12} aria-hidden/> Centralizar
             </button>
             <button
               type="button"
@@ -7652,10 +7741,11 @@ function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
                 height: 36, fontSize: 12,
                 background: bgMirror ? 'var(--success-surface)' : undefined,
                 borderColor: bgMirror ? 'var(--accent)' : undefined,
+                display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6,
               }}
               title="Espelhar horizontalmente"
             >
-              ⇄ Espelhar
+              <FlipHorizontal2 size={12} aria-hidden/> Espelhar
             </button>
           </div>
 
@@ -7853,7 +7943,7 @@ function KeysModal({
             </div>
 
             <div style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5, padding:'8px 2px 0' }}>
-              <span style={{ fontSize:12, lineHeight:1, marginTop:1 }}>🔒</span>
+              <Lock size={11} aria-hidden style={{ marginTop:1, flexShrink:0 }}/>
               <span>
                 As chaves ficam <strong style={{ color:'var(--text-secondary)' }}>só no seu navegador</strong>. Custos vão direto pra sua conta da Anthropic/OpenAI — você controla o uso.
               </span>
@@ -8253,8 +8343,9 @@ function GenerateModal({
               if (suggestions.length === 0) return null;
               return (
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>
-                    💾 Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Bookmark size={10} aria-hidden/>
+                    Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {suggestions.map(h => (
@@ -9529,7 +9620,8 @@ function SidebarContent({
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
-                  🎯 Abrir preview grande pra arrastar
+                  <Move size={14} aria-hidden/>
+                  Abrir preview grande pra arrastar
                 </button>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
                   Tem grade de rule-of-thirds + crosshair pra centralizar com precisão.
@@ -9602,7 +9694,7 @@ function SidebarContent({
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                       onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                     >
-                      <span style={{ fontSize:11 }}>💾</span> Salvar como hook
+                      <Bookmark size={11} aria-hidden/> Salvar como hook
                     </button>
                   ) : null}
                 </label>
@@ -11057,7 +11149,7 @@ function SidebarContent({
                           display: 'flex', alignItems: 'center', gap: 8,
                         }}
                       >
-                        <span style={{ fontSize: 14 }}>✨</span>
+                        <Sparkles size={14} style={{ color: 'var(--accent)' }} aria-hidden/>
                         <span>Usar cor dominante da foto do card atual como «Destaques»</span>
                       </button>
                     ) : null}
@@ -11359,7 +11451,7 @@ function SidebarContent({
             </S>
 
             {hasLastGenerate ? (
-              <S title="🔀 Refazer com tom alternativo" hint="Usa o mesmo tema/material da última geração mas com inflexão de tom diferente. O carrossel atual fica em Cmd+Z (undo) pra você comparar.">
+              <S title="Refazer com tom alternativo" hint="Usa o mesmo tema/material da última geração mas com inflexão de tom diferente. O carrossel atual fica em Cmd+Z (undo) pra você comparar.">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                   {[
                     { id:'analitico',  label:'Analítico',   hint:'mais analítico-editorial, conceitual e calmo, com profundidade de raciocínio' },
@@ -13838,6 +13930,12 @@ export default function App() {
       cardVisualStyle: cardStyleArg,
     };
     setHasLastGenerate(true);
+    trackEvent('carousel_generate_start', {
+      preset: presetArg ?? creativePreset ?? 'livre',
+      mode: chosenNarrativeMode || mode || 'editorial',
+      count: String(count || 0),
+      with_images: fetchImagesNow ? 'true' : 'false',
+    });
     try {
     const effectiveAxes = axes || imgParams;
     const cp = presetArg ?? creativePreset ?? 'livre';
@@ -14091,6 +14189,15 @@ ${jsonShapeLine}`;
         5500,
       );
     }
+      trackEvent('carousel_generate_success', {
+        slide_count: String(newSlides.length),
+        image_failures: String(imgFailCount),
+      });
+    } catch (err) {
+      trackEvent('carousel_generate_error', {
+        msg: String(err?.message || '').slice(0, 80),
+      });
+      throw err;
     } finally {
       setGenProgress(null);
     }
@@ -14265,6 +14372,7 @@ ${capRules}
       const stamp = new Date().toISOString().slice(0, 10);
       await downloadBlob(zipBlob, `carrossel-slides-${stamp}.zip`);
       toast(`ZIP com ${slides.length} cards pronto`, 'success');
+      trackEvent('export_zip', { card_count: String(slides.length) });
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
   };
@@ -14461,6 +14569,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     });
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
+    trackEvent('template_applied', { template: tpl.id || tpl.name });
     // Guard contra race-condition (mesmo padrão do handleGenerate)
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
     const abort = { cancelled: false };
@@ -16303,6 +16412,7 @@ function AccountHomeShell({
 // ─── LIBRARY MODAL ────────────────────────────────────────────────────────────
 // Lista os carrosséis salvos com mini-thumbnail, nome editável, status e ações.
 function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDuplicate, onDelete, onRename, onSetStatus, onExportDoc, onExportAll, onImportTrigger }) {
+  useScrollLock(open);
   const [filter, setFilter] = useState('all'); // all | draft | ready | published
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -16595,6 +16705,7 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
 // ─── BRANDS MODAL ─────────────────────────────────────────────────────────────
 // Gerencia perfis de marca: lista, aplica, salva o atual como novo, deleta.
 function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApply, onSave, onDelete }) {
+  useScrollLock(open);
   const [newName, setNewName] = useState('');
   const [confirmDeleteBrandId, setConfirmDeleteBrandId] = useState(null);
   if (!open) return null;
@@ -16740,6 +16851,7 @@ function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApp
 }
 
 function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust, creativePreset = 'livre' }) {
+  useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
   const [size, setSize] = useState({ w:0, h:0 });
   const [photoAdjustOpen, setPhotoAdjustOpen] = useState(false);
