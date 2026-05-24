@@ -7173,17 +7173,20 @@ function MobileDrawer({ open, onClose, children }) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — dim leve em vez de blackout total + blur. User precisa
+          ver os cards atrás enquanto edita (ajusta size, peso, cor e vê o
+          efeito ao vivo). Click no backdrop continua fechando. */}
       {open && (
         <div
           onClick={onClose}
           style={{
-            position:'fixed', inset:0, background:'rgba(0,0,0,0.7)',
-            backdropFilter:'blur(4px)', zIndex:30, animation:'fadeIn 0.18s',
+            position:'fixed', inset:0, background:'rgba(0,0,0,0.18)',
+            zIndex:30, animation:'fadeIn 0.18s',
           }}
         />
       )}
-      {/* Painel — transform/transition controlados via ref (applyDrag) para zero lag */}
+      {/* Painel — half-height (55vh) pro user ver metade superior do viewport
+          com cards e metade inferior com controles. Drag-down ainda fecha. */}
       <div
         ref={panelRef}
         onTouchStart={onTouchStart}
@@ -7195,8 +7198,8 @@ function MobileDrawer({ open, onClose, children }) {
           borderTop:'1px solid var(--border)',
           borderRadius:'18px 18px 0 0',
           display:'flex', flexDirection:'column',
-          maxHeight:'88vh',
-          boxShadow:'0 -8px 40px rgba(0,0,0,0.6)',
+          height:'55dvh', maxHeight:'55dvh',
+          boxShadow:'0 -8px 40px rgba(0,0,0,0.35)',
           transform: open ? 'translateY(0)' : 'translateY(110%)',
           transition: 'transform 0.3s var(--ease-smooth)',
           paddingBottom:'env(safe-area-inset-bottom, 0)',
