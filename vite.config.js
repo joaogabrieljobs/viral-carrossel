@@ -127,5 +127,21 @@ export default defineConfig(({ mode }) => {
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     },
+    build: {
+      // Code-splitting: separa vendor estável (react, lucide) do app code.
+      // Quando só ViralCarrossel.jsx muda, vendor fica cacheado entre deploys
+      // → user re-baixa só ~150KB em vez de ~640KB. Cache-control immutable
+      // (definido em netlify.toml) garante 1 ano de cache pros chunks vendor.
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'lucide-icons': ['lucide-react'],
+          },
+        },
+      },
+      // Aumenta o warning threshold já que o app é grande por natureza.
+      chunkSizeWarningLimit: 700,
+    },
   };
 });

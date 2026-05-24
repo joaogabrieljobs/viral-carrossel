@@ -13286,14 +13286,20 @@ export default function App() {
     const entry = library.find(e => e.id === docId);
     if (!entry) return;
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [entry] }, null, 2)], { type: 'application/json' });
-    await downloadBlob(blob, `${entry.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`);
-  }, [library]);
+    const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
+    await downloadBlob(blob, fname);
+    toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
+    trackEvent('export_json_single', { size_kb: String(Math.round(blob.size / 1024)) });
+  }, [library, toast]);
 
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: library }, null, 2)], { type: 'application/json' });
-    await downloadBlob(blob, `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`);
-  }, [library]);
+    const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
+    await downloadBlob(blob, fname);
+    toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
+    trackEvent('export_json_full', { project_count: String(library.length), size_kb: String(Math.round(blob.size / 1024)) });
+  }, [library, toast]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
   const importDocRef = useRef(null);
@@ -13344,13 +13350,16 @@ export default function App() {
     });
   }, []);
   const deleteBrand = useCallback((brandId) => {
+    const brand = brandRoster.find(b => b.id === brandId);
+    const name = brand?.name || 'esta marca';
+    if (!window.confirm(`Apagar a marca "${name}"?\n\nProjetos que usam essa marca vão voltar pra padrão.`)) return;
     setBrandRoster(prev => {
       const next = prev.filter(b => b.id !== brandId);
       if (!next.length) return [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
       return next;
     });
     if (brandId === activeBrandId) setActiveBrandId('default');
-  }, [activeBrandId]);
+  }, [activeBrandId, brandRoster]);
   // Salva o brand do doc atual como um perfil novo na "estante"
   const saveCurrentBrandAsProfile = useCallback((name) => {
     const newBrand = { ...doc.brand, id: uid(), name: name || `Perfil ${brandRoster.length + 1}` };
@@ -14239,6 +14248,9 @@ export default function App() {
   }, [slides, brand, doc.cardVisualStyle, setSlides]);
   const deleteSlide = useCallback((i) => {
     if (slides.length<=1) return;
+    const slide = slides[i];
+    const preview = (slide?.title || '').trim().slice(0, 50) || `Card ${i+1}`;
+    if (!window.confirm(`Apagar "${preview}"?\n\nEsta ação não pode ser desfeita por completo (o Cmd+Z pode recuperar nesta sessão).`)) return;
     const next = slides.filter((_,j)=>j!==i).map((s,j)=>({...s,num:j+1}));
     setSlides(next); setActiveIdx(Math.min(activeIdx, next.length-1));
   }, [slides, activeIdx]);
@@ -16984,14 +16996,55 @@ function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDu
 
         {/* Cards */}
         <div style={{ padding:'14px 20px 20px', display:'flex', flexDirection:'column', gap:8 }}>
-          {items.length === 0 && (
-            <div style={{
-              padding:'40px 20px', textAlign:'center', color:'var(--text-muted)',
-              fontSize:13, fontFamily:'var(--font-ui)',
-            }}>
-              {search.trim() ? 'Nenhum carrossel com esse nome.' : 'Nenhum carrossel neste filtro.'}
-            </div>
-          )}
+          {items.length === 0 && (() => {
+            // Empty state diferenciado: biblioteca 100% vazia (primeira visita) vs filtro
+            const totalLibrary = library.filter(e => !isDefault(e.doc?.slides || [])).length;
+            const isFirstVisit = totalLibrary === 0 && !search.trim() && filter === 'all';
+            if (isFirstVisit) {
+              return (
+                <div style={{
+                  padding:'48px 24px', textAlign:'center', display:'flex', flexDirection:'column',
+                  alignItems:'center', gap:14, color:'var(--text-secondary)', fontFamily:'var(--font-ui)',
+                }}>
+                  <div style={{
+                    width:60, height:60, borderRadius:16, background:'var(--success-surface)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <BookOpen size={24} style={{ color:'var(--accent)' }}/>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:16, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.018em', marginBottom:4 }}>
+                      Sua biblioteca está vazia
+                    </div>
+                    <div style={{ fontSize:13, lineHeight:1.55, maxWidth:320, color:'var(--text-muted)', letterSpacing:'-0.011em' }}>
+                      Crie seu primeiro carrossel — depois ele aparece aqui com auto-save, nome editável e ações de duplicar/exportar.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { onClose(); onNew?.(); }}
+                    style={{
+                      marginTop:6, padding:'10px 18px', borderRadius:9999, cursor:'pointer',
+                      background:'var(--accent)', color:'#fff', border:'none',
+                      fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
+                      letterSpacing:'-0.011em', display:'inline-flex', alignItems:'center', gap:8,
+                    }}
+                  >
+                    <Plus size={14}/>
+                    Criar primeiro carrossel
+                  </button>
+                </div>
+              );
+            }
+            return (
+              <div style={{
+                padding:'40px 20px', textAlign:'center', color:'var(--text-muted)',
+                fontSize:13, fontFamily:'var(--font-ui)',
+              }}>
+                {search.trim() ? 'Nenhum carrossel com esse nome.' : 'Nenhum carrossel neste filtro.'}
+              </div>
+            );
+          })()}
           {items.map(entry => {
             const isActive = entry.id === activeDocId;
             const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
