@@ -8,7 +8,7 @@ import {
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image as ImageIcon,
   ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
-  ChevronRight, ChevronLeft, ChevronDown, Instagram, Settings, Maximize2, Minus,
+  ChevronRight, ChevronLeft, ChevronDown, Check, Instagram, Settings, Maximize2, Minus,
   Home, Layers, SlidersHorizontal,
   Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
   Target, Camera,
@@ -379,36 +379,54 @@ const GLOBAL_STYLE = `
     padding: 12px 16px;
   }
 
-  /* Section labels — taxonomy mono (DESIGN.md eyebrow cadence, adaptado ao PT) */
+  /* Section labels — taxonomy mono. Polish: peso 600 (era 400) + traço mais
+     presente (2px largo, 18px comprimento) + cor de texto secondary em
+     hover/active pra dar respiro. */
   .section-label {
     font-size: 11px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--text-muted);
-    font-weight: 400;
+    color: var(--text-secondary);
+    font-weight: 600;
     font-family: var(--font-mono);
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 10px;
   }
   .section-label::before {
-    content: ''; display: block; width: 14px; height: 1px; background: var(--hairline);
+    content: ''; display: block; width: 18px; height: 2px;
+    background: var(--accent); border-radius: 2px;
     flex-shrink: 0;
   }
 
-  /* Tab bar — sub-nav monocromático (underline = primário preto) */
+  /* Tab bar — sub-nav. Polish: padding mais generoso (14px), font 13.5px,
+     ícones podem crescer pra 13 via JSX. Active state ganha micro-fill
+     pra firmar onde o foco está, junto com a underline. */
   .tab-bar-item {
-    flex: 1; padding: 12px 0; font-size: 13px; font-weight: 400;
-    letter-spacing: -0.016em; text-transform: none;
+    flex: 1; padding: 14px 6px 13px; font-size: 13px; font-weight: 500;
+    letter-spacing: -0.014em; text-transform: none;
     font-family: var(--font-ui); cursor: pointer; border: none;
     background: transparent; display: flex; align-items: center;
-    justify-content: center; gap: 6px; position: relative;
-    transition: color 0.15s; outline: none; color: var(--text-muted);
+    justify-content: center; gap: 7px; position: relative;
+    transition: color 0.15s var(--ease-smooth), background-color 0.15s var(--ease-smooth);
+    outline: none; color: var(--text-muted);
+    min-height: 44px;
   }
-  .tab-bar-item.active { color: var(--text-primary); font-weight: 600; }
+  .tab-bar-item.active {
+    color: var(--text-primary); font-weight: 600;
+    background: var(--accent-surface);
+  }
   .tab-bar-item.active::after {
     content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
     height: 2px; background: var(--accent); border-radius: 99px;
   }
-  .tab-bar-item:hover:not(.active) { color: var(--text-secondary); }
+  .tab-bar-item:hover:not(.active) {
+    color: var(--text-secondary);
+    background: var(--bg-pearl);
+  }
+  .tab-bar-item:focus-visible {
+    outline: 2px solid var(--accent-focus, var(--accent));
+    outline-offset: -2px;
+    border-radius: 4px;
+  }
 
   /* Slide thumbs — foco com anel de primário (--accent-focus) */
   .slide-thumb {
@@ -3746,6 +3764,10 @@ function sandwichZonesByRotationIndex(i) {
 }
 
 function slideHasPendingPhotoIntent(slide) {
+  // Vídeo importado é "intenção de mídia visual" tanto quanto bgImage —
+  // sem isso, sandwich layout (Cultura/Tendência) desativa a zona da foto
+  // e o <video> nunca renderiza apesar de slide.videoId estar setado.
+  if (slide?.videoId) return true;
   return !!(String(slide?.imageQuery ?? '').trim());
 }
 
@@ -7862,17 +7884,63 @@ function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
 
 // ─── REFINE BUTTON ────────────────────────────────────────────────────────────
 
-function RefineBtn({ onRefine, busy }) {
+/**
+ * RefineBtn — CTA pra refinar texto via IA. Quando colapsado, oferece o
+ * gatilho; quando aberto, expõe presets + input livre.
+ *
+ * `variant` controla apenas a aparência do estado colapsado:
+ *   - 'compact'    (default): ghost height 36, pro uso dentro dos cards
+ *                  onde já tem "Marcar Destaque" + "Gerar variações" juntos.
+ *   - 'prominent': drop-zone com círculo accent + label + subtítulo, pro
+ *                  uso na sidebar Refinar onde é o CTA principal da seção.
+ */
+function RefineBtn({ onRefine, busy, variant = 'compact', label = 'Refinar com IA', subtitle = 'IA reescreve mantendo a voz do carrossel' }) {
   const [open, setOpen] = useState(false);
   const [txt, setTxt] = useState('');
   const presets = ['Mais direto','Mais curto','Adicione número','Tom técnico','Tom casual','Mais polêmico','Storytelling'];
 
-  if (!open) return (
-    <button onClick={()=>setOpen(true)} className="vc-btn vc-btn-ghost" style={{ width:'100%', height:36 }}>
-      <Wand2 size={12}/>
-      <span>Refinar com IA</span>
-    </button>
-  );
+  if (!open) {
+    if (variant === 'prominent') {
+      return (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={label}
+          style={{
+            width:'100%', minHeight:60, padding:'10px 14px', borderRadius:11,
+            cursor:'pointer', border:'1px solid var(--hairline)',
+            background:'var(--bg-card)', fontFamily:'var(--font-ui)',
+            display:'flex', alignItems:'center', gap:12, textAlign:'left',
+            transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='var(--accent-surface)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; }}
+        >
+          <span style={{
+            width:32, height:32, borderRadius:'50%', flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            background:'var(--accent-surface)', color:'var(--accent)',
+          }} aria-hidden>
+            <Wand2 size={14} strokeWidth={2.25}/>
+          </span>
+          <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+              {label}
+            </span>
+            <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em', lineHeight:1.35 }}>
+              {subtitle}
+            </span>
+          </span>
+        </button>
+      );
+    }
+    return (
+      <button onClick={()=>setOpen(true)} className="vc-btn vc-btn-ghost" style={{ width:'100%', height:36 }}>
+        <Wand2 size={12}/>
+        <span>{label}</span>
+      </button>
+    );
+  }
 
   return (
     <div style={{
@@ -8243,6 +8311,27 @@ function GenerateModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  // Wizard multi-step: 1=Ideia, 2=Formato, 3=Imagens, 4=Revisão.
+  // Reset pra step 1 sempre que reabre — usuário pega o fluxo limpo.
+  const [step, setStep] = useState(1);
+  useEffect(() => { if (open) setStep(1); }, [open]);
+  const STEPS = useMemo(() => ([
+    { id: 1, label: 'Ideia' },
+    { id: 2, label: 'Formato' },
+    { id: 3, label: 'Imagens' },
+    { id: 4, label: 'Revisão' },
+  ]), []);
+  // Labels amigáveis para densidade (IDs internos preservados pra compatibilidade
+  // com docs salvos). "1/1, 1/2..." era abstrato — "Denso/Balanceado/Minimal"
+  // comunica intenção direta.
+  const DENSITY_FRIENDLY = useMemo(() => ({
+    '1_1': 'Denso',
+    '1_2': 'Balanceado',
+    '1_3': 'Médio',
+    '1_4': 'Minimal',
+    '1_5': 'Mínimo',
+  }), []);
+
   useEffect(()=>{ if(open){ setErr(''); if(defaultTopic) setTopic(defaultTopic); } },[open,defaultTopic]);
   useEffect(()=>{ if(defaultNiche) setNiche(defaultNiche); },[defaultNiche]);
   useEffect(()=>{ if(defaultAudience) setAudience(defaultAudience); },[defaultAudience]);
@@ -8266,6 +8355,11 @@ function GenerateModal({
     if (hasContextPack) return 'Conteúdo baseado no material de referência e na identidade da marca.';
     return '';
   })();
+
+  // Step 1 exige tema válido (resolvedGenerationTopic já cobre fallbacks
+  // de nicho/contexto). Demais steps liberados — usuário pode revisar valores
+  // default e seguir adiante.
+  const canProceed = step === 1 ? !!resolvedGenerationTopic : true;
 
   if (!open) return null;
 
@@ -8315,7 +8409,7 @@ function GenerateModal({
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
-          flexShrink: 0, background:'var(--bg-sidebar)', zIndex: 1,
+          flexShrink: 0, background:'var(--bg-sidebar)', zIndex: 2,
         }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{
@@ -8326,7 +8420,7 @@ function GenerateModal({
             </div>
             <div>
               <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Configurar carrossel</div>
-              <div className="vc-eyebrow">Geração com IA</div>
+              <div className="vc-eyebrow">Passo {step} de {STEPS.length} · {STEPS[step-1].label}</div>
             </div>
           </div>
           <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
@@ -8334,521 +8428,621 @@ function GenerateModal({
           </button>
         </div>
 
+        {/* Stepper — clicável apenas pra steps já alcançados; avanço é controlado
+            pelo Continuar (que valida campos obrigatórios). */}
+        <div role="tablist" aria-label="Etapas do wizard" style={{
+          display:'flex', gap:4, padding:'10px 14px',
+          borderBottom:'1px solid var(--border)',
+          background:'var(--bg-sidebar)', flexShrink:0, zIndex:1,
+          overflowX:'auto',
+        }}>
+          {STEPS.map((s) => {
+            const isActive = s.id === step;
+            const isCompleted = s.id < step;
+            const isClickable = s.id <= step;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`gen-step-${s.id}`}
+                disabled={!isClickable || busy}
+                onClick={() => isClickable && setStep(s.id)}
+                style={{
+                  flex:'1 1 0', minWidth:90, minHeight:44,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  padding:'8px 10px', borderRadius:11,
+                  border:`1px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+                  background: isActive ? 'var(--accent-surface)' : 'transparent',
+                  cursor: isClickable ? 'pointer' : 'not-allowed',
+                  fontFamily:'var(--font-ui)',
+                  transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s',
+                  opacity: !isClickable ? 0.45 : 1,
+                }}
+              >
+                <span style={{
+                  width:22, height:22, borderRadius:'50%',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  background: (isActive || isCompleted) ? 'var(--accent)' : 'var(--bg-pearl)',
+                  color: (isActive || isCompleted) ? '#fff' : 'var(--text-muted)',
+                  fontSize:11, fontWeight:700, flexShrink:0,
+                  border: `1px solid ${(isActive || isCompleted) ? 'var(--accent)' : 'var(--hairline)'}`,
+                  fontVariantNumeric:'tabular-nums',
+                }}>
+                  {isCompleted ? <Check size={12} strokeWidth={3}/> : s.id}
+                </span>
+                <span style={{
+                  fontSize:12,
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  letterSpacing:'-0.011em', whiteSpace:'nowrap',
+                }}>{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div
           className="vc-modal-scroll-body"
+          id={`gen-step-${step}`}
+          role="tabpanel"
           style={{
             display: 'flex',
             flexDirection: 'column',
             gap: 18,
             padding: '16px 20px',
-            paddingBottom: 'max(36px, env(safe-area-inset-bottom, 0px))',
+            paddingBottom: 24,
           }}
         >
-          {onGoToMaterial && (
-            <div
-              role="region"
-              aria-label="Conteúdo para geração"
-              style={{
-                borderRadius:11,
-                border:'1px solid var(--hairline)',
-                background:'var(--bg-pearl)',
-                padding:'12px 14px',
-                display:'flex',
-                flexDirection:'column',
-                gap:10,
-              }}
-            >
-              <div style={{ fontSize:13, lineHeight:1.47, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
-                {hasMaterialPack ? (
-                  <>
-                    <span style={{ fontWeight:600 }}>Conteúdo</span>
-                    {' '}já tem base — você pode ajustar matéria-prima, fontes e instruções na aba Conteúdo quando quiser.
-                  </>
-                ) : (
-                  <>
-                    Vai gerar só pelo tema abaixo? Para basear o carrossel em{' '}
-                    <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preencha primeiro a aba{' '}
-                    <span style={{ fontWeight:600 }}>Conteúdo</span> — assim a IA não inventa em cima de um ponto genérico.
-                  </>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onGoToMaterial();
-                  onClose();
-                }}
-                style={{
-                  alignSelf:'flex-start',
-                  minHeight:44,
-                  padding:'0 20px',
-                  borderRadius:9999,
-                  border:'none',
-                  background:'var(--accent)',
-                  color:'#fff',
-                  fontSize:13,
-                  fontWeight:600,
-                  fontFamily:'var(--font-ui)',
-                  letterSpacing:'-0.011em',
-                  cursor:'pointer',
-                  transition:'transform 0.1s var(--ease-smooth)',
-                }}
-                onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-                onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-              >
-                Ir para a aba Conteúdo
-              </button>
-            </div>
-          )}
-          {/* Pacote criativo — primeiro: define se há camada editorial fixa ou fluxo personalizado */}
-          <div>
-            <label className="vc-label">Pacote criativo da IA</label>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {CREATIVE_PRESETS.map((p) => {
-                const on = packCreative === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPackCreative(p.id)}
-                    style={{
-                      textAlign:'left', padding:'12px 14px', borderRadius:11,
-                      border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                      background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
-                      cursor:'pointer', transition:'border-color 0.12s',
-                    }}
-                  >
-                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>{p.label}</div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4, lineHeight:1.4 }}>{p.desc}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Topic */}
-          <div>
-            <label className="vc-label">
-              Sobre o que é o conteúdo?
-            </label>
-            <textarea
-              value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
-              placeholder="Ex: como freelancers usam IA para triplicar a produtividade sem estresse"
-              className="vc-input vc-textarea"
-            />
-            {/* B2: Hooks salvos pra este nicho — clicar preenche o tema */}
-            {(() => {
-              const suggestions = getHooksForNiche(hookLibrary, niche, 3);
-              if (suggestions.length === 0) return null;
-              return (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <Bookmark size={10} aria-hidden/>
-                    Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {suggestions.map(h => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => setTopic(h.hook)}
-                        title={`Usado ${h.usageCount}× · salvo ${new Date(h.savedAt).toLocaleDateString('pt-BR')}`}
-                        style={{
-                          textAlign: 'left', padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
-                          background: 'var(--bg-card)', border: '1px solid var(--border)',
-                          color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
-                          letterSpacing: '-0.011em', lineHeight: 1.4,
-                          transition: 'border-color 0.12s, color 0.12s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                      >
-                        {h.hook}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-            {hasContextPack && (
-              <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
-                {modoPersonalizado ? (
-                  <>Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.</>
-                ) : (
-                  <>
-                    {isQuickTemplatePreset(packCreative) ? (
+          {/* ═══════════ STEP 1 — IDEIA ═══════════
+              Pacote criativo, tema, hooks salvos. Personalizado expõe modo
+              narrativo, nicho, público. Outros pacotes mostram aviso explicando
+              estrutura fixa. */}
+          {step === 1 && (
+            <>
+              {onGoToMaterial && (
+                <div
+                  role="region"
+                  aria-label="Conteúdo para geração"
+                  style={{
+                    borderRadius:11,
+                    border:'1px solid var(--hairline)',
+                    background:'var(--bg-pearl)',
+                    padding:'12px 14px',
+                    display:'flex',
+                    flexDirection:'column',
+                    gap:10,
+                  }}
+                >
+                  <div style={{ fontSize:13, lineHeight:1.47, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
+                    {hasMaterialPack ? (
                       <>
-                        O pacote <span style={{ fontWeight:600 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span> segue o arco dos Templates prontos — use este campo ou Marca/Conteúdo como fonte do tema.
+                        <span style={{ fontWeight:600 }}>Conteúdo</span>
+                        {' '}já tem base — você pode ajustar matéria-prima, fontes e instruções na aba Conteúdo quando quiser.
                       </>
                     ) : (
                       <>
-                        O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.
+                        Vai gerar só pelo tema abaixo? Para basear o carrossel em{' '}
+                        <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preencha primeiro a aba{' '}
+                        <span style={{ fontWeight:600 }}>Conteúdo</span> — assim a IA não inventa em cima de um ponto genérico.
                       </>
                     )}
-                  </>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { onGoToMaterial(); onClose(); }}
+                    style={{
+                      alignSelf:'flex-start', minHeight:44, padding:'0 20px',
+                      borderRadius:9999, border:'none', background:'var(--accent)',
+                      color:'#fff', fontSize:13, fontWeight:600,
+                      fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                      cursor:'pointer', transition:'transform 0.1s var(--ease-smooth)',
+                    }}
+                    onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                    onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  >
+                    Ir para a aba Conteúdo
+                  </button>
+                </div>
+              )}
+
+              {/* Pacote criativo — primeiro: define se há camada editorial fixa ou fluxo personalizado */}
+              <div>
+                <label className="vc-label">Pacote criativo da IA</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {CREATIVE_PRESETS.map((p) => {
+                    const on = packCreative === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPackCreative(p.id)}
+                        style={{
+                          textAlign:'left', padding:'12px 14px', borderRadius:11,
+                          border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                          background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
+                          cursor:'pointer', transition:'border-color 0.12s',
+                        }}
+                      >
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>{p.label}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4, lineHeight:1.4 }}>{p.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Topic */}
+              <div>
+                <label className="vc-label">Sobre o que é o conteúdo?</label>
+                <textarea
+                  value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
+                  placeholder="Ex: como freelancers usam IA para triplicar a produtividade sem estresse"
+                  className="vc-input vc-textarea"
+                />
+                {/* B2: Hooks salvos pra este nicho — clicar preenche o tema */}
+                {(() => {
+                  const suggestions = getHooksForNiche(hookLibrary, niche, 3);
+                  if (suggestions.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Bookmark size={10} aria-hidden/>
+                        Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {suggestions.map(h => (
+                          <button
+                            key={h.id}
+                            type="button"
+                            onClick={() => setTopic(h.hook)}
+                            title={`Usado ${h.usageCount}× · salvo ${new Date(h.savedAt).toLocaleDateString('pt-BR')}`}
+                            style={{
+                              textAlign: 'left', padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                              background: 'var(--bg-card)', border: '1px solid var(--border)',
+                              color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
+                              letterSpacing: '-0.011em', lineHeight: 1.4,
+                              transition: 'border-color 0.12s, color 0.12s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                          >
+                            {h.hook}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {hasContextPack && (
+                  <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
+                    {modoPersonalizado ? (
+                      <>Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.</>
+                    ) : (
+                      <>
+                        {isQuickTemplatePreset(packCreative) ? (
+                          <>O pacote <span style={{ fontWeight:600 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span> segue o arco dos Templates prontos — use este campo ou Marca/Conteúdo como fonte do tema.</>
+                        ) : (
+                          <>O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.</>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Modo narrativo, público-alvo e tom — só fazem parte do fluxo Personalizado */}
-          {modoPersonalizado && (
-          <>
-          <ModePicker value={mode} onChange={setMode}/>
-          <ReferenceProfilesCuradoria material={material} setMaterial={setMaterial} />
-          <div
-            aria-live="polite"
-            style={{
-              fontSize:11,
-              color:'var(--text-muted)',
-              lineHeight:1.47,
-              letterSpacing:'-0.011em',
-              padding:'8px 10px',
-              background:'var(--bg-pearl)',
-              borderRadius:11,
-              border:'1px solid var(--hairline)',
-            }}
-          >
-            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Será aplicado ao gerar:</span>{' '}
-            <span style={{ display:'inline-flex', alignItems:'center', gap:6, verticalAlign:'middle' }}>
-              {(() => {
-                const ModeIc = GEN_MODE_BY_ID[mode]?.Icon;
-                return ModeIc ? <ModeIc size={13} strokeWidth={2} style={{ color:'var(--text-secondary)', flexShrink:0 }} /> : null;
-              })()}
-              {GEN_MODE_BY_ID[mode]?.label}
-            </span>
-            {' · '}
-            <span>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
-            {' · '}
-            <span>Densidade {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity}</span>
-          </div>
+              {/* Modo narrativo, público-alvo, nicho — só fazem parte do fluxo Personalizado */}
+              {modoPersonalizado && (
+                <>
+                  <ModePicker value={mode} onChange={setMode}/>
+                  <ReferenceProfilesCuradoria material={material} setMaterial={setMaterial} />
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <div>
+                      <label className="vc-label">Nicho</label>
+                      <input value={niche} onChange={e=>setNiche(e.target.value)} placeholder="Ex: marketing digital" className="vc-input"/>
+                    </div>
+                    <div>
+                      <label className="vc-label">Para quem?</label>
+                      <input value={audience} onChange={e=>setAudience(e.target.value)} placeholder="Ex: empreendedores" className="vc-input"/>
+                    </div>
+                  </div>
+                </>
+              )}
 
-          {/* Niche + Audience */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <label className="vc-label">Nicho</label>
-              <input value={niche} onChange={e=>setNiche(e.target.value)} placeholder="Ex: marketing digital" className="vc-input"/>
-            </div>
-            <div>
-              <label className="vc-label">Para quem?</label>
-              <input value={audience} onChange={e=>setAudience(e.target.value)} placeholder="Ex: empreendedores" className="vc-input"/>
-            </div>
-          </div>
-          </>
+              {!modoPersonalizado && (
+                <div
+                  aria-live="polite"
+                  style={{
+                    fontSize:11, color:'var(--text-muted)', lineHeight:1.47, letterSpacing:'-0.011em',
+                    padding:'10px 12px', background:'var(--bg-pearl)',
+                    borderRadius:11, border:'1px solid var(--hairline)',
+                  }}
+                >
+                  <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>
+                    {isQuickTemplatePreset(packCreative)
+                      ? `Pacote ${CREATIVE_PRESET_BY_ID[packCreative]?.label}:`
+                      : 'Pacote Tendência/Cultura:'}
+                  </span>{' '}
+                  {isQuickTemplatePreset(packCreative)
+                    ? 'estrutura de arco fixa (Templates prontos). Modo narrativo, nicho e público não são escolhidos — ajuste o tema acima, tom na Marca e a densidade nos próximos passos.'
+                    : 'estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho e público-alvo do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto no próximo passo.'}
+                </div>
+              )}
+            </>
           )}
 
-          {!modoPersonalizado && (
-          <div
-            aria-live="polite"
-            style={{
-              fontSize:11,
-              color:'var(--text-muted)',
-              lineHeight:1.47,
-              letterSpacing:'-0.011em',
-              padding:'10px 12px',
-              background:'var(--bg-pearl)',
-              borderRadius:11,
-              border:'1px solid var(--hairline)',
-            }}
-          >
-            <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>
-              {isQuickTemplatePreset(packCreative)
-                ? `Pacote ${CREATIVE_PRESET_BY_ID[packCreative]?.label}:`
-                : 'Pacote Tendência/Cultura:'}
-            </span>{' '}
-            {isQuickTemplatePreset(packCreative)
-              ? 'estrutura de arco fixa (Templates prontos). Modo narrativo, nicho e público não são escolhidos — ajuste o tema acima, tom na Marca e a densidade abaixo.'
-              : 'estrutura de arco e regras de texto vêm definidas pelo pacote. Modo narrativo, nicho e público-alvo do fluxo Personalizado não são usados aqui — ajuste o tema acima e a densidade de texto logo abaixo.'}
-            {' '}
-            <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>
-              · {SLIDE_TEXT_DENSITY_BY_ID[textDensity]?.label || textDensity} ({CREATIVE_PRESET_BY_ID[packCreative]?.label})
-            </span>
-          </div>
+          {/* ═══════════ STEP 2 — FORMATO ═══════════
+              Número de cards, densidade de texto (labels amigáveis), estilo
+              visual da foto. Tudo que não muda a "história" mas afeta o look. */}
+          {step === 2 && (
+            <>
+              {/* Slide count primeiro — decisão mais imediata pro usuário */}
+              <div>
+                <label className="vc-label">Número de cards</label>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {[3,4,5,6,7,8,9,10].map(n=>(
+                    <button key={n} onClick={()=>setCount(n)} style={{
+                      width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
+                      cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
+                      fontVariantNumeric:'tabular-nums',
+                      transition:'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                      background: count===n ? 'var(--accent)' : 'var(--bg-pearl)',
+                      border: `1px solid ${count===n ? 'var(--accent)' : 'var(--hairline)'}`,
+                      color: count===n ? '#fff' : 'var(--text-primary)',
+                    }}>{n}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Densidade de texto — labels amigáveis (DENSITY_FRIENDLY). ID interno
+                  preservado pra compat com docs salvos. */}
+              <div>
+                <label className="vc-label" id="slide-text-density-label">Texto por card</label>
+                <div
+                  role="group"
+                  aria-labelledby="slide-text-density-label"
+                  style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}
+                >
+                  {SLIDE_TEXT_DENSITY_OPTIONS.map((opt) => {
+                    const on = textDensity === opt.id;
+                    const friendly = DENSITY_FRIENDLY[opt.id] || opt.label;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setTextDensity(opt.id)}
+                        style={{
+                          minWidth: 86, height: 44, padding: '0 14px',
+                          borderRadius: 11, fontSize: 13, fontWeight: 600,
+                          cursor: 'pointer', fontFamily: 'var(--font-ui)',
+                          letterSpacing: '-0.011em',
+                          transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                          background: on ? 'var(--accent)' : 'var(--bg-pearl)',
+                          border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                          color: on ? '#fff' : 'var(--text-primary)',
+                        }}
+                      >
+                        {friendly}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{
+                  fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.47,
+                  letterSpacing: '-0.011em', marginTop: 4,
+                }}>
+                  {SLIDE_TEXT_DENSITY_OPTIONS.find(o => o.id === textDensity)?.desc}
+                  {' '}
+                  Valores menores geram menos caracteres nos subtítulos ao usar IA (geração e refinamento).
+                </div>
+              </div>
+
+              {/* Estilo visual da foto vs texto (layout clássico) */}
+              <div>
+                <label className="vc-label" id="card-visual-style-label">Estilo dos cards</label>
+                <div
+                  role="group"
+                  aria-labelledby="card-visual-style-label"
+                  style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}
+                >
+                  {CARD_VISUAL_STYLE_OPTIONS.map((opt) => {
+                    const on = cardStyle === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        aria-pressed={on}
+                        title={`${opt.short}: ${opt.desc}`}
+                        onClick={() => setCardStyle(opt.id)}
+                        style={{
+                          minWidth: 72, minHeight: 76, padding: '8px 6px',
+                          borderRadius: 11, cursor: 'pointer',
+                          display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', gap: 4,
+                          transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
+                          background: on ? 'var(--accent)' : 'var(--bg-pearl)',
+                          border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                          color: on ? '#fff' : 'var(--text-primary)',
+                        }}
+                      >
+                        <PhotoRegionMiniIcon regionId={opt.id} active={on} />
+                        <span style={{
+                          fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                          letterSpacing: '0.06em', textTransform: 'uppercase',
+                          textAlign: 'center', lineHeight: 1.15, maxWidth: 68,
+                        }}>{opt.short}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{
+                  fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.47,
+                  letterSpacing: '-0.011em', marginTop: 4,
+                }}>
+                  {CARD_VISUAL_STYLE_OPTIONS.find((o) => o.id === cardStyle)?.desc}{' '}
+                  Aplica-se ao layout clássico (sem canvas no card). Pacotes Cultura podem alterar alguns slides (sanduíche / tela cheia).
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Densidade de texto por card (1/1 … 1/5) */}
-          <div>
-            <label className="vc-label" id="slide-text-density-label">Texto por card</label>
-            <div
-              role="group"
-              aria-labelledby="slide-text-density-label"
-              style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}
-            >
-              {SLIDE_TEXT_DENSITY_OPTIONS.map((opt) => {
-                const on = textDensity === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setTextDensity(opt.id)}
-                    style={{
-                      minWidth: 44,
-                      height: 44,
-                      padding: '0 12px',
-                      borderRadius: 11,
-                      fontSize: 15,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'var(--font-ui)',
-                      letterSpacing: '-0.014em',
-                      fontVariantNumeric: 'tabular-nums',
-                      transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
-                      background: on ? 'var(--accent)' : 'var(--bg-pearl)',
-                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                      color: on ? '#fff' : 'var(--text-primary)',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--text-muted)',
-                lineHeight: 1.47,
-                letterSpacing: '-0.011em',
-                marginTop: 4,
-              }}
-            >
-              {SLIDE_TEXT_DENSITY_OPTIONS.find(o => o.id === textDensity)?.desc}
-              {' '}
-              Valores menores geram menos caracteres nos subtítulos ao usar IA (geração e refinamento).
-            </div>
-          </div>
-
-          {/* Estilo visual da foto vs texto (layout clássico) */}
-          <div>
-            <label className="vc-label" id="card-visual-style-label">
-              Estilo dos cards
-            </label>
-            <div
-              role="group"
-              aria-labelledby="card-visual-style-label"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}
-            >
-              {CARD_VISUAL_STYLE_OPTIONS.map((opt) => {
-                const on = cardStyle === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    aria-pressed={on}
-                    title={`${opt.short}: ${opt.desc}`}
-                    onClick={() => setCardStyle(opt.id)}
-                    style={{
-                      minWidth: 72,
-                      minHeight: 76,
-                      padding: '8px 6px',
-                      borderRadius: 11,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 4,
-                      transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
-                      background: on ? 'var(--accent)' : 'var(--bg-pearl)',
-                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                      color: on ? '#fff' : 'var(--text-primary)',
-                    }}
-                  >
-                    <PhotoRegionMiniIcon regionId={opt.id} active={on} />
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 600,
-                        fontFamily: 'var(--font-mono)',
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        textAlign: 'center',
-                        lineHeight: 1.15,
-                        maxWidth: 68,
-                      }}
-                    >
-                      {opt.short}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--text-muted)',
-                lineHeight: 1.47,
-                letterSpacing: '-0.011em',
-                marginTop: 4,
-              }}
-            >
-              {CARD_VISUAL_STYLE_OPTIONS.find((o) => o.id === cardStyle)?.desc}{' '}
-              Aplica-se ao layout clássico (sem canvas no card). Pacotes Cultura podem alterar alguns slides (sanduíche / tela cheia).
-            </div>
-          </div>
-
-          {/* Slide count */}
-          <div>
-            <label className="vc-label">Número de Cards</label>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {[3,4,5,6,7,8,9,10].map(n=>(
-                <button key={n} onClick={()=>setCount(n)} style={{
-                  width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
-                  cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
-                  fontVariantNumeric:'tabular-nums',
-                  transition:'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
-                  background: count===n ? 'var(--accent)' : 'var(--bg-pearl)',
-                  border: `1px solid ${count===n ? 'var(--accent)' : 'var(--hairline)'}`,
-                  color: count===n ? '#fff' : 'var(--text-primary)',
-                }}>{n}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Imagens — só GPT Image (busca stock tipo “Web trend” desativada até novo método). */}
-          <div>
-            <label className="vc-label">Imagens dos Cards</label>
-            {hasOpenAI ? (
-              <div style={{
-                padding:'10px 12px', borderRadius:8, border:'1.5px solid var(--accent)',
-                background:'var(--accent-surface-strong)', position:'relative',
-              }}>
-                <span style={{
-                  position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
-                  background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
-                  letterSpacing:'-0.011em',
-                }}>Ativo</span>
-                <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
-                  GPT Image 2
-                </div>
-                <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                  OpenAI · geração a partir do tema e das palavras-chave de cada slide
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                fontSize:13, color:'var(--text-secondary)', background:'var(--bg-pearl)',
-                border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
-                fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
-              }}>
-                A geração automática de fundos usa <b>GPT Image 2</b>. Sem chave OpenAI, o carrossel sai com texto e palavras-chave de imagem; depois use Upload ou URL em cada card.
-              </div>
-            )}
-            {!hasOpenAI && (
-              <div style={{
-                marginTop:8, fontSize:13, color:'var(--text-secondary)', background:'var(--accent-surface)',
-                border:'1px solid rgba(0,0,0,0.14)', borderRadius:8, padding:'10px 12px',
-                fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', lineHeight:1.47,
-                display:'flex', flexDirection:'column', gap:8,
-              }}>
-                <div>
-                  Para usar <b>GPT Image 2</b> (OpenAI · foto-realismo), defina a chave OpenAI nas definições.
-                  Custo aproximado: ~US$0.13 por imagem em qualidade <code>high</code>.
-                </div>
-                {onOpenKeys && (
-                  <button
-                    type="button"
-                    onClick={() => { onClose(); setTimeout(onOpenKeys, 80); }}
-                    style={{
-                      alignSelf:'flex-start',
-                      background:'var(--accent)', color:'#fff', border:'none',
-                      borderRadius:6, padding:'6px 12px', fontSize:11, fontWeight:600,
-                      cursor:'pointer', fontFamily:'var(--font-ui)',
-                      display:'flex', alignItems:'center', gap:6,
-                    }}
-                  >
-                    <Settings size={12}/> Configurar chave OpenAI
-                  </button>
+          {/* ═══════════ STEP 3 — IMAGENS ═══════════
+              Status do provedor + ajuste dos eixos (fidelidade, criatividade,
+              irreverência, objetividade). Sem chave OpenAI, só mostra o CTA
+              pra configurar e explica o fallback. */}
+          {step === 3 && (
+            <>
+              <div>
+                <label className="vc-label">Imagens dos Cards</label>
+                {hasOpenAI ? (
+                  <div style={{
+                    padding:'10px 12px', borderRadius:8, border:'1.5px solid var(--accent)',
+                    background:'var(--accent-surface-strong)', position:'relative',
+                  }}>
+                    <span style={{
+                      position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
+                      background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
+                      letterSpacing:'-0.011em',
+                    }}>Ativo</span>
+                    <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
+                      GPT Image 2
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+                      OpenAI · geração a partir do tema e das palavras-chave de cada slide
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize:13, color:'var(--text-secondary)', background:'var(--bg-pearl)',
+                    border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
+                    fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
+                  }}>
+                    A geração automática de fundos usa <b>GPT Image 2</b>. Sem chave OpenAI, o carrossel sai com texto e palavras-chave de imagem; depois use Upload ou URL em cada card. Você pode seguir com <b>Só texto</b> no último passo.
+                  </div>
+                )}
+                {!hasOpenAI && (
+                  <div style={{
+                    marginTop:8, fontSize:13, color:'var(--text-secondary)', background:'var(--accent-surface)',
+                    border:'1px solid rgba(0,0,0,0.14)', borderRadius:8, padding:'10px 12px',
+                    fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', lineHeight:1.47,
+                    display:'flex', flexDirection:'column', gap:8,
+                  }}>
+                    <div>
+                      Para usar <b>GPT Image 2</b> (OpenAI · foto-realismo), defina a chave OpenAI nas definições.
+                      Custo aproximado: ~US$0.13 por imagem em qualidade <code>high</code>.
+                    </div>
+                    {onOpenKeys && (
+                      <button
+                        type="button"
+                        onClick={() => { onClose(); setTimeout(onOpenKeys, 80); }}
+                        style={{
+                          alignSelf:'flex-start',
+                          background:'var(--accent)', color:'#fff', border:'none',
+                          borderRadius:6, padding:'6px 12px', fontSize:11, fontWeight:600,
+                          cursor:'pointer', fontFamily:'var(--font-ui)',
+                          display:'flex', alignItems:'center', gap:6,
+                        }}
+                      >
+                        <Settings size={12}/> Configurar chave OpenAI
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Direção da imagem — eixos só alteram prompts do GPT Image (geração). */}
-          {hasOpenAI && (
-            <ImgParamsPanel value={params} onChange={setAxis} />
+              {/* Eixos só alteram prompts do GPT Image (geração). */}
+              {hasOpenAI && (
+                <ImgParamsPanel value={params} onChange={setAxis} />
+              )}
+            </>
           )}
 
-          {/* Resumo de contexto que será injetado no prompt — feedback claro pro user */}
-          {((brandSummary && brandSummary.length) || (materialSummary && materialSummary.length)) && (
-            <div style={{
-              fontSize:13, color:'var(--text-secondary)', background:'var(--success-surface)',
-              border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
-              fontFamily:'var(--font-ui)', lineHeight:1.5,
-            }}>
-              <div style={{ fontWeight:600, color:'var(--success-text)', marginBottom:6, fontSize:12, letterSpacing:'-0.011em' }}>
-                Contexto aplicado nesta geração
+          {/* ═══════════ STEP 4 — REVISÃO ═══════════
+              Recap das escolhas + contexto aplicado + erros. Botões de gerar
+              vivem no footer fixo, mas mostramos aqui o hint do que cada um faz. */}
+          {step === 4 && (
+            <>
+              {/* Recap das escolhas — comunicação clara antes do clique final */}
+              <div style={{
+                padding:'14px 16px', borderRadius:11,
+                border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
+                display:'flex', flexDirection:'column', gap:10,
+              }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'0.04em', textTransform:'uppercase' }}>
+                  Pronto pra gerar
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'minmax(0,auto) 1fr', columnGap:14, rowGap:8, fontSize:13, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', alignItems:'center' }}>
+                  <span style={{ color:'var(--text-muted)' }}>Tema</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
+                    {resolvedGenerationTopic.length > 100
+                      ? `${resolvedGenerationTopic.slice(0, 100)}…`
+                      : resolvedGenerationTopic}
+                  </span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Pacote</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
+
+                  {modoPersonalizado && (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Modo narrativo</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500, display:'inline-flex', alignItems:'center', gap:6 }}>
+                        {(() => {
+                          const ModeIc = GEN_MODE_BY_ID[mode]?.Icon;
+                          return ModeIc ? <ModeIc size={13} strokeWidth={2} style={{ color:'var(--text-secondary)', flexShrink:0 }} /> : null;
+                        })()}
+                        {GEN_MODE_BY_ID[mode]?.label}
+                      </span>
+                    </>
+                  )}
+
+                  <span style={{ color:'var(--text-muted)' }}>Cards</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{count}</span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Densidade</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{DENSITY_FRIENDLY[textDensity] || textDensity}</span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Estilo</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CARD_VISUAL_STYLE_OPTIONS.find(o=>o.id===cardStyle)?.short}</span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Imagens</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
+                    {hasOpenAI ? 'GPT Image 2 (OpenAI)' : 'Só palavras-chave (sem OpenAI)'}
+                  </span>
+                </div>
               </div>
-              {brandSummary && brandSummary.length > 0 && (
-                <div>Marca: {brandSummary.join(', ')}</div>
-              )}
-              {materialSummary && materialSummary.length > 0 && (
-                <div>Conteúdo: {materialSummary.join(', ')}</div>
-              )}
-            </div>
-          )}
 
-          {err && (
-            <div style={{
-              fontSize:13, color:'#c5251c', background:'rgba(255,59,48,0.10)', letterSpacing:'-0.011em',
-              border:'1px solid #7f1d1d', borderRadius:8, padding:'10px 14px',
-              fontFamily:'var(--font-ui)',
-            }}>{err}</div>
-          )}
+              {/* Contexto que será injetado no prompt — feedback claro pro user */}
+              {((brandSummary && brandSummary.length) || (materialSummary && materialSummary.length)) && (
+                <div style={{
+                  fontSize:13, color:'var(--text-secondary)', background:'var(--success-surface)',
+                  border:'1px solid var(--success-border)', borderRadius:8, padding:'10px 12px', letterSpacing:'-0.011em',
+                  fontFamily:'var(--font-ui)', lineHeight:1.5,
+                }}>
+                  <div style={{ fontWeight:600, color:'var(--success-text)', marginBottom:6, fontSize:12, letterSpacing:'-0.011em' }}>
+                    Contexto aplicado nesta geração
+                  </div>
+                  {brandSummary && brandSummary.length > 0 && (
+                    <div>Marca: {brandSummary.join(', ')}</div>
+                  )}
+                  {materialSummary && materialSummary.length > 0 && (
+                    <div>Conteúdo: {materialSummary.join(', ')}</div>
+                  )}
+                </div>
+              )}
 
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'stretch' }}>
-            <button onClick={onClose} disabled={busy} className="vc-btn vc-btn-ghost" style={{ height:44, padding:'0 16px' }}>Voltar</button>
-            {/* Botão primário: gera texto + imagens DALL-E. Disabled se sem OpenAI. */}
+              {/* Hint pros 2 botões do footer */}
+              <div style={{
+                fontSize:11, color:'var(--text-muted)', lineHeight:1.47, letterSpacing:'-0.011em',
+                padding:'10px 12px', borderRadius:11, border:'1px solid var(--hairline)', background:'var(--bg-card)',
+              }}>
+                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos OpenAI.
+                {' '}
+                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> rápido — você gera as imagens depois, card a card.
+              </div>
+
+              {err && (
+                <div style={{
+                  fontSize:13, color:'#c5251c', background:'rgba(255,59,48,0.10)', letterSpacing:'-0.011em',
+                  border:'1px solid #7f1d1d', borderRadius:8, padding:'10px 14px',
+                  fontFamily:'var(--font-ui)',
+                }}>{err}</div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ═══════════ FOOTER FIXO ═══════════
+            Voltar/Cancelar à esquerda, Continuar (steps 1-3) ou Gerar (step 4)
+            à direita. Continuar valida canProceed; em step 4 mostra 2 botões
+            de geração com mesma lógica de disabled da versão antiga. */}
+        <div style={{
+          display:'flex', gap:8, padding:'14px 20px',
+          borderTop:'1px solid var(--border)',
+          background:'var(--bg-sidebar)', flexShrink:0,
+          paddingBottom:'max(14px, env(safe-area-inset-bottom, 0px))',
+          alignItems:'center', flexWrap:'wrap',
+        }}>
+          <button
+            onClick={step === 1 ? onClose : () => setStep(step - 1)}
+            disabled={busy}
+            className="vc-btn vc-btn-ghost"
+            style={{ height:44, padding:'0 16px', display:'inline-flex', alignItems:'center', gap:6 }}
+          >
+            {step > 1 && <ChevronLeft size={15}/>}
+            {step === 1 ? 'Cancelar' : 'Voltar'}
+          </button>
+          <div style={{ flex:1 }}/>
+          {step < 4 && (
             <button
               type="button"
-              onClick={() => run({ withImages: true })}
-              disabled={busy || !resolvedGenerationTopic || !hasOpenAI}
-              title={!hasOpenAI ? 'Configure a chave OpenAI em ⚙ pra gerar imagens' : 'Gera texto E imagens IA (mais lento, custa créditos OpenAI)'}
+              onClick={() => canProceed && setStep(step + 1)}
+              disabled={!canProceed || busy}
+              title={!canProceed ? 'Informe o tema (ou nicho, ou contexto Marca/Conteúdo) para continuar' : 'Próximo passo'}
               style={{
-                flex: '1 1 200px', height: 44, borderRadius: 9999, border: 'none',
-                cursor: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'not-allowed' : 'pointer',
-                background: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--bg-pearl)' : 'var(--accent)',
-                color: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--text-muted)' : '#fff',
-                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                letterSpacing: '-0.014em',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                height:44, minWidth:160, padding:'0 22px', borderRadius:9999, border:'none',
+                cursor: (canProceed && !busy) ? 'pointer' : 'not-allowed',
+                background: (canProceed && !busy) ? 'var(--accent)' : 'var(--bg-pearl)',
+                color: (canProceed && !busy) ? '#fff' : 'var(--text-muted)',
+                fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                opacity: (canProceed && !busy) ? 1 : 0.6,
                 transition: 'background-color 0.15s var(--ease-smooth)',
-                opacity: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 0.6 : 1,
-                padding: '0 14px',
               }}
             >
-              {busy
-                ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
-                : <><Sparkles size={15}/>Gerar (texto + imagem)</>
-              }
+              Continuar <ChevronRight size={15}/>
             </button>
-            {/* Botão secundário: só texto + imageQuery. Mais rápido e barato. */}
-            <button
-              type="button"
-              onClick={() => run({ withImages: false })}
-              disabled={busy || !resolvedGenerationTopic}
-              title="Gera só texto e palavras-chave da imagem (rápido). Você pode gerar cada imagem depois no botão «Gerar imagem» do card."
-              style={{
-                flex: '1 1 180px', height: 44, borderRadius: 9999,
-                cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
-                background: 'var(--bg-pearl)',
-                color: 'var(--text-primary)',
-                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                letterSpacing: '-0.014em',
-                border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'border-color 0.15s, background 0.15s',
-                opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
-                padding: '0 14px',
-              }}
-              onMouseEnter={e => { if (!busy && resolvedGenerationTopic) e.currentTarget.style.borderColor = 'var(--accent)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-            >
-              <Sparkles size={15} style={{ color: 'var(--text-muted)' }}/>Gerar (só texto)
-            </button>
-          </div>
+          )}
+          {step === 4 && (
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
+              {/* Secundário: só texto + imageQuery. Rápido e barato. */}
+              <button
+                type="button"
+                onClick={() => run({ withImages: false })}
+                disabled={busy || !resolvedGenerationTopic}
+                title="Gera só texto e palavras-chave da imagem (rápido). Você pode gerar cada imagem depois no botão «Gerar imagem» do card."
+                style={{
+                  height:44, padding:'0 18px', borderRadius:9999,
+                  cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
+                  background: 'var(--bg-pearl)', color: 'var(--text-primary)',
+                  fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
+                  letterSpacing:'-0.014em', border:'1px solid var(--border)',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  transition:'border-color 0.15s, background 0.15s',
+                  opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
+                }}
+                onMouseEnter={e => { if (!busy && resolvedGenerationTopic) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+              >
+                <Sparkles size={15} style={{ color: 'var(--text-muted)' }}/>Só texto
+              </button>
+              {/* Primário: texto + imagens GPT Image. Disabled se sem OpenAI. */}
+              <button
+                type="button"
+                onClick={() => run({ withImages: true })}
+                disabled={busy || !resolvedGenerationTopic || !hasOpenAI}
+                title={!hasOpenAI ? 'Configure a chave OpenAI em ⚙ pra gerar imagens' : 'Gera texto E imagens IA (mais lento, custa créditos OpenAI)'}
+                style={{
+                  height:44, padding:'0 18px', borderRadius:9999, border:'none',
+                  cursor: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'not-allowed' : 'pointer',
+                  background: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--bg-pearl)' : 'var(--accent)',
+                  color: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--text-muted)' : '#fff',
+                  fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
+                  letterSpacing:'-0.014em',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  transition:'background-color 0.15s var(--ease-smooth)',
+                  opacity: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 0.6 : 1,
+                }}
+              >
+                {busy
+                  ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
+                  : <><Sparkles size={15}/>Texto + imagem</>
+                }
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -9608,18 +9802,35 @@ function SidebarContent({
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      {/* Tab bar */}
-      <div data-vc-tour="sidebar-tabs" style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+      {/* Tab bar — sub-nav. Polish: ícone 13 (era 11), aria-label,
+          aria-current, role=tab pra screen readers. */}
+      <div
+        data-vc-tour="sidebar-tabs"
+        role="tablist"
+        aria-label="Áreas de edição do projeto"
+        style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0 }}
+      >
         {[
           {id:'brand',    icon:Palette,  label:'Marca'},
           {id:'material', icon:BookOpen, label:'Conteúdo'},
           {id:'slide',    icon:Layout,   label:'Cards'},
-          {id:'ai',       icon:Wand2,    label:'Refinar'},
-        ].map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} className={`tab-bar-item ${tab===t.id?'active':''}`}>
-            <t.icon size={11}/>{t.label}
-          </button>
-        ))}
+          {id:'ai',       icon:Wand2,    label:'IA'},
+        ].map(t=>{
+          const active = tab===t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-current={active ? 'page' : undefined}
+              onClick={()=>setTab(t.id)}
+              className={`tab-bar-item ${active?'active':''}`}
+            >
+              <t.icon size={13} strokeWidth={active ? 2.25 : 2}/>{t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Scrollable body */}
@@ -9629,48 +9840,75 @@ function SidebarContent({
           <>
             <S
               title="Layout canvas"
-              hint="Ative zonas redimensionáveis na arte. Em seguida use o toggle para ver molduras no card; clique na área da foto para importar só ali. Arraste o pino de swap para trocar texto ou foto entre cards."
+              hint="Zonas redimensionáveis na arte. Ative primeiro abaixo; depois ligue o modo edição para ver molduras no card e clicar direto na área da foto. Pino de swap troca texto/foto entre cards."
             >
-              <Toggle
-                label="Modo edição de zonas (molduras no card)"
-                value={canvasEditMode}
-                onChange={(v) => {
-                  if (!anyCanvasEnabled) {
-                    toast?.('Ative primeiro o layout canvas com o botão abaixo.', 'info');
-                    return;
-                  }
-                  setCanvasEditMode(v);
-                }}
-              />
+              {/* Polish: CTA primário com fontWeight 600 + ícone (era 400 e
+                  parecia botão fantasma). Quando ativo, vira selo de sucesso
+                  com Check em vez de só trocar cor. Desativar fica como link
+                  sutil pra reduzir peso visual. Toggle vai pra baixo — só faz
+                  sentido depois de ativar. */}
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 <button
                   type="button"
                   onClick={enableCanvasLayout}
+                  disabled={anyCanvasEnabled}
                   style={{
-                    width:'100%', minHeight:36, borderRadius:9999, cursor:'pointer',
-                    border:`1px solid ${anyCanvasEnabled ? 'var(--success)' : 'var(--accent)'}`,
-                    background:anyCanvasEnabled ? 'var(--success)' : 'var(--accent)',
+                    width:'100%', minHeight:44, padding:'0 18px', borderRadius:9999,
+                    cursor: anyCanvasEnabled ? 'default' : 'pointer',
+                    border:`1px solid ${anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--accent)'}`,
+                    background: anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--accent)',
                     color:'#fff',
-                    fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
-                    transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                    fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                   }}
-                  onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                  onMouseDown={(e) => { if (!anyCanvasEnabled) e.currentTarget.style.transform = 'scale(0.97)'; }}
                   onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
-                  Ativar layout canvas em todos os cards
+                  {anyCanvasEnabled
+                    ? <><Check size={14} strokeWidth={2.5}/>Layout canvas ativo</>
+                    : <><Sparkles size={14}/>Ativar layout canvas</>}
                 </button>
-                <button
-                  type="button"
-                  onClick={disableCanvasLayout}
-                  style={{
-                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
-                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
-                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
+                {anyCanvasEnabled && (
+                  <button
+                    type="button"
+                    onClick={disableCanvasLayout}
+                    aria-label="Desativar layout canvas em todos os cards"
+                    style={{
+                      alignSelf:'center', minHeight:32, padding:'0 14px',
+                      cursor:'pointer', border:'none', background:'transparent',
+                      color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+                      letterSpacing:'-0.005em', textDecoration:'underline',
+                      textUnderlineOffset:'3px', textDecorationColor:'var(--hairline)',
+                      transition:'color 0.12s, text-decoration-color 0.12s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.textDecorationColor='var(--text-muted)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.textDecorationColor='var(--hairline)'; }}
+                  >
+                    Desativar layout canvas
+                  </button>
+                )}
+              </div>
+              {/* Toggle só faz sentido depois de ativar — fica desabilitado e
+                  com hint visual claro do porquê quando canvas está off. */}
+              <div style={{ opacity: anyCanvasEnabled ? 1 : 0.55, transition:'opacity 0.15s' }}>
+                <Toggle
+                  label="Modo edição de zonas (molduras no card)"
+                  value={canvasEditMode}
+                  onChange={(v) => {
+                    if (!anyCanvasEnabled) {
+                      toast?.('Ative primeiro o layout canvas com o botão acima.', 'info');
+                      return;
+                    }
+                    setCanvasEditMode(v);
                   }}
-                >
-                  Desativar layout canvas
-                </button>
+                />
+                {!anyCanvasEnabled && (
+                  <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, letterSpacing:'-0.005em' }}>
+                    Disponível depois de ativar o canvas.
+                  </div>
+                )}
               </div>
             </S>
 
@@ -9678,64 +9916,74 @@ function SidebarContent({
               title="Imagem — zona canvas"
               hint="Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do card. O primeiro ficheiro vai para o slide 1, o segundo para o slide 2, e assim por diante."
             >
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <button
-                  type="button"
-                  onClick={() => batchPhotoInputRef.current?.click()}
-                  style={{
-                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
-                    border:'1px solid var(--hairline)', background:'var(--bg-card)',
-                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  }}
-                >
-                  <Upload size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
-                  Importar em lote (slide 1 … N)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openPhotoZoneImport?.(activeIdx)}
-                  style={{
-                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
-                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
-                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  }}
-                >
-                  <ImageIcon size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
-                  Importar foto só neste slide (zona imagem)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPickVideo?.()}
-                  style={{
-                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
-                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
-                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  }}
-                  title="Importa um vídeo de fundo (MP4/MOV/WebM, máx 60 MB). Substitui foto se houver."
-                >
-                  <Video size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
-                  Importar vídeo neste slide
-                </button>
-                {slide.videoId ? (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveVideo?.()}
-                    style={{
-                      width:'100%', minHeight:30, borderRadius:9, cursor:'pointer',
-                      border:'1px solid var(--border)', background:'transparent',
-                      color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
-                      display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                    }}
-                  >
-                    <Trash2 size={12} aria-hidden/>
-                    Remover vídeo do slide
-                    {slide.videoName ? <span style={{ opacity:0.6, marginLeft:4 }}>({slide.videoName.slice(0, 18)}…)</span> : null}
-                  </button>
-                ) : null}
-              </div>
+              {/* Polish: 3 botões com mesmo padrão drop-zone (ícone num
+                  círculo accent + label primary + subtítulo). Hover puxa
+                  fundo accent-surface + borda accent. Visual e a11y unificados
+                  com os uploads da Marca. */}
+              {(() => {
+                const importBtnStyle = {
+                  width:'100%', minHeight:60, padding:'10px 14px', borderRadius:11,
+                  cursor:'pointer', border:'1px solid var(--hairline)',
+                  background:'var(--bg-card)', fontFamily:'var(--font-ui)',
+                  display:'flex', alignItems:'center', gap:12, textAlign:'left',
+                  transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
+                };
+                const importIconWrap = {
+                  width:30, height:30, borderRadius:'50%', flexShrink:0,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  background:'var(--accent-surface)', color:'var(--accent)',
+                };
+                const importTextWrap = { display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 };
+                const importTitle = { fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 };
+                const importSub = { fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em', lineHeight:1.35 };
+                const onEnter = e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='var(--accent-surface)'; };
+                const onLeave = e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; };
+                return (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    <button type="button" onClick={() => batchPhotoInputRef.current?.click()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                      <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
+                      <span style={importTextWrap}>
+                        <span style={importTitle}>Importar em lote</span>
+                        <span style={importSub}>Distribui um arquivo por slide na ordem (1 → N)</span>
+                      </span>
+                    </button>
+                    <button type="button" onClick={() => openPhotoZoneImport?.(activeIdx)} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                      <span style={importIconWrap} aria-hidden><ImageIcon size={14} strokeWidth={2.25}/></span>
+                      <span style={importTextWrap}>
+                        <span style={importTitle}>Importar foto neste slide</span>
+                        <span style={importSub}>Substitui só a zona de imagem do card {activeIdx + 1}</span>
+                      </span>
+                    </button>
+                    <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
+                      <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>
+                      <span style={importTextWrap}>
+                        <span style={importTitle}>Importar vídeo neste slide</span>
+                        <span style={importSub}>MP4 · MOV · WebM — até 60 MB · substitui a foto</span>
+                      </span>
+                    </button>
+                    {slide.videoId ? (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveVideo?.()}
+                        style={{
+                          alignSelf:'center', minHeight:32, padding:'0 14px',
+                          cursor:'pointer', border:'none', background:'transparent',
+                          color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+                          letterSpacing:'-0.005em',
+                          display:'inline-flex', alignItems:'center', gap:6,
+                          transition:'color 0.12s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color='var(--accent)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; }}
+                      >
+                        <Trash2 size={11} aria-hidden/>
+                        Remover vídeo do slide
+                        {slide.videoName ? <span style={{ opacity:0.6, marginLeft:4 }}>({slide.videoName.slice(0, 18)}…)</span> : null}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </S>
 
             {slide.bgImage ? (
@@ -10732,23 +10980,46 @@ function SidebarContent({
                   </div>
                 </div>
                 <div>
-                  <label className="vc-label-sm">Caixa</label>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                  <label className="vc-label-sm">Caixa do título</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                     {[
-                      { id:'normal', label:'Normal' },
-                      { id:'upper',  label:'AaA → AAA' },
-                      { id:'lower',  label:'AaA → aaa' },
-                    ].map(c => (
-                      <button key={c.id} type="button" onClick={()=>setBrand({ ...brand, textTitleCase: c.id })}
-                        style={{
-                          padding:'7px 4px', borderRadius:6, fontSize:10, cursor:'pointer',
-                          fontWeight:600, fontFamily:'var(--font-ui)', transition:'all 0.12s',
-                          background: (brand.textTitleCase ?? 'normal') === c.id ? 'var(--text-primary)' : 'var(--bg-card)',
-                          border: `1px solid ${(brand.textTitleCase ?? 'normal') === c.id ? 'transparent' : 'var(--border)'}`,
-                          color:    (brand.textTitleCase ?? 'normal') === c.id ? 'var(--bg-base)'  : 'var(--text-secondary)',
-                        }}
-                      >{c.label}</button>
-                    ))}
+                      // Preview-as-label: cada botão mostra "Ab" renderizado no caso real
+                      // — usuário vê o efeito antes de clicar. CSS textTransform faz o resto.
+                      { id:'normal', label:'Aa',   title:'Como digitado (Title case)',  cssCase:'none',      hint:'Como digitado' },
+                      { id:'upper',  label:'Aa',   title:'Tudo MAIÚSCULO',              cssCase:'uppercase', hint:'MAIÚSCULAS' },
+                      { id:'lower',  label:'Aa',   title:'tudo minúsculo',              cssCase:'lowercase', hint:'minúsculas' },
+                    ].map(c => {
+                      const on = (brand.textTitleCase ?? 'normal') === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={()=>setBrand({ ...brand, textTitleCase: c.id })}
+                          title={c.title}
+                          aria-label={c.title}
+                          aria-pressed={on}
+                          style={{
+                            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                            gap:2, padding:'8px 4px', borderRadius:8, cursor:'pointer',
+                            fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                            background: on ? 'var(--text-primary)' : 'var(--bg-card)',
+                            border: `1px solid ${on ? 'transparent' : 'var(--border)'}`,
+                            color:    on ? 'var(--bg-base)' : 'var(--text-secondary)',
+                          }}
+                        >
+                          {/* Preview tipográfico — o "Aa" é renderizado no caso real */}
+                          <span style={{
+                            fontSize:16, fontWeight:700, lineHeight:1, letterSpacing:'-0.02em',
+                            textTransform: c.cssCase,
+                          }}>{c.label}</span>
+                          <span style={{
+                            fontSize:9, fontFamily:'var(--font-mono)',
+                            letterSpacing:'0.04em', textTransform:'uppercase',
+                            opacity: on ? 0.85 : 0.6,
+                          }}>{c.hint}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -10985,19 +11256,43 @@ function SidebarContent({
                   </details>
                   </>
                 ) : (
+                  // Drop-zone do avatar do @: borda sólida hairline, ícone num
+                  // círculo accent-surface; hover puxa fundo accent-surface sem
+                  // mudar borda pra accent (evita o "tracejado vermelho" agressivo).
                   <label
                     style={{
-                      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                      height:56, borderRadius:9, cursor:'pointer', marginTop:4,
-                      background:'var(--bg-card)', border:'1px dashed var(--border)',
-                      color:'var(--text-secondary)', fontSize:12, fontWeight:600,
-                      fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                      display:'flex', alignItems:'center', gap:12,
+                      padding:'12px 14px', minHeight:60, borderRadius:11,
+                      cursor:'pointer', marginTop:6,
+                      background:'var(--bg-card)', border:'1px solid var(--hairline)',
+                      color:'var(--text-secondary)',
+                      fontFamily:'var(--font-ui)',
+                      transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                     }}
-                    onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
-                    onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                    onMouseEnter={e=>{
+                      e.currentTarget.style.borderColor='var(--accent)';
+                      e.currentTarget.style.background='var(--accent-surface)';
+                    }}
+                    onMouseLeave={e=>{
+                      e.currentTarget.style.borderColor='var(--hairline)';
+                      e.currentTarget.style.background='var(--bg-card)';
+                    }}
                   >
-                    <Upload size={13}/>
-                    Carregar foto (PNG / JPG / WebP · até 2MB)
+                    <span style={{
+                      width:32, height:32, borderRadius:'50%', flexShrink:0,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      background:'var(--accent-surface)', color:'var(--accent)',
+                    }} aria-hidden>
+                      <Upload size={14} strokeWidth={2.25}/>
+                    </span>
+                    <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+                        Carregar foto de perfil
+                      </span>
+                      <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                        PNG · JPG · WebP — até 2&nbsp;MB
+                      </span>
+                    </span>
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
@@ -11071,19 +11366,42 @@ function SidebarContent({
                   </button>
                 </div>
               ) : (
+                // Mesmo padrão drop-zone do avatar: borda sólida hairline,
+                // ícone num círculo accent, hover = fundo accent-surface.
                 <label
                   style={{
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                    height:64, borderRadius:9, cursor:'pointer',
-                    background:'var(--bg-card)', border:'1px dashed var(--border)',
-                    color:'var(--text-secondary)', fontSize:12, fontWeight:500,
-                    fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                    display:'flex', alignItems:'center', gap:12,
+                    padding:'12px 14px', minHeight:60, borderRadius:11,
+                    cursor:'pointer',
+                    background:'var(--bg-card)', border:'1px solid var(--hairline)',
+                    color:'var(--text-secondary)',
+                    fontFamily:'var(--font-ui)',
+                    transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                   }}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}
+                  onMouseEnter={e=>{
+                    e.currentTarget.style.borderColor='var(--accent)';
+                    e.currentTarget.style.background='var(--accent-surface)';
+                  }}
+                  onMouseLeave={e=>{
+                    e.currentTarget.style.borderColor='var(--hairline)';
+                    e.currentTarget.style.background='var(--bg-card)';
+                  }}
                 >
-                  <Upload size={13}/>
-                  Carregar PNG / JPG / SVG (até 2MB)
+                  <span style={{
+                    width:32, height:32, borderRadius:'50%', flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    background:'var(--accent-surface)', color:'var(--accent)',
+                  }} aria-hidden>
+                    <Upload size={14} strokeWidth={2.25}/>
+                  </span>
+                  <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
+                    <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+                      Carregar logo da marca
+                    </span>
+                    <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                      PNG · JPG · SVG — até 2&nbsp;MB (PNG transparente é o ideal)
+                    </span>
+                  </span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/svg+xml,image/webp"
@@ -11321,17 +11639,37 @@ function SidebarContent({
                   ) : (
                     <label
                       style={{
-                        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                        height:52, borderRadius:9, cursor:'pointer', marginTop:4,
-                        background:'var(--bg-card)', border:'1px dashed var(--border)',
-                        color:'var(--text-secondary)', fontSize:12, fontWeight:600,
-                        fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                        display:'flex', alignItems:'center', gap:12,
+                        padding:'10px 14px', minHeight:54, borderRadius:11,
+                        cursor:'pointer', marginTop:6,
+                        background:'var(--bg-card)', border:'1px solid var(--hairline)',
+                        fontFamily:'var(--font-ui)',
+                        transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                       }}
-                      onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
-                      onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                      onMouseEnter={e=>{
+                        e.currentTarget.style.borderColor='var(--accent)';
+                        e.currentTarget.style.background='var(--accent-surface)';
+                      }}
+                      onMouseLeave={e=>{
+                        e.currentTarget.style.borderColor='var(--hairline)';
+                        e.currentTarget.style.background='var(--bg-card)';
+                      }}
                     >
-                      <Upload size={13}/>
-                      Carregar fonte para títulos
+                      <span style={{
+                        width:30, height:30, borderRadius:'50%', flexShrink:0,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        background:'var(--accent-surface)', color:'var(--accent)',
+                      }} aria-hidden>
+                        <Upload size={13} strokeWidth={2.25}/>
+                      </span>
+                      <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
+                        <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+                          Carregar fonte do título
+                        </span>
+                        <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                          WOFF2 · WOFF · TTF · OTF — até 5&nbsp;MB
+                        </span>
+                      </span>
                       <input
                         type="file"
                         accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
@@ -11391,17 +11729,37 @@ function SidebarContent({
                   ) : (
                     <label
                       style={{
-                        display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                        height:52, borderRadius:9, cursor:'pointer', marginTop:4,
-                        background:'var(--bg-card)', border:'1px dashed var(--border)',
-                        color:'var(--text-secondary)', fontSize:12, fontWeight:600,
-                        fontFamily:'var(--font-ui)', transition:'all 0.12s',
+                        display:'flex', alignItems:'center', gap:12,
+                        padding:'10px 14px', minHeight:54, borderRadius:11,
+                        cursor:'pointer', marginTop:6,
+                        background:'var(--bg-card)', border:'1px solid var(--hairline)',
+                        fontFamily:'var(--font-ui)',
+                        transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                       }}
-                      onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--accent)'; }}
-                      onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)'; }}
+                      onMouseEnter={e=>{
+                        e.currentTarget.style.borderColor='var(--accent)';
+                        e.currentTarget.style.background='var(--accent-surface)';
+                      }}
+                      onMouseLeave={e=>{
+                        e.currentTarget.style.borderColor='var(--hairline)';
+                        e.currentTarget.style.background='var(--bg-card)';
+                      }}
                     >
-                      <Upload size={13}/>
-                      Carregar fonte para corpo
+                      <span style={{
+                        width:30, height:30, borderRadius:'50%', flexShrink:0,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        background:'var(--accent-surface)', color:'var(--accent)',
+                      }} aria-hidden>
+                        <Upload size={13} strokeWidth={2.25}/>
+                      </span>
+                      <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
+                        <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+                          Carregar fonte do corpo
+                        </span>
+                        <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                          WOFF2 · WOFF · TTF · OTF — até 5&nbsp;MB
+                        </span>
+                      </span>
                       <input
                         type="file"
                         accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
@@ -11574,37 +11932,62 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Refinar todos os cards">
-              <RefineBtn onRefine={refineAll} busy={refining}/>
-              <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5 }}>
-                Aplica uma instrução a todo o carrossel mantendo coerência narrativa.
-              </div>
+            <S title="Refinar todos os cards" hint="Aplica uma instrução a todo o carrossel mantendo coerência narrativa.">
+              {/* Variante prominent: CTA drop-zone (círculo accent + título +
+                  subtítulo) pra ler como botão e não como fundo desbotado. */}
+              <RefineBtn
+                onRefine={refineAll}
+                busy={refining}
+                variant="prominent"
+                label="Refinar com IA"
+                subtitle="Aplica uma instrução em todos os cards de uma vez"
+              />
             </S>
 
             {hasLastGenerate ? (
               <S title="Refazer com tom alternativo" hint="Usa o mesmo tema/material da última geração mas com inflexão de tom diferente. O carrossel atual fica em Cmd+Z (undo) pra você comparar.">
+                {/* Polish: cards verticais com label grande + micro-descrição em cinza.
+                    Hover puxa borda accent + lift sutil. Disabled durante refining. */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
                   {[
-                    { id:'analitico',  label:'Analítico',   hint:'mais analítico-editorial, conceitual e calmo, com profundidade de raciocínio' },
-                    { id:'provocador', label:'Provocador',  hint:'mais provocador e contraintuitivo, virando a tese óbvia do avesso sem deixar de sustentar' },
-                    { id:'leve',       label:'Leve',        hint:'mais leve, conversacional e direto, com humor sutil e frases curtas' },
+                    { id:'analitico',  label:'Analítico',  blurb:'Editorial, calmo, conceitual.', hint:'mais analítico-editorial, conceitual e calmo, com profundidade de raciocínio' },
+                    { id:'provocador', label:'Provocador', blurb:'Contraintuitivo, vira a tese.',  hint:'mais provocador e contraintuitivo, virando a tese óbvia do avesso sem deixar de sustentar' },
+                    { id:'leve',       label:'Leve',       blurb:'Direto, humor sutil, curto.',   hint:'mais leve, conversacional e direto, com humor sutil e frases curtas' },
                   ].map(opt => (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => remixWithTone(opt.hint, opt.label)}
                       disabled={refining}
+                      title={opt.hint}
                       style={{
-                        padding:'10px 8px', borderRadius:8, cursor: refining ? 'not-allowed' : 'pointer',
+                        display:'flex', flexDirection:'column', alignItems:'flex-start', gap:4,
+                        padding:'10px 10px 11px', borderRadius:10, cursor: refining ? 'not-allowed' : 'pointer',
                         background:'var(--bg-card)', border:'1px solid var(--border)',
-                        color:'var(--text-secondary)', fontSize:11, fontWeight:600,
-                        fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
-                        opacity: refining ? 0.5 : 1, transition:'border-color 0.12s',
+                        color:'var(--text-secondary)',
+                        fontFamily:'var(--font-ui)',
+                        opacity: refining ? 0.5 : 1,
+                        transition:'border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth), background-color 0.15s var(--ease-smooth)',
+                        textAlign:'left',
                       }}
-                      onMouseEnter={e => { if (!refining) e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                      onMouseEnter={e => {
+                        if (refining) return;
+                        e.currentTarget.style.borderColor = 'var(--accent)';
+                        e.currentTarget.style.background = 'var(--accent-surface)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.background = 'var(--bg-card)';
+                      }}
+                      onMouseDown={e => { if (!refining) e.currentTarget.style.transform = 'scale(0.97)'; }}
+                      onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
-                      {opt.label}
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
+                        {opt.label}
+                      </span>
+                      <span style={{ fontSize:10, lineHeight:1.35, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                        {opt.blurb}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -11628,18 +12011,35 @@ function SidebarContent({
                   </div>
                 </>
               ) : (
+                // Empty state da legenda: solid border + ícone num círculo
+                // accent, mesma estética dos uploads. Hover puxa fundo accent-surface.
                 <button onClick={generateCaption} disabled={genCaption} style={{
-                  width:'100%', height:44, borderRadius:8, cursor:'pointer',
-                  background:'var(--bg-card)', border:'1px dashed var(--border)',
-                  color:'var(--text-secondary)', fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)',
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  opacity:genCaption?0.6:1, transition:'all 0.12s',
+                  width:'100%', minHeight:60, padding:'12px 16px', borderRadius:11,
+                  cursor:genCaption?'not-allowed':'pointer',
+                  background:'var(--bg-card)', border:'1px solid var(--hairline)',
+                  fontFamily:'var(--font-ui)',
+                  display:'flex', alignItems:'center', gap:12,
+                  opacity:genCaption?0.6:1,
+                  transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                 }}
-                onMouseEnter={e=>{if(!genCaption){e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--text-primary)';}}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--text-secondary)';}}
+                onMouseEnter={e=>{if(!genCaption){e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.background='var(--accent-surface)';}}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--hairline)';e.currentTarget.style.background='var(--bg-card)';}}
                 >
-                  {genCaption ? <Loader2 size={14} style={{animation:'spin 0.8s linear infinite'}}/> : <FileText size={14}/>}
-                  Gerar legenda para o post
+                  <span style={{
+                    width:32, height:32, borderRadius:'50%', flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    background:'var(--accent-surface)', color:'var(--accent)',
+                  }} aria-hidden>
+                    {genCaption ? <Loader2 size={14} style={{animation:'spin 0.8s linear infinite'}}/> : <FileText size={14} strokeWidth={2.25}/>}
+                  </span>
+                  <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0, textAlign:'left' }}>
+                    <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
+                      Gerar legenda para o post
+                    </span>
+                    <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
+                      IA escreve com base no carrossel atual
+                    </span>
+                  </span>
                 </button>
               )}
             </S>
@@ -11692,8 +12092,17 @@ function SidebarContent({
             ? <>Meus projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong> salvos</>
             : 'Meus projetos salvos'}
         </button>
-        <div style={{ fontSize:9, color:'var(--text-muted)', fontFamily:'var(--font-ui)', textAlign:'center', lineHeight:1.4, opacity:0.6 }}>
-          ✓ Salvando automaticamente
+        {/* Polish: selo de auto-save com check em accent + texto secundary,
+            sai do quase-invisível (9px opacity 0.6) pra um selo confiável. */}
+        <div style={{
+          display:'inline-flex', alignSelf:'center', alignItems:'center', gap:6,
+          fontSize:10, color:'var(--text-secondary)', fontFamily:'var(--font-ui)',
+          letterSpacing:'-0.005em', lineHeight:1.2,
+          padding:'4px 10px', borderRadius:9999,
+          background:'var(--bg-pearl)', border:'1px solid var(--hairline)',
+        }}>
+          <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
+          Salvando automaticamente
         </div>
       </div>
     </div>
@@ -13280,6 +13689,18 @@ export default function App() {
     });
   }, [activeDocId]);
 
+  // ── TOAST helpers — declarados ANTES de qualquer callback que os referencie
+  // no array de deps (exportDoc, exportAllDocs etc.). Ordem importa: deps array
+  // é avaliado no momento do useCallback, e const é TDZ até a linha rodar.
+  const [toasts, setToasts] = useState([]);
+  const dismissToast = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
+  const toast = useCallback((message, kind='info', ttl=3500) => {
+    const id = uid();
+    setToasts(t => [...t, { id, message, kind }]);
+    if (ttl > 0) setTimeout(() => dismissToast(id), ttl);
+  }, [dismissToast]);
+  const setError = useCallback((msg) => { if (msg) toast(msg, 'error', 5000); }, [toast]);
+
   // ── EXPORT / IMPORT de projetos ─────────────────────────────────────────────
   // Exporta UMA entrada da biblioteca como arquivo .json
   const exportDoc = useCallback(async (docId) => {
@@ -13470,7 +13891,20 @@ export default function App() {
   const [videoUrls, setVideoUrls] = useState({}); // { [videoId]: blobUrl }
   const videoUrlsRef = useRef({});
   videoUrlsRef.current = videoUrls;
-  // Sync pro módulo-level pra renderers lerem sem prop drilling
+  // Wrapper que mantém __vcVideoUrlMap SINCRONIZADO com o setVideoUrls.
+  // Sem isso, o renderer (que lê o map module-level via getVideoUrl) ficava
+  // 1 render atrás — bloco do <video> nunca disparava porque getVideoUrl
+  // retornava null no primeiro render após import. useEffect só roda DEPOIS
+  // do commit, então o mapa ficava stale até o próximo render espontâneo.
+  const setVideoUrlsSync = useCallback((nextOrFn) => {
+    setVideoUrls(prev => {
+      const next = typeof nextOrFn === 'function' ? nextOrFn(prev) : nextOrFn;
+      __vcVideoUrlMap = next;
+      videoUrlsRef.current = next;
+      return next;
+    });
+  }, []);
+  // Defesa em profundidade: mesmo se algo escapar, useEffect garante sync.
   useEffect(() => { __vcVideoUrlMap = videoUrls; }, [videoUrls]);
   // Refetch URLs sempre que algum slide aponta pra videoId que não temos URL gerada
   useEffect(() => {
@@ -13492,10 +13926,10 @@ export default function App() {
           console.warn(`[video] falha ao carregar ${id}:`, err.message);
         }
       }
-      if (!cancelled) setVideoUrls(newUrls);
+      if (!cancelled) setVideoUrlsSync(newUrls);
     })();
     return () => { cancelled = true; };
-  }, [library]);
+  }, [library, setVideoUrlsSync]);
   // Cleanup periódico de orphans (vídeos sem slide apontando) — 1× por sessão após boot
   useEffect(() => {
     const id = setTimeout(async () => {
@@ -13548,7 +13982,6 @@ export default function App() {
   const [genCaption, setGenCaption] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState({ current:0, total:0 });
-  const [toasts, setToasts] = useState([]);
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const fileInputRef = useRef(null);
   const batchPhotoInputRef = useRef(null);
@@ -13558,15 +13991,6 @@ export default function App() {
   const videoFileInputRef = useRef(null);
   const refImageTargetIdxRef = useRef(null);
   const slideRefs = useRef({});
-
-  // Toast helpers
-  const dismissToast = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
-  const toast = useCallback((message, kind='info', ttl=3500) => {
-    const id = uid();
-    setToasts(t => [...t, { id, message, kind }]);
-    if (ttl > 0) setTimeout(() => dismissToast(id), ttl);
-  }, [dismissToast]);
-  const setError = useCallback((msg) => { if (msg) toast(msg, 'error', 5000); }, [toast]);
 
   // Escuta eventos de quota do localStorage — disparados por lsSet quando o storage enche
   useEffect(() => {
@@ -13957,9 +14381,10 @@ export default function App() {
           try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
         }
       }
-      // Cria object URL imediato pra render rápido
+      // Cria object URL imediato pra render rápido. Sync = mapa module-level
+      // atualiza ANTES do próximo render (não fica 1 ciclo atrás).
       const url = URL.createObjectURL(file);
-      setVideoUrls(prev => ({ ...prev, [id]: url }));
+      setVideoUrlsSync(prev => ({ ...prev, [id]: url }));
       // Atualiza slide: limpa bgImage (mutual exclusion), seta videoId
       updateSlide({
         videoId: id,
@@ -13989,7 +14414,7 @@ export default function App() {
       const oldUrl = videoUrlsRef.current[oldId];
       if (oldUrl) {
         try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
-        setVideoUrls(prev => {
+        setVideoUrlsSync(prev => {
           const next = { ...prev };
           delete next[oldId];
           return next;
