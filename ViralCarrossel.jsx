@@ -7138,18 +7138,31 @@ function ImgParamsPanel({ value, onChange }) {
 }
 
 // ─── MOBILE DRAWER ────────────────────────────────────────────────────────────
-// Drawer bottom-sheet com swipe-to-dismiss, backdrop e safe-area iOS.
-// Detecta arrasto vertical pra baixo (>80px ou vel > 0.4 px/ms) → fecha.
-function MobileDrawer({ open, onClose, children }) {
-  // ── drag via ref direto no DOM para eliminar o lag do setState async ──────
-  const panelRef  = useRef(null);
-  const startRef  = useRef({ y:0, t:0 });
-  const dragging  = useRef(false);
+// Bottom-sheet com 3 snaps de altura (small/medium/large) — user arrasta
+// pra cima pra expandir ou pra baixo pra encolher/fechar. Cada drag termina
+// no snap mais próximo (não fica em altura arbitrária — UX consistente).
+const DRAWER_SNAPS = [
+  { id: 'small',  dvh: 35, label: 'Pequeno' },
+  { id: 'medium', dvh: 55, label: 'Médio' },   // default
+  { id: 'large',  dvh: 85, label: 'Grande' },
+];
+const DRAWER_DEFAULT_SNAP = 1; // 55dvh
 
-  // Aplica o offset de drag diretamente no elemento (sem re-render React)
+function MobileDrawer({ open, onClose, children }) {
+  const panelRef  = useRef(null);
+  const startRef  = useRef({ y:0, t:0, snap: DRAWER_DEFAULT_SNAP });
+  const dragging  = useRef(false);
+  // Snap atual — reset pra default ao reabrir o drawer.
+  const [snapIdx, setSnapIdx] = useState(DRAWER_DEFAULT_SNAP);
+  useEffect(() => { if (open) setSnapIdx(DRAWER_DEFAULT_SNAP); }, [open]);
+
+  const currentDvh = DRAWER_SNAPS[snapIdx].dvh;
+
+  // Aplica offset de drag direto no DOM (sem re-render por frame)
   const applyDrag = useCallback((dy) => {
     if (!panelRef.current) return;
-    panelRef.current.style.transition = dy > 0 ? 'none' : 'transform 0.3s var(--ease-smooth)';
+    // Durante drag ativo: sem transição. Ao soltar/abrir: transição smooth.
+    panelRef.current.style.transition = dragging.current ? 'none' : 'transform 0.28s var(--ease-smooth), height 0.28s var(--ease-smooth)';
     panelRef.current.style.transform  = open ? `translateY(${dy}px)` : 'translateY(110%)';
   }, [open]);
 
@@ -7158,39 +7171,55 @@ function MobileDrawer({ open, onClose, children }) {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    // Reseta qualquer drag residual ao fechar
     applyDrag(0);
     return () => { document.body.style.overflow = prev; };
   }, [open, applyDrag]);
 
   const onTouchStart = (e) => {
-    // Só reage a arrasto iniciado no handle/header (não no scroll do conteúdo)
+    // Só reage a arrasto iniciado no handle (não no scroll do conteúdo)
     if (!e.target.closest('[data-drawer-handle]')) return;
     dragging.current = true;
-    startRef.current = { y: e.touches[0].clientY, t: Date.now() };
+    startRef.current = { y: e.touches[0].clientY, t: Date.now(), snap: snapIdx };
     applyDrag(0);
   };
   const onTouchMove = (e) => {
     if (!dragging.current) return;
     const dy = e.touches[0].clientY - startRef.current.y;
-    if (dy < 0) return; // ignora arrasto pra cima
-    applyDrag(dy);
+    // Permite drag em AMBAS as direções: dy>0 encolhe (move pra baixo),
+    // dy<0 expande visualmente o painel pra cima (clamping em -20px pra
+    // sinalizar limite sem permitir voo).
+    const clamped = Math.max(-20, dy);
+    applyDrag(clamped);
   };
   const onTouchEnd = (e) => {
     if (!dragging.current) return;
     const dy = e.changedTouches[0].clientY - startRef.current.y;
     const dt = Math.max(1, Date.now() - startRef.current.t);
-    const velocity = dy / dt; // px/ms
+    const velocity = dy / dt; // px/ms (positivo = pra baixo)
     dragging.current = false;
     applyDrag(0);
-    if (dy > 80 || velocity > 0.4) onClose();
+
+    // Threshold: 60px ou velocidade alta. Drag pra baixo = próximo snap menor
+    // (ou fecha se já no menor). Drag pra cima = próximo snap maior.
+    const threshold = 60;
+    const fastDown = dy > threshold || velocity > 0.4;
+    const fastUp = dy < -threshold || velocity < -0.4;
+    const startSnap = startRef.current.snap;
+
+    if (fastDown) {
+      const next = startSnap - 1;
+      if (next < 0) onClose();
+      else setSnapIdx(next);
+    } else if (fastUp) {
+      const next = Math.min(DRAWER_SNAPS.length - 1, startSnap + 1);
+      setSnapIdx(next);
+    }
+    // Drag pequeno = volta pro snap original (applyDrag(0) já cuida).
   };
 
   return (
     <>
-      {/* Backdrop — dim leve em vez de blackout total + blur. User precisa
-          ver os cards atrás enquanto edita (ajusta size, peso, cor e vê o
-          efeito ao vivo). Click no backdrop continua fechando. */}
+      {/* Backdrop dim leve sem blur — cards visíveis acima */}
       {open && (
         <div
           onClick={onClose}
@@ -7200,8 +7229,8 @@ function MobileDrawer({ open, onClose, children }) {
           }}
         />
       )}
-      {/* Painel — half-height (55vh) pro user ver metade superior do viewport
-          com cards e metade inferior com controles. Drag-down ainda fecha. */}
+      {/* Painel resizable — altura controlada por snapIdx, drag escolhe entre
+          os 3 snaps (pequeno/médio/grande) ou fecha no limite inferior. */}
       <div
         ref={panelRef}
         onTouchStart={onTouchStart}
@@ -7213,29 +7242,40 @@ function MobileDrawer({ open, onClose, children }) {
           borderTop:'1px solid var(--border)',
           borderRadius:'18px 18px 0 0',
           display:'flex', flexDirection:'column',
-          height:'55dvh', maxHeight:'55dvh',
+          height:`${currentDvh}dvh`, maxHeight:`${currentDvh}dvh`,
           boxShadow:'0 -8px 40px rgba(0,0,0,0.35)',
           transform: open ? 'translateY(0)' : 'translateY(110%)',
-          transition: 'transform 0.3s var(--ease-smooth)',
+          transition: 'transform 0.28s var(--ease-smooth), height 0.28s var(--ease-smooth)',
           paddingBottom:'env(safe-area-inset-bottom, 0)',
         }}
       >
-        {/* Handle tactível pra arrastar/fechar — MAIS EVIDENTE: pill 56×6
-            com cor text-muted (era 40×4 hairline quase invisível) +
-            tap target generoso. */}
+        {/* Handle tactível com 3 dots indicando snap atual. Drag pra cima
+            expande, pra baixo encolhe ou fecha. */}
         <div
           data-drawer-handle
           style={{
             display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-            padding:'12px 16px 6px', flexShrink:0,
+            padding:'10px 16px 6px', flexShrink:0,
             cursor:'grab', userSelect:'none', touchAction:'none',
-            position:'relative',
+            position:'relative', gap:4,
           }}
+          title={`Tamanho ${DRAWER_SNAPS[snapIdx].label} · arraste pra cima/baixo`}
         >
+          {/* Pill principal — visualmente óbvia */}
           <div style={{
             width:56, height:5, background:'var(--text-muted)', borderRadius:99,
             opacity:0.55,
           }}/>
+          {/* 3 dots indicando snap atual (pequeno/médio/grande) */}
+          <div style={{ display:'flex', gap:4, marginTop:2 }} aria-hidden>
+            {DRAWER_SNAPS.map((s, i) => (
+              <div key={s.id} style={{
+                width: i === snapIdx ? 14 : 4, height:4, borderRadius:99,
+                background: i === snapIdx ? 'var(--accent)' : 'var(--border)',
+                transition:'width 0.2s var(--ease-smooth), background 0.2s',
+              }}/>
+            ))}
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -9827,12 +9867,21 @@ function SidebarContent({
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       {/* Tab bar — sub-nav. Polish: ícone 13 (era 11), aria-label,
-          aria-current, role=tab pra screen readers. */}
+          aria-current, role=tab pra screen readers. Sombra inset abaixo
+          + borda mais escura pra separar visualmente do conteúdo
+          (especialmente no drawer mobile, onde tab bar e body têm mesmo
+          bg-sidebar e antes fundiam visualmente). */}
       <div
         data-vc-tour="sidebar-tabs"
         role="tablist"
         aria-label="Áreas de edição do projeto"
-        style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0 }}
+        style={{
+          display:'flex',
+          borderBottom:'1px solid var(--border)',
+          boxShadow:'0 6px 12px -8px rgba(0,0,0,0.18)',
+          flexShrink:0,
+          position:'relative', zIndex:1,
+        }}
       >
         {[
           {id:'brand',    icon:Palette,  label:'Marca'},
