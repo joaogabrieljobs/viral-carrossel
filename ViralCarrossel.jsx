@@ -7220,16 +7220,22 @@ function MobileDrawer({ open, onClose, children }) {
           paddingBottom:'env(safe-area-inset-bottom, 0)',
         }}
       >
-        {/* Handle tactível pra arrastar/fechar */}
+        {/* Handle tactível pra arrastar/fechar — MAIS EVIDENTE: pill 56×6
+            com cor text-muted (era 40×4 hairline quase invisível) +
+            tap target generoso. */}
         <div
           data-drawer-handle
           style={{
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            padding:'10px 16px 4px', flexShrink:0,
+            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+            padding:'12px 16px 6px', flexShrink:0,
             cursor:'grab', userSelect:'none', touchAction:'none',
+            position:'relative',
           }}
         >
-          <div style={{ width:40, height:4, background:'var(--border)', borderRadius:99, margin:'0 auto' }}/>
+          <div style={{
+            width:56, height:5, background:'var(--text-muted)', borderRadius:99,
+            opacity:0.55,
+          }}/>
           <button
             onClick={onClose}
             style={{
@@ -16174,6 +16180,71 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                       }}
                     ><ChevronRight size={18}/></button>
                   )}
+                </div>
+
+                {/* Ações rápidas do card atual — pill flutuante com tela cheia,
+                    baixar, grade. Acima dos dots pra ficar visível mesmo quando
+                    o drawer está aberto (área do card é metade superior). */}
+                <div style={{ display:'flex', justifyContent:'center', marginTop:12 }}>
+                  <div style={{
+                    display:'inline-flex', alignItems:'center', gap:2,
+                    padding:4, borderRadius:9999,
+                    background:'var(--bg-card)', border:'1px solid var(--border)',
+                    boxShadow:'0 2px 8px rgba(0,0,0,0.06)',
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setFullscreenOpen(true)}
+                      title="Visualizar em tela cheia"
+                      aria-label={`Visualizar card ${activeIdx+1} em tela cheia`}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
+                        background:'transparent', border:'none', color:'var(--text-secondary)',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        transition:'background 0.12s, color 0.12s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background='var(--bg-pearl)'; e.currentTarget.style.color='var(--text-primary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)'; }}
+                    >
+                      <Maximize2 size={15}/>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportSlide(activeIdx)}
+                      disabled={exporting}
+                      title={`Baixar card ${activeIdx+1} em PNG`}
+                      aria-label={`Baixar card ${activeIdx+1}`}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999, cursor: exporting ? 'not-allowed' : 'pointer',
+                        background:'transparent', border:'none', color:'var(--text-secondary)',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        transition:'background 0.12s, color 0.12s',
+                        opacity: exporting ? 0.5 : 1,
+                      }}
+                      onMouseEnter={e => { if(!exporting){ e.currentTarget.style.background='var(--bg-pearl)'; e.currentTarget.style.color='var(--text-primary)'; } }}
+                      onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)'; }}
+                    >
+                      {exporting ? <Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/> : <Download size={15}/>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreviewAlignGrid(g => !g)}
+                      title={showPreviewAlignGrid ? 'Esconder grade de alinhamento' : 'Mostrar grade de alinhamento'}
+                      aria-label={showPreviewAlignGrid ? 'Esconder grade' : 'Mostrar grade'}
+                      aria-pressed={showPreviewAlignGrid}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
+                        background: showPreviewAlignGrid ? 'var(--accent-surface)' : 'transparent',
+                        border:'none', color: showPreviewAlignGrid ? 'var(--accent)' : 'var(--text-secondary)',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        transition:'background 0.12s, color 0.12s',
+                      }}
+                      onMouseEnter={e => { if(!showPreviewAlignGrid){ e.currentTarget.style.background='var(--bg-pearl)'; e.currentTarget.style.color='var(--text-primary)'; } }}
+                      onMouseLeave={e => { if(!showPreviewAlignGrid){ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)'; } }}
+                    >
+                      <LayoutGrid size={15}/>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Dots + contador */}
