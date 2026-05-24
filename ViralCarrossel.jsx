@@ -676,13 +676,21 @@ const FORMATS = {
 
 /** Proporção de exportação — uma linha no desktop; grelha largura total no mobile (evita barra apertada). */
 function EditorFormatSelector({ fmt, setFmt, layout }) {
-  const grid = layout === 'mobile';
-  const wrapStyle = grid
+  // Mobile: segmented pill compacto (38px) em vez de grid 3-cards 80px+.
+  // Liberta espaço vertical pro user ver os cards no preview enquanto
+  // o drawer está aberto (drawer já é 55dvh).
+  const grid = false;
+  const wrapStyle = layout === 'mobile'
     ? {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-        gap: 8,
+        display: 'flex',
+        alignItems: 'center',
+        background: 'var(--bg-card)',
+        borderRadius: 9999,
+        padding: 3,
+        gap: 2,
+        border: '1px solid var(--border)',
         width: '100%',
+        flexShrink: 0,
       }
     : {
         display: 'flex',
@@ -731,9 +739,14 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     transition: 'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
                   }
                 : {
-                    padding: '5px 14px',
+                    // No mobile (wrapper width 100%) preciso flex:1 pra
+                    // 3 botões dividirem largura igualmente; no desktop
+                    // fica padding natural (auto-width pill clássico).
+                    flex: layout === 'mobile' ? '1 1 0' : 'initial',
+                    minHeight: layout === 'mobile' ? 32 : undefined,
+                    padding: layout === 'mobile' ? '6px 10px' : '5px 14px',
                     borderRadius: 9999,
-                    fontSize: 13,
+                    fontSize: layout === 'mobile' ? 12 : 13,
                     fontWeight: isActive ? 600 : 400,
                     fontFamily: 'var(--font-ui)',
                     letterSpacing: '-0.011em',
@@ -744,7 +757,9 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: 6,
+                    whiteSpace: 'nowrap',
                   }
             }
           >
@@ -760,7 +775,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                 }}
               />
             )}
-            {grid ? compactLabel : v.label}
+            {layout === 'mobile' ? compactLabel : (grid ? compactLabel : v.label)}
           </button>
         );
       })}
@@ -12050,11 +12065,14 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Download footer — hierarquia clara: 1 CTA primário + dropdown secundários + link sutil */}
-      <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:8, flexShrink:0 }}>
+      {/* Download footer — compactado: CTA primário + linha de meta (Mais
+          formatos, Meus projetos, auto-save) tudo numa única row. Era 4
+          blocos em coluna (~155px) → agora 2 rows (~80px) pra libertar
+          espaço de drawer mobile e desktop sidebar. */}
+      <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
         {tab !== 'material' && (
           <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
-            width:'100%', height:42, borderRadius:9999, border:'none', cursor:'pointer',
+            width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
             background:'var(--text-primary)', color:'#fff',
             fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
             letterSpacing:'-0.011em',
@@ -12066,46 +12084,49 @@ function SidebarContent({
             {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
           </button>
         )}
-        {/* Dropdown "Mais formatos" — esconde ZIP/PDF/Fotos limpas atrás de um botão único */}
-        <ExportMoreFormats
-          slides={slides}
-          exporting={exporting}
-          onExportAll={exportAll}
-          onExportPDF={exportPDF}
-          onExportPhotosOnly={exportPhotosOnly}
-        />
-        {/* Library como link sutil (não CTA) — auto-save indicado pelo texto */}
-        <button
-          onClick={() => setLibraryOpen(true)}
-          aria-label="Abrir biblioteca de projetos salvos"
-          style={{
-            width:'100%', minHeight:32, cursor:'pointer',
-            border:'none', background:'transparent',
-            color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.011em',
-            display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-            transition:'color 0.12s',
-            marginTop:2, padding:'6px 8px', borderRadius:6,
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-        >
-          <BookOpen size={11}/>
-          {libraryCount > 1
-            ? <>Meus projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong> salvos</>
-            : 'Meus projetos salvos'}
-        </button>
-        {/* Polish: selo de auto-save com check em accent + texto secundary,
-            sai do quase-invisível (9px opacity 0.6) pra um selo confiável. */}
-        <div style={{
-          display:'inline-flex', alignSelf:'center', alignItems:'center', gap:6,
-          fontSize:10, color:'var(--text-secondary)', fontFamily:'var(--font-ui)',
-          letterSpacing:'-0.005em', lineHeight:1.2,
-          padding:'4px 10px', borderRadius:9999,
-          background:'var(--bg-pearl)', border:'1px solid var(--hairline)',
-        }}>
-          <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
-          Salvando automaticamente
+        {/* Meta-row: Mais formatos (dropdown) | Meus projetos (link) | ✓ Salvando (badge inline)
+            Tudo numa linha pra ocupar mínimo de altura. */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'space-between' }}>
+          <ExportMoreFormats
+            slides={slides}
+            exporting={exporting}
+            onExportAll={exportAll}
+            onExportPDF={exportPDF}
+            onExportPhotosOnly={exportPhotosOnly}
+          />
+          <button
+            onClick={() => setLibraryOpen(true)}
+            aria-label="Abrir biblioteca de projetos salvos"
+            title={libraryCount > 1 ? `${libraryCount} projetos salvos` : 'Meus projetos salvos'}
+            style={{
+              minHeight:32, cursor:'pointer',
+              border:'none', background:'transparent',
+              color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+              letterSpacing:'-0.005em',
+              display:'inline-flex', alignItems:'center', gap:5,
+              transition:'color 0.12s',
+              padding:'4px 6px', borderRadius:6, whiteSpace:'nowrap',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            <BookOpen size={11}/>
+            {libraryCount > 1
+              ? <>Projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong></>
+              : 'Projetos'}
+          </button>
+          <span
+            title="Salvando automaticamente"
+            aria-label="Salvando automaticamente"
+            style={{
+              display:'inline-flex', alignItems:'center', gap:4,
+              fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
+              letterSpacing:'-0.005em', whiteSpace:'nowrap',
+            }}
+          >
+            <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
+            Salvo
+          </span>
         </div>
       </div>
     </div>
