@@ -12065,76 +12065,69 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Download footer — compactado: CTA primário + linha de meta (Mais
-          formatos, Meus projetos, auto-save) tudo numa única row. Era 4
-          blocos em coluna (~155px) → agora 2 rows (~80px) pra libertar
-          espaço de drawer mobile e desktop sidebar. */}
-      <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
-        {tab !== 'material' && (
-          <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
-            width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
-            background:'var(--text-primary)', color:'#fff',
-            fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.011em',
-            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-            opacity:exporting?0.5:1,
-            transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-          }}>
-            <Download size={14}/>
-            {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
-          </button>
-        )}
-        {/* Meta-row: Mais formatos (dropdown) | Meus projetos (link) | ✓ Salvando (badge inline)
-            Tudo numa linha pra ocupar mínimo de altura. */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'space-between' }}>
-          <ExportMoreFormats
-            slides={slides}
-            exporting={exporting}
-            onExportAll={exportAll}
-            onExportPDF={exportPDF}
-            onExportPhotosOnly={exportPhotosOnly}
-          />
-          <button
-            onClick={() => setLibraryOpen(true)}
-            aria-label="Abrir biblioteca de projetos salvos"
-            title={libraryCount > 1 ? `${libraryCount} projetos salvos` : 'Meus projetos salvos'}
-            style={{
-              minHeight:32, cursor:'pointer',
-              border:'none', background:'transparent',
-              color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
-              letterSpacing:'-0.005em',
-              display:'inline-flex', alignItems:'center', gap:5,
-              transition:'color 0.12s',
-              padding:'4px 6px', borderRadius:6, whiteSpace:'nowrap',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-          >
-            <BookOpen size={11}/>
-            {libraryCount > 1
-              ? <>Projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong></>
-              : 'Projetos'}
-          </button>
-          <span
-            title="Salvando automaticamente"
-            aria-label="Salvando automaticamente"
-            style={{
-              display:'inline-flex', alignItems:'center', gap:4,
-              fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
-              letterSpacing:'-0.005em', whiteSpace:'nowrap',
-            }}
-          >
-            <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
-            Salvo
-          </span>
-        </div>
+      {/* Download footer — uma única row: dropdown "Baixar" (com card N + ZIP
+          + PDF + fotos limpas dentro) + Projetos + ✓ Salvo. Liberta ~80px
+          que antes eram do CTA fixo "Baixar card N". */}
+      <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', alignItems:'center', gap:8, justifyContent:'space-between', flexShrink:0 }}>
+        <ExportMoreFormats
+          slides={slides}
+          exporting={exporting}
+          exportProgress={exportProgress}
+          activeIdx={activeIdx}
+          onExportSlide={exportSlide}
+          onExportAll={exportAll}
+          onExportPDF={exportPDF}
+          onExportPhotosOnly={exportPhotosOnly}
+          hideSlideOption={tab === 'material'}
+        />
+        <button
+          onClick={() => setLibraryOpen(true)}
+          aria-label="Abrir biblioteca de projetos salvos"
+          title={libraryCount > 1 ? `${libraryCount} projetos salvos` : 'Meus projetos salvos'}
+          style={{
+            minHeight:32, cursor:'pointer',
+            border:'none', background:'transparent',
+            color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.005em',
+            display:'inline-flex', alignItems:'center', gap:5,
+            transition:'color 0.12s',
+            padding:'4px 6px', borderRadius:6, whiteSpace:'nowrap',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+        >
+          <BookOpen size={11}/>
+          {libraryCount > 1
+            ? <>Projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong></>
+            : 'Projetos'}
+        </button>
+        <span
+          title="Salvando automaticamente"
+          aria-label="Salvando automaticamente"
+          style={{
+            display:'inline-flex', alignItems:'center', gap:4,
+            fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.005em', whiteSpace:'nowrap',
+          }}
+        >
+          <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
+          Salvo
+        </span>
       </div>
     </div>
   );
 }
 
-// ─── EXPORT MORE FORMATS — dropdown que esconde formatos secundários ──────────
-function ExportMoreFormats({ slides, exporting, onExportAll, onExportPDF, onExportPhotosOnly }) {
+// ─── EXPORT MORE FORMATS — único dropdown "Baixar" com todas as saídas ────────
+// Antes era um botão secundário ("Mais formatos") abaixo do CTA fixo "Baixar
+// card N". Agora absorve a opção do card individual como PRIMEIRA do menu e
+// vira o único ponto de download da app — economiza 50px no footer mobile.
+function ExportMoreFormats({
+  slides, exporting, exportProgress,
+  activeIdx, onExportSlide,
+  onExportAll, onExportPDF, onExportPhotosOnly,
+  hideSlideOption = false,
+}) {
   const [open, setOpen] = React.useState(false);
   const refMenu = React.useRef(null);
   React.useEffect(() => {
@@ -12153,59 +12146,85 @@ function ExportMoreFormats({ slides, exporting, onExportAll, onExportPDF, onExpo
   }, [open]);
   const photoCount = slides.filter(s => !!s.bgImage).length;
   const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
+  const menuItemStyle = {
+    display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+    border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
+    fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
+    transition:'background 0.12s', textAlign:'left', width:'100%',
+  };
   return (
-    <div ref={refMenu} style={{ position:'relative' }}>
+    <div ref={refMenu} style={{ position:'relative', flex:'0 0 auto' }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         disabled={exporting}
-        className="vc-btn vc-btn-ghost"
         aria-haspopup="menu"
         aria-expanded={open}
-        style={{ width:'100%', height:34, fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+        aria-label="Opções de download"
+        style={{
+          minHeight:36, padding:'0 16px', borderRadius:9999, border:'none',
+          background:'var(--text-primary)', color:'#fff',
+          fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
+          letterSpacing:'-0.011em', cursor:'pointer',
+          display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6,
+          opacity: exporting ? 0.5 : 1,
+          transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+          whiteSpace:'nowrap',
+        }}
       >
-        Mais formatos
-        <ChevronDown size={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}/>
+        <Download size={13}/>
+        {exporting && exportProgress
+          ? `${exportProgress.current}/${exportProgress.total}…`
+          : 'Baixar'}
+        <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}/>
       </button>
       {open && (
         <div
           role="menu"
           style={{
-            position:'absolute', bottom:'100%', left:0, right:0, marginBottom:6,
+            position:'absolute', bottom:'100%', left:0, marginBottom:6, minWidth:260,
             background:'var(--bg-base)', border:'1px solid var(--hairline)',
             borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,0.12)',
             padding:6, display:'flex', flexDirection:'column', gap:2, zIndex:50,
           }}
         >
+          {/* Card individual — primeira opção, era o CTA fixo antes */}
+          {!hideSlideOption && onExportSlide && (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setOpen(false); onExportSlide(activeIdx); }}
+              disabled={exporting}
+              style={menuItemStyle}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Download size={13} style={{ color:'var(--accent)' }}/>
+              <span style={{ flex:1, fontWeight:600 }}>Card {activeIdx + 1}</span>
+              <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>PNG</span>
+            </button>
+          )}
           <button
             role="menuitem"
             type="button"
             onClick={() => { setOpen(false); onExportAll(); }}
             disabled={exporting}
-            style={{
-              display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
-              border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
-              fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
-              transition:'background 0.12s', textAlign:'left',
-            }}
+            style={menuItemStyle}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <Download size={13} style={{ color:'var(--text-muted)' }}/>
-            <span style={{ flex:1 }}>Carrossel completo (ZIP)</span>
-            <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>{slides.length} cards</span>
+            <span style={{ flex:1 }}>Carrossel completo</span>
+            <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
+              ZIP · {slides.length} cards
+            </span>
           </button>
           <button
             role="menuitem"
             type="button"
             onClick={() => { setOpen(false); onExportPDF(); }}
             disabled={exporting}
-            style={{
-              display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
-              border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
-              fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
-              transition:'background 0.12s', textAlign:'left',
-            }}
+            style={menuItemStyle}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
@@ -12218,12 +12237,7 @@ function ExportMoreFormats({ slides, exporting, onExportAll, onExportPDF, onExpo
               type="button"
               onClick={() => { setOpen(false); onExportPhotosOnly(); }}
               disabled={exporting}
-              style={{
-                display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
-                border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
-                fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
-                transition:'background 0.12s', textAlign:'left',
-              }}
+              style={menuItemStyle}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               title="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA"
