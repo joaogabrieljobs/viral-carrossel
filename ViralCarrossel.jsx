@@ -3,6 +3,7 @@ import {
   Sparkles, Search, Download, Trash2, Copy,
   Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2,
   Bookmark, Shuffle, Lock, Move, FlipHorizontal2, RotateCcw,
+  Video, Film,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image as ImageIcon,
@@ -16,8 +17,17 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
+import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId } from './src/utils/video-store.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
+
+// ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
+// Permite os componentes de render (SlideCardInner, ClassicCanvasInner) lerem
+// o object URL de um vídeo sem precisar threadear via props.
+let __vcVideoUrlMap = {};
+function getVideoUrl(videoId) {
+  return videoId ? __vcVideoUrlMap[videoId] || null : null;
+}
 
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 // Plausible (carregado via index.html). Helper que é no-op se ad blocker bloquear
@@ -1981,6 +1991,11 @@ const mkSlide = (n = 1, brand = null) => {
   subtitle: 'Subtítulo descritivo que reforça o gancho principal do carrossel.',
   layout: 'mc', align: 'center',
   bgImage: null, imageQuery: '',
+  /** Vídeo de fundo (mutually exclusive c/ bgImage). Guardado em IndexedDB pelo id;
+   *  o blob URL é regenerado a cada load da app via useVideoLoader. */
+  videoId: null,
+  videoMime: null,
+  videoName: null,
   /** Campo opcional `presentationImgAdjust` (tela cheia) — não definido em slides novos; ver FullscreenViewer. */
   /** Data URL ou URL https — enviada à API de imagem como referência (produto, pack, moodboard). */
   refImage: null,
@@ -5812,7 +5827,25 @@ const SlideCardInner = React.forwardRef(({
                 }}/>
               </div>
             )}
-            {sandwich && imgReady && !imgErr && slide.bgImage && (
+            {sandwich && slide.videoId && getVideoUrl(slide.videoId) && (
+              <>
+                <video
+                  src={getVideoUrl(slide.videoId)}
+                  autoPlay loop muted playsInline
+                  style={sandwichPhotoZoneImgStyle(slide, effectivePresentationFilter)}
+                />
+                {slide.overlay > 0 ? (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+                      background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay / 100 * 0.4}) 0%, rgba(0,0,0,${slide.overlay / 100}) 100%)`,
+                    }}
+                  />
+                ) : null}
+                <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
+              </>
+            )}
+            {sandwich && !slide.videoId && imgReady && !imgErr && slide.bgImage && (
               <>
                 <img
                   src={slide.bgImage}
@@ -5834,7 +5867,7 @@ const SlideCardInner = React.forwardRef(({
                 <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
               </>
             )}
-            {sandwich && !slide.bgImage && (
+            {sandwich && !slide.videoId && !slide.bgImage && (
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
                 color:cr.inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
@@ -6100,7 +6133,40 @@ const SlideCardInner = React.forwardRef(({
               ) : null}
             </div>
           )}
-          {sandwich && imgReady && !imgErr && slide.bgImage && (
+          {sandwich && slide.videoId && getVideoUrl(slide.videoId) && (
+            <div data-vc-photo-zone="1" style={{
+              width:'100%', flex: '0 1 auto',
+              height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
+              minHeight: f.h * 0.22, maxHeight: f.h * 0.32,
+              borderRadius: f.w * 0.017, overflow:'hidden', flexShrink:1, position:'relative',
+              background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+            }}>
+              <video
+                src={getVideoUrl(slide.videoId)}
+                autoPlay loop muted playsInline
+                style={sandwichPhotoZoneImgStyle(slide, effectivePresentationFilter)}
+              />
+              {slide.overlay > 0 ? (
+                <div style={{
+                  position:'absolute', inset:0, pointerEvents:'none', zIndex:1,
+                  background: `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
+                }}/>
+              ) : null}
+              <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
+              <span
+                title="Vídeo importado"
+                style={{
+                  position: 'absolute', top: f.h * 0.012, right: f.w * 0.018, zIndex: 3,
+                  fontSize: f.w * 0.018, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.04em', color: '#ffffff', background: 'rgba(0,0,0,0.48)',
+                  padding: `${f.h * 0.004}px ${f.w * 0.012}px`, borderRadius: 9999,
+                  backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', pointerEvents: 'none',
+                  display:'inline-flex', alignItems:'center', gap:4,
+                }}
+              ><Video size={Math.max(8, f.w * 0.018)} aria-hidden/> VÍDEO</span>
+            </div>
+          )}
+          {sandwich && !slide.videoId && imgReady && !imgErr && slide.bgImage && (
             <div data-vc-photo-zone="1" style={{
               width:'100%',
               flex: '0 1 auto',
@@ -9296,6 +9362,7 @@ function SidebarContent({
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
   setLibraryOpen = () => {}, libraryCount = 0,
+  onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
@@ -9604,6 +9671,36 @@ function SidebarContent({
                   <ImageIcon size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
                   Importar foto só neste slide (zona imagem)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => onPickVideo?.()}
+                  style={{
+                    width:'100%', minHeight:36, borderRadius:11, cursor:'pointer',
+                    border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
+                    color:'var(--text-secondary)', fontSize:12, fontWeight:400, fontFamily:'var(--font-ui)',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  }}
+                  title="Importa um vídeo de fundo (MP4/MOV/WebM, máx 60 MB). Substitui foto se houver."
+                >
+                  <Video size={14} style={{ color:'var(--accent)', flexShrink:0 }} />
+                  Importar vídeo neste slide
+                </button>
+                {slide.videoId ? (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveVideo?.()}
+                    style={{
+                      width:'100%', minHeight:30, borderRadius:9, cursor:'pointer',
+                      border:'1px solid var(--border)', background:'transparent',
+                      color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                    }}
+                  >
+                    <Trash2 size={12} aria-hidden/>
+                    Remover vídeo do slide
+                    {slide.videoName ? <span style={{ opacity:0.6, marginLeft:4 }}>({slide.videoName.slice(0, 18)}…)</span> : null}
+                  </button>
+                ) : null}
               </div>
             </S>
 
@@ -13225,6 +13322,56 @@ export default function App() {
   // Biblioteca de hooks aprovados (B2)
   const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
   useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
+  // ── VÍDEOS — IndexedDB store + Map reativo de id → blob URL ──────────────────
+  // videoId no slide referencia o blob no IndexedDB. Aqui criamos object URLs sob
+  // demanda e revogamos no unmount. Cleanup de orphans roda quando slides mudam.
+  const [videoUrls, setVideoUrls] = useState({}); // { [videoId]: blobUrl }
+  const videoUrlsRef = useRef({});
+  videoUrlsRef.current = videoUrls;
+  // Sync pro módulo-level pra renderers lerem sem prop drilling
+  useEffect(() => { __vcVideoUrlMap = videoUrls; }, [videoUrls]);
+  // Refetch URLs sempre que algum slide aponta pra videoId que não temos URL gerada
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const idsInUse = (library || []).flatMap(e => (e.doc?.slides || []).map(s => s.videoId).filter(Boolean));
+      const uniqIds = [...new Set(idsInUse)];
+      const missing = uniqIds.filter(id => !videoUrlsRef.current[id]);
+      if (missing.length === 0) return;
+      const newUrls = { ...videoUrlsRef.current };
+      for (const id of missing) {
+        try {
+          const entry = await videoGet(id);
+          if (cancelled) return;
+          if (entry?.blob) {
+            newUrls[id] = URL.createObjectURL(entry.blob);
+          }
+        } catch (err) {
+          console.warn(`[video] falha ao carregar ${id}:`, err.message);
+        }
+      }
+      if (!cancelled) setVideoUrls(newUrls);
+    })();
+    return () => { cancelled = true; };
+  }, [library]);
+  // Cleanup periódico de orphans (vídeos sem slide apontando) — 1× por sessão após boot
+  useEffect(() => {
+    const id = setTimeout(async () => {
+      try {
+        const inUse = (library || []).flatMap(e => (e.doc?.slides || []).map(s => s.videoId).filter(Boolean));
+        const removed = await videoCleanupOrphans(inUse);
+        if (removed > 0) console.log(`[video] cleanup: removeu ${removed} vídeo(s) orfão(s)`);
+      } catch { /* */ }
+    }, 5000);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Revogar todas as object URLs quando o componente desmonta (raro mas correto)
+  useEffect(() => () => {
+    Object.values(videoUrlsRef.current).forEach(url => {
+      try { URL.revokeObjectURL(url); } catch { /* */ }
+    });
+  }, []);
   // Últimos args passados a handleGenerate — permite remix com tom alternativo sem reabrir modal (B1)
   const lastGenerateArgsRef = useRef(null);
   const [hasLastGenerate, setHasLastGenerate] = useState(false);
@@ -13266,6 +13413,7 @@ export default function App() {
   const photoZoneInputRef = useRef(null);
   const photoZoneTargetIdxRef = useRef(null);
   const refImageInputRef = useRef(null);
+  const videoFileInputRef = useRef(null);
   const refImageTargetIdxRef = useRef(null);
   const slideRefs = useRef({});
 
@@ -13646,6 +13794,71 @@ export default function App() {
     if (!file || idx == null || !Number.isFinite(idx)) return;
     consumePhotoZoneFileForSlide(Math.trunc(idx), file);
   }, [consumePhotoZoneFileForSlide]);
+
+  // Importar vídeo no slide ativo — guarda blob no IndexedDB, atualiza slide.videoId
+  const importVideoToActiveSlide = useCallback(async (file) => {
+    if (!file) return;
+    const MAX_BYTES = 60 * 1024 * 1024; // 60MB — Safari iOS quebra acima disso
+    if (file.size > MAX_BYTES) {
+      toast(`Vídeo grande demais (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: 60 MB. Comprima antes (CapCut, HandBrake).`, 'error', 6000);
+      return;
+    }
+    try {
+      const id = newVideoId();
+      await videoPut(id, file, { mime: file.type, name: file.name });
+      // Limpa videoId antigo se houver (cleanup async, não bloqueia)
+      const oldId = slides[activeIdx]?.videoId;
+      if (oldId) {
+        videoDelete(oldId).catch(() => {});
+        const oldUrl = videoUrlsRef.current[oldId];
+        if (oldUrl) {
+          try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
+        }
+      }
+      // Cria object URL imediato pra render rápido
+      const url = URL.createObjectURL(file);
+      setVideoUrls(prev => ({ ...prev, [id]: url }));
+      // Atualiza slide: limpa bgImage (mutual exclusion), seta videoId
+      updateSlide({
+        videoId: id,
+        videoMime: file.type || 'video/mp4',
+        videoName: file.name,
+        bgImage: null,
+        bgImageFailed: false,
+        bgImageSource: null,
+      });
+      const usage = await videoStorageUsage().catch(() => null);
+      const usageNote = usage ? ` · uso total ${usage.totalMB.toFixed(1)} MB / ${usage.count} vídeos` : '';
+      toast(`Vídeo importado (${(file.size / 1024 / 1024).toFixed(1)} MB)${usageNote}`, 'success', 4000);
+      trackEvent('video_imported', { size_mb: String(Math.round(file.size / 1024 / 1024)), mime: file.type || 'unknown' });
+    } catch (e) {
+      console.error('[video] erro ao importar:', e);
+      toast(`Erro ao importar vídeo: ${e.message}`, 'error', 6000);
+    }
+  }, [activeIdx, slides, updateSlide, toast]);
+
+  // Remover vídeo do slide ativo (apaga do IndexedDB também)
+  const removeVideoFromActiveSlide = useCallback(async () => {
+    const slide = slides[activeIdx];
+    const oldId = slide?.videoId;
+    if (!oldId) return;
+    try {
+      await videoDelete(oldId);
+      const oldUrl = videoUrlsRef.current[oldId];
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
+        setVideoUrls(prev => {
+          const next = { ...prev };
+          delete next[oldId];
+          return next;
+        });
+      }
+      updateSlide({ videoId: null, videoMime: null, videoName: null });
+      toast('Vídeo removido do card.', 'info');
+    } catch (e) {
+      console.error('[video] erro ao remover:', e);
+    }
+  }, [activeIdx, slides, updateSlide, toast]);
 
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
@@ -14345,9 +14558,21 @@ ${capRules}
   const exportSlide = async (idx) => {
     setExporting(true); setExportProgress({current:1,total:1});
     try {
+      const slide = slides[idx];
+      // Se card tem vídeo, baixa o vídeo bruto + uma cópia PNG do card sem o vídeo
+      // (pra você sobrepor manualmente no CapCut/InShot)
+      if (slide?.videoId) {
+        const entry = await videoGet(slide.videoId);
+        if (entry?.blob) {
+          const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
+          await downloadBlob(entry.blob, `slide-${String(idx+1).padStart(2,'0')}-video.${ext}`);
+          toast(`Vídeo do card ${idx+1} baixado. Adicione o texto no editor de vídeo (CapCut, InShot, etc).`, 'success', 6000);
+          return;
+        }
+      }
       await loadHtml2Canvas();
       await waitForRender();
-      const canvas = await renderSlideToCanvas(slides[idx]);
+      const canvas = await renderSlideToCanvas(slide);
       await downloadCanvasPng(canvas, `slide-${String(idx+1).padStart(2,'0')}.png`);
       toast(`Card ${idx+1} baixado`, 'success');
     } catch(e) { setError('Erro ao exportar: '+e.message); }
@@ -14362,17 +14587,67 @@ ${capRules}
       await waitForRender();
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
+      const videoSlides = [];
       for (let i=0; i<slides.length; i++) {
         setExportProgress({current:i+1,total:slides.length});
-        const canvas = await renderSlideToCanvas(slides[i]);
+        const slide = slides[i];
+        if (slide?.videoId) {
+          // Slide com vídeo: empacota o vídeo bruto + ainda gera o PNG do preview
+          // (o PNG ajuda a visualizar; o vídeo é o material editável no CapCut)
+          try {
+            const entry = await videoGet(slide.videoId);
+            if (entry?.blob) {
+              const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
+              zip.file(`slide-${String(i+1).padStart(2,'0')}-video.${ext}`, entry.blob);
+              videoSlides.push({ idx: i+1, title: slide.title, subtitle: slide.subtitle, body: slide.bodyAfterImage || '' });
+            }
+          } catch (e) {
+            console.warn(`Falha ao empacotar vídeo do slide ${i+1}:`, e.message);
+          }
+        }
+        // PNG do preview sempre (mesmo se tem vídeo — útil de referência)
+        const canvas = await renderSlideToCanvas(slide);
         const blob = await canvasToPngBlob(canvas);
-        zip.file(`slide-${String(i+1).padStart(2,'0')}.png`, blob);
+        const suffix = slide?.videoId ? '-preview' : '';
+        zip.file(`slide-${String(i+1).padStart(2,'0')}${suffix}.png`, blob);
+      }
+      // README explicando como usar quando há vídeos
+      if (videoSlides.length > 0) {
+        const readme = [
+          '# Carrossel — Material de Exportação',
+          '',
+          `Este ZIP contém ${slides.length} card(s).`,
+          `${videoSlides.length} card(s) têm VÍDEO em vez de foto estática.`,
+          '',
+          '## Cards com vídeo',
+          '',
+          ...videoSlides.map(v => [
+            `### Slide ${String(v.idx).padStart(2, '0')}`,
+            `- Vídeo bruto: slide-${String(v.idx).padStart(2, '0')}-video.*`,
+            `- Preview com texto: slide-${String(v.idx).padStart(2, '0')}-preview.png`,
+            `- Título: ${v.title || '(vazio)'}`,
+            v.subtitle ? `- Subtítulo: ${v.subtitle}` : null,
+            v.body ? `- Corpo: ${v.body}` : null,
+            '',
+          ].filter(Boolean).join('\n')),
+          '',
+          '## Como combinar texto + vídeo',
+          '',
+          '1. Abre o vídeo no CapCut, InShot, Premiere ou similar',
+          '2. Adiciona uma camada de texto por cima usando o título/subtítulo acima',
+          '3. Exporta como MP4 com proporção 4:5 (1080×1350) pra feed do Instagram',
+          '4. Pra carrossel misto (foto + vídeo), suba todos juntos no Instagram',
+          '',
+          '(Cards SEM vídeo já vêm prontos como PNG — basta postar.)',
+        ].join('\n');
+        zip.file('LEIA-ME.md', readme);
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
       const stamp = new Date().toISOString().slice(0, 10);
-      await downloadBlob(zipBlob, `carrossel-slides-${stamp}.zip`);
-      toast(`ZIP com ${slides.length} cards pronto`, 'success');
-      trackEvent('export_zip', { card_count: String(slides.length) });
+      await downloadBlob(zipBlob, `carrossel-${stamp}.zip`);
+      const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
+      toast(`ZIP com ${slides.length} cards pronto${videoNote}`, 'success');
+      trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
   };
@@ -14688,6 +14963,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
     setLibraryOpen, libraryCount: library.length,
+    onPickVideo: () => videoFileInputRef.current?.click(),
+    onRemoveVideo: removeVideoFromActiveSlide,
     openRefImagePicker,
     slideImgGenBusy,
     generateSlideImageAt,
@@ -15511,6 +15788,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
       <input id={VC_PHOTO_ZONE_FILE_INPUT_ID} ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
       <input ref={refImageInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
+      <input ref={videoFileInputRef} type="file" accept="video/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importVideoToActiveSlide(f); }}/>
 
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
