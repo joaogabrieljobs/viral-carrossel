@@ -4638,7 +4638,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-              >⇄</div>
+              ><Shuffle size={14} aria-hidden/></div>
             )}
             <div
               data-vc-handle
@@ -7208,6 +7208,40 @@ function MobileDrawer({ open, onClose, children }) {
   );
 }
 
+// ─── SAVED INDICATOR — mostra "Salvo há Xs" perto do nome do projeto ─────────
+// Reduz ansiedade do user ("vou perder?") sem ser intrusivo. Atualiza
+// progressivamente: agora → "agora mesmo", < 60s → "Xs", < 1h → "Xmin",
+// > 1h → "Xh". Re-renderiza a cada 30s pra refrescar o texto.
+function SavedIndicator({ savedAt }) {
+  const [, force] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    if (!savedAt) return;
+    const id = setInterval(force, 30000);
+    return () => clearInterval(id);
+  }, [savedAt]);
+  if (!savedAt) return null;
+  const diff = Date.now() - savedAt;
+  let label;
+  if (diff < 5000) label = 'agora mesmo';
+  else if (diff < 60000) label = `há ${Math.round(diff / 1000)}s`;
+  else if (diff < 3600000) label = `há ${Math.round(diff / 60000)}min`;
+  else label = `há ${Math.round(diff / 3600000)}h`;
+  return (
+    <span
+      title="Auto-save: alterações são gravadas automaticamente. Clique no botão 'Meus projetos' pra gerenciar versões."
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+        letterSpacing: '-0.005em', opacity: 0.7,
+        cursor: 'help',
+      }}
+    >
+      <span style={{ color: 'var(--success-text)', fontSize: 9 }}>✓</span>
+      Salvo {label}
+    </span>
+  );
+}
+
 // ─── SCROLL LOCK (modais grandes) ────────────────────────────────────────────
 // Trava scroll do body enquanto modal está aberto + preserva scroll position no close.
 // Conta abertura simultânea de múltiplos modais (caso raro de modal sobre modal).
@@ -9580,7 +9614,7 @@ function SidebarContent({
           {id:'brand',    icon:Palette,  label:'Marca'},
           {id:'material', icon:BookOpen, label:'Conteúdo'},
           {id:'slide',    icon:Layout,   label:'Cards'},
-          {id:'ai',       icon:Wand2,    label:'IA'},
+          {id:'ai',       icon:Wand2,    label:'Refinar'},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} className={`tab-bar-item ${tab===t.id?'active':''}`}>
             <t.icon size={11}/>{t.label}
@@ -9595,7 +9629,7 @@ function SidebarContent({
           <>
             <S
               title="Layout canvas"
-              hint="Ative zonas redimensionáveis na arte. Em seguida use o toggle para ver molduras no card; clique na área da foto para importar só ali. Arraste ⇄ para trocar texto ou foto entre cards."
+              hint="Ative zonas redimensionáveis na arte. Em seguida use o toggle para ver molduras no card; clique na área da foto para importar só ali. Arraste o pino de swap para trocar texto ou foto entre cards."
             >
               <Toggle
                 label="Modo edição de zonas (molduras no card)"
@@ -11613,34 +11647,11 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Download footer — PNG por card omitido na aba Conteúdo (ZIP/PDF mantidos). */}
-      <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
-        {/* Salvar / abrir biblioteca — visível pra dar feedback de que projeto está salvo */}
-        <button
-          onClick={() => setLibraryOpen(true)}
-          aria-label="Abrir biblioteca de projetos salvos"
-          style={{
-            width:'100%', minHeight:38, borderRadius:11, cursor:'pointer',
-            border:'1px solid var(--accent)', background:'var(--success-surface)',
-            color:'var(--text-primary)', fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.011em',
-            display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'8px 12px',
-            transition:'background 0.12s, border-color 0.12s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#fff'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--success-surface)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-        >
-          <BookOpen size={14}/>
-          {libraryCount > 1
-            ? `Meus projetos (${libraryCount} salvos)`
-            : 'Salvar projeto / abrir salvos'}
-        </button>
-        <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', textAlign:'center', marginBottom:4, lineHeight:1.4 }}>
-          ✓ Salvando automaticamente · clique pra nomear, duplicar ou voltar a um anterior
-        </div>
+      {/* Download footer — hierarquia clara: 1 CTA primário + dropdown secundários + link sutil */}
+      <div style={{ borderTop:'1px solid var(--border)', padding:12, display:'flex', flexDirection:'column', gap:8, flexShrink:0 }}>
         {tab !== 'material' && (
           <button onClick={()=>exportSlide(activeIdx)} disabled={exporting} aria-label={`Baixar card ${activeIdx+1} em PNG`} style={{
-            width:'100%', height:40, borderRadius:9999, border:'none', cursor:'pointer',
+            width:'100%', height:42, borderRadius:9999, border:'none', cursor:'pointer',
             background:'var(--text-primary)', color:'#fff',
             fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
             letterSpacing:'-0.011em',
@@ -11648,39 +11659,151 @@ function SidebarContent({
             opacity:exporting?0.5:1,
             transition:'opacity 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
           }}>
-            <Download size={13}/>
+            <Download size={14}/>
             {exporting ? `${exportProgress.current}/${exportProgress.total}…` : `Baixar card ${activeIdx+1}`}
           </button>
         )}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-          <button onClick={exportAll} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label={`Baixar todos os cards num ficheiro ZIP (${slides.length} imagens)`}>
-            <Download size={11}/>ZIP ({slides.length})
-          </button>
-          <button onClick={exportPDF} disabled={exporting} className="vc-btn vc-btn-ghost" style={{ height:34, fontSize:11 }} aria-label="Baixar carrossel em PDF">
-            <FileText size={11}/>PDF
-          </button>
+        {/* Dropdown "Mais formatos" — esconde ZIP/PDF/Fotos limpas atrás de um botão único */}
+        <ExportMoreFormats
+          slides={slides}
+          exporting={exporting}
+          onExportAll={exportAll}
+          onExportPDF={exportPDF}
+          onExportPhotosOnly={exportPhotosOnly}
+        />
+        {/* Library como link sutil (não CTA) — auto-save indicado pelo texto */}
+        <button
+          onClick={() => setLibraryOpen(true)}
+          aria-label="Abrir biblioteca de projetos salvos"
+          style={{
+            width:'100%', minHeight:32, cursor:'pointer',
+            border:'none', background:'transparent',
+            color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+            letterSpacing:'-0.011em',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+            transition:'color 0.12s',
+            marginTop:2, padding:'6px 8px', borderRadius:6,
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+        >
+          <BookOpen size={11}/>
+          {libraryCount > 1
+            ? <>Meus projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong> salvos</>
+            : 'Meus projetos salvos'}
+        </button>
+        <div style={{ fontSize:9, color:'var(--text-muted)', fontFamily:'var(--font-ui)', textAlign:'center', lineHeight:1.4, opacity:0.6 }}>
+          ✓ Salvando automaticamente
         </div>
-        {(() => {
-          const photoCount = slides.filter(s => !!s.bgImage).length;
-          if (photoCount === 0) return null;
-          const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
-          return (
+      </div>
+    </div>
+  );
+}
+
+// ─── EXPORT MORE FORMATS — dropdown que esconde formatos secundários ──────────
+function ExportMoreFormats({ slides, exporting, onExportAll, onExportPDF, onExportPhotosOnly }) {
+  const [open, setOpen] = React.useState(false);
+  const refMenu = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (!refMenu.current) return;
+      if (!refMenu.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const photoCount = slides.filter(s => !!s.bgImage).length;
+  const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
+  return (
+    <div ref={refMenu} style={{ position:'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        disabled={exporting}
+        className="vc-btn vc-btn-ghost"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        style={{ width:'100%', height:34, fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+      >
+        Mais formatos
+        <ChevronDown size={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}/>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position:'absolute', bottom:'100%', left:0, right:0, marginBottom:6,
+            background:'var(--bg-base)', border:'1px solid var(--hairline)',
+            borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,0.12)',
+            padding:6, display:'flex', flexDirection:'column', gap:2, zIndex:50,
+          }}
+        >
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => { setOpen(false); onExportAll(); }}
+            disabled={exporting}
+            style={{
+              display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+              border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
+              fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
+              transition:'background 0.12s', textAlign:'left',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Download size={13} style={{ color:'var(--text-muted)' }}/>
+            <span style={{ flex:1 }}>Carrossel completo (ZIP)</span>
+            <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>{slides.length} cards</span>
+          </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => { setOpen(false); onExportPDF(); }}
+            disabled={exporting}
+            style={{
+              display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+              border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
+              fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
+              transition:'background 0.12s', textAlign:'left',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <FileText size={13} style={{ color:'var(--text-muted)' }}/>
+            <span style={{ flex:1 }}>Carrossel em PDF</span>
+          </button>
+          {photoCount > 0 && (
             <button
-              onClick={exportPhotosOnly}
+              role="menuitem"
+              type="button"
+              onClick={() => { setOpen(false); onExportPhotosOnly(); }}
               disabled={exporting}
-              className="vc-btn vc-btn-ghost"
-              style={{ height:34, fontSize:11, width:'100%' }}
-              aria-label={`Baixar ${photoCount} fotos limpas em ZIP (sem texto sobreposto)`}
+              style={{
+                display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+                border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
+                fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
+                transition:'background 0.12s', textAlign:'left',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               title="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA"
             >
-              <ImageIcon size={11}/>
-              {aiCount > 0
-                ? `Fotos limpas — ${photoCount} ZIP (${aiCount} IA)`
-                : `Fotos limpas — ${photoCount} ZIP`}
+              <ImageIcon size={13} style={{ color:'var(--text-muted)' }}/>
+              <span style={{ flex:1 }}>Apenas fotos limpas</span>
+              <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
+                {photoCount}{aiCount > 0 ? ` · ${aiCount} IA` : ''}
+              </span>
             </button>
-          );
-        })()}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -13001,7 +13124,17 @@ export default function App() {
   }, []);
 
   // Persiste os 3 stores (debounced — sincronização imediata acima nos eventos do sistema)
-  useEffect(() => { const t = setTimeout(() => lsSet(SK.library, library), 100); return () => clearTimeout(t); }, [library]);
+  // Auto-save da biblioteca + tracking do último save pro indicador no header
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const firstSaveRef = useRef(true);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      lsSet(SK.library, library);
+      if (firstSaveRef.current) { firstSaveRef.current = false; return; }
+      setLastSavedAt(Date.now());
+    }, 100);
+    return () => clearTimeout(t);
+  }, [library]);
   useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
   useEffect(() => { lsSet(SK.brands, brandRoster); }, [brandRoster]);
   useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
@@ -15113,29 +15246,32 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               Viral<span style={{ color:'var(--accent)' }}>.</span>
             </div>
             {activeEntry && (
-              <button
-                onClick={async () => {
-                  const current = activeEntry.name || 'Carrossel';
-                  const next = await askPrompt({
-                    title: 'Renomear projeto',
-                    label: 'Nome',
-                    defaultValue: current,
-                    placeholder: 'Ex: Meu carrossel viral',
-                    cta: 'Renomear',
-                  });
-                  if (next && next.trim() && next !== current) renameDoc(activeEntry.id, next.trim());
-                }}
-                style={{
-                  marginTop:3, fontSize:11, color:'var(--text-muted)',
-                  letterSpacing:'-0.011em',
-                  background:'none', border:'none', cursor:'pointer', padding:0,
-                  maxWidth:220, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
-                  textAlign:'left', display:'block',
-                }}
-                title="Clique para renomear"
-              >
-                {activeEntry.name || 'Sem título'}
-              </button>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:3, flexWrap:'wrap' }}>
+                <button
+                  onClick={async () => {
+                    const current = activeEntry.name || 'Carrossel';
+                    const next = await askPrompt({
+                      title: 'Renomear projeto',
+                      label: 'Nome',
+                      defaultValue: current,
+                      placeholder: 'Ex: Meu carrossel viral',
+                      cta: 'Renomear',
+                    });
+                    if (next && next.trim() && next !== current) renameDoc(activeEntry.id, next.trim());
+                  }}
+                  style={{
+                    fontSize:11, color:'var(--text-muted)',
+                    letterSpacing:'-0.011em',
+                    background:'none', border:'none', cursor:'pointer', padding:0,
+                    maxWidth:220, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                    textAlign:'left',
+                  }}
+                  title="Clique para renomear"
+                >
+                  {activeEntry.name || 'Sem título'}
+                </button>
+                <SavedIndicator savedAt={lastSavedAt}/>
+              </div>
             )}
           </div>
         </div>
@@ -15502,6 +15638,38 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     />
                   ) : null}
 
+                  {/* Onboarding hint — só aparece quando slide ainda tem texto-placeholder */}
+                  {slide.title === 'Seu título aqui' && slides.length === 1 ? (
+                    <div
+                      aria-hidden
+                      style={{
+                        position:'absolute', inset:0, zIndex:10, pointerEvents:'none',
+                        display:'flex', alignItems:'flex-start', justifyContent:'center',
+                        padding: `${f.h * previewScale * 0.05}px`,
+                      }}
+                    >
+                      <div style={{
+                        background:'rgba(20,20,22,0.92)', color:'#fff',
+                        padding:'10px 14px', borderRadius:10,
+                        fontSize:11, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                        lineHeight:1.5, maxWidth:'88%',
+                        backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
+                        boxShadow:'0 8px 24px rgba(0,0,0,0.32)',
+                        animation:'fadeUp 0.4s var(--ease-smooth)',
+                      }}>
+                        <div style={{ fontWeight:600, marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
+                          <Sparkles size={12} style={{ color:'var(--accent)' }}/>
+                          Comece em 3 caminhos
+                        </div>
+                        <div style={{ opacity:0.85, fontSize:10, lineHeight:1.6 }}>
+                          → Click <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
+                          → Escolha um <strong style={{ color:'#fff' }}>Template pronto</strong><br/>
+                          → Ou edite o título e copy aqui mesmo
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* Setas flutuantes */}
                   {activeIdx > 0 && (
                     <button
@@ -15647,9 +15815,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                           aria-label={`Visualizar card ${i+1} em tela cheia`}
                           style={{
                             background:'none', border:'none', color:'var(--text-muted)',
-                            cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
+                            cursor:'pointer', padding:6, borderRadius:6, transition:'color 0.12s, background 0.12s',
                             display:'inline-flex', alignItems:'center', justifyContent:'center',
-                            minWidth:24, minHeight:24,
+                            minWidth:32, minHeight:32,
                           }}
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
@@ -15692,9 +15860,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                           aria-label={`Baixar card ${i+1}`}
                           style={{
                             background:'none', border:'none', color:'var(--text-muted)',
-                            cursor:'pointer', padding:4, borderRadius:4, transition:'color 0.12s',
+                            cursor:'pointer', padding:6, borderRadius:6, transition:'color 0.12s, background 0.12s',
                             display:'inline-flex', alignItems:'center', justifyContent:'center',
-                            minWidth:24, minHeight:24,
+                            minWidth:32, minHeight:32,
                           }}
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
@@ -15738,7 +15906,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 { id:'brand',    label:'Marca',    icon:Palette },
                 { id:'material', label:'Conteúdo', icon:BookOpen },
                 { id:'slide',    label:'Cards',    icon:Layout },
-                { id:'ai',       label:'IA',       icon:Wand2 },
+                { id:'ai',       label:'Refinar',  icon:Wand2 },
               ].map(({ id, label, icon:Icon }) => (
                 <button
                   key={id}
