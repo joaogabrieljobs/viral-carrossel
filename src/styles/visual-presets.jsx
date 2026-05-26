@@ -56,6 +56,195 @@ function TextLines({ y, color, count = 2, widths = [50, 35], height = 4, gap = 1
   ));
 }
 
+/**
+ * Gerador único de preview a partir dos campos do preset.
+ * Reproduz fielmente o que o renderer real desenha: foto simulada + header
+ * 3-col + badge + star + eyebrow + título + subtítulo (se visível) + footer
+ * pill OU footer bar 3-col. Posicionamento respeita slideDefaults.layout/align.
+ *
+ * Resultado: cada um dos 12 cards mostra sua assinatura visual real,
+ * não uma abstração genérica.
+ */
+export function renderPresetPreview(preset) {
+  const b = preset.brand || {};
+  const d = preset.slideDefaults || {};
+
+  // Layout: tl/tc/tr (top) · ml/mc/mr (mid) · bl/bc/br (bottom)
+  const layout = d.layout || 'mc';
+  const vPos = layout.charAt(0); // t/m/b
+  const hPos = layout.charAt(1); // l/c/r
+  const align = d.align || 'left';
+
+  // Foto BG simulada — todos os presets usam foto exceto Minimal Clean.
+  const noPhoto = preset.id === 'minimal_clean';
+  const photoColor = noPhoto ? b.bg : '#3a3a3a';
+
+  // Cores derivadas
+  const titleC = b.titleColor || '#fff';
+  const subC = b.subtitleColor || titleC;
+  const accent = b.accent || titleC;
+  const mutedC = noPhoto ? '#a0a0a0' : 'rgba(255,255,255,0.6)';
+
+  // Flags
+  const hasHeader = !!(b.cultureHeaderLeft || b.cultureHeaderYear || b.cultureHeaderCenter);
+  const hasBadge = !!b.showPageBadge;
+  const hasStar = !!b.showStarOrnament;
+  const hasEyebrow = !!d.eyebrowText;
+  const subVisible = b.subtitleVisible !== false;
+  const hasStrike = !!d.strikethroughText;
+  const hasFooterPill = !!b.footerPillText;
+  const hasFooterBar = !!(b.footerBarLeft || b.footerBarCenter || b.footerBarRight);
+
+  // Posição base da pilha eyebrow/star/título (respeita layout vertical)
+  const stackBaseY = vPos === 't' ? 12 : vPos === 'm' ? 30 : 46;
+
+  // Helper de alinhamento horizontal (start/center/end)
+  const xAlign = align === 'center' ? 'center' : align === 'right' ? 'end' : 'start';
+  const xLineCenter = 30;
+  const xLineX = (w) => xAlign === 'center' ? 30 - w/2 : xAlign === 'end' ? 56 - w : 4;
+
+  // Posição base do pill / bar do footer
+  const footerY = 67;
+
+  let y = stackBaseY;
+
+  return (
+    <PreviewCard bg={b.bg || '#222'}>
+      {/* Foto simulada — overlay escurecido pra texto contrastar */}
+      {!noPhoto && (
+        <>
+          <rect x="0" y="0" width="60" height="75" fill={photoColor} />
+          <rect x="0" y="40" width="60" height="35" fill="rgba(0,0,0,0.45)" />
+        </>
+      )}
+
+      {/* Header 3-col fino no topo */}
+      {hasHeader && (
+        <g>
+          {b.cultureHeaderLeft && <rect x="3" y="3" width="13" height="1.6" fill={mutedC} rx="0.4"/>}
+          {(b.cultureHeaderCenter || '').trim() && <rect x="23" y="3" width="14" height="1.6" fill={mutedC} rx="0.4"/>}
+          {b.cultureHeaderYear && <rect x={hasBadge ? 43 : 44} y="3" width={hasBadge ? 7 : 13} height="1.6" fill={mutedC} rx="0.4"/>}
+        </g>
+      )}
+
+      {/* Badge "N/M" pill canto sup direito */}
+      {hasBadge && (
+        <g>
+          <rect x="50" y="2.5" width="8" height="4" rx="2" fill="rgba(0,0,0,0.5)"/>
+          <text x="54" y="5.7" fontSize="2.8" fill="#fff" fontWeight="700" textAnchor="middle">1/N</text>
+        </g>
+      )}
+
+      {/* Star ornament 8-pontas centralizado acima do eyebrow */}
+      {hasStar && (() => {
+        const sx = xLineCenter;
+        const sy = y + 2;
+        y += 7;
+        return (
+          <g fill={accent} transform={`translate(${sx} ${sy})`}>
+            <polygon points="0,-3.5 0.8,-0.5 3.5,0 0.8,0.5 0,3.5 -0.8,0.5 -3.5,0 -0.8,-0.5"/>
+            <g transform="rotate(45)">
+              <polygon points="0,-3 0.7,-0.4 3,0 0.7,0.4 0,3 -0.7,0.4 -3,0 -0.7,-0.4"/>
+            </g>
+          </g>
+        );
+      })()}
+
+      {/* Eyebrow MAIÚSCULAS pequeno */}
+      {hasEyebrow && (() => {
+        const w = 32;
+        const x = hasStar || align === 'center' ? 30 - w/2 : xLineX(w);
+        const row = <rect key="eb" x={x} y={y} width={w} height={1.6} fill={subC} rx="0.4"/>;
+        y += 4;
+        return row;
+      })()}
+
+      {/* Título — 2-3 linhas com cor titleColor */}
+      {(() => {
+        const lines = [
+          { w: align === 'center' ? 44 : 50, h: 4 },
+          { w: align === 'center' ? 38 : 44, h: 4 },
+          { w: align === 'center' ? 30 : 36, h: 4 },
+        ];
+        const out = lines.map((ln, i) => {
+          const x = xLineX(ln.w);
+          const rect = <rect key={`t${i}`} x={x} y={y} width={ln.w} height={ln.h} fill={titleC} rx="0.6"/>;
+          y += ln.h + 1.2;
+          return rect;
+        });
+        return out;
+      })()}
+
+      {/* Subtítulo (se visível) — peso mais leve, cor sutil */}
+      {subVisible && (() => {
+        y += 1.5;
+        const w = align === 'center' ? 28 : 32;
+        const x = xLineX(w);
+        const r1 = <rect key="s1" x={x} y={y} width={w} height={1.8} fill={subC} opacity="0.7" rx="0.4"/>;
+        y += 2.8;
+        const r2 = <rect key="s2" x={x} y={y} width={w-6} height={1.8} fill={subC} opacity="0.7" rx="0.4"/>;
+        y += 2.8;
+        return [r1, r2];
+      })()}
+
+      {/* Strikethrough (Bold Promo Pink) */}
+      {hasStrike && (() => {
+        y += 2;
+        const xStrike = xLineX(36);
+        return (
+          <g key="strike">
+            <rect x={xStrike} y={y} width="10" height="2.5" fill={titleC} opacity="0.8" rx="0.4"/>
+            <line x1={xStrike} y1={y + 1.2} x2={xStrike + 10} y2={y + 1.2} stroke={accent} strokeWidth="0.8"/>
+            <rect x={xStrike + 12} y={y} width="22" height="2.5" fill={titleC} rx="0.4"/>
+          </g>
+        );
+      })()}
+
+      {/* Footer pill centralizado bottom */}
+      {hasFooterPill && (
+        <g>
+          <rect
+            x={b.footerPillArrow === false ? 18 : 14}
+            y={footerY}
+            width={b.footerPillArrow === false ? 24 : 32}
+            height="5"
+            rx="2.5"
+            fill={b.footerPillBg || accent}
+          />
+          <rect
+            x={b.footerPillArrow === false ? 22 : 18}
+            y={footerY + 1.4}
+            width={b.footerPillArrow === false ? 16 : 18}
+            height="2"
+            fill={b.footerPillFg || (b.footerPillBg ? '#fff' : '#0a0a0a')}
+            rx="0.4"
+          />
+          {b.footerPillArrow !== false && (
+            <circle
+              cx={42}
+              cy={footerY + 2.5}
+              r="1.8"
+              fill={b.footerPillFg || '#0a0a0a'}
+            />
+          )}
+        </g>
+      )}
+
+      {/* Footer bar 3-col (Authority Black) */}
+      {hasFooterBar && (
+        <g>
+          {[8, 24, 40].map((x, i) => (
+            <g key={`fb${i}`}>
+              <rect x={x} y={footerY} width="12" height="1.4" fill={mutedC} rx="0.3"/>
+              <rect x={x} y={footerY + 2.4} width="11" height="1.4" fill={titleC} rx="0.3"/>
+            </g>
+          ))}
+        </g>
+      )}
+    </PreviewCard>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // 12 PRESETS
 // ───────────────────────────────────────────────────────────────────────────

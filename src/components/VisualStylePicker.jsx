@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { Check } from 'lucide-react';
+import { renderPresetPreview } from '../styles/visual-presets.jsx';
 
 export default function VisualStylePicker({
   value,
@@ -83,9 +84,11 @@ export default function VisualStylePicker({
                   <Check size={11} strokeWidth={3} />
                 </span>
               )}
-              {/* Mini-preview SVG */}
+              {/* Mini-preview SVG — gerado a partir dos campos do preset
+                  (header bar, badge, star, eyebrow, título, subtítulo, pill,
+                  footer bar, strikethrough) com fidelidade ao card real. */}
               <div style={{ width: 60, height: 75, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.1)', borderRadius: 6 }}>
-                {p.preview()}
+                {renderPresetPreview(p)}
               </div>
               {/* Nome do preset */}
               <div
