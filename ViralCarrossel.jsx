@@ -101,94 +101,147 @@ const GLOBAL_STYLE = `
   /* Figma Design System — pastéis marketing + magenta CTA (+ Inter / JetBrains Mono). */
 
   :root {
-    /* — Pastéis FIGMA ({colors.block-*}) — */
-    --figma-lime: #dceeb1;
-    --figma-lilac: #c5b0f4;
-    --figma-cream: #f4ecd6;
-    --figma-pink: #efd4d4;
-    --figma-mint: #c8e6cd;
-    --figma-coral: #f3c9b6;
-    --figma-navy: #1f1d3d;
-    --figma-magenta: #ff3d8b;
+    /* — NARRATIVE OS Design System (Sessão A: Foundation Dark + Glass) — */
 
-    /* — Surfaces — */
-    --bg-base: #ffffff;
-    --bg-parchment: #f0f7f2;      /* wash menta Figma */
-    --bg-pearl: #f6f3fc;           /* wash lilás Figma */
-    --bg-sidebar: var(--figma-cream);
-    --bg-elevated: #ffffff;
-    --bg-card: #ffffff;
+    /* Magenta core (mantém identidade) */
+    --accent-primary: #ff2d8d;
+    --accent-hover: #ff4fa1;
+    --accent-blue: #7ba7ff;
+    --accent-violet: #8f7dff;
+    --accent-amber: #ffb86a;
 
-    --bg-tile-1: #272729;
-    --bg-tile-2: #2a2a2c;
-    --bg-tile-3: #252527;
+    /* Spec Narrative OS: bg light, mas mock é dark — interpolação:
+       app fica DARK por default, surfaces com glass; texto on-dark.
+       Tons charcoal/midnight em vez de preto puro. */
+    --bg-primary: #0e0c14;
+    --bg-secondary: #15131c;
+    --bg-tertiary: #1c1925;
+
+    /* Surfaces compat (mapeia tokens legacy do app pra equivalentes dark) */
+    --bg-base: var(--bg-primary);
+    --bg-parchment: var(--bg-secondary);
+    --bg-pearl: var(--bg-secondary);
+    --bg-sidebar: var(--bg-secondary);
+    --bg-elevated: var(--bg-tertiary);
+    --bg-card: var(--bg-tertiary);
+
+    --bg-tile-1: #1c1925;
+    --bg-tile-2: #221f2c;
+    --bg-tile-3: #1a1722;
     --bg-black: #000000;
 
-    --border: #e6e6e6;
-    --border-muted: #ede9f7;
-    --hairline: #e6e6e6;
-    --divider-soft: rgba(31, 29, 61, 0.06);
-    --border-on-dark: rgba(255,255,255,0.10);
+    /* Glass system — multi-layer com blur. White/dark variants. */
+    --bg-glass:        rgba(255, 255, 255, 0.06);
+    --bg-glass-strong: rgba(255, 255, 255, 0.10);
+    --bg-glass-deep:   rgba(255, 255, 255, 0.14);
+    --bg-dark-glass:   rgba(10, 10, 10, 0.42);
+    --glass-border:    rgba(255, 255, 255, 0.10);
+    --glass-border-strong: rgba(255, 255, 255, 0.18);
+    --glass-highlight: rgba(255, 255, 255, 0.22);
 
-    --text-primary: #000000;
-    --text-secondary: #363636;
-    --text-muted: #5c5c5c;
+    /* Blur tokens */
+    --blur-xs: 6px;
+    --blur-sm: 12px;
+    --blur-md: 18px;
+    --blur-lg: 24px;
+    --blur-xl: 40px;
+
+    /* Borders */
+    --border: rgba(255, 255, 255, 0.10);
+    --border-muted: rgba(255, 255, 255, 0.06);
+    --hairline: rgba(255, 255, 255, 0.10);
+    --divider-soft: rgba(255, 255, 255, 0.04);
+    --border-on-dark: rgba(255, 255, 255, 0.10);
+
+    /* Text on dark */
+    --text-primary: #f3f0eb;
+    --text-secondary: #b8b3a8;
+    --text-muted: rgba(243, 240, 235, 0.55);
     --text-on-dark: #ffffff;
-    --text-on-dark-muted: rgba(255,255,255,0.72);
+    --text-on-dark-muted: rgba(255, 255, 255, 0.72);
 
-    /* Ação principal = magenta Figma; links secundários / molduras = lilás */
-    --accent: var(--figma-magenta);
-    --accent-hover: #e6327a;
-    --accent-focus: var(--figma-navy);
-    --accent-secondary: var(--figma-lilac);
+    /* Accent system (legacy aliases pra compat) */
+    --accent: var(--accent-primary);
+    --accent-focus: var(--accent-primary);
+    --accent-secondary: var(--accent-violet);
     --accent-on-dark: #ffffff;
-    --accent-surface: rgba(197, 176, 244, 0.28);
-    --accent-surface-strong: rgba(197, 176, 244, 0.42);
-    --accent-magenta-surface: rgba(255, 61, 139, 0.10);
-    --accent-glow: rgba(255, 61, 139, 0.22);
+    --accent-surface:        rgba(255, 45, 141, 0.10);
+    --accent-surface-strong: rgba(255, 45, 141, 0.18);
+    --accent-magenta-surface: rgba(255, 45, 141, 0.10);
+    --accent-glow: rgba(255, 45, 141, 0.32);
 
-    --logo-mark-bg: var(--figma-coral);
-    --logo-mark-fg: var(--figma-navy);
+    --logo-mark-bg: var(--accent-surface);
+    --logo-mark-fg: var(--accent-primary);
 
     --success: #1ea64a;
     --success-surface: rgba(30, 166, 74, 0.12);
     --success-border: rgba(30, 166, 74, 0.28);
-    --success-text: #146c31;
+    --success-text: #5fd47e;
     --danger: #ff3b30;
     --warning: #ff9500;
 
-    --font-ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Typography */
+    --font-ui: 'Inter', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+    --font-display: 'Inter', 'SF Pro Display', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
     --font-serif: 'Inter', system-ui, serif;
 
-    --radius-sm: 6px;
-    --radius-md: 8px;
+    /* Radius scale Narrative OS */
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 18px;
     --radius-lg: 24px;
-    --radius-pill: 50px;
+    --radius-xl: 32px;
+    --radius-pill: 9999px;
 
-    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    /* Spacing scale (8pt + accents) */
+    --space-2: 2px;
+    --space-4: 4px;
+    --space-6: 6px;
+    --space-8: 8px;
+    --space-12: 12px;
+    --space-16: 16px;
+    --space-20: 20px;
+    --space-24: 24px;
+    --space-32: 32px;
+    --space-40: 40px;
+    --space-48: 48px;
+
+    /* Motion — cinematic */
+    --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-slow: 280ms;
+    --motion-cinematic: 420ms;
 
-    --shadow-product: 0 5px 30px rgba(0, 0, 0, 0.22);
+    /* Soft depth shadows */
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.22);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.36);
+    --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.48);
 
-    /* Sombras premium multi-layer — usadas em cards/modals/elevações.
-       Cada nível com tint accent sutil pra coerência cromática. */
+    /* Ambient colored glows */
+    --shadow-pink:   0 0 40px rgba(255, 45, 141, 0.22);
+    --shadow-blue:   0 0 48px rgba(123, 167, 255, 0.18);
+    --shadow-violet: 0 0 56px rgba(143, 125, 255, 0.18);
+
+    /* Legacy compat (já usado em vários lugares) */
+    --shadow-product: var(--shadow-lg);
     --shadow-card-rest:
-      0 1px 2px rgba(0, 0, 0, 0.04),
-      0 2px 8px rgba(0, 0, 0, 0.04);
+      0 4px 12px rgba(0, 0, 0, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.12);
     --shadow-card-hover:
-      0 1px 3px rgba(0, 0, 0, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.08),
-      0 24px 48px rgba(255, 61, 139, 0.06);
+      0 16px 40px rgba(0, 0, 0, 0.36),
+      0 0 40px rgba(255, 45, 141, 0.12);
     --shadow-elevated:
-      0 0 0 0.5px rgba(0, 0, 0, 0.04) inset,
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 8px 24px rgba(0, 0, 0, 0.08);
+      0 8px 32px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
 
-    /* Gradients sutis pra surfaces premium */
-    --gradient-surface: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.85) 100%);
-    --gradient-accent: linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%);
+    /* Surface gradients — dark glass */
+    --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    --gradient-accent: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
+    --gradient-bg: linear-gradient(180deg, #0e0c14 0%, #15131c 100%);
 
     --safe-top:    env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -199,7 +252,13 @@ const GLOBAL_STYLE = `
   * { box-sizing: border-box; }
 
   body {
-    background: var(--bg-base); color: var(--text-primary);
+    /* Dark gradient + ambient glow magenta no canto (Vision OS-like) */
+    background:
+      radial-gradient(ellipse at top right, rgba(255, 45, 141, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(143, 125, 255, 0.06) 0%, transparent 60%),
+      var(--gradient-bg);
+    background-attachment: fixed;
+    color: var(--text-primary);
     font-family: var(--font-ui);
     font-size: 17px;
     line-height: 1.47;
@@ -207,7 +266,6 @@ const GLOBAL_STYLE = `
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Inter font features pra elegância: alt 1, single-storey a, cursive italic */
     font-feature-settings: 'cv11', 'ss01', 'kern' 1;
     text-rendering: optimizeLegibility;
     overscroll-behavior-x: none;
@@ -386,58 +444,59 @@ const GLOBAL_STYLE = `
   /* — GLOBAL BUTTON POLISH (atinge TODOS os botões, incluindo inline-styled) — */
   button {
     transition:
-      transform 0.16s var(--ease-smooth),
-      box-shadow 0.22s var(--ease-smooth),
-      background 0.20s var(--ease-smooth),
-      border-color 0.18s var(--ease-smooth),
-      color 0.18s var(--ease-smooth);
+      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      background 0.20s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+      color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
     font-feature-settings: 'cv11', 'ss01', 'kern' 1;
   }
   button:not(:disabled):active { transform: scale(0.96); }
-  /* Botão com background colorido (accent) ganha sombra magenta automaticamente */
+
+  /* Botão accent magenta — gradient 135deg + sombra magenta + glow no hover */
   button[style*="background:var(--accent)"]:not(:disabled),
   button[style*="background: var(--accent)"]:not(:disabled),
   button[style*="background:'var(--accent)'"]:not(:disabled) {
+    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
     box-shadow:
-      0 1px 2px rgba(255, 61, 139, 0.30),
-      0 4px 12px rgba(255, 61, 139, 0.22),
+      0 8px 24px rgba(255, 45, 141, 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
   }
   button[style*="background:var(--accent)"]:not(:disabled):hover,
   button[style*="background: var(--accent)"]:not(:disabled):hover,
   button[style*="background:'var(--accent)'"]:not(:disabled):hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     box-shadow:
-      0 2px 4px rgba(255, 61, 139, 0.36),
-      0 8px 22px rgba(255, 61, 139, 0.32),
+      0 16px 40px rgba(255, 45, 141, 0.32),
+      0 0 24px rgba(255, 45, 141, 0.18),
       inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
   }
-  /* Botão preto/dark (.text-primary) ganha sombra neutra elevada */
+
+  /* Botão dark (.text-primary) → sombra colored neutra elegante */
   button[style*="background:var(--text-primary)"]:not(:disabled),
   button[style*="background: var(--text-primary)"]:not(:disabled) {
     box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.20),
-      0 6px 16px rgba(0, 0, 0, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+      0 8px 24px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
   }
   button[style*="background:var(--text-primary)"]:not(:disabled):hover,
   button[style*="background: var(--text-primary)"]:not(:disabled):hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     box-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.24),
-      0 10px 24px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+      0 16px 40px rgba(0, 0, 0, 0.52),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
   }
 
-  /* Inputs globais (textareas + selects + input) ganham focus halo accent */
+  /* Inputs globais → focus glow halo accent (4px ring) */
   input:not([type="range"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):focus,
   textarea:focus,
   select:focus {
     outline: none;
-    border-color: var(--accent) !important;
+    border-color: rgba(255, 45, 141, 0.42) !important;
     box-shadow:
-      0 0 0 4px rgba(255, 61, 139, 0.14),
-      0 1px 3px rgba(255, 61, 139, 0.08) !important;
+      0 0 0 4px rgba(255, 45, 141, 0.08),
+      0 8px 24px rgba(255, 45, 141, 0.12) !important;
   }
 
   /* — Buttons — modernizados: micro-interactions, glass ghost, glow primary,
@@ -461,55 +520,54 @@ const GLOBAL_STYLE = `
   .vc-btn:focus-visible { outline: 2px solid var(--accent-focus); outline-offset: 3px; }
   .vc-btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
 
-  /* Primary pill — gradient sutil + sombra colored + glow no hover */
+  /* Primary pill — gradient 135deg magenta + sombra colored + glow no hover */
   .vc-btn-primary {
     color: #fff;
     padding: 0 22px; height: 40px; font-size: 14px; font-weight: 500;
-    background:
-      linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%);
+    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow:
-      0 1px 2px rgba(255, 61, 139, 0.32),
-      0 4px 12px rgba(255, 61, 139, 0.22),
+      0 8px 24px rgba(255, 45, 141, 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
   .vc-btn-primary:hover:not(:disabled) {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     box-shadow:
-      0 2px 4px rgba(255, 61, 139, 0.36),
-      0 8px 22px rgba(255, 61, 139, 0.32),
+      0 16px 40px rgba(255, 45, 141, 0.32),
+      0 0 24px rgba(255, 45, 141, 0.18),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
   .vc-btn-primary:active:not(:disabled) {
-    transform: scale(0.97) translateY(0);
+    transform: scale(0.97);
     box-shadow:
-      0 1px 2px rgba(255, 61, 139, 0.36),
-      0 2px 6px rgba(255, 61, 139, 0.22);
+      0 4px 12px rgba(255, 45, 141, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
 
-  /* Ghost — glass sutil: backdrop blur + border hairline + sombra ambient */
+  /* Ghost — glass-white sobre dark, border sutil branca */
   .vc-btn-ghost {
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    background: var(--bg-glass-strong);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
     color: var(--text-secondary);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--glass-border-strong);
     padding: 0 16px; height: 36px; font-size: 13px; font-weight: 500;
     border-radius: 9999px;
     box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.04),
-      0 0 0 0.5px rgba(0, 0, 0, 0.03) inset;
+      0 4px 16px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
   .vc-btn-ghost:hover:not(:disabled) {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.85);
-    border-color: rgba(0, 0, 0, 0.12);
+    background: var(--bg-glass-deep);
+    border-color: rgba(255, 255, 255, 0.28);
     box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.08),
-      0 0 0 0.5px rgba(0, 0, 0, 0.05) inset;
+      0 8px 24px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
   }
   .vc-btn-ghost:active:not(:disabled) { transform: scale(0.97); }
 
-  /* Botão de ícone — touch target 36px, hover com glass tint */
+  /* Botão de ícone — touch target 36px, hover com glass branca sutil */
   .vc-icon-btn {
     background: none; border: none; cursor: pointer; color: var(--text-muted);
     min-width: 36px; min-height: 36px; padding: 8px; border-radius: 10px;
@@ -519,29 +577,37 @@ const GLOBAL_STYLE = `
   }
   .vc-icon-btn:hover {
     color: var(--text-primary);
-    background: rgba(0, 0, 0, 0.045);
+    background: rgba(255, 255, 255, 0.08);
   }
   .vc-icon-btn:active { transform: scale(0.92); }
   .vc-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* Inputs modernos — pill, surface sutil, focus glow halo */
+  /* Inputs glass — surface translúcida sobre dark + focus halo magenta */
   .vc-input {
-    width: 100%; background: rgba(255, 255, 255, 0.85); border: 1.5px solid var(--hairline);
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border-strong);
     border-radius: 9999px; padding: 11px 18px; font-size: 14px;
     color: var(--text-primary); font-family: var(--font-ui);
     letter-spacing: -0.014em;
     font-feature-settings: 'cv11', 'ss01';
     outline: none;
-    transition: border-color 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth), background 0.2s;
+    transition: border-color 0.18s var(--ease-smooth), box-shadow 0.18s var(--ease-smooth), background 0.18s;
     -webkit-appearance: none; appearance: none;
   }
   .vc-input::placeholder { color: var(--text-muted); }
-  .vc-input:hover:not(:focus) { border-color: rgba(0, 0, 0, 0.14); background: #ffffff; }
+  .vc-input:hover:not(:focus) {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.08);
+  }
   .vc-input:focus {
-    border-color: var(--accent); background: #ffffff;
+    border-color: rgba(255, 45, 141, 0.52);
+    background: rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 0 0 4px rgba(255, 61, 139, 0.14),
-      0 1px 3px rgba(255, 61, 139, 0.08);
+      0 0 0 4px rgba(255, 45, 141, 0.10),
+      0 8px 24px rgba(255, 45, 141, 0.18);
   }
   @media (max-width: 767px) {
     .vc-input { font-size: 16px; padding: 12px 18px; }
@@ -666,12 +732,12 @@ const GLOBAL_STYLE = `
   /* Modals — frosted-glass overlay, parchment panel, no heavy chrome */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 50;
-    /* Glass premium — escurece levemente + blur intenso = focus no modal */
-    background: rgba(15, 12, 30, 0.32);
-    backdrop-filter: saturate(170%) blur(28px);
-    -webkit-backdrop-filter: saturate(170%) blur(28px);
+    /* Dark glass dim — quase preto translúcido + blur intenso */
+    background: rgba(5, 4, 10, 0.62);
+    backdrop-filter: saturate(170%) blur(32px);
+    -webkit-backdrop-filter: saturate(170%) blur(32px);
     display: flex; align-items: flex-end; justify-content: center;
-    animation: fadeIn 0.22s var(--ease-smooth);
+    animation: fadeIn 0.24s var(--ease-smooth);
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
@@ -679,23 +745,25 @@ const GLOBAL_STYLE = `
     .modal-overlay { align-items: center; padding: 16px; }
   }
   .modal-panel {
-    /* Glass premium: light surface translúcida + blur + saturate */
-    background: rgba(255, 255, 255, 0.94);
+    /* Glass dark premium — surface translúcida sobre dark */
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%),
+      var(--bg-secondary);
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--glass-border-strong);
     width: 100%;
     max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    animation: slideUp 0.28s var(--ease-smooth);
-    border-top-left-radius: 22px; border-top-right-radius: 22px;
+    animation: slideUp 0.32s var(--ease-smooth);
+    border-top-left-radius: 24px; border-top-right-radius: 24px;
     padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px));
     color: var(--text-primary);
-    /* Sombra premium multi-layer (cima do modal-overlay) */
+    /* Sombra multi-layer + ambient glow magenta */
     box-shadow:
-      0 -1px 2px rgba(0, 0, 0, 0.04),
-      0 -12px 40px rgba(0, 0, 0, 0.18),
-      0 -32px 80px rgba(255, 61, 139, 0.08);
+      0 -1px 0 rgba(255, 255, 255, 0.10) inset,
+      0 -12px 40px rgba(0, 0, 0, 0.42),
+      0 -32px 80px rgba(255, 45, 141, 0.12);
   }
   @supports (height: 100svh) {
     .modal-panel {
@@ -704,17 +772,16 @@ const GLOBAL_STYLE = `
   }
   @media (min-width: 640px) {
     .modal-panel {
-      border: 0.5px solid rgba(0, 0, 0, 0.08);
-      border-radius: 22px;
+      border: 1px solid var(--glass-border-strong);
+      border-radius: 24px;
       max-width: 480px; max-height: min(90vh, 900px);
       padding-bottom: 12px;
-      animation: modalIn 0.24s var(--ease-smooth);
-      /* Sombra ambient pra modal desktop — float feeling */
+      animation: modalIn 0.28s var(--ease-smooth);
+      /* Float dark com glow magenta multi-layer */
       box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.06),
-        0 24px 60px rgba(0, 0, 0, 0.18),
-        0 48px 120px rgba(255, 61, 139, 0.10),
-        inset 0 0.5px 0 rgba(255, 255, 255, 0.5);
+        0 1px 0 rgba(255, 255, 255, 0.10) inset,
+        0 24px 60px rgba(0, 0, 0, 0.48),
+        0 48px 120px rgba(255, 45, 141, 0.14);
     }
   }
   /* Modal alto (ex.: Gerar): cabeçalho fixo + corpo com scroll — evita CTA escondido no mobile */
