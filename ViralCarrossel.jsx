@@ -10119,13 +10119,16 @@ function SidebarContent({
         }}
       >
         {[
-          // FASE 1 do Narrative OS: domínios cognitivos, não tipo de config.
-          // Visual ganha tab própria (era enterrado em Marca).
-          // IA virou Narrativa (cognição > técnico).
+          // FASE 1 Narrative OS — 5 domínios cognitivos finais:
+          //   Narrativa (texto/IA + Conteúdo base)
+          //   Visual (padrão visual + tipografia)
+          //   Imagem (upload/IA/crop/filtro/padrão sobre fundo)
+          //   Layout (composição/canvas/posição)
+          //   Marca (identidade pura: logo/handle/bio/posicionamento)
           {id:'narrativa',icon:Wand2,    label:'Narrativa'},
           {id:'visual',   icon:Palette,  label:'Visual'},
-          {id:'material', icon:BookOpen, label:'Conteúdo'},
-          {id:'slide',    icon:Layout,   label:'Cards'},
+          {id:'imagem',   icon:ImageIcon,label:'Imagem'},
+          {id:'layout',   icon:Layout,   label:'Layout'},
           {id:'brand',    icon:Instagram,label:'Marca'},
         ].map(t=>{
           const active = tab===t.id;
@@ -10148,9 +10151,12 @@ function SidebarContent({
       {/* Scrollable body */}
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:20, paddingBottom:24 }}>
 
-        {tab==='slide' && (
+        {/* FASE 1 Narrative OS: split Cards em Imagem + Layout + (Tipografia
+            em Visual + Texto card em Narrativa). Outer condition cobre os 4
+            tabs que reusam seções daqui; cada section interno gate por tab. */}
+        {(tab==='imagem' || tab==='layout' || tab==='visual' || tab==='narrativa' || tab==='slide') && (
           <>
-            <S
+            {(tab==='layout'||tab==='slide') && (<S
               title="Layout canvas"
               hint="Zonas redimensionáveis na arte. Ative primeiro abaixo; depois ligue o modo edição para ver molduras no card e clicar direto na área da foto. Pino de swap troca texto/foto entre cards."
             >
@@ -10222,9 +10228,9 @@ function SidebarContent({
                   </div>
                 )}
               </div>
-            </S>
+            </S>)}
 
-            <S
+            {(tab==='imagem'||tab==='slide') && (<S
               title="Imagem — zona canvas"
               hint="Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do card. O primeiro ficheiro vai para o slide 1, o segundo para o slide 2, e assim por diante."
             >
@@ -10296,9 +10302,9 @@ function SidebarContent({
                   </div>
                 );
               })()}
-            </S>
+            </S>)}
 
-            {slide.bgImage ? (
+            {(tab==='imagem'||tab==='slide') && slide.bgImage ? (
               <S title="Posicionar foto" hint="Arraste a foto livremente num preview grande pra centralizar. Usa o mesmo bgX/bgY já existente, só a UX é melhor.">
                 <button
                   type="button"
@@ -10321,7 +10327,7 @@ function SidebarContent({
             ) : null}
 
             {/* D4: Filtros pré-configurados — só faz sentido se há foto no slide ativo */}
-            {slide.bgImage ? (
+            {(tab==='imagem'||tab==='slide') && slide.bgImage ? (
               <S title="Filtro da foto (preset)" hint="Atalho rápido. Pra ajuste fino use o painel «Ajustes da foto» em tela cheia.">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                   {PRESENTATION_IMG_FILTER_PRESETS.map((p) => {
@@ -10360,7 +10366,7 @@ function SidebarContent({
               </S>
             ) : null}
 
-            <S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
+            {(tab==='narrativa'||tab==='slide') && (<S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
               <div>
                 <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                   <span>Título</span>
@@ -10528,22 +10534,24 @@ function SidebarContent({
               >
                 <Zap size={11} style={{ color:'var(--accent)' }}/>Gerar 5 variações de gancho
               </button>
-            </S>
+            </S>)}
 
-            <PerSlideImageRefBlock
-              slide={slide}
-              onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
-              onRemoveRef={() => updateSlide({ refImage: null })}
-              onPickRef={() => openRefImagePicker(activeIdx)}
-              onGenerateImage={() => generateSlideImageAt(activeIdx)}
-              generateImageBusy={!!slideImgGenBusy[slide.id]}
-              generateImageDisabled={
-                !(slide.imageQuery || '').trim() ||
-                (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
-              }
-            />
+            {(tab==='imagem'||tab==='slide') && (
+              <PerSlideImageRefBlock
+                slide={slide}
+                onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
+                onRemoveRef={() => updateSlide({ refImage: null })}
+                onPickRef={() => openRefImagePicker(activeIdx)}
+                onGenerateImage={() => generateSlideImageAt(activeIdx)}
+                generateImageBusy={!!slideImgGenBusy[slide.id]}
+                generateImageDisabled={
+                  !(slide.imageQuery || '').trim() ||
+                  (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
+                }
+              />
+            )}
 
-            <S title={slide.canvas?.enabled ? 'Imagem na zona foto (canvas)' : 'Imagem de fundo'}>
+            {(tab==='imagem'||tab==='slide') && (<S title={slide.canvas?.enabled ? 'Imagem na zona foto (canvas)' : 'Imagem de fundo'}>
               {slide.bgImage && (
                 <div style={{ position:'relative', marginBottom:2, borderRadius:8, overflow:'hidden' }}>
                   <img
@@ -10829,9 +10837,9 @@ function SidebarContent({
                   <Toggle label="Espelhar horizontalmente" value={slide.bgMirror} onChange={v=>updateSlide({bgMirror:v})}/>
                 </>
               )}
-            </S>
+            </S>)}
 
-            <S title="Padrão sobre o fundo" hint="Textura discreta por cima da cor e da foto (incluída nas exportações).">
+            {(tab==='imagem'||tab==='slide') && (<S title="Padrão sobre o fundo" hint="Textura discreta por cima da cor e da foto (incluída nas exportações).">
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                 {BG_PATTERN_OPTIONS.map((opt) => {
                   const on = (slide.bgPattern ?? 'none') === opt.id;
@@ -10859,9 +10867,9 @@ function SidebarContent({
                   );
                 })}
               </div>
-            </S>
+            </S>)}
 
-            <details className="vc-adjust-details" style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
+            {(tab==='layout'||tab==='slide') && (<><details className="vc-adjust-details" style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
               <summary style={{
                 padding:'10px 12px',
                 cursor:'pointer',
@@ -11019,9 +11027,9 @@ function SidebarContent({
                 )}
                 <Slider label="Distância das bordas" value={slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET} min={1} max={20} onChange={(v) => updateSlide({ textInset: v })} />
               </div>
-            </details>
+            </details></>)}
 
-            <S
+            {(tab==='layout'||tab==='slide') && (<S
               title="Ajuste automático"
               hint="Cover e tipografia; com canvas reorganiza foto e todas as zonas de texto em conjunto (largura útil ~6%, espaçamentos entre foto/título/subtítulo ou topo/foto/rodapé) para caber dentro da margem do cartão e evitar cortes."
             >
@@ -11058,9 +11066,9 @@ function SidebarContent({
                 <SlidersHorizontal size={15} aria-hidden/>
                 Ajuste automático
               </button>
-            </S>
+            </S>)}
 
-            <S title="Tamanho">
+            {(tab==='visual'||tab==='slide') && (<S title="Tamanho">
               <Slider label="Tamanho título"    value={slide.titleSize} min={50} max={180} onChange={v=>updateSlide({titleSize:v})}/>
               <Slider label="Tamanho subtítulo" value={slide.subSize}   min={50} max={180} onChange={v=>updateSlide({subSize:v})}/>
               {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout || !!(String(slide.bodyAfterImage || '').trim())) ? (
@@ -11072,9 +11080,9 @@ function SidebarContent({
                   onChange={(v) => updateSlide({ bodyAfterSize: v })}
                 />
               ) : null}
-            </S>
+            </S>)}
 
-            <S title="Espaçamento — Título">
+            {(tab==='visual'||tab==='slide') && (<S title="Espaçamento — Título">
               <Slider label="Entre letras (tracking)" value={slide.titleTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({titleTracking:v})}/>
               <Slider label="Entre linhas (leading)"  value={slide.titleLeading ?? 105} min={80} max={180} onChange={v=>updateSlide({titleLeading:v})}/>
               <div>
@@ -11117,14 +11125,14 @@ function SidebarContent({
                   ))}
                 </div>
               </div>
-            </S>
+            </S>)}
 
-            <S title="Espaçamento — Subtítulo">
+            {(tab==='visual'||tab==='slide') && (<S title="Espaçamento — Subtítulo">
               <Slider label="Entre letras (tracking)" value={slide.subTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({subTracking:v})}/>
               <Slider label="Entre linhas (leading)"  value={slide.subLeading ?? 150} min={100} max={220} onChange={v=>updateSlide({subLeading:v})}/>
-            </S>
+            </S>)}
 
-            <S title="Legibilidade">
+            {(tab==='visual'||tab==='slide') && (<S title="Legibilidade">
               <Toggle label="Sombra no texto" value={slide.textShadow!==false} onChange={v=>updateSlide({textShadow:v})}/>
               <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
                 <button
@@ -11172,9 +11180,9 @@ function SidebarContent({
                   e <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste card em todos os slides (não altera textos nem posição no grid).
                 </p>
               </div>
-            </S>
+            </S>)}
 
-            <S title="Operações">
+            {(tab==='layout'||tab==='slide') && (<S title="Operações">
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {[
                   { label:'Duplicar', icon:Copy, action:()=>duplicateSlide(activeIdx), disabled:false },
@@ -11197,7 +11205,7 @@ function SidebarContent({
                   </button>
                 ))}
               </div>
-            </S>
+            </S>)}
           </>
         )}
 
@@ -12134,7 +12142,9 @@ function SidebarContent({
           </>
         )}
 
-        {tab==='material' && (
+        {/* Conteúdo base agora vive dentro de Narrativa (FASE 1 merge) —
+            matéria-prima da IA pertence ao domínio narrativo. */}
+        {tab==='narrativa' && (
           <>
             <S
               title="Conteúdo base"
@@ -16785,11 +16795,11 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             }}
             >
               {[
-                // FASE 1 Narrative OS: 5 domínios cognitivos no bottom nav
+                // FASE 1 Narrative OS — 5 domínios finais no bottom nav
                 { id:'narrativa', label:'Narrativa', icon:Wand2 },
                 { id:'visual',    label:'Visual',    icon:Palette },
-                { id:'material',  label:'Conteúdo',  icon:BookOpen },
-                { id:'slide',     label:'Cards',     icon:Layout },
+                { id:'imagem',    label:'Imagem',    icon:ImageIcon },
+                { id:'layout',    label:'Layout',    icon:Layout },
                 { id:'brand',     label:'Marca',     icon:Instagram },
               ].map(({ id, label, icon:Icon }) => (
                 <button
