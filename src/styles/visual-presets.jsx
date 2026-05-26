@@ -108,6 +108,8 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: 'CRACK',
       // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
       showPageBadge: true,
+      // Subtítulo OFF — visual hierarchy é eyebrow + título rosa pastel
+      subtitleVisible: false,
     },
     // Slide overrides — alinhamento esquerda + texto bottom-left forçados
     slideDefaults: {
@@ -157,6 +159,8 @@ export const VISUAL_PRESETS = [
       showStarOrnament: true,
       // Footer pill verde-neon com seta no rodapé
       footerPillText: 'ESTUDO NMLSS ACADEMY®',
+      // Subtítulo OFF — só eyebrow + título dominam
+      subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bl',
@@ -209,6 +213,8 @@ export const VISUAL_PRESETS = [
       footerPillBg: 'rgba(0,0,0,0.55)',
       footerPillFg: '#fff5d1',
       footerPillArrow: false,  // sem seta — visual mais compacto
+      // Subtítulo OFF — quote/mood usa só o título
+      subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bc',
@@ -255,6 +261,8 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: 'COPYRIGHT',
       showPageBadge: false,  // promo não usa contador
       showStarOrnament: false,
+      // Subtítulo OFF — espaço pro strikethrough/after-title
+      subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bl',
@@ -306,6 +314,8 @@ export const VISUAL_PRESETS = [
       footerPillText: '@JONATHANCADORE',
       footerPillBg: 'rgba(255,255,255,0.12)',  // cinza translúcido
       footerPillFg: '#f3e8c0',  // cream
+      // Subtítulo OFF — só eyebrow + título cream dominam
+      subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bc',  // bottom-center
@@ -358,6 +368,9 @@ export const VISUAL_PRESETS = [
       footerPillBg: '#34d399',
       footerPillFg: '#0a0a0a',
       footerPillArrow: false,
+      // Subtítulo pequeno em peso médio acima do pill (estilo legenda noticiário)
+      subtitleVisible: true,
+      subtitleWeight: 500,
     },
     slideDefaults: {
       layout: 'bl',
@@ -407,6 +420,10 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '',
       showPageBadge: false,
       showStarOrnament: false,
+      // Subtítulo MAIÚSCULAS pequeno bold — estilo capa de revista
+      subtitleVisible: true,
+      subtitleWeight: 600,
+      subtitleCase: 'upper',
     },
     slideDefaults: {
       layout: 'tc',  // top-center — título no TOPO da foto
@@ -454,6 +471,10 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '2025',
       showPageBadge: true,
       showStarOrnament: false,
+      // Subtítulo em italic dourado claro — descrição editorial fashion
+      subtitleVisible: true,
+      subtitleWeight: 500,
+      subtitleItalic: true,
     },
     slideDefaults: {
       layout: 'tl',  // top-left — título alto na foto
@@ -506,6 +527,8 @@ export const VISUAL_PRESETS = [
       footerPillText: 'ARRASTA PRO LADO',
       footerPillBg: 'rgba(255,255,255,0.95)',
       footerPillFg: '#0a0a0a',
+      // Subtítulo OFF — título dominante + pill cobrem toda comunicação
+      subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bl',
@@ -553,6 +576,10 @@ export const VISUAL_PRESETS = [
       cultureHeaderCenter: '',
       cultureHeaderYear: '',
       showPageBadge: false,
+      // Subtítulo italic branco — vibe legenda de filme
+      subtitleVisible: true,
+      subtitleItalic: true,
+      subtitleWeight: 400,
     },
     slideDefaults: {
       layout: 'bl',
@@ -604,6 +631,9 @@ export const VISUAL_PRESETS = [
       footerBarLeft: 'Topic|Instagram',
       footerBarCenter: 'Brought to you|by Sociyell',
       footerBarRight: 'Make sure to|Save this post',
+      // Subtítulo sutil branco regular abaixo do título grande
+      subtitleVisible: true,
+      subtitleWeight: 400,
     },
     slideDefaults: {
       layout: 'mc',  // mid-center pra dar espaço pro footer
@@ -655,6 +685,9 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '',
       showPageBadge: false,
       showStarOrnament: false,
+      // Subtítulo regular peso 400 — vibe Apple/Swiss minimal limpo
+      subtitleVisible: true,
+      subtitleWeight: 400,
     },
     slideDefaults: {
       layout: 'mc',  // mid-center

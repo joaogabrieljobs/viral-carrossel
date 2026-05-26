@@ -6716,7 +6716,10 @@ const SlideCardInner = React.forwardRef(({
                   letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
                 />
               ) : slide.title}</h1>
-              {slide.subtitle && (
+              {/* Subtítulo — preset controla via brand.subtitleVisible/Weight/Case
+                  (presets editoriais como Sports/NMLSS escondem subtítulo pra
+                  não competir com eyebrow+título). */}
+              {slide.subtitle && brand.subtitleVisible !== false && (
                 cultureRichText ? (
                   <div style={{
                     margin:0,
@@ -6732,7 +6735,7 @@ const SlideCardInner = React.forwardRef(({
                       fontFamily={bodyFF}
                       fontSize={f.w*0.028*(slide.subSize/100)}
                       lineHeight={(slide.subLeading ?? 150)/100}
-                      fontWeight={400}
+                      fontWeight={brand.subtitleWeight ?? 400}
                       letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
                       paraGap={f.h*0.010}
                     />
@@ -6742,9 +6745,13 @@ const SlideCardInner = React.forwardRef(({
                   color: displayBodyInk, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
-                  fontWeight:400, margin:0,
+                  fontWeight: brand.subtitleWeight ?? 400,
+                  margin:0,
                   letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                   textShadow: shadow,
+                  textTransform: brand.subtitleCase === 'upper' ? 'uppercase'
+                    : brand.subtitleCase === 'lower' ? 'lowercase' : 'none',
+                  fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
                 }}>{slide.subtitle}</p>
               ))}
               {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
