@@ -11231,10 +11231,13 @@ function SidebarContent({
           </>
         )}
 
-        {tab==='brand' && (
+        {/* FASE 1 final: 'Texto nos slides' e 'Paletas prontas' migram pra
+            domínio Visual. Outer cobre brand+visual; sections internas gate
+            por tab apropriado (Marca-only vs Visual-only). */}
+        {(tab==='brand' || tab==='visual') && (
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
-            {setBrandsOpen && (
+            {tab==='brand' && setBrandsOpen && (
               <S title="Perfis de marca" hint="Salve combinações completas (cores, fontes, logo, bio, tom) e troque entre clientes/projetos com 1 clique.">
                 <button
                   onClick={() => setBrandsOpen(true)}
@@ -11273,7 +11276,7 @@ function SidebarContent({
             {/* Padrão Visual migrado pra aba Visual (FASE 1 Narrative OS).
                 Marca agora foca em identidade pura: logo, handle, bio, tom. */}
 
-            <S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
+            {tab==='visual' && (<S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
               <div>
                 <div style={{
                   fontFamily:'var(--font-mono)',
@@ -11421,9 +11424,9 @@ function SidebarContent({
                   Não altera textos nem layout — só copia os valores acima para cada card (como em Cards → Legibilidade → Aplicar em todos).
                 </p>
               </div>
-            </S>
+            </S>)}
 
-            <S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
+            {tab==='brand' && (<S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input
@@ -11659,9 +11662,9 @@ function SidebarContent({
                   </label>
                 )}
               </div>
-            </S>
+            </S>)}
 
-            {(creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout)) && (
+            {tab==='brand' && (creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout)) && (
               <S title="Barra editorial (opcional)" hint="Aparece fina no topo dos cards no pacote Tendência/Cultura, como nas referências tipo brandsdecoded.">
                 <div>
                   <label className="vc-label-sm">Texto à esquerda (ex.: Powered by…)</label>
@@ -11686,7 +11689,7 @@ function SidebarContent({
               </S>
             )}
 
-            <S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
+            {tab==='brand' && (<S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
               {brand.logo ? (
                 <div style={{
                   display:'flex', alignItems:'center', gap:10,
@@ -11796,9 +11799,9 @@ function SidebarContent({
                   <Slider label="Opacidade" value={brand.logoOpacity ?? 90} min={20} max={100} onChange={v=>setBrand({...brand, logoOpacity: v})}/>
                 </>
               )}
-            </S>
+            </S>)}
 
-            <S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais preciso, mais consistente o carrossel fica.">
+            {tab==='brand' && (<S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais preciso, mais consistente o carrossel fica.">
               <div>
                 <label className="vc-label-sm">Bio / o que faço</label>
                 <textarea
@@ -11849,9 +11852,9 @@ function SidebarContent({
                   className="vc-input"
                 />
               </div>
-            </S>
+            </S>)}
 
-            <S title="Paletas prontas">
+            {tab==='visual' && (<><S title="Paletas prontas">
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {PALETTES.map(p=>(
                   <button
@@ -12139,6 +12142,7 @@ function SidebarContent({
 
             <FontPicker title="Fonte — Título" fonts={TITLE_FONTS} active={brand.titleFont} onChange={val=>setBrand({...brand,titleFont:val})}/>
             <FontPicker title="Fonte — Corpo"  fonts={BODY_FONTS}  active={brand.bodyFont}  onChange={val=>setBrand({...brand,bodyFont:val})}/>
+            </>)}
           </>
         )}
 
