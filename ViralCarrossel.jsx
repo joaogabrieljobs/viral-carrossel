@@ -12436,34 +12436,39 @@ function SidebarContent({
             </S>
 
             <S title="Atalhos rápidos">
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                <button
-                  onClick={() => setMaterial({ ...material, content: '', sources: '', context: '', refProfileId: null })}
-                  disabled={!materialHasUserInput(material)}
-                  style={{
-                    height:36, borderRadius:8, cursor:'pointer',
-                    background:'var(--bg-card)', border:'1px solid var(--border)',
-                    color:'var(--text-muted)', fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                    opacity: !materialHasUserInput(material) ? 0.4 : 1,
-                  }}
-                >
-                  <Trash2 size={11}/>Limpar tudo
-                </button>
-                <button
-                  onClick={() => setSetupOpen(true)}
-                  style={{
-                    height:38, borderRadius:9999, cursor:'pointer',
-                    background:'var(--accent)', border:'none',
-                    color:'#fff', fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
-                    letterSpacing:'-0.011em',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:6,
-                    transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-                  }}
-                >
-                  <Sparkles size={13}/>Gerar com este material
-                </button>
-              </div>
+              {/* Hierarquia: CTA primário full-width, Limpar como link sutil.
+                  Era grid 1fr-1fr que forçava 'Gerar com este material' a
+                  quebrar em 2 linhas (apertado e feio). */}
+              <button
+                onClick={() => setSetupOpen(true)}
+                style={{
+                  width:'100%', height:44, borderRadius:9999, cursor:'pointer',
+                  background:'var(--accent)', border:'none',
+                  color:'#fff', fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
+                  letterSpacing:'-0.011em',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                  whiteSpace:'nowrap',
+                  transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                }}
+              >
+                <Sparkles size={14}/>Gerar com este material
+              </button>
+              <button
+                onClick={() => setMaterial({ ...material, content: '', sources: '', context: '', refProfileId: null })}
+                disabled={!materialHasUserInput(material)}
+                style={{
+                  alignSelf:'center', minHeight:32, padding:'4px 12px',
+                  cursor: !materialHasUserInput(material) ? 'not-allowed' : 'pointer',
+                  border:'none', background:'transparent',
+                  color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+                  letterSpacing:'-0.005em',
+                  display:'inline-flex', alignItems:'center', gap:5,
+                  opacity: !materialHasUserInput(material) ? 0.4 : 1,
+                  transition:'color 0.12s',
+                }}
+              >
+                <Trash2 size={11}/>Limpar tudo
+              </button>
             </S>
           </>
         )}
