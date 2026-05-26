@@ -60,6 +60,27 @@ function TextLines({ y, color, count = 2, widths = [50, 35], height = 4, gap = 1
 // 12 PRESETS
 // ───────────────────────────────────────────────────────────────────────────
 
+// Atalhos pra os font-families mais usados — strings completas que
+// brand.titleFont/bodyFont esperam (não índices!). Cada string bate
+// com TITLE_FONTS[n].val / BODY_FONTS[n].val do ViralCarrossel.jsx.
+const FF = {
+  // Sans
+  outfit:       '"Outfit", sans-serif',
+  interTight:   '"Inter Tight", sans-serif',
+  inter:        '"Inter", sans-serif',
+  spaceGrotesk: '"Space Grotesk", sans-serif',
+  dmSans:       '"DM Sans", sans-serif',
+  // Display (impacto)
+  bebas:        '"Bebas Neue", sans-serif',
+  anton:        '"Anton", sans-serif',
+  archivoBlack: '"Archivo Black", sans-serif',
+  bigShoulders: '"Big Shoulders Display", sans-serif',
+  // Serif
+  playfair:     '"Playfair Display", serif',
+  yeseva:       '"Yeseva One", serif',
+  italiana:     '"Italiana", serif',
+};
+
 export const VISUAL_PRESETS = [
   // 1. Sports Editorial — NBA-style: foto BG + sans bold branco + header bar
   {
@@ -72,8 +93,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#ff5736',
-      titleFont: 14, // Archivo Black
-      bodyFont: 0,   // Inter Tight
+      titleFont: FF.archivoBlack,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -10,
@@ -106,8 +127,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#c0ff32',
-      titleFont: 1, // Inter Tight
-      bodyFont: 0,
+      titleFont: FF.interTight,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -8,
@@ -140,8 +161,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8d8a8',
       textColor: '#d4c290',
       accent: '#fbbf24',
-      titleFont: 14, // Archivo Black
-      bodyFont: 0,
+      titleFont: FF.archivoBlack,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -5,
@@ -174,8 +195,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#fce7f3',
       textColor: '#fbcfe8',
       accent: '#dc2626',
-      titleFont: 12, // Anton
-      bodyFont: 0,
+      titleFont: FF.anton,
+      bodyFont: FF.interTight,
       textTitleWeight: 700,
       textTitleCase: 'upper',
       textTitleTracking: -8,
@@ -208,8 +229,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#d4c19a',
       textColor: '#b8a685',
       accent: '#fbbf24',
-      titleFont: 11, // Bebas Neue
-      bodyFont: 1,   // Inter
+      titleFont: FF.bebas,
+      bodyFont: FF.inter,
       textTitleWeight: 700,
       textTitleCase: 'upper',
       textTitleTracking: 5,
@@ -243,8 +264,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#34d399',
-      titleFont: 12, // Anton
-      bodyFont: 0,
+      titleFont: FF.anton,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -6,
@@ -281,8 +302,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#dc2626',
-      titleFont: 18, // Playfair Display
-      bodyFont: 2,   // DM Sans
+      titleFont: FF.playfair,
+      bodyFont: FF.dmSans,
       textTitleWeight: 700,
       textTitleCase: 'normal',
       textTitleTracking: -8,
@@ -317,8 +338,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#f5e8d0',
       textColor: '#d4c19a',
       accent: '#d4af37',
-      titleFont: 11, // Bebas Neue
-      bodyFont: 0,
+      titleFont: FF.bebas,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -3,
@@ -356,8 +377,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#ef4444',
-      titleFont: 14, // Archivo Black
-      bodyFont: 0,
+      titleFont: FF.archivoBlack,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -10,
@@ -393,8 +414,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#dc2626',
-      titleFont: 0, // Outfit
-      bodyFont: 1,  // Inter
+      titleFont: FF.outfit,
+      bodyFont: FF.inter,
       textTitleWeight: 600,
       textTitleCase: 'lower',
       textTitleTracking: -5,
@@ -430,8 +451,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#e8e8e8',
       textColor: '#cfcfcf',
       accent: '#dc2626',
-      titleFont: 14, // Archivo Black
-      bodyFont: 0,
+      titleFont: FF.archivoBlack,
+      bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -8,
@@ -470,8 +491,8 @@ export const VISUAL_PRESETS = [
       subtitleColor: '#3a3a3a',
       textColor: '#5a5a5a',
       accent: '#1a1a1a',
-      titleFont: 1, // Inter Tight
-      bodyFont: 0,
+      titleFont: FF.interTight,
+      bodyFont: FF.interTight,
       textTitleWeight: 700,
       textTitleCase: 'normal',
       textTitleTracking: -10,
