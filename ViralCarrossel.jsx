@@ -11091,9 +11091,7 @@ function SidebarContent({
               ) : null}
             </S>)}
 
-            {(tab==='texto'||tab==='slide') && (<S title="Espaçamento — Título">
-              <Slider label="Entre letras (tracking)" value={slide.titleTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({titleTracking:v})}/>
-              <Slider label="Entre linhas (leading)"  value={slide.titleLeading ?? 105} min={80} max={180} onChange={v=>updateSlide({titleLeading:v})}/>
+            {(tab==='texto'||tab==='slide') && (<S title="Estilo do título" hint="Peso e caixa são os controles primários. Tracking/leading em «Ajustes avançados».">
               <div>
                 <label className="vc-label-sm">
                   Peso da fonte
@@ -11134,11 +11132,46 @@ function SidebarContent({
                   ))}
                 </div>
               </div>
+              {/* Ajustes avançados: tracking + leading do título.
+                  Escondidos por default — reduz cognitive overload no
+                  domínio Texto (90% dos users não vão mexer aqui). */}
+              <details className="vc-adjust-details" style={{ marginTop:6, border:'1px solid var(--hairline)', borderRadius:11, background:'var(--bg-pearl)' }}>
+                <summary style={{
+                  padding:'10px 12px', cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  fontFamily:'var(--font-mono)', fontSize:10, letterSpacing:'0.06em',
+                  fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase',
+                  userSelect:'none',
+                }}>
+                  Ajustes avançados (título)
+                  <ChevronDown size={14} strokeWidth={2} style={{ opacity:0.45, flexShrink:0 }} aria-hidden/>
+                </summary>
+                <div style={{ padding:'0 12px 12px' }}>
+                  <Slider label="Entre letras (tracking)" value={slide.titleTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({titleTracking:v})}/>
+                  <Slider label="Entre linhas (leading)"  value={slide.titleLeading ?? 105} min={80} max={180} onChange={v=>updateSlide({titleLeading:v})}/>
+                </div>
+              </details>
             </S>)}
 
-            {(tab==='texto'||tab==='slide') && (<S title="Espaçamento — Subtítulo">
-              <Slider label="Entre letras (tracking)" value={slide.subTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({subTracking:v})}/>
-              <Slider label="Entre linhas (leading)"  value={slide.subLeading ?? 150} min={100} max={220} onChange={v=>updateSlide({subLeading:v})}/>
+            {/* Subtítulo: tracking/leading também vão atrás de details
+                (são ajustes finos, não primary controls). */}
+            {(tab==='texto'||tab==='slide') && (<S title="Estilo do subtítulo" hint="Ajustes finos de espaçamento em «Ajustes avançados».">
+              <details className="vc-adjust-details" style={{ border:'1px solid var(--hairline)', borderRadius:11, background:'var(--bg-pearl)' }}>
+                <summary style={{
+                  padding:'10px 12px', cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  fontFamily:'var(--font-mono)', fontSize:10, letterSpacing:'0.06em',
+                  fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase',
+                  userSelect:'none',
+                }}>
+                  Ajustes avançados (subtítulo)
+                  <ChevronDown size={14} strokeWidth={2} style={{ opacity:0.45, flexShrink:0 }} aria-hidden/>
+                </summary>
+                <div style={{ padding:'0 12px 12px' }}>
+                  <Slider label="Entre letras (tracking)" value={slide.subTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({subTracking:v})}/>
+                  <Slider label="Entre linhas (leading)"  value={slide.subLeading ?? 150} min={100} max={220} onChange={v=>updateSlide({subLeading:v})}/>
+                </div>
+              </details>
             </S>)}
 
             {(tab==='texto'||tab==='slide') && (<S title="Legibilidade">
@@ -12520,7 +12553,7 @@ function ExportMoreFormats({
         <Download size={13}/>
         {exporting && exportProgress
           ? `${exportProgress.current}/${exportProgress.total}…`
-          : 'Baixar'}
+          : 'Exportar'}
         <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}/>
       </button>
       {open && (
@@ -16855,9 +16888,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 }}
                 onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.95)'; }}
                 onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                aria-label="Baixar card atual"
+                aria-label="Exportar card atual"
               >
-                <Download size={14}/>Baixar
+                <Download size={14}/>Exportar
               </button>
             </div>
           )}
