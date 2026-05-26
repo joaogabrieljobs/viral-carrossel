@@ -9696,6 +9696,8 @@ function SidebarContent({
   onOpenPhotoPosition = () => {},
   remixWithTone = () => {},
   hasLastGenerate = false,
+  visualPreset = null,
+  applyVisualPreset: applyVisualPresetCb = () => {},
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -11021,6 +11023,18 @@ function SidebarContent({
                 </button>
               </S>
             )}
+
+            {/* Padrão Visual — picker dos 12 presets. Clique aplica imediatamente
+                ao brand (paleta + fontes + tipografia). Diferente do GenerateModal
+                onde só aplica ao gerar — aqui é live preview. */}
+            <S title="Padrão Visual" hint="Escolha um dos 12 padrões curados — paleta, fontes e tipografia mudam de uma vez.">
+              <VisualStylePicker
+                value={visualPreset}
+                onChange={applyVisualPresetCb}
+                presets={VISUAL_PRESETS}
+                title=""
+              />
+            </S>
 
             <S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
               <div>
@@ -15683,6 +15697,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     remixWithTone,
     hasLastGenerate,
     exportPhotosOnly,
+    visualPreset,
+    applyVisualPreset: applyVisualStylePreset,
   };
 
   const desktopThumbWidth = f.w * previewScale;
