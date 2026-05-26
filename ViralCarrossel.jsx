@@ -10119,10 +10119,14 @@ function SidebarContent({
         }}
       >
         {[
-          {id:'brand',    icon:Palette,  label:'Marca'},
+          // FASE 1 do Narrative OS: domínios cognitivos, não tipo de config.
+          // Visual ganha tab própria (era enterrado em Marca).
+          // IA virou Narrativa (cognição > técnico).
+          {id:'narrativa',icon:Wand2,    label:'Narrativa'},
+          {id:'visual',   icon:Palette,  label:'Visual'},
           {id:'material', icon:BookOpen, label:'Conteúdo'},
           {id:'slide',    icon:Layout,   label:'Cards'},
-          {id:'ai',       icon:Wand2,    label:'IA'},
+          {id:'brand',    icon:Instagram,label:'Marca'},
         ].map(t=>{
           const active = tab===t.id;
           return (
@@ -11197,6 +11201,28 @@ function SidebarContent({
           </>
         )}
 
+        {/* Visual (FASE 1 Narrative OS): domínio dedicado ao mood/estética.
+            Padrão Visual ganha protagonismo aqui — era enterrado na Marca. */}
+        {tab==='visual' && (
+          <>
+            <div style={{
+              padding:'4px 0 8px',
+              fontSize:13, color:'var(--text-secondary)',
+              fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', lineHeight:1.5,
+            }}>
+              <strong style={{ color:'var(--text-primary)' }}>Escolha um padrão visual.</strong>
+              {' '}Paleta, fontes e tipografia mudam de uma vez.
+              Cada estilo tem uma assinatura própria (header bar, pill, ornaments…).
+            </div>
+            <VisualStylePicker
+              value={visualPreset}
+              onChange={applyVisualPresetCb}
+              presets={VISUAL_PRESETS}
+              title=""
+            />
+          </>
+        )}
+
         {tab==='brand' && (
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
@@ -11236,17 +11262,8 @@ function SidebarContent({
               </S>
             )}
 
-            {/* Padrão Visual — picker dos 12 presets. Clique aplica imediatamente
-                ao brand (paleta + fontes + tipografia). Diferente do GenerateModal
-                onde só aplica ao gerar — aqui é live preview. */}
-            <S title="Padrão Visual" hint="Escolha um dos 12 padrões curados — paleta, fontes e tipografia mudam de uma vez.">
-              <VisualStylePicker
-                value={visualPreset}
-                onChange={applyVisualPresetCb}
-                presets={VISUAL_PRESETS}
-                title=""
-              />
-            </S>
+            {/* Padrão Visual migrado pra aba Visual (FASE 1 Narrative OS).
+                Marca agora foca em identidade pura: logo, handle, bio, tom. */}
 
             <S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
               <div>
@@ -12206,7 +12223,9 @@ function SidebarContent({
           </>
         )}
 
-        {tab==='ai' && (
+        {/* Narrativa (FASE 1): IA + Conteúdo gradual. Por enquanto só os
+            controles que estavam na aba IA (gerar/refinar/legenda/tom). */}
+        {tab==='narrativa' && (
           <>
             <S title="Gerar conteúdo">
               <button onClick={()=>setSetupOpen(true)} style={{
@@ -16766,10 +16785,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             }}
             >
               {[
-                { id:'brand',    label:'Marca',    icon:Palette },
-                { id:'material', label:'Conteúdo', icon:BookOpen },
-                { id:'slide',    label:'Cards',    icon:Layout },
-                { id:'ai',       label:'Refinar',  icon:Wand2 },
+                // FASE 1 Narrative OS: 5 domínios cognitivos no bottom nav
+                { id:'narrativa', label:'Narrativa', icon:Wand2 },
+                { id:'visual',    label:'Visual',    icon:Palette },
+                { id:'material',  label:'Conteúdo',  icon:BookOpen },
+                { id:'slide',     label:'Cards',     icon:Layout },
+                { id:'brand',     label:'Marca',     icon:Instagram },
               ].map(({ id, label, icon:Icon }) => (
                 <button
                   key={id}
