@@ -98,88 +98,79 @@ function readInitialShellView() {
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
 
 const GLOBAL_STYLE = `
-  /* Airtable Design System (hard apply) — clean enterprise, deep navy + blue CTA.
-     Source: getdesign.md/airtable. Tokens semânticos --theme_* preservados
-     com nomes legacy (--accent etc) pra compat com o resto do código. */
+  /* Figma Design System — pastéis marketing + magenta CTA (+ Inter / JetBrains Mono). */
 
   :root {
-    /* — Airtable core palette — */
-    --airtable-blue: #1b61c9;
-    --airtable-blue-mid: #254fad;
-    --airtable-blue-hover: #1652ad;
-    --airtable-navy: #181d26;
-    --airtable-border: #e0e2e6;
-    --airtable-surface-light: #f8fafc;
-    --airtable-spotlight: rgba(249, 252, 255, 0.97);
-    --airtable-success: #006400;
-    --airtable-text-weak: rgba(4, 14, 32, 0.69);
-    --airtable-text-secondary-active: rgba(7, 12, 20, 0.82);
+    /* — Pastéis FIGMA ({colors.block-*}) — */
+    --figma-lime: #dceeb1;
+    --figma-lilac: #c5b0f4;
+    --figma-cream: #f4ecd6;
+    --figma-pink: #efd4d4;
+    --figma-mint: #c8e6cd;
+    --figma-coral: #f3c9b6;
+    --figma-navy: #1f1d3d;
+    --figma-magenta: #ff3d8b;
 
-    /* — Surfaces — Airtable white canvas */
+    /* — Surfaces — */
     --bg-base: #ffffff;
-    --bg-parchment: var(--airtable-surface-light);
-    --bg-pearl: var(--airtable-surface-light);
-    --bg-sidebar: var(--airtable-surface-light);
+    --bg-parchment: #f0f7f2;      /* wash menta Figma */
+    --bg-pearl: #f6f3fc;           /* wash lilás Figma */
+    --bg-sidebar: var(--figma-cream);
     --bg-elevated: #ffffff;
     --bg-card: #ffffff;
 
-    --bg-tile-1: #2a2f3a;
-    --bg-tile-2: #2d3340;
-    --bg-tile-3: #28303d;
-    --bg-black: #181d26;
+    --bg-tile-1: #272729;
+    --bg-tile-2: #2a2a2c;
+    --bg-tile-3: #252527;
+    --bg-black: #000000;
 
-    --border: var(--airtable-border);
-    --border-muted: #ecedf0;
-    --hairline: var(--airtable-border);
-    --divider-soft: rgba(24, 29, 38, 0.06);
-    --border-on-dark: rgba(255, 255, 255, 0.10);
+    --border: #e6e6e6;
+    --border-muted: #ede9f7;
+    --hairline: #e6e6e6;
+    --divider-soft: rgba(31, 29, 61, 0.06);
+    --border-on-dark: rgba(255,255,255,0.10);
 
-    --text-primary: var(--airtable-navy);
-    --text-secondary: #333333;
-    --text-muted: var(--airtable-text-weak);
+    --text-primary: #000000;
+    --text-secondary: #363636;
+    --text-muted: #5c5c5c;
     --text-on-dark: #ffffff;
-    --text-on-dark-muted: rgba(255, 255, 255, 0.72);
+    --text-on-dark-muted: rgba(255,255,255,0.72);
 
-    /* Ação principal = Airtable Blue (era magenta). Secondary = blue-mid. */
-    --accent: var(--airtable-blue);
-    --accent-hover: var(--airtable-blue-hover);
-    --accent-focus: var(--airtable-blue);
-    --accent-secondary: var(--airtable-blue-mid);
+    /* Ação principal = magenta Figma; links secundários / molduras = lilás */
+    --accent: var(--figma-magenta);
+    --accent-hover: #e6327a;
+    --accent-focus: var(--figma-navy);
+    --accent-secondary: var(--figma-lilac);
     --accent-on-dark: #ffffff;
-    --accent-surface: rgba(27, 97, 201, 0.10);
-    --accent-surface-strong: rgba(27, 97, 201, 0.18);
-    --accent-magenta-surface: rgba(27, 97, 201, 0.08);  /* legacy alias */
-    --accent-glow: rgba(45, 127, 249, 0.28);
+    --accent-surface: rgba(197, 176, 244, 0.28);
+    --accent-surface-strong: rgba(197, 176, 244, 0.42);
+    --accent-magenta-surface: rgba(255, 61, 139, 0.10);
+    --accent-glow: rgba(255, 61, 139, 0.22);
 
-    --logo-mark-bg: var(--accent-surface);
-    --logo-mark-fg: var(--accent);
+    --logo-mark-bg: var(--figma-coral);
+    --logo-mark-fg: var(--figma-navy);
 
-    --success: var(--airtable-success);
-    --success-surface: rgba(0, 100, 0, 0.10);
-    --success-border: rgba(0, 100, 0, 0.28);
-    --success-text: #004d00;
-    --danger: #d92d20;
-    --warning: #b54708;
+    --success: #1ea64a;
+    --success-surface: rgba(30, 166, 74, 0.12);
+    --success-border: rgba(30, 166, 74, 0.28);
+    --success-text: #146c31;
+    --danger: #ff3b30;
+    --warning: #ff9500;
 
-    /* Haas é proprietária — Inter é a fallback recomendada pelo spec Airtable */
-    --font-ui: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Inter', -apple-system, system-ui, 'Segoe UI', sans-serif;
+    --font-ui: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
     --font-serif: 'Inter', system-ui, serif;
 
-    /* Airtable radius scale: 2px small, 12px buttons, 16-24px cards, 32px large */
-    --radius-sm: 2px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
-    --radius-pill: 9999px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 24px;
+    --radius-pill: 50px;
 
     --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    /* Multi-layer blue-tinted shadow do Airtable */
-    --shadow-product: rgba(0,0,0,0.32) 0px 0px 1px, rgba(0,0,0,0.08) 0px 0px 2px, rgba(45,127,249,0.28) 0px 1px 3px, rgba(0,0,0,0.06) 0px 0px 0px 0.5px inset;
-    --shadow-soft: rgba(15, 48, 106, 0.05) 0px 0px 20px;
+    --shadow-product: 0 5px 30px rgba(0, 0, 0, 0.22);
 
     --safe-top:    env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
