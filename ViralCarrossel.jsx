@@ -10119,16 +10119,18 @@ function SidebarContent({
         }}
       >
         {[
-          // FASE 1 Narrative OS — 5 domínios cognitivos finais:
-          //   Narrativa (texto/IA + Conteúdo base)
-          //   Visual (padrão visual + tipografia)
-          //   Imagem (upload/IA/crop/filtro/padrão sobre fundo)
-          //   Layout (composição/canvas/posição)
-          //   Marca (identidade pura: logo/handle/bio/posicionamento)
+          // FASE 1 Narrative OS — 6 domínios cognitivos finais:
+          //   Narrativa (ideia/hook/refinamento IA + Conteúdo base)
+          //   Visual   (mood: Padrão Visual + Paletas + Cores)
+          //   Imagem   (upload/IA/crop/filtro/padrão sobre fundo)
+          //   Layout   (composição/grid/posição/zonas)
+          //   Texto    (tipografia: fontes/escala/peso/espaçamento/legibilidade)
+          //   Marca    (identidade pura: logo/handle/bio/posicionamento)
           {id:'narrativa',icon:Wand2,    label:'Narrativa'},
           {id:'visual',   icon:Palette,  label:'Visual'},
           {id:'imagem',   icon:ImageIcon,label:'Imagem'},
           {id:'layout',   icon:Layout,   label:'Layout'},
+          {id:'texto',    icon:Type,     label:'Texto'},
           {id:'brand',    icon:Instagram,label:'Marca'},
         ].map(t=>{
           const active = tab===t.id;
@@ -10154,11 +10156,11 @@ function SidebarContent({
         {/* FASE 1 Narrative OS: split Cards em Imagem + Layout + (Tipografia
             em Visual + Texto card em Narrativa). Outer condition cobre os 4
             tabs que reusam seções daqui; cada section interno gate por tab. */}
-        {(tab==='imagem' || tab==='layout' || tab==='visual' || tab==='narrativa' || tab==='slide') && (
+        {(tab==='imagem' || tab==='layout' || tab==='texto' || tab==='narrativa' || tab==='slide') && (
           <>
             {(tab==='layout'||tab==='slide') && (<S
-              title="Layout canvas"
-              hint="Zonas redimensionáveis na arte. Ative primeiro abaixo; depois ligue o modo edição para ver molduras no card e clicar direto na área da foto. Pino de swap troca texto/foto entre cards."
+              title="Composição"
+              hint="Zonas redimensionáveis dentro do card. Ative primeiro abaixo; depois mostre as molduras para clicar direto na área da foto. Pino de swap troca texto/foto entre cards."
             >
               {/* Polish: CTA primário com fontWeight 600 + ícone (era 400 e
                   parecia botão fantasma). Quando ativo, vira selo de sucesso
@@ -10185,14 +10187,14 @@ function SidebarContent({
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   {anyCanvasEnabled
-                    ? <><Check size={14} strokeWidth={2.5}/>Layout canvas ativo</>
-                    : <><Sparkles size={14}/>Ativar layout canvas</>}
+                    ? <><Check size={14} strokeWidth={2.5}/>Composição ativa</>
+                    : <><Sparkles size={14}/>Ativar composição</>}
                 </button>
                 {anyCanvasEnabled && (
                   <button
                     type="button"
                     onClick={disableCanvasLayout}
-                    aria-label="Desativar layout canvas em todos os cards"
+                    aria-label="Desativar composição em todos os cards"
                     style={{
                       alignSelf:'center', minHeight:32, padding:'0 14px',
                       cursor:'pointer', border:'none', background:'transparent',
@@ -10204,7 +10206,7 @@ function SidebarContent({
                     onMouseEnter={e => { e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.textDecorationColor='var(--text-muted)'; }}
                     onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.textDecorationColor='var(--hairline)'; }}
                   >
-                    Desativar layout canvas
+                    Desativar composição
                   </button>
                 )}
               </div>
@@ -10212,11 +10214,11 @@ function SidebarContent({
                   com hint visual claro do porquê quando canvas está off. */}
               <div style={{ opacity: anyCanvasEnabled ? 1 : 0.55, transition:'opacity 0.15s' }}>
                 <Toggle
-                  label="Modo edição de zonas (molduras no card)"
+                  label="Mostrar zonas no card"
                   value={canvasEditMode}
                   onChange={(v) => {
                     if (!anyCanvasEnabled) {
-                      toast?.('Ative primeiro o layout canvas com o botão acima.', 'info');
+                      toast?.('Ative primeiro a composição com o botão acima.', 'info');
                       return;
                     }
                     setCanvasEditMode(v);
@@ -10231,7 +10233,7 @@ function SidebarContent({
             </S>)}
 
             {(tab==='imagem'||tab==='slide') && (<S
-              title="Imagem — zona canvas"
+              title="Importar imagens"
               hint="Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do card. O primeiro ficheiro vai para o slide 1, o segundo para o slide 2, e assim por diante."
             >
               {/* Polish: 3 botões com mesmo padrão drop-zone (ícone num
@@ -10551,7 +10553,7 @@ function SidebarContent({
               />
             )}
 
-            {(tab==='imagem'||tab==='slide') && (<S title={slide.canvas?.enabled ? 'Imagem na zona foto (canvas)' : 'Imagem de fundo'}>
+            {(tab==='imagem'||tab==='slide') && (<S title={slide.canvas?.enabled ? 'Imagem na área da foto' : 'Imagem de fundo'}>
               {slide.bgImage && (
                 <div style={{ position:'relative', marginBottom:2, borderRadius:8, overflow:'hidden' }}>
                   <img
@@ -10928,7 +10930,7 @@ function SidebarContent({
                     background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
                     padding:'8px 10px',
                   }}>
-                    Com layout canvas ativo, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
+                    Com composição ativa, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
                     {' '}das zonas de texto do preview (junto com «Distância das bordas»).
                     Para mover o quadro inteiro no card, use o modo edição de zonas no preview e arraste a moldura.
                   </div>
@@ -11068,7 +11070,7 @@ function SidebarContent({
               </button>
             </S>)}
 
-            {(tab==='visual'||tab==='slide') && (<S title="Tamanho">
+            {(tab==='texto'||tab==='slide') && (<S title="Tamanho">
               <Slider label="Tamanho título"    value={slide.titleSize} min={50} max={180} onChange={v=>updateSlide({titleSize:v})}/>
               <Slider label="Tamanho subtítulo" value={slide.subSize}   min={50} max={180} onChange={v=>updateSlide({subSize:v})}/>
               {(creativePreset === 'tendencia_cultura' || slide.useCultureLayout || !!(String(slide.bodyAfterImage || '').trim())) ? (
@@ -11082,7 +11084,7 @@ function SidebarContent({
               ) : null}
             </S>)}
 
-            {(tab==='visual'||tab==='slide') && (<S title="Espaçamento — Título">
+            {(tab==='texto'||tab==='slide') && (<S title="Espaçamento — Título">
               <Slider label="Entre letras (tracking)" value={slide.titleTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({titleTracking:v})}/>
               <Slider label="Entre linhas (leading)"  value={slide.titleLeading ?? 105} min={80} max={180} onChange={v=>updateSlide({titleLeading:v})}/>
               <div>
@@ -11127,12 +11129,12 @@ function SidebarContent({
               </div>
             </S>)}
 
-            {(tab==='visual'||tab==='slide') && (<S title="Espaçamento — Subtítulo">
+            {(tab==='texto'||tab==='slide') && (<S title="Espaçamento — Subtítulo">
               <Slider label="Entre letras (tracking)" value={slide.subTracking ?? 0} min={-10} max={30} onChange={v=>updateSlide({subTracking:v})}/>
               <Slider label="Entre linhas (leading)"  value={slide.subLeading ?? 150} min={100} max={220} onChange={v=>updateSlide({subLeading:v})}/>
             </S>)}
 
-            {(tab==='visual'||tab==='slide') && (<S title="Legibilidade">
+            {(tab==='texto'||tab==='slide') && (<S title="Legibilidade">
               <Toggle label="Sombra no texto" value={slide.textShadow!==false} onChange={v=>updateSlide({textShadow:v})}/>
               <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
                 <button
@@ -11231,10 +11233,9 @@ function SidebarContent({
           </>
         )}
 
-        {/* FASE 1 final: 'Texto nos slides' e 'Paletas prontas' migram pra
-            domínio Visual. Outer cobre brand+visual; sections internas gate
-            por tab apropriado (Marca-only vs Visual-only). */}
-        {(tab==='brand' || tab==='visual') && (
+        {/* FASE 1 final + 6 domínios: outer cobre brand+visual+texto.
+            Marca = identidade pura, Visual = mood/paletas, Texto = fontes. */}
+        {(tab==='brand' || tab==='visual' || tab==='texto') && (
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
@@ -11276,7 +11277,7 @@ function SidebarContent({
             {/* Padrão Visual migrado pra aba Visual (FASE 1 Narrative OS).
                 Marca agora foca em identidade pura: logo, handle, bio, tom. */}
 
-            {tab==='visual' && (<S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
+            {tab==='texto' && (<S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
               <div>
                 <div style={{
                   fontFamily:'var(--font-mono)',
@@ -11954,7 +11955,9 @@ function SidebarContent({
                 );
               })()}
             </S>
+            </>)}
 
+            {tab==='texto' && (<>
             <S title="Fontes próprias (ficheiro)" hint="WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o ficheiro não tiver todos os pesos.">
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div>
@@ -14873,13 +14876,13 @@ export default function App() {
       }),
     );
     setCanvasEditMode(true);
-    toast('Layout canvas ativado em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
+    toast('Composição ativada em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
   }, [creativePreset, setSlides, toast]);
 
   const disableCanvasLayout = useCallback(() => {
     setSlides((prev) => prev.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false } } : s)));
     setCanvasEditMode(false);
-    toast('Layout canvas desligado (as zonas ficam guardadas).', 'info');
+    toast('Composição desativada (as zonas ficam guardadas).', 'info');
   }, [setSlides, toast]);
 
   const swapCanvasZoneContent = useCallback((toIdx, raw) => {
@@ -16799,11 +16802,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             }}
             >
               {[
-                // FASE 1 Narrative OS — 5 domínios finais no bottom nav
+                // FASE 1 Narrative OS — 6 domínios finais no bottom nav
                 { id:'narrativa', label:'Narrativa', icon:Wand2 },
                 { id:'visual',    label:'Visual',    icon:Palette },
                 { id:'imagem',    label:'Imagem',    icon:ImageIcon },
                 { id:'layout',    label:'Layout',    icon:Layout },
+                { id:'texto',     label:'Texto',     icon:Type },
                 { id:'brand',     label:'Marca',     icon:Instagram },
               ].map(({ id, label, icon:Icon }) => (
                 <button
