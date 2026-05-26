@@ -522,6 +522,80 @@ const GLOBAL_STYLE = `
       0 8px 24px rgba(255, 45, 141, 0.12) !important;
   }
 
+  /* — REGRESSION FIXES Sessão C — atinge inline-styled patterns globais
+       que estavam usando bg-card/bg-pearl/text-primary (light theme).
+       Converte pra glass dark coerente com Narrative OS. */
+
+  /* Botões com bg=text-primary (eram pretos sólidos em light theme;
+     ficariam BRANCOS em dark — visualmente errado). Viram accent gradient. */
+  button[style*="background:var(--text-primary)"]:not(.vc-btn-primary):not(:disabled),
+  button[style*="background: var(--text-primary)"]:not(.vc-btn-primary):not(:disabled) {
+    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+    box-shadow:
+      0 8px 24px rgba(255, 45, 141, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  }
+
+  /* Botões inativos com bg=bg-card → glass dark sutil */
+  button[style*="background:var(--bg-card)"]:not(:disabled),
+  button[style*="background: var(--bg-card)"]:not(:disabled),
+  label[style*="background:var(--bg-card)"],
+  label[style*="background: var(--bg-card)"] {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--glass-border) !important;
+    color: var(--text-secondary) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+
+  /* Botões inativos com bg=bg-pearl → glass dark mais sutil ainda */
+  button[style*="background:var(--bg-pearl)"]:not(:disabled),
+  button[style*="background: var(--bg-pearl)"]:not(:disabled) {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: var(--glass-border) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  /* Botões com bg=bg-elevated (modais internos) → glass deep */
+  button[style*="background:var(--bg-elevated)"]:not(:disabled),
+  button[style*="background: var(--bg-elevated)"]:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--glass-border) !important;
+  }
+
+  /* Hover dos glass inativos → realça */
+  button[style*="background:var(--bg-card)"]:not(:disabled):hover,
+  button[style*="background: var(--bg-card)"]:not(:disabled):hover,
+  button[style*="background:var(--bg-pearl)"]:not(:disabled):hover,
+  button[style*="background: var(--bg-pearl)"]:not(:disabled):hover,
+  label[style*="background:var(--bg-card)"]:hover,
+  label[style*="background: var(--bg-card)"]:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: var(--glass-border-strong) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Divs (cards/sections) com bg-card/bg-pearl/bg-elevated → glass dark */
+  div[style*="background:var(--bg-card)"]:not(input):not(button),
+  div[style*="background: var(--bg-card)"]:not(input):not(button),
+  div[style*="background:var(--bg-pearl)"]:not(input):not(button),
+  div[style*="background: var(--bg-pearl)"]:not(input):not(button) {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: var(--glass-border) !important;
+  }
+
+  /* Inputs inline com bg=bg-base ou white (raros) → glass */
+  input[style*="background:'white'"],
+  input[style*='background:"white"'],
+  input[style*="background:#ffffff"],
+  input[style*="background: #ffffff"] {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--glass-border-strong) !important;
+    color: var(--text-primary) !important;
+  }
+
   /* — Buttons — modernizados: micro-interactions, glass ghost, glow primary,
      transitions cubic-bezier suaves. Mantém identidade magenta. — */
   .vc-btn {
