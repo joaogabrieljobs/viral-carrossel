@@ -8,3 +8,4 @@ dist
 
 # Referência local opcional (repo git embutido — não versionar como submodule por defeito)
 awesome-design-md/
+ROADMAP.md
