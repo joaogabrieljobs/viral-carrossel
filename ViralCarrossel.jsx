@@ -20,6 +20,8 @@ import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
 import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId } from './src/utils/video-store.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
+import VisualStylePicker from './src/components/VisualStylePicker.jsx';
+import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset } from './src/styles/visual-presets.jsx';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 // Permite os componentes de render (SlideCardInner, ClassicCanvasInner) lerem
@@ -8350,6 +8352,8 @@ function GenerateModal({
   onSlideTextDensityChange,
   cardVisualStyle: defaultCardVisualStyle = 'full',
   onCardVisualStyleChange,
+  visualPreset: defaultVisualPreset = null,
+  onVisualPresetChange,
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
   hookLibrary = [],
@@ -8368,6 +8372,10 @@ function GenerateModal({
   useEffect(() => {
     if (open) setCardStyle(normalizeCardVisualStyle(defaultCardVisualStyle));
   }, [open, defaultCardVisualStyle]);
+  // Padrão visual selecionado (paleta + fontes + tipografia). Null = mantém
+  // marca atual sem mudanças. Aplicado ao brand no momento de gerar.
+  const [visualPreset, setVisualPresetLocal] = useState(defaultVisualPreset);
+  useEffect(() => { if (open) setVisualPresetLocal(defaultVisualPreset); }, [open, defaultVisualPreset]);
   // Cópia local mutável dos eixos da imagem (commit no doc só ao gerar)
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
@@ -8447,6 +8455,9 @@ function GenerateModal({
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
       onCardVisualStyleChange?.(cardStyle);
+      // Aplica padrão visual ao brand ANTES da geração — IA usa as cores
+      // novas pra recomendar paleta consistente nos slides.
+      if (visualPreset && onVisualPresetChange) onVisualPresetChange(visualPreset);
       await onGenerate({
         topic: resolvedGenerationTopic,
         count,
@@ -8738,11 +8749,21 @@ function GenerateModal({
           )}
 
           {/* ═══════════ STEP 2 — FORMATO ═══════════
-              Número de cards, densidade de texto (labels amigáveis), estilo
-              visual da foto. Tudo que não muda a "história" mas afeta o look. */}
+              Padrão visual (paleta/fontes/tipografia), número de cards,
+              densidade de texto, estilo da foto. Tudo que afeta o look. */}
           {step === 2 && (
             <>
-              {/* Slide count primeiro — decisão mais imediata pro usuário */}
+              {/* Padrão visual — 12 presets curados extraídos de referências
+                  reais (NBA editorial, case study neon, luxury, viral hype...).
+                  Override APENAS de cores/fontes/tipografia — não mexe em
+                  creativePreset nem layout dos slides. */}
+              <VisualStylePicker
+                value={visualPreset}
+                onChange={setVisualPresetLocal}
+                presets={VISUAL_PRESETS}
+              />
+
+              {/* Slide count — decisão imediata pro usuário */}
               <div>
                 <label className="vc-label">Número de cards</label>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -13692,6 +13713,19 @@ export default function App() {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     return { ...d, fmt: FORMATS[raw] ? raw : 'carrossel' };
   }), [history]);
+
+  // ── PADRÃO VISUAL ────────────────────────────────────────────────────────
+  // Trackeia qual dos 12 presets visuais o user escolheu (null = nenhum).
+  // applyVisualStylePreset: merge das cores/fontes/tipografia do preset
+  // no brand atual. Chamado pelo GenerateModal antes de disparar onGenerate
+  // — afeta só rendering (gerador de texto não usa cor da marca).
+  const [visualPreset, setVisualPreset] = useState(null);
+  const applyVisualStylePreset = useCallback((presetId) => {
+    if (!presetId) return;
+    setVisualPreset(presetId);
+    setBrand((b) => applyVisualPreset(b, presetId));
+    trackEvent('visual_preset_applied', { preset: presetId });
+  }, [setBrand]);
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
   const setMaterial  = useCallback(next => history.set(d => ({
     ...d,
@@ -16659,6 +16693,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onSlideTextDensityChange={setSlideTextDensity}
         cardVisualStyle={cardVisualStyle}
         onCardVisualStyleChange={setCardVisualStyle}
+        visualPreset={visualPreset}
+        onVisualPresetChange={applyVisualStylePreset}
         material={material}
         setMaterial={setMaterial}
         hookLibrary={hookLibrary}
