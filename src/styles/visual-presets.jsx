@@ -82,24 +82,37 @@ const FF = {
 };
 
 export const VISUAL_PRESETS = [
-  // 1. Sports Editorial — NBA-style: foto BG + sans bold branco + header bar
+  // 1. Sports Editorial — NBA-style: foto BG + título ROSA PASTEL bold +
+  //    header bar 3-col MAIÚSCULAS + badge "N/M" canto sup direito.
+  //    Ref: IMG_5302 (Damian Lillard NBA).
   {
     id: 'sports_editorial',
     label: 'Sports Editorial',
-    desc: 'Sans bold branco · header bar com page-num · estilo notícia esportiva',
+    desc: 'Título rosa pastel · header bar 3-col · badge N/M · alinhado esquerda',
     brand: {
       bg: '#0a0a0a',
-      titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
+      titleColor: '#f7d8e0',  // ROSA PASTEL — assinatura do estilo (era branco)
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
       accent: '#ff5736',
       titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
-      textTitleTracking: -2,
-      textTitleLeading: 105,
+      textTitleTracking: -1,
+      textTitleLeading: 102,
       textSubLeading: 140,
+      // Header bar 3 colunas — placeholder editorial
+      cultureHeaderLeft: 'DE MILHÕES!',
+      cultureHeaderCenter: 'NEWS!',
+      cultureHeaderYear: 'CRACK',
+      // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
+      showPageBadge: true,
+    },
+    // Slide overrides — alinhamento esquerda + texto bottom-left forçados
+    slideDefaults: {
+      layout: 'bl',       // bottom-left
+      align: 'left',      // texto alinhado à esquerda
     },
     preview: () => (
       <PreviewCard bg="#0a0a0a">
@@ -521,13 +534,23 @@ export const VISUAL_PRESETS = [
 export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p.id, p]));
 
 /**
- * Aplica um preset visual ao objeto brand. Retorna NOVO brand (não muta).
+ * Aplica overrides de marca de um preset visual. Retorna NOVO brand (não muta).
  * Campos não definidos no preset preservam valores atuais do brand.
- *
- * Uso: `setBrand(applyVisualPreset(brand, 'sports_editorial'))`
  */
 export function applyVisualPreset(brand, presetId) {
   const preset = VISUAL_PRESET_BY_ID[presetId];
   if (!preset) return brand;
   return { ...brand, ...preset.brand };
+}
+
+/**
+ * Devolve overrides aplicáveis a CADA slide (layout, align, etc).
+ * Presets visuais editoriais (Sports Editorial, etc) precisam forçar
+ * alinhamento esquerda + layout bottom-left pro título ficar onde a ref mostra.
+ *
+ * Uso: `setSlides(slides.map(s => ({ ...s, ...getSlideOverrides(presetId) })))`
+ */
+export function getSlideOverridesForPreset(presetId) {
+  const preset = VISUAL_PRESET_BY_ID[presetId];
+  return preset?.slideDefaults || {};
 }

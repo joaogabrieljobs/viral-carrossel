@@ -21,7 +21,7 @@ import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
-import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset } from './src/styles/visual-presets.jsx';
+import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset } from './src/styles/visual-presets.jsx';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 // Permite os componentes de render (SlideCardInner, ClassicCanvasInner) lerem
@@ -5678,7 +5678,9 @@ const SlideCardInner = React.forwardRef(({
   const hideInstaBadge = false;
   // Desligado: contador "N/M" no canto superior direito do card foi removido a pedido.
   // (UI já mostra o número do card via tabs/navegação fora do canvas.)
-  const showCultureIdx = false;
+  // Badge "N/M" canto sup direito — ativado por brand.showPageBadge
+  // (era hardcoded false; agora opt-in via preset visual Sports Editorial etc).
+  const showCultureIdx = !!brand.showPageBadge;
   const cultureAccentCol = brand.accent || '#000000';
 
   const slideCardBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
@@ -6444,6 +6446,63 @@ const SlideCardInner = React.forwardRef(({
         }}/>
       )}
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
+
+      {/* Header bar 3-col + badge "N/M" — usado por presets visuais editoriais
+          (Sports Editorial etc) em modo full-bleed (não-Cultura). Já existe
+          variante no renderer Cultura; aqui é versão simplificada pra classic. */}
+      {(() => {
+        const hLeft  = (brand.cultureHeaderLeft  || '').trim();
+        const hCenter = (brand.cultureHeaderCenter || brand.handle || '').trim();
+        const hRight = (brand.cultureHeaderYear  || '').trim();
+        const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && brand.cultureHeaderLeft);
+        const hasPageBadge = !!brand.showPageBadge;
+        if (!hasHeaderBar && !hasPageBadge) return null;
+        // Cor branca translúcida quando há foto BG; senão tom da marca.
+        const headerColor = slide.bgImage ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
+        const badgeBg = slide.bgImage ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
+        const badgeColor = slide.bgImage ? '#fff' : (displayBodyInk || '#222');
+        return (
+          <>
+            {hasHeaderBar && (
+              <div style={{
+                position:'absolute', top:f.h*0.028, left:f.w*0.05,
+                right: hasPageBadge ? f.w*0.16 : f.w*0.05,
+                zIndex:25,
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+                gap:f.w*0.02, pointerEvents:'none',
+              }}>
+                <span style={{
+                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                  maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{hLeft}</span>
+                <span style={{
+                  flex:1, textAlign:'center',
+                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                }}>{hCenter}</span>
+                <span style={{
+                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                  maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
+                }}>{hRight}</span>
+              </div>
+            )}
+            {hasPageBadge && (
+              <div style={{
+                position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
+                background: badgeBg, color: badgeColor,
+                padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:9999,
+                fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
+                letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
+                backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
+                pointerEvents:'none',
+              }}>{num}/{total}</div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Loading até a URL da imagem terminar de baixar */}
       {imgLoading && (
@@ -13738,8 +13797,14 @@ export default function App() {
     if (!presetId) return;
     setVisualPreset(presetId);
     setBrand((b) => applyVisualPreset(b, presetId));
+    // Aplica overrides de slide (align, layout) se preset definir slideDefaults.
+    // Cada slide preserva seus campos próprios — só sobrescreve os do preset.
+    const slideOverrides = getSlideOverridesForPreset(presetId);
+    if (Object.keys(slideOverrides).length > 0) {
+      setSlides((slides) => slides.map((s) => ({ ...s, ...slideOverrides })));
+    }
     trackEvent('visual_preset_applied', { preset: presetId });
-  }, [setBrand]);
+  }, [setBrand, setSlides]);
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
   const setMaterial  = useCallback(next => history.set(d => ({
     ...d,
