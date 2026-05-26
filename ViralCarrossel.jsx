@@ -399,19 +399,22 @@ const GLOBAL_STYLE = `
     flex-shrink: 0;
   }
 
-  /* Tab bar — sub-nav. Polish: padding mais generoso (14px), font 13.5px,
-     ícones podem crescer pra 13 via JSX. Active state ganha micro-fill
-     pra firmar onde o foco está, junto com a underline. */
+  /* Tab bar — grid 3-col × 2 rows. Active item ganha fundo + indicador
+     accent à esquerda (em vez de underline bottom — funciona melhor em grid). */
   .tab-bar-item {
-    flex: 1; padding: 14px 6px 13px; font-size: 13px; font-weight: 500;
+    padding: 11px 6px; font-size: 12px; font-weight: 500;
     letter-spacing: -0.014em; text-transform: none;
     font-family: var(--font-ui); cursor: pointer; border: none;
     background: transparent; display: flex; align-items: center;
-    justify-content: center; gap: 7px; position: relative;
+    justify-content: center; gap: 6px; position: relative;
     transition: color 0.15s var(--ease-smooth), background-color 0.15s var(--ease-smooth);
     outline: none; color: var(--text-muted);
     min-height: 44px;
+    border-right: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
   }
+  .tab-bar-item:nth-child(3n) { border-right: none; }
+  .tab-bar-item:nth-last-child(-n+3) { border-bottom: none; }
   .tab-bar-item.active {
     color: var(--text-primary); font-weight: 600;
     background: var(--accent-surface);
@@ -10111,7 +10114,11 @@ function SidebarContent({
         role="tablist"
         aria-label="Áreas de edição do projeto"
         style={{
-          display:'flex',
+          // Grid 3 colunas — 6 domínios em 2 linhas, todos visíveis sem overflow.
+          // Era flex single-row que cortava quando passou de 4 itens.
+          display:'grid',
+          gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
+          rowGap: 0,
           borderBottom:'1px solid var(--border)',
           boxShadow:'0 6px 12px -8px rgba(0,0,0,0.18)',
           flexShrink:0,
@@ -16787,7 +16794,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             )}
           </div>
 
-          {/* Mobile bottom bar — 4 abas + ação de baixar.
+          {/* Mobile bottom bar — 6 abas em grid 3×2 + ação de baixar.
               Empurra o conteúdo da home indicator iOS via safe-area-inset-bottom. */}
           {isMobile && !empty && !drawerOpen && (
             <div
@@ -16796,13 +16803,18 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               position:'fixed', bottom:0, left:0, right:0, zIndex:20,
               background:'var(--bg-sidebar)', borderTop:'1px solid var(--border)',
               padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0))',
-              display:'flex', gap:6,
+              display:'flex', gap:6, alignItems:'stretch',
               boxShadow:'0 -4px 16px rgba(0,0,0,0.4)',
               backdropFilter:'blur(8px)',
             }}
             >
+              <div style={{
+                flex:1, display:'grid',
+                gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
+                gap:4,
+              }}>
               {[
-                // FASE 1 Narrative OS — 6 domínios finais no bottom nav
+                // FASE 1 Narrative OS — 6 domínios finais no bottom nav (grid 3×2)
                 { id:'narrativa', label:'Narrativa', icon:Wand2 },
                 { id:'visual',    label:'Visual',    icon:Palette },
                 { id:'imagem',    label:'Imagem',    icon:ImageIcon },
@@ -16814,10 +16826,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   key={id}
                   onClick={() => { setTab(id); setDrawerOpen(true); }}
                   style={{
-                    flex:1, height:48, borderRadius:11, border:'1px solid var(--hairline)',
+                    minHeight:46, borderRadius:10, border:'1px solid var(--hairline)',
                     background:'var(--bg-pearl)', color:'var(--text-secondary)',
                     fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
-                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4,
+                    display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:5,
                     letterSpacing:'-0.011em',
                     transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                   }}
@@ -16825,9 +16837,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                   aria-label={`Abrir aba ${label}`}
                 >
-                  <Icon size={14}/>{label}
+                  <Icon size={13}/>{label}
                 </button>
               ))}
+              </div>
               <button
                 onClick={() => exportSlide(activeIdx)}
                 disabled={exporting}
