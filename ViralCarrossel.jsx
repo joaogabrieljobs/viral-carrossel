@@ -17015,24 +17015,26 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             )}
           </div>
 
-          {/* Mobile bottom bar — 6 abas em grid 3×2 + ação de baixar.
-              Empurra o conteúdo da home indicator iOS via safe-area-inset-bottom. */}
+          {/* Mobile bottom bar — 6 abas em grid 3×2 (proeminentes) + FAB
+              Exportar circular compacto. Tabs maiores, Exportar não domina. */}
           {isMobile && !empty && !drawerOpen && (
             <div
               data-vc-tour="mobile-bar"
               style={{
               position:'fixed', bottom:0, left:0, right:0, zIndex:20,
-              background:'var(--bg-sidebar)', borderTop:'1px solid var(--border)',
-              padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0))',
-              display:'flex', gap:6, alignItems:'stretch',
-              boxShadow:'0 -4px 16px rgba(0,0,0,0.4)',
-              backdropFilter:'blur(8px)',
+              background:'rgba(244, 236, 214, 0.92)',
+              backdropFilter:'blur(20px) saturate(180%)',
+              WebkitBackdropFilter:'blur(20px) saturate(180%)',
+              borderTop:'0.5px solid rgba(0,0,0,0.08)',
+              padding:'10px 10px calc(10px + env(safe-area-inset-bottom, 0))',
+              display:'flex', gap:10, alignItems:'stretch',
+              boxShadow:'0 -8px 32px rgba(0,0,0,0.18)',
             }}
             >
               <div style={{
                 flex:1, display:'grid',
                 gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
-                gap:4,
+                gap:6,
               }}>
               {[
                 // FASE 1 Narrative OS — 6 domínios finais no bottom nav (grid 3×2)
@@ -17042,43 +17044,59 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 { id:'layout',    label:'Layout',    icon:Layout },
                 { id:'texto',     label:'Texto',     icon:Type },
                 { id:'brand',     label:'Marca',     icon:Instagram },
-              ].map(({ id, label, icon:Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => { setTab(id); setDrawerOpen(true); }}
-                  style={{
-                    minHeight:46, borderRadius:10, border:'1px solid var(--hairline)',
-                    background:'var(--bg-pearl)', color:'var(--text-secondary)',
-                    fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
-                    display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:5,
-                    letterSpacing:'-0.011em',
-                    transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-                  }}
-                  onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-                  onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  aria-label={`Abrir aba ${label}`}
-                >
-                  <Icon size={13}/>{label}
-                </button>
-              ))}
+              ].map(({ id, label, icon:Icon }) => {
+                const active = tab === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { setTab(id); setDrawerOpen(true); }}
+                    style={{
+                      minHeight:54, padding:'4px 6px',
+                      borderRadius:12,
+                      border: active ? '1.5px solid var(--accent)' : '1px solid rgba(0,0,0,0.06)',
+                      background: active ? 'var(--accent-surface)' : 'rgba(255,255,255,0.85)',
+                      color: active ? 'var(--accent)' : 'var(--text-primary)',
+                      fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
+                      display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6,
+                      letterSpacing:'-0.011em',
+                      boxShadow: active
+                        ? '0 2px 8px rgba(255, 61, 139, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.6)'
+                        : '0 1px 2px rgba(0, 0, 0, 0.04)',
+                      transition:'all 0.18s var(--ease-smooth)',
+                    }}
+                    onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+                    onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    aria-label={`Abrir aba ${label}`}
+                    aria-pressed={active}
+                  >
+                    <Icon size={15} strokeWidth={active ? 2.25 : 2}/>{label}
+                  </button>
+                );
+              })}
               </div>
+              {/* Exportar FAB circular — proporcional aos tabs (não mais 40% largura) */}
               <button
                 onClick={() => exportSlide(activeIdx)}
                 disabled={exporting}
                 style={{
-                  flex:1.4, height:48, borderRadius:9999, border:'none', cursor:'pointer',
+                  alignSelf:'center',
+                  width:60, height:60, borderRadius:'50%',
+                  border:'none', cursor:'pointer',
                   background:'var(--accent)', color:'#fff',
-                  fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
-                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
+                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
                   letterSpacing:'-0.011em',
                   opacity:exporting?0.5:1,
-                  transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                  boxShadow:
+                    '0 2px 4px rgba(255, 61, 139, 0.34), 0 8px 22px rgba(255, 61, 139, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                  transition:'background 0.15s var(--ease-smooth), transform 0.12s var(--ease-smooth), box-shadow 0.22s',
                 }}
-                onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.95)'; }}
+                onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.94)'; }}
                 onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 aria-label="Exportar card atual"
+                title="Exportar"
               >
-                <Download size={14}/>Exportar
+                <Download size={20} strokeWidth={2.5}/>
+                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.02em' }}>EXPORTAR</span>
               </button>
             </div>
           )}
