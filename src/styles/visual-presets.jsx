@@ -178,15 +178,17 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 3. Mood Sépia — texto amarelo cream centralizado, foto BG escura, pill hashtag
+  // 3. Mood Sépia — título cream centralizado + hashtag pill (sem seta).
+  //    Ref: IMG_5305 (Correr Não Me Cura. Mas Me Segura.). Estilo mood
+  //    reflexivo / quote — minimal, sem header bar nem badge.
   {
     id: 'mood_sepia',
     label: 'Mood Sépia',
-    desc: 'Cream sobre BG escuro · texto centralizado · pill com hashtag',
+    desc: 'Cream centralizado · pill com hashtag · vibe mood reflexivo',
     brand: {
       bg: '#1a1612',
-      titleColor: '#fff5d1',
-      subtitleColor: '#e8d8a8',
+      titleColor: '#fff5d1',  // CREAM mais claro (luminância alta)
+      subtitleColor: '#fff5d1',
       textColor: '#d4c290',
       accent: '#fbbf24',
       titleFont: FF.archivoBlack,
@@ -194,8 +196,24 @@ export const VISUAL_PRESETS = [
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -1,
-      textTitleLeading: 110,
+      textTitleLeading: 108,
       textSubLeading: 145,
+      // SEM header bar (limpo, estilo quote/poema)
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: '',
+      cultureHeaderYear: '',
+      showPageBadge: false,
+      showStarOrnament: false,
+      // Pill hashtag SEM seta (variante minimal)
+      footerPillText: '#NÃOSURTOHOJE',
+      footerPillBg: 'rgba(0,0,0,0.55)',
+      footerPillFg: '#fff5d1',
+      footerPillArrow: false,  // sem seta — visual mais compacto
+    },
+    slideDefaults: {
+      layout: 'bc',
+      align: 'center',
+      eyebrowText: '',  // sem eyebrow
     },
     preview: () => (
       <PreviewCard bg="#1a1612">

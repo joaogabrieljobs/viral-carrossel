@@ -6758,6 +6758,11 @@ const SlideCardInner = React.forwardRef(({
       {brand.footerPillText && (() => {
         const pillBg = brand.footerPillBg || brand.accent || '#0a0a0a';
         const pillFg = brand.footerPillFg || (pillBg === brand.accent ? '#0a0a0a' : '#ffffff');
+        // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
+        // Default true se undefined; só esconde quando explicitamente false.
+        const showArrow = brand.footerPillArrow !== false;
+        // Padding-right encolhe quando não tem seta (visual mais compacto).
+        const padRight = showArrow ? f.w*0.014 : f.w*0.028;
         return (
           <div style={{
             position:'absolute', bottom: f.h*0.058,
@@ -6766,7 +6771,7 @@ const SlideCardInner = React.forwardRef(({
           }}>
             <div style={{
               background: pillBg, color: pillFg,
-              padding: `${f.h*0.012}px ${f.w*0.014}px ${f.h*0.012}px ${f.w*0.032}px`,
+              padding: `${f.h*0.012}px ${padRight}px ${f.h*0.012}px ${f.w*0.028}px`,
               borderRadius: 9999,
               display:'inline-flex', alignItems:'center', gap: f.w*0.018,
               fontSize: f.w*0.026, fontWeight:700, fontFamily: bodyFF,
@@ -6775,13 +6780,15 @@ const SlideCardInner = React.forwardRef(({
               boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
             }}>
               {brand.footerPillText}
-              <span style={{
-                width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
-                background: pillFg, color: pillBg,
-                display:'inline-flex', alignItems:'center', justifyContent:'center',
-                fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
-                flexShrink:0,
-              }}>→</span>
+              {showArrow && (
+                <span style={{
+                  width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
+                  background: pillFg, color: pillBg,
+                  display:'inline-flex', alignItems:'center', justifyContent:'center',
+                  fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
+                  flexShrink:0,
+                }}>→</span>
+              )}
             </div>
           </div>
         );
