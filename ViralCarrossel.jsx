@@ -6747,7 +6747,73 @@ const SlideCardInner = React.forwardRef(({
                   textShadow: shadow,
                 }}>{slide.subtitle}</p>
               ))}
+              {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
+                  do título. Suporta strikethroughText pra preço antigo riscado:
+                  "DE R$99" riscado + "POR R$0,00 (100% GRATUITO)" intacto. */}
+              {slide.afterTitleText && (
+                <p style={{
+                  color: displayTitleInk, fontFamily: titleFF,
+                  fontSize: f.w*0.034,
+                  fontWeight: slide.titleWeight ?? 800,
+                  letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
+                  margin: 0,
+                  textTransform: slide.titleCase === 'upper' ? 'uppercase' : 'none',
+                  textShadow: shadow,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: f.w*0.014,
+                  alignItems: 'baseline',
+                }}>
+                  {slide.strikethroughText && (
+                    <span style={{
+                      textDecoration: 'line-through',
+                      textDecorationColor: brand.accent || '#dc2626',
+                      textDecorationThickness: f.w*0.004,
+                      opacity: 0.85,
+                    }}>{slide.strikethroughText}</span>
+                  )}
+                  <span>{slide.afterTitleText}</span>
+                </p>
+              )}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Footer bar 3 colunas (Authority Black REF 11): Topic / Brought by / Save.
+          Texto pequeno MAIÚSCULAS distribuído no rodapé, similar ao header
+          mas em baixo. Cada coluna tem label cinza + valor branco em 2 linhas. */}
+      {(() => {
+        const fLeft = brand.footerBarLeft;
+        const fCenter = brand.footerBarCenter;
+        const fRight = brand.footerBarRight;
+        const hasFooter = !!(fLeft || fCenter || fRight);
+        if (!hasFooter) return null;
+        const labelColor = slide.bgImage ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
+        const valueColor = slide.bgImage ? '#ffffff' : (displayTitleInk || '#000');
+        const Col = ({ data }) => {
+          if (!data) return <div style={{ flex:1 }}/>;
+          const [label, value] = String(data).split('|');
+          return (
+            <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
+              <span style={{ fontSize: f.w*0.020, fontFamily: bodyFF, color: labelColor,
+                letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
+              {value && (
+                <span style={{ fontSize: f.w*0.022, fontFamily: bodyFF, color: valueColor,
+                  fontWeight: 700 }}>{value}</span>
+              )}
+            </div>
+          );
+        };
+        return (
+          <div style={{
+            position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
+            zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+            gap: f.w*0.02, pointerEvents:'none',
+          }}>
+            <Col data={fLeft}/>
+            <Col data={fCenter}/>
+            <Col data={fRight}/>
           </div>
         );
       })()}

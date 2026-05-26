@@ -230,24 +230,38 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 4. Bold Promo Rosa — display branco + strikethrough vermelho, bg pink
+  // 4. Bold Promo Pink — promo com strikethrough pro preço.
+  //    Ref: IMG_5308 (Gary — Conheça o Gary, gratuito).
   {
     id: 'bold_promo_rosa',
-    label: 'Bold Promo Rosa',
-    desc: 'Display branco bold sobre rosa · strikethrough vermelho pra oferta',
+    label: 'Bold Promo Pink',
+    desc: 'Display branco · strikethrough vermelho pra oferta promo',
     brand: {
       bg: '#ec4899',
       titleColor: '#ffffff',
       subtitleColor: '#fce7f3',
       textColor: '#fbcfe8',
-      accent: '#dc2626',
-      titleFont: FF.anton,
+      accent: '#dc2626',  // vermelho pro strikethrough
+      titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
-      textTitleWeight: 700,
+      textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -1,
-      textTitleLeading: 108,
+      textTitleLeading: 100,
       textSubLeading: 140,
+      // Header 3-col sutil (placeholder editorial @copyright)
+      cultureHeaderLeft: '@MARCA',
+      cultureHeaderCenter: 'DIGITAL THINKER',
+      cultureHeaderYear: 'COPYRIGHT',
+      showPageBadge: false,  // promo não usa contador
+      showStarOrnament: false,
+    },
+    slideDefaults: {
+      layout: 'bl',
+      align: 'left',
+      // After-title text com strikethrough — assinatura visual da promo
+      strikethroughText: 'DE R$99',
+      afterTitleText: 'POR R$0,00 (100% GRATUITO)',
     },
     preview: () => (
       <PreviewCard bg="#ec4899" gradient="linear-gradient(180deg, #f472b6 0%, #ec4899 70%, #be185d 100%)">
@@ -314,24 +328,40 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 6. Tabloid Keywords — sans branco com palavras-chave verde-menta
+  // 6. Tabloid Keywords — sans branco + accent verde-menta · vibe noticiário.
+  //    Ref: IMG_5310 (Chora Não LinkedIn — CEO tóxico). User marca palavras-
+  //    chave usando "Marcar Destaque" pra ter as palavras coloridas (accent).
   {
     id: 'tabloid_keywords',
     label: 'Tabloid Keywords',
-    desc: 'Sans branco · palavras-chave em verde-menta · vibe noticiário',
+    desc: 'Sans branco · accent verde-menta · marque palavras-chave com Destaque',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
-      accent: '#34d399',
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
+      accent: '#34d399',  // verde-menta pras palavras destacadas
       titleFont: FF.anton,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -1,
-      textTitleLeading: 108,
+      textTitleLeading: 100,
       textSubLeading: 140,
+      cultureHeaderLeft: 'EDUCADORA FM 91.7',
+      cultureHeaderCenter: 'POSTNEWS',
+      cultureHeaderYear: '',
+      showPageBadge: true,
+      showStarOrnament: false,
+      // Pill verde-menta com hashtag no rodapé
+      footerPillText: 'FOI NO SHOW DO COLDPLAY',
+      footerPillBg: '#34d399',
+      footerPillFg: '#0a0a0a',
+      footerPillArrow: false,
+    },
+    slideDefaults: {
+      layout: 'bl',
+      align: 'left',
     },
     preview: () => (
       <PreviewCard bg="#0a0a0a">
@@ -352,24 +382,35 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 7. Editorial Magazine — serif elegante + sans, contagem de likes
+  // 7. Editorial Magazine — Playfair serif + sans · estilo capa de revista.
+  //    Ref: IMG_5322 (The Claude Workflow). Título serif elegante centralizado
+  //    no TOPO da foto (não no rodapé), like um lookbook editorial.
   {
     id: 'editorial_magazine',
     label: 'Editorial Magazine',
-    desc: 'Serifa elegante + sans condensed · estilo capa de revista',
+    desc: 'Serifa Playfair elegante · estilo capa de revista lookbook',
     brand: {
       bg: '#1e3a5f',
       titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
       accent: '#dc2626',
-      titleFont: FF.playfair,
+      titleFont: FF.playfair,  // serif elegante
       bodyFont: FF.dmSans,
       textTitleWeight: 700,
-      textTitleCase: 'normal',
+      textTitleCase: 'normal',  // Title Case (não maiúsculas)
       textTitleTracking: -2,
-      textTitleLeading: 108,
-      textSubLeading: 140,
+      textTitleLeading: 100,
+      textSubLeading: 145,
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: '',
+      cultureHeaderYear: '',
+      showPageBadge: false,
+      showStarOrnament: false,
+    },
+    slideDefaults: {
+      layout: 'tc',  // top-center — título no TOPO da foto
+      align: 'center',
     },
     preview: () => (
       <PreviewCard bg="#1e3a5f" gradient="linear-gradient(180deg, #2a4870 0%, #1e3a5f 100%)">
@@ -388,24 +429,35 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 8. Luxury Hybrid — display sans + serifa script dourada
+  // 8. Luxury Hybrid — sans bold branco + accent dourado.
+  //    Ref: IMG_5323 (Trends viralizando na gringa). Versão simplificada
+  //    sem mistura tipográfica complexa — paleta marrom premium + dourado.
   {
     id: 'luxury_hybrid',
     label: 'Luxury Hybrid',
-    desc: 'Sans + serifa script dourada · vibe luxo premium',
+    desc: 'Sans bold branco + accent dourado · vibe luxo fashion editorial',
     brand: {
       bg: '#3e2418',
       titleColor: '#ffffff',
       subtitleColor: '#f5e8d0',
       textColor: '#d4c19a',
-      accent: '#d4af37',
-      titleFont: FF.bebas,
+      accent: '#d4af37',  // dourado luxury
+      titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
-      textTitleTracking: -3,
+      textTitleTracking: -1,
       textTitleLeading: 100,
       textSubLeading: 145,
+      cultureHeaderLeft: 'TRENDS',
+      cultureHeaderCenter: 'LUXURY EDITION',
+      cultureHeaderYear: '2025',
+      showPageBadge: true,
+      showStarOrnament: false,
+    },
+    slideDefaults: {
+      layout: 'tl',  // top-left — título alto na foto
+      align: 'left',
     },
     preview: () => (
       <PreviewCard bg="#3e2418">
@@ -427,24 +479,37 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 9. Viral Hype Dark — display branco + accent vermelho, BG dramático
+  // 9. Viral Hype Dark — preto + vermelho dramático + "ARRASTA PRO LADO →".
+  //    Ref: IMG_5324 (Segredo Exposto — fogo viral). Visual de alta tensão.
   {
     id: 'viral_hype_dark',
     label: 'Viral Hype Dark',
-    desc: 'Display branco bombástico · accent vermelho · "ARRASTA →"',
+    desc: 'Preto/vermelho dramático · pill "ARRASTA PRO LADO →"',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
-      accent: '#ef4444',
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
+      accent: '#ef4444',  // vermelho fogo
       titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
-      textTitleTracking: -2,
-      textTitleLeading: 105,
+      textTitleTracking: -1,
+      textTitleLeading: 100,
       textSubLeading: 140,
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: '',
+      cultureHeaderYear: '',
+      showPageBadge: true,
+      // Pill "ARRASTA PRO LADO" com seta — assinatura do estilo
+      footerPillText: 'ARRASTA PRO LADO',
+      footerPillBg: 'rgba(255,255,255,0.95)',
+      footerPillFg: '#0a0a0a',
+    },
+    slideDefaults: {
+      layout: 'bl',
+      align: 'left',
     },
     preview: () => (
       <PreviewCard bg="#0a0a0a">
@@ -464,24 +529,34 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 10. Cinematic Hybrid — sans + serifa cursive vermelha
+  // 10. Cinematic Hybrid — serifa vermelha · vibe cinema noir.
+  //     Ref: IMG_5326 (Como Gerar imagens no Canva). Versão simplificada
+  //     usando serifa vermelha pra título inteiro (sem mistura sans+serif).
   {
     id: 'cinematic_hybrid',
     label: 'Cinematic Hybrid',
-    desc: 'Sans "como" + serifa cursiva vermelha · vibe cinema noir',
+    desc: 'Serifa vermelha cinematic · vibe cinema noir filme',
     brand: {
       bg: '#0c1018',
-      titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
+      titleColor: '#dc2626',  // VERMELHO cinematic
+      subtitleColor: '#ffffff',
       textColor: '#cfcfcf',
       accent: '#dc2626',
-      titleFont: FF.outfit,
+      titleFont: FF.yeseva,  // Yeseva One — serif elegante cursive-like
       bodyFont: FF.inter,
-      textTitleWeight: 600,
-      textTitleCase: 'lower',
+      textTitleWeight: 400,  // serif natural
+      textTitleCase: 'normal',  // Title Case
       textTitleTracking: -2,
-      textTitleLeading: 108,
+      textTitleLeading: 100,
       textSubLeading: 145,
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: '',
+      cultureHeaderYear: '',
+      showPageBadge: false,
+    },
+    slideDefaults: {
+      layout: 'bl',
+      align: 'left',
     },
     preview: () => (
       <PreviewCard bg="#0c1018">
@@ -501,24 +576,38 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 11. Authority Black — display gigante + footer 3 colunas
+  // 11. Authority Black — display gigante + footer 3 colunas.
+  //     Ref: IMG_5327 (7 Secrets — estátua vermelha). Documentário/autoridade.
+  //     Usa footer bar 3-col (feature nova) com label/value por coluna.
   {
     id: 'authority_black',
     label: 'Authority Black',
-    desc: 'Display branco gigante · footer 3 colunas · vibe documentário',
+    desc: 'Display branco gigante · footer 3-col Topic/By/Save',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
       accent: '#dc2626',
       titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
       textTitleTracking: -2,
-      textTitleLeading: 105,
+      textTitleLeading: 100,
       textSubLeading: 145,
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: 'SOCIYELL SMM & GROWTH',
+      cultureHeaderYear: '',
+      showPageBadge: false,
+      // Footer 3-col (feature nova): "LABEL|VALUE" por coluna
+      footerBarLeft: 'Topic|Instagram',
+      footerBarCenter: 'Brought to you|by Sociyell',
+      footerBarRight: 'Make sure to|Save this post',
+    },
+    slideDefaults: {
+      layout: 'mc',  // mid-center pra dar espaço pro footer
+      align: 'center',
     },
     preview: () => (
       <PreviewCard bg="#0a0a0a">
@@ -541,11 +630,13 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 12. Minimal Clean — sem foto, fundo limpo, tipografia centrada
+  // 12. Minimal Clean — sem foto, fundo creme, tipografia centrada.
+  //     Padrão "Apple"/Swiss modernism: contraste alto, hierarquia clara,
+  //     muito whitespace. Bom contraste pra texto/quotes sem foto.
   {
     id: 'minimal_clean',
     label: 'Minimal Clean',
-    desc: 'Sem foto · fundo creme · tipografia centrada · vibe Apple',
+    desc: 'Fundo creme · tipografia centrada · vibe Apple/Swiss',
     brand: {
       bg: '#fafaf6',
       titleColor: '#0a0a0a',
@@ -559,6 +650,15 @@ export const VISUAL_PRESETS = [
       textTitleTracking: -3,
       textTitleLeading: 110,
       textSubLeading: 150,
+      cultureHeaderLeft: '',
+      cultureHeaderCenter: '',
+      cultureHeaderYear: '',
+      showPageBadge: false,
+      showStarOrnament: false,
+    },
+    slideDefaults: {
+      layout: 'mc',  // mid-center
+      align: 'center',
     },
     preview: () => (
       <PreviewCard bg="#fafaf6">
