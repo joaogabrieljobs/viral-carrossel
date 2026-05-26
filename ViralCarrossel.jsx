@@ -383,6 +383,63 @@ const GLOBAL_STYLE = `
     border: 2px solid rgba(255,255,255,0.22);
   }
 
+  /* — GLOBAL BUTTON POLISH (atinge TODOS os botões, incluindo inline-styled) — */
+  button {
+    transition:
+      transform 0.16s var(--ease-smooth),
+      box-shadow 0.22s var(--ease-smooth),
+      background 0.20s var(--ease-smooth),
+      border-color 0.18s var(--ease-smooth),
+      color 0.18s var(--ease-smooth);
+    font-feature-settings: 'cv11', 'ss01', 'kern' 1;
+  }
+  button:not(:disabled):active { transform: scale(0.96); }
+  /* Botão com background colorido (accent) ganha sombra magenta automaticamente */
+  button[style*="background:var(--accent)"]:not(:disabled),
+  button[style*="background: var(--accent)"]:not(:disabled),
+  button[style*="background:'var(--accent)'"]:not(:disabled) {
+    box-shadow:
+      0 1px 2px rgba(255, 61, 139, 0.30),
+      0 4px 12px rgba(255, 61, 139, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  }
+  button[style*="background:var(--accent)"]:not(:disabled):hover,
+  button[style*="background: var(--accent)"]:not(:disabled):hover,
+  button[style*="background:'var(--accent)'"]:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 4px rgba(255, 61, 139, 0.36),
+      0 8px 22px rgba(255, 61, 139, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  }
+  /* Botão preto/dark (.text-primary) ganha sombra neutra elevada */
+  button[style*="background:var(--text-primary)"]:not(:disabled),
+  button[style*="background: var(--text-primary)"]:not(:disabled) {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.20),
+      0 6px 16px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+  }
+  button[style*="background:var(--text-primary)"]:not(:disabled):hover,
+  button[style*="background: var(--text-primary)"]:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.24),
+      0 10px 24px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  }
+
+  /* Inputs globais (textareas + selects + input) ganham focus halo accent */
+  input:not([type="range"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--accent) !important;
+    box-shadow:
+      0 0 0 4px rgba(255, 61, 139, 0.14),
+      0 1px 3px rgba(255, 61, 139, 0.08) !important;
+  }
+
   /* — Buttons — modernizados: micro-interactions, glass ghost, glow primary,
      transitions cubic-bezier suaves. Mantém identidade magenta. — */
   .vc-btn {
