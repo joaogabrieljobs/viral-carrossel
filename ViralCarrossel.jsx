@@ -16908,16 +16908,31 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         />
       ) : (
       <>
-      {/* ── HEADER ── */}
+      {/* ── HEADER ── No mobile, esconde quando drawer aberto (mais espaço
+          pros cards). Reaparece quando user fecha o drawer (pull down). */}
       <header style={{
         borderBottom:'1px solid var(--border)', background:'var(--bg-sidebar)',
         flexShrink:0,
+        overflow: 'hidden',
+        /* Mobile collapse: slide up + colapsa altura quando drawerOpen */
+        ...(isMobile && drawerOpen ? {
+          maxHeight: 0,
+          opacity: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          borderBottom: 'none',
+          pointerEvents: 'none',
+          transform: 'translateY(-12px)',
+        } : {}),
+        transition: 'max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1), padding 0.32s, transform 0.32s, border-color 0.22s',
         ...(isMobile ? {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'stretch',
           gap: 10,
           padding: `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`,
+          /* maxHeight grande pra não cortar quando aberto; collapse pra 0 quando drawer abre */
+          maxHeight: drawerOpen ? 0 : 240,
         } : {
           display:'flex',
           alignItems:'center',
@@ -17138,13 +17153,27 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         {/* ── CANVAS ── */}
         <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-base)' }}>
 
-          {/* ── THUMBNAIL STRIP ── */}
+          {/* ── THUMBNAIL STRIP ── Mobile: colapsa junto com header quando
+              drawer aberto. Desktop: sempre visível. */}
           <div
             data-vc-tour="thumbnails"
             style={{
             background:'var(--bg-sidebar)', borderBottom:'1px solid var(--border)',
             padding: isMobile ? '8px 10px' : '10px 14px',
             flexShrink:0,
+            overflow: 'hidden',
+            ...(isMobile && drawerOpen ? {
+              maxHeight: 0,
+              opacity: 0,
+              paddingTop: 0,
+              paddingBottom: 0,
+              borderBottom: 'none',
+              pointerEvents: 'none',
+              transform: 'translateY(-8px)',
+            } : isMobile ? {
+              maxHeight: 200,
+            } : {}),
+            transition: 'max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s, padding 0.32s, transform 0.32s, border-color 0.22s',
           }}
           >
             <div style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2 }}>
