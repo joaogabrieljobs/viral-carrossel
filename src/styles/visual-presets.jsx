@@ -75,15 +75,19 @@ export function renderPresetPreview(preset) {
   const hPos = layout.charAt(1); // l/c/r
   const align = d.align || 'left';
 
-  // Foto BG simulada — todos os presets usam foto exceto Minimal Clean.
+  // Foto BG simulada — usa brand.bg como cor dominante (não mais cinza
+  // genérico). Sobre o bg, aplica um wash escuro pra simular overlay de
+  // foto. Resultado: presets com bg colorido (Pink, brown) mantêm sua
+  // identidade cromática; presets com bg neutro (preto) ficam visíveis.
   const noPhoto = preset.id === 'minimal_clean';
-  const photoColor = noPhoto ? b.bg : '#3a3a3a';
 
   // Cores derivadas
   const titleC = b.titleColor || '#fff';
   const subC = b.subtitleColor || titleC;
   const accent = b.accent || titleC;
-  const mutedC = noPhoto ? '#a0a0a0' : 'rgba(255,255,255,0.6)';
+  // Determina se bg é "claro" pra ajustar contraste dos elementos sutis
+  const isLightBg = (b.bg || '').match(/^#([fF][a-fA-F0-9]|[eE][a-fA-F0-9])/);
+  const mutedC = noPhoto ? '#a0a0a0' : isLightBg ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.65)';
 
   // Flags
   const hasHeader = !!(b.cultureHeaderLeft || b.cultureHeaderYear || b.cultureHeaderCenter);
@@ -110,28 +114,31 @@ export function renderPresetPreview(preset) {
 
   return (
     <PreviewCard bg={b.bg || '#222'}>
-      {/* Foto simulada — overlay escurecido pra texto contrastar */}
+      {/* Foto simulada — wash escuro SOBRE brand.bg (não mais cinza
+          genérico). Mantém a cor da marca dominante. */}
       {!noPhoto && (
         <>
-          <rect x="0" y="0" width="60" height="75" fill={photoColor} />
-          <rect x="0" y="40" width="60" height="35" fill="rgba(0,0,0,0.45)" />
+          {/* Sugestão de elemento fotográfico (silhueta sutil) no topo */}
+          <ellipse cx="30" cy="22" rx="14" ry="13" fill="rgba(0,0,0,0.22)"/>
+          {/* Overlay escuro embaixo pra contrastar texto */}
+          <rect x="0" y="38" width="60" height="37" fill={isLightBg ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.40)'}/>
         </>
       )}
 
-      {/* Header 3-col fino no topo */}
+      {/* Header 3-col fino no topo — visualmente mais presente */}
       {hasHeader && (
         <g>
-          {b.cultureHeaderLeft && <rect x="3" y="3" width="13" height="1.6" fill={mutedC} rx="0.4"/>}
-          {(b.cultureHeaderCenter || '').trim() && <rect x="23" y="3" width="14" height="1.6" fill={mutedC} rx="0.4"/>}
-          {b.cultureHeaderYear && <rect x={hasBadge ? 43 : 44} y="3" width={hasBadge ? 7 : 13} height="1.6" fill={mutedC} rx="0.4"/>}
+          {b.cultureHeaderLeft && <rect x="3" y="3" width="14" height="2" fill={mutedC} rx="0.5"/>}
+          {(b.cultureHeaderCenter || '').trim() && <rect x="23" y="3" width="14" height="2" fill={mutedC} rx="0.5"/>}
+          {b.cultureHeaderYear && <rect x={hasBadge ? 41 : 44} y="3" width={hasBadge ? 8 : 13} height="2" fill={mutedC} rx="0.5"/>}
         </g>
       )}
 
-      {/* Badge "N/M" pill canto sup direito */}
+      {/* Badge "N/M" pill canto sup direito — maior pra ser óbvio */}
       {hasBadge && (
         <g>
-          <rect x="50" y="2.5" width="8" height="4" rx="2" fill="rgba(0,0,0,0.5)"/>
-          <text x="54" y="5.7" fontSize="2.8" fill="#fff" fontWeight="700" textAnchor="middle">1/N</text>
+          <rect x="49" y="2" width="9" height="5" rx="2.5" fill="rgba(0,0,0,0.65)"/>
+          <text x="53.5" y="5.8" fontSize="3" fill="#fff" fontWeight="700" textAnchor="middle">1/N</text>
         </g>
       )}
 
@@ -187,15 +194,19 @@ export function renderPresetPreview(preset) {
         return [r1, r2];
       })()}
 
-      {/* Strikethrough (Bold Promo Pink) */}
+      {/* Strikethrough (Bold Promo Pink) — risco vermelho ÓBVIO acima
+          de texto branco. Visual de promo com preço cortado. */}
       {hasStrike && (() => {
-        y += 2;
-        const xStrike = xLineX(36);
+        y += 3;
+        const xStrike = xLineX(40);
         return (
           <g key="strike">
-            <rect x={xStrike} y={y} width="10" height="2.5" fill={titleC} opacity="0.8" rx="0.4"/>
-            <line x1={xStrike} y1={y + 1.2} x2={xStrike + 10} y2={y + 1.2} stroke={accent} strokeWidth="0.8"/>
-            <rect x={xStrike + 12} y={y} width="22" height="2.5" fill={titleC} rx="0.4"/>
+            {/* "DE R$99" riscado */}
+            <rect x={xStrike} y={y} width="12" height="3" fill={titleC} opacity="0.9" rx="0.5"/>
+            <line x1={xStrike - 0.5} y1={y + 1.5} x2={xStrike + 12.5} y2={y + 1.5}
+              stroke={accent} strokeWidth="1.4"/>
+            {/* "POR R$0,00" intacto */}
+            <rect x={xStrike + 14} y={y} width="24" height="3" fill={titleC} rx="0.5"/>
           </g>
         );
       })()}
