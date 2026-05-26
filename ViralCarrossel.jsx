@@ -6652,6 +6652,40 @@ const SlideCardInner = React.forwardRef(({
               gap: f.h*0.018,
               maxWidth:'92%',
             }}>
+              {/* Star ornament (8-pontas) — usado em presets como Case Study Neon.
+                  Centrado independente do align do título. */}
+              {brand.showStarOrnament && (
+                <svg
+                  viewBox="0 0 24 24"
+                  width={f.w*0.045}
+                  height={f.w*0.045}
+                  style={{ alignSelf:'center', flexShrink:0 }}
+                  aria-hidden
+                >
+                  <g fill={brand.accent || displayTitleInk}>
+                    <polygon points="12,1 13,11 23,12 13,13 12,23 11,13 1,12 11,11"/>
+                    <g transform="rotate(45 12 12)">
+                      <polygon points="12,3 13,11 21,12 13,13 12,21 11,13 3,12 11,11"/>
+                    </g>
+                  </g>
+                </svg>
+              )}
+              {/* Eyebrow — texto MAIÚSCULAS pequeno acima do título.
+                  Usado em refs editoriais (NBA, NMLSS, Cadore). */}
+              {slide.eyebrowText && (
+                <span style={{
+                  fontSize: f.w*0.024,
+                  fontFamily: bodyFF,
+                  fontWeight: 600,
+                  color: displayBodyInk,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.3,
+                  margin: 0,
+                  alignSelf: brand.showStarOrnament ? 'center' : 'auto',
+                  textShadow: shadow,
+                }}>{slide.eyebrowText}</span>
+              )}
               <h1 style={{
                 color: displayTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
@@ -6709,6 +6743,41 @@ const SlideCardInner = React.forwardRef(({
                   textShadow: shadow,
                 }}>{slide.subtitle}</p>
               ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Footer pill com seta — usado em presets como Case Study Neon
+          (CTA verde-neon) e Reflexivo Cream (handle pill). Texto + seta
+          circular contrastante. Cor de fundo = brand.accent. */}
+      {brand.footerPillText && (() => {
+        const pillBg = brand.footerPillBg || brand.accent || '#0a0a0a';
+        const pillFg = brand.footerPillFg || (pillBg === brand.accent ? '#0a0a0a' : '#ffffff');
+        return (
+          <div style={{
+            position:'absolute', bottom: f.h*0.058,
+            left:'50%', transform:'translateX(-50%)',
+            zIndex:25, pointerEvents:'none',
+          }}>
+            <div style={{
+              background: pillBg, color: pillFg,
+              padding: `${f.h*0.012}px ${f.w*0.014}px ${f.h*0.012}px ${f.w*0.032}px`,
+              borderRadius: 9999,
+              display:'inline-flex', alignItems:'center', gap: f.w*0.018,
+              fontSize: f.w*0.026, fontWeight:700, fontFamily: bodyFF,
+              letterSpacing:'-0.011em', whiteSpace:'nowrap',
+              textTransform: 'uppercase',
+              boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
+            }}>
+              {brand.footerPillText}
+              <span style={{
+                width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
+                background: pillFg, color: pillBg,
+                display:'inline-flex', alignItems:'center', justifyContent:'center',
+                fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
+                flexShrink:0,
+              }}>→</span>
             </div>
           </div>
         );

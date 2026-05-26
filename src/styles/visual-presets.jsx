@@ -129,24 +129,39 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 2. Case Study Neon — pill CTA neon-green + estrela ornament + foto BG
+  // 2. Case Study Neon — pill CTA verde-neon + estrela 8-pontas + foto BG.
+  //    Ref: IMG_5304 (NMLSS Academy show case).
   {
     id: 'case_study_neon',
     label: 'Case Study Neon',
-    desc: 'Editorial com pill verde-neon de CTA · ornament estrela',
+    desc: 'Pill CTA verde-neon · estrela ornament · header 3-col · estilo case study',
     brand: {
       bg: '#0c0c10',
       titleColor: '#ffffff',
-      subtitleColor: '#e8e8e8',
-      textColor: '#cfcfcf',
-      accent: '#c0ff32',
-      titleFont: FF.interTight,
+      subtitleColor: '#ffffff',
+      textColor: '#e8e8e8',
+      accent: '#c0ff32',  // verde-neon — assinatura
+      titleFont: FF.bigShoulders,  // Big Shoulders Display — condensado bold
       bodyFont: FF.interTight,
       textTitleWeight: 800,
       textTitleCase: 'upper',
-      textTitleTracking: -3,
-      textTitleLeading: 108,
+      textTitleTracking: -2,
+      textTitleLeading: 100,
       textSubLeading: 145,
+      // Header bar 3-col fininho no topo (placeholder editorial)
+      cultureHeaderLeft: 'ESTUDO DE CASO',
+      cultureHeaderCenter: 'NMLSS ACADEMY',
+      cultureHeaderYear: '©COPYRIGHT 2025',
+      showPageBadge: true,
+      // Star ornament 8-pontas centralizado acima do eyebrow
+      showStarOrnament: true,
+      // Footer pill verde-neon com seta no rodapé
+      footerPillText: 'ESTUDO NMLSS ACADEMY®',
+    },
+    slideDefaults: {
+      layout: 'bl',
+      align: 'left',
+      eyebrowText: 'O TEMPO É O NOVO INIMIGO',
     },
     preview: () => (
       <PreviewCard bg="#0c0c10">
