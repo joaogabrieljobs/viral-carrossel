@@ -64,6 +64,10 @@ const SK = {
   shellView:     'vc_shell_view',
   /** Lista no editor: grelha de alinhamento sobre o preview (não exportada). */
   previewGrid:   'vc_preview_align_grid',
+  /** Sistema de Modos (FASE 2 Narrative OS): criador (default, 90%
+      dos users), diretor (intermediate), studio (avançado). Controla
+      progressive disclosure global. */
+  appMode:       'vc_app_mode',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */
@@ -7350,6 +7354,131 @@ const FontPicker = ({ title, fonts, active, onChange }) => {
   );
 };
 
+/**
+ * ModeSwitcher — chip dropdown pra trocar entre Criador / Diretor / Studio.
+ * Controla progressive disclosure global do Narrative OS (FASE 2).
+ *
+ * - Criador (90% users): só tema, estilo, intensidade, gerar. Tabs reduzidas.
+ * - Diretor (intermediate): + narrativa, branding, composição, IA, estética.
+ * - Studio (advanced): tudo + grids, tracking, overlays, canvas, ajustes finos.
+ */
+const APP_MODES = [
+  { id: 'criador',  label: 'Criador',  icon: Sparkles,    desc: 'Simples — tema, estilo e gerar' },
+  { id: 'diretor',  label: 'Diretor',  icon: SlidersHorizontal, desc: 'Controle intermediário' },
+  { id: 'studio',   label: 'Studio',   icon: Settings,    desc: 'Avançado — todos os controles' },
+];
+function ModeSwitcher({ value, onChange, compact = false }) {
+  const [open, setOpen] = React.useState(false);
+  const refMenu = React.useRef(null);
+  const current = APP_MODES.find((m) => m.id === value) || APP_MODES[0];
+  React.useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (!refMenu.current || !refMenu.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const Ic = current.icon;
+  return (
+    <div ref={refMenu} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Modo atual: ${current.label}. Clique para mudar.`}
+        title={`Modo: ${current.label} — ${current.desc}`}
+        style={{
+          minHeight: 34, padding: compact ? '0 10px' : '0 12px',
+          borderRadius: 9999,
+          border: '1px solid var(--glass-border-strong)',
+          background: 'var(--bg-glass)',
+          backdropFilter: 'blur(18px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+          color: 'var(--text-primary)',
+          fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+          letterSpacing: '-0.011em',
+          cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <Ic size={13} strokeWidth={2.25} style={{ color: 'var(--accent)' }}/>
+        {!compact && <span>{current.label}</span>}
+        <ChevronDown size={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }}/>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+            minWidth: 220,
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%), var(--bg-secondary)',
+            backdropFilter: 'blur(32px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+            border: '1px solid var(--glass-border-strong)',
+            borderRadius: 14,
+            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.42), 0 0 40px rgba(255, 45, 141, 0.10)',
+            padding: 4, zIndex: 100,
+            animation: 'fadeUp 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          {APP_MODES.map((m) => {
+            const I = m.icon;
+            const active = m.id === value;
+            return (
+              <button
+                key={m.id}
+                role="menuitem"
+                type="button"
+                onClick={() => { onChange(m.id); setOpen(false); }}
+                aria-current={active}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '10px 12px', borderRadius: 10, border: 'none',
+                  background: active ? 'rgba(255, 45, 141, 0.10)' : 'transparent',
+                  cursor: 'pointer', textAlign: 'left',
+                  fontFamily: 'var(--font-ui)',
+                  transition: 'background 0.15s var(--ease-smooth)',
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: active ? 'rgba(255, 45, 141, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                  color: active ? 'var(--accent)' : 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <I size={14} strokeWidth={2.25}/>
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{
+                    display: 'block', fontSize: 13, fontWeight: 600,
+                    color: active ? 'var(--accent)' : 'var(--text-primary)',
+                    letterSpacing: '-0.011em', lineHeight: 1.2,
+                  }}>{m.label}</span>
+                  <span style={{
+                    display: 'block', fontSize: 11, color: 'var(--text-muted)',
+                    marginTop: 2, lineHeight: 1.3,
+                  }}>{m.desc}</span>
+                </span>
+                {active && <Check size={13} strokeWidth={2.5} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 4 }}/>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const S = ({ title, children, className='', hint }) => (
   <div className={className} style={{ display:'flex', flexDirection:'column', gap:10 }}>
     <div className="section-label">{title}</div>
@@ -10271,6 +10400,7 @@ function SidebarContent({
   hasLastGenerate = false,
   visualPreset = null,
   applyVisualPreset: applyVisualPresetCb = () => {},
+  appMode = 'criador',
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -10483,21 +10613,23 @@ function SidebarContent({
           position:'relative', zIndex:1,
         }}
       >
-        {[
-          // FASE 1 Narrative OS — 6 domínios cognitivos finais:
-          //   Narrativa (ideia/hook/refinamento IA + Conteúdo base)
-          //   Visual   (mood: Padrão Visual + Paletas + Cores)
-          //   Imagem   (upload/IA/crop/filtro/padrão sobre fundo)
-          //   Layout   (composição/grid/posição/zonas)
-          //   Texto    (tipografia: fontes/escala/peso/espaçamento/legibilidade)
-          //   Marca    (identidade pura: logo/handle/bio/posicionamento)
-          {id:'narrativa',icon:Wand2,    label:'Narrativa'},
-          {id:'visual',   icon:Palette,  label:'Visual'},
-          {id:'imagem',   icon:ImageIcon,label:'Imagem'},
-          {id:'layout',   icon:Layout,   label:'Layout'},
-          {id:'texto',    icon:Type,     label:'Texto'},
-          {id:'brand',    icon:Instagram,label:'Marca'},
-        ].map(t=>{
+        {(() => {
+          // FASE 2 Narrative OS — tabs filtradas por appMode:
+          //   Criador (90% users): Narrativa + Visual + Imagem + Marca (4)
+          //   Diretor: + Texto (5)
+          //   Studio: + Layout (6 — todos)
+          const ALL_TABS = [
+            { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
+            { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
+            { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
+            { id:'texto',     icon:Type,     label:'Texto',     mode:'diretor' },
+            { id:'layout',    icon:Layout,   label:'Layout',    mode:'studio' },
+            { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
+          ];
+          const modeRank = { criador: 1, diretor: 2, studio: 3 };
+          const visible = ALL_TABS.filter((t) => modeRank[t.mode] <= modeRank[appMode]);
+          return visible;
+        })().map(t=>{
           const active = tab===t.id;
           return (
             <button
@@ -14682,6 +14814,19 @@ export default function App() {
   }, [claudeModel]);
   // Biblioteca de hooks aprovados (B2)
   const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
+  // FASE 2 Narrative OS: Sistema de Modos (Criador/Diretor/Studio)
+  // Default Criador — esconde complexidade pra 90% dos users.
+  // Persiste em localStorage pra preservar entre sessions.
+  const [appMode, setAppModeState] = useState(() => {
+    const saved = lsGet(SK.appMode, 'criador');
+    return ['criador', 'diretor', 'studio'].includes(saved) ? saved : 'criador';
+  });
+  const setAppMode = useCallback((next) => {
+    if (!['criador', 'diretor', 'studio'].includes(next)) return;
+    setAppModeState(next);
+    lsSet(SK.appMode, next);
+    trackEvent('app_mode_change', { mode: next });
+  }, []);
   useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
   // ── VÍDEOS — IndexedDB store + Map reativo de id → blob URL ──────────────────
   // videoId no slide referencia o blob no IndexedDB. Aqui criamos object URLs sob
@@ -14959,6 +15104,9 @@ export default function App() {
 
   const editorHeaderActions = (
         <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 4 : 6, flexShrink:0 }}>
+          {/* Mode Switcher chip — FASE 2 Narrative OS. Progressive disclosure
+              global. Criador esconde complexidade, Studio expõe tudo. */}
+          <ModeSwitcher value={appMode} onChange={setAppMode} compact={isMobile}/>
           {!isMobile && (
             <button onClick={()=>setTemplatesOpen(true)} style={{
               width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
@@ -16356,6 +16504,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     exportPhotosOnly,
     visualPreset,
     applyVisualPreset: applyVisualStylePreset,
+    appMode,
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -17217,15 +17366,19 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
                 gap:6,
               }}>
-              {[
-                // FASE 1 Narrative OS — 6 domínios finais no bottom nav (grid 3×2)
-                { id:'narrativa', label:'Narrativa', icon:Wand2 },
-                { id:'visual',    label:'Visual',    icon:Palette },
-                { id:'imagem',    label:'Imagem',    icon:ImageIcon },
-                { id:'layout',    label:'Layout',    icon:Layout },
-                { id:'texto',     label:'Texto',     icon:Type },
-                { id:'brand',     label:'Marca',     icon:Instagram },
-              ].map(({ id, label, icon:Icon }) => {
+              {(() => {
+                // FASE 2 Narrative OS — bottom nav também filtra por modo
+                const ALL = [
+                  { id:'narrativa', label:'Narrativa', icon:Wand2,     mode:'criador' },
+                  { id:'visual',    label:'Visual',    icon:Palette,   mode:'criador' },
+                  { id:'imagem',    label:'Imagem',    icon:ImageIcon, mode:'criador' },
+                  { id:'texto',     label:'Texto',     icon:Type,      mode:'diretor' },
+                  { id:'layout',    label:'Layout',    icon:Layout,    mode:'studio' },
+                  { id:'brand',     label:'Marca',     icon:Instagram, mode:'criador' },
+                ];
+                const rank = { criador: 1, diretor: 2, studio: 3 };
+                return ALL.filter((t) => rank[t.mode] <= rank[appMode]);
+              })().map(({ id, label, icon:Icon }) => {
                 const active = tab === id;
                 return (
                   <button
