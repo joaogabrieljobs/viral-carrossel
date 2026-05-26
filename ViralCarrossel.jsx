@@ -6452,7 +6452,11 @@ const SlideCardInner = React.forwardRef(({
           variante no renderer Cultura; aqui é versão simplificada pra classic. */}
       {(() => {
         const hLeft  = (brand.cultureHeaderLeft  || '').trim();
-        const hCenter = (brand.cultureHeaderCenter || brand.handle || '').trim();
+        // Centro: se preset setar explicitamente (mesmo ''), respeita.
+        // Senão (undefined/null), fallback pro handle do user.
+        const hCenter = (typeof brand.cultureHeaderCenter === 'string'
+          ? brand.cultureHeaderCenter
+          : (brand.handle || '')).trim();
         const hRight = (brand.cultureHeaderYear  || '').trim();
         const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && brand.cultureHeaderLeft);
         const hasPageBadge = !!brand.showPageBadge;

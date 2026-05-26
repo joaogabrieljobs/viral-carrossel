@@ -246,24 +246,39 @@ export const VISUAL_PRESETS = [
     ),
   },
 
-  // 5. Reflexivo Cream — texto cream + pill com handle, BG sépia escuro
+  // 5. Reflexivo Cream — título AMARELO CREAM centralizado + pill cinza
+  //    escuro com handle. Ref: IMG_5309 (Jonathan Cadore maratona).
   {
     id: 'reflexivo_cream',
     label: 'Reflexivo Cream',
-    desc: 'Cream sépia · pill com @handle no rodapé · tom contemplativo',
+    desc: 'Título cream centralizado · pill handle no rodapé · header 2-col',
     brand: {
-      bg: '#3e3527',
-      titleColor: '#f5e8d0',
-      subtitleColor: '#d4c19a',
-      textColor: '#b8a685',
+      bg: '#1a1612',
+      titleColor: '#f3e8c0',  // AMARELO CREAM — assinatura do estilo
+      subtitleColor: '#f3e8c0',  // eyebrow mesma cor
+      textColor: '#d4c290',
       accent: '#fbbf24',
-      titleFont: FF.bebas,
+      titleFont: FF.archivoBlack,  // condensado extra-bold pra escala
       bodyFont: FF.inter,
-      textTitleWeight: 700,
+      textTitleWeight: 800,
       textTitleCase: 'upper',
-      textTitleTracking: 5,
-      textTitleLeading: 95,
+      textTitleTracking: -1,
+      textTitleLeading: 100,
       textSubLeading: 145,
+      // Header 2-col (centro vazio)
+      cultureHeaderLeft: 'REFLEXÕES NECESSÁRIAS',
+      cultureHeaderCenter: '',  // vazio — só 2 colunas visíveis
+      cultureHeaderYear: '@JONATHANCADORE',
+      showPageBadge: true,
+      // Footer pill cinza-escuro (não accent)
+      footerPillText: '@JONATHANCADORE',
+      footerPillBg: 'rgba(255,255,255,0.12)',  // cinza translúcido
+      footerPillFg: '#f3e8c0',  // cream
+    },
+    slideDefaults: {
+      layout: 'bc',  // bottom-center
+      align: 'center',  // título centralizado
+      eyebrowText: 'QUANDO CORRER 42 KM VIROU PROVA DE STATUS',
     },
     preview: () => (
       <PreviewCard bg="#3e3527">
