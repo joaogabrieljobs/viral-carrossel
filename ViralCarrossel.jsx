@@ -313,15 +313,38 @@ const GLOBAL_STYLE = `
     color: #fff;
   }
   .vc-card-elevated {
-    background: var(--gradient-surface);
-    border: 1px solid var(--hairline);
-    border-radius: 14px;
-    box-shadow: var(--shadow-card-rest);
-    transition: box-shadow 0.24s var(--ease-smooth), transform 0.18s var(--ease-smooth), border-color 0.18s;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition:
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.18s;
   }
   .vc-card-elevated:hover {
-    box-shadow: var(--shadow-card-hover);
-    border-color: rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
+    border-color: var(--glass-border-strong);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.42),
+      0 0 40px rgba(255, 45, 141, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+  .vc-glass-card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: 16px;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
   .vc-shimmer {
     background: linear-gradient(
@@ -635,35 +658,41 @@ const GLOBAL_STYLE = `
     content: ''; display: block; width: 18px; height: 2px;
     background: var(--accent); border-radius: 2px;
     flex-shrink: 0;
+    /* Ambient glow magenta sutil */
+    box-shadow: 0 0 8px rgba(255, 45, 141, 0.5);
   }
 
-  /* Tab bar — grid 3-col × 2 rows. Active item ganha fundo + indicador
-     accent à esquerda (em vez de underline bottom — funciona melhor em grid). */
+  /* Tab bar — grid 3-col × 2 rows. Active com ambient glow magenta
+     (Narrative OS premium). */
   .tab-bar-item {
     padding: 11px 6px; font-size: 12px; font-weight: 500;
     letter-spacing: -0.014em; text-transform: none;
     font-family: var(--font-ui); cursor: pointer; border: none;
     background: transparent; display: flex; align-items: center;
     justify-content: center; gap: 6px; position: relative;
-    transition: color 0.15s var(--ease-smooth), background-color 0.15s var(--ease-smooth);
+    transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     outline: none; color: var(--text-muted);
     min-height: 44px;
-    border-right: 1px solid var(--hairline);
-    border-bottom: 1px solid var(--hairline);
+    border-right: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
   }
   .tab-bar-item:nth-child(3n) { border-right: none; }
   .tab-bar-item:nth-last-child(-n+3) { border-bottom: none; }
   .tab-bar-item.active {
-    color: var(--text-primary); font-weight: 600;
-    background: var(--accent-surface);
+    color: #fff; font-weight: 600;
+    background: linear-gradient(135deg, rgba(255,45,141,0.16) 0%, rgba(255,45,141,0.06) 100%);
+    box-shadow:
+      inset 0 0 24px rgba(255, 45, 141, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
   .tab-bar-item.active::after {
     content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
     height: 2px; background: var(--accent); border-radius: 99px;
+    box-shadow: 0 0 12px rgba(255, 45, 141, 0.6);
   }
   .tab-bar-item:hover:not(.active) {
     color: var(--text-secondary);
-    background: var(--bg-pearl);
+    background: rgba(255, 255, 255, 0.04);
   }
   .tab-bar-item:focus-visible {
     outline: 2px solid var(--accent-focus, var(--accent));
@@ -16480,10 +16509,15 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       {/* ── BODY ── */}
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
 
-        {/* Desktop sidebar */}
+        {/* Desktop sidebar — glass dark panel premium (Narrative OS) */}
         {!isMobile && (
           <aside style={{
-            width:272, borderRight:'1px solid var(--border)', background:'var(--bg-sidebar)',
+            width:272,
+            borderRight:'1px solid var(--glass-border)',
+            background:'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%), var(--bg-secondary)',
+            backdropFilter:'blur(32px) saturate(180%)',
+            WebkitBackdropFilter:'blur(32px) saturate(180%)',
+            boxShadow:'inset -1px 0 0 rgba(255,255,255,0.04)',
             display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0,
           }}>
             <SidebarContent {...sidebarProps}/>
@@ -17094,13 +17128,14 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               data-vc-tour="mobile-bar"
               style={{
               position:'fixed', bottom:0, left:0, right:0, zIndex:20,
-              background:'rgba(244, 236, 214, 0.92)',
-              backdropFilter:'blur(20px) saturate(180%)',
-              WebkitBackdropFilter:'blur(20px) saturate(180%)',
-              borderTop:'0.5px solid rgba(0,0,0,0.08)',
+              /* Glass dark + ambient pink glow no top */
+              background:'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%), rgba(15, 13, 22, 0.85)',
+              backdropFilter:'blur(32px) saturate(180%)',
+              WebkitBackdropFilter:'blur(32px) saturate(180%)',
+              borderTop:'1px solid var(--glass-border-strong)',
               padding:'10px 10px calc(10px + env(safe-area-inset-bottom, 0))',
               display:'flex', gap:10, alignItems:'stretch',
-              boxShadow:'0 -8px 32px rgba(0,0,0,0.18)',
+              boxShadow:'0 -16px 40px rgba(0,0,0,0.42), 0 -32px 80px rgba(255,45,141,0.08)',
             }}
             >
               <div style={{
@@ -17124,17 +17159,24 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     onClick={() => { setTab(id); setDrawerOpen(true); }}
                     style={{
                       minHeight:54, padding:'4px 6px',
-                      borderRadius:12,
-                      border: active ? '1.5px solid var(--accent)' : '1px solid rgba(0,0,0,0.06)',
-                      background: active ? 'var(--accent-surface)' : 'rgba(255,255,255,0.85)',
-                      color: active ? 'var(--accent)' : 'var(--text-primary)',
+                      borderRadius:14,
+                      border: active
+                        ? '1px solid rgba(255, 45, 141, 0.42)'
+                        : '1px solid var(--glass-border)',
+                      background: active
+                        ? 'linear-gradient(135deg, rgba(255,45,141,0.18) 0%, rgba(255,45,141,0.08) 100%)'
+                        : 'var(--bg-glass)',
+                      color: active ? '#fff' : 'var(--text-secondary)',
                       fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
                       display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6,
                       letterSpacing:'-0.011em',
+                      backdropFilter:'blur(18px)',
+                      WebkitBackdropFilter:'blur(18px)',
+                      /* Active: ambient glow magenta + inset highlight */
                       boxShadow: active
-                        ? '0 2px 8px rgba(255, 61, 139, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.6)'
-                        : '0 1px 2px rgba(0, 0, 0, 0.04)',
-                      transition:'all 0.18s var(--ease-smooth)',
+                        ? '0 0 24px rgba(255, 45, 141, 0.32), 0 4px 16px rgba(255, 45, 141, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
+                        : '0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+                      transition:'all 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
                     }}
                     onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.96)'; }}
                     onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
