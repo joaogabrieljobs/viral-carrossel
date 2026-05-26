@@ -68,6 +68,8 @@ const SK = {
       dos users), diretor (intermediate), studio (avançado). Controla
       progressive disclosure global. */
   appMode:       'vc_app_mode',
+  /** Onboarding dos 3 modos — primeira visita ou clique no chip "?". */
+  modesIntro:    'vc_modes_intro_done',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */
@@ -7479,6 +7481,214 @@ function ModeSwitcher({ value, onChange, compact = false }) {
   );
 }
 
+/**
+ * ModesIntroModal — onboarding dos 3 modos. Aparece na primeira visita
+ * e pode ser reaberto via menu "?". Glass dark premium.
+ */
+function ModesIntroModal({ open, onSelect, onClose, currentMode = 'criador' }) {
+  if (!open) return null;
+  const MODES = [
+    {
+      id: 'criador',
+      icon: Sparkles,
+      label: 'Criador',
+      tagline: 'Pra começar agora',
+      desc: 'Pra quem quer criar carrosséis sem se preocupar com detalhes técnicos. Tema + estilo + gerar.',
+      features: ['Padrões visuais prontos', 'Geração com IA', 'Imagem automática', 'Identidade da marca'],
+      recommended: true,
+    },
+    {
+      id: 'diretor',
+      icon: SlidersHorizontal,
+      label: 'Diretor',
+      tagline: 'Controle intermediário',
+      desc: 'Pra quem quer afinar tom, narrativa, tipografia. Mais controle sem complexidade técnica.',
+      features: ['Tudo do Criador', '+ Tipografia (Texto)', '+ Refinamento de tom', '+ Variações IA'],
+    },
+    {
+      id: 'studio',
+      icon: Settings,
+      label: 'Studio',
+      tagline: 'Avançado — tudo aberto',
+      desc: 'Pra designers e usuários experientes. Composição livre, grids, tracking, overlays, zonas.',
+      features: ['Tudo do Diretor', '+ Composição (Layout)', '+ Tracking/Leading', '+ Zonas canvas'],
+    },
+  ];
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modes-intro-title">
+      <div
+        className="modal-panel"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 720, padding: 32 }}
+      >
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18,
+            background: 'linear-gradient(135deg, rgba(255,45,141,0.18) 0%, rgba(143,125,255,0.10) 100%)',
+            border: '1px solid var(--glass-border-strong)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 16,
+            boxShadow: '0 0 32px rgba(255, 45, 141, 0.24)',
+          }}>
+            <Sparkles size={28} strokeWidth={2} style={{ color: 'var(--accent)' }}/>
+          </div>
+          <h2
+            id="modes-intro-title"
+            style={{
+              fontSize: 28, fontWeight: 700, color: 'var(--text-primary)',
+              letterSpacing: '-0.022em', lineHeight: 1.15, margin: '0 0 8px',
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            Bem-vindo ao <span style={{ color: 'var(--accent)' }}>Narrative OS</span>
+          </h2>
+          <p style={{
+            fontSize: 15, color: 'var(--text-secondary)',
+            letterSpacing: '-0.011em', lineHeight: 1.5, margin: 0,
+            maxWidth: 480, marginInline: 'auto',
+          }}>
+            Escolha como quer trabalhar. Pode mudar a qualquer momento no chip
+            <strong style={{ color: 'var(--accent)', fontWeight: 600 }}> Modo </strong>
+            no topo.
+          </p>
+        </div>
+
+        {/* 3 mode cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+          {MODES.map((m) => {
+            const I = m.icon;
+            const isCurrent = m.id === currentMode;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onSelect(m.id)}
+                style={{
+                  textAlign: 'left',
+                  padding: '18px 20px',
+                  borderRadius: 16,
+                  border: `1px solid ${isCurrent ? 'rgba(255, 45, 141, 0.42)' : 'var(--glass-border)'}`,
+                  background: isCurrent
+                    ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,45,141,0.03) 100%)'
+                    : 'rgba(255, 255, 255, 0.04)',
+                  backdropFilter: 'blur(18px)',
+                  WebkitBackdropFilter: 'blur(18px)',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'flex-start', gap: 14,
+                  boxShadow: isCurrent
+                    ? '0 0 24px rgba(255, 45, 141, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+                  transition: 'all 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
+                  fontFamily: 'var(--font-ui)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrent) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.borderColor = 'var(--glass-border-strong)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  if (!isCurrent) e.currentTarget.style.borderColor = 'var(--glass-border)';
+                }}
+              >
+                {/* Icon */}
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  background: isCurrent ? 'rgba(255, 45, 141, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                  color: isCurrent ? 'var(--accent)' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                }}>
+                  <I size={20} strokeWidth={2.25}/>
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: 17, fontWeight: 600, color: 'var(--text-primary)',
+                      letterSpacing: '-0.016em',
+                    }}>{m.label}</span>
+                    {m.recommended && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        background: 'rgba(255, 45, 141, 0.18)', color: 'var(--accent)',
+                        padding: '2px 8px', borderRadius: 9999,
+                        letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}>Recomendado</span>
+                    )}
+                    {isCurrent && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        background: 'rgba(255, 255, 255, 0.10)', color: 'var(--text-secondary)',
+                        padding: '2px 8px', borderRadius: 9999,
+                        letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}>Atual</span>
+                    )}
+                  </div>
+                  <p style={{
+                    fontSize: 11, fontWeight: 500, color: 'var(--accent)',
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    margin: '0 0 8px', lineHeight: 1.3,
+                  }}>{m.tagline}</p>
+                  <p style={{
+                    fontSize: 13, color: 'var(--text-secondary)',
+                    letterSpacing: '-0.011em', lineHeight: 1.5,
+                    margin: '0 0 10px',
+                  }}>{m.desc}</p>
+                  <ul style={{
+                    listStyle: 'none', padding: 0, margin: 0,
+                    display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px 12px',
+                  }}>
+                    {m.features.map((f) => (
+                      <li key={f} style={{
+                        fontSize: 11, color: 'var(--text-muted)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        <Check size={10} strokeWidth={2.5} style={{ color: 'var(--accent)', flexShrink: 0 }}/>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Arrow */}
+                <ChevronRight size={18} strokeWidth={2} style={{
+                  color: isCurrent ? 'var(--accent)' : 'var(--text-muted)',
+                  flexShrink: 0, marginTop: 12,
+                }}/>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{
+            fontSize: 11, color: 'var(--text-muted)',
+            letterSpacing: '-0.005em', lineHeight: 1.4,
+          }}>
+            Pode mudar quando quiser no chip de modo
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              minHeight: 36, padding: '0 18px',
+              borderRadius: 9999, border: '1px solid var(--glass-border-strong)',
+              background: 'transparent', color: 'var(--text-secondary)',
+              fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+              cursor: 'pointer', letterSpacing: '-0.011em',
+            }}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const S = ({ title, children, className='', hint }) => (
   <div className={className} style={{ display:'flex', flexDirection:'column', gap:10 }}>
     <div className="section-label">{title}</div>
@@ -10401,6 +10611,8 @@ function SidebarContent({
   visualPreset = null,
   applyVisualPreset: applyVisualPresetCb = () => {},
   appMode = 'criador',
+  setActiveIdx = () => {},
+  activeEntry = null,
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
@@ -10614,11 +10826,12 @@ function SidebarContent({
         }}
       >
         {(() => {
-          // FASE 2 Narrative OS — tabs filtradas por appMode:
-          //   Criador (90% users): Narrativa + Visual + Imagem + Marca (4)
-          //   Diretor: + Texto (5)
-          //   Studio: + Layout (6 — todos)
+          // FASE 2 Narrative OS — tabs filtradas por appMode + HOME sempre primeira:
+          //   Criador: Home + Narrativa + Visual + Imagem + Marca (5)
+          //   Diretor: + Texto (6)
+          //   Studio: + Layout (7 — todos)
           const ALL_TABS = [
+            { id:'home',      icon:Home,     label:'Home',      mode:'criador' },
             { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
             { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
             { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
@@ -12775,6 +12988,139 @@ function SidebarContent({
           </>
         )}
 
+        {/* HOME / Storyboard — visão geral do projeto. Sequência de cards,
+            estatísticas, fluxo narrativo. "Mesa criativa" cinematográfica. */}
+        {tab==='home' && (
+          <>
+            {/* Saudação + status */}
+            <div style={{
+              padding: '18px 16px',
+              borderRadius: 16,
+              border: '1px solid var(--glass-border-strong)',
+              background: 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(143,125,255,0.06) 100%)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+              boxShadow: '0 0 32px rgba(255, 45, 141, 0.10), inset 0 1px 0 rgba(255,255,255,0.10)',
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 600, color: 'var(--accent)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                marginBottom: 6, fontFamily: 'var(--font-mono)',
+              }}>
+                Storyboard
+              </div>
+              <div style={{
+                fontSize: 18, fontWeight: 600, color: 'var(--text-primary)',
+                letterSpacing: '-0.016em', lineHeight: 1.25, marginBottom: 4,
+                fontFamily: 'var(--font-display)',
+              }}>
+                {activeEntry?.name || 'Carrossel sem título'}
+              </div>
+              <div style={{
+                fontSize: 12, color: 'var(--text-muted)',
+                letterSpacing: '-0.005em',
+              }}>
+                {slides.length} card{slides.length === 1 ? '' : 's'} ·
+                {' '}{slides.filter(s => s.bgImage).length} com imagem ·
+                {' '}{slides.filter(s => (s.title || '').trim()).length} com título
+              </div>
+            </div>
+
+            {/* Fluxo narrativo — mini-thumbs vertical */}
+            <S title="Fluxo da narrativa" hint="Sequência dos cards e progressão. Clique pra editar.">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {slides.map((s, i) => {
+                  const isActive = i === activeIdx;
+                  const hasImg = !!s.bgImage;
+                  const titlePreview = (s.title || '').trim().slice(0, 50) || '— sem título —';
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setActiveIdx(i)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: 10, borderRadius: 12,
+                        border: `1px solid ${isActive ? 'rgba(255, 45, 141, 0.42)' : 'var(--glass-border)'}`,
+                        background: isActive
+                          ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,45,141,0.03) 100%)'
+                          : 'rgba(255, 255, 255, 0.04)',
+                        cursor: 'pointer', textAlign: 'left',
+                        boxShadow: isActive
+                          ? '0 0 16px rgba(255, 45, 141, 0.16), inset 0 1px 0 rgba(255,255,255,0.08)'
+                          : 'none',
+                        transition: 'all 0.18s var(--ease-smooth)',
+                      }}
+                    >
+                      {/* Mini thumb */}
+                      <div style={{
+                        width: 40, height: 50, borderRadius: 6, flexShrink: 0,
+                        background: hasImg
+                          ? `url(${s.bgImage}) center/cover, ${s.bg || brand.bg || '#0a0a0a'}`
+                          : (s.bg || brand.bg || '#0a0a0a'),
+                        border: '1px solid var(--glass-border)',
+                        position: 'relative',
+                      }}>
+                        <span style={{
+                          position: 'absolute', bottom: 2, left: 3,
+                          fontSize: 8, fontWeight: 700, color: '#fff',
+                          fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                        }}>{String(i + 1).padStart(2, '0')}</span>
+                      </div>
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 12, fontWeight: 600,
+                          color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                          letterSpacing: '-0.011em',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          marginBottom: 2,
+                        }}>{titlePreview}</div>
+                        <div style={{
+                          fontSize: 10, color: 'var(--text-muted)',
+                          letterSpacing: '-0.005em',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                          {hasImg && <><ImageIcon size={9}/>foto</>}
+                          {hasImg && (s.title || '').trim() && <span style={{ opacity: 0.5 }}>·</span>}
+                          {(s.title || '').trim() && <><Type size={9}/>texto</>}
+                          {!hasImg && !(s.title || '').trim() && <span style={{ color: 'var(--text-muted)' }}>vazio</span>}
+                        </div>
+                      </div>
+                      {isActive && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: 'var(--accent)',
+                          fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                        }}>Ativo</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </S>
+
+            {/* Ação rápida — gerar novo */}
+            <S title="Ações rápidas">
+              <button
+                onClick={() => setSetupOpen?.(true)}
+                style={{
+                  width: '100%', minHeight: 48, borderRadius: 9999,
+                  background: 'linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.10)',
+                  color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  letterSpacing: '-0.011em', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 8px 24px rgba(255, 45, 141, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18)',
+                }}
+              >
+                <Sparkles size={15}/>Novo carrossel com IA
+              </button>
+            </S>
+          </>
+        )}
+
         {/* Narrativa (FASE 1): IA + Conteúdo gradual. Por enquanto só os
             controles que estavam na aba IA (gerar/refinar/legenda/tom). */}
         {tab==='narrativa' && (
@@ -14827,6 +15173,22 @@ export default function App() {
     lsSet(SK.appMode, next);
     trackEvent('app_mode_change', { mode: next });
   }, []);
+  // Modal de boas-vindas dos 3 modos — primeira visita só.
+  const [modesIntroOpen, setModesIntroOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      if (!localStorage.getItem(SK.modesIntro)) {
+        const t = window.setTimeout(() => setModesIntroOpen(true), 600);
+        return () => window.clearTimeout(t);
+      }
+    } catch { /* */ }
+    return undefined;
+  }, []);
+  const closeModesIntro = useCallback(() => {
+    setModesIntroOpen(false);
+    try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
+  }, []);
   useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
   // ── VÍDEOS — IndexedDB store + Map reativo de id → blob URL ──────────────────
   // videoId no slide referencia o blob no IndexedDB. Aqui criamos object URLs sob
@@ -16505,6 +16867,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     visualPreset,
     applyVisualPreset: applyVisualStylePreset,
     appMode,
+    setActiveIdx,
+    activeEntry,
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -17368,7 +17732,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               }}>
               {(() => {
                 // FASE 2 Narrative OS — bottom nav também filtra por modo
+                // + HOME sempre primeira (storyboard / visão geral do projeto)
                 const ALL = [
+                  { id:'home',      label:'Home',      icon:Home,      mode:'criador' },
                   { id:'narrativa', label:'Narrativa', icon:Wand2,     mode:'criador' },
                   { id:'visual',    label:'Visual',    icon:Palette,   mode:'criador' },
                   { id:'imagem',    label:'Imagem',    icon:ImageIcon, mode:'criador' },
@@ -17455,6 +17821,14 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
 
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
+
+      {/* Onboarding dos 3 modos — primeira visita ou reabrível via ? */}
+      <ModesIntroModal
+        open={modesIntroOpen}
+        currentMode={appMode}
+        onSelect={(m) => { setAppMode(m); closeModesIntro(); toast(`Modo ${m.charAt(0).toUpperCase() + m.slice(1)} ativo. Boa criação!`, 'success', 4000); }}
+        onClose={closeModesIntro}
+      />
 
       {/* Barra de progresso fixa no rodapé durante geração de carrossel */}
       {genProgress && (() => {
