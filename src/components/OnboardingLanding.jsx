@@ -17,6 +17,12 @@ const IMG = {
   cta: '/landing/cta-wide.png',
   mobile: '/landing/mobile-reels.png',
   showcase: '/landing/showcase-creator.png',
+  carouselSamples: [
+    '/landing/carousel-01.png',
+    '/landing/carousel-02.png',
+    '/landing/carousel-03.png',
+    '/landing/carousel-04.png',
+  ],
 };
 
 const STEPS = [
@@ -259,6 +265,10 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
+        @keyframes vcLandingCarouselMarquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
         .vc-landing-slide-card {
           animation: vcLandingFloat 5.5s ease-in-out infinite;
         }
@@ -270,10 +280,14 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         .vc-landing-marquee-track {
           animation: vcLandingMarquee 28s linear infinite;
         }
+        .vc-landing-carousel-track {
+          animation: vcLandingCarouselMarquee 36s linear infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
           .vc-landing-slide-card,
           .vc-landing-glow,
-          .vc-landing-marquee-track {
+          .vc-landing-marquee-track,
+          .vc-landing-carousel-track {
             animation: none !important;
           }
         }
@@ -637,7 +651,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '64px 16px' : '96px clamp(24px, 5vw, 48px)',
+          padding: isMobile ? '48px 16px 24px' : '64px clamp(24px, 5vw, 48px) 28px',
         }}
       >
         <p style={{
@@ -714,18 +728,62 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── MONTAGE — capabilities marquee ── */}
+      {/* ── MONTAGE — previews de carrossel + capabilities marquee ── */}
       <RevealSection
         variant="scale"
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: isMobile ? '32px 0 64px' : '48px 0 80px',
+          padding: isMobile ? '8px 0 40px' : '16px 0 48px',
           overflow: 'hidden',
         }}
       >
         <div style={{
-          padding: isMobile ? '0 16px 24px' : '0 clamp(24px, 5vw, 48px) 32px',
+          marginBottom: isMobile ? 28 : 36,
+          overflow: 'hidden',
+          maskImage: 'linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)',
+        }}>
+          <div
+            className="vc-landing-carousel-track"
+            style={{
+              display: 'flex',
+              gap: isMobile ? 12 : 16,
+              width: 'max-content',
+              padding: isMobile ? '4px 16px' : '8px clamp(24px, 5vw, 48px)',
+            }}
+          >
+            {[...IMG.carouselSamples, ...IMG.carouselSamples].map((src, i) => (
+              <div
+                key={`${src}-${i}`}
+                style={{
+                  flexShrink: 0,
+                  width: isMobile ? 168 : 220,
+                  aspectRatio: '4 / 5',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--glass-border-strong)',
+                  boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
+                  overflow: 'hidden',
+                  background: 'var(--bg-secondary)',
+                }}
+              >
+                <img
+                  src={src}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{
+          padding: isMobile ? '0 16px 16px' : '0 clamp(24px, 5vw, 48px) 20px',
           maxWidth: 1200,
           margin: '0 auto',
         }}>
@@ -809,7 +867,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '0 16px 64px' : '0 clamp(24px, 5vw, 48px) 80px',
+          padding: isMobile ? '0 16px 40px' : '0 clamp(24px, 5vw, 48px) 48px',
         }}
       >
         <div style={{
@@ -902,7 +960,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '0 16px 64px' : '0 clamp(24px, 5vw, 48px) 80px',
+          padding: isMobile ? '0 16px 40px' : '0 clamp(24px, 5vw, 48px) 48px',
         }}
       >
         <p style={{
