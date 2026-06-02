@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles, Flame, ArrowRight, ChevronDown,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
+  BookOpen, Layers, Image, FileText,
 } from 'lucide-react';
 
 /** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND) */
@@ -59,20 +60,20 @@ const MODES = [
   {
     id: 'criador',
     label: 'Criador',
-    tag: 'Recomendado',
-    desc: 'Tema + estilo + gerar. Sem painel técnico — ideal pra postar hoje.',
+    tag: 'Comece aqui',
+    desc: 'Tema + gerar. Carrossel, legenda e export em minutos — sem painel técnico, sem tutorial.',
   },
   {
     id: 'diretor',
     label: 'Diretor',
     tag: null,
-    desc: 'Tipografia, tom e refinamento slide a slide. Controle sem virar designer.',
+    desc: 'Refina gancho, tom e tipografia slide a slide. Controle editorial sem virar designer.',
   },
   {
     id: 'studio',
     label: 'Studio',
-    tag: 'Avançado',
-    desc: 'Grids, tracking, zonas e composição livre. Tudo aberto.',
+    tag: 'Pro',
+    desc: 'Grids, tracking e composição livre. Quando você quer cada pixel no lugar.',
   },
 ];
 
@@ -80,6 +81,39 @@ const PAIN_POINTS = [
   'Ideia na cabeça, slide em branco no Figma.',
   'Legenda genérica que não segura até o último card.',
   'Horas ajustando fonte e cor em vez de publicar.',
+];
+
+const GENERATION_LAYERS = [
+  {
+    n: '01',
+    icon: BookOpen,
+    title: 'Gera narrativa',
+    body: 'Gancho, tese e arco editorial — do primeiro slide ao CTA, com o tom da sua marca.',
+  },
+  {
+    n: '02',
+    icon: Layers,
+    title: 'Gera estrutura',
+    body: 'Quantidade de cards, ritmo entre slides e função de cada frame no argumento.',
+  },
+  {
+    n: '03',
+    icon: Image,
+    title: 'Gera visual',
+    body: 'Layout, tipografia, paleta e imagens sugeridas ou geradas — identidade já aplicada.',
+  },
+  {
+    n: '04',
+    icon: FileText,
+    title: 'Gera legenda',
+    body: 'Texto do post pronto pra colar: contexto, desenvolvimento e fechamento que segura o swipe.',
+  },
+  {
+    n: '05',
+    icon: Download,
+    title: 'Gera exportação',
+    body: 'PNG slide a slide ou PDF multipágina em 4:5, quadrado ou stories — dimensões reais do feed.',
+  },
 ];
 
 const FAQ = [
@@ -355,6 +389,10 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }
         .vc-landing-cap-chip:hover {
           border-color: var(--glass-border-strong);
+          background: var(--bg-glass-strong);
+        }
+        .vc-landing-gen-layer:hover {
+          border-color: rgba(255, 45, 141, 0.35);
           background: var(--bg-glass-strong);
         }
       `}</style>
@@ -707,6 +745,243 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         <CarouselSlideStrip isMobile={isMobile} />
       </RevealSection>
 
+      {/* ── NÃO É EDITOR ── */}
+      <RevealSection
+        variant="rise"
+        id="nao-editor"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '20px 16px 24px' : '32px clamp(24px, 5vw, 48px) 28px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Posicionamento</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 28 : 40,
+          fontWeight: 600,
+          letterSpacing: '-0.028em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.1,
+          maxWidth: '16ch',
+        }}>
+          Não é um editor de carrossel.
+        </h2>
+        <p style={{
+          margin: '0 0 32px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Editor só arrasta caixa. O Viral. parte do tema e entrega o post inteiro —
+          cada camada gerada num fluxo, não montada slide a slide no Canva.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 12,
+        }}>
+          {GENERATION_LAYERS.map(({ n, icon: Icon, title, body }) => (
+            <div
+              key={title}
+              className="vc-landing-gen-layer"
+              style={{
+                padding: '20px 18px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-glass)',
+                backdropFilter: 'blur(12px)',
+                transition: 'border-color 0.2s, background 0.2s',
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: 'var(--accent-surface)',
+                  color: 'var(--accent)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Icon size={18} strokeWidth={2} />
+                </div>
+                <span style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  color: 'var(--text-muted)',
+                  fontWeight: 600,
+                }}>{n}</span>
+              </div>
+              <h3 style={{
+                margin: '0 0 8px',
+                fontSize: 16,
+                fontWeight: 600,
+                letterSpacing: '-0.018em',
+              }}>{title}</h3>
+              <p style={{
+                margin: 0,
+                fontSize: 14,
+                lineHeight: 1.45,
+                color: 'var(--text-secondary)',
+              }}>{body}</p>
+            </div>
+          ))}
+        </div>
+      </RevealSection>
+
+      {/* ── MODOS ── */}
+      <RevealSection
+        variant="rise"
+        id="modos"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '8px 16px 20px' : '16px clamp(24px, 5vw, 48px) 24px',
+        }}
+      >
+        <div style={{
+          padding: isMobile ? 24 : 32,
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--glass-border)',
+          background: 'linear-gradient(135deg, rgba(255,45,141,0.08) 0%, rgba(143,125,255,0.05) 100%)',
+        }}>
+          <p style={{
+            margin: '0 0 8px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+            fontWeight: 600,
+          }}>Modos de trabalho</p>
+          <h2 style={{
+            margin: '0 0 12px',
+            fontSize: isMobile ? 24 : 32,
+            fontWeight: 600,
+            letterSpacing: '-0.022em',
+            fontFamily: 'var(--font-display)',
+            lineHeight: 1.12,
+          }}>
+            Publique hoje.
+            <br />
+            <span style={{ color: 'var(--accent)' }}>Aprofunde quando quiser.</span>
+          </h2>
+          <p style={{
+            margin: '0 0 24px',
+            fontSize: 16,
+            lineHeight: 1.47,
+            color: 'var(--text-secondary)',
+            maxWidth: '54ch',
+          }}>
+            Você não precisa ser designer nem copywriter. No modo Criador, um tema vira
+            post completo — narrativa, slides, legenda e arquivo pronto pro feed.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: 12,
+          }}>
+            {MODES.map(({ id, label, tag, desc }) => (
+              <div
+                key={id}
+                style={{
+                  padding: '16px 18px',
+                  borderRadius: 'var(--radius-md)',
+                  border: `1px solid ${id === 'criador' ? 'rgba(255,45,141,0.4)' : 'var(--hairline)'}`,
+                  background: id === 'criador' ? 'var(--accent-surface)' : 'var(--bg-glass)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
+                  {tag && (
+                    <span style={{
+                      fontSize: 9,
+                      fontFamily: 'var(--font-mono)',
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      color: 'var(--accent)',
+                      fontWeight: 700,
+                    }}>{tag}</span>
+                  )}
+                </div>
+                <p style={{
+                  margin: 0,
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                  color: 'var(--text-secondary)',
+                }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            alignItems: 'center',
+            marginTop: 24,
+          }}>
+            <button
+              type="button"
+              className="vc-landing-cta"
+              onClick={onEnter}
+              style={{
+                height: 48,
+                padding: '0 24px',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontFamily: 'var(--font-ui)',
+                boxShadow: 'var(--shadow-pink)',
+              }}
+            >
+              <Sparkles size={16} />
+              Começar no modo Criador
+              <ArrowRight size={14} />
+            </button>
+            <p style={{
+              margin: 0,
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              lineHeight: 1.47,
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.02em',
+            }}>
+              Troque de modo a qualquer momento — sem perder o projeto.
+            </p>
+          </div>
+        </div>
+      </RevealSection>
+
       {/* ── COMO FUNCIONA ── */}
       <RevealSection
         variant="clip"
@@ -877,99 +1152,6 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               </div>
             ))}
           </div>
-        </div>
-      </RevealSection>
-
-      {/* ── MODOS ── */}
-      <RevealSection
-        variant="rise"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '0 16px 40px' : '0 clamp(24px, 5vw, 48px) 48px',
-        }}
-      >
-        <div style={{
-          padding: 32,
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid var(--glass-border)',
-          background: 'linear-gradient(135deg, rgba(255,45,141,0.08) 0%, rgba(143,125,255,0.05) 100%)',
-        }}>
-          <p style={{
-            margin: '0 0 8px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-          }}>Modos de trabalho</p>
-          <h2 style={{
-            margin: '0 0 12px',
-            fontSize: isMobile ? 22 : 28,
-            fontWeight: 600,
-            letterSpacing: '-0.022em',
-            fontFamily: 'var(--font-display)',
-          }}>Simples ou profundo — você escolhe</h2>
-          <p style={{
-            margin: '0 0 24px',
-            fontSize: 15,
-            lineHeight: 1.47,
-            color: 'var(--text-secondary)',
-            maxWidth: '52ch',
-          }}>
-            Três níveis de controle. Comece no Criador e suba quando quiser
-            afinar tipografia, layout ou composição avançada.
-          </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: 12,
-          }}>
-            {MODES.map(({ id, label, tag, desc }) => (
-              <div
-                key={id}
-                style={{
-                  padding: '16px 18px',
-                  borderRadius: 'var(--radius-md)',
-                  border: `1px solid ${id === 'criador' ? 'rgba(255,45,141,0.4)' : 'var(--hairline)'}`,
-                  background: id === 'criador' ? 'var(--accent-surface)' : 'var(--bg-glass)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
-                  {tag && (
-                    <span style={{
-                      fontSize: 9,
-                      fontFamily: 'var(--font-mono)',
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      color: 'var(--accent)',
-                      fontWeight: 700,
-                    }}>{tag}</span>
-                  )}
-                </div>
-                <p style={{
-                  margin: 0,
-                  fontSize: 13,
-                  lineHeight: 1.45,
-                  color: 'var(--text-secondary)',
-                }}>{desc}</p>
-              </div>
-            ))}
-          </div>
-          <p style={{
-            margin: '16px 0 0',
-            fontSize: 13,
-            color: 'var(--text-muted)',
-            lineHeight: 1.47,
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '0.02em',
-          }}>
-            Troque de modo a qualquer momento no chip Modo, no topo do editor.
-          </p>
         </div>
       </RevealSection>
 
