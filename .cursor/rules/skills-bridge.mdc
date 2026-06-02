@@ -20,6 +20,13 @@ When the user's request matches a skill's trigger conditions (described in each 
 
 **Important:** This skill explicitly references `/frontend-design` and `/teach-impeccable` as preparation steps. Those slash-commands are Claude Code conventions and may not exist in Cursor — when not available here, treat them as informational and proceed with the skill body, while substituting the project's existing design-system context (read `DESIGN.md` and `.cursor/rules/design-system.mdc` first to anchor the polish pass to the project's actual visual language).
 
+### `influ-cinematic-landing`
+**Path:** `.agents/skills/influ-cinematic-landing/SKILL.md`
+
+**Triggers:** landing de onboarding, influ cinematic landing, página inicial cinematográfica para criadores, primeira visita editorial, onboarding full-screen da plataforma.
+
+**What it does:** Landing cinematográfica estilo influencer/editorial — hero com stage de carrosséis, fluxo em 3 passos, montagem de capacidades e CTA para o studio. Implementação em `src/components/OnboardingLanding.jsx`; flag `vc_landing_done`.
+
 ### `carrossel-cultura`
 **Path:** `.agents/skills/carrossel-cultura/SKILL.md`
 

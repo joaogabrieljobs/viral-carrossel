@@ -21,6 +21,7 @@ import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
+import OnboardingLanding from './src/components/OnboardingLanding.jsx';
 import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset } from './src/styles/visual-presets.jsx';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
@@ -61,6 +62,8 @@ const SK = {
   /** Biblioteca de hooks (capas) que o usuário aprovou — sugerida em novas gerações do mesmo nicho. */
   hookLibrary:   'vc_hook_library',
   onboarding:    'vc_onboarding_done',
+  /** Landing cinematográfica de onboarding — primeira visita. */
+  landingDone:   'vc_landing_done',
   shellView:     'vc_shell_view',
   /** Lista no editor: grelha de alinhamento sobre o preview (não exportada). */
   previewGrid:   'vc_preview_align_grid',
@@ -15090,6 +15093,19 @@ export default function App() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [hookVarsOpen, setHookVarsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [landingOpen, setLandingOpen] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && !localStorage.getItem(SK.landingDone);
+    } catch {
+      return false;
+    }
+  });
+  const completeLanding = useCallback(() => {
+    setLandingOpen(false);
+    setShellView('project');
+    try { localStorage.setItem(SK.landingDone, '1'); } catch { /* */ }
+    trackEvent('landing_complete');
+  }, []);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -15176,7 +15192,7 @@ export default function App() {
   // Modal de boas-vindas dos 3 modos — primeira visita só.
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || landingOpen) return undefined;
     try {
       if (!localStorage.getItem(SK.modesIntro)) {
         const t = window.setTimeout(() => setModesIntroOpen(true), 600);
@@ -15184,7 +15200,7 @@ export default function App() {
       }
     } catch { /* */ }
     return undefined;
-  }, []);
+  }, [landingOpen]);
   const closeModesIntro = useCallback(() => {
     setModesIntroOpen(false);
     try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
@@ -15273,7 +15289,7 @@ export default function App() {
 
   // Tour guiado — primeira visita (pode repetir pela ajuda)
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || landingOpen) return undefined;
     try {
       if (!localStorage.getItem(SK.onboarding)) {
         const t = window.setTimeout(() => setTourOpen(true), 850);
@@ -15281,7 +15297,7 @@ export default function App() {
       }
     } catch { /* ignore */ }
     return undefined;
-  }, []);
+  }, [landingOpen]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -16872,6 +16888,26 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
   };
 
   const desktopThumbWidth = f.w * previewScale;
+
+  if (landingOpen) {
+    return (
+      <div
+        className="vc-landing-shell"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          background: 'var(--bg-primary, #0e0c14)',
+        }}
+      >
+        <style>{GLOBAL_STYLE}</style>
+        <OnboardingLanding onEnter={completeLanding} isMobile={isMobile} />
+      </div>
+    );
+  }
 
   return (
     <div style={{
