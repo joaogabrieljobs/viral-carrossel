@@ -150,6 +150,58 @@ function HeroSlideCard({ style, imageSrc, label }) {
   );
 }
 
+/** Faixa horizontal de previews 4:5 (carrosséis reais) */
+function CarouselSlideStrip({ isMobile, style }) {
+  return (
+    <div
+      style={{
+        overflow: 'hidden',
+        maskImage: 'linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)',
+        ...style,
+      }}
+    >
+      <div
+        className="vc-landing-carousel-track"
+        style={{
+          display: 'flex',
+          gap: isMobile ? 10 : 14,
+          width: 'max-content',
+          padding: isMobile ? '0 16px' : '0 clamp(24px, 5vw, 48px)',
+        }}
+      >
+        {[...IMG.carouselSamples, ...IMG.carouselSamples].map((src, i) => (
+          <div
+            key={`${src}-${i}`}
+            style={{
+              flexShrink: 0,
+              width: isMobile ? 152 : 200,
+              aspectRatio: '4 / 5',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--glass-border-strong)',
+              boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
+              overflow: 'hidden',
+              background: 'var(--bg-secondary)',
+            }}
+          >
+            <img
+              src={src}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LandingImage({ src, alt = '', style, rounded = 'var(--radius-lg)' }) {
   return (
     <img
@@ -555,7 +607,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '0 16px 48px' : '0 clamp(24px, 5vw, 48px) 64px',
+          padding: isMobile ? '0 16px 16px' : '0 clamp(24px, 5vw, 48px) 20px',
         }}
       >
         <div style={{
@@ -642,6 +694,19 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
+      <RevealSection
+        variant="rise"
+        eager
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          padding: isMobile ? '12px 0 20px' : '16px 0 24px',
+          overflow: 'hidden',
+        }}
+      >
+        <CarouselSlideStrip isMobile={isMobile} />
+      </RevealSection>
+
       {/* ── COMO FUNCIONA ── */}
       <RevealSection
         variant="clip"
@@ -651,7 +716,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '48px 16px 24px' : '64px clamp(24px, 5vw, 48px) 28px',
+          padding: isMobile ? '20px 16px 16px' : '28px clamp(24px, 5vw, 48px) 20px',
         }}
       >
         <p style={{
@@ -674,7 +739,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           Do tema ao arquivo final.
         </h2>
         <p style={{
-          margin: '0 0 48px',
+          margin: '0 0 28px',
           fontSize: 17,
           lineHeight: 1.47,
           color: 'var(--text-secondary)',
@@ -728,62 +793,18 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── MONTAGE — previews de carrossel + capabilities marquee ── */}
+      {/* ── MONTAGE — capabilities marquee ── */}
       <RevealSection
         variant="scale"
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: isMobile ? '8px 0 40px' : '16px 0 48px',
+          padding: isMobile ? '20px 0 32px' : '28px 0 40px',
           overflow: 'hidden',
         }}
       >
         <div style={{
-          marginBottom: isMobile ? 28 : 36,
-          overflow: 'hidden',
-          maskImage: 'linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)',
-        }}>
-          <div
-            className="vc-landing-carousel-track"
-            style={{
-              display: 'flex',
-              gap: isMobile ? 12 : 16,
-              width: 'max-content',
-              padding: isMobile ? '4px 16px' : '8px clamp(24px, 5vw, 48px)',
-            }}
-          >
-            {[...IMG.carouselSamples, ...IMG.carouselSamples].map((src, i) => (
-              <div
-                key={`${src}-${i}`}
-                style={{
-                  flexShrink: 0,
-                  width: isMobile ? 168 : 220,
-                  aspectRatio: '4 / 5',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--glass-border-strong)',
-                  boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
-                  overflow: 'hidden',
-                  background: 'var(--bg-secondary)',
-                }}
-              >
-                <img
-                  src={src}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{
-          padding: isMobile ? '0 16px 16px' : '0 clamp(24px, 5vw, 48px) 20px',
+          padding: isMobile ? '0 16px 12px' : '0 clamp(24px, 5vw, 48px) 16px',
           maxWidth: 1200,
           margin: '0 auto',
         }}>
