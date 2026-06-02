@@ -4,21 +4,39 @@ import {
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
 } from 'lucide-react';
 
+/** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND) */
+const IMG = {
+  heroStage: '/landing/hero-stage.png',
+  heroSlides: [
+    '/landing/hero-slide-1.png',
+    '/landing/hero-slide-2.png',
+    '/landing/hero-slide-3.png',
+  ],
+  problem: '/landing/section-problem.png',
+  steps: ['/landing/step-01.png', '/landing/step-02.png', '/landing/step-03.png'],
+  cta: '/landing/cta-wide.png',
+  mobile: '/landing/mobile-reels.png',
+  showcase: '/landing/showcase-creator.png',
+};
+
 const STEPS = [
   {
     n: '01',
     title: 'Escolha o arco',
     body: 'Tendência quente, erro que todo mundo comete, decodificação de marca ou mudança de comportamento. Você define o tema — a IA monta a narrativa em slides.',
+    image: IMG.steps[0],
   },
   {
     n: '02',
     title: 'Gere e refine',
     body: 'Gancho na capa, corpo argumentativo e legenda pronta num fluxo. Ajuste tom, troque imagens, teste variações de tese até a versão que para o scroll.',
+    image: IMG.steps[1],
   },
   {
     n: '03',
     title: 'Publique no feed',
     body: 'Exporte PNG slide a slide ou PDF multipágina em 4:5, quadrado ou stories — dimensões reais do Instagram, sem redimensionar no Canva.',
+    image: IMG.steps[2],
   },
 ];
 
@@ -73,63 +91,75 @@ const FAQ = [
   },
 ];
 
-/** Cartão flutuante do hero — mock de slide de carrossel */
-function HeroSlideCard({ style, title, subtitle, accent }) {
+/** Cartão flutuante do hero — preview real de slide */
+function HeroSlideCard({ style, imageSrc, label }) {
   return (
     <div
       className="vc-landing-slide-card"
       style={{
         position: 'absolute',
-        width: 'clamp(140px, 28vw, 200px)',
+        width: 'clamp(120px, 22vw, 168px)',
         aspectRatio: '4 / 5',
         borderRadius: 16,
         border: '1px solid var(--glass-border-strong)',
-        background: 'linear-gradient(165deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)',
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
         boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
         overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-        padding: 14,
         ...style,
       }}
     >
+      <img
+        src={imageSrc}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: accent || 'radial-gradient(circle at 30% 20%, rgba(255,45,141,0.35) 0%, transparent 55%)',
+        background: 'linear-gradient(to top, rgba(14,12,20,0.75) 0%, transparent 55%)',
         pointerEvents: 'none',
       }} />
-      <div style={{
-        position: 'relative',
-        fontSize: 11,
-        fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: 'var(--text-muted)',
-        marginBottom: 6,
-      }}>Slide</div>
-      <div style={{
-        position: 'relative',
-        fontSize: 15,
-        fontWeight: 600,
-        letterSpacing: '-0.02em',
-        lineHeight: 1.2,
-        color: 'var(--text-primary)',
-        fontFamily: 'var(--font-display)',
-      }}>{title}</div>
-      {subtitle && (
+      {label && (
         <div style={{
-          position: 'relative',
-          marginTop: 4,
-          fontSize: 11,
-          color: 'var(--text-secondary)',
-          lineHeight: 1.35,
-        }}>{subtitle}</div>
+          position: 'absolute',
+          bottom: 10,
+          left: 10,
+          right: 10,
+          fontSize: 10,
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.85)',
+          fontWeight: 600,
+        }}>{label}</div>
       )}
     </div>
+  );
+}
+
+function LandingImage({ src, alt = '', style, rounded = 'var(--radius-lg)' }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      style={{
+        display: 'block',
+        width: '100%',
+        height: 'auto',
+        borderRadius: rounded,
+        border: '1px solid var(--hairline)',
+        ...style,
+      }}
+    />
   );
 }
 
@@ -447,12 +477,12 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             </div>
           </div>
 
-          {/* Stage — floating carousel cards */}
+          {/* Stage — composição principal + slides flutuantes */}
           <div style={{
             order: isMobile ? 1 : 0,
             position: 'relative',
-            height: isMobile ? 280 : 420,
-            minHeight: isMobile ? 280 : 360,
+            height: isMobile ? 'auto' : 480,
+            minHeight: isMobile ? 0 : 400,
             transform: `translateY(${parallax}px)`,
           }}>
             <div
@@ -460,45 +490,45 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               aria-hidden
               style={{
                 position: 'absolute',
-                width: '70%',
-                height: '70%',
-                top: '15%',
-                left: '15%',
+                width: '80%',
+                height: '80%',
+                top: '10%',
+                left: '10%',
                 borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(255,45,141,0.25) 0%, transparent 70%)',
-                filter: 'blur(40px)',
+                background: 'radial-gradient(circle, rgba(255,45,141,0.22) 0%, transparent 70%)',
+                filter: 'blur(48px)',
+                zIndex: 0,
               }}
             />
-            <HeroSlideCard
-              title="O erro que mata 90% dos carrosséis"
-              subtitle="Capa · Erro comum"
+            <LandingImage
+              src={IMG.heroStage}
+              alt="Preview do editor Viral Carrossel com export para Instagram"
               style={{
-                top: '8%',
-                left: '5%',
-                '--rot': '-6deg',
+                position: 'relative',
                 zIndex: 1,
+                boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
               }}
+              rounded="var(--radius-xl)"
             />
-            <HeroSlideCard
-              title="A tendência já virou — e ninguém percebeu"
-              accent="radial-gradient(circle at 70% 30%, rgba(143,125,255,0.4) 0%, transparent 55%)"
-              style={{
-                top: '22%',
-                right: '8%',
-                '--rot': '4deg',
-                zIndex: 3,
-              }}
-            />
-            <HeroSlideCard
-              title="Por que marcas grandes postam menos"
-              subtitle="Decodificação · Slide 7"
-              style={{
-                bottom: '5%',
-                left: '22%',
-                '--rot': '-2deg',
-                zIndex: 2,
-              }}
-            />
+            {!isMobile && (
+              <>
+                <HeroSlideCard
+                  imageSrc={IMG.heroSlides[0]}
+                  label="Slide 01"
+                  style={{ top: '6%', left: '-4%', '--rot': '-8deg', zIndex: 3 }}
+                />
+                <HeroSlideCard
+                  imageSrc={IMG.heroSlides[1]}
+                  label="Slide 05"
+                  style={{ top: '18%', right: '-2%', '--rot': '6deg', zIndex: 4 }}
+                />
+                <HeroSlideCard
+                  imageSrc={IMG.heroSlides[2]}
+                  label="Slide 09"
+                  style={{ bottom: '4%', left: '12%', '--rot': '-3deg', zIndex: 2 }}
+                />
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -515,76 +545,86 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }}
       >
         <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1.05fr',
+          gap: isMobile ? 24 : 40,
+          alignItems: 'center',
           padding: isMobile ? '28px 20px' : '36px 40px',
           borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--hairline)',
           background: 'var(--bg-secondary)',
         }}>
-          <p style={{
-            margin: '0 0 20px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-          }}>O problema</p>
-          <blockquote style={{
-            margin: '0 0 24px',
-            padding: 0,
-            border: 'none',
-            fontSize: isMobile ? 20 : 26,
-            fontWeight: 600,
-            letterSpacing: '-0.022em',
-            lineHeight: 1.25,
-            fontFamily: 'var(--font-display)',
-            color: 'var(--text-primary)',
-          }}>
-            Carrossel bom não é slide bonito.
-            <br />
-            <span style={{ color: 'var(--accent)' }}>É arco narrativo que segura até o fim.</span>
-          </blockquote>
-          <ul style={{
-            margin: 0,
-            padding: 0,
-            listStyle: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}>
-            {PAIN_POINTS.map((line) => (
-              <li
-                key={line}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 12,
-                  fontSize: 15,
-                  lineHeight: 1.47,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <span style={{
-                  flexShrink: 0,
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: 'var(--accent)',
-                  marginTop: 8,
-                }} aria-hidden />
-                {line}
-              </li>
-            ))}
-          </ul>
-          <p style={{
-            margin: '24px 0 0',
-            fontSize: 15,
-            lineHeight: 1.47,
-            color: 'var(--text-muted)',
-            fontStyle: 'italic',
-          }}>
-            O Viral. existe pra fechar essa lacuna — do insight ao post publicável.
-          </p>
+          <div>
+            <p style={{
+              margin: '0 0 20px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+            }}>O problema</p>
+            <blockquote style={{
+              margin: '0 0 24px',
+              padding: 0,
+              border: 'none',
+              fontSize: isMobile ? 20 : 26,
+              fontWeight: 600,
+              letterSpacing: '-0.022em',
+              lineHeight: 1.25,
+              fontFamily: 'var(--font-display)',
+              color: 'var(--text-primary)',
+            }}>
+              Carrossel bom não é slide bonito.
+              <br />
+              <span style={{ color: 'var(--accent)' }}>É arco narrativo que segura até o fim.</span>
+            </blockquote>
+            <ul style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              {PAIN_POINTS.map((line) => (
+                <li
+                  key={line}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    fontSize: 15,
+                    lineHeight: 1.47,
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <span style={{
+                    flexShrink: 0,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--accent)',
+                    marginTop: 8,
+                  }} aria-hidden />
+                  {line}
+                </li>
+              ))}
+            </ul>
+            <p style={{
+              margin: '24px 0 0',
+              fontSize: 15,
+              lineHeight: 1.47,
+              color: 'var(--text-muted)',
+              fontStyle: 'italic',
+            }}>
+              O Viral. existe pra fechar essa lacuna — do insight ao post publicável.
+            </p>
+          </div>
+          <LandingImage
+            src={IMG.problem}
+            alt="Interface de dados e criação com IA"
+          />
         </div>
       </RevealSection>
 
@@ -634,37 +674,41 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: 16,
         }}>
-          {STEPS.map(({ n, title, body }) => (
+          {STEPS.map(({ n, title, body, image }) => (
             <div
               key={n}
               style={{
-                padding: 24,
+                padding: 0,
                 borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--hairline)',
                 background: 'var(--bg-glass)',
                 backdropFilter: 'blur(12px)',
+                overflow: 'hidden',
               }}
             >
-              <div style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 13,
-                color: 'var(--accent)',
-                letterSpacing: '0.06em',
-                marginBottom: 16,
-                fontWeight: 600,
-              }}>{n}</div>
-              <h3 style={{
-                margin: '0 0 10px',
-                fontSize: 20,
-                fontWeight: 600,
-                letterSpacing: '-0.02em',
-              }}>{title}</h3>
-              <p style={{
-                margin: 0,
-                fontSize: 15,
-                lineHeight: 1.47,
-                color: 'var(--text-secondary)',
-              }}>{body}</p>
+              <LandingImage src={image} alt="" rounded={0} style={{ border: 'none', borderRadius: 0 }} />
+              <div style={{ padding: 24 }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  color: 'var(--accent)',
+                  letterSpacing: '0.06em',
+                  marginBottom: 16,
+                  fontWeight: 600,
+                }}>{n}</div>
+                <h3 style={{
+                  margin: '0 0 10px',
+                  fontSize: 20,
+                  fontWeight: 600,
+                  letterSpacing: '-0.02em',
+                }}>{title}</h3>
+                <p style={{
+                  margin: 0,
+                  fontSize: 15,
+                  lineHeight: 1.47,
+                  color: 'var(--text-secondary)',
+                }}>{body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -850,6 +894,52 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
+      {/* ── SHOWCASE criador + mobile ── */}
+      <RevealSection
+        variant="scale"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '0 16px 64px' : '0 clamp(24px, 5vw, 48px) 80px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Na prática</p>
+        <h2 style={{
+          margin: '0 0 28px',
+          fontSize: isMobile ? 24 : 32,
+          fontWeight: 600,
+          letterSpacing: '-0.022em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+        }}>
+          Do café ao post publicado
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: 16,
+        }}>
+          <LandingImage
+            src={IMG.showcase}
+            alt="Criadora de conteúdo usando o Viral Carrossel"
+          />
+          <LandingImage
+            src={IMG.mobile}
+            alt="Editor de carrossel no celular"
+          />
+        </div>
+      </RevealSection>
+
       {/* ── FAQ ── */}
       <RevealSection
         variant="rise"
@@ -921,14 +1011,34 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }}
       >
         <div style={{
-          maxWidth: 640,
+          position: 'relative',
+          maxWidth: 720,
           margin: '0 auto',
           padding: isMobile ? '40px 24px' : '56px 48px',
           borderRadius: 'var(--radius-xl)',
           border: '1px solid rgba(255, 45, 141, 0.28)',
-          background: 'linear-gradient(165deg, rgba(255,45,141,0.12) 0%, rgba(143,125,255,0.06) 50%, rgba(255,255,255,0.02) 100%)',
+          overflow: 'hidden',
           boxShadow: 'var(--shadow-pink)',
         }}>
+          <img
+            src={IMG.cta}
+            alt=""
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 0.32,
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(165deg, rgba(14,12,20,0.88) 0%, rgba(14,12,20,0.72) 100%)',
+          }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
           <p style={{
             margin: '0 0 8px',
             fontFamily: 'var(--font-mono)',
@@ -993,6 +1103,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           }}>
             Grátis · Sem cadastro · Dados locais no navegador
           </p>
+          </div>
         </div>
       </RevealSection>
 

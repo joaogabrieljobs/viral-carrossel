@@ -62,7 +62,9 @@ const SK = {
   /** Biblioteca de hooks (capas) que o usuário aprovou — sugerida em novas gerações do mesmo nicho. */
   hookLibrary:   'vc_hook_library',
   onboarding:    'vc_onboarding_done',
-  /** Landing cinematográfica de onboarding — primeira visita. */
+  /** Landing cinematográfica — dispensada nesta sessão após "Entrar no studio". */
+  landingDismissed: 'vc_landing_dismissed',
+  /** Legado (não usar para decidir se abre a landing). */
   landingDone:   'vc_landing_done',
   shellView:     'vc_shell_view',
   /** Lista no editor: grelha de alinhamento sobre o preview (não exportada). */
@@ -102,6 +104,26 @@ function readInitialShellView() {
     /* ignore */
   }
   return 'home';
+}
+
+/** Landing de introdução: entrada padrão do site até o utilizador clicar Entrar. */
+function shouldShowOnboardingLanding() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('app') === '1' || q.get('studio') === '1') return false;
+    if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') return true;
+    return sessionStorage.getItem(SK.landingDismissed) !== '1';
+  } catch {
+    return true;
+  }
+}
+
+function dismissOnboardingLanding() {
+  try {
+    sessionStorage.setItem(SK.landingDismissed, '1');
+    localStorage.setItem(SK.landingDone, '1');
+  } catch { /* */ }
 }
 
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
@@ -15093,18 +15115,29 @@ export default function App() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [hookVarsOpen, setHookVarsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [landingOpen, setLandingOpen] = useState(() => {
-    try {
-      return typeof window !== 'undefined' && !localStorage.getItem(SK.landingDone);
-    } catch {
-      return false;
+  const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('app') === '1' || q.get('studio') === '1') {
+      dismissOnboardingLanding();
+      setLandingOpen(false);
+      return undefined;
     }
-  });
+    if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') {
+      setLandingOpen(true);
+    }
+    return undefined;
+  }, []);
   const completeLanding = useCallback(() => {
+    dismissOnboardingLanding();
     setLandingOpen(false);
-    setShellView('project');
-    try { localStorage.setItem(SK.landingDone, '1'); } catch { /* */ }
+    setShellView('home');
     trackEvent('landing_complete');
+  }, []);
+  const reopenLanding = useCallback(() => {
+    try { sessionStorage.removeItem(SK.landingDismissed); } catch { /* */ }
+    setLandingOpen(true);
   }, []);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -18075,6 +18108,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       <HelpModal
         open={helpOpen}
         onClose={()=>setHelpOpen(false)}
+        onShowLanding={() => { setHelpOpen(false); reopenLanding(); }}
         onStartTour={() => { setHelpOpen(false); setTourOpen(true); }}
       />
       <FullscreenViewer
@@ -19819,7 +19853,7 @@ function OnboardingTour({ open, onDismiss, isMobile, empty, setTab, setDrawerOpe
   );
 }
 
-function HelpModal({ open, onClose, onStartTour }) {
+function HelpModal({ open, onClose, onShowLanding, onStartTour }) {
   if (!open) return null;
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const Mod = isMac ? '⌘' : 'Ctrl';
@@ -19857,11 +19891,21 @@ function HelpModal({ open, onClose, onStartTour }) {
               </div>
             </div>
           ))}
-          {typeof onStartTour === 'function' && (
+          {typeof onShowLanding === 'function' && (
             <button
               type="button"
               className="vc-btn vc-btn-ghost"
               style={{ width: '100%', height: 40, marginTop: 10, fontSize: 14, border: '1px solid var(--hairline)' }}
+              onClick={() => onShowLanding()}
+            >
+              Ver página de introdução
+            </button>
+          )}
+          {typeof onStartTour === 'function' && (
+            <button
+              type="button"
+              className="vc-btn vc-btn-ghost"
+              style={{ width: '100%', height: 40, marginTop: 8, fontSize: 14, border: '1px solid var(--hairline)' }}
               onClick={() => onStartTour()}
             >
               Ver tour guiado
