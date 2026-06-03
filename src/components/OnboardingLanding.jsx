@@ -18,6 +18,7 @@ const IMG = {
   cta: '/landing/cta-wide.png',
   mobile: '/landing/mobile-reels.png',
   showcase: '/landing/showcase-creator.png',
+  modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
     '/landing/carousel-01.png',
     '/landing/carousel-02.png',
@@ -862,43 +863,55 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           padding: isMobile ? '8px 16px 20px' : '16px clamp(24px, 5vw, 48px) 24px',
         }}
       >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Modos de trabalho</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 28 : 40,
+          fontWeight: 600,
+          letterSpacing: '-0.028em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.1,
+        }}>
+          Publique hoje.
+          <br />
+          <span style={{ color: 'var(--accent)' }}>Aprofunde quando quiser.</span>
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '54ch',
+        }}>
+          Você não precisa ser designer nem copywriter. No modo Criador, um tema vira
+          post completo — narrativa, slides, legenda e arquivo pronto pro feed.
+        </p>
+
+        <LandingImage
+          src={IMG.modosPlatform}
+          alt="Plataforma Viral Carrossel — editor com geração de narrativa, slides e imagens por IA"
+          rounded="var(--radius-xl)"
+          style={{
+            marginBottom: isMobile ? 24 : 32,
+            border: '1px solid var(--glass-border-strong)',
+            boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
+          }}
+        />
+
         <div style={{
-          padding: isMobile ? 24 : 32,
+          padding: isMobile ? 20 : 28,
           borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--glass-border)',
-          background: 'linear-gradient(135deg, rgba(255,45,141,0.08) 0%, rgba(143,125,255,0.05) 100%)',
+          background: 'linear-gradient(135deg, rgba(255,45,141,0.06) 0%, rgba(143,125,255,0.04) 100%)',
         }}>
-          <p style={{
-            margin: '0 0 8px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-          }}>Modos de trabalho</p>
-          <h2 style={{
-            margin: '0 0 12px',
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: 600,
-            letterSpacing: '-0.022em',
-            fontFamily: 'var(--font-display)',
-            lineHeight: 1.12,
-          }}>
-            Publique hoje.
-            <br />
-            <span style={{ color: 'var(--accent)' }}>Aprofunde quando quiser.</span>
-          </h2>
-          <p style={{
-            margin: '0 0 24px',
-            fontSize: 16,
-            lineHeight: 1.47,
-            color: 'var(--text-secondary)',
-            maxWidth: '54ch',
-          }}>
-            Você não precisa ser designer nem copywriter. No modo Criador, um tema vira
-            post completo — narrativa, slides, legenda e arquivo pronto pro feed.
-          </p>
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
