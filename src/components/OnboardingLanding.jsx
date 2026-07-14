@@ -10,7 +10,7 @@ const IMG = {
   heroStage: '/landing/hero-stage.png',
   heroSlides: [
     '/landing/creator-reaction.png',
-    '/landing/hero-slide-2.png',
+    '/landing/carousel-07.png',
     '/landing/hero-slide-3.png',
   ],
   problem: '/landing/section-problem.png',
