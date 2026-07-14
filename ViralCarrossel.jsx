@@ -7249,19 +7249,37 @@ const APP_MODES = [
 ];
 function ModeSwitcher({ value, onChange, compact = false }) {
   const [open, setOpen] = React.useState(false);
+  // Posição calculada em px (não CSS `absolute` relativo ao wrapper) porque o
+  // <header> pai usa `overflow:hidden` (pro collapse mobile) e clipava o menu,
+  // deixando os itens visíveis-mas-inclicáveis / invisíveis. `position:fixed`
+  // ancorado via getBoundingClientRect escapa desse clipping.
+  const [menuPos, setMenuPos] = React.useState(null);
   const refMenu = React.useRef(null);
   const current = APP_MODES.find((m) => m.id === value) || APP_MODES[0];
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!open) return;
+    const updatePos = () => {
+      const r = refMenu.current?.getBoundingClientRect();
+      if (!r) return;
+      const menuW = 220;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 9999;
+      const left = Math.min(r.left, Math.max(8, vw - menuW - 8));
+      setMenuPos({ top: r.bottom + 8, left });
+    };
+    updatePos();
     const onClickOutside = (e) => {
       if (!refMenu.current || !refMenu.current.contains(e.target)) setOpen(false);
     };
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onClickOutside);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
     return () => {
       document.removeEventListener('mousedown', onClickOutside);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
     };
   }, [open]);
   const Ic = current.icon;
@@ -7293,11 +7311,11 @@ function ModeSwitcher({ value, onChange, compact = false }) {
         {!compact && <span>{current.label}</span>}
         <ChevronDown size={11} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }}/>
       </button>
-      {open && (
+      {open && menuPos && (
         <div
           role="menu"
           style={{
-            position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+            position: 'fixed', top: menuPos.top, left: menuPos.left,
             minWidth: 220,
             background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%), var(--bg-secondary)',
             backdropFilter: 'blur(32px) saturate(180%)',
