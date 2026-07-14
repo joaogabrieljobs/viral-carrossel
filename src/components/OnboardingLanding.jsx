@@ -5,18 +5,18 @@ import {
   BookOpen, Layers, Image, FileText,
 } from 'lucide-react';
 
-/** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND) */
+/** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND + IMAGENS VIRACAL CARRECEL) */
 const IMG = {
   heroStage: '/landing/hero-stage.png',
   heroSlides: [
-    '/landing/hero-slide-1.png',
+    '/landing/creator-reaction.png',
     '/landing/hero-slide-2.png',
     '/landing/hero-slide-3.png',
   ],
   problem: '/landing/section-problem.png',
-  steps: ['/landing/step-01.png', '/landing/step-02.png', '/landing/step-03.png'],
-  cta: '/landing/cta-wide.png',
-  mobile: '/landing/mobile-reels.png',
+  steps: ['/landing/step-01.png', '/landing/creator-filming.png', '/landing/step-03.png'],
+  cta: '/landing/analytics-screen.png',
+  mobile: '/landing/phone-feed.png',
   showcase: '/landing/showcase-creator.png',
   modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
@@ -24,6 +24,9 @@ const IMG = {
     '/landing/carousel-02.png',
     '/landing/carousel-03.png',
     '/landing/carousel-04.png',
+    '/landing/carousel-05.png',
+    '/landing/carousel-06.png',
+    '/landing/carousel-07.png',
   ],
 };
 

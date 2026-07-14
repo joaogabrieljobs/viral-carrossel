@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "cinematic-ui": {
+      "source": "akseolabs-seo/cinematic-ui",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "8b447ae50fbd6fd3ae80e7caa3955a74a54c5516ae7378fe574d424294b76710"
+    },
     "polish": {
       "source": "Aston1690/polish",
       "sourceType": "github",
