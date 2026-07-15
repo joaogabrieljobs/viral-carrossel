@@ -624,12 +624,16 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          // No mobile o rosto dele fica na metade de cima da foto — texto
+          // centralizado caía bem em cima do rosto. Jogando pro final
+          // (flex-end) o texto desce pra área do suéter (mais neutra,
+          // melhor contraste) em vez de sobrepor o rosto.
+          justifyContent: isMobile ? 'flex-end' : 'center',
           textAlign: 'center',
           gap: isMobile ? 20 : 24,
           width: 'min(1100px, 92vw)',
           margin: '0 auto',
-          padding: isMobile ? '48px 20px 72px' : '64px clamp(24px, 5vw, 48px) 96px',
+          padding: isMobile ? '48px 20px 56px' : '64px clamp(24px, 5vw, 48px) 96px',
         }}>
           <p className="section-label" style={{
             margin: 0,
