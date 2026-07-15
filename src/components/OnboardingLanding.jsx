@@ -547,7 +547,11 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              objectPosition: 'center 30%',
+              // A foto é bem larga (paisagem) e ele fica no lado direito.
+              // Num crop retrato (mobile), "center" corta bem no meio e some
+              // com ele quase todo — desloca a âncora horizontal pra ~72%
+              // pra manter o rosto dele dentro do enquadramento.
+              objectPosition: isMobile ? '72% 18%' : 'center 30%',
               filter: 'saturate(104%)',
               transform: 'scale(1.04)',
             }}
