@@ -8,7 +8,7 @@ import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
 /** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND + IMAGENS VIRACAL CARRECEL) */
 const IMG = {
-  heroStage: '/landing/hero-stage-newbrand.webp',
+  heroStage: '/landing/hero-stage.png',
   heroSlides: [
     '/landing/creator-reaction.png',
     '/landing/carousel-07.png',
