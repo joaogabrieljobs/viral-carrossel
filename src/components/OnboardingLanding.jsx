@@ -21,7 +21,7 @@ const IMG = {
   showcase: '/landing/showcase-creator.png',
   heroPhoto: '/landing/hero-creator-photo.jpg',
   showcaseWindowPhone: '/landing/showcase-window-phone.jpg',
-  showcasePhoneNike: '/landing/showcase-phone-nike.webp',
+  showcasePhoneNike: '/landing/showcase-phone-nike.jpg',
   modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
     '/landing/carousel-01.png',
