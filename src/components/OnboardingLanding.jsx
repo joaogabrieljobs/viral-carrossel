@@ -4,6 +4,7 @@ import {
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
   BookOpen, Layers, Image, FileText,
 } from 'lucide-react';
+import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
 /** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND + IMAGENS VIRACAL CARRECEL) */
 const IMG = {
@@ -18,6 +19,9 @@ const IMG = {
   cta: '/landing/analytics-screen.png',
   mobile: '/landing/phone-feed.png',
   showcase: '/landing/showcase-creator.png',
+  heroPhoto: '/landing/hero-creator-photo.jpg',
+  showcaseWindowPhone: '/landing/showcase-window-phone.jpg',
+  showcasePhoneNike: '/landing/showcase-phone-nike.jpg',
   modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
     '/landing/carousel-01.png',
@@ -240,9 +244,10 @@ function CarouselSlideStrip({ isMobile, style }) {
   );
 }
 
-function LandingImage({ src, alt = '', style, rounded = 'var(--radius-lg)' }) {
+const LandingImage = React.forwardRef(function LandingImage({ src, alt = '', style, rounded = 'var(--radius-lg)' }, ref) {
   return (
     <img
+      ref={ref}
       src={src}
       alt={alt}
       loading="lazy"
@@ -257,31 +262,46 @@ function LandingImage({ src, alt = '', style, rounded = 'var(--radius-lg)' }) {
       }}
     />
   );
-}
+});
 
-function useReveal(ref, { threshold = 0.15, rootMargin = '0px 0px -8% 0px' } = {}) {
+// rootMargin positivo em baixo = a seção já é considerada "visível" um bom
+// tanto ANTES de entrar de fato na viewport (o observer enxerga além do que a
+// tela mostra). threshold baixo = já dispara com uma fatia mínima da seção
+// nessa área expandida. Isso garante que o reveal termina de rodar bem antes
+// do usuário rolar até ali — como clip-path/opacity não colapsam a altura da
+// seção, qualquer atraso aqui aparece como vão vazio enquanto rola.
+// Duas rodadas ajustando o IntersectionObserver (threshold/rootMargin) não
+// resolveram o vão vazio reportado — mesmo com o dev server confirmadamente
+// servindo a versão atual. Ao invés de continuar caçando a causa exata do
+// observer não disparar a tempo (clip-path/opacity não colapsam a altura da
+// seção enquanto ela espera o "entrou na tela", então qualquer atraso vira
+// buraco visível), a reveal virou "dispara pouco depois do mount" em vez de
+// "dispara quando rola até a seção". Isso garante que a transição já
+// terminou muito antes do usuário conseguir rolar até ali (mount acontece no
+// carregamento inicial da página inteira, não seção por seção), eliminando a
+// classe inteira do bug — não é só uma seção que já teria dado tempo de
+// aparecer, é fisicamente impossível o usuário rolar mais rápido que isso.
+function useReveal() {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced) {
       setVisible(true);
       return undefined;
     }
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
-      { threshold, rootMargin },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [ref, threshold, rootMargin]);
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
   return visible;
 }
 
 function RevealSection({ children, variant = 'rise', style, className = '', eager = false, id }) {
   const ref = useRef(null);
-  const visible = useReveal(ref, eager ? { threshold: 0.05, rootMargin: '0px 0px 0px 0px' } : undefined);
+  // `eager` não muda mais o comportamento (todo RevealSection revela no
+  // mount, não no scroll — ver comentário em useReveal) mas o prop continua
+  // aceito pra não quebrar os call sites existentes.
+  const visible = useReveal();
   const variants = {
     rise: {
       opacity: visible ? 1 : 0,
@@ -316,19 +336,36 @@ function RevealSection({ children, variant = 'rise', style, className = '', eage
 
 export default function OnboardingLanding({ onEnter, isMobile }) {
   const heroRef = useRef(null);
-  const [scrollY, setScrollY] = useState(0);
 
-  useEffect(() => {
-    const shell = document.querySelector('.vc-landing-shell');
-    const onScroll = () => setScrollY(shell ? shell.scrollTop : window.scrollY);
-    const target = shell || window;
-    target.addEventListener('scroll', onScroll, { passive: true });
-    return () => target.removeEventListener('scroll', onScroll);
-  }, []);
+  // Refs pros efeitos GSAP (reveal de texto, parallax de imagem e header
+  // fixo) — ver src/hooks/useLandingGsapEffects.js pra a lógica em si.
+  const heroTitleRef = useRef(null);
+  const notEditorTitleRef = useRef(null);
+  const ctaSectionRef = useRef(null);
+  const ctaImageRef = useRef(null);
+  const stickyHeaderRef = useRef(null);
+  const heroBgRef = useRef(null);
+  const previewStageRef = useRef(null);
+  const problemImageRef = useRef(null);
+  const modosImageRef = useRef(null);
+  const stepsGridRef = useRef(null);
 
-  const reducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const parallax = reducedMotion ? 0 : scrollY * 0.08;
+  useLandingGsapEffects({
+    splitRefs: [heroTitleRef, notEditorTitleRef],
+    parallaxLayers: [
+      { ref: heroBgRef, speed: 0.65 },
+      { ref: previewStageRef, speed: 0.4 },
+      { ref: problemImageRef, speed: 0.32 },
+      { ref: modosImageRef, speed: 0.28 },
+      { ref: stepsGridRef, speed: 0.18 },
+    ],
+    ctaSectionRef,
+    ctaImageRef,
+    heroSectionRef: heroRef,
+    heroBgRef,
+    stickyHeaderRef,
+    isMobile,
+  });
 
   return (
     <div
@@ -350,6 +387,13 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         @keyframes vcLandingPulse {
           0%, 100% { opacity: 0.45; transform: scale(1); }
           50% { opacity: 0.75; transform: scale(1.06); }
+        }
+        @keyframes vcLandingScrollCue {
+          0%, 100% { transform: translateY(0); opacity: 0.7; }
+          50% { transform: translateY(5px); opacity: 1; }
+        }
+        .vc-landing-scroll-cue {
+          animation: vcLandingScrollCue 1.8s ease-in-out infinite;
         }
         @keyframes vcLandingMarquee {
           0% { transform: translateX(0); }
@@ -377,7 +421,8 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           .vc-landing-slide-card,
           .vc-landing-glow,
           .vc-landing-marquee-track,
-          .vc-landing-carousel-track {
+          .vc-landing-carousel-track,
+          .vc-landing-scroll-cue {
             animation: none !important;
           }
         }
@@ -401,6 +446,65 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }
       `}</style>
 
+      {/* Header fixo — some no topo do hero, entra com transição suave (GSAP)
+          assim que o usuário rola além do hero. Estado inicial (oculto) já
+          vem no style pra não piscar antes do JS montar. */}
+      <div
+        ref={stickyHeaderRef}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 20,
+          opacity: 0,
+          transform: 'translateY(-100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: isMobile ? '10px 16px' : '10px clamp(24px, 5vw, 48px)',
+          background: 'var(--bg-glass-strong)',
+          backdropFilter: 'blur(18px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+          borderBottom: '1px solid var(--glass-border-strong)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: 'var(--logo-mark-bg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Flame size={14} color="var(--logo-mark-fg)" />
+          </div>
+          <span style={{
+            fontSize: 15, fontWeight: 600, letterSpacing: '-0.022em',
+            fontFamily: 'var(--font-display)',
+          }}>
+            Viral<span style={{ color: 'var(--accent)' }}>.</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          className="vc-landing-cta"
+          onClick={onEnter}
+          style={{
+            height: 36,
+            padding: '0 18px',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px solid var(--glass-border-strong)',
+            background: 'var(--bg-glass)',
+            color: 'var(--text-primary)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+          }}
+        >
+          Entrar no studio
+        </button>
+      </div>
+
       {/* Ambient layers */}
       <div aria-hidden style={{
         position: 'fixed',
@@ -414,24 +518,60 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         `,
       }} />
 
-      {/* ── HERO ── */}
+      {/* ── HERO — full-bleed cinematográfico ── */}
       <header
         ref={heroRef}
         style={{
           position: 'relative',
           zIndex: 1,
-          minHeight: isMobile ? 'auto' : 'min(100vh, 920px)',
+          minHeight: isMobile ? '92svh' : '100svh',
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: 'calc(20px + env(safe-area-inset-top, 0))',
+          overflow: 'hidden',
         }}
       >
+        {/* Fundo — foto real em alta resolução (1920px, otimizada a partir do
+            original 2752×1536 enviado pelo usuário), sem precisar de blur pra
+            disfarçar baixa resolução como na versão anterior. Overlay escuro
+            só o suficiente pra garantir contraste do texto por cima. Ken
+            Burns (GSAP, no ref) dá o movimento contínuo que o vídeo do site
+            de referência tinha. */}
+        <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
+          <img
+            ref={heroBgRef}
+            src={IMG.heroPhoto}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center 30%',
+              filter: 'saturate(104%)',
+              transform: 'scale(1.04)',
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: `
+              linear-gradient(180deg, rgba(14,12,20,0.5) 0%, rgba(14,12,20,0.38) 38%, rgba(14,12,20,0.94) 100%),
+              radial-gradient(ellipse 70% 55% at 50% 20%, rgba(255,45,141,0.14) 0%, transparent 60%)
+            `,
+          }} />
+        </div>
+
         <nav style={{
+          position: 'relative',
+          zIndex: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: isMobile ? '0 16px 24px' : '0 clamp(24px, 5vw, 48px) 32px',
-          maxWidth: 1200,
+          padding: isMobile
+            ? 'calc(16px + env(safe-area-inset-top, 0)) 16px 0'
+            : 'calc(20px + env(safe-area-inset-top, 0)) clamp(24px, 5vw, 48px) 0',
+          maxWidth: 1280,
           margin: '0 auto',
           width: '100%',
         }}>
@@ -460,6 +600,8 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               borderRadius: 'var(--radius-pill)',
               border: '1px solid var(--glass-border-strong)',
               background: 'var(--bg-glass)',
+              backdropFilter: 'blur(18px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(180%)',
               color: 'var(--text-primary)',
               fontSize: 13,
               fontWeight: 600,
@@ -472,174 +614,185 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </nav>
 
         <div style={{
+          position: 'relative',
+          zIndex: 2,
           flex: 1,
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-          gap: isMobile ? 32 : 48,
+          display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          maxWidth: 1200,
+          justifyContent: 'center',
+          textAlign: 'center',
+          gap: isMobile ? 20 : 24,
+          width: 'min(1100px, 92vw)',
           margin: '0 auto',
-          width: '100%',
-          padding: isMobile ? '0 16px 48px' : '0 clamp(24px, 5vw, 48px) 64px',
+          padding: isMobile ? '48px 20px 72px' : '64px clamp(24px, 5vw, 48px) 96px',
         }}>
-          {/* Copy */}
-          <div style={{ order: isMobile ? 2 : 0 }}>
-            <p className="section-label" style={{
-              margin: '0 0 16px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--accent)',
-              fontWeight: 600,
-            }}>
-              Narrative OS · Carrossel Studio
-            </p>
-            <h1 style={{
-              margin: '0 0 20px',
-              fontSize: isMobile ? 'clamp(2rem, 8vw, 2.75rem)' : 'clamp(2.5rem, 4.5vw, 3.75rem)',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              lineHeight: 1.05,
-              fontFamily: 'var(--font-display)',
-            }}>
-              Carrossel que prende
-              <br />
-              <span style={{ color: 'var(--accent)' }}>do gancho ao CTA.</span>
-            </h1>
-            <p style={{
-              margin: '0 0 16px',
-              fontSize: isMobile ? 17 : 18,
-              lineHeight: 1.47,
-              letterSpacing: '-0.011em',
-              color: 'var(--text-secondary)',
-              maxWidth: '44ch',
-            }}>
-              Você traz o tema. A IA escreve a narrativa, monta os slides, sugere imagens
-              e entrega a legenda — com a identidade visual da sua marca já aplicada.
-            </p>
-            <p style={{
-              margin: '0 0 32px',
-              fontSize: 15,
-              lineHeight: 1.47,
-              letterSpacing: '-0.011em',
-              color: 'var(--text-muted)',
-              maxWidth: '44ch',
-            }}>
-              Sem Canva genérico. Sem prompt solto no ChatGPT. Um fluxo editorial
-              pensado pra Instagram — direto no browser.
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-              <button
-                type="button"
-                className="vc-landing-cta"
-                onClick={onEnter}
-                style={{
-                  height: 52,
-                  padding: '0 28px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: 'none',
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  fontFamily: 'var(--font-ui)',
-                  boxShadow: 'var(--shadow-pink)',
-                }}
-              >
-                <Sparkles size={18} />
-                Entrar no studio
-                <ArrowRight size={16} />
-              </button>
-              <a
-                href="#como-funciona"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const shell = document.querySelector('.vc-landing-shell');
-                  const target = document.getElementById('como-funciona');
-                  if (shell && target) {
-                    const shellRect = shell.getBoundingClientRect();
-                    const targetRect = target.getBoundingClientRect();
-                    shell.scrollTop += targetRect.top - shellRect.top - 24;
-                  } else {
-                    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: 'var(--text-muted)',
-                  fontSize: 14,
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                Como funciona
-                <ChevronDown size={14} />
-              </a>
-            </div>
-          </div>
-
-          {/* Stage — composição principal + slides flutuantes */}
-          <div style={{
-            order: isMobile ? 1 : 0,
-            position: 'relative',
-            height: isMobile ? 'auto' : 480,
-            minHeight: isMobile ? 0 : 400,
-            transform: `translateY(${parallax}px)`,
+          <p className="section-label" style={{
+            margin: 0,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--accent)',
+            fontWeight: 600,
           }}>
-            <div
-              className="vc-landing-glow"
-              aria-hidden
+            Narrative OS · Carrossel Studio
+          </p>
+          <h1 ref={heroTitleRef} style={{
+            margin: 0,
+            maxWidth: '100%',
+            fontSize: isMobile ? 'clamp(2.4rem, 11vw, 3.1rem)' : 'clamp(3.2rem, 6vw, 5.25rem)',
+            fontWeight: 600,
+            letterSpacing: '-0.03em',
+            // 1.02 era apertado demais: o SplitText embrulha cada linha numa
+            // caixa com overflow:hidden do tamanho exato da linha (pro efeito
+            // de reveal). Com pouca folga, descendentes de letras como "g"
+            // (gancho) ficam por baixo da caixa e são cortados. 1.14 dá
+            // espaço suficiente sem perder o aperto visual do display.
+            lineHeight: 1.14,
+            fontFamily: 'var(--font-display)',
+          }}>
+            Carrossel que prende
+            <br />
+            <span style={{ color: 'var(--accent)' }}>do gancho ao CTA.</span>
+          </h1>
+          <p style={{
+            margin: 0,
+            fontSize: isMobile ? 16 : 19,
+            lineHeight: 1.5,
+            letterSpacing: '-0.011em',
+            color: 'var(--text-secondary)',
+            maxWidth: '46ch',
+          }}>
+            Você traz o tema. A IA escreve a narrativa, monta os slides, sugere imagens
+            e entrega a legenda — com a identidade visual da sua marca já aplicada.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+            <button
+              type="button"
+              className="vc-landing-cta"
+              onClick={onEnter}
               style={{
-                position: 'absolute',
-                width: '80%',
-                height: '80%',
-                top: '10%',
-                left: '10%',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(255,45,141,0.22) 0%, transparent 70%)',
-                filter: 'blur(48px)',
-                zIndex: 0,
+                height: 52,
+                padding: '0 28px',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                fontFamily: 'var(--font-ui)',
+                boxShadow: 'var(--shadow-pink)',
               }}
-            />
-            <LandingImage
-              src={IMG.heroStage}
-              alt="Preview do editor Viral Carrossel com export para Instagram"
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
-              }}
-              rounded="var(--radius-xl)"
-            />
-            {!isMobile && (
-              <>
-                <HeroSlideCard
-                  imageSrc={IMG.heroSlides[0]}
-                  label="Slide 01"
-                  style={{ top: '6%', left: '-4%', '--rot': '-8deg', zIndex: 3 }}
-                />
-                <HeroSlideCard
-                  imageSrc={IMG.heroSlides[1]}
-                  label="Slide 05"
-                  style={{ top: '18%', right: '-2%', '--rot': '6deg', zIndex: 4 }}
-                />
-                <HeroSlideCard
-                  imageSrc={IMG.heroSlides[2]}
-                  label="Slide 09"
-                  style={{ bottom: '4%', left: '12%', '--rot': '-3deg', zIndex: 2 }}
-                />
-              </>
-            )}
+            >
+              <Sparkles size={18} />
+              Entrar no studio
+              <ArrowRight size={16} />
+            </button>
           </div>
+          <a
+            href="#como-funciona"
+            onClick={(e) => {
+              e.preventDefault();
+              const shell = document.querySelector('.vc-landing-shell');
+              const target = document.getElementById('como-funciona');
+              if (shell && target) {
+                const shellRect = shell.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                shell.scrollTop += targetRect.top - shellRect.top - 24;
+              } else {
+                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--text-muted)',
+              fontSize: 12,
+              textDecoration: 'none',
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              marginTop: isMobile ? 12 : 20,
+            }}
+          >
+            Como funciona
+            <ChevronDown size={16} className="vc-landing-scroll-cue" />
+          </a>
         </div>
       </header>
+
+      {/* ── PREVIEW DO PRODUTO — composição que antes vivia dentro do hero ── */}
+      <RevealSection
+        variant="scale"
+        eager
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '32px 16px 8px' : '56px clamp(24px, 5vw, 48px) 8px',
+        }}
+      >
+        <div ref={previewStageRef} style={{
+          position: 'relative',
+          maxWidth: 760,
+          margin: '0 auto',
+          height: isMobile ? 'auto' : 440,
+          minHeight: isMobile ? 0 : 360,
+        }}>
+          <div
+            className="vc-landing-glow"
+            aria-hidden
+            style={{
+              position: 'absolute',
+              width: '80%',
+              height: '80%',
+              top: '10%',
+              left: '10%',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,45,141,0.22) 0%, transparent 70%)',
+              filter: 'blur(48px)',
+              zIndex: 0,
+            }}
+          />
+          <LandingImage
+            src={IMG.heroStage}
+            alt="Preview do editor Viral Carrossel com export para Instagram"
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
+            }}
+            rounded="var(--radius-xl)"
+          />
+          {!isMobile && (
+            <>
+              <HeroSlideCard
+                imageSrc={IMG.heroSlides[0]}
+                label="Slide 01"
+                style={{ top: '6%', left: '-4%', '--rot': '-8deg', zIndex: 3 }}
+              />
+              <HeroSlideCard
+                imageSrc={IMG.heroSlides[1]}
+                label="Slide 05"
+                style={{ top: '18%', right: '-2%', '--rot': '6deg', zIndex: 4 }}
+              />
+              <HeroSlideCard
+                imageSrc={IMG.heroSlides[2]}
+                label="Slide 09"
+                style={{ bottom: '4%', left: '12%', '--rot': '-3deg', zIndex: 2 }}
+              />
+            </>
+          )}
+        </div>
+      </RevealSection>
 
       {/* ── PROBLEMA EDITORIAL ── */}
       <RevealSection
@@ -730,6 +883,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             </p>
           </div>
           <LandingImage
+            ref={problemImageRef}
             src={IMG.problem}
             alt="Interface de dados e criação com IA"
           />
@@ -770,7 +924,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           color: 'var(--text-muted)',
           fontWeight: 600,
         }}>Posicionamento</p>
-        <h2 style={{
+        <h2 ref={notEditorTitleRef} style={{
           margin: '0 0 12px',
           fontSize: isMobile ? 28 : 40,
           fontWeight: 600,
@@ -899,6 +1053,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </p>
 
         <LandingImage
+          ref={modosImageRef}
           src={IMG.modosPlatform}
           alt="Plataforma Viral Carrossel — editor com geração de narrativa, slides e imagens por IA"
           rounded="var(--radius-xl)"
@@ -1039,7 +1194,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           Três etapas. Você não precisa ser copywriter nem designer —
           só saber o que quer dizer.
         </p>
-        <div style={{
+        <div ref={stepsGridRef} style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: 16,
@@ -1201,19 +1356,61 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }}>
           Do café ao post publicado
         </h2>
+        {/* As duas fotos têm proporções bem diferentes (showcase é retrato
+            0.8, mobile é paisagem 1.85) — lado a lado num grid comum, isso
+            deixava uma sobrando bem mais alta que a outra e um vão vazio do
+            lado da menor. Fix: cada uma vira um painel de altura fixa e igual
+            (object-fit:cover), então as duas preenchem a mesma caixa
+            independente da proporção original da imagem. */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : '1.05fr 0.95fr',
           gap: 16,
+          alignItems: 'stretch',
         }}>
-          <LandingImage
-            src={IMG.showcase}
-            alt="Criadora de conteúdo usando o Viral Carrossel"
-          />
-          <LandingImage
-            src={IMG.mobile}
-            alt="Editor de carrossel no celular"
-          />
+          <div style={{
+            position: 'relative',
+            height: isMobile ? 320 : 440,
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            border: '1px solid var(--hairline)',
+          }}>
+            <LandingImage
+              src={IMG.showcaseWindowPhone}
+              alt="Criadora revisando o carrossel publicado no Instagram"
+              rounded={0}
+              style={{
+                border: 'none',
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 20%',
+              }}
+            />
+          </div>
+          <div style={{
+            position: 'relative',
+            height: isMobile ? 320 : 440,
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            border: '1px solid var(--hairline)',
+          }}>
+            <LandingImage
+              src={IMG.showcasePhoneNike}
+              alt="Exemplo de carrossel publicado no feed do Instagram"
+              rounded={0}
+              style={{
+                border: 'none',
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          </div>
         </div>
       </RevealSection>
 
@@ -1287,7 +1484,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           padding: isMobile ? '48px 16px 64px' : '80px 24px 96px',
         }}
       >
-        <div style={{
+        <div ref={ctaSectionRef} style={{
           position: 'relative',
           maxWidth: 720,
           margin: '0 auto',
@@ -1298,6 +1495,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           boxShadow: 'var(--shadow-pink)',
         }}>
           <img
+            ref={ctaImageRef}
             src={IMG.cta}
             alt=""
             aria-hidden
