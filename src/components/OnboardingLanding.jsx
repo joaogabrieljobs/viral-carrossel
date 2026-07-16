@@ -15,7 +15,7 @@ const IMG = {
     '/landing/hero-slide-3.png',
   ],
   problem: '/landing/section-problem.png',
-  steps: ['/landing/step-01.png', '/landing/creator-filming.png', '/landing/step-03.png'],
+  steps: ['/landing/step-01-imersao.webp', '/landing/step-02-refine.webp', '/landing/step-03-publicar.webp'],
   cta: '/landing/analytics-screen.png',
   mobile: '/landing/phone-feed.png',
   showcase: '/landing/showcase-creator.png',
