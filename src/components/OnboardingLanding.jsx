@@ -140,14 +140,14 @@ const FAQ = [
 ];
 
 /** Cartão flutuante do hero — preview real de slide */
-function HeroSlideCard({ style, imageSrc, label }) {
+function HeroSlideCard({ style, imageSrc, label, aspect = '4 / 5' }) {
   return (
     <div
       className="vc-landing-slide-card"
       style={{
         position: 'absolute',
         width: 'clamp(120px, 22vw, 168px)',
-        aspectRatio: '4 / 5',
+        aspectRatio: aspect,
         borderRadius: 16,
         border: '1px solid var(--glass-border-strong)',
         boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
@@ -790,7 +790,8 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               <HeroSlideCard
                 imageSrc={IMG.heroSlides[1]}
                 label="Slide 05"
-                style={{ top: '18%', right: '-2%', '--rot': '6deg', zIndex: 4 }}
+                aspect="480 / 834"
+                style={{ top: '8%', right: '-2%', '--rot': '6deg', zIndex: 4, width: 'clamp(140px, 24vw, 190px)' }}
               />
               <HeroSlideCard
                 imageSrc={IMG.heroSlides[2]}
