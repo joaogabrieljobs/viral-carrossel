@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles, Flame, ArrowRight, ChevronDown,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
-  BookOpen, Layers, Image, FileText,
+  BookOpen, Layers, Image, FileText, Check, X,
 } from 'lucide-react';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
@@ -91,6 +91,67 @@ const PAIN_POINTS = [
   'Horas ajustando fonte e cor em vez de publicar.',
 ];
 
+const OUTCOMES = [
+  {
+    title: 'Carrossel completo',
+    body: 'Narrativa + slides + legenda num fluxo — não um rascunho pra “terminar depois”.',
+  },
+  {
+    title: 'Ganchos pra testar',
+    body: 'Variações de tese no mesmo tema, pra escolher a capa que para o scroll.',
+  },
+  {
+    title: 'Marca já aplicada',
+    body: 'Paleta, tipografia e handle no visual — sem redesenhar no Canva.',
+  },
+  {
+    title: 'Arquivo publicável',
+    body: 'PNG ou PDF nas medidas do Instagram. Export e publica.',
+  },
+];
+
+const CONTRAST_WITHOUT = [
+  'Texto genérico: “não é X, é Y”, “revolução silenciosa”…',
+  'Zero arco — cada slide parece um post isolado.',
+  'Emojis decorativos, quase nenhum dado concreto.',
+  'Você ainda precisa montar layout, exportar e escrever legenda.',
+];
+
+const CONTRAST_WITH = [
+  'Gancho com tese clara e ritmo até o CTA.',
+  'Estrutura de argumento: cada card tem função no swipe.',
+  'Identidade visual da marca já no frame.',
+  'Legenda + export prontos — você só refina o que importa.',
+];
+
+const SWIPE_RULES = [
+  {
+    n: '01',
+    title: 'Slide 1 abre curiosidade',
+    body: 'Promete uma resposta sem entregar tudo. Sem lacuna, o feed passa reto.',
+  },
+  {
+    n: '02',
+    title: 'Slide 2 não começa frio',
+    body: 'O Instagram pode mostrar o post a partir do segundo card — ele também precisa prender.',
+  },
+  {
+    n: '03',
+    title: 'Cada card tem função',
+    body: 'Lista, provocação, prova ou fecho. Sem “encher linguiça” no meio do arco.',
+  },
+  {
+    n: '04',
+    title: 'Número > adjetivo',
+    body: 'Dado concreto segura mais atenção do que “resultado incrível” ou “mudança silenciosa”.',
+  },
+  {
+    n: '05',
+    title: 'CTA que pede ação real',
+    body: 'Convite específico (salvar, marcar, comentar) — não “curta e siga” genérico.',
+  },
+];
+
 const GENERATION_LAYERS = [
   {
     n: '01',
@@ -126,16 +187,28 @@ const GENERATION_LAYERS = [
 
 const FAQ = [
   {
-    q: 'Preciso pagar ou criar conta?',
-    a: 'Não. O Viral. roda no seu navegador, sem cadastro. Seus projetos ficam salvos localmente neste dispositivo.',
+    q: 'O Viral. é gratuito?',
+    a: 'Não. É um studio pago: você assina um plano e usa o fluxo completo — gerar, refinar e exportar. Os valores e o checkout entram no lançamento; não há versão “free forever”.',
   },
   {
-    q: 'Preciso de chave de API?',
-    a: 'Para gerar texto e imagens com IA, sim — Anthropic e/ou OpenAI. Você configura uma vez no ícone de engrenagem. Em dev local, o servidor pode ler .env.local.',
+    q: 'Preciso criar conta?',
+    a: 'Sim, para acessar o studio com o seu plano, salvar projetos e manter a identidade da marca. O cadastro faz parte do checkout.',
+  },
+  {
+    q: 'ChatGPT ou Claude sozinhos não bastam?',
+    a: 'Eles geram texto. O Viral. gera o post: arco narrativo, estrutura de slides, visual com a sua marca, legenda e export nas medidas do Instagram — num só lugar.',
+  },
+  {
+    q: 'Ainda preciso do Canva?',
+    a: 'Não no fluxo principal. Você gera, ajusta e baixa PNG ou PDF direto do studio. Canva só se quiser um retoque pontual fora do produto.',
+  },
+  {
+    q: 'Preciso da minha chave de API?',
+    a: 'Depende do plano. Em alguns planos a geração vem incluída; em outros você pode usar a sua chave Anthropic ou OpenAI nas definições. Isso fica claro no checkout.',
   },
   {
     q: 'Funciona no celular?',
-    a: 'Sim. Editor, preview, geração e export foram pensados mobile-first — drawer inferior, navegação por slides e barra de progresso durante a geração.',
+    a: 'Sim. Editor, preview, geração e export foram feitos mobile-first — navegação por slides e fluxo pensado pra publicar do telefone.',
   },
 ];
 
@@ -501,7 +574,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             fontFamily: 'var(--font-ui)',
           }}
         >
-          Entrar no studio
+          Começar agora
         </button>
       </div>
 
@@ -613,7 +686,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               fontFamily: 'var(--font-ui)',
             }}
           >
-            Entrar no app
+            Começar agora
           </button>
         </nav>
 
@@ -672,8 +745,8 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             color: 'var(--text-secondary)',
             maxWidth: '46ch',
           }}>
-            Você traz o tema. A IA escreve a narrativa, monta os slides, sugere imagens
-            e entrega a legenda — com a identidade visual da sua marca já aplicada.
+            Você traz o tema. O Viral. entrega narrativa, slides, legenda e arquivo
+            publicável — com a identidade da sua marca. Sem Canva genérico. Sem prompt solto.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
             <button
@@ -698,7 +771,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               }}
             >
               <Sparkles size={18} />
-              Entrar no studio
+              Criar meu primeiro carrossel
               <ArrowRight size={16} />
             </button>
           </div>
@@ -1017,6 +1090,254 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
+      {/* ── OUTCOMES ── */}
+      <RevealSection
+        variant="rise"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '20px 16px 24px' : '28px clamp(24px, 5vw, 48px) 32px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Resultado</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+        }}>
+          O que sai pronto — não rascunho.
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '50ch',
+        }}>
+          Chat gera parágrafo. Viral. gera post publicável. Quatro entregas no mesmo fluxo.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+          gap: 12,
+        }}>
+          {OUTCOMES.map(({ title, body }) => (
+            <div
+              key={title}
+              style={{
+                padding: '20px 18px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-secondary)',
+              }}
+            >
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: 'var(--accent-surface)',
+                color: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 14,
+              }}>
+                <Check size={16} strokeWidth={2.5} />
+              </div>
+              <h3 style={{
+                margin: '0 0 8px',
+                fontSize: 16,
+                fontWeight: 600,
+                letterSpacing: '-0.016em',
+              }}>{title}</h3>
+              <p style={{
+                margin: 0,
+                fontSize: 14,
+                lineHeight: 1.45,
+                color: 'var(--text-secondary)',
+              }}>{body}</p>
+            </div>
+          ))}
+        </div>
+      </RevealSection>
+
+      {/* ── CONTRASTE ── */}
+      <RevealSection
+        variant="rise"
+        id="contraste"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '8px 16px 28px' : '12px clamp(24px, 5vw, 48px) 36px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Mesmo tema. Processo diferente.</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+          maxWidth: '18ch',
+        }}>
+          Prompt solto vs studio editorial.
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Não é “uma IA melhor”. É o mesmo tipo de modelo, com um fluxo que força
+          arco, marca e export — em vez de texto genérico pra você montar depois.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: 16,
+        }}>
+          <div style={{
+            padding: isMobile ? 22 : 28,
+            borderRadius: 'var(--radius-xl)',
+            border: '1px solid var(--hairline)',
+            background: 'var(--bg-secondary)',
+          }}>
+            <p style={{
+              margin: '0 0 16px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+            }}>Sem Viral.</p>
+            <h3 style={{
+              margin: '0 0 20px',
+              fontSize: 20,
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
+            }}>ChatGPT / Claude direto</h3>
+            <ul style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}>
+              {CONTRAST_WITHOUT.map((line) => (
+                <li key={line} style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  fontSize: 15,
+                  lineHeight: 1.45,
+                  color: 'var(--text-secondary)',
+                }}>
+                  <X size={16} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: 3 }} aria-hidden />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div style={{
+            padding: isMobile ? 22 : 28,
+            borderRadius: 'var(--radius-xl)',
+            border: '1px solid rgba(255, 45, 141, 0.35)',
+            background: 'linear-gradient(160deg, rgba(255,45,141,0.1) 0%, rgba(14,12,20,0.4) 100%)',
+          }}>
+            <p style={{
+              margin: '0 0 16px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--accent)',
+              fontWeight: 600,
+            }}>Com Viral.</p>
+            <h3 style={{
+              margin: '0 0 20px',
+              fontSize: 20,
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
+            }}>Studio de carrossel</h3>
+            <ul style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}>
+              {CONTRAST_WITH.map((line) => (
+                <li key={line} style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  fontSize: 15,
+                  lineHeight: 1.45,
+                  color: 'var(--text-primary)',
+                }}>
+                  <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 3 }} aria-hidden />
+                  {line}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="vc-landing-cta"
+              onClick={onEnter}
+              style={{
+                marginTop: 24,
+                height: 46,
+                padding: '0 22px',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontFamily: 'var(--font-ui)',
+                boxShadow: 'var(--shadow-pink)',
+              }}
+            >
+              <Sparkles size={16} />
+              Gerar meu primeiro carrossel
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </RevealSection>
+
       {/* ── MODOS ── */}
       <RevealSection
         variant="rise"
@@ -1243,6 +1564,88 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
                   color: 'var(--text-secondary)',
                 }}>{body}</p>
               </div>
+            </div>
+          ))}
+        </div>
+      </RevealSection>
+
+      {/* ── ANATOMIA DO SWIPE ── */}
+      <RevealSection
+        variant="rise"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '24px 16px 28px' : '36px clamp(24px, 5vw, 48px) 40px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Editorial</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+          maxWidth: '18ch',
+        }}>
+          O que faz o swipe continuar.
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '50ch',
+        }}>
+          Regras embutidas no fluxo — o tipo de coisa que some quando você pede
+          “faz um carrossel” num chat solto.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, 1fr)',
+          gap: 12,
+        }}>
+          {SWIPE_RULES.map(({ n, title, body }) => (
+            <div
+              key={n}
+              style={{
+                padding: '18px 16px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-glass)',
+              }}
+            >
+              <div style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--accent)',
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+                marginBottom: 12,
+              }}>{n}</div>
+              <h3 style={{
+                margin: '0 0 8px',
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: '-0.016em',
+                lineHeight: 1.3,
+              }}>{title}</h3>
+              <p style={{
+                margin: 0,
+                fontSize: 13,
+                lineHeight: 1.45,
+                color: 'var(--text-secondary)',
+              }}>{body}</p>
             </div>
           ))}
         </div>
@@ -1585,7 +1988,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            Grátis · Sem cadastro · Dados locais no navegador
+            Acesso ao studio · Produto pago · Export pronto pro feed
           </p>
           </div>
         </div>
@@ -1657,7 +2060,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               fontFamily: 'var(--font-ui)',
             }}
           >
-            Entrar no studio
+            Começar agora
           </button>
           <p style={{
             margin: 0,
