@@ -188,23 +188,27 @@ const GENERATION_LAYERS = [
 const FAQ = [
   {
     q: 'O Viral. é gratuito?',
-    a: 'Não. É um studio pago: você assina um plano e usa o fluxo completo — gerar, refinar e exportar. Os valores e o checkout entram no lançamento; não há versão “free forever”.',
+    a: 'Não. Você assina o acesso ao studio — o fluxo editorial, a marca, os modos e o export. Não cobramos por carrossel gerado: a geração usa a sua chave de IA.',
+  },
+  {
+    q: 'Como funciona a geração com IA?',
+    a: 'O Viral. é a interface. Você configura Anthropic e/ou OpenAI uma vez nas definições. Cada geração consome créditos na sua conta da LLM — você controla quanto gasta e quanto publica.',
+  },
+  {
+    q: 'Tem limite de carrosséis por mês?',
+    a: 'Não. Sem teto artificial no studio. O limite prático é o orçamento da sua chave de API e o quanto você quer produzir.',
   },
   {
     q: 'Preciso criar conta?',
-    a: 'Sim, para acessar o studio com o seu plano, salvar projetos e manter a identidade da marca. O cadastro faz parte do checkout.',
+    a: 'Sim, para acessar o plano, salvar projetos e manter a identidade da marca. O cadastro faz parte do checkout no lançamento.',
   },
   {
     q: 'ChatGPT ou Claude sozinhos não bastam?',
-    a: 'Eles geram texto. O Viral. gera o post: arco narrativo, estrutura de slides, visual com a sua marca, legenda e export nas medidas do Instagram — num só lugar.',
+    a: 'Eles geram texto. O Viral. organiza o post: arco narrativo, estrutura de slides, visual com a sua marca, legenda e export nas medidas do Instagram — num só lugar.',
   },
   {
     q: 'Ainda preciso do Canva?',
     a: 'Não no fluxo principal. Você gera, ajusta e baixa PNG ou PDF direto do studio. Canva só se quiser um retoque pontual fora do produto.',
-  },
-  {
-    q: 'Preciso da minha chave de API?',
-    a: 'Depende do plano. Em alguns planos a geração vem incluída; em outros você pode usar a sua chave Anthropic ou OpenAI nas definições. Isso fica claro no checkout.',
   },
   {
     q: 'Funciona no celular?',
@@ -745,8 +749,9 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             color: 'var(--text-secondary)',
             maxWidth: '46ch',
           }}>
-            Você traz o tema. O Viral. entrega narrativa, slides, legenda e arquivo
-            publicável — com a identidade da sua marca. Sem Canva genérico. Sem prompt solto.
+            Você traz o tema e a sua chave de IA. O Viral. entrega narrativa, slides,
+            legenda e arquivo publicável — com a identidade da marca. Sem Canva genérico.
+            Sem limite artificial de posts.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
             <button
@@ -1127,7 +1132,8 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           color: 'var(--text-secondary)',
           maxWidth: '50ch',
         }}>
-          Chat gera parágrafo. Viral. gera post publicável. Quatro entregas no mesmo fluxo.
+          Chat gera parágrafo. Viral. gera post publicável — na sua chave de IA,
+          sem teto artificial de carrosséis no studio.
         </p>
         <div style={{
           display: 'grid',
@@ -1380,6 +1386,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         }}>
           Você não precisa ser designer nem copywriter. No modo Criador, um tema vira
           post completo — narrativa, slides, legenda e arquivo pronto pro feed.
+          A geração roda na sua chave de IA; o Viral. é o studio onde isso vira post.
         </p>
 
         <LandingImage
@@ -1845,7 +1852,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Antes de entrar</p>
+        }}>Dúvidas</p>
         <h2 style={{
           margin: '0 0 32px',
           fontSize: isMobile ? 24 : 30,
@@ -1854,7 +1861,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
           fontFamily: 'var(--font-display)',
           lineHeight: 1.15,
         }}>
-          Perguntas que todo mundo faz
+          Antes de assinar
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {FAQ.map(({ q, a }) => (
@@ -1988,7 +1995,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            Acesso ao studio · Produto pago · Export pronto pro feed
+            Acesso ao studio · Sua chave de IA · Sem limite de carrosséis
           </p>
           </div>
         </div>
