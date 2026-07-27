@@ -22,6 +22,12 @@ import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import OnboardingLanding from './src/components/OnboardingLanding.jsx';
+import Paywall from './src/components/Paywall.jsx';
+import {
+  fetchAccessSession,
+  confirmCheckoutSession,
+  openBillingPortal,
+} from './src/lib/billing.js';
 import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset } from './src/styles/visual-presets.jsx';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
@@ -13819,28 +13825,105 @@ export default function App() {
   const [hookVarsOpen, setHookVarsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const q = new URLSearchParams(window.location.search);
-    if (q.get('app') === '1' || q.get('studio') === '1') {
-      dismissOnboardingLanding();
-      setLandingOpen(false);
-      return undefined;
-    }
-    if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') {
-      setLandingOpen(true);
-    }
-    return undefined;
-  }, []);
-  const completeLanding = useCallback(() => {
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
+  const accessActive = !!access.active;
+
+  const enterStudio = useCallback(() => {
     dismissOnboardingLanding();
     setLandingOpen(false);
+    setPaywallOpen(false);
     setShellView('home');
     trackEvent('landing_complete');
   }, []);
+
+  const refreshAccess = useCallback(async () => {
+    const session = await fetchAccessSession();
+    setAccess({
+      status: session.billingDisabled ? 'disabled' : (session.active ? 'active' : 'inactive'),
+      active: !!session.active,
+      email: session.email || null,
+      billingDisabled: !!session.billingDisabled,
+      currentPeriodEnd: session.currentPeriodEnd || null,
+    });
+    return session;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const q = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : null;
+      const sessionId = q?.get('session_id');
+      const billing = q?.get('billing');
+
+      if (billing === 'success' && sessionId) {
+        try {
+          await confirmCheckoutSession(sessionId);
+          trackEvent('billing_success');
+        } catch (e) {
+          console.warn('[billing] confirm failed', e);
+        }
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('billing');
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, '', url.pathname + url.search);
+        } catch { /* */ }
+      }
+
+      const session = await refreshAccess();
+      if (cancelled) return;
+
+      if (q?.get('app') === '1' || q?.get('studio') === '1') {
+        dismissOnboardingLanding();
+        setLandingOpen(false);
+        if (!session.active) setPaywallOpen(true);
+        return;
+      }
+      if (q?.get('landing') === '1' || q?.get('intro') === '1' || q?.get('welcome') === '1') {
+        setLandingOpen(true);
+      }
+      if (billing === 'success' && session.active) {
+        enterStudio();
+      }
+      if (billing === 'restored' && session.active) {
+        enterStudio();
+      }
+      if (billing === 'cancel') {
+        setPaywallOpen(true);
+        setLandingOpen(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshAccess, enterStudio]);
+
+  const completeLanding = useCallback(async () => {
+    const session = await refreshAccess();
+    if (session.active) {
+      enterStudio();
+      return;
+    }
+    setLandingOpen(false);
+    setPaywallOpen(true);
+    trackEvent('paywall_open');
+  }, [refreshAccess, enterStudio]);
+
   const reopenLanding = useCallback(() => {
     try { sessionStorage.removeItem(SK.landingDismissed); } catch { /* */ }
+    setPaywallOpen(false);
     setLandingOpen(true);
+  }, []);
+
+  const openPortal = useCallback(async () => {
+    try {
+      const { url } = await openBillingPortal();
+      if (url) window.location.href = url;
+    } catch (e) {
+      console.warn('[billing] portal', e);
+      alert(e?.message || 'Não foi possível abrir o portal de assinatura.');
+    }
   }, []);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -15645,6 +15728,47 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     );
   }
 
+  if (access.status === 'loading') {
+    return (
+      <div style={{
+        width: '100%', height: '100vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-primary, #0e0c14)', color: 'var(--text-muted, #8a8696)',
+        fontFamily: 'var(--font-ui)', fontSize: 14,
+      }}>
+        <style>{GLOBAL_STYLE}</style>
+        A verificar assinatura…
+      </div>
+    );
+  }
+
+  if (paywallOpen || !accessActive) {
+    return (
+      <div
+        className="vc-landing-shell"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          background: 'var(--bg-primary, #0e0c14)',
+        }}
+      >
+        <style>{GLOBAL_STYLE}</style>
+        <Paywall
+          isMobile={isMobile}
+          onBack={reopenLanding}
+          onAlreadyActive={async () => {
+            await refreshAccess();
+            enterStudio();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{
       width:'100%', height:'100vh', background:'var(--bg-base)', color:'var(--text-primary)',
@@ -15669,6 +15793,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenSettings={() => setKeysOpen(true)}
           onContinueEditor={() => setShellView('project')}
           onImportPick={() => importDocRef.current?.click()}
+          onManageBilling={access.billingDisabled ? undefined : openPortal}
+          accessEmail={access.email}
           openDoc={openDoc}
           newDoc={newDoc}
           renameDoc={renameDoc}
@@ -16902,6 +17028,8 @@ function AccountHomeShell({
   setDocStatus,
   exportDoc,
   askPrompt,
+  onManageBilling,
+  accessEmail,
 }) {
   const totalCards = useMemo(
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
@@ -16962,10 +17090,25 @@ function AccountHomeShell({
                     Viral<span style={{ color: 'var(--accent)' }}>.</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-                    Dados só neste aparelho
+                    {accessEmail ? accessEmail : 'Assinatura ativa · dados neste aparelho'}
                   </div>
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {onManageBilling && (
+                  <button type="button" onClick={() => onManageBilling()} aria-label="Gerir assinatura" title="Gerir assinatura" style={{
+                    height: 40, padding: '0 12px', borderRadius: 8, flexShrink: 0,
+                    border: '1px solid var(--divider-soft)',
+                    background: 'var(--bg-pearl)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-ui)',
+                  }}>
+                    Plano
+                  </button>
+                )}
               <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
                 width: 40, height: 40, borderRadius: 8, flexShrink: 0,
                 border: `1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
@@ -16978,6 +17121,7 @@ function AccountHomeShell({
               }}>
                 <Settings size={13} />
               </button>
+              </div>
             </div>
             <button type="button" data-vc-tour="generate" onClick={() => onGenerate()} style={{
               width: '100%',
@@ -17020,11 +17164,21 @@ function AccountHomeShell({
               Viral<span style={{ color: 'var(--accent)' }}>.</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-              Início · dados apenas neste navegador
+              {accessEmail ? accessEmail : 'Início · assinatura ativa'}
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {onManageBilling && (
+            <button type="button" onClick={() => onManageBilling()} aria-label="Gerir assinatura" style={{
+              height: 36, padding: '0 12px', borderRadius: 8,
+              border: '1px solid var(--divider-soft)',
+              background: 'var(--bg-pearl)', color: 'var(--text-secondary)',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+            }}>
+              Plano
+            </button>
+          )}
           <button type="button" onClick={() => onOpenTemplates()} aria-label="Templates prontos" style={{
               width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
               background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',

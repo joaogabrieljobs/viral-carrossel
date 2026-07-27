@@ -188,7 +188,7 @@ const GENERATION_LAYERS = [
 const FAQ = [
   {
     q: 'O Viral. é gratuito?',
-    a: 'Não. Você assina o acesso ao studio — o fluxo editorial, a marca, os modos e o export. Não cobramos por carrossel gerado: a geração usa a sua chave de IA.',
+    a: 'Não. A assinatura individual custa R$ 97/mês e libera o studio completo. A geração de conteúdo usa a sua chave Anthropic/OpenAI — não cobramos por carrossel.',
   },
   {
     q: 'Como funciona a geração com IA?',
@@ -199,8 +199,12 @@ const FAQ = [
     a: 'Não. Sem teto artificial no studio. O limite prático é o orçamento da sua chave de API e o quanto você quer produzir.',
   },
   {
+    q: 'Como assino e como cancelo?',
+    a: 'No checkout Stripe (cartão). Depois, o botão Plano na home abre o portal do cliente para atualizar pagamento ou cancelar.',
+  },
+  {
     q: 'Preciso criar conta?',
-    a: 'Sim, para acessar o plano, salvar projetos e manter a identidade da marca. O cadastro faz parte do checkout no lançamento.',
+    a: 'O e-mail da assinatura Stripe identifica o acesso. Projetos e chaves ficam neste navegador; a assinatura vale no cookie seguro ligado ao seu customer Stripe.',
   },
   {
     q: 'ChatGPT ou Claude sozinhos não bastam?',
@@ -1995,7 +1999,7 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            Acesso ao studio · Sua chave de IA · Sem limite de carrosséis
+            Acesso ao studio · R$ 97/mês · Sua chave de IA · Sem limite de carrosséis
           </p>
           </div>
         </div>
