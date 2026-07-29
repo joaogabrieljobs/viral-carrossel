@@ -13896,6 +13896,7 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [paywallEmail, setPaywallEmail] = useState('');
   const [loginHint, setLoginHint] = useState('');
+  const [accountTab, setAccountTab] = useState('projects'); // projects | profile | plan
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const accessActive = !!access.active;
 
@@ -13903,8 +13904,14 @@ export default function App() {
     dismissOnboardingLanding();
     setLandingOpen(false);
     setPaywallOpen(false);
+    setAccountTab('projects');
     setShellView('home');
     trackEvent('landing_complete');
+  }, []);
+
+  const goAccount = useCallback((tab = 'projects') => {
+    setAccountTab(tab);
+    setShellView('home');
   }, []);
 
   const refreshAccess = useCallback(async () => {
@@ -14408,115 +14415,169 @@ export default function App() {
     if (!slide.bgImage && photoPositionOpen) setPhotoPositionOpen(false);
   }, [slide.bgImage, imageCropOpen, photoPositionOpen]);
 
+  const editorIconBtn = ({
+    onClick,
+    title,
+    ariaLabel,
+    children,
+    active = false,
+    tour,
+    style: extraStyle = {},
+  }) => (
+    <button
+      type="button"
+      data-vc-tour={tour}
+      onClick={onClick}
+      title={title}
+      aria-label={ariaLabel || title}
+      style={{
+        width: isMobile ? 40 : 34,
+        height: isMobile ? 40 : 34,
+        borderRadius: 9999,
+        border: `1px solid ${active ? 'var(--success-border)' : 'var(--border)'}`,
+        background: active ? 'var(--success-surface)' : 'var(--bg-card)',
+        color: active ? 'var(--success-text)' : 'var(--text-muted)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.12s',
+        position: 'relative',
+        flexShrink: 0,
+        ...extraStyle,
+      }}
+    >
+      {children}
+    </button>
+  );
+
+  const editorAccountNav = !isMobile && (
+    <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button
+        type="button"
+        onClick={() => goAccount('profile')}
+        style={{
+          height: 34, padding: '0 12px', borderRadius: 9999,
+          border: '1px solid var(--border)', background: 'var(--bg-card)',
+          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        <User size={13} color="var(--text-muted)" /> Perfil
+      </button>
+      <button
+        type="button"
+        onClick={() => goAccount('plan')}
+        style={{
+          height: 34, padding: '0 12px', borderRadius: 9999,
+          border: '1px solid var(--border)', background: 'var(--bg-card)',
+          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        <CreditCard size={13} color="var(--text-muted)" /> Assinatura
+      </button>
+      <button
+        type="button"
+        onClick={() => goAccount('projects')}
+        style={{
+          height: 34, padding: '0 12px', borderRadius: 9999,
+          border: '1px solid var(--border)', background: 'var(--bg-card)',
+          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        <Home size={13} color="var(--text-muted)" /> Projetos
+      </button>
+    </nav>
+  );
+
+  const editorGenerateBtn = (
+    <button
+      type="button"
+      data-vc-tour="generate"
+      onClick={() => setSetupOpen(true)}
+      aria-label="Gerar carrossel com IA"
+      style={{
+        height: isMobile ? 40 : 40,
+        padding: isMobile ? '0 14px' : '0 20px',
+        borderRadius: 9999,
+        border: 'none',
+        cursor: 'pointer',
+        background: 'var(--accent)',
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: 600,
+        fontFamily: 'var(--font-ui)',
+        letterSpacing: '-0.016em',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        flexShrink: 0,
+      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      <Sparkles size={14} />
+      {isMobile ? 'Gerar' : 'Gerar com IA'}
+    </button>
+  );
+
   const editorHeaderActions = (
-        <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 4 : 6, flexShrink:0 }}>
-          {/* Mode Switcher chip — FASE 2 Narrative OS. Progressive disclosure
-              global. Criador esconde complexidade, Studio expõe tudo. */}
-          <ModeSwitcher value={appMode} onChange={setAppMode} compact={isMobile}/>
-          {!isMobile && (
-            <button onClick={()=>setTemplatesOpen(true)} style={{
-              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Templates prontos" aria-label="Abrir templates">
-              <Layout size={13}/>
-            </button>
-          )}
-          <button type="button" data-vc-tour="library" onClick={()=>setLibraryOpen(true)} style={{
-            width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
-            borderRadius:8, border:'1px solid var(--border)',
-            background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            position:'relative',
-          }}
-          onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-          onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-          title={`Biblioteca · ${library.length} carrosséis`} aria-label="Abrir biblioteca">
-            <BookOpen size={13}/>
+    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flexShrink: 0 }}>
+      <ModeSwitcher value={appMode} onChange={setAppMode} compact={isMobile} />
+      {!isMobile && editorIconBtn({
+        onClick: () => setTemplatesOpen(true),
+        title: 'Templates prontos',
+        children: <Layout size={13} />,
+      })}
+      {editorIconBtn({
+        onClick: () => setLibraryOpen(true),
+        title: `Biblioteca · ${library.length} carrosséis`,
+        ariaLabel: 'Abrir biblioteca',
+        tour: 'library',
+        children: (
+          <>
+            <BookOpen size={13} />
             {library.length > 1 && (
               <span style={{
-                position:'absolute', top:-4, right:-4,
-                fontSize:8, fontWeight:700, fontFamily:'var(--font-mono)',
-                background:'var(--accent)', color:'#fff',
-                padding:'1px 5px', borderRadius:99, lineHeight:1.2,
-                minWidth:14, textAlign:'center', pointerEvents:'none',
+                position: 'absolute', top: -4, right: -4,
+                fontSize: 8, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                background: 'var(--accent)', color: '#fff',
+                padding: '1px 5px', borderRadius: 99, lineHeight: 1.2,
+                minWidth: 14, textAlign: 'center', pointerEvents: 'none',
               }}>{library.length}</span>
             )}
-          </button>
-          {!empty && (
-            <button onClick={()=>setFullscreenOpen(true)} style={{
-              width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
-              borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Tela cheia (F)" aria-label="Apresentar em tela cheia">
-              <Maximize2 size={13}/>
-            </button>
-          )}
-          {!isMobile && (
-            <button onClick={()=>setHelpOpen(true)} style={{
-              width:34, height:34, borderRadius:8, border:'1px solid var(--border)',
-              background:'var(--bg-card)', color:'var(--text-muted)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-            }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border)';}}
-            title="Atalhos de teclado (?)" aria-label="Ajuda e atalhos">
-              <span style={{ fontSize:14, fontWeight:600 }}>?</span>
-            </button>
-          )}
-          <button type="button" data-vc-tour="settings" onClick={()=>setKeysOpen(true)} style={{
-            width: isMobile ? 40 : 34, height: isMobile ? 40 : 34,
-            borderRadius:8, border:`1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
-            background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
-            color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.12s',
-          }}
-                  onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
-          onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'var(--success-text)':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'var(--success-border)':'var(--divider-soft)';}}
-          title={
-            hasAnyAI
-              ? `IA pronta · texto ${aiSettings.textProvider} · imagem ${aiSettings.imageProvider}`
-              : 'Configurar provedores de IA'
-          } aria-label="Configurações">
-            <Settings size={13}/>
-          </button>
-          {!isMobile && (
-            <button onClick={()=>setResearchOpen(true)} style={{
-              width:34, height:34, borderRadius:11, border:'1px solid var(--divider-soft)',
-              background:'var(--bg-pearl)', color:'var(--text-secondary)', cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s var(--ease-smooth)',
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.background='#f0f0f3';}}
-            onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.background='var(--bg-pearl)';}}
-            title="Pesquisar nicho" aria-label="Pesquisar nicho">
-              <TrendingUp size={14}/>
-            </button>
-          )}
-          <button type="button" data-vc-tour="generate" onClick={()=>setSetupOpen(true)} style={{
-            height: isMobile ? 40 : 34, padding: '0 16px',
-            borderRadius:9999, border:'none', cursor:'pointer',
-            background:'var(--accent)',
-            color:'#fff', fontSize:13, fontWeight:400, fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.016em',
-            display:'flex', alignItems:'center', gap:6,
-            transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-          }}
-          onMouseEnter={e=>e.currentTarget.style.background='var(--accent-hover)'}
-          onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
-          onMouseDown={e=>e.currentTarget.style.transform='scale(0.95)'}
-          onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
-          aria-label="Gerar carrossel com IA"
-          >
-            <Sparkles size={isMobile ? 14 : 13}/>{!isMobile && 'Gerar'}
-          </button>
-        </div>
+          </>
+        ),
+      })}
+      {!empty && editorIconBtn({
+        onClick: () => setFullscreenOpen(true),
+        title: 'Tela cheia (F)',
+        children: <Maximize2 size={13} />,
+      })}
+      {!isMobile && editorIconBtn({
+        onClick: () => setHelpOpen(true),
+        title: 'Ajuda e atalhos',
+        children: <span style={{ fontSize: 14, fontWeight: 600 }}>?</span>,
+      })}
+      {editorIconBtn({
+        onClick: () => setKeysOpen(true),
+        title: hasAnyAI
+          ? `IA pronta · texto ${aiSettings.textProvider} · imagem ${aiSettings.imageProvider}`
+          : 'Configurar provedores de IA',
+        ariaLabel: 'Configurar IA',
+        tour: 'settings',
+        active: hasAnyAI,
+        children: <Settings size={13} />,
+      })}
+      {!isMobile && editorIconBtn({
+        onClick: () => setResearchOpen(true),
+        title: 'Pesquisar nicho',
+        children: <TrendingUp size={14} />,
+      })}
+      {isMobile && editorGenerateBtn}
+    </div>
   );
 
   const updateSlide = useCallback(patch => {
@@ -15932,6 +15993,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
+          accountTab={accountTab}
+          setAccountTab={setAccountTab}
           openDoc={openDoc}
           newDoc={newDoc}
           renameDoc={renameDoc}
@@ -15969,12 +16032,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           /* maxHeight grande pra não cortar quando aberto; collapse pra 0 quando drawer abre */
           maxHeight: drawerOpen ? 0 : 240,
         } : {
-          display:'flex',
-          alignItems:'center',
-          justifyContent:'space-between',
-          padding:'env(safe-area-inset-top, 0) 14px 0',
-          height: `calc(52px + env(safe-area-inset-top, 0))`,
-          gap:10,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+          alignItems: 'center',
+          padding: 'env(safe-area-inset-top, 0) 14px 0',
+          height: `calc(56px + env(safe-area-inset-top, 0))`,
+          gap: 12,
         }),
       }}>
         {isMobile ? (
@@ -15990,13 +16053,13 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
                 <button
                   type="button"
-                  onClick={() => setShellView('home')}
-                  title="Início — projetos e conta"
-                  aria-label="Início"
+                  onClick={() => goAccount('projects')}
+                  title="Projetos"
+                  aria-label="Projetos"
                   style={{
                     width: 40,
                     height: 40,
-                    borderRadius: 11,
+                    borderRadius: 9999,
                     border: '1px solid var(--border)',
                     background: 'var(--bg-card)',
                     color: 'var(--text-muted)',
@@ -16008,6 +16071,27 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   }}
                 >
                   <Home size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goAccount('profile')}
+                  title="Perfil"
+                  aria-label="Perfil"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 9999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <User size={15} />
                 </button>
                 <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
                   <div style={{
@@ -16033,21 +16117,25 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           </>
         ) : (
           <>
-        {/* Brand */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+        {/* Esquerda — marca + Perfil / Assinatura / Projetos */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
-            width:30, height:30, borderRadius:8, background:'var(--logo-mark-bg)',
-            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+            width: 30, height: 30, borderRadius: 8, background: 'var(--logo-mark-bg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <Flame size={14} color="var(--logo-mark-fg)"/>
+            <Flame size={14} color="var(--logo-mark-fg)" />
           </div>
-          <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:15, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em', lineHeight:1, fontFamily:'var(--font-display)' }}>
-              Viral<span style={{ color:'var(--accent)' }}>.</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: 15, fontWeight: 600, color: 'var(--text-primary)',
+              letterSpacing: '-0.022em', lineHeight: 1, fontFamily: 'var(--font-display)',
+            }}>
+              Viral<span style={{ color: 'var(--accent)' }}>.</span>
             </div>
             {activeEntry && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:3, flexWrap:'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
                 <button
+                  type="button"
                   onClick={async () => {
                     const current = activeEntry.name || 'Carrossel';
                     const next = await askPrompt({
@@ -16060,85 +16148,67 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     if (next && next.trim() && next !== current) renameDoc(activeEntry.id, next.trim());
                   }}
                   style={{
-                    fontSize:11, color:'var(--text-muted)',
-                    letterSpacing:'-0.011em',
-                    background:'none', border:'none', cursor:'pointer', padding:0,
-                    maxWidth:220, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
-                    textAlign:'left',
+                    fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    textAlign: 'left',
                   }}
                   title="Clique para renomear"
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                <SavedIndicator savedAt={lastSavedAt}/>
+                <SavedIndicator savedAt={lastSavedAt} />
               </div>
             )}
           </div>
+          {editorAccountNav}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShellView('home')}
-          title="Início — projetos e conta"
-          aria-label="Início"
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 11,
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <Home size={14} />
-        </button>
+        {/* Centro — Gerar com IA */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          {editorGenerateBtn}
+        </div>
 
-        {/* Undo/Redo */}
-        <div style={{
-            display:'flex', alignItems:'center', background:'var(--bg-card)',
-            borderRadius:8, padding:3, gap:0, border:'1px solid var(--border)', flexShrink:0,
+        {/* Direita — undo, formato, ferramentas */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
+            borderRadius: 9999, padding: 3, gap: 0, border: '1px solid var(--border)', flexShrink: 0,
           }}>
             <button
+              type="button"
               onClick={history.undo}
               disabled={!history.canUndo}
               title="Desfazer (⌘Z)"
               aria-label="Desfazer"
               style={{
-                width:28, height:26, borderRadius:5, border:'none', background:'transparent',
-                color:'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                opacity: history.canUndo ? 1 : 0.35, transition:'all 0.12s',
+                width: 28, height: 26, borderRadius: 9999, border: 'none', background: 'transparent',
+                color: 'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: history.canUndo ? 1 : 0.35,
               }}
-              onMouseEnter={e=>{ if(history.canUndo) e.currentTarget.style.color='var(--text-primary)'; }}
-              onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
             </button>
             <button
+              type="button"
               onClick={history.redo}
               disabled={!history.canRedo}
               title="Refazer (⌘⇧Z)"
               aria-label="Refazer"
               style={{
-                width:28, height:26, borderRadius:5, border:'none', background:'transparent',
-                color:'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                opacity: history.canRedo ? 1 : 0.35, transition:'all 0.12s',
+                width: 28, height: 26, borderRadius: 9999, border: 'none', background: 'transparent',
+                color: 'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: history.canRedo ? 1 : 0.35,
               }}
-              onMouseEnter={e=>{ if(history.canRedo) e.currentTarget.style.color='var(--text-primary)'; }}
-              onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
             </button>
           </div>
-
-        <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
-        {editorHeaderActions}
+          <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
+          {editorHeaderActions}
+        </div>
           </>
         )}
       </header>
@@ -17164,23 +17234,24 @@ function AccountHomeShell({
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
+  accountTab = 'projects',
+  setAccountTab,
 }) {
   const totalCards = useMemo(
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
     [library],
   );
 
-  const [homeTab, setHomeTab] = useState('projects'); // projects | profile | plan
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const navBtn = (id, label, Icon) => {
-    const active = homeTab === id;
+    const active = accountTab === id;
     return (
       <button
         key={id}
         type="button"
-        onClick={() => setHomeTab(id)}
+        onClick={() => setAccountTab?.(id)}
         style={{
           height: isMobile ? 36 : 36,
           padding: '0 12px',
@@ -17305,7 +17376,7 @@ function AccountHomeShell({
         }}>
           <button
             type="button"
-            onClick={() => setHomeTab('projects')}
+            onClick={() => setAccountTab?.('projects')}
             title="Projetos"
             style={{
               display: 'flex',
@@ -17423,12 +17494,12 @@ function AccountHomeShell({
         overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
-          boxSizing: 'border-box', width: '100%', maxWidth: homeTab === 'profile' ? 820 : 720,
+          boxSizing: 'border-box', width: '100%', maxWidth: accountTab === 'profile' ? 820 : 720,
           marginLeft: 'auto', marginRight: 'auto',
           padding: isMobile ? '24px 16px 40px' : '40px 24px 72px',
           display: 'grid', gap: 28,
         }}>
-          {homeTab === 'profile' && (
+          {accountTab === 'profile' && (
             <>
               <header>
                 <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
@@ -17463,7 +17534,7 @@ function AccountHomeShell({
             </>
           )}
 
-          {homeTab === 'plan' && (
+          {accountTab === 'plan' && (
             <>
               <header>
                 <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
@@ -17532,7 +17603,7 @@ function AccountHomeShell({
             </>
           )}
 
-          {homeTab === 'projects' && (
+          {accountTab === 'projects' && (
           <>
           <header>
             <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Início</p>
