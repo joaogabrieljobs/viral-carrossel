@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { startCheckout } from '../lib/billing.js';
+import GoogleSignInButton from './GoogleSignInButton.jsx';
 
 const PRICE_LABEL = 'R$ 97';
 const PRICE_PERIOD = '/mês';
@@ -9,10 +10,24 @@ const PRICE_PERIOD = '/mês';
  * Paywall de assinatura individual (Stripe Checkout).
  * BYOK: a geração usa a chave do utilizador; aqui só se paga o acesso ao studio.
  */
-export default function Paywall({ isMobile, onBack, onAlreadyActive }) {
-  const [email, setEmail] = useState('');
+export default function Paywall({
+  isMobile,
+  onBack,
+  onAlreadyActive,
+  initialEmail = '',
+  loginHint = '',
+}) {
+  const [email, setEmail] = useState(initialEmail || '');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(loginHint || '');
+
+  useEffect(() => {
+    if (initialEmail) setEmail(initialEmail);
+  }, [initialEmail]);
+
+  useEffect(() => {
+    if (loginHint) setError(loginHint);
+  }, [loginHint]);
 
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -137,6 +152,31 @@ export default function Paywall({ isMobile, onBack, onAlreadyActive }) {
             </li>
           ))}
         </ul>
+
+        <div style={{ marginBottom: 18 }}>
+          <p style={{
+            margin: '0 0 10px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--text-muted, #8a8696)',
+          }}>
+            Já assina? Entre com Google
+          </p>
+          <GoogleSignInButton fullWidth label="Entrar com Google" />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginTop: 16,
+            color: 'var(--text-muted, #8a8696)',
+            fontSize: 11,
+            fontFamily: 'var(--font-mono, monospace)',
+          }}>
+            <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+            ou assine com e-mail
+            <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+          </div>
+        </div>
 
         <form onSubmit={submit}>
           <label style={{

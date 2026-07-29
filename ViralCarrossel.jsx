@@ -23,6 +23,7 @@ import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import OnboardingLanding from './src/components/OnboardingLanding.jsx';
 import Paywall from './src/components/Paywall.jsx';
+import LoginModal from './src/components/LoginModal.jsx';
 import {
   fetchAccessSession,
   confirmCheckoutSession,
@@ -13891,6 +13892,9 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [paywallEmail, setPaywallEmail] = useState('');
+  const [loginHint, setLoginHint] = useState('');
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const accessActive = !!access.active;
 
@@ -13938,6 +13942,17 @@ export default function App() {
         } catch { /* */ }
       }
 
+      const loginStatus = q?.get('login');
+      const loginEmail = q?.get('email') || '';
+      if (loginStatus) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('login');
+          url.searchParams.delete('email');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch { /* */ }
+      }
+
       const session = await refreshAccess();
       if (cancelled) return;
 
@@ -13953,12 +13968,32 @@ export default function App() {
       if (billing === 'success' && session.active) {
         enterStudio();
       }
-      if (billing === 'restored' && session.active) {
+      if ((billing === 'restored' || loginStatus === 'google') && session.active) {
+        trackEvent('login_google_ok');
         enterStudio();
       }
       if (billing === 'cancel') {
         setPaywallOpen(true);
         setLandingOpen(false);
+      }
+
+      if (loginStatus === 'no_subscription') {
+        setPaywallEmail(loginEmail);
+        setLoginHint(loginEmail
+          ? `Nenhuma assinatura ativa em ${loginEmail}. Assine abaixo para entrar.`
+          : 'Nenhuma assinatura ativa nesta conta Google. Assine abaixo para entrar.');
+        setLandingOpen(false);
+        setPaywallOpen(true);
+        setLoginOpen(false);
+      } else if (loginStatus === 'denied') {
+        setLoginHint('Login Google cancelado. Tente de novo.');
+        setLoginOpen(true);
+      } else if (loginStatus === 'google_unconfigured') {
+        setLoginHint('Login Google ainda não configurado neste ambiente.');
+        setLoginOpen(true);
+      } else if (loginStatus === 'invalid_state' || loginStatus === 'error') {
+        setLoginHint('Não foi possível entrar com Google. Tente de novo.');
+        setLoginOpen(true);
       }
     })();
     return () => { cancelled = true; };
@@ -15795,7 +15830,22 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         }}
       >
         <style>{GLOBAL_STYLE}</style>
-        <OnboardingLanding onEnter={completeLanding} isMobile={isMobile} />
+        <OnboardingLanding
+          onEnter={completeLanding}
+          onLogin={() => { setLoginHint(''); setLoginOpen(true); }}
+          isMobile={isMobile}
+        />
+        <LoginModal
+          open={loginOpen}
+          onClose={() => setLoginOpen(false)}
+          initialEmail={paywallEmail}
+          hint={loginHint}
+          onAlreadyActive={async () => {
+            await refreshAccess();
+            setLoginOpen(false);
+            enterStudio();
+          }}
+        />
       </div>
     );
   }
@@ -15831,9 +15881,22 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         <style>{GLOBAL_STYLE}</style>
         <Paywall
           isMobile={isMobile}
+          initialEmail={paywallEmail}
+          loginHint={loginHint}
           onBack={reopenLanding}
           onAlreadyActive={async () => {
             await refreshAccess();
+            enterStudio();
+          }}
+        />
+        <LoginModal
+          open={loginOpen}
+          onClose={() => setLoginOpen(false)}
+          initialEmail={paywallEmail}
+          hint={loginHint}
+          onAlreadyActive={async () => {
+            await refreshAccess();
+            setLoginOpen(false);
             enterStudio();
           }}
         />

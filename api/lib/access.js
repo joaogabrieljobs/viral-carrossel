@@ -86,6 +86,17 @@ export function readAccessCookie(req) {
   return verifyAccessToken(cookies[COOKIE_NAME]);
 }
 
+function appendSetCookie(res, value) {
+  const prev = res.getHeader?.('Set-Cookie');
+  if (!prev) {
+    res.setHeader('Set-Cookie', value);
+  } else if (Array.isArray(prev)) {
+    res.setHeader('Set-Cookie', [...prev, value]);
+  } else {
+    res.setHeader('Set-Cookie', [prev, value]);
+  }
+}
+
 export function setAccessCookie(res, token) {
   const secure = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   const parts = [
@@ -96,7 +107,7 @@ export function setAccessCookie(res, token) {
     'SameSite=Lax',
   ];
   if (secure) parts.push('Secure');
-  res.setHeader('Set-Cookie', parts.join('; '));
+  appendSetCookie(res, parts.join('; '));
 }
 
 export function clearAccessCookie(res) {
@@ -109,7 +120,7 @@ export function clearAccessCookie(res) {
     'SameSite=Lax',
   ];
   if (secure) parts.push('Secure');
-  res.setHeader('Set-Cookie', parts.join('; '));
+  appendSetCookie(res, parts.join('; '));
 }
 
 export { COOKIE_NAME, MAX_AGE_SEC };

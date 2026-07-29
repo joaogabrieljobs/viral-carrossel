@@ -468,7 +468,7 @@ function RevealSection({ children, variant = 'rise', style, className = '', eage
   );
 }
 
-export default function OnboardingLanding({ onEnter, isMobile }) {
+export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
   const heroRef = useRef(null);
 
   // Refs pros efeitos GSAP (reveal de texto, parallax de imagem e header
@@ -618,25 +618,47 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
             Viral<span style={{ color: 'var(--accent)' }}>.</span>
           </span>
         </div>
-        <button
-          type="button"
-          className="vc-landing-cta"
-          onClick={onEnter}
-          style={{
-            height: 36,
-            padding: '0 18px',
-            borderRadius: 'var(--radius-pill)',
-            border: '1px solid var(--glass-border-strong)',
-            background: 'var(--bg-glass)',
-            color: 'var(--text-primary)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-          }}
-        >
-          Começar agora
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onLogin && (
+            <button
+              type="button"
+              onClick={onLogin}
+              style={{
+                height: 36,
+                padding: '0 14px',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              Entrar
+            </button>
+          )}
+          <button
+            type="button"
+            className="vc-landing-cta"
+            onClick={onEnter}
+            style={{
+              height: 36,
+              padding: '0 18px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--glass-border-strong)',
+              background: 'var(--bg-glass)',
+              color: 'var(--text-primary)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+            }}
+          >
+            Começar agora
+          </button>
+        </div>
       </div>
 
       {/* Ambient layers */}
@@ -728,27 +750,49 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               Viral<span style={{ color: 'var(--accent)' }}>.</span>
             </span>
           </div>
-          <button
-            type="button"
-            className="vc-landing-cta"
-            onClick={onEnter}
-            style={{
-              height: 40,
-              padding: '0 20px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--glass-border-strong)',
-              background: 'var(--bg-glass)',
-              backdropFilter: 'blur(18px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-              color: 'var(--text-primary)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
-            }}
-          >
-            Começar agora
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onLogin && (
+              <button
+                type="button"
+                onClick={onLogin}
+                style={{
+                  height: 40,
+                  padding: '0 16px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                Entrar
+              </button>
+            )}
+            <button
+              type="button"
+              className="vc-landing-cta"
+              onClick={onEnter}
+              style={{
+                height: 40,
+                padding: '0 20px',
+                borderRadius: 'var(--radius-pill)',
+                border: '1px solid var(--glass-border-strong)',
+                background: 'var(--bg-glass)',
+                backdropFilter: 'blur(18px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              Começar agora
+            </button>
+          </div>
         </nav>
 
         <div style={{
@@ -2266,6 +2310,27 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
               Assinar e entrar no studio
               <ArrowRight size={16} />
             </button>
+            {onLogin && (
+              <button
+                type="button"
+                onClick={onLogin}
+                style={{
+                  marginTop: 12,
+                  width: '100%',
+                  height: 44,
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid var(--glass-border-strong)',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                Já assina? Entrar
+              </button>
+            )}
             <p style={{
               margin: '14px 0 0',
               fontSize: 12,
