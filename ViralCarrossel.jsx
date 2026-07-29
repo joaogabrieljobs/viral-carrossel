@@ -49,7 +49,9 @@ import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
   DEFAULT_AI_SETTINGS,
+  IMAGE_PROVIDERS,
   normalizeAISettings,
+  TEXT_PROVIDERS,
 } from './src/config/ai-providers.js';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
@@ -15851,9 +15853,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           activeDocId={activeDocId}
           activeEntryName={activeEntry?.name}
           brandCount={brandRoster.length}
-          hasOpenAI={hasOpenAI}
-          hasAnthropic={hasAnthropic}
-          hasAnyAI={hasAnyAI}
+          aiSettings={aiSettings}
+          hasTextAI={hasAnyAI}
+          hasImageAI={hasOpenAI}
           isMobile={isMobile}
           onGenerate={() => setSetupOpen(true)}
           onOpenLibrary={() => setLibraryOpen(true)}
@@ -15862,7 +15864,6 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenHelp={() => setHelpOpen(true)}
           onOpenSettings={() => setKeysOpen(true)}
           onContinueEditor={() => setShellView('project')}
-          onImportPick={() => importDocRef.current?.click()}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
           accessEmail={access.email}
           openDoc={openDoc}
@@ -17074,9 +17075,9 @@ function AccountHomeShell({
   activeDocId,
   activeEntryName,
   brandCount,
-  hasOpenAI,
-  hasAnthropic,
-  hasAnyAI,
+  aiSettings = DEFAULT_AI_SETTINGS,
+  hasTextAI,
+  hasImageAI,
   isMobile,
   onGenerate,
   onOpenLibrary,
@@ -17085,7 +17086,6 @@ function AccountHomeShell({
   onOpenHelp,
   onOpenSettings,
   onContinueEditor,
-  onImportPick,
   openDoc,
   newDoc,
   renameDoc,
@@ -17110,6 +17110,33 @@ function AccountHomeShell({
       .filter(e => !search.trim() || (e.name || '').toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   ), [library, search]);
+
+  const textProvider = TEXT_PROVIDERS[aiSettings.textProvider] || TEXT_PROVIDERS.openai;
+  const imageProvider = IMAGE_PROVIDERS[aiSettings.imageProvider] || IMAGE_PROVIDERS.openai;
+  const textModelName = textProvider.models.find((m) => m.id === aiSettings.textModels?.[aiSettings.textProvider])?.name
+    || aiSettings.textModels?.[aiSettings.textProvider]
+    || 'Modelo';
+  const imageModelName = imageProvider.models.find((m) => m.id === aiSettings.imageModels?.[aiSettings.imageProvider])?.name
+    || aiSettings.imageModels?.[aiSettings.imageProvider]
+    || 'Modelo';
+  const aiReady = hasTextAI && hasImageAI;
+  const projectName = activeEntryName || 'Sem título';
+
+  const headerBtn = {
+    height: isMobile ? 40 : 36,
+    padding: '0 12px',
+    borderRadius: 9999,
+    border: '1px solid var(--border)',
+    background: 'var(--bg-card)',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    fontSize: 12,
+    fontWeight: 600,
+    fontFamily: 'var(--font-ui)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+  };
 
   return (
     <div
@@ -17138,355 +17165,381 @@ function AccountHomeShell({
           : `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
         flexShrink: 0,
       }}>
-        {isMobile ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 8, background: 'var(--logo-mark-bg)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <Flame size={16} color="var(--logo-mark-fg)" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
-                    fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
-                  }}>
-                    Viral<span style={{ color: 'var(--accent)' }}>.</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-                    {accessEmail ? accessEmail : 'Assinatura ativa · dados neste aparelho'}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                {onManageBilling && (
-                  <button type="button" onClick={() => onManageBilling()} aria-label="Gerir assinatura" title="Gerir assinatura" style={{
-                    height: 40, padding: '0 12px', borderRadius: 8, flexShrink: 0,
-                    border: '1px solid var(--divider-soft)',
-                    background: 'var(--bg-pearl)',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    fontFamily: 'var(--font-ui)',
-                  }}>
-                    Plano
-                  </button>
-                )}
-              <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
-                width: 40, height: 40, borderRadius: 8, flexShrink: 0,
-                border: `1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
-                background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Settings size={13} />
-              </button>
-              </div>
-            </div>
-            <button type="button" data-vc-tour="generate" onClick={() => onGenerate()} style={{
-              width: '100%',
-              minHeight: 48,
-              padding: '0 20px',
-              borderRadius: 9999,
-              border: 'none',
-              cursor: 'pointer',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: 400,
-              letterSpacing: '-0.016em',
-              fontFamily: 'var(--font-ui)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-            >
-              <Sparkles size={15} /> Gerar com IA
-            </button>
-          </>
-        ) : (
-          <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 8, background: 'var(--logo-mark-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Flame size={16} color="var(--logo-mark-fg)" />
-          </div>
-          <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: isMobile ? '100%' : 'auto', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
             <div style={{
-              fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
-              fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
+              width: 34, height: 34, borderRadius: 10, background: 'var(--logo-mark-bg)',
+              display: 'grid', placeItems: 'center', flexShrink: 0,
+              border: '1px solid var(--border)',
             }}>
-              Viral<span style={{ color: 'var(--accent)' }}>.</span>
+              <Flame size={16} color="var(--logo-mark-fg)" />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-              {accessEmail ? accessEmail : 'Início · assinatura ativa'}
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
+                fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1.2,
+              }}>
+                Viral<span style={{ color: 'var(--accent)' }}>.</span>
+              </div>
+              <div style={{
+                marginTop: 2, fontSize: 11, color: 'var(--text-muted)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {accessEmail || 'Studio · dados neste aparelho'}
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {onManageBilling && (
-            <button type="button" onClick={() => onManageBilling()} aria-label="Gerir assinatura" style={{
-              height: 36, padding: '0 12px', borderRadius: 8,
-              border: '1px solid var(--divider-soft)',
-              background: 'var(--bg-pearl)', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
-            }}>
-              Plano
-            </button>
+          {isMobile && (
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              {onManageBilling && (
+                <button type="button" onClick={() => onManageBilling()} style={headerBtn}>Plano</button>
+              )}
+              <button
+                type="button"
+                onClick={() => onOpenSettings()}
+                aria-label="Configurar IA"
+                style={{
+                  ...headerBtn,
+                  border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
+                  background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                  color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+                }}
+              >
+                <Settings size={13} /> IA
+              </button>
+            </div>
           )}
-          <button type="button" onClick={() => onOpenTemplates()} aria-label="Templates prontos" style={{
-              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
-              background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Layout size={13} />
-            </button>
-          <button type="button" onClick={() => onOpenResearch()} aria-label="Pesquisar nicho" style={{
-              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--divider-soft)',
-              background: 'var(--bg-pearl)', color: 'var(--text-secondary)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <TrendingUp size={14} />
-            </button>
-          <button type="button" onClick={() => onOpenHelp()} aria-label="Ajuda" style={{
-              width: 36, height: 36, borderRadius: 11, border: '1px solid var(--border)',
-              background: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>?</span>
-            </button>
-          <button type="button" onClick={() => onOpenSettings()} aria-label="Configurações" style={{
-            width: 36, height: 36, borderRadius: 8,
-            border: `1px solid ${hasAnyAI ? 'var(--success-border)' : 'var(--divider-soft)'}`,
-            background: hasAnyAI ? 'var(--success-surface)' : 'var(--bg-pearl)',
-            color: hasAnyAI ? 'var(--success-text)' : 'var(--text-secondary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <Settings size={13} />
-          </button>
-          <button type="button" data-vc-tour="generate" onClick={() => onGenerate()} style={{
-            height: 38, padding: '0 20px',
-            borderRadius: 9999, border: 'none', cursor: 'pointer',
-            background: 'var(--accent)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 400,
-            letterSpacing: '-0.016em',
-            fontFamily: 'var(--font-ui)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-          onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-          onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            <Sparkles size={13} /> Gerar com IA
-          </button>
         </div>
-          </>
+
+        {isMobile ? (
+          <button
+            type="button"
+            data-vc-tour="generate"
+            onClick={() => onGenerate()}
+            style={{
+              width: '100%', minHeight: 48, padding: '0 20px', borderRadius: 9999,
+              border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff',
+              fontSize: 15, fontWeight: 600, letterSpacing: '-0.016em', fontFamily: 'var(--font-ui)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+            onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+            onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <Sparkles size={15} /> Gerar com IA
+          </button>
+        ) : (
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} aria-label="Ações principais">
+            {onManageBilling && (
+              <button type="button" onClick={() => onManageBilling()} style={headerBtn}>Plano</button>
+            )}
+            <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
+              <Layout size={13} /> Templates
+            </button>
+            <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
+              <TrendingUp size={13} /> Pesquisa
+            </button>
+            <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
+            <button
+              type="button"
+              onClick={() => onOpenSettings()}
+              style={{
+                ...headerBtn,
+                border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
+                background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+              }}
+            >
+              <Settings size={13} /> Configurar IA
+            </button>
+            <button
+              type="button"
+              data-vc-tour="generate"
+              onClick={() => onGenerate()}
+              style={{
+                height: 38, padding: '0 18px', borderRadius: 9999, border: 'none', cursor: 'pointer',
+                background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
+                letterSpacing: '-0.016em', fontFamily: 'var(--font-ui)',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+              onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              <Sparkles size={13} /> Gerar com IA
+            </button>
+          </nav>
         )}
       </header>
 
       <div style={{
-        flex: 1,
-        minHeight: 0,
-        minWidth: 0,
-        width: '100%',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch',
+        flex: 1, minHeight: 0, minWidth: 0, width: '100%',
+        overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
-          boxSizing: 'border-box',
-          width: '100%',
-          maxWidth: 912,
-          marginLeft: 'auto',
-          marginRight: 'auto',
-          padding: isMobile ? '24px 16px 32px' : '48px 24px 80px',
+          boxSizing: 'border-box', width: '100%', maxWidth: 720,
+          marginLeft: 'auto', marginRight: 'auto',
+          padding: isMobile ? '24px 16px 40px' : '40px 24px 72px',
+          display: 'grid', gap: 28,
         }}>
-        <p style={{
-          margin: '0 0 8px', fontSize: 11, letterSpacing: '0.12em',
-          fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)',
-          fontFamily: 'var(--font-ui)',
-        }}>Área da conta</p>
-        <h2 style={{
-          margin: '0 0 12px', fontSize: 28, fontWeight: 600, letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1.12,
-        }}>Olá de novo</h2>
-        <p style={{
-          margin: '0 0 32px', fontSize: 17, lineHeight: 1.47,
-          letterSpacing: '-0.011em', color: 'var(--text-secondary)',
-          maxWidth: '62ch',
-        }}>
-          <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Projeto em edição:</strong>{' '}
-          <button type="button" onClick={onContinueEditor} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            padding: 0, color: 'var(--accent)', font: 'inherit', fontWeight: 600,
-          }}>{activeEntryName || 'Sem título'}</button>.
-          Para continuar, abra o editor e use as abas <strong style={{ fontWeight: 600 }}>Marca</strong>,{' '}
-          <strong style={{ fontWeight: 600 }}>Conteúdo</strong>,{' '}
-          <strong style={{ fontWeight: 600 }}>Cards</strong> e <strong style={{ fontWeight: 600 }}>IA</strong>.
-        </p>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: 12,
-          marginBottom: 32,
-        }}>
-          {[
-            { k: 'projetos', label: 'Projetos', value: library.length },
-            { k: 'perfis', label: 'Perfis de marca', value: brandCount },
-            {
-              k: 'cartoes',
-              label: 'Cards no total',
-              value: totalCards,
-              hint: 'Soma todos os projetos salvos aqui.',
-            },
-          ].map(({ k, label, value, hint }) => (
-            <div key={k} style={{
-              background: 'var(--bg-pearl)', borderRadius: 18,
-              border: '1px solid var(--hairline)',
-              padding: 20,
+          <header>
+            <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Início</p>
+            <h2 style={{
+              margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
+              letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
+              color: 'var(--text-primary)', lineHeight: 1.15,
             }}>
-              <div style={{
-                fontSize: 11,
-                letterSpacing: '0.06em',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                color: 'var(--text-muted)',
-                marginBottom: 8,
-              }}>{label}</div>
-              <div style={{
-                fontSize: 30, fontWeight: 600,
-                letterSpacing: '-0.028em',
-                fontFamily: 'var(--font-display)',
+              Seus projetos
+            </h2>
+            <p style={{
+              margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
+              color: 'var(--text-muted)', maxWidth: '52ch',
+            }}>
+              Continue o carrossel em edição ou comece um novo.
+            </p>
+          </header>
+
+          <section
+            aria-label="Projeto atual"
+            style={{
+              border: '1.5px solid var(--accent)',
+              background: 'var(--accent-surface)',
+              borderRadius: 16,
+              padding: isMobile ? 16 : 20,
+              display: 'grid',
+              gap: 14,
+            }}
+          >
+            <div>
+              <div className="vc-eyebrow" style={{ marginBottom: 6 }}>Em edição</div>
+              <h3 style={{
+                margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
                 color: 'var(--text-primary)',
-                lineHeight: 1,
-              }}>{value}</div>
-              {hint && (
-                <div style={{
-                  marginTop: 10, fontSize: 13, letterSpacing: '-0.011em',
-                  color: 'var(--text-muted)',
-                }}>{hint}</div>
-              )}
+              }}>
+                {projectName}
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                No editor: Marca → Conteúdo → Cards → IA
+              </p>
             </div>
-          ))}
-        </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button
+                type="button"
+                onClick={onContinueEditor}
+                style={{
+                  height: 40, padding: '0 18px', borderRadius: 9999, border: 'none',
+                  background: 'var(--accent)', color: '#fff', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                Continuar no editor <ChevronRight size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => newDoc()}
+                style={{
+                  height: 40, padding: '0 16px', borderRadius: 9999,
+                  border: '1px solid var(--border)', background: 'var(--bg-base)',
+                  color: 'var(--text-primary)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <Plus size={14} /> Novo projeto
+              </button>
+            </div>
+          </section>
 
-        <div style={{
-          background: 'var(--bg-parchment)', borderRadius: 18, border: '1px solid var(--hairline)',
-          padding: 20,
-          marginBottom: 24,
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
-        }}>
-          <div style={{
-            flex: '1 1 200px',
-            fontSize: 14,
-            color: 'var(--text-secondary)',
-            letterSpacing: '-0.011em',
-          }}>
+          <section aria-label="Resumo">
             <div style={{
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              marginBottom: 4,
-            }}>Ligações de IA</div>
-            {hasAnthropic ? 'Anthropic disponível para texto. ' : 'Anthropic opcional. '}
-            {hasOpenAI ? 'OpenAI disponível para texto e imagens. ' : 'OpenAI opcional (GPT Image ou chave neste dispositivo). '}
-            {!hasAnyAI && 'Configure as chaves no ícone de engrenagem.'}
-          </div>
-          <button type="button" onClick={() => onOpenSettings()} style={{
-            height: 40, padding: '0 18px', borderRadius: 9999,
-            border: '1px solid var(--accent)', cursor: 'pointer',
-            background: 'var(--bg-base)', color: 'var(--accent)',
-            fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 400,
-          }}>APIs</button>
-        </div>
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gap: 10,
+            }}>
+              {[
+                { label: 'Projetos', value: library.length },
+                { label: 'Marcas', value: brandCount },
+                { label: 'Cards', value: totalCards },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  style={{
+                    background: 'var(--bg-pearl)',
+                    borderRadius: 12,
+                    border: '1px solid var(--hairline)',
+                    padding: '14px 16px',
+                  }}
+                >
+                  <div style={{
+                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 600,
+                    textTransform: 'uppercase', color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)', marginBottom: 6,
+                  }}>
+                    {label}
+                  </div>
+                  <div style={{
+                    fontSize: 26, fontWeight: 600, letterSpacing: '-0.028em',
+                    fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1,
+                  }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 10,
-          marginBottom: 16,
-          alignItems: 'center',
-        }}>
-          <h3 style={{
-            flex: '1 1 auto', margin: 0, fontSize: 21, letterSpacing: '-0.022em',
-            fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
-          }}>Projetos</h3>
-          <button type="button" onClick={() => onOpenLibrary()} data-vc-tour="library" style={{
-            height: 38, padding: '0 16px',
-            borderRadius: 9999, border: '1px solid var(--border)',
-            background: 'var(--bg-base)', cursor: 'pointer',
-            color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600,
-          }}>Ver tudo na biblioteca</button>
-          <button type="button" onClick={() => onImportPick()} style={{
-            height: 38, padding: '0 16px',
-            borderRadius: 9999, border: '1px solid var(--border)',
-            background: 'var(--bg-base)', cursor: 'pointer',
-            color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600,
-          }}>Importar JSON</button>
-          <button type="button" onClick={() => newDoc()} style={{
-            height: 38, padding: '0 16px',
-            borderRadius: 9999, border: 'none',
-            cursor: 'pointer',
-            background: 'var(--accent)',
-            color: '#fff', fontSize: 13, fontFamily: 'var(--font-ui)',
-          }}>
-            <Layers size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
-            Novo projeto
-          </button>
-          <button type="button" onClick={() => onContinueEditor()} style={{
-            height: 38, padding: '0 16px',
-            borderRadius: 9999, border: '1px solid var(--accent)',
-            background: 'var(--bg-base)', cursor: 'pointer',
-            color: 'var(--accent)', fontSize: 13, fontFamily: 'var(--font-ui)',
-          }}>
-            Ir ao editor
-          </button>
-        </div>
+          <section
+            aria-label="Estado da IA"
+            style={{
+              border: '1px solid var(--border)',
+              background: 'var(--bg-card)',
+              borderRadius: 16,
+              padding: 18,
+              display: 'grid',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div className="vc-eyebrow" style={{ marginBottom: 6 }}>IA</div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {aiReady ? 'Pronta para gerar' : 'Configure para gerar'}
+                </h3>
+                <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Escolha quem escreve e quem gera as imagens
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenSettings()}
+                style={{
+                  height: 36, padding: '0 14px', borderRadius: 9999, flexShrink: 0,
+                  border: aiReady ? '1px solid var(--border)' : 'none',
+                  background: aiReady ? 'var(--bg-pearl)' : 'var(--accent)',
+                  color: aiReady ? 'var(--text-primary)' : '#fff',
+                  cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {aiReady ? 'Ajustar' : 'Configurar IA'}
+              </button>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: 8,
+            }}>
+              {[
+                { label: 'Texto', name: textProvider.name, model: textModelName, ok: hasTextAI },
+                { label: 'Imagens', name: imageProvider.name, model: imageModelName, ok: hasImageAI },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    background: 'var(--bg-pearl)',
+                    display: 'grid',
+                    gap: 4,
+                  }}
+                >
+                  <span style={{
+                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+                    textTransform: 'uppercase', color: 'var(--text-muted)',
+                  }}>
+                    {row.label}
+                  </span>
+                  <strong style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {row.name}
+                  </strong>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{row.model}</span>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
+                    fontSize: 10, fontFamily: 'var(--font-mono)',
+                    color: row.ok ? 'var(--success)' : 'var(--text-muted)',
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: row.ok ? 'var(--success)' : 'var(--hairline)',
+                    }} />
+                    {row.ok ? 'Conectado' : 'Falta chave'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
 
-        <input
-          type="search"
-          placeholder="Filtrar por nome…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="vc-input"
-          aria-label="Filtrar projetos"
-          style={{ width: '100%', marginBottom: 16 }}
-        />
+          <section aria-label="Lista de projetos" style={{ display: 'grid', gap: 14 }}>
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+              justifyContent: 'space-between', gap: 10,
+            }}>
+              <div>
+                <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Biblioteca</div>
+                <h3 style={{
+                  margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
+                  fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
+                }}>
+                  Todos os projetos
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => onOpenLibrary()}
+                  data-vc-tour="library"
+                  style={{
+                    height: 36, padding: '0 14px', borderRadius: 9999,
+                    border: '1px solid var(--border)', background: 'var(--bg-base)',
+                    cursor: 'pointer', color: 'var(--text-secondary)',
+                    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  }}
+                >
+                  Abrir biblioteca
+                </button>
+                <button
+                  type="button"
+                  onClick={() => newDoc()}
+                  style={{
+                    height: 36, padding: '0 14px', borderRadius: 9999, border: 'none',
+                    cursor: 'pointer', background: 'var(--accent)', color: '#fff',
+                    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  <Plus size={13} /> Novo
+                </button>
+              </div>
+            </div>
+
+            <input
+              type="search"
+              placeholder="Buscar projeto…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="vc-input"
+              aria-label="Buscar projetos"
+              style={{ width: '100%' }}
+            />
+
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.length === 0 && (
             <div style={{
-              padding: 40,
+              padding: 36,
               textAlign: 'center',
               color: 'var(--text-muted)',
-              border: `1px dashed var(--hairline)`,
-              borderRadius: 18,
-              fontSize: 15,
-              letterSpacing: '-0.011em',
+              border: '1px dashed var(--hairline)',
+              borderRadius: 16,
+              fontSize: 14,
+              lineHeight: 1.45,
             }}>
-              Sem correspondências nesta pesquisa.
+              {search.trim()
+                ? 'Nenhum projeto com esse nome.'
+                : 'Ainda sem projetos. Crie um novo ou gere com IA.'}
             </div>
           )}
           {items.map(entry => {
             const isActive = entry.id === activeDocId;
-            const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
             const slides = entry.doc?.slides || [];
             const firstSlide = slides[0];
             const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {});
@@ -17496,7 +17549,7 @@ function AccountHomeShell({
                 style={{
                   background: isActive ? 'var(--accent-surface)' : 'var(--bg-pearl)',
                   border: `1px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
-                  borderRadius: 18,
+                  borderRadius: 14,
                   padding: 14,
                   display: 'flex',
                   alignItems: 'center',
@@ -17609,19 +17662,8 @@ function AccountHomeShell({
                     color: 'var(--text-muted)',
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    <span style={{
-                      padding: '2px 7px',
-                      borderRadius: 99,
-                      background: status.bg,
-                      border: `1px solid ${status.border}`,
-                      color: status.color,
-                      fontWeight: 600,
-                    }}>{status.label}</span>
-                    {' · '}
-                    {slides.length}{' '}card{slides.length !== 1 ? 's' : ''}
-                    {entry.updatedAt && (
-                      <span>{' '}· atualizado {' '}{fmtDate(entry.updatedAt)}</span>
-                    )}
+                    {slides.length} card{slides.length !== 1 ? 's' : ''}
+                    {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
                 </div>
                 <div style={{
@@ -17728,20 +17770,16 @@ function AccountHomeShell({
           })}
         </div>
 
-        {!isMobile && (
           <p style={{
-            marginTop: 48,
-            fontSize: 14,
-            lineHeight: 1.47,
-            letterSpacing: '-0.011em',
+            margin: 0,
+            fontSize: 12,
+            lineHeight: 1.45,
             color: 'var(--text-muted)',
+            textAlign: 'center',
           }}>
-            Fluxo recomendado: primeiro <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Marca</strong>{' '}
-            e a base de <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Conteúdo</strong>,
-            {' '}depois edição nos <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Cards</strong>,
-            {' '}por fim <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>IA</strong> para refinar e gerar legenda.
+            Atalhos: Templates e Pesquisa no topo · chaves de IA em Configurar IA
           </p>
-        )}
+          </section>
         </div>
       </div>
     </div>
