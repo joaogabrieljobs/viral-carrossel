@@ -1,283 +1,599 @@
-import { useState, useEffect } from 'react';
-import { Settings, X, Lock } from 'lucide-react';
-import { getServerStatus } from '../utils/server-status.js';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Check, ChevronRight, ExternalLink, Image, KeyRound, Lock,
+  Settings, Sparkles, Type, X,
+} from 'lucide-react';
+import {
+  DEFAULT_AI_SETTINGS,
+  IMAGE_PROVIDERS,
+  normalizeAISettings,
+  TEXT_PROVIDERS,
+} from '../config/ai-providers.js';
+
+const PRESETS = [
+  {
+    id: 'economy',
+    name: 'Economizar',
+    note: 'Texto grátis + imagem barata',
+    textProvider: 'zai',
+    textModel: 'glm-4.7-flash',
+    imageProvider: 'zai',
+    imageModel: 'cogview-4-250304',
+  },
+  {
+    id: 'balanced',
+    name: 'Equilíbrio',
+    note: 'Boa qualidade com custo menor',
+    textProvider: 'openai',
+    textModel: 'gpt-5.6-terra',
+    imageProvider: 'zai',
+    imageModel: 'glm-image',
+  },
+  {
+    id: 'quality',
+    name: 'Qualidade',
+    note: 'Melhor copy + melhor imagem',
+    textProvider: 'anthropic',
+    textModel: 'claude-sonnet-5',
+    imageProvider: 'openai',
+    imageModel: 'gpt-image-2',
+  },
+];
+
+const TABS = [
+  { id: 'setup', label: 'Configuração', icon: Sparkles },
+  { id: 'keys', label: 'Chaves', icon: KeyRound },
+];
+
+function ProviderCard({ provider, selected, configured, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      style={{
+        minHeight: 82,
+        padding: '14px 14px 12px',
+        borderRadius: 12,
+        border: selected ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+        background: selected ? 'var(--accent-surface)' : 'var(--bg-card)',
+        color: 'var(--text-primary)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        position: 'relative',
+        fontFamily: 'var(--font-ui)',
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <strong style={{ fontSize: 14, fontWeight: 600 }}>{provider.name}</strong>
+        {selected && <Check size={15} strokeWidth={2.5} />}
+      </span>
+      <span style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted)' }}>
+        {provider.short}
+      </span>
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        marginTop: 'auto',
+        fontSize: 10,
+        color: configured ? 'var(--success)' : 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)',
+      }}>
+        <span style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: configured ? 'var(--success)' : 'var(--hairline)',
+        }} />
+        {configured ? 'Conectado' : 'Falta chave'}
+      </span>
+    </button>
+  );
+}
+
+function ModelSelect({ provider, value, onChange }) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {provider.models.map((model) => {
+        const selected = value === model.id;
+        return (
+          <button
+            key={model.id}
+            type="button"
+            onClick={() => onChange(model.id)}
+            aria-pressed={selected}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: selected ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+              background: selected ? 'var(--accent-surface)' : 'transparent',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              textAlign: 'left',
+              fontFamily: 'var(--font-ui)',
+            }}
+          >
+            <span>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>{model.name}</span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: 'var(--text-muted)' }}>
+                {model.id}
+              </span>
+            </span>
+            <span style={{
+              flexShrink: 0,
+              padding: '4px 7px',
+              borderRadius: 9999,
+              background: model.tier === 'free' ? 'var(--success-surface)' : 'var(--bg-pearl)',
+              color: model.tier === 'free' ? 'var(--success)' : 'var(--text-muted)',
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+            }}>
+              {model.note}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function KeysModal({
-  open, onClose, openaiKey, onSave, onRefreshStatus,
-  openaiKeyPersist, onChangePersist, claudeModel, onChangeClaudeModel,
-  anthropicKey, onSaveAnthropic, anthropicKeyPersist, onChangeAnthropicPersist,
+  open,
+  onClose,
+  aiSettings = DEFAULT_AI_SETTINGS,
+  onSaveSettings,
 }) {
-  const [val, setVal] = useState(openaiKey || '');
-  const [persist, setPersist] = useState(!!openaiKeyPersist);
-  const [model, setModel] = useState(claudeModel || 'sonnet');
-  const [anthropicVal, setAnthropicVal] = useState(anthropicKey || '');
-  const [anthropicPersistVal, setAnthropicPersistVal] = useState(!!anthropicKeyPersist);
-  const [status, setStatus] = useState(null);
+  const [draft, setDraft] = useState(() => normalizeAISettings(aiSettings));
+  const [tab, setTab] = useState('setup');
+  const [section, setSection] = useState('text');
+
   useEffect(() => {
-    if (open) {
-      setVal(openaiKey || '');
-      setPersist(!!openaiKeyPersist);
-      setModel(claudeModel || 'sonnet');
-      setAnthropicVal(anthropicKey || '');
-      setAnthropicPersistVal(!!anthropicKeyPersist);
-      getServerStatus({ force: true }).then(s => {
-        setStatus(s);
-        onRefreshStatus?.(s);
-      });
-    }
-  }, [open, openaiKey, openaiKeyPersist, claudeModel, anthropicKey, anthropicKeyPersist, onRefreshStatus]);
+    if (!open) return;
+    setDraft(normalizeAISettings(aiSettings));
+    setTab('setup');
+  }, [open, aiSettings]);
+
+  const requiredKeys = useMemo(
+    () => new Set([draft.textProvider, IMAGE_PROVIDERS[draft.imageProvider]?.keyProvider]),
+    [draft.textProvider, draft.imageProvider],
+  );
+
   if (!open) return null;
+
+  const setTextProvider = (id) => setDraft((current) => ({ ...current, textProvider: id }));
+  const setImageProvider = (id) => setDraft((current) => ({ ...current, imageProvider: id }));
+  const setTextModel = (id) => setDraft((current) => ({
+    ...current,
+    textModels: { ...current.textModels, [current.textProvider]: id },
+  }));
+  const setImageModel = (id) => setDraft((current) => ({
+    ...current,
+    imageModels: { ...current.imageModels, [current.imageProvider]: id },
+  }));
+  const applyPreset = (preset) => setDraft((current) => ({
+    ...current,
+    textProvider: preset.textProvider,
+    imageProvider: preset.imageProvider,
+    textModels: { ...current.textModels, [preset.textProvider]: preset.textModel },
+    imageModels: { ...current.imageModels, [preset.imageProvider]: preset.imageModel },
+  }));
   const save = () => {
-    onSave(val.trim());
-    onChangePersist?.(persist);
-    onChangeClaudeModel?.(model);
-    onSaveAnthropic?.(anthropicVal.trim());
-    onChangeAnthropicPersist?.(anthropicPersistVal);
+    onSaveSettings?.(normalizeAISettings(draft));
     onClose();
   };
+
+  const textProvider = TEXT_PROVIDERS[draft.textProvider];
+  const imageProvider = IMAGE_PROVIDERS[draft.imageProvider];
+  const ready = [...requiredKeys].every((providerId) => draft.keys[providerId]?.trim());
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={e=>e.stopPropagation()} style={{ maxWidth:420 }}>
-        <div style={{
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          padding:'16px 20px', borderBottom:'1px solid var(--border)',
-          position:'sticky', top:0, background:'var(--bg-sidebar)', zIndex:1,
+      <div
+        className="modal-panel"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-settings-title"
+        style={{ maxWidth: 680, width: 'min(680px, calc(100vw - 24px))', maxHeight: 'min(780px, calc(100vh - 24px))' }}
+      >
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '18px 20px',
+          borderBottom: '1px solid var(--border)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 3,
+          background: 'var(--bg-sidebar)',
         }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{
-              width:32, height:32, borderRadius:8, background:'rgba(255,255,255,0.06)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              border:'1px solid var(--border)',
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              display: 'grid',
+              placeItems: 'center',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-pearl)',
             }}>
-              <Settings size={14} color="var(--text-secondary)"/>
-            </div>
+              <Settings size={16} />
+            </span>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Chaves de API</div>
-              <div className="vc-eyebrow">Conecte suas chaves de IA</div>
+              <h2 id="ai-settings-title" style={{
+                margin: 0,
+                fontSize: 18,
+                lineHeight: 1.2,
+                fontWeight: 600,
+                letterSpacing: '-0.022em',
+              }}>
+                Configurar IA
+              </h2>
+              <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                Escolha quem escreve e quem gera as imagens
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
-            <X size={16}/>
+          <button type="button" onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+            <X size={17} />
           </button>
-        </div>
-        <div style={{ padding:20, display:'flex', flexDirection:'column', gap:18 }}>
-          {/* Intro — explica o quê, por quê, como obter */}
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <div>
-              <div style={{ fontSize:15, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.018em', marginBottom:4 }}>
-                Conecte uma chave pra começar
-              </div>
-              <div style={{ fontSize:12, lineHeight:1.5, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                A IA escreve o copy dos cards e gera as fotos. Você só precisa de uma chave — duas dão o melhor resultado.
-              </div>
-            </div>
+        </header>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {/* OpenAI — recomendado (border accent) */}
-              <div style={{
-                position:'relative',
-                border:'1.5px solid var(--accent)',
-                background:'var(--success-surface)',
-                borderRadius:11, padding:'12px 12px 14px',
-                display:'flex', flexDirection:'column', gap:6,
-              }}>
-                <div style={{
-                  position:'absolute', top:-9, left:10,
-                  fontSize:9, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
-                  background:'var(--accent)', color:'#fff',
-                  padding:'3px 8px', borderRadius:9999, fontFamily:'var(--font-ui)',
-                }}>Recomendado</div>
-                <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
-                  <span style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.014em' }}>OpenAI</span>
-                  <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.02em' }}>GPT-4o · DALL·E</span>
-                </div>
-                <div style={{ fontSize:11, lineHeight:1.5, color:'var(--text-secondary)', fontFamily:'var(--font-ui)' }}>
-                  Texto <strong>e</strong> imagens numa chave só. Mais simples pra começar.
-                </div>
-                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"
-                   style={{ marginTop:'auto', fontSize:11, color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}
-                   onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                   onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                  Obter chave →
-                </a>
-              </div>
-
-              {/* Anthropic — opcional */}
-              <div style={{
-                border:'1px solid var(--border)',
-                background:'var(--bg-card)',
-                borderRadius:11, padding:'12px 12px 14px',
-                display:'flex', flexDirection:'column', gap:6,
-              }}>
-                <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
-                  <span style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.014em' }}>Anthropic</span>
-                  <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.02em' }}>Claude · web search</span>
-                </div>
-                <div style={{ fontSize:11, lineHeight:1.5, color:'var(--text-secondary)', fontFamily:'var(--font-ui)' }}>
-                  Copy mais editorial e profundo. Com OpenAI junto = melhor combo.
-                </div>
-                <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"
-                   style={{ marginTop:'auto', fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-mono)', textDecoration:'none', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}
-                   onMouseEnter={e=>{ e.currentTarget.style.color='var(--accent)'; e.currentTarget.style.textDecoration='underline'; }}
-                   onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.textDecoration='none'; }}>
-                  Obter chave →
-                </a>
-              </div>
-            </div>
-
-            <div style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5, padding:'8px 2px 0' }}>
-              <Lock size={11} aria-hidden style={{ marginTop:1, flexShrink:0 }}/>
-              <span>
-                As chaves ficam <strong style={{ color:'var(--text-secondary)' }}>só no seu navegador</strong>. Custos vão direto pra sua conta da Anthropic/OpenAI — você controla o uso.
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label className="vc-label">
-              Anthropic API Key — Claude (texto + web search)
-            </label>
-            <input
-              type="password"
-              value={anthropicVal}
-              onChange={e=>setAnthropicVal(e.target.value)}
-              placeholder="sk-ant-..."
-              className="vc-input"
-              onKeyDown={e=>e.key==='Enter'&&save()}
-            />
-            <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:8, lineHeight:1.5 }}>
-              Obtenha em{' '}
-              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"
-                 style={{ color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none' }}
-                 onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                 onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                console.anthropic.com/settings/keys
-              </a>
-              . A chave fica salva apenas no seu navegador.
-            </div>
-            <label style={{
-              display:'flex', alignItems:'center', gap:8, marginTop:10, fontSize:12,
-              color:'var(--text-secondary)', fontFamily:'var(--font-ui)', cursor:'pointer',
-              userSelect:'none',
-            }}>
-              <input
-                type="checkbox"
-                checked={anthropicPersistVal}
-                onChange={(e) => setAnthropicPersistVal(e.target.checked)}
-                style={{ accentColor:'var(--accent)', width:14, height:14 }}
-              />
-              <span>Manter chave Anthropic salva entre sessões (localStorage)</span>
-            </label>
-          </div>
-
-          <div>
-            <label className="vc-label">
-              OpenAI API Key — gpt-4o + GPT Image 2
-            </label>
-            <input
-              type="password"
-              value={val}
-              onChange={e=>setVal(e.target.value)}
-              placeholder="sk-proj-..."
-              className="vc-input"
-              onKeyDown={e=>e.key==='Enter'&&save()}
-            />
-            <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:8, lineHeight:1.5 }}>
-              Obtenha em{' '}
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"
-                 style={{ color:'var(--accent)', fontFamily:'var(--font-mono)', textDecoration:'none' }}
-                 onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                 onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                platform.openai.com/api-keys
-              </a>
-              {!anthropicVal && (
-                <> Sem chave Anthropic, esta também é usada para gerar texto (GPT-4o).</>
-              )}
-            </div>
-            <label style={{
-              display:'flex', alignItems:'center', gap:8, marginTop:10, fontSize:12,
-              color:'var(--text-secondary)', fontFamily:'var(--font-ui)', cursor:'pointer',
-              userSelect:'none',
-            }}>
-              <input
-                type="checkbox"
-                checked={persist}
-                onChange={(e) => setPersist(e.target.checked)}
-                style={{ accentColor:'var(--accent)', width:14, height:14 }}
-              />
-              <span>Manter chave salva entre sessões (localStorage)</span>
-            </label>
-            <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, lineHeight:1.5, marginLeft:22 }}>
-              {persist
-                ? 'A chave fica no localStorage e sobrevive ao fechar a aba — mais conveniente, menos seguro.'
-                : 'A chave fica só nesta sessão e some quando fechar a aba — mais seguro contra scripts maliciosos.'}
-            </div>
-          </div>
-
-          {/* Selector de modelo Claude — sempre visível */}
-          <div>
-            <label className="vc-label">Modelo Claude (geração de texto)</label>
-              <div style={{ display:'flex', gap:8 }}>
-                {[
-                  { id:'sonnet', label:'Sonnet 4.6', desc:'Rápido + barato' },
-                  { id:'opus',   label:'Opus 4.7',   desc:'Máxima qualidade' },
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setModel(opt.id)}
-                    style={{
-                      flex:1, padding:'10px 12px', borderRadius:8, cursor:'pointer',
-                      border: model === opt.id ? '1px solid var(--accent)' : '1px solid var(--border)',
-                      background: model === opt.id ? 'var(--success-surface)' : 'transparent',
-                      color: model === opt.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      fontSize:12, fontFamily:'var(--font-ui)', textAlign:'left',
-                      display:'flex', flexDirection:'column', gap:2,
-                    }}
-                  >
-                    <span style={{ fontWeight:600 }}>{opt.label}</span>
-                    <span style={{ fontSize:10, color:'var(--text-muted)' }}>{opt.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          {/* Status compacto das duas chaves — visual claro do que está ativado */}
-          {(() => {
-            const anthropicOK = !!(anthropicVal && anthropicVal.trim().startsWith('sk-ant-'));
-            const openaiOK = !!(val && val.trim().startsWith('sk-'));
-            if (!anthropicOK && !openaiOK) return null;
-            const Row = ({ ok, label, detail }) => (
-              <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, fontFamily:'var(--font-ui)' }}>
+        <nav style={{
+          display: 'flex',
+          gap: 4,
+          padding: '10px 20px',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-sidebar)',
+          position: 'sticky',
+          top: 73,
+          zIndex: 2,
+        }}>
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              style={{
+                height: 34,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: 9999,
+                background: tab === id ? 'var(--text-primary)' : 'transparent',
+                color: tab === id ? 'var(--bg-base)' : 'var(--text-secondary)',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              <Icon size={13} />
+              {label}
+              {id === 'keys' && (
                 <span style={{
-                  width:8, height:8, borderRadius:'50%',
-                  background: ok ? '#30b352' : 'var(--text-muted)',
-                  flexShrink:0,
-                }}/>
-                <span style={{ color: ok ? 'var(--success-text)' : 'var(--text-muted)', fontWeight:600 }}>{label}</span>
-                <span style={{ color:'var(--text-muted)', fontSize:11 }}>{detail}</span>
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: ready ? 'var(--success)' : '#d97706',
+                }} />
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ padding: 20, overflowY: 'auto' }}>
+          {tab === 'setup' ? (
+            <div style={{ display: 'grid', gap: 24 }}>
+              <section>
+                <div style={{ marginBottom: 10 }}>
+                  <div className="vc-eyebrow">Comece por aqui</div>
+                  <h3 style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 600 }}>
+                    Escolha o que você prioriza
+                  </h3>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                  {PRESETS.map((preset) => {
+                    const selected =
+                      draft.textProvider === preset.textProvider &&
+                      draft.textModels[preset.textProvider] === preset.textModel &&
+                      draft.imageProvider === preset.imageProvider &&
+                      draft.imageModels[preset.imageProvider] === preset.imageModel;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => applyPreset(preset)}
+                        style={{
+                          padding: '13px 14px',
+                          borderRadius: 12,
+                          border: selected ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                          background: selected ? 'var(--accent-surface)' : 'var(--bg-card)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          fontFamily: 'var(--font-ui)',
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <strong style={{ fontSize: 13, fontWeight: 600 }}>{preset.name}</strong>
+                          {selected && <Check size={14} />}
+                        </span>
+                        <span style={{ display: 'block', marginTop: 5, fontSize: 10, lineHeight: 1.35, color: 'var(--text-muted)' }}>
+                          {preset.note}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <div style={{
+                  display: 'flex',
+                  gap: 4,
+                  padding: 4,
+                  borderRadius: 12,
+                  background: 'var(--bg-pearl)',
+                  marginBottom: 14,
+                }}>
+                  {[
+                    { id: 'text', label: 'Texto', icon: Type },
+                    { id: 'image', label: 'Imagens', icon: Image },
+                  ].map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSection(id)}
+                      style={{
+                        flex: 1,
+                        height: 36,
+                        border: 'none',
+                        borderRadius: 8,
+                        background: section === id ? 'var(--bg-card)' : 'transparent',
+                        color: 'var(--text-primary)',
+                        boxShadow: section === id ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 7,
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    >
+                      <Icon size={14} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {section === 'text' ? (
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    <div>
+                      <div className="vc-label" style={{ marginBottom: 8 }}>1. Provedor de texto</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                        {Object.values(TEXT_PROVIDERS).map((provider) => (
+                          <ProviderCard
+                            key={provider.id}
+                            provider={provider}
+                            selected={provider.id === draft.textProvider}
+                            configured={Boolean(draft.keys[provider.id]?.trim())}
+                            onClick={() => setTextProvider(provider.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="vc-label" style={{ marginBottom: 8 }}>2. Modelo</div>
+                      <ModelSelect
+                        provider={textProvider}
+                        value={draft.textModels[draft.textProvider]}
+                        onChange={setTextModel}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    <div>
+                      <div className="vc-label" style={{ marginBottom: 8 }}>1. Provedor de imagem</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                        {Object.values(IMAGE_PROVIDERS).map((provider) => (
+                          <ProviderCard
+                            key={provider.id}
+                            provider={provider}
+                            selected={provider.id === draft.imageProvider}
+                            configured={Boolean(draft.keys[provider.keyProvider]?.trim())}
+                            onClick={() => setImageProvider(provider.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="vc-label" style={{ marginBottom: 8 }}>2. Modelo</div>
+                      <ModelSelect
+                        provider={imageProvider}
+                        value={draft.imageModels[draft.imageProvider]}
+                        onChange={setImageModel}
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <button
+                type="button"
+                onClick={() => setTab('keys')}
+                style={{
+                  minHeight: 48,
+                  padding: '0 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  textAlign: 'left',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                <span>
+                  <strong style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>
+                    {ready ? 'Chaves necessárias conectadas' : 'Agora conecte as chaves'}
+                  </strong>
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: 'var(--text-muted)' }}>
+                    Só pedimos as chaves usadas na configuração
+                  </span>
+                </span>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 18 }}>
+              <div>
+                <div className="vc-eyebrow">Conexões</div>
+                <h3 style={{ margin: '4px 0 6px', fontSize: 15, fontWeight: 600 }}>
+                  Cole apenas as chaves que vai usar
+                </h3>
+                <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+                  Necessárias agora: {[...requiredKeys].map((id) => TEXT_PROVIDERS[id]?.name).filter(Boolean).join(' + ')}.
+                </p>
               </div>
-            );
-            return (
-              <div style={{
-                background:'var(--success-surface)',
-                border:'1px solid var(--success-border)',
-                borderRadius:8, padding:'10px 12px',
-                display:'flex', flexDirection:'column', gap:6,
+
+              <div style={{ display: 'grid', gap: 12 }}>
+                {Object.values(TEXT_PROVIDERS).map((provider) => {
+                  const required = requiredKeys.has(provider.id);
+                  return (
+                    <div
+                      key={provider.id}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        border: required ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                        background: required ? 'var(--accent-surface)' : 'var(--bg-card)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 9 }}>
+                        <label htmlFor={`key-${provider.id}`} style={{ fontSize: 13, fontWeight: 600 }}>
+                          {provider.name}
+                          {required && <span style={{ marginLeft: 7, fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>EM USO</span>}
+                        </label>
+                        <a
+                          href={provider.keyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)', fontSize: 10, textDecoration: 'none' }}
+                        >
+                          Criar chave <ExternalLink size={10} />
+                        </a>
+                      </div>
+                      <input
+                        id={`key-${provider.id}`}
+                        type="password"
+                        value={draft.keys[provider.id] || ''}
+                        onChange={(event) => setDraft((current) => ({
+                          ...current,
+                          keys: { ...current.keys, [provider.id]: event.target.value },
+                        }))}
+                        placeholder={provider.placeholder}
+                        className="vc-input"
+                        autoComplete="off"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                padding: '12px 14px',
+                borderRadius: 10,
+                background: 'var(--bg-pearl)',
+                cursor: 'pointer',
               }}>
-                <Row ok={anthropicOK} label="Claude" detail={anthropicOK ? '— texto + web search ativos' : '— não configurado, GPT-4o vai gerar texto'} />
-                <Row ok={openaiOK} label="OpenAI" detail={openaiOK ? '— imagens (DALL·E) ativas' : '— sem geração automática de imagens'} />
+                <input
+                  type="checkbox"
+                  checked={draft.persistKeys}
+                  onChange={(event) => setDraft((current) => ({ ...current, persistKeys: event.target.checked }))}
+                  style={{ marginTop: 2, accentColor: 'var(--accent)' }}
+                />
+                <span>
+                  <strong style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>
+                    Manter chaves neste navegador
+                  </strong>
+                  <span style={{ display: 'block', marginTop: 3, fontSize: 10, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+                    Desmarcado: somem ao fechar a aba. Marcado: ficam no armazenamento local deste navegador.
+                  </span>
+                </span>
+              </label>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.5 }}>
+                <Lock size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>As chaves não entram na nossa base de dados. Elas só são enviadas ao provedor escolhido durante a geração.</span>
               </div>
-            );
-          })()}
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onClose} className="vc-btn vc-btn-ghost" style={{ height:40, padding:'0 16px' }}>Cancelar</button>
-            <button onClick={save} style={{
-              flex:1, height:40, borderRadius:8, border:'none', cursor:'pointer',
-              background:'var(--text-primary)', color:'var(--bg-base)',
-              fontSize:13, fontWeight:700, fontFamily:'var(--font-ui)',
-            }}>Salvar</button>
-          </div>
+            </div>
+          )}
         </div>
+
+        <footer style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '14px 20px',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--bg-sidebar)',
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 3,
+        }}>
+          <span style={{ fontSize: 10, color: ready ? 'var(--success)' : 'var(--text-muted)' }}>
+            {ready ? 'Tudo pronto para gerar' : 'Configure as chaves marcadas “em uso”'}
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onClose} className="vc-btn vc-btn-ghost" style={{ height: 40, padding: '0 16px' }}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={!ready}
+              className="vc-btn"
+              style={{
+                height: 40,
+                padding: '0 20px',
+                borderRadius: 9999,
+                border: 'none',
+                background: 'var(--text-primary)',
+                color: 'var(--bg-base)',
+                opacity: ready ? 1 : 0.42,
+                cursor: ready ? 'pointer' : 'not-allowed',
+                fontWeight: 600,
+              }}
+            >
+              Salvar configuração
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -107,6 +107,16 @@ export default defineConfig(({ mode }) => {
             });
           },
         },
+        '/api/zai': {
+          target: 'https://api.z.ai',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/zai/, ''),
+        },
+        '/api/kimi': {
+          target: 'https://api.moonshot.ai',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/kimi/, ''),
+        },
         // Endpoint de status: cliente descobre quais providers o servidor tem configurados
         '/api/status': {
           bypass: (req, res) => {

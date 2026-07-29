@@ -89,7 +89,7 @@ export default function Paywall({ isMobile, onBack, onAlreadyActive }) {
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
           Um plano. Todos os modos (Criador, Diretor, Studio).
-          Sem limite de carrosséis — a geração usa a sua chave Anthropic/OpenAI.
+          Sem limite de carrosséis — a geração usa a chave do provedor que você escolher.
         </p>
 
         <div style={{
@@ -122,7 +122,7 @@ export default function Paywall({ isMobile, onBack, onAlreadyActive }) {
             'Studio completo · modos livres',
             'Marca, narrativa, legenda e export',
             'BYOK — você controla o gasto na LLM',
-            'Cancele quando quiser no portal Stripe',
+            'Cancele quando quiser no portal do cliente',
           ].map((line) => (
             <li key={line} style={{
               display: 'flex',
@@ -242,7 +242,7 @@ export default function Paywall({ isMobile, onBack, onAlreadyActive }) {
           letterSpacing: '0.02em',
           textAlign: 'center',
         }}>
-          Pagamento seguro via Stripe · Assinatura mensal
+          Pagamento seguro · Assinatura mensal
         </p>
       </div>
       <style>{`

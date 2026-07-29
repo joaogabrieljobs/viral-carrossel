@@ -3,6 +3,7 @@ import {
   Sparkles, Flame, ArrowRight, ChevronDown,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
   BookOpen, Layers, Image, FileText, Check, X,
+  CameraOff, Bookmark, MessageSquare,
 } from 'lucide-react';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
@@ -188,11 +189,15 @@ const GENERATION_LAYERS = [
 const FAQ = [
   {
     q: 'O Viral. é gratuito?',
-    a: 'Não. A assinatura individual custa R$ 97/mês e libera o studio completo. A geração de conteúdo usa a sua chave Anthropic/OpenAI — não cobramos por carrossel.',
+    a: 'Não. A assinatura individual custa R$ 97/mês (ou R$ 790/ano) e libera o studio completo. A geração usa a sua chave do provedor de IA escolhido — não cobramos por carrossel.',
+  },
+  {
+    q: 'Vocês vendem créditos de imagem como outros apps?',
+    a: 'Não. Ferramentas que “incluem IA” cobram créditos e limitam volume. No Viral. você traz a sua chave: o studio é o produto; o gasto com LLM fica na sua conta, sem teto artificial de posts.',
   },
   {
     q: 'Como funciona a geração com IA?',
-    a: 'O Viral. é a interface. Você configura Anthropic e/ou OpenAI uma vez nas definições. Cada geração consome créditos na sua conta da LLM — você controla quanto gasta e quanto publica.',
+    a: 'O Viral. é a interface. Você escolhe entre OpenAI, Anthropic, Z.ai ou Kimi e conecta sua chave. Cada geração consome créditos diretamente na sua conta — você controla quanto gasta e quanto publica.',
   },
   {
     q: 'Tem limite de carrosséis por mês?',
@@ -200,11 +205,11 @@ const FAQ = [
   },
   {
     q: 'Como assino e como cancelo?',
-    a: 'No checkout Stripe (cartão). Depois, o botão Plano na home abre o portal do cliente para atualizar pagamento ou cancelar.',
+    a: 'Assine com cartão no checkout. Depois, o botão Plano na home abre o portal do cliente para atualizar pagamento ou cancelar — sem fidelidade escondida.',
   },
   {
-    q: 'Preciso criar conta?',
-    a: 'O e-mail da assinatura Stripe identifica o acesso. Projetos e chaves ficam neste navegador; a assinatura vale no cookie seguro ligado ao seu customer Stripe.',
+    q: 'Preciso aparecer ou gravar Reels?',
+    a: 'Não. O Viral. é feito pra carrossel: autoridade pela tese e pelo arco, não pela câmera. Cresce pela ideia — sem dancinha e sem travar na lente.',
   },
   {
     q: 'ChatGPT ou Claude sozinhos não bastam?',
@@ -218,6 +223,54 @@ const FAQ = [
     q: 'Funciona no celular?',
     a: 'Sim. Editor, preview, geração e export foram feitos mobile-first — navegação por slides e fluxo pensado pra publicar do telefone.',
   },
+];
+
+const NO_CAMERA_POINTS = [
+  {
+    icon: CameraOff,
+    title: 'Sem câmera obrigatória',
+    body: 'Carrossel cresce pela ideia. Você não precisa gravar, editar Reels nem “aparecer todo dia”.',
+  },
+  {
+    icon: Bookmark,
+    title: 'Formato que o feed guarda',
+    body: 'Swipe, salvamento e profundidade — carrossel aceita tese e dado, não só gancho de 3 segundos.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Tema em alta → ângulo do seu nicho',
+    body: 'Surfa o que já tem atenção e traz pro seu posicionamento — sem inventar trend do zero.',
+  },
+];
+
+const VALUE_STACK = [
+  {
+    icon: MessageSquare,
+    label: 'Chat / LLM',
+    role: 'Escreve texto',
+    gap: 'Sem arco, sem slides, sem export.',
+  },
+  {
+    icon: Layout,
+    label: 'Canva',
+    role: 'Monta layout',
+    gap: 'Você ainda escreve e estrutura o argumento.',
+  },
+  {
+    icon: Download,
+    label: 'Export solto',
+    role: 'Recorta e sobe',
+    gap: 'Três abas. Zero fluxo editorial.',
+  },
+];
+
+const PLAN_FEATURES = [
+  'Studio completo — Criador, Diretor e Studio',
+  'Narrativa, estrutura, visual, legenda e export',
+  'Identidade de marca no fluxo',
+  'BYOK — escolha seu provedor e use sua chave',
+  'Sem limite artificial de carrosséis',
+  'Cancele quando quiser no portal do cliente',
 ];
 
 /** Cartão flutuante do hero — preview real de slide */
@@ -1348,6 +1401,102 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
         </div>
       </RevealSection>
 
+      {/* ── SEM APARECER / POR QUE CARROSSEL ── */}
+      <RevealSection
+        variant="rise"
+        id="sem-aparecer"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '20px 16px 28px' : '32px clamp(24px, 5vw, 48px) 40px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Formato</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+          maxWidth: '18ch',
+        }}>
+          Cresce pela ideia.
+          <br />
+          <span style={{ color: 'var(--accent)' }}>Não pela câmera.</span>
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Guru manda gravar Reels todo dia. Carrossel entrega tese, salvamento e
+          autoridade — sem travar na lente. O Viral. existe pra esse formato.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 24,
+        }}>
+          {NO_CAMERA_POINTS.map(({ icon: Icon, title, body }) => (
+            <div
+              key={title}
+              style={{
+                padding: '22px 20px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-secondary)',
+              }}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'var(--accent-surface)', color: 'var(--accent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 14,
+              }}>
+                <Icon size={18} strokeWidth={2} />
+              </div>
+              <h3 style={{
+                margin: '0 0 8px',
+                fontSize: 17,
+                fontWeight: 600,
+                letterSpacing: '-0.018em',
+              }}>{title}</h3>
+              <p style={{
+                margin: 0,
+                fontSize: 14,
+                lineHeight: 1.45,
+                color: 'var(--text-secondary)',
+              }}>{body}</p>
+            </div>
+          ))}
+        </div>
+        <p style={{
+          margin: 0,
+          fontSize: 13,
+          color: 'var(--text-muted)',
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.02em',
+          lineHeight: 1.5,
+        }}>
+          Benchmarks públicos (ex.: Socialinsider) repetem: carrossel segue entre os formatos
+          com mais engajamento e salvamento — o Viral. otimiza o arco pra esse jogo.
+        </p>
+      </RevealSection>
+
       {/* ── MODOS ── */}
       <RevealSection
         variant="rise"
@@ -1833,6 +1982,340 @@ export default function OnboardingLanding({ onEnter, isMobile }) {
                 objectFit: 'cover',
               }}
             />
+          </div>
+        </div>
+      </RevealSection>
+
+      {/* ── ÂNCORA DE VALOR ── */}
+      <RevealSection
+        variant="rise"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '24px 16px 20px' : '40px clamp(24px, 5vw, 48px) 28px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Uma aba</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+          maxWidth: '20ch',
+        }}>
+          Canva escreve layout.
+          <br />
+          Chat escreve texto.
+          <br />
+          <span style={{ color: 'var(--accent)' }}>Viral. fecha o post.</span>
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Três ferramentas soltas = três abas e zero arco. O studio junta narrativa,
+          marca e export — a geração fica na sua chave de IA.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 16,
+        }}>
+          {VALUE_STACK.map(({ icon: Icon, label, role, gap }) => (
+            <div
+              key={label}
+              style={{
+                padding: '20px 18px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-glass)',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={16} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
+              </div>
+              <p style={{
+                margin: '0 0 6px',
+                fontSize: 14,
+                color: 'var(--text-secondary)',
+              }}>{role}</p>
+              <p style={{
+                margin: 0,
+                fontSize: 13,
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+              }}>{gap}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{
+          padding: isMobile ? '18px 16px' : '20px 24px',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid rgba(255, 45, 141, 0.35)',
+          background: 'var(--accent-surface)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <p style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: '-0.014em',
+            maxWidth: '42ch',
+            lineHeight: 1.4,
+          }}>
+            Um fluxo. Um export. Sem montar o argumento em três apps.
+          </p>
+          <button
+            type="button"
+            className="vc-landing-cta"
+            onClick={onEnter}
+            style={{
+              height: 44,
+              padding: '0 20px',
+              borderRadius: 'var(--radius-pill)',
+              border: 'none',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontFamily: 'var(--font-ui)',
+              flexShrink: 0,
+            }}
+          >
+            Ver plano e assinar
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </RevealSection>
+
+      {/* ── PLANOS ── */}
+      <RevealSection
+        variant="rise"
+        id="planos"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: isMobile ? '20px 16px 40px' : '28px clamp(24px, 5vw, 48px) 64px',
+        }}
+      >
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Planos</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+        }}>
+          Um plano. Studio completo.
+        </h2>
+        <p style={{
+          margin: '0 0 32px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Sem créditos de imagem embutidos. Sem trava de “N carrosséis”.
+          Você assina o acesso — a geração roda na sua chave.
+        </p>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr',
+          gap: 16,
+          alignItems: 'stretch',
+        }}>
+          <div style={{
+            padding: isMobile ? 24 : 32,
+            borderRadius: 'var(--radius-xl)',
+            border: '1px solid rgba(255, 45, 141, 0.4)',
+            background: 'linear-gradient(160deg, rgba(255,45,141,0.12) 0%, rgba(14,12,20,0.5) 55%)',
+            boxShadow: 'var(--shadow-pink)',
+          }}>
+            <div style={{
+              display: 'inline-flex',
+              padding: '4px 10px',
+              borderRadius: 999,
+              background: 'var(--accent-surface)',
+              color: 'var(--accent)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              marginBottom: 16,
+            }}>
+              Individual · recomendado
+            </div>
+            <h3 style={{
+              margin: '0 0 8px',
+              fontSize: 22,
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
+            }}>Viral. Studio</h3>
+            <div style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 8,
+              marginBottom: 8,
+            }}>
+              <span style={{
+                fontSize: isMobile ? 40 : 48,
+                fontWeight: 600,
+                letterSpacing: '-0.03em',
+              }}>R$ 97</span>
+              <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>/mês</span>
+            </div>
+            <p style={{
+              margin: '0 0 24px',
+              fontSize: 14,
+              color: 'var(--text-secondary)',
+            }}>
+              Ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong>
+              {' '}(~R$ 66/mês) — mesmo acesso, menos no cartão.
+            </p>
+            <ul style={{
+              margin: '0 0 28px',
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}>
+              {PLAN_FEATURES.map((line) => (
+                <li key={line} style={{
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                  fontSize: 14,
+                  lineHeight: 1.4,
+                  color: 'var(--text-secondary)',
+                }}>
+                  <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 2 }} />
+                  {line}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="vc-landing-cta"
+              onClick={onEnter}
+              style={{
+                width: '100%',
+                height: 52,
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                fontFamily: 'var(--font-ui)',
+                boxShadow: 'var(--shadow-pink)',
+              }}
+            >
+              <Sparkles size={18} />
+              Assinar e entrar no studio
+              <ArrowRight size={16} />
+            </button>
+            <p style={{
+              margin: '14px 0 0',
+              fontSize: 12,
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.03em',
+            }}>
+              Sem fidelidade · Cancele quando quiser
+            </p>
+          </div>
+
+          <div style={{
+            padding: isMobile ? 22 : 28,
+            borderRadius: 'var(--radius-xl)',
+            border: '1px solid var(--hairline)',
+            background: 'var(--bg-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: 16,
+          }}>
+            <p style={{
+              margin: 0,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+            }}>Por que não créditos?</p>
+            <p style={{
+              margin: 0,
+              fontSize: 16,
+              lineHeight: 1.5,
+              color: 'var(--text-secondary)',
+            }}>
+              Apps que “incluem IA” vendem pacote de imagem e travam volume.
+              Aqui o produto é o <strong style={{ color: 'var(--text-primary)' }}>studio</strong>:
+              fluxo editorial, marca e export. A LLM é sua — você escolhe quanto gerar.
+            </p>
+            <p style={{
+              margin: 0,
+              fontSize: 14,
+              lineHeight: 1.45,
+              color: 'var(--text-muted)',
+            }}>
+              Método no chat (curso) ensina. Prompt solto gera texto.
+              Viral. entrega o arquivo pronto pra postar no browser.
+            </p>
           </div>
         </div>
       </RevealSection>

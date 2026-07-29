@@ -1,46 +1,48 @@
-import { getStripe, isSubscriptionActive } from '../lib/stripe.js';
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-async function readRawBody(req) {
-  if (Buffer.isBuffer(req.body)) return req.body;
-  if (typeof req.body === 'string') return Buffer.from(req.body);
-  const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  if (chunks.length) return Buffer.concat(chunks);
-  if (req.body && typeof req.body === 'object') {
-    return Buffer.from(JSON.stringify(req.body));
-  }
-  return Buffer.alloc(0);
-}
+import Stripe from 'stripe';
+import { isSubscriptionActive } from '../lib/stripe.js';
 
 /**
- * POST /api/stripe/webhook
- * Fonte da verdade para eventos (logs + futuro sync).
- * O acesso ao studio valida a assinatura live no Stripe via cookie.
+ * Edge runtime: `request.text()` devolve o body cru (obrigatório p/ assinatura Stripe).
+ * O bodyParser do Node na Vercel re-serializava o JSON e quebrava o webhook (400).
  */
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(request) {
+  if (request.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET em falta');
-    return res.status(500).json({ error: 'webhook_not_configured' });
+  // Stripe falha se o secret tiver newline/espaço (comum ao colar na Vercel).
+  const secret = cleanEnv(process.env.STRIPE_WEBHOOK_SECRET);
+  const key = cleanEnv(process.env.STRIPE_SECRET_KEY);
+  if (!secret || !key) {
+    console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET ou STRIPE_SECRET_KEY em falta');
+    return Response.json({ error: 'webhook_not_configured' }, { status: 500 });
+  }
+  if (!secret.startsWith('whsec_')) {
+    console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET não começa com whsec_');
+    return Response.json({ error: 'webhook_secret_invalid' }, { status: 500 });
   }
 
   try {
-    const stripe = getStripe();
-    const rawBody = await readRawBody(req);
-    const sig = req.headers['stripe-signature'];
-    const event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+    const stripe = new Stripe(key, {
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+    const rawBody = await request.text();
+    const signature = request.headers.get('stripe-signature');
+    if (!signature) {
+      return Response.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    }
+
+    const event = await stripe.webhooks.constructEventAsync(
+      rawBody,
+      signature,
+      secret,
+      undefined,
+      Stripe.createSubtleCryptoProvider(),
+    );
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -67,9 +69,18 @@ export default async function handler(req, res) {
         console.log(`[stripe/webhook] ignored ${event.type}`);
     }
 
-    return res.status(200).json({ received: true });
+    return Response.json({ received: true });
   } catch (e) {
     console.error('[stripe/webhook]', e.message || e);
-    return res.status(400).json({ error: `Webhook Error: ${e.message}` });
+    return Response.json({ error: `Webhook Error: ${e.message}` }, { status: 400 });
   }
+}
+
+/** Remove BOM, aspas e qualquer whitespace (newline ao colar na Vercel). */
+function cleanEnv(value) {
+  return String(value || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, '');
 }

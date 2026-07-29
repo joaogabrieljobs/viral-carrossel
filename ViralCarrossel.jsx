@@ -47,6 +47,10 @@ import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/libra
 import { FORMATS } from './src/utils/formats.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
+import {
+  DEFAULT_AI_SETTINGS,
+  normalizeAISettings,
+} from './src/config/ai-providers.js';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 // Permite os componentes de render (SlideCardInner, ClassicCanvasInner) lerem
@@ -83,6 +87,8 @@ const SK = {
   anthropicKeyPersist: 'vc_anthropic_key_persist',
   /** Modelo Claude preferido: 'sonnet' (default, rápido) ou 'opus' (qualidade máxima). */
   claudeModel:   'vc_claude_model',
+  aiSettings:    'vc_ai_settings',
+  aiKeys:        'vc_ai_keys',
   /** Biblioteca de hooks (capas) que o usuário aprovou — sugerida em novas gerações do mesmo nicho. */
   hookLibrary:   'vc_hook_library',
   onboarding:    'vc_onboarding_done',
@@ -2365,6 +2371,7 @@ const ANTHROPIC_URL = USE_ANTHROPIC_PROXY
 const OPENAI_CHAT_URL  = IS_LOCAL_DEV ? '/api/openai/v1/chat/completions'      : 'https://api.openai.com/v1/chat/completions';
 const OPENAI_IMAGE_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/generations'    : 'https://api.openai.com/v1/images/generations';
 const OPENAI_IMAGE_EDITS_URL = IS_LOCAL_DEV ? '/api/openai/v1/images/edits'     : 'https://api.openai.com/v1/images/edits';
+const COMPATIBLE_AI_URL = '/api/ai/compatible';
 
 /** Converte "Failed to fetch" numa mensagem acionável (CORS, preview sem proxy, rede). */
 function enhanceNetworkError(err, label) {
@@ -2381,10 +2388,8 @@ function enhanceNetworkError(err, label) {
     hint = 'Verifique se `npm run dev` está rodando e se há internet. Em local dev, o proxy /api precisa do servidor Vite ativo.';
   } else if (isClaude) {
     hint =
-      'Em produção, Claude passa pelo proxy /api/anthropic (Netlify Function). ' +
-      'Verifique se: (a) sua chave Anthropic está preenchida no ⚙ no header, OU ' +
-      '(b) o admin do site configurou ANTHROPIC_API_KEY no Netlify. ' +
-      'Como atalho, adicione apenas a chave OpenAI no ⚙ — ela cobre texto (GPT-4o) e imagens (DALL·E).';
+      'Claude passa pelo proxy seguro /api/anthropic. ' +
+      'Confira a chave Anthropic em ⚙ → Chaves ou escolha outro provedor de texto em Configuração.';
   } else if (isOpenAI) {
     hint =
       'Sua chave OpenAI pode estar inválida, expirada ou sem saldo. ' +
@@ -2399,34 +2404,29 @@ function enhanceNetworkError(err, label) {
 
 const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês.';
 
-// Backend Anthropic (Claude)
-// Mutável em runtime via setClaudeModelPref — React component sincroniza via useEffect.
-// Defaults para Sonnet (rápido); usuário pode trocar para Opus em ⚙ para qualidade máxima.
-const CLAUDE_MODELS = {
-  sonnet: 'claude-sonnet-4-6',
-  opus:   'claude-opus-4-7',
+// Configuração selecionada no modal. Mantida em módulo para as funções de geração,
+// que vivem fora do componente React, lerem a preferência atual sem prop drilling.
+let _aiRuntimeSettings = normalizeAISettings(DEFAULT_AI_SETTINGS);
+const setAIRuntimeSettings = (value) => {
+  _aiRuntimeSettings = normalizeAISettings(value);
 };
-let _claudeModelPref = 'sonnet';
-const setClaudeModelPref = (v) => { _claudeModelPref = (v === 'opus' ? 'opus' : 'sonnet'); };
-const getClaudeModelId = () => CLAUDE_MODELS[_claudeModelPref] || CLAUDE_MODELS.sonnet;
-
-// Mutável em runtime — App.useEffect sincroniza após mudança no input do KeysModal.
-let _anthropicUserKey = '';
-const setAnthropicUserKey = (k) => { _anthropicUserKey = String(k || '').trim(); };
+const getTextModel = (provider) =>
+  _aiRuntimeSettings.textModels?.[provider] || DEFAULT_AI_SETTINGS.textModels[provider];
+const getProviderKey = (provider) => String(_aiRuntimeSettings.keys?.[provider] || '').trim();
 
 const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null } = {}) => {
   const body = {
-    model: getClaudeModelId(),
+    model: getTextModel('anthropic'),
     max_tokens: maxTokens,
     system: AI_SYSTEM_PT,
     messages: [{ role: 'user', content: userMsg }],
   };
   if (tools) body.tools = tools;
   const headers = { 'Content-Type': 'application/json' };
-  // Local dev: chave do usuário (se preenchida) é injetada via header pro proxy usar
-  // como x-api-key no Anthropic. Sem chave do usuário, proxy usa ANTHROPIC_API_KEY do .env.local.
-  if (IS_LOCAL_DEV && _anthropicUserKey) {
-    headers['x-anthropic-key'] = _anthropicUserKey;
+  // BYOK: chave do usuário via header; sem ela, o proxy usa ANTHROPIC_API_KEY do host.
+  const anthropicKey = getProviderKey('anthropic');
+  if (anthropicKey) {
+    headers['x-anthropic-key'] = anthropicKey;
   }
   let res;
   try {
@@ -2460,19 +2460,19 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   return json ? extractJSON(text) : text.trim();
 };
 
-// Backend OpenAI (gpt-4o) — usado como fallback quando só há chave OpenAI
+// Backend OpenAI — Chat Completions com a família GPT-5.6.
 const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) => {
+  key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
   if (!IS_LOCAL_DEV && !key) throw new Error('Chave OpenAI ausente — configure em ⚙ no header.');
   const body = {
-    model: 'gpt-4o',
-    max_tokens: maxTokens,
+    model: getTextModel('openai'),
+    max_completion_tokens: maxTokens,
     messages: [
       { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.` },
       { role: 'user',   content: userMsg },
     ],
-    temperature: 0.85,
   };
   if (json) body.response_format = { type: 'json_object' };
   const headers = { 'Content-Type': 'application/json' };
@@ -2508,55 +2508,74 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
   return json ? extractJSON(text) : text.trim();
 };
 
-// Multi-provider: tenta Anthropic primeiro, cai para OpenAI se necessário.
-// `openaiKey` é a chave configurada pelo usuário no UI (KeysModal).
-// Em local dev, OpenAI também funciona sem chave do user se o servidor tiver
-// `OPENAI_API_KEY` no .env.local (o proxy usa ela como fallback).
-//
-// Estratégia de erro: erros transitórios (429, 5xx, timeout, rede) no Anthropic
-// recebem retry com backoff exponencial antes de cair para OpenAI — evita queimar
-// crédito OpenAI quando o Claude está só sobrecarregado por uns segundos.
-const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
-  const status = await getServerStatus();
-  const openaiAvailable = !!openaiKey || (IS_LOCAL_DEV && status.openai);
-  // Anthropic disponível se: prod (Claude artifact, sempre) || env.local tem key || user forneceu key via UI
-  const anthropicAvailable = status.anthropic || !!_anthropicUserKey;
-  const isTransient = (e) => {
-    const msg = String(e?.message || '');
-    return e instanceof TypeError ||
-      e?.status === 429 || e?.status >= 500 ||
-      /HTTP\s*(429|5\d\d)|rate.?limit|timeout|network|fetch failed/i.test(msg);
+const COMPATIBLE_DIRECT_URLS = {
+  zai: '/api/zai/api/paas/v4/chat/completions',
+  kimi: '/api/kimi/v1/chat/completions',
+};
+
+const callCompatibleChat = async (
+  provider,
+  userMsg,
+  { json = false, maxTokens = 4096 } = {},
+) => {
+  const apiKey = getProviderKey(provider);
+  if (!apiKey) throw new Error(`Chave ${provider === 'zai' ? 'Z.ai' : 'Kimi'} ausente — configure em ⚙.`);
+  const payload = {
+    model: getTextModel(provider),
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra.` },
+      { role: 'user', content: userMsg },
+    ],
+    temperature: 0.8,
   };
-  if (anthropicAvailable) {
-    const backoffs = [0, 1000, 3000]; // 3 tentativas no Claude (imediata, +1s, +3s)
-    let lastErr;
-    for (let i = 0; i < backoffs.length; i++) {
-      if (backoffs[i] > 0) await new Promise(r => setTimeout(r, backoffs[i]));
-      try {
-        return await callAnthropic(userMsg, { json, maxTokens });
-      } catch (e) {
-        lastErr = e;
-        if (!isTransient(e) || i === backoffs.length - 1) break;
-        console.warn(`[callAI] Claude transitório (tentativa ${i+1}/${backoffs.length}):`, e.message);
-      }
-    }
-    if (openaiAvailable) {
-      console.warn('[callAI] Claude esgotou tentativas, caindo para OpenAI:', lastErr?.message);
-      return await callOpenAIChat(userMsg, { json, maxTokens, key: openaiKey });
-    }
-    throw lastErr;
+  if (json) payload.response_format = { type: 'json_object' };
+
+  const useDirect = IS_LOCAL_DEV;
+  const url = useDirect ? COMPATIBLE_DIRECT_URLS[provider] : COMPATIBLE_AI_URL;
+  const headers = { 'Content-Type': 'application/json' };
+  const body = useDirect
+    ? payload
+    : { provider, operation: 'chat', apiKey, payload };
+  if (useDirect) headers.Authorization = `Bearer ${apiKey}`;
+
+  let res;
+  try {
+    res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch (error) {
+    throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
   }
-  if (openaiAvailable) {
-    return await callOpenAIChat(userMsg, { json, maxTokens, key: openaiKey });
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch { throw new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'}: resposta inválida (HTTP ${res.status})`); }
+  if (!res.ok || data.error) {
+    throw new Error(data?.error?.message || `${provider} HTTP ${res.status}`);
   }
-  throw new Error('Sem chave de IA configurada. Adicione sua chave OpenAI em ⚙ no header (ou ANTHROPIC_API_KEY em .env.local para usar Claude).');
+  const text = data.choices?.[0]?.message?.content || '';
+  if (!text.trim()) throw new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'} retornou conteúdo vazio.`);
+  return json ? extractJSON(text) : text.trim();
+};
+
+// O provedor selecionado é respeitado: não há fallback oculto que possa gerar
+// cobrança numa segunda conta sem o usuário esperar.
+const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
+  const provider = _aiRuntimeSettings.textProvider;
+  if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens });
+  if (provider === 'openai') {
+    return callOpenAIChat(userMsg, { json, maxTokens, key: getProviderKey('openai') || openaiKey });
+  }
+  if (provider === 'zai' || provider === 'kimi') {
+    return callCompatibleChat(provider, userMsg, { json, maxTokens });
+  }
+  throw new Error('Provedor de texto inválido. Abra ⚙ e escolha uma opção.');
 };
 
 // Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic.
 const callAIwithSearch = async (userMsg, { json = false, maxTokens = 4096 } = {}) => {
   const status = await getServerStatus();
-  if (!status.anthropic) {
-    throw new Error('A pesquisa de nicho com web ao vivo precisa de uma chave Anthropic. Adicione ANTHROPIC_API_KEY em .env.local na raiz do projeto e reinicie o npm run dev.');
+  if (!status.anthropic && !getProviderKey('anthropic')) {
+    throw new Error('A pesquisa com web ao vivo precisa de uma chave Anthropic. Adicione-a em ⚙ → Chaves.');
   }
   return callAnthropic(userMsg, {
     json, maxTokens,
@@ -2979,6 +2998,45 @@ function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference =
   return body;
 }
 
+async function generateZaiImage(q, imgParams, imgExtraPrompt) {
+  const apiKey = getProviderKey('zai');
+  if (!apiKey) throw new Error('Chave Z.ai ausente — configure em ⚙ → Chaves.');
+  const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
+  const payload = {
+    model,
+    prompt: prompt.slice(0, 32000),
+    size: model === 'glm-image' ? '1088x1472' : '864x1152',
+    quality: model === 'glm-image' ? 'hd' : 'standard',
+  };
+  const useDirect = IS_LOCAL_DEV;
+  const url = useDirect
+    ? '/api/zai/api/paas/v4/images/generations'
+    : COMPATIBLE_AI_URL;
+  const headers = { 'Content-Type': 'application/json' };
+  const body = useDirect
+    ? payload
+    : { provider: 'zai', operation: 'images', apiKey, payload };
+  if (useDirect) headers.Authorization = `Bearer ${apiKey}`;
+
+  let res;
+  try {
+    res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch (error) {
+    throw enhanceNetworkError(error, 'Z.ai Image');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error || data.code) {
+    throw new Error(data?.error?.message || data?.message || `Z.ai Image HTTP ${res.status}`);
+  }
+  const image = data.data?.[0];
+  if (image?.b64_json) {
+    return `data:${image.mime || 'image/png'};base64,${image.b64_json}`;
+  }
+  if (image?.url) return image.url;
+  throw new Error('Z.ai não retornou a imagem.');
+}
+
 // Lista de modelos OpenAI tentados em ordem (do mais novo/melhor pro mais antigo).
 // `gpt-image-2` exige org verificada (>=abril/2026); `gpt-image-1` e `dall-e-3`
 // não. O fallback acontece automaticamente quando a API retorna 403 (verificação)
@@ -2993,6 +3051,14 @@ const OPENAI_IMAGE_MODELS = [
 ];
 
 let _cachedModel = null; // memoiza o primeiro modelo que funcionou nesta sessão
+function getOpenAIImageOrder() {
+  const selectedName = _aiRuntimeSettings.imageModels?.openai || 'gpt-image-2';
+  const selected = OPENAI_IMAGE_MODELS.find((model) => model.name === selectedName);
+  const candidates = [selected, _cachedModel, ...OPENAI_IMAGE_MODELS].filter(Boolean);
+  return candidates.filter(
+    (model, index, all) => all.findIndex((item) => item.name === model.name) === index,
+  );
+}
 
 /** Geração com uma ou mais imagens de referência (API edits — multipart). */
 async function generateDALLEEdits(refBlob, prompt, apiKey) {
@@ -3004,9 +3070,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const order = _cachedModel
-    ? [_cachedModel, ...OPENAI_IMAGE_MODELS.filter(m => m.name !== _cachedModel.name)]
-    : OPENAI_IMAGE_MODELS;
+  const order = getOpenAIImageOrder();
 
   let lastErr = null;
   for (const model of order) {
@@ -3071,6 +3135,10 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
  */
 const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
   const { refImage, imgExtraPrompt } = options || {};
+  if (_aiRuntimeSettings.imageProvider === 'zai') {
+    return generateZaiImage(q, imgParams, imgExtraPrompt);
+  }
+  apiKey = getProviderKey('openai') || apiKey;
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
 
   if (refImage) {
@@ -3091,9 +3159,7 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const order = _cachedModel
-    ? [_cachedModel, ...OPENAI_IMAGE_MODELS.filter(m => m.name !== _cachedModel.name)]
-    : OPENAI_IMAGE_MODELS;
+  const order = getOpenAIImageOrder();
 
   let lastErr = null;
   for (const model of order) {
@@ -8072,6 +8138,7 @@ function GenerateModal({
   open, onClose, onGenerate,
   defaultNiche='', defaultTopic='', defaultTone='', defaultAudience='',
   hasOpenAI=false, hasAnthropic=false, onOpenKeys,
+  imageProviderLabel = 'GPT Image 2',
   brandSummary, materialSummary,
   onGoToMaterial,
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
@@ -8606,10 +8673,7 @@ function GenerateModal({
             </>
           )}
 
-          {/* ═══════════ STEP 3 — IMAGENS ═══════════
-              Status do provedor + ajuste dos eixos (fidelidade, criatividade,
-              irreverência, objetividade). Sem chave OpenAI, só mostra o CTA
-              pra configurar e explica o fallback. */}
+          {/* ═══════════ STEP 3 — IMAGENS ═══════════ */}
           {step === 3 && (
             <>
               <div>
@@ -8625,10 +8689,10 @@ function GenerateModal({
                       letterSpacing:'-0.011em',
                     }}>Ativo</span>
                     <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
-                      GPT Image 2
+                      {imageProviderLabel}
                     </div>
                     <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                      OpenAI · geração a partir do tema e das palavras-chave de cada slide
+                      Geração a partir do tema e das palavras-chave de cada slide
                     </div>
                   </div>
                 ) : (
@@ -8637,7 +8701,7 @@ function GenerateModal({
                     border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
                     fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
                   }}>
-                    A geração automática de fundos usa <b>GPT Image 2</b>. Sem chave OpenAI, o carrossel sai com texto e palavras-chave de imagem; depois use Upload ou URL em cada card. Você pode seguir com <b>Só texto</b> no último passo.
+                    Sem provedor de imagem, o carrossel sai com texto e palavras-chave. Depois use Upload/URL em cada card, ou configure OpenAI/Z.ai em ⚙.
                   </div>
                 )}
                 {!hasOpenAI && (
@@ -8648,8 +8712,7 @@ function GenerateModal({
                     display:'flex', flexDirection:'column', gap:8,
                   }}>
                     <div>
-                      Para usar <b>GPT Image 2</b> (OpenAI · foto-realismo), defina a chave OpenAI nas definições.
-                      Custo aproximado: ~US$0.13 por imagem em qualidade <code>high</code>.
+                      Em ⚙ → Configuração escolha <b>OpenAI</b> (GPT Image) ou <b>Z.ai</b> (CogView/GLM-Image) e cole a chave.
                     </div>
                     {onOpenKeys && (
                       <button
@@ -8726,7 +8789,7 @@ function GenerateModal({
 
                   <span style={{ color:'var(--text-muted)' }}>Imagens</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
-                    {hasOpenAI ? 'GPT Image 2 (OpenAI)' : 'Só palavras-chave (sem OpenAI)'}
+                    {hasOpenAI ? imageProviderLabel : 'Só palavras-chave'}
                   </span>
                 </div>
               </div>
@@ -8755,7 +8818,7 @@ function GenerateModal({
                 fontSize:11, color:'var(--text-muted)', lineHeight:1.47, letterSpacing:'-0.011em',
                 padding:'10px 12px', borderRadius:11, border:'1px solid var(--hairline)', background:'var(--bg-card)',
               }}>
-                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos OpenAI.
+                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos do provedor de imagem.
                 {' '}
                 <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> rápido — você gera as imagens depois, card a card.
               </div>
@@ -8840,7 +8903,7 @@ function GenerateModal({
                 type="button"
                 onClick={() => run({ withImages: true })}
                 disabled={busy || !resolvedGenerationTopic || !hasOpenAI}
-                title={!hasOpenAI ? 'Configure a chave OpenAI em ⚙ pra gerar imagens' : 'Gera texto E imagens IA (mais lento, custa créditos OpenAI)'}
+                title={!hasOpenAI ? 'Configure o provedor de imagem em ⚙' : `Gera texto E imagens (${imageProviderLabel})`}
                 style={{
                   height:44, padding:'0 18px', borderRadius:9999, border:'none',
                   cursor: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'not-allowed' : 'pointer',
@@ -8904,7 +8967,7 @@ REGRAS:
       setData(r);
       onSetNiche?.(niche);
     } catch (e1) {
-      if (!openaiKey?.trim()) {
+      if (!getProviderKey(_aiRuntimeSettings.textProvider)) {
         setErr(e1.message || String(e1));
         return;
       }
@@ -9361,7 +9424,7 @@ function SidebarContent({
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
   const applyDalleQuery = async (q) => {
-    if (!hasOpenAI) { toast?.('Configure a chave OpenAI primeiro (ícone ⚙ no header ou OPENAI_API_KEY no .env.local)', 'error'); return; }
+    if (!hasOpenAI) { toast?.('Configure o provedor de imagem em ⚙ (OpenAI ou Z.ai).', 'error'); return; }
     updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
     setDalleLoading(true);
     try {
@@ -13932,67 +13995,66 @@ export default function App() {
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
   const [imageCropOpen, setImageCropOpen] = useState(false);
   const [photoPositionOpen, setPhotoPositionOpen] = useState(false);
-  // Estratégia de persistência da chave OpenAI:
-  // - default = sessionStorage (apaga ao fechar aba, mitiga XSS de longa duração)
-  // - se usuário marcar "manter salvo entre sessões", migra para localStorage
-  // Sem botão = comportamento legado preservado ao carregar (se localStorage tinha, mantém)
-  const [openaiKeyPersist, setOpenaiKeyPersist] = useState(() => {
-    try { return localStorage.getItem(SK.openaiKeyPersist) === '1'; } catch { return false; }
-  });
-  const [openaiKey, setOpenaiKey] = useState(() => {
+  // Configuração unificada de IA. Preferências (sem segredos) ficam no localStorage;
+  // chaves ficam na sessão por padrão e só persistem se o usuário autorizar.
+  const [aiSettings, setAISettings] = useState(() => {
     try {
-      const ls = localStorage.getItem(SK.openaiKey) || '';
-      if (ls) return ls; // legacy: já estava em localStorage, preserva
-      return sessionStorage.getItem(SK.openaiKey) || '';
-    } catch { return ''; }
-  });
-  useEffect(() => {
-    try {
-      if (openaiKeyPersist) {
-        localStorage.setItem(SK.openaiKey, openaiKey);
-        sessionStorage.removeItem(SK.openaiKey);
-      } else {
-        sessionStorage.setItem(SK.openaiKey, openaiKey);
-        localStorage.removeItem(SK.openaiKey);
-      }
-      localStorage.setItem(SK.openaiKeyPersist, openaiKeyPersist ? '1' : '0');
-    } catch { /* privado / bloqueado */ }
-  }, [openaiKey, openaiKeyPersist]);
-  // Chave Anthropic (mesmo padrão da OpenAI: session por default, localStorage se user marcar)
-  const [anthropicKeyPersist, setAnthropicKeyPersist] = useState(() => {
-    try { return localStorage.getItem(SK.anthropicKeyPersist) === '1'; } catch { return false; }
-  });
-  const [anthropicKey, setAnthropicKey] = useState(() => {
-    try {
-      const ls = localStorage.getItem(SK.anthropicKey) || '';
-      if (ls) return ls;
-      return sessionStorage.getItem(SK.anthropicKey) || '';
-    } catch { return ''; }
-  });
-  useEffect(() => {
-    try {
-      if (anthropicKeyPersist) {
-        localStorage.setItem(SK.anthropicKey, anthropicKey);
-        sessionStorage.removeItem(SK.anthropicKey);
-      } else {
-        sessionStorage.setItem(SK.anthropicKey, anthropicKey);
-        localStorage.removeItem(SK.anthropicKey);
-      }
-      localStorage.setItem(SK.anthropicKeyPersist, anthropicKeyPersist ? '1' : '0');
-    } catch { /* */ }
-    setAnthropicUserKey(anthropicKey);
-  }, [anthropicKey, anthropicKeyPersist]);
-  // Modelo Claude preferido
-  const [claudeModel, setClaudeModel] = useState(() => {
-    try {
-      const v = localStorage.getItem(SK.claudeModel);
-      return v === 'opus' ? 'opus' : 'sonnet';
-    } catch { return 'sonnet'; }
+      const savedConfig = JSON.parse(localStorage.getItem(SK.aiSettings) || '{}');
+      const savedKeys = JSON.parse(
+        localStorage.getItem(SK.aiKeys) ||
+        sessionStorage.getItem(SK.aiKeys) ||
+        '{}',
+      );
+      // Migração transparente da janela antiga.
+      const legacyOpenAI =
+        localStorage.getItem(SK.openaiKey) ||
+        sessionStorage.getItem(SK.openaiKey) ||
+        '';
+      const legacyAnthropic =
+        localStorage.getItem(SK.anthropicKey) ||
+        sessionStorage.getItem(SK.anthropicKey) ||
+        '';
+      const legacyClaudeModel = localStorage.getItem(SK.claudeModel);
+      return normalizeAISettings({
+        ...savedConfig,
+        keys: {
+          ...savedKeys,
+          openai: savedKeys.openai || legacyOpenAI,
+          anthropic: savedKeys.anthropic || legacyAnthropic,
+        },
+        textModels: {
+          ...(savedConfig.textModels || {}),
+          ...(!savedConfig.textModels?.anthropic && legacyClaudeModel
+            ? { anthropic: legacyClaudeModel === 'opus' ? 'claude-opus-5' : 'claude-sonnet-5' }
+            : {}),
+        },
+        persistKeys:
+          savedConfig.persistKeys ??
+          (localStorage.getItem(SK.openaiKeyPersist) === '1' ||
+            localStorage.getItem(SK.anthropicKeyPersist) === '1'),
+      });
+    } catch {
+      return normalizeAISettings(DEFAULT_AI_SETTINGS);
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem(SK.claudeModel, claudeModel); } catch { /* */ }
-    setClaudeModelPref(claudeModel);
-  }, [claudeModel]);
+    setAIRuntimeSettings(aiSettings);
+    try {
+      const { keys, ...safeSettings } = aiSettings;
+      localStorage.setItem(SK.aiSettings, JSON.stringify(safeSettings));
+      const target = aiSettings.persistKeys ? localStorage : sessionStorage;
+      const other = aiSettings.persistKeys ? sessionStorage : localStorage;
+      target.setItem(SK.aiKeys, JSON.stringify(keys));
+      other.removeItem(SK.aiKeys);
+      // Remove cópias legadas para não deixar segredos duplicados.
+      localStorage.removeItem(SK.openaiKey);
+      sessionStorage.removeItem(SK.openaiKey);
+      localStorage.removeItem(SK.anthropicKey);
+      sessionStorage.removeItem(SK.anthropicKey);
+    } catch { /* storage privado/bloqueado */ }
+  }, [aiSettings]);
+  const openaiKey = aiSettings.keys.openai || '';
+  const anthropicKey = aiSettings.keys.anthropic || '';
   // Biblioteca de hooks aprovados (B2)
   const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
   // FASE 2 Narrative OS: Sistema de Modos (Criador/Diretor/Studio)
@@ -14101,9 +14163,18 @@ export default function App() {
   // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
   const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
-  const hasOpenAI    = !!openaiKey || (IS_LOCAL_DEV && serverStatus.openai);
+  const selectedTextProvider = aiSettings.textProvider;
+  const selectedImageKeyProvider = aiSettings.imageProvider === 'zai' ? 'zai' : 'openai';
+  // Nome legado (`hasOpenAI`) preservado nos componentes de imagem; agora significa
+  // "há um provedor de imagem configurado", inclusive Z.ai.
+  const hasOpenAI =
+    !!aiSettings.keys[selectedImageKeyProvider] ||
+    (selectedImageKeyProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai);
   const hasAnthropic = serverStatus.anthropic || !!anthropicKey;
-  const hasAnyAI     = hasOpenAI || hasAnthropic;
+  const hasAnyAI =
+    !!aiSettings.keys[selectedTextProvider] ||
+    (selectedTextProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai) ||
+    (selectedTextProvider === 'anthropic' && hasAnthropic);
   const [niche, setNiche] = useState('');
 
   // Tour guiado — primeira visita (pode repetir pela ajuda)
@@ -14372,10 +14443,9 @@ export default function App() {
                   onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
           onMouseLeave={e=>{e.currentTarget.style.color=hasAnyAI?'var(--success-text)':'var(--text-secondary)';e.currentTarget.style.borderColor=hasAnyAI?'var(--success-border)':'var(--divider-soft)';}}
           title={
-            hasOpenAI && hasAnthropic ? 'Anthropic + OpenAI configurados ✓' :
-            hasOpenAI                 ? 'OpenAI configurado ✓' :
-            hasAnthropic              ? 'Anthropic (Claude) configurado ✓' :
-                                        'Configurar API keys'
+            hasAnyAI
+              ? `IA pronta · texto ${aiSettings.textProvider} · imagem ${aiSettings.imageProvider}`
+              : 'Configurar provedores de IA'
           } aria-label="Configurações">
             <Settings size={13}/>
           </button>
@@ -14752,7 +14822,7 @@ export default function App() {
     }
 
     if (!hasOpenAI) {
-      toast('Configure a chave OpenAI para gerar com GPT Image (ícone de engrenagem).', 'error');
+      toast('Configure o provedor de imagem em ⚙ (OpenAI ou Z.ai).', 'error');
       return;
     }
 
@@ -16807,17 +16877,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       <KeysModal
         open={keysOpen}
         onClose={()=>setKeysOpen(false)}
-        openaiKey={openaiKey}
-        onSave={setOpenaiKey}
-        onRefreshStatus={setServerStatus}
-        openaiKeyPersist={openaiKeyPersist}
-        onChangePersist={setOpenaiKeyPersist}
-        claudeModel={claudeModel}
-        onChangeClaudeModel={setClaudeModel}
-        anthropicKey={anthropicKey}
-        onSaveAnthropic={setAnthropicKey}
-        anthropicKeyPersist={anthropicKeyPersist}
-        onChangeAnthropicPersist={setAnthropicKeyPersist}
+        aiSettings={aiSettings}
+        onSaveSettings={setAISettings}
       />
       <GenerateModal
         open={setupOpen}
@@ -16829,6 +16890,11 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         defaultAudience={brand.defaultAudience || ''}
         hasOpenAI={hasOpenAI}
         hasAnthropic={hasAnthropic}
+        imageProviderLabel={
+          aiSettings.imageProvider === 'zai'
+            ? (aiSettings.imageModels?.zai === 'glm-image' ? 'GLM-Image · Z.ai' : 'CogView-4 · Z.ai')
+            : (aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2')
+        }
         onOpenKeys={() => setKeysOpen(true)}
         onGoToMaterial={() => {
           setShellView('project');

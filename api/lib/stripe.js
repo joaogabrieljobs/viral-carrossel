@@ -2,8 +2,16 @@ import Stripe from 'stripe';
 
 let _stripe;
 
+function cleanEnv(value) {
+  return String(value || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, '');
+}
+
 export function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = cleanEnv(process.env.STRIPE_SECRET_KEY);
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY não configurada');
   }
@@ -23,7 +31,7 @@ export function getAppUrl(req) {
 }
 
 export function getPriceId() {
-  const id = process.env.STRIPE_PRICE_ID || '';
+  const id = cleanEnv(process.env.STRIPE_PRICE_ID);
   if (!id) throw new Error('STRIPE_PRICE_ID não configurada');
   return id;
 }
