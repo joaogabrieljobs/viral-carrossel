@@ -9,7 +9,7 @@ import {
   Type, Quote, BookOpen, Image as ImageIcon,
   ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
   ChevronRight, ChevronLeft, ChevronDown, Check, Instagram, Settings, Maximize2, Minus,
-  Home, Layers, SlidersHorizontal,
+  Home, Layers, SlidersHorizontal, User, CreditCard,
   Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
   Target, Camera,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import OnboardingLanding from './src/components/OnboardingLanding.jsx';
 import Paywall from './src/components/Paywall.jsx';
 import LoginModal from './src/components/LoginModal.jsx';
+import AccountProfile from './src/components/AccountProfile.jsx';
 import {
   fetchAccessSession,
   confirmCheckoutSession,
@@ -15928,7 +15929,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenSettings={() => setKeysOpen(true)}
           onContinueEditor={() => setShellView('project')}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
+          onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
+          currentPeriodEnd={access.currentPeriodEnd}
           openDoc={openDoc}
           newDoc={newDoc}
           renameDoc={renameDoc}
@@ -17158,15 +17161,24 @@ function AccountHomeShell({
   exportDoc,
   askPrompt,
   onManageBilling,
+  onOpenBrands,
   accessEmail,
+  currentPeriodEnd,
 }) {
   const totalCards = useMemo(
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
     [library],
   );
 
+  const [homeTab, setHomeTab] = useState('projects'); // projects | profile | plan
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const NAV_ITEMS = [
+    { id: 'projects', label: 'Projetos', icon: Layers },
+    { id: 'profile', label: 'Perfil pessoal', icon: User },
+    { id: 'plan', label: 'Assinatura', icon: CreditCard },
+  ];
 
   const items = useMemo(() => (
     [...library]
@@ -17333,16 +17345,226 @@ function AccountHomeShell({
         )}
       </header>
 
+      {isMobile && (
+        <nav
+          aria-label="Área da conta"
+          style={{
+            display: 'flex',
+            gap: 4,
+            padding: '10px 12px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-sidebar)',
+            flexShrink: 0,
+            overflowX: 'auto',
+          }}
+        >
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setHomeTab(id)}
+              style={{
+                height: 34,
+                padding: '0 12px',
+                border: 'none',
+                borderRadius: 9999,
+                background: homeTab === id ? 'var(--text-primary)' : 'transparent',
+                color: homeTab === id ? 'var(--bg-base)' : 'var(--text-secondary)',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
+        width: '100%',
+        display: 'flex',
+        overflow: 'hidden',
+      }}>
+        {!isMobile && (
+          <aside style={{
+            width: 220,
+            flexShrink: 0,
+            borderRight: '1px solid var(--border)',
+            background: 'var(--bg-sidebar)',
+            padding: '16px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}>
+            <p style={{
+              margin: '0 8px 8px',
+              fontSize: 10,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              Conta
+            </p>
+            {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+              const active = homeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setHomeTab(id)}
+                  style={{
+                    width: '100%',
+                    minHeight: 42,
+                    padding: '0 12px',
+                    borderRadius: 10,
+                    border: active ? '1px solid var(--border)' : '1px solid transparent',
+                    background: active ? 'var(--accent-surface)' : 'transparent',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textAlign: 'left',
+                    fontFamily: 'var(--font-ui)',
+                  }}
+                >
+                  <Icon size={15} color={active ? 'var(--accent)' : 'var(--text-muted)'} />
+                  {label}
+                </button>
+              );
+            })}
+          </aside>
+        )}
+
       <div style={{
         flex: 1, minHeight: 0, minWidth: 0, width: '100%',
         overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
-          boxSizing: 'border-box', width: '100%', maxWidth: 720,
+          boxSizing: 'border-box', width: '100%', maxWidth: homeTab === 'profile' ? 820 : 720,
           marginLeft: 'auto', marginRight: 'auto',
           padding: isMobile ? '24px 16px 40px' : '40px 24px 72px',
           display: 'grid', gap: 28,
         }}>
+          {homeTab === 'profile' && (
+            <>
+              <header>
+                <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
+                <h2 style={{
+                  margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
+                  letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
+                  color: 'var(--text-primary)', lineHeight: 1.15,
+                }}>
+                  Perfil pessoal
+                </h2>
+                <p style={{
+                  margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
+                  color: 'var(--text-muted)', maxWidth: '52ch',
+                }}>
+                  Seu nome, bio, redes e resumo da assinatura.
+                </p>
+              </header>
+              <AccountProfile
+                email={accessEmail}
+                libraryCount={library.length}
+                brandCount={brandCount}
+                totalCards={totalCards}
+                aiSettings={aiSettings}
+                hasTextAI={hasTextAI}
+                hasImageAI={hasImageAI}
+                isMobile={isMobile}
+                onOpenSettings={onOpenSettings}
+                onManageBilling={onManageBilling}
+                onOpenBrands={onOpenBrands}
+                currentPeriodEnd={currentPeriodEnd}
+              />
+            </>
+          )}
+
+          {homeTab === 'plan' && (
+            <>
+              <header>
+                <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
+                <h2 style={{
+                  margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
+                  letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
+                  color: 'var(--text-primary)', lineHeight: 1.15,
+                }}>
+                  Assinatura
+                </h2>
+                <p style={{
+                  margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
+                  color: 'var(--text-muted)', maxWidth: '52ch',
+                }}>
+                  Gerencie plano, pagamento e cancelamento no portal seguro.
+                </p>
+              </header>
+              <section style={{
+                padding: isMobile ? 18 : 24,
+                borderRadius: 16,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-card)',
+                display: 'grid',
+                gap: 16,
+              }}>
+                <div>
+                  <div className="vc-eyebrow" style={{ marginBottom: 6 }}>Plano atual</div>
+                  <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Studio Viral. · mensal</h3>
+                  <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                    Acesso completo aos modos Criador, Diretor e Studio.
+                    {currentPeriodEnd
+                      ? ` Renovação em ${new Date(currentPeriodEnd).toLocaleDateString('pt-BR')}.`
+                      : ''}
+                  </p>
+                </div>
+                {accessEmail && (
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+                    Conta: <strong>{accessEmail}</strong>
+                  </p>
+                )}
+                {onManageBilling ? (
+                  <button
+                    type="button"
+                    onClick={onManageBilling}
+                    style={{
+                      height: 44,
+                      width: 'fit-content',
+                      padding: '0 18px',
+                      borderRadius: 9999,
+                      border: 'none',
+                      background: 'var(--text-primary)',
+                      color: 'var(--bg-base)',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Abrir portal do cliente
+                  </button>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+                    Billing desativado neste ambiente.
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
+          {homeTab === 'projects' && (
+          <>
           <header>
             <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Início</p>
             <h2 style={{
@@ -17843,7 +18065,10 @@ function AccountHomeShell({
             Atalhos: Templates e Pesquisa no topo · chaves de IA em Configurar IA
           </p>
           </section>
+          </>
+          )}
         </div>
+      </div>
       </div>
     </div>
   );
