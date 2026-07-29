@@ -17174,11 +17174,67 @@ function AccountHomeShell({
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  const NAV_ITEMS = [
-    { id: 'projects', label: 'Projetos', icon: Layers },
-    { id: 'profile', label: 'Perfil pessoal', icon: User },
-    { id: 'plan', label: 'Assinatura', icon: CreditCard },
-  ];
+  const navBtn = (id, label, Icon) => {
+    const active = homeTab === id;
+    return (
+      <button
+        key={id}
+        type="button"
+        onClick={() => setHomeTab(id)}
+        style={{
+          height: isMobile ? 36 : 36,
+          padding: '0 12px',
+          borderRadius: 9999,
+          border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+          background: active ? 'var(--accent-surface)' : 'var(--bg-card)',
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 600,
+          fontFamily: 'var(--font-ui)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <Icon size={13} color={active ? 'var(--accent)' : 'var(--text-muted)'} />
+        {label}
+      </button>
+    );
+  };
+
+  const generateBtn = (fullWidth = false) => (
+    <button
+      type="button"
+      data-vc-tour="generate"
+      onClick={() => onGenerate()}
+      style={{
+        width: fullWidth ? '100%' : 'auto',
+        height: fullWidth ? 48 : 40,
+        minHeight: fullWidth ? 48 : 40,
+        padding: '0 22px',
+        borderRadius: 9999,
+        border: 'none',
+        cursor: 'pointer',
+        background: 'var(--accent)',
+        color: '#fff',
+        fontSize: fullWidth ? 15 : 13,
+        fontWeight: 600,
+        letterSpacing: '-0.016em',
+        fontFamily: 'var(--font-ui)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        boxShadow: '0 0 0 1px rgba(255,45,141,0.25)',
+      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      <Sparkles size={fullWidth ? 15 : 14} /> Gerar com IA
+    </button>
+  );
 
   const items = useMemo(() => (
     [...library]
@@ -17230,18 +17286,40 @@ function AccountHomeShell({
       <header style={{
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-sidebar)',
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        alignItems: isMobile ? 'stretch' : 'center',
-        justifyContent: 'space-between',
-        gap: isMobile ? 12 : 10,
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto minmax(0, 1fr)',
+        alignItems: 'center',
+        gap: isMobile ? 12 : 16,
         padding: isMobile
           ? `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`
           : `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: isMobile ? '100%' : 'auto', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+        {/* Esquerda — marca + Perfil / Assinatura */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          minWidth: 0,
+          justifyContent: 'flex-start',
+        }}>
+          <button
+            type="button"
+            onClick={() => setHomeTab('projects')}
+            title="Projetos"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              minWidth: 0,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: 0,
+              color: 'inherit',
+              textAlign: 'left',
+            }}
+          >
             <div style={{
               width: 34, height: 34, borderRadius: 10, background: 'var(--logo-mark-bg)',
               display: 'grid', placeItems: 'center', flexShrink: 0,
@@ -17259,16 +17337,41 @@ function AccountHomeShell({
               <div style={{
                 marginTop: 2, fontSize: 11, color: 'var(--text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                maxWidth: isMobile ? 140 : 180,
               }}>
                 {accessEmail || 'Studio · dados neste aparelho'}
               </div>
             </div>
+          </button>
+          {!isMobile && (
+            <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+              {navBtn('profile', 'Perfil', User)}
+              {navBtn('plan', 'Assinatura', CreditCard)}
+              {navBtn('projects', 'Projetos', Layers)}
+            </nav>
+          )}
+        </div>
+
+        {/* Centro — Gerar com IA */}
+        {!isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            {generateBtn(false)}
           </div>
-          {isMobile && (
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              {onManageBilling && (
-                <button type="button" onClick={() => onManageBilling()} style={headerBtn}>Plano</button>
-              )}
+        )}
+
+        {/* Direita — ferramentas */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isMobile ? 'flex-end' : 'flex-end',
+          gap: 8,
+          minWidth: 0,
+          flexWrap: 'wrap',
+        }}>
+          {isMobile ? (
+            <>
+              {navBtn('profile', 'Perfil', User)}
+              {navBtn('plan', 'Assinatura', CreditCard)}
               <button
                 type="button"
                 onClick={() => onOpenSettings()}
@@ -17282,172 +17385,38 @@ function AccountHomeShell({
               >
                 <Settings size={13} /> IA
               </button>
-            </div>
+            </>
+          ) : (
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
+              <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
+                <Layout size={13} /> Templates
+              </button>
+              <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
+                <TrendingUp size={13} /> Pesquisa
+              </button>
+              <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
+              <button
+                type="button"
+                onClick={() => onOpenSettings()}
+                style={{
+                  ...headerBtn,
+                  border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
+                  background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                  color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+                }}
+              >
+                <Settings size={13} /> Configurar IA
+              </button>
+            </nav>
           )}
         </div>
 
-        {isMobile ? (
-          <button
-            type="button"
-            data-vc-tour="generate"
-            onClick={() => onGenerate()}
-            style={{
-              width: '100%', minHeight: 48, padding: '0 20px', borderRadius: 9999,
-              border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff',
-              fontSize: 15, fontWeight: 600, letterSpacing: '-0.016em', fontFamily: 'var(--font-ui)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-            onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-            onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            <Sparkles size={15} /> Gerar com IA
-          </button>
-        ) : (
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} aria-label="Ações principais">
-            {onManageBilling && (
-              <button type="button" onClick={() => onManageBilling()} style={headerBtn}>Plano</button>
-            )}
-            <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
-              <Layout size={13} /> Templates
-            </button>
-            <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
-              <TrendingUp size={13} /> Pesquisa
-            </button>
-            <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
-            <button
-              type="button"
-              onClick={() => onOpenSettings()}
-              style={{
-                ...headerBtn,
-                border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
-                background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
-              }}
-            >
-              <Settings size={13} /> Configurar IA
-            </button>
-            <button
-              type="button"
-              data-vc-tour="generate"
-              onClick={() => onGenerate()}
-              style={{
-                height: 38, padding: '0 18px', borderRadius: 9999, border: 'none', cursor: 'pointer',
-                background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
-                letterSpacing: '-0.016em', fontFamily: 'var(--font-ui)',
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-              }}
-              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-              onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-            >
-              <Sparkles size={13} /> Gerar com IA
-            </button>
-          </nav>
+        {isMobile && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            {generateBtn(true)}
+          </div>
         )}
       </header>
-
-      {isMobile && (
-        <nav
-          aria-label="Área da conta"
-          style={{
-            display: 'flex',
-            gap: 4,
-            padding: '10px 12px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--bg-sidebar)',
-            flexShrink: 0,
-            overflowX: 'auto',
-          }}
-        >
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setHomeTab(id)}
-              style={{
-                height: 34,
-                padding: '0 12px',
-                border: 'none',
-                borderRadius: 9999,
-                background: homeTab === id ? 'var(--text-primary)' : 'transparent',
-                color: homeTab === id ? 'var(--bg-base)' : 'var(--text-secondary)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-ui)',
-              }}
-            >
-              <Icon size={13} />
-              {label}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      <div style={{
-        flex: 1,
-        minHeight: 0,
-        minWidth: 0,
-        width: '100%',
-        display: 'flex',
-        overflow: 'hidden',
-      }}>
-        {!isMobile && (
-          <aside style={{
-            width: 220,
-            flexShrink: 0,
-            borderRight: '1px solid var(--border)',
-            background: 'var(--bg-sidebar)',
-            padding: '16px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-          }}>
-            <p style={{
-              margin: '0 8px 8px',
-              fontSize: 10,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)',
-            }}>
-              Conta
-            </p>
-            {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-              const active = homeTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setHomeTab(id)}
-                  style={{
-                    width: '100%',
-                    minHeight: 42,
-                    padding: '0 12px',
-                    borderRadius: 10,
-                    border: active ? '1px solid var(--border)' : '1px solid transparent',
-                    background: active ? 'var(--accent-surface)' : 'transparent',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textAlign: 'left',
-                    fontFamily: 'var(--font-ui)',
-                  }}
-                >
-                  <Icon size={15} color={active ? 'var(--accent)' : 'var(--text-muted)'} />
-                  {label}
-                </button>
-              );
-            })}
-          </aside>
-        )}
 
       <div style={{
         flex: 1, minHeight: 0, minWidth: 0, width: '100%',
@@ -18068,7 +18037,6 @@ function AccountHomeShell({
           </>
           )}
         </div>
-      </div>
       </div>
     </div>
   );
