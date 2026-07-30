@@ -472,7 +472,7 @@ export default function AccountProfile({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Assinatura</div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Studio Viral.</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Studio Viral. · mensal</h3>
             </div>
             <CreditCard size={18} color="var(--text-muted)" />
           </div>
@@ -481,24 +481,29 @@ export default function AccountProfile({
             {currentPeriodEnd
               ? ` · renova ${new Date(currentPeriodEnd).toLocaleDateString('pt-BR')}`
               : ''}
+            . Pagamento e cancelamento no portal seguro.
           </p>
-          {onManageBilling && (
+          {onManageBilling ? (
             <button
               type="button"
               onClick={onManageBilling}
               style={{
                 height: 40,
                 borderRadius: 9999,
-                border: '1px solid var(--border)',
-                background: 'var(--bg-pearl)',
-                color: 'var(--text-primary)',
+                border: 'none',
+                background: 'var(--text-primary)',
+                color: 'var(--bg-base)',
                 fontWeight: 600,
                 fontSize: 13,
                 cursor: 'pointer',
               }}
             >
-              Gerir plano
+              Abrir portal do cliente
             </button>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              Billing desativado neste ambiente.
+            </p>
           )}
         </div>
 

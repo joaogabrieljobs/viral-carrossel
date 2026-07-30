@@ -9,7 +9,7 @@ import {
   Type, Quote, BookOpen, Image as ImageIcon,
   ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
   ChevronRight, ChevronLeft, ChevronDown, Check, Instagram, Settings, Maximize2, Minus,
-  Home, Layers, SlidersHorizontal, User, CreditCard,
+  Home, Layers, SlidersHorizontal, User,
   Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
   Target, Camera,
 } from 'lucide-react';
@@ -13896,7 +13896,7 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [paywallEmail, setPaywallEmail] = useState('');
   const [loginHint, setLoginHint] = useState('');
-  const [accountTab, setAccountTab] = useState('projects'); // projects | profile | plan
+  const [accountTab, setAccountTab] = useState('projects'); // projects | profile
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const accessActive = !!access.active;
 
@@ -13910,7 +13910,8 @@ export default function App() {
   }, []);
 
   const goAccount = useCallback((tab = 'projects') => {
-    setAccountTab(tab);
+    // Assinatura vive dentro do Perfil (legado: 'plan' → profile)
+    setAccountTab(tab === 'plan' ? 'profile' : tab);
     setShellView('home');
   }, []);
 
@@ -14471,7 +14472,6 @@ export default function App() {
   const editorAccountNav = !isMobile && (
     <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
       {editorPillBtn(() => goAccount('profile'), 'Perfil', User)}
-      {editorPillBtn(() => goAccount('plan'), 'Assinatura', CreditCard)}
     </nav>
   );
 
@@ -16089,20 +16089,6 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 >
                   <User size={15} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => goAccount('plan')}
-                  title="Assinatura"
-                  aria-label="Assinatura"
-                  style={{
-                    width: 40, height: 40, borderRadius: 9999,
-                    border: '1px solid var(--border)', background: 'var(--bg-card)',
-                    color: 'var(--text-muted)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <CreditCard size={15} />
-                </button>
               </div>
             </div>
             <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
@@ -16161,7 +16147,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           {editorGenerateBtn}
         </div>
 
-        {/* Direita — ferramentas + Perfil / Assinatura (extremo direito) */}
+        {/* Direita — ferramentas + Perfil (extremo direito) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
@@ -17417,7 +17403,7 @@ function AccountHomeShell({
           </div>
         )}
 
-        {/* Direita — ferramentas + Perfil / Assinatura (extremo direito) */}
+        {/* Direita — ferramentas + Perfil (extremo direito; Assinatura fica dentro do Perfil) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -17442,7 +17428,6 @@ function AccountHomeShell({
                 <Settings size={13} /> IA
               </button>
               {navBtn('profile', 'Perfil', User)}
-              {navBtn('plan', 'Assinatura', CreditCard)}
             </>
           ) : (
             <>
@@ -17469,7 +17454,6 @@ function AccountHomeShell({
               </nav>
               <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {navBtn('profile', 'Perfil', User)}
-                {navBtn('plan', 'Assinatura', CreditCard)}
               </nav>
             </>
           )}
@@ -17507,7 +17491,7 @@ function AccountHomeShell({
                   margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
                   color: 'var(--text-muted)', maxWidth: '52ch',
                 }}>
-                  Seu nome, bio, redes e resumo da assinatura.
+                  Seu nome, bio, redes e assinatura.
                 </p>
               </header>
               <AccountProfile
@@ -17524,75 +17508,6 @@ function AccountHomeShell({
                 onOpenBrands={onOpenBrands}
                 currentPeriodEnd={currentPeriodEnd}
               />
-            </>
-          )}
-
-          {accountTab === 'plan' && (
-            <>
-              <header>
-                <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
-                <h2 style={{
-                  margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
-                  letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
-                  color: 'var(--text-primary)', lineHeight: 1.15,
-                }}>
-                  Assinatura
-                </h2>
-                <p style={{
-                  margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
-                  color: 'var(--text-muted)', maxWidth: '52ch',
-                }}>
-                  Gerencie plano, pagamento e cancelamento no portal seguro.
-                </p>
-              </header>
-              <section style={{
-                padding: isMobile ? 18 : 24,
-                borderRadius: 16,
-                border: '1px solid var(--border)',
-                background: 'var(--bg-card)',
-                display: 'grid',
-                gap: 16,
-              }}>
-                <div>
-                  <div className="vc-eyebrow" style={{ marginBottom: 6 }}>Plano atual</div>
-                  <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Studio Viral. · mensal</h3>
-                  <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                    Acesso completo aos modos Criador, Diretor e Studio.
-                    {currentPeriodEnd
-                      ? ` Renovação em ${new Date(currentPeriodEnd).toLocaleDateString('pt-BR')}.`
-                      : ''}
-                  </p>
-                </div>
-                {accessEmail && (
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
-                    Conta: <strong>{accessEmail}</strong>
-                  </p>
-                )}
-                {onManageBilling ? (
-                  <button
-                    type="button"
-                    onClick={onManageBilling}
-                    style={{
-                      height: 44,
-                      width: 'fit-content',
-                      padding: '0 18px',
-                      borderRadius: 9999,
-                      border: 'none',
-                      background: 'var(--text-primary)',
-                      color: 'var(--bg-base)',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Abrir portal do cliente
-                  </button>
-                ) : (
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-                    Billing desativado neste ambiente.
-                  </p>
-                )}
-              </section>
             </>
           )}
 
