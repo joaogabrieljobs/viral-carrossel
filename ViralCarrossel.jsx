@@ -14451,44 +14451,27 @@ export default function App() {
     </button>
   );
 
+  const editorPillBtn = (onClick, label, Icon) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        height: 34, padding: '0 12px', borderRadius: 9999,
+        border: '1px solid var(--border)', background: 'var(--bg-card)',
+        color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
+        flexShrink: 0,
+      }}
+    >
+      <Icon size={13} color="var(--text-muted)" /> {label}
+    </button>
+  );
+
+  /** Conta no extremo direito — padrão SaaS (avatar/conta à direita). */
   const editorAccountNav = !isMobile && (
-    <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <button
-        type="button"
-        onClick={() => goAccount('profile')}
-        style={{
-          height: 34, padding: '0 12px', borderRadius: 9999,
-          border: '1px solid var(--border)', background: 'var(--bg-card)',
-          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
-        }}
-      >
-        <User size={13} color="var(--text-muted)" /> Perfil
-      </button>
-      <button
-        type="button"
-        onClick={() => goAccount('plan')}
-        style={{
-          height: 34, padding: '0 12px', borderRadius: 9999,
-          border: '1px solid var(--border)', background: 'var(--bg-card)',
-          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
-        }}
-      >
-        <CreditCard size={13} color="var(--text-muted)" /> Assinatura
-      </button>
-      <button
-        type="button"
-        onClick={() => goAccount('projects')}
-        style={{
-          height: 34, padding: '0 12px', borderRadius: 9999,
-          border: '1px solid var(--border)', background: 'var(--bg-card)',
-          color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center', gap: 6,
-        }}
-      >
-        <Home size={13} color="var(--text-muted)" /> Projetos
-      </button>
+    <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
+      {editorPillBtn(() => goAccount('profile'), 'Perfil', User)}
+      {editorPillBtn(() => goAccount('plan'), 'Assinatura', CreditCard)}
     </nav>
   );
 
@@ -16072,27 +16055,6 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 >
                   <Home size={15} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => goAccount('profile')}
-                  title="Perfil"
-                  aria-label="Perfil"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 9999,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <User size={15} />
-                </button>
                 <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
                   <div style={{
                     width:32, height:32, borderRadius:8, background:'var(--logo-mark-bg)',
@@ -16111,13 +16073,43 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   </div>
                 </div>
               </div>
-              {editorHeaderActions}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                {editorHeaderActions}
+                <button
+                  type="button"
+                  onClick={() => goAccount('profile')}
+                  title="Perfil"
+                  aria-label="Perfil"
+                  style={{
+                    width: 40, height: 40, borderRadius: 9999,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    color: 'var(--text-muted)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <User size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goAccount('plan')}
+                  title="Assinatura"
+                  aria-label="Assinatura"
+                  style={{
+                    width: 40, height: 40, borderRadius: 9999,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    color: 'var(--text-muted)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <CreditCard size={15} />
+                </button>
+              </div>
             </div>
             <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
           </>
         ) : (
           <>
-        {/* Esquerda — marca + Perfil / Assinatura / Projetos */}
+        {/* Esquerda — marca + Projetos */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
             width: 30, height: 30, borderRadius: 8, background: 'var(--logo-mark-bg)',
@@ -16161,7 +16153,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               </div>
             )}
           </div>
-          {editorAccountNav}
+          {editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -16169,7 +16161,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           {editorGenerateBtn}
         </div>
 
-        {/* Direita — undo, formato, ferramentas */}
+        {/* Direita — ferramentas + Perfil / Assinatura (extremo direito) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
@@ -16208,6 +16200,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           </div>
           <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
           {editorHeaderActions}
+          {editorAccountNav}
         </div>
           </>
         )}
@@ -17366,7 +17359,7 @@ function AccountHomeShell({
           : `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
         flexShrink: 0,
       }}>
-        {/* Esquerda — marca + Perfil / Assinatura */}
+        {/* Esquerda — marca + Projetos */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -17414,13 +17407,7 @@ function AccountHomeShell({
               </div>
             </div>
           </button>
-          {!isMobile && (
-            <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-              {navBtn('profile', 'Perfil', User)}
-              {navBtn('plan', 'Assinatura', CreditCard)}
-              {navBtn('projects', 'Projetos', Layers)}
-            </nav>
-          )}
+          {!isMobile && navBtn('projects', 'Projetos', Layers)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -17430,19 +17417,17 @@ function AccountHomeShell({
           </div>
         )}
 
-        {/* Direita — ferramentas */}
+        {/* Direita — ferramentas + Perfil / Assinatura (extremo direito) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isMobile ? 'flex-end' : 'flex-end',
+          justifyContent: 'flex-end',
           gap: 8,
           minWidth: 0,
           flexWrap: 'wrap',
         }}>
           {isMobile ? (
             <>
-              {navBtn('profile', 'Perfil', User)}
-              {navBtn('plan', 'Assinatura', CreditCard)}
               <button
                 type="button"
                 onClick={() => onOpenSettings()}
@@ -17456,29 +17441,37 @@ function AccountHomeShell({
               >
                 <Settings size={13} /> IA
               </button>
+              {navBtn('profile', 'Perfil', User)}
+              {navBtn('plan', 'Assinatura', CreditCard)}
             </>
           ) : (
-            <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
-              <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
-                <Layout size={13} /> Templates
-              </button>
-              <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
-                <TrendingUp size={13} /> Pesquisa
-              </button>
-              <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
-              <button
-                type="button"
-                onClick={() => onOpenSettings()}
-                style={{
-                  ...headerBtn,
-                  border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
-                  background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                  color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
-                }}
-              >
-                <Settings size={13} /> Configurar IA
-              </button>
-            </nav>
+            <>
+              <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
+                <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
+                  <Layout size={13} /> Templates
+                </button>
+                <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
+                  <TrendingUp size={13} /> Pesquisa
+                </button>
+                <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
+                <button
+                  type="button"
+                  onClick={() => onOpenSettings()}
+                  style={{
+                    ...headerBtn,
+                    border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
+                    background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                    color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+                  }}
+                >
+                  <Settings size={13} /> Configurar IA
+                </button>
+              </nav>
+              <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {navBtn('profile', 'Perfil', User)}
+                {navBtn('plan', 'Assinatura', CreditCard)}
+              </nav>
+            </>
           )}
         </div>
 
