@@ -13,11 +13,25 @@ import {
   billingDisabled,
 } from '../lib/access.js';
 
+// Allowlist estrita: endpoints de billing carregam cookie de acesso, então
+// nunca refletir Origin arbitrário com Allow-Credentials (CSRF/credential leak).
+function allowedOrigins() {
+  return new Set(
+    [
+      (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, ''),
+      'http://localhost:5173',
+      'http://localhost:4173',
+    ].filter(Boolean),
+  );
+}
+
 function cors(req, res) {
   const origin = req.headers?.origin;
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
-  else res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (origin && allowedOrigins().has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }

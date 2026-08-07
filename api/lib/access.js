@@ -3,9 +3,11 @@ import crypto from 'crypto';
 const COOKIE_NAME = 'vc_access';
 const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 dias
 
+// Nunca reusar STRIPE_SECRET_KEY como chave de assinatura de cookie —
+// segredos de domínios distintos, rotação independente.
 function getSecret() {
-  const s = process.env.ACCESS_COOKIE_SECRET || process.env.STRIPE_SECRET_KEY;
-  if (!s) throw new Error('ACCESS_COOKIE_SECRET (ou STRIPE_SECRET_KEY) em falta');
+  const s = process.env.ACCESS_COOKIE_SECRET;
+  if (!s) throw new Error('ACCESS_COOKIE_SECRET em falta');
   return s;
 }
 
@@ -126,5 +128,11 @@ export function clearAccessCookie(res) {
 export { COOKIE_NAME, MAX_AGE_SEC };
 
 export function billingDisabled() {
-  return process.env.BILLING_DISABLED === 'true' || process.env.BILLING_DISABLED === '1';
+  const flag = process.env.BILLING_DISABLED === 'true' || process.env.BILLING_DISABLED === '1';
+  if (!flag) return false;
+  // Guard: flag é dev-only. Em produção (Vercel prod ou NODE_ENV=production
+  // fora da Vercel) ignora, mesmo se alguém setar por engano.
+  if (process.env.VERCEL_ENV === 'production') return false;
+  if (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production') return false;
+  return true;
 }
