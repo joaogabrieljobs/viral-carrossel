@@ -50,6 +50,17 @@ import { FORMATS } from './src/utils/formats.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
+  AUTOFIT_MIN_SCALE,
+  DARK_CREAM,
+  FONT_PAIRINGS,
+  applyCompositionToSlide,
+  clampTitleWeight,
+  getComposition,
+  inferCompositionId,
+  pairingMatchesBrand,
+  suggestCreativePresetForVisual,
+} from './src/utils/slide-design-system.js';
+import {
   DEFAULT_AI_SETTINGS,
   IMAGE_PROVIDERS,
   normalizeAISettings,
@@ -1270,10 +1281,10 @@ function cultureReadableInks(bgSolidHex, carouselTitleInk, carouselBodyInk, bran
     const aL = aRgb ? vcRelLuminance01(aRgb) : 0;
     const accentInk = !aRgb || aL < 0.42 ? '#dceeb1' : accentHex;
     return {
-      titleInk: '#f5f5f7',
-      subtitleInk: 'rgba(245,245,247,0.9)',
-      bodyInk: 'rgba(245,245,247,0.82)',
-      inkMuted: 'rgba(245,245,247,0.54)',
+      titleInk: DARK_CREAM.title,
+      subtitleInk: DARK_CREAM.subtitle,
+      bodyInk: DARK_CREAM.body,
+      inkMuted: DARK_CREAM.muted,
       accentInk,
       solidBgIsLight: false,
     };
@@ -2278,9 +2289,8 @@ function typographyPatchFromBrand(brand) {
   const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   const tc = b.textTitleCase;
   const titleCase = tc === 'upper' || tc === 'lower' || tc === 'normal' ? tc : 'normal';
-  let w = num(b.textTitleWeight, 800);
-  if (w < 400) w = 400;
-  if (w > 900) w = 900;
+  let w = num(b.textTitleWeight, 700);
+  w = clampTitleWeight(b.titleFont, w);
   return {
     titleSize: num(b.textTitleSize, 100),
     subSize: num(b.textSubSize, 100),
@@ -2349,6 +2359,12 @@ const mkSlide = (n = 1, brand = null) => {
    * variant: 'classic' (foto full / texto) | 'sandwich' | 'stat'
    */
   canvas: null,
+  /** Composition ID (slide-design-system) — hook_fullbleed, sandwich_editorial, etc. */
+  composition: '',
+  /** Cue → na borda direita (swipe). Default on excepto CTA. */
+  showSwipeCue: true,
+  /** Peek visual na borda (reveal_bridge / panorama leve). */
+  edgePeek: false,
   /** Intervalos UTF-16 [início,fim exclusivo) na cor Destaques — texto bruto sem marcadores asterisco. */
   destaqueSpans: undefined,
 };
@@ -4152,7 +4168,7 @@ function inferCanvasDefaults(slide, creativePreset) {
 }
 
 /** Margem lateral mínima do card para molduras de texto no «Ajuste automático». */
-const CANVAS_AUTO_EDGE_PCT = 6;
+const CANVAS_AUTO_EDGE_PCT = 8;
 /** Padding interno (`textInset`) mínimo com canvas quando se corre o ajuste — evita tipo colado na moldura azul. */
 const CANVAS_AUTO_TEXT_INSET_MIN = 13;
 
@@ -4184,6 +4200,9 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
   const cv = mergedSlide.canvas;
   if (!cv?.zones || typeof cv.zones !== 'object' || !cv.variant) return null;
 
+  const edgePct = typeof f.edgePct === 'number' ? f.edgePct : CANVAS_AUTO_EDGE_PCT;
+  const topSafePct = typeof f.topSafePct === 'number' ? f.topSafePct : 14;
+
   const baselineInsetPad = mergedSlide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const insetCalc = Math.max(CANVAS_AUTO_TEXT_INSET_MIN, baselineInsetPad);
   const padXpx = f.w * (0.012 + insetCalc * 0.004);
@@ -4210,8 +4229,8 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
   const subLeadCv = (mergedSlide.subLeading ?? 142) / 100;
   const bodyLeadCv = (mergedSlide.subLeading ?? 145) / 100;
 
-  const bottomLim = Math.min(100 - CANVAS_AUTO_EDGE_PCT, 99);
-  const TOP_SAFE_PCT = 11;
+  const bottomLim = Math.min(100 - edgePct, 99);
+  const TOP_SAFE_PCT = topSafePct;
   /** Espaços verticais harmónicos (% da altura do card) entre molduras. */
   const gapTitleSub = 1.35;
   const gapPhotoTitle = 1.6;
@@ -4227,8 +4246,8 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     /** Foto só na faixa superior: título vinha logo abaixo da foto. */
     const bandPhoto = prevP.y + prevP.h <= prevT.y + 1.5;
 
-    const ux = CANVAS_AUTO_EDGE_PCT;
-    const uw = Math.max(CANVAS_ZONE_MIN.w * 4, 100 - 2 * CANVAS_AUTO_EDGE_PCT);
+    const ux = edgePct;
+    const uw = Math.max(CANVAS_ZONE_MIN.w * 4, 100 - 2 * edgePct);
 
     const titleFs = f.w * 0.084 * (ts / 100);
     const innerTW = Math.max(f.w * 0.06, (uw / 100) * f.w - 2 * padXpx);
@@ -5577,6 +5596,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         position: 'relative',
         background: bg,
         zIndex: 2,
+        boxShadow: 'var(--shadow-product)',
         cursor: bandClickable ? 'pointer' : undefined,
       }}
     >
@@ -5847,7 +5867,7 @@ ClassicLegadoInsetPhotoColumn.displayName = 'ClassicLegadoInsetPhotoColumn';
 //   <OverflowScaler containerStyle={{...}} deps={[title, subtitle, body]} minScale={0.7}>
 //     {(scale) => (<>... fontSize={baseSize * scale} ...</>)}
 //   </OverflowScaler>
-function OverflowScaler({ containerStyle, deps = [], minScale = 0.55, children }) {
+function OverflowScaler({ containerStyle, deps = [], minScale = AUTOFIT_MIN_SCALE, children }) {
   const ref = React.useRef(null);
   const [scale, setScale] = React.useState(1);
   const iterationsRef = React.useRef(0);
@@ -6019,7 +6039,7 @@ const SlideCardInner = React.forwardRef(({
       const rgbBg = vcHexToRgb(vcNormalizeHex(slideCardBg) || '#fafafc');
       const Lbg = rgbBg ? vcRelLuminance01(rgbBg) : 0.96;
       if (Lbg >= 0.55) {
-        displayTitleInk = '#f5f5f7';
+        displayTitleInk = DARK_CREAM.title;
         displayBodyInk = 'rgba(245,245,247,0.92)';
       }
     }
@@ -6065,6 +6085,7 @@ const SlideCardInner = React.forwardRef(({
       overflow: 'hidden',
       borderRadius: f.w * 0.017,
       background: cr.solidBgIsLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+      boxShadow: 'var(--shadow-product)',
     };
     inner = (
       <div
@@ -6114,7 +6135,7 @@ const SlideCardInner = React.forwardRef(({
             textAlign: slide.align === 'justify' ? 'left' : slide.align,
           }}
           deps={[slide.title, slide.subtitle, slide.titleSize, slide.subSize, topR.w, topR.h, f.w, f.h]}
-          minScale={0.6}
+          minScale={AUTOFIT_MIN_SCALE}
         >
           {(topScale) => (
           <div
@@ -6264,7 +6285,7 @@ const SlideCardInner = React.forwardRef(({
             textAlign: slide.align === 'justify' ? 'left' : slide.align,
           }}
           deps={[bodyAfterCulture, slide.bodyAfterSize, slide.subSize, botR.w, botR.h, f.w, f.h]}
-          minScale={0.6}
+          minScale={AUTOFIT_MIN_SCALE}
         >
           {(botScale) => (
           <CultureRichParagraphs
@@ -6502,6 +6523,7 @@ const SlideCardInner = React.forwardRef(({
               minHeight: f.h * 0.22, maxHeight: f.h * 0.32,
               borderRadius: f.w * 0.017, overflow:'hidden', flexShrink:1, position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+              boxShadow: 'var(--shadow-product)',
             }}>
               <video
                 src={getVideoUrl(slide.videoId)}
@@ -6540,6 +6562,7 @@ const SlideCardInner = React.forwardRef(({
               flexShrink:1,
               position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+              boxShadow: 'var(--shadow-product)',
             }}>
               <img
                 src={slide.bgImage}
@@ -7220,6 +7243,13 @@ const SlideCardInner = React.forwardRef(({
     ? (surfaceQuick === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surfaceQuick === 'accent' ? (brand.accent || '#000000') : lightCultureOuter)
     : bg;
 
+  const showSwipe = slide.showSwipeCue !== false
+    && brand.showSwipeCue !== false
+    && total > 1
+    && slideIdx < total - 1
+    && getComposition(slide.composition)?.showSwipeCue !== false;
+  const showEdgePeek = !!(slide.edgePeek || getComposition(slide.composition)?.edgePeek);
+
   return (
     <div style={{
       width:f.w*scale, height:f.h*scale,
@@ -7227,8 +7257,51 @@ const SlideCardInner = React.forwardRef(({
       borderRadius: scale < 0.9 ? 10 : 0,
       flexShrink:0, background: outerBg,
     }}>
-      <div style={{ transform:`scale(${scale})`, transformOrigin:'top left', width:f.w, height:f.h }}>
+      <div style={{ transform:`scale(${scale})`, transformOrigin:'top left', width:f.w, height:f.h, position:'relative' }}>
         {inner}
+        {showEdgePeek && (
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: f.w * 0.028,
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.18))',
+              pointerEvents: 'none',
+              zIndex: 40,
+            }}
+          />
+        )}
+        {showSwipe && (
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              right: f.w * 0.028,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: f.w * 0.055,
+              height: f.w * 0.055,
+              borderRadius: '50%',
+              background: 'rgba(0,0,0,0.35)',
+              color: '#F2EDE4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: f.w * 0.032,
+              fontWeight: 600,
+              fontFamily: 'var(--font-ui), system-ui, sans-serif',
+              pointerEvents: 'none',
+              zIndex: 41,
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+            }}
+          >
+            →
+          </div>
+        )}
       </div>
     </div>
   );
@@ -7266,6 +7339,63 @@ const FONT_CAT_LABELS = {
   editorial: 'Editorial',
   mono:      'Mono',
 };
+const FontPairingPicker = ({ brand, onApply, children }) => {
+  const [showAll, setShowAll] = React.useState(false);
+  return (
+    <>
+      <S title="Pairings tipográficos" hint="Combinações curadas para carrosséis virais. “Todas as fontes” abre os pickers individuais.">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
+          {FONT_PAIRINGS.map((p) => {
+            const active = pairingMatchesBrand(brand, p);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onApply(p)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  background: active ? 'var(--accent-surface)' : 'var(--bg-card)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'grid',
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: p.titleFont, color: 'var(--text-primary)' }}>
+                  {p.name}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
+                  {p.use} · título + corpo
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          style={{
+            marginTop: 8,
+            height: 34,
+            borderRadius: 9999,
+            border: '1px solid var(--border)',
+            background: 'var(--bg-pearl)',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {showAll ? 'Ocultar fontes individuais' : 'Todas as fontes'}
+        </button>
+      </S>
+      {showAll ? children : null}
+    </>
+  );
+};
+
 const FontPicker = ({ title, fonts, active, onChange }) => {
   const [cat, setCat] = React.useState('all');
   const cats = React.useMemo(() => {
@@ -11697,8 +11827,18 @@ function SidebarContent({
               </div>
             </S>
 
-            <FontPicker title="Fonte — Título" fonts={TITLE_FONTS} active={brand.titleFont} onChange={val=>setBrand({...brand,titleFont:val})}/>
-            <FontPicker title="Fonte — Corpo"  fonts={BODY_FONTS}  active={brand.bodyFont}  onChange={val=>setBrand({...brand,bodyFont:val})}/>
+            <FontPairingPicker
+              brand={brand}
+              onApply={(p) => setBrand({
+                ...brand,
+                titleFont: p.titleFont,
+                bodyFont: p.bodyFont,
+                textTitleWeight: clampTitleWeight(p.titleFont, p.textTitleWeight),
+              })}
+            >
+              <FontPicker title="Fonte — Título" fonts={TITLE_FONTS} active={brand.titleFont} onChange={val=>setBrand({...brand,titleFont:val})}/>
+              <FontPicker title="Fonte — Corpo"  fonts={BODY_FONTS}  active={brand.bodyFont}  onChange={val=>setBrand({...brand,bodyFont:val})}/>
+            </FontPairingPicker>
             </>)}
           </>
         )}
@@ -12664,54 +12804,45 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
   if (!n) return slides;
   const isTC = isTendenciaCulturaPreset(creativePreset);
   const persoHybrid = isPersoHybridDensity(creativePreset, slideTextDensity);
+  const zonesByKey = {
+    cover: DEFAULT_CANVAS_ZONES_COVER_FULLBLEED,
+    classic: DEFAULT_CANVAS_ZONES_CLASSIC,
+    sandwich: DEFAULT_CANVAS_ZONES_SANDWICH,
+    stat: DEFAULT_CANVAS_ZONES_STAT,
+  };
 
   return slides.map((s, i) => {
     const q = String(s.imageQuery || '').trim();
     const bod = String(s.bodyAfterImage || '').trim();
 
+    // Composition explícita (templates / IA futura) tem prioridade.
+    if (s.composition && getComposition(s.composition)) {
+      return applyCompositionToSlide(s, s.composition, zonesByKey);
+    }
+
     if (isTC) {
       const fullBleedPortrait = i === 0 || i === n - 1;
       if (fullBleedPortrait && q) {
-        return {
-          ...s,
-          canvas: {
-            enabled: true,
-            variant: 'classic',
-            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
-          },
-        };
+        return applyCompositionToSlide(
+          { ...s, imageQuery: q },
+          i === n - 1 ? 'cta_close' : 'hook_fullbleed',
+          zonesByKey,
+        );
       }
       const mid = i > 0 && i < n - 1;
       if (mid && bod && q) {
-        return {
-          ...s,
-          canvas: {
-            enabled: true,
-            variant: 'sandwich',
-            // Usa o mesmo layout do botão "Ativar Layout Canvas" (zonas + amplas)
-            // em vez de rotação variável que dava zonas pequenas pra texto denso.
-            zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH },
-          },
-        };
+        return applyCompositionToSlide(s, 'sandwich_editorial', zonesByKey);
       }
       if (mid && bod && !q) {
-        return {
-          ...s,
-          canvas: { enabled: true, variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } },
-        };
+        return applyCompositionToSlide(s, 'stat_proof', zonesByKey);
       }
       if (mid && q && !bod) {
-        return {
-          ...s,
-          canvas: {
-            enabled: true,
-            variant: 'classic',
-            zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
-          },
-        };
+        return applyCompositionToSlide(s, 'reveal_bridge', zonesByKey);
       }
-      const d = inferCanvasDefaults(s, creativePreset);
-      return { ...s, canvas: { enabled: true, variant: d.variant, zones: { ...d.zones } } };
+      const inferred = inferCompositionId({
+        index: i, total: n, hasPhoto: !!q, hasBodyAfter: !!bod, isStat: mid && bod && !q,
+      });
+      return applyCompositionToSlide(s, inferred, zonesByKey);
     }
 
     if (persoHybrid) {
@@ -13387,9 +13518,9 @@ const DEFAULT_BRAND = {
   /** Posição da pílula @ no card (0–100% da largura / altura; referência = canto sup. esq. do badge). */
   handleBadgeX: 5,
   handleBadgeY: 4,
-  /* Visual neutro: quadro Figma (preto/branco); realces no slide vêm do perfil de marca. */
-  titleFont: '"Inter", sans-serif',
-  bodyFont: '"Inter Tight", sans-serif',
+  /* Visual neutro: quadro Figma (preto/branco); pairing Autoridade B2B por defeito. */
+  titleFont: '"Outfit", sans-serif',
+  bodyFont: '"Inter", sans-serif',
   bg: '#fafafc',
   titleColor: '#000000',
   /** Linha curta sob o título nos cards do meio (nem capa nem fecho). */
@@ -13397,6 +13528,8 @@ const DEFAULT_BRAND = {
   /** Parágrafos / corpo (ex-bloco «Subtítulo» da marca). */
   textColor: '#363636',
   accent: '#000000',
+  /** Cue → entre slides (exceto último). */
+  showSwipeCue: true,
   /** Ímpar (slides 1,3…) = `bg` · Par (2,4…) = `bgAlternate` quando activo e cor definida. */
   interleaveBg: false,
   /** Segunda cor de fundo para intercalção (margem/pérola por defeito). */
@@ -13427,7 +13560,7 @@ const DEFAULT_BRAND = {
   textSubTracking: 0,
   textTitleLeading: 105,
   textSubLeading: 150,
-  textTitleWeight: 800,
+  textTitleWeight: 700,
   textTitleCase: 'normal',
   /** Fonte própria (título) — { dataUrl, format, fileName } */
   customTitleFont: null,
@@ -13658,24 +13791,6 @@ export default function App() {
     return { ...d, fmt: FORMATS[raw] ? raw : 'carrossel' };
   }), [history]);
 
-  // ── PADRÃO VISUAL ────────────────────────────────────────────────────────
-  // Trackeia qual dos 12 presets visuais o user escolheu (null = nenhum).
-  // applyVisualStylePreset: merge das cores/fontes/tipografia do preset
-  // no brand atual. Chamado pelo GenerateModal antes de disparar onGenerate
-  // — afeta só rendering (gerador de texto não usa cor da marca).
-  const [visualPreset, setVisualPreset] = useState(null);
-  const applyVisualStylePreset = useCallback((presetId) => {
-    if (!presetId) return;
-    setVisualPreset(presetId);
-    setBrand((b) => applyVisualPreset(b, presetId));
-    // Aplica overrides de slide (align, layout) se preset definir slideDefaults.
-    // Cada slide preserva seus campos próprios — só sobrescreve os do preset.
-    const slideOverrides = getSlideOverridesForPreset(presetId);
-    if (Object.keys(slideOverrides).length > 0) {
-      setSlides((slides) => slides.map((s) => ({ ...s, ...slideOverrides })));
-    }
-    trackEvent('visual_preset_applied', { preset: presetId });
-  }, [setBrand, setSlides]);
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
   const setMaterial  = useCallback(next => history.set(d => ({
     ...d,
@@ -13697,6 +13812,29 @@ export default function App() {
     ...d,
     creativePreset: typeof next==='function' ? next(d.creativePreset ?? 'livre') : next,
   })), [history]);
+
+  // ── PADRÃO VISUAL ────────────────────────────────────────────────────────
+  // Trackeia qual dos 12 presets visuais o user escolheu (null = nenhum).
+  // applyVisualStylePreset: merge das cores/fontes/tipografia do preset
+  // no brand atual. Chamado pelo GenerateModal antes de disparar onGenerate
+  // — afeta só rendering (gerador de texto não usa cor da marca).
+  const [visualPreset, setVisualPreset] = useState(null);
+  const applyVisualStylePreset = useCallback((presetId) => {
+    if (!presetId) return;
+    setVisualPreset(presetId);
+    setBrand((b) => applyVisualPreset(b, presetId));
+    // Aplica overrides de slide (align, layout) se preset definir slideDefaults.
+    // Cada slide preserva seus campos próprios — só sobrescreve os do preset.
+    const slideOverrides = getSlideOverridesForPreset(presetId);
+    if (Object.keys(slideOverrides).length > 0) {
+      setSlides((slides) => slides.map((s) => ({ ...s, ...slideOverrides })));
+    }
+    // Alinha pele visual + arco narrativo (utilizador pode mudar depois).
+    const fromPreset = VISUAL_PRESET_BY_ID?.[presetId]?.creativePreset
+      || suggestCreativePresetForVisual(presetId);
+    if (fromPreset) setCreativePreset(fromPreset);
+    trackEvent('visual_preset_applied', { preset: presetId, creativePreset: fromPreset || null });
+  }, [setBrand, setSlides, setCreativePreset]);
   const setSlideTextDensity = useCallback(next => history.set(d => ({
     ...d,
     slideTextDensity: typeof next==='function' ? next(d.slideTextDensity ?? '1_1') : next,
@@ -13885,6 +14023,8 @@ export default function App() {
   const [showPreviewAlignGrid, setShowPreviewAlignGrid] = useState(() => {
     try { return localStorage.getItem(SK.previewGrid) === '1'; } catch { return false; }
   });
+  /** QA: simula leitura à distância do polegar (tipo menor no preview). */
+  const [thumbQaMode, setThumbQaMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -14402,11 +14542,13 @@ export default function App() {
     if (isMobile) {
       /* Margens laterais maiores para o texto não “escorrer” junto ao bezel / overscroll */
       const side = Math.max(16, vw * 0.04);
-      return Math.min((vw - side * 2) / f.w, 0.92);
+      const base = Math.min((vw - side * 2) / f.w, 0.92);
+      return thumbQaMode ? base * 0.72 : base;
     }
-    // Desktop: thumbnail compacta na faixa horizontal.
-    return Math.min(360 / f.w, 0.44);
-  }, [isMobile, vw, f]);
+    // Desktop: thumbnail compacta na faixa horizontal (QA reduz ~feed 4:5 à distância).
+    const base = Math.min(360 / f.w, 0.44);
+    return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
+  }, [isMobile, vw, f, thumbQaMode]);
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const empty = isDefault(slides);
@@ -15340,6 +15482,7 @@ Retorne exatamente: ${singleJson}`,
     try {
       const ctx = slides.map((s,i)=>`Slide ${i+1}: ${s.title} — ${s.subtitle}`).join('\n');
       const brandBlock = buildBrandBlock(brand);
+      const capRules = buildCaptionVoiceRules(creativePreset, mode);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const r = await callAI(
         `Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.
@@ -15629,6 +15772,7 @@ ${capRules}
       ).join('\n');
       const brandBlock = buildBrandBlock(brand);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
+      const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Reescreva TODOS os slides do carrossel abaixo aplicando a instrução do usuário, mantendo coerência narrativa entre eles.
@@ -15676,11 +15820,22 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     finally { setRefining(false); }
   }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset, mode, slideTextDensity]);
 
-  // Aplica um template pronto (preenche slides + brand)
+  // Aplica um template pronto (preenche slides + brand + composições)
   const applyTemplate = useCallback((tpl) => {
     const palette = PALETTES[tpl.palette] || PALETTES[0];
-    const titleFont = TITLE_FONTS[tpl.titleFont] || TITLE_FONTS[0];
-    const bodyFont = BODY_FONTS[tpl.bodyFont] || BODY_FONTS[0];
+    const pairing = FONT_PAIRINGS.find((p) => p.id === tpl.pairingId);
+    const titleFont = pairing
+      ? { val: pairing.titleFont }
+      : (TITLE_FONTS[tpl.titleFont] || TITLE_FONTS[0]);
+    const bodyFont = pairing
+      ? { val: pairing.bodyFont }
+      : (BODY_FONTS[tpl.bodyFont] || BODY_FONTS[0]);
+    const zonesByKey = {
+      cover: DEFAULT_CANVAS_ZONES_COVER_FULLBLEED,
+      classic: DEFAULT_CANVAS_ZONES_CLASSIC,
+      sandwich: DEFAULT_CANVAS_ZONES_SANDWICH,
+      stat: DEFAULT_CANVAS_ZONES_STAT,
+    };
     let newSlides = [];
     history.set((d) => {
       const nextBrand = {
@@ -15692,24 +15847,45 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         accent: palette.accent,
         titleFont: titleFont.val,
         bodyFont: bodyFont.val,
+        textTitleWeight: clampTitleWeight(
+          titleFont.val,
+          pairing?.textTitleWeight ?? d.brand?.textTitleWeight ?? 700,
+        ),
+        showSwipeCue: true,
       };
       const hb = hydrateBrandTextColors(nextBrand);
-      newSlides = tpl.slides.map((s, i) => ({
-        ...mkSlide(i + 1, hb),
-        title: s.title,
-        subtitle: s.subtitle,
-        imageQuery: s.q,
-        imgMode: 'dalle',
-        bgImage: null,
-        overlay: 65,
-        layout: i === 0 ? 'mc' : 'bl',
-        align: i === 0 ? 'center' : 'left',
-      }));
-      return { ...d, slides: newSlides, brand: hb };
+      const n = tpl.slides.length;
+      newSlides = tpl.slides.map((s, i) => {
+        const composition = s.composition || inferCompositionId({
+          index: i,
+          total: n,
+          hasPhoto: !!s.q,
+          hasBodyAfter: !!s.body,
+          isStat: s.composition === 'stat_proof' || (!s.q && /%|×|x\b|\d/.test(String(s.title || ''))),
+        });
+        const base = {
+          ...mkSlide(i + 1, hb),
+          title: s.title,
+          subtitle: s.subtitle,
+          bodyAfterImage: s.body || '',
+          imageQuery: s.q || '',
+          imgMode: 'dalle',
+          bgImage: null,
+          layout: i === 0 ? 'mc' : 'bl',
+          align: i === 0 ? 'center' : 'left',
+        };
+        return applyCompositionToSlide(base, composition, zonesByKey);
+      });
+      return {
+        ...d,
+        slides: newSlides,
+        brand: hb,
+        creativePreset: tpl.creativePreset || d.creativePreset || 'livre',
+      };
     });
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
-    trackEvent('template_applied', { template: tpl.id || tpl.name });
+    trackEvent('template_applied', { template: tpl.id || tpl.name, slides: tpl.slides.length });
     // Guard contra race-condition (mesmo padrão do handleGenerate)
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
     const abort = { cancelled: false };
@@ -16630,6 +16806,23 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                       onMouseLeave={e => { if(!showPreviewAlignGrid){ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)'; } }}
                     >
                       <LayoutGrid size={15}/>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThumbQaMode((v) => !v)}
+                      title={thumbQaMode ? 'Sair do preview telemóvel (distância)' : 'QA: preview à distância do polegar'}
+                      aria-label="Preview qualidade tipográfica"
+                      aria-pressed={thumbQaMode}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
+                        background: thumbQaMode ? 'var(--accent-surface)' : 'transparent',
+                        border:'none', color: thumbQaMode ? 'var(--accent)' : 'var(--text-secondary)',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        transition:'background 0.12s, color 0.12s',
+                        fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      Aa
                     </button>
                   </div>
                 </div>
