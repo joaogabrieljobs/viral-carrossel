@@ -11,7 +11,7 @@ import React from 'react';
  *    </AutoFitText> */
 export default function AutoFitText({
   baseFontSize,
-  minScale = 0.7,
+  minScale = 0.85,
   deps = [],
   wrapStyle,
   children,
