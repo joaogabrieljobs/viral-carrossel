@@ -9,7 +9,7 @@
 | ID | Task | Entrega verificável | RF / DEC | Depende de | Status |
 |---|---|---|---|---|---|
 | 01 | walking-skeleton-vitest-ci | `npm test` roda Vitest com 1 teste real de `api/lib/access.js` (token válido + adulterado) passando local e no GitHub Actions | RF-04 (parcial) · DEC-001, DEC-007 | — | ✅ 2026-08-07 |
-| 02 | unit-utils-puros | Testes de `src/utils/*` (parsers, formats, schema-migration, brand-helpers, hooks-library, wcag, slide-design-system) + `src/lib/billing.js` | RF-03 | 01 | ⬜ |
+| 02 | unit-utils-puros | Testes de `src/utils/*` (parsers, formats, schema-migration, brand-helpers, hooks-library, wcag, slide-design-system) + `src/lib/billing.js` | RF-03 | 01 | ✅ 2026-08-07 |
 | 03 | integracao-auth | `session`, `logout`, `access.js` completo (expirado/ausente), Google OAuth mockado (state inválido, assinante, sem sub) via req/res fake | RF-04, RF-05, RF-06 · DEC-003 | 01 | ⬜ |
 | 04 | integracao-stripe | `checkout` (e-mail inválido/novo/já ativo), `confirm` (paga/não paga/inválida), `portal` (401/ok), `webhook` (assinatura válida/inválida) com `vi.mock('stripe')` | RF-07..RF-10 · DEC-002 | 01 | ⬜ |
 | 05 | seguranca-regressao | Origin fora da allowlist sem ACAO; `getSecret()` sem env → throw; `BILLING_DISABLED` ignorada em prod; proxy Anthropic anônimo → 401 | RF-12..RF-14 · DEC-005 | 03 | ⬜ |
