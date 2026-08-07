@@ -3,21 +3,16 @@
  * Configure ANTHROPIC_API_KEY em Vercel → Project → Settings → Environment Variables.
  */
 
+import { applyCors } from '../../lib/cors.js';
+import { readAccessCookie, billingDisabled } from '../../lib/access.js';
+
 const TARGET = 'https://api.anthropic.com/v1/messages';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'Content-Type, anthropic-version, x-api-key, x-anthropic-key, Anthropic-Version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-function setCors(res) {
-  Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
-}
-
 export default async function handler(req, res) {
-  setCors(res);
+  applyCors(req, res, {
+    credentials: true,
+    headers: 'Content-Type, anthropic-version, x-api-key, x-anthropic-key, Anthropic-Version',
+  });
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -31,7 +26,22 @@ export default async function handler(req, res) {
     req.headers['x-anthropic-key'] || req.headers['X-Anthropic-Key'] || '',
   ).trim();
   const envKey = String(process.env.ANTHROPIC_API_KEY || '').trim();
-  const key = userKey || envKey;
+
+  // Chave do host (fallback) só para assinante com sessão válida — sem isso,
+  // qualquer requisição anônima consumiria a ANTHROPIC_API_KEY da Vercel.
+  let key = userKey;
+  if (!key && envKey) {
+    const hasSession = billingDisabled() || Boolean(readAccessCookie(req)?.customerId);
+    if (hasSession) key = envKey;
+    else {
+      return res.status(401).json({
+        error: {
+          message:
+            'Sem chave própria e sem sessão de assinante. Adicione sua chave Anthropic no ícone de chaves (⚙) ou faça login pela assinatura.',
+        },
+      });
+    }
+  }
 
   if (!key) {
     return res.status(503).json({

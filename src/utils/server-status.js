@@ -8,9 +8,17 @@ const IS_LOCAL_DEV =
 // Módulo singleton — todos os call sites que importam getServerStatus compartilham o mesmo cache.
 let _serverStatusPromise = null;
 export const getServerStatus = ({ force = false } = {}) => {
-  if (!IS_LOCAL_DEV) return Promise.resolve({ anthropic: true, openai: true, dev: false });
   if (force) _serverStatusPromise = null;
   if (_serverStatusPromise) return _serverStatusPromise;
-  _serverStatusPromise = fetch('/api/status').then(r => r.json()).catch(() => ({ anthropic: false, openai: false, dev: true }));
+  // Dev e produção têm /api/status (vite.config.js bypass e api/status.js).
+  // Em produção, falha de rede assume providers disponíveis (otimista) pra não
+  // bloquear quem usa chave própria (BYOK) — o erro real aparece na chamada.
+  _serverStatusPromise = fetch('/api/status')
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
+    .catch(() =>
+      IS_LOCAL_DEV
+        ? { anthropic: false, openai: false, dev: true }
+        : { anthropic: true, openai: true, dev: false },
+    );
   return _serverStatusPromise;
 };

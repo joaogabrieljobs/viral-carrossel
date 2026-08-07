@@ -58,15 +58,15 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 
 ## Backlog sugerido (por prioridade)
 
-| # | Item | Fonte |
-|---|---|---|
-| 1 | ~~Fix `capRules`/`voiceBulk`~~ feito | §crítico 1-2 |
-| 2 | Allowlist CORS + gate de sessão nos proxies IA (`api/anthropic`, `api/ai/compatible`) | §crítico 3 |
-| 3 | Corrigir `server-status` prod (health check real) | §crítico 4 |
-| 4 | Limpar query params `billing=cancel/restored`; não engolir params com `?app=1` | §4 |
-| 5 | Unificar `ALL_TABS`/`modeRank` em constante única; matar tab `'material'`; decidir destino da `'slide'` | §4 |
-| 6 | Persistir `visualPreset` no doc; clamp de peso no `applyVisualPreset` | §3 |
-| 7 | Bundle local de html2canvas/jsPDF (export offline + supply chain) | §3 |
-| 8 | Extrair prompts do monólito p/ módulo próprio; single source das faixas de caracteres | §2 |
-| 9 | Remover pipeline web_trend morto + `SAFE_ZONES` + builders órfãos + monólito legado da pasta pai | §1-3 |
-| 10 | Consolidar 3 implementações de proxy Anthropic e fetch-source | §1 |
+| # | Item | Fonte | Status |
+|---|---|---|---|
+| 1 | Fix `capRules`/`voiceBulk` | §crítico 1-2 | ✅ 2026-08-07 |
+| 2 | Allowlist CORS + gate de sessão nos proxies IA (`api/lib/cors.js`; env-key do host exige assinante) | §crítico 3 | ✅ 2026-08-07 |
+| 3 | `server-status` honesto em prod (`api/status.js` novo + fetch real) | §crítico 4 | ✅ 2026-08-07 |
+| 4 | Limpar query params `billing=cancel/restored` da URL | §4 | ✅ 2026-08-07 (pendente: `?app=1` ainda engole params combinados) |
+| 5 | `EDITOR_TABS` fonte única; tab `'material'` → `narrativa` | §4 | ✅ 2026-08-07 (pendente: destino da tab fantasma `'slide'`) |
+| 6 | `visualPreset` persistido no doc; clamp de peso no `applyVisualPreset` | §3 | ✅ 2026-08-07 |
+| 7 | Bundle local de html2canvas/jsPDF (export offline + supply chain) | §3 | ⬜ |
+| 8 | Extrair prompts do monólito p/ módulo próprio; single source das faixas de caracteres | §2 | ⬜ |
+| 9 | Remover pipeline web_trend morto + `SAFE_ZONES` + builders órfãos + monólito legado da pasta pai | §1-3 | ⬜ |
+| 10 | Consolidar 3 implementações de proxy Anthropic e fetch-source | §1 | ⬜ |

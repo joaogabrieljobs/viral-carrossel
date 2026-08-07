@@ -2,16 +2,16 @@
  * 12 padrões visuais para carrosséis virais — extraídos de referências reais
  * (NBA news, case studies neon, editorial magazine, luxury, viral hype, etc).
  *
- * Cada preset define APENAS overrides de marca: cores, fontes (índices em
- * TITLE_FONTS/BODY_FONTS do ViralCarrossel.jsx), e tipografia. NÃO altera
- * modo narrativo (creativePreset) nem layout dos slides — usuário continua
- * livre pra escolher. Aplicação: merge no brand antes da geração.
+ * Cada preset define overrides de marca (cores, fontes, tipografia) e, opcionalmente,
+ * `creativePreset` sugerido para alinhar pele + arco narrativo. O utilizador pode
+ * mudar o pacote depois. Aplicação: merge no brand (+ creativePreset) antes da geração.
  *
  * Cada preset traz `previewSvg(size)` que renderiza uma mini-card 60×75
  * representando a "assinatura visual" do estilo (cores + tipografia + accent).
  */
 
 import React from 'react';
+import { clampTitleWeight } from '../utils/slide-design-system.js';
 
 // Índices em TITLE_FONTS e BODY_FONTS (referência rápida — ver ViralCarrossel.jsx)
 //
@@ -289,6 +289,7 @@ export const VISUAL_PRESETS = [
     id: 'sports_editorial',
     label: 'Sports Editorial',
     desc: 'Título rosa pastel · header bar 3-col · badge N/M · alinhado esquerda',
+    creativePreset: 'quick_erro_comum',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#f7d8e0',  // ROSA PASTEL — assinatura do estilo (era branco)
@@ -335,6 +336,7 @@ export const VISUAL_PRESETS = [
   //    Ref: IMG_5304 (NMLSS Academy show case).
   {
     id: 'case_study_neon',
+    creativePreset: 'quick_decodificacao',
     label: 'Case Study Neon',
     desc: 'Pill CTA verde-neon · estrela ornament · header 3-col · estilo case study',
     brand: {
@@ -387,6 +389,7 @@ export const VISUAL_PRESETS = [
   //    reflexivo / quote — minimal, sem header bar nem badge.
   {
     id: 'mood_sepia',
+    creativePreset: 'quick_comportamento',
     label: 'Mood Sépia',
     desc: 'Cream centralizado · pill com hashtag · vibe mood reflexivo',
     brand: {
@@ -440,6 +443,7 @@ export const VISUAL_PRESETS = [
   //    Ref: IMG_5308 (Gary — Conheça o Gary, gratuito).
   {
     id: 'bold_promo_rosa',
+    creativePreset: 'quick_erro_comum',
     label: 'Bold Promo Pink',
     desc: 'Display branco · strikethrough vermelho pra oferta promo',
     brand: {
@@ -490,6 +494,7 @@ export const VISUAL_PRESETS = [
   //    escuro com handle. Ref: IMG_5309 (Jonathan Cadore maratona).
   {
     id: 'reflexivo_cream',
+    creativePreset: 'quick_decodificacao',
     label: 'Reflexivo Cream',
     desc: 'Título cream centralizado · pill handle no rodapé · header 2-col',
     brand: {
@@ -543,6 +548,7 @@ export const VISUAL_PRESETS = [
   //    chave usando "Marcar Destaque" pra ter as palavras coloridas (accent).
   {
     id: 'tabloid_keywords',
+    creativePreset: 'quick_tendencia',
     label: 'Tabloid Keywords',
     desc: 'Sans branco · accent verde-menta · marque palavras-chave com Destaque',
     brand: {
@@ -600,6 +606,7 @@ export const VISUAL_PRESETS = [
   //    no TOPO da foto (não no rodapé), like um lookbook editorial.
   {
     id: 'editorial_magazine',
+    creativePreset: 'tendencia_cultura',
     label: 'Editorial Magazine',
     desc: 'Serifa Playfair elegante · estilo capa de revista lookbook',
     brand: {
@@ -651,6 +658,7 @@ export const VISUAL_PRESETS = [
   //    sem mistura tipográfica complexa — paleta marrom premium + dourado.
   {
     id: 'luxury_hybrid',
+    creativePreset: 'quick_decodificacao',
     label: 'Luxury Hybrid',
     desc: 'Sans bold branco + accent dourado · vibe luxo fashion editorial',
     brand: {
@@ -704,6 +712,7 @@ export const VISUAL_PRESETS = [
   //    Ref: IMG_5324 (Segredo Exposto — fogo viral). Visual de alta tensão.
   {
     id: 'viral_hype_dark',
+    creativePreset: 'quick_erro_comum',
     label: 'Viral Hype Dark',
     desc: 'Preto/vermelho dramático · pill "ARRASTA PRO LADO →"',
     brand: {
@@ -757,6 +766,7 @@ export const VISUAL_PRESETS = [
   //     usando serifa vermelha pra título inteiro (sem mistura sans+serif).
   {
     id: 'cinematic_hybrid',
+    creativePreset: 'tendencia_cultura',
     label: 'Cinematic Hybrid',
     desc: 'Serifa vermelha cinematic · vibe cinema noir filme',
     brand: {
@@ -808,6 +818,7 @@ export const VISUAL_PRESETS = [
   //     Usa footer bar 3-col (feature nova) com label/value por coluna.
   {
     id: 'authority_black',
+    creativePreset: 'quick_erro_comum',
     label: 'Authority Black',
     desc: 'Display branco gigante · footer 3-col Topic/By/Save',
     brand: {
@@ -865,6 +876,7 @@ export const VISUAL_PRESETS = [
   //     muito whitespace. Bom contraste pra texto/quotes sem foto.
   {
     id: 'minimal_clean',
+    creativePreset: 'livre',
     label: 'Minimal Clean',
     desc: 'Fundo creme · tipografia centrada · vibe Apple/Swiss',
     brand: {
@@ -921,7 +933,13 @@ export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p
 export function applyVisualPreset(brand, presetId) {
   const preset = VISUAL_PRESET_BY_ID[presetId];
   if (!preset) return brand;
-  return { ...brand, ...preset.brand };
+  const next = { ...brand, ...preset.brand };
+  // Mesma regra anti-faux-bold dos pickers: fontes Google capadas a 700
+  // não podem receber peso 800/900 vindo do preset.
+  if (next.textTitleWeight != null) {
+    next.textTitleWeight = clampTitleWeight(next.titleFont, next.textTitleWeight);
+  }
+  return next;
 }
 
 /**

@@ -7453,6 +7453,21 @@ const APP_MODES = [
   { id: 'diretor',  label: 'Diretor',  icon: SlidersHorizontal, desc: 'Controle intermediário' },
   { id: 'studio',   label: 'Studio',   icon: Settings,    desc: 'Avançado — todos os controles' },
 ];
+
+// Fonte única das tabs do editor (sidebar desktop + bottom bar mobile).
+// Criador: Home + Narrativa + Visual + Imagem + Marca · Diretor: + Texto · Studio: + Layout
+const EDITOR_TABS = [
+  { id:'home',      icon:Home,     label:'Home',      mode:'criador' },
+  { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
+  { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
+  { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
+  { id:'texto',     icon:Type,     label:'Texto',     mode:'diretor' },
+  { id:'layout',    icon:Layout,   label:'Layout',    mode:'studio' },
+  { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
+];
+const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
+const visibleEditorTabs = (appMode) =>
+  EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
 function ModeSwitcher({ value, onChange, compact = false }) {
   const [open, setOpen] = React.useState(false);
   // Posição calculada em px (não CSS `absolute` relativo ao wrapper) porque o
@@ -9767,22 +9782,8 @@ function SidebarContent({
         }}
       >
         {(() => {
-          // FASE 2 Narrative OS — tabs filtradas por appMode + HOME sempre primeira:
-          //   Criador: Home + Narrativa + Visual + Imagem + Marca (5)
-          //   Diretor: + Texto (6)
-          //   Studio: + Layout (7 — todos)
-          const ALL_TABS = [
-            { id:'home',      icon:Home,     label:'Home',      mode:'criador' },
-            { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
-            { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
-            { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
-            { id:'texto',     icon:Type,     label:'Texto',     mode:'diretor' },
-            { id:'layout',    icon:Layout,   label:'Layout',    mode:'studio' },
-            { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
-          ];
-          const modeRank = { criador: 1, diretor: 2, studio: 3 };
-          const visible = ALL_TABS.filter((t) => modeRank[t.mode] <= modeRank[appMode]);
-          return visible;
+          // FASE 2 Narrative OS — tabs filtradas por appMode (fonte única EDITOR_TABS)
+          return visibleEditorTabs(appMode);
         })().map(t=>{
           const active = tab===t.id;
           return (
@@ -12248,7 +12249,7 @@ function SidebarContent({
           onExportAll={exportAll}
           onExportPDF={exportPDF}
           onExportPhotosOnly={exportPhotosOnly}
-          hideSlideOption={tab === 'material'}
+          hideSlideOption={false}
         />
         <button
           onClick={() => setLibraryOpen(true)}
@@ -13815,10 +13816,13 @@ export default function App() {
 
   // ── PADRÃO VISUAL ────────────────────────────────────────────────────────
   // Trackeia qual dos 12 presets visuais o user escolheu (null = nenhum).
-  // applyVisualStylePreset: merge das cores/fontes/tipografia do preset
-  // no brand atual. Chamado pelo GenerateModal antes de disparar onGenerate
-  // — afeta só rendering (gerador de texto não usa cor da marca).
-  const [visualPreset, setVisualPreset] = useState(null);
+  // Persistido no doc — antes era useState local e o picker "esquecia" a
+  // seleção em reload/troca de projeto, mesmo com as cores já aplicadas.
+  const visualPreset = doc.visualPreset ?? null;
+  const setVisualPreset = useCallback(next => history.set(d => ({
+    ...d,
+    visualPreset: typeof next === 'function' ? next(d.visualPreset ?? null) : next,
+  })), [history]);
   const applyVisualStylePreset = useCallback((presetId) => {
     if (!presetId) return;
     setVisualPreset(presetId);
@@ -14083,11 +14087,16 @@ export default function App() {
         } catch (e) {
           console.warn('[billing] confirm failed', e);
         }
+      }
+      // Limpa TODO param de billing da URL (success/restored/cancel) — sem isso,
+      // reload em ?billing=cancel reabre o paywall e ?billing=restored re-entra
+      // no studio indefinidamente.
+      if (billing) {
         try {
           const url = new URL(window.location.href);
           url.searchParams.delete('billing');
           url.searchParams.delete('session_id');
-          window.history.replaceState({}, '', url.pathname + url.search);
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
         } catch { /* */ }
       }
 
@@ -17036,21 +17045,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
                 gap:6,
               }}>
-              {(() => {
-                // FASE 2 Narrative OS — bottom nav também filtra por modo
-                // + HOME sempre primeira (storyboard / visão geral do projeto)
-                const ALL = [
-                  { id:'home',      label:'Home',      icon:Home,      mode:'criador' },
-                  { id:'narrativa', label:'Narrativa', icon:Wand2,     mode:'criador' },
-                  { id:'visual',    label:'Visual',    icon:Palette,   mode:'criador' },
-                  { id:'imagem',    label:'Imagem',    icon:ImageIcon, mode:'criador' },
-                  { id:'texto',     label:'Texto',     icon:Type,      mode:'diretor' },
-                  { id:'layout',    label:'Layout',    icon:Layout,    mode:'studio' },
-                  { id:'brand',     label:'Marca',     icon:Instagram, mode:'criador' },
-                ];
-                const rank = { criador: 1, diretor: 2, studio: 3 };
-                return ALL.filter((t) => rank[t.mode] <= rank[appMode]);
-              })().map(({ id, label, icon:Icon }) => {
+              {visibleEditorTabs(appMode).map(({ id, label, icon:Icon }) => {
                 const active = tab === id;
                 return (
                   <button
@@ -17207,7 +17202,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onOpenKeys={() => setKeysOpen(true)}
         onGoToMaterial={() => {
           setShellView('project');
-          setTab('material');
+          // «Fontes & referências» vive na tab narrativa — 'material' não é uma
+          // tab real e deixava a sidebar vazia.
+          setTab('narrativa');
           if (isMobile) setDrawerOpen(true);
         }}
         brandSummary={[
