@@ -12,6 +12,7 @@ import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentat
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
+import { resolvePresetText } from '../../utils/preset-tokens.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
@@ -108,11 +109,17 @@ function cultureResolveSurface(slide, num) {
   return num % 2 === 0 ? 'light' : 'dark';
 }
 
-/** Quebra de linha segura em zonas estreitas (mobile / canvas). */
+/** Quebra de linha segura em zonas estreitas (mobile / canvas).
+ *
+ *  NÃO hifenizar e NÃO quebrar palavra em ponto arbitrário: título de carrossel
+ *  é a peça mais visível do produto e "VOCÊ ESTÁ FA-ZENDO ERRADO" destrói a
+ *  credibilidade da peça. `overflowWrap: break-word` ainda protege do estouro —
+ *  só quebra quando a palavra sozinha não cabe na linha — e o auto-fit reduz a
+ *  fonte antes disso. */
 const VC_TEXT_ZONE_STYLE = {
-  wordBreak: 'break-word',
-  overflowWrap: 'anywhere',
-  hyphens: 'auto',
+  wordBreak: 'normal',
+  overflowWrap: 'break-word',
+  hyphens: 'manual',
   boxSizing: 'border-box',
 };
 
@@ -966,6 +973,19 @@ const SlideCardInner = React.forwardRef(({
   onPhotoZoneNativeFile = null,
   enableZoneSwapDrag = false,
 }, ref) => {
+  // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
+  // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
+  // handle mesmo que o usuário configure depois de aplicar o padrão visual.
+  const brandRaw = brand;
+  brand = React.useMemo(() => {
+    const campos = ['cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
+      'footerPillText', 'footerBarLeft', 'footerBarCenter', 'footerBarRight'];
+    if (!brandRaw || !campos.some((k) => String(brandRaw[k] || '').includes('{'))) return brandRaw;
+    const out = { ...brandRaw };
+    for (const k of campos) out[k] = resolvePresetText(brandRaw[k], brandRaw);
+    return out;
+  }, [brandRaw]);
+
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const slideIdx = slideIndexProp != null ? slideIndexProp : num - 1;
   const zonePatchRef = React.useRef(onCanvasZonePatch);

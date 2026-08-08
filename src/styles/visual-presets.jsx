@@ -1,6 +1,11 @@
 /**
- * 12 padrões visuais para carrosséis virais — extraídos de referências reais
- * (NBA news, case studies neon, editorial magazine, luxury, viral hype, etc).
+ * 12 padrões visuais para carrosséis virais — a estrutura veio de referências
+ * reais (NBA news, case study neon, editorial magazine, luxury, viral hype).
+ *
+ * REGRA: copiamos o LAYOUT das referências, nunca o texto. Nenhum preset pode
+ * conter nome de marca, handle ou frase de terceiro — isso vazava para o
+ * carrossel do usuário. Use os tokens de `src/utils/preset-tokens.js`:
+ * `{handle}`, `{marca}`, `{ano}`, ou um placeholder genérico ("SUA CATEGORIA").
  *
  * Cada preset define overrides de marca (cores, fontes, tipografia) e, opcionalmente,
  * `creativePreset` sugerido para alinhar pele + arco narrativo. O utilizador pode
@@ -304,9 +309,9 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 102,
       textSubLeading: 140,
       // Header bar 3 colunas — placeholder editorial
-      cultureHeaderLeft: 'DE MILHÕES!',
-      cultureHeaderCenter: 'NEWS!',
-      cultureHeaderYear: 'CRACK',
+      cultureHeaderLeft: 'DESTAQUE',
+      cultureHeaderCenter: 'NEWS',
+      cultureHeaderYear: '{ano}',
       // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
       showPageBadge: true,
       // Subtítulo OFF — visual hierarchy é eyebrow + título rosa pastel
@@ -354,20 +359,20 @@ export const VISUAL_PRESETS = [
       textSubLeading: 145,
       // Header bar 3-col fininho no topo (placeholder editorial)
       cultureHeaderLeft: 'ESTUDO DE CASO',
-      cultureHeaderCenter: 'NMLSS ACADEMY',
-      cultureHeaderYear: '©COPYRIGHT 2025',
+      cultureHeaderCenter: '{marca}',
+      cultureHeaderYear: '©{ano}',
       showPageBadge: true,
       // Star ornament 8-pontas centralizado acima do eyebrow
       showStarOrnament: true,
       // Footer pill verde-neon com seta no rodapé
-      footerPillText: 'ESTUDO NMLSS ACADEMY®',
+      footerPillText: 'ESTUDO DE CASO',
       // Subtítulo OFF — só eyebrow + título dominam
       subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bl',
       align: 'left',
-      eyebrowText: 'O TEMPO É O NOVO INIMIGO',
+      eyebrowText: 'O TÍTULO DE APOIO ENTRA AQUI',
     },
     preview: () => (
       <PreviewCard bg="#0c0c10">
@@ -412,7 +417,7 @@ export const VISUAL_PRESETS = [
       showPageBadge: false,
       showStarOrnament: false,
       // Pill hashtag SEM seta (variante minimal)
-      footerPillText: '#NÃOSURTOHOJE',
+      footerPillText: '#SUAHASHTAG',
       footerPillBg: 'rgba(0,0,0,0.55)',
       footerPillFg: '#fff5d1',
       footerPillArrow: false,  // sem seta — visual mais compacto
@@ -460,9 +465,9 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 100,
       textSubLeading: 140,
       // Header 3-col sutil (placeholder editorial @copyright)
-      cultureHeaderLeft: '@MARCA',
-      cultureHeaderCenter: 'DIGITAL THINKER',
-      cultureHeaderYear: 'COPYRIGHT',
+      cultureHeaderLeft: '{handle}',
+      cultureHeaderCenter: 'SUA CATEGORIA',
+      cultureHeaderYear: '©{ano}',
       showPageBadge: false,  // promo não usa contador
       showStarOrnament: false,
       // Subtítulo OFF — espaço pro strikethrough/after-title
@@ -472,8 +477,8 @@ export const VISUAL_PRESETS = [
       layout: 'bl',
       align: 'left',
       // After-title text com strikethrough — assinatura visual da promo
-      strikethroughText: 'DE R$99',
-      afterTitleText: 'POR R$0,00 (100% GRATUITO)',
+      strikethroughText: 'DE R$00',
+      afterTitleText: 'POR R$00 (SUA OFERTA)',
     },
     preview: () => (
       <PreviewCard bg="#ec4899" gradient="linear-gradient(180deg, #f472b6 0%, #ec4899 70%, #be185d 100%)">
@@ -511,12 +516,12 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 100,
       textSubLeading: 145,
       // Header 2-col (centro vazio)
-      cultureHeaderLeft: 'REFLEXÕES NECESSÁRIAS',
+      cultureHeaderLeft: 'SUA EDITORIA',
       cultureHeaderCenter: '',  // vazio — só 2 colunas visíveis
-      cultureHeaderYear: '@JONATHANCADORE',
+      cultureHeaderYear: '{handle}',
       showPageBadge: true,
       // Footer pill cinza-escuro (não accent)
-      footerPillText: '@JONATHANCADORE',
+      footerPillText: '{handle}',
       footerPillBg: 'rgba(255,255,255,0.12)',  // cinza translúcido
       footerPillFg: '#f3e8c0',  // cream
       // Subtítulo OFF — só eyebrow + título cream dominam
@@ -525,7 +530,7 @@ export const VISUAL_PRESETS = [
     slideDefaults: {
       layout: 'bc',  // bottom-center
       align: 'center',  // título centralizado
-      eyebrowText: 'QUANDO CORRER 42 KM VIROU PROVA DE STATUS',
+      eyebrowText: 'O TÍTULO DE APOIO ENTRA AQUI',
     },
     preview: () => (
       <PreviewCard bg="#3e3527">
@@ -564,13 +569,13 @@ export const VISUAL_PRESETS = [
       textTitleTracking: -1,
       textTitleLeading: 100,
       textSubLeading: 140,
-      cultureHeaderLeft: 'EDUCADORA FM 91.7',
+      cultureHeaderLeft: '{marca}',
       cultureHeaderCenter: 'POSTNEWS',
       cultureHeaderYear: '',
       showPageBadge: true,
       showStarOrnament: false,
       // Pill verde-menta com hashtag no rodapé
-      footerPillText: 'FOI NO SHOW DO COLDPLAY',
+      footerPillText: 'SUA CHAMADA AQUI',
       footerPillBg: '#34d399',
       footerPillFg: '#0a0a0a',
       footerPillArrow: false,
@@ -676,7 +681,7 @@ export const VISUAL_PRESETS = [
       textSubLeading: 145,
       cultureHeaderLeft: 'TRENDS',
       cultureHeaderCenter: 'LUXURY EDITION',
-      cultureHeaderYear: '2025',
+      cultureHeaderYear: '{ano}',
       showPageBadge: true,
       showStarOrnament: false,
       // Subtítulo em italic dourado claro — descrição editorial fashion
@@ -835,13 +840,13 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 100,
       textSubLeading: 145,
       cultureHeaderLeft: '',
-      cultureHeaderCenter: 'SOCIYELL SMM & GROWTH',
+      cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '',
       showPageBadge: false,
       // Footer 3-col (feature nova): "LABEL|VALUE" por coluna
-      footerBarLeft: 'Topic|Instagram',
-      footerBarCenter: 'Brought to you|by Sociyell',
-      footerBarRight: 'Make sure to|Save this post',
+      footerBarLeft: 'Tema|Instagram',
+      footerBarCenter: 'Conteúdo por|{marca}',
+      footerBarRight: 'Não esqueça|de salvar',
       // Subtítulo sutil branco regular abaixo do título grande
       subtitleVisible: true,
       subtitleWeight: 400,
@@ -930,10 +935,31 @@ export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p
  * Aplica overrides de marca de um preset visual. Retorna NOVO brand (não muta).
  * Campos não definidos no preset preservam valores atuais do brand.
  */
+/**
+ * Campos de "assinatura visual" do preset (ornamentos e microcopy).
+ * Precisam ser LIMPOS antes de aplicar outro padrão: como cada preset define
+ * só os que usa, um merge simples acumulava o header de um, o pill de outro e
+ * a footer bar de um terceiro — o "Minimal Clean" acabava entulhado com os
+ * ornamentos de todos os padrões visitados antes.
+ */
+export const PRESET_BRAND_SIGNATURE_KEYS = [
+  'cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
+  'footerPillText', 'footerPillBg', 'footerPillFg', 'footerPillArrow',
+  'footerBarLeft', 'footerBarCenter', 'footerBarRight',
+  'showPageBadge', 'showStarOrnament', 'subtitleVisible',
+];
+
+/** Mesma lógica, nos campos que vivem no slide. */
+export const PRESET_SLIDE_SIGNATURE_KEYS = [
+  'eyebrowText', 'strikethroughText', 'afterTitleText',
+];
+
 export function applyVisualPreset(brand, presetId) {
   const preset = VISUAL_PRESET_BY_ID[presetId];
   if (!preset) return brand;
-  const next = { ...brand, ...preset.brand };
+  const limpo = { ...brand };
+  for (const k of PRESET_BRAND_SIGNATURE_KEYS) delete limpo[k];
+  const next = { ...limpo, ...preset.brand };
   // Mesma regra anti-faux-bold dos pickers: fontes Google capadas a 700
   // não podem receber peso 800/900 vindo do preset.
   if (next.textTitleWeight != null) {
@@ -951,5 +977,12 @@ export function applyVisualPreset(brand, presetId) {
  */
 export function getSlideOverridesForPreset(presetId) {
   const preset = VISUAL_PRESET_BY_ID[presetId];
-  return preset?.slideDefaults || {};
+  const defaults = preset?.slideDefaults || {};
+  // Zera a assinatura anterior antes de aplicar a nova: sem isto o eyebrow de
+  // um preset e o preço riscado de outro sobreviviam ao troca-troca.
+  const reset = {};
+  for (const k of PRESET_SLIDE_SIGNATURE_KEYS) {
+    if (!(k in defaults)) reset[k] = undefined;
+  }
+  return { ...reset, ...defaults };
 }
