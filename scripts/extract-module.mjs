@@ -118,10 +118,30 @@ function referencedTopLevel(name) {
   return out;
 }
 
+/** Componente = tem nó JSX real ou chama hook. Via AST, não regex no texto:
+ *  `<video>` citado num comentário não é JSX. */
 function looksLikeComponent(name) {
   const { node } = decls.get(name);
-  const text = srcOf(node);
-  return /<[A-Za-z]/.test(text) || /\buse[A-Z][A-Za-z]*\s*\(/.test(text);
+  let found = false;
+  traverse(ast, {
+    enter(path) {
+      if (found) return;
+      if (path.node.start < node.start || path.node.end > node.end) return;
+      if (path.node.type === 'JSXElement' || path.node.type === 'JSXFragment') found = true;
+      if (
+        path.node.type === 'CallExpression' &&
+        path.node.callee.type === 'Identifier' &&
+        /^use[A-Z]/.test(path.node.callee.name)
+      ) found = true;
+      if (
+        path.node.type === 'CallExpression' &&
+        path.node.callee.type === 'MemberExpression' &&
+        path.node.callee.property?.type === 'Identifier' &&
+        /^use[A-Z]/.test(path.node.callee.property.name)
+      ) found = true;
+    },
+  });
+  return found;
 }
 
 // ── fecho transitivo ─────────────────────────────────────────────────────────
