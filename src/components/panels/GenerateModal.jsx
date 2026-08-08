@@ -535,7 +535,7 @@ function GenerateModal({
                         key={opt.id}
                         type="button"
                         aria-pressed={on}
-                        title={`${opt.short}: ${opt.desc}`}
+                        aria-label={`${opt.short}: ${opt.desc}`} title={`${opt.short}: ${opt.desc}`}
                         onClick={() => setCardStyle(opt.id)}
                         style={{
                           minWidth: 72, minHeight: 76, padding: '8px 6px',

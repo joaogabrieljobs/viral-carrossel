@@ -1038,7 +1038,7 @@ export default function App() {
     reopenLanding,
     openPortal,
     handleLogout,
-  } = useAccess({ setShellView });
+  } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false) });
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
@@ -2156,7 +2156,11 @@ ${jsonShapeLine}`;
       }));
     }
     if (isMobile) {
-      setTab('slide');
+      // Antes ia para a tab 'slide' — que não existe em EDITOR_TABS e renderiza
+      // a união de layout+imagem+texto, entregando ferramentas de Studio a um
+      // usuário no modo Criador. 'narrativa' existe em todos os modos e é onde
+      // o texto recém-gerado é editado.
+      setTab('narrativa');
       setDrawerOpen(true);
     }
     if (n) setNiche(n);
@@ -2540,7 +2544,9 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     const onKey = (e) => {
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
-      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen;
+      // Qualquer overlay bloqueia os atalhos. Landing/paywall/login e a intro de
+      // modos faltavam: com eles abertos, setas/Delete/F agiam no documento por baixo.
+      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
@@ -2594,11 +2600,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
-    // hookLibrary/niche: usados pelo botão "salvar hook na biblioteca" (SidebarContent)
-    hookLibrary, setHookLibrary, niche,
+    // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
+    // hookLibrary em si só é lido pelo GenerateModal — não entra aqui.
+    setHookLibrary, niche,
     slide, slides, activeIdx, brand, setBrand, updateSlide,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,

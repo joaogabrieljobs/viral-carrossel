@@ -284,21 +284,21 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                   <div style={{ display:'flex', gap:4 }}>
                     <button
                       onClick={() => startEdit(entry)}
-                      title="Renomear"
+                      aria-label="Renomear" title="Renomear"
                       style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                     </button>
                     <button
                       onClick={() => onDuplicate(entry.id)}
-                      title="Duplicar"
+                      aria-label="Duplicar" title="Duplicar"
                       style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
                       <Copy size={10}/>
                     </button>
                     <button
                       onClick={() => onExportDoc(entry.id)}
-                      title="Exportar como JSON"
+                      aria-label="Exportar como JSON" title="Exportar como JSON"
                       style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
                       <Download size={10}/>
@@ -312,14 +312,14 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                         >OK</button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
-                          title="Cancelar"
+                          aria-label="Cancelar" title="Cancelar"
                           style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                         ><X size={10}/></button>
                       </>
                     ) : (
                       <button
                         onClick={() => setConfirmDeleteId(entry.id)}
-                        title="Apagar"
+                        aria-label="Apagar" title="Apagar"
                         style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                       >
                         <Trash2 size={10}/>

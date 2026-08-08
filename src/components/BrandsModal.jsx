@@ -122,14 +122,14 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
                         >OK</button>
                         <button
                           onClick={() => setConfirmDeleteBrandId(null)}
-                          title="Cancelar"
+                          aria-label="Cancelar" title="Cancelar"
                           style={{ width:28, height:28, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                         ><X size={11}/></button>
                       </>
                     ) : (
                       <button
                         onClick={() => setConfirmDeleteBrandId(b.id)}
-                        title="Apagar perfil"
+                        aria-label="Apagar perfil" title="Apagar perfil"
                         style={{ width:28, height:28, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                       >
                         <Trash2 size={11}/>

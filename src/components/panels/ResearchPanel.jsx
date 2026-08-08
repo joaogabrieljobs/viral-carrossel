@@ -104,7 +104,7 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
               className="vc-input" style={{ flex:1 }}
               onKeyDown={e=>{if(e.key==='Enter')run();}}
             />
-            <button onClick={run} disabled={busy||!niche.trim()} className="vc-btn vc-btn-primary"
+            <button onClick={run} disabled={busy||!niche.trim()} className="vc-btn vc-btn-primary" aria-label="Pesquisar"
               style={{ padding:'0 16px', height:40, opacity:(busy||!niche.trim())?0.5:1 }}
             >
               {busy ? <Loader2 size={14} style={{animation:'spin 0.8s linear infinite'}}/> : <Search size={14}/>}

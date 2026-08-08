@@ -70,28 +70,55 @@ for (const [file, { ast, code }] of parsed) {
   });
 }
 
-/** componente -> Set(props passadas em algum call site) */
+// `const sidebarProps = { a, b, ... }` — para resolver `{...sidebarProps}`.
+// Sem isto o checker pulava todo componente com spread, que foi exatamente
+// o furo por onde `setHookLibrary`/`niche` passaram.
+const objetosLocais = new Map();
+for (const [, { ast }] of parsed) {
+  traverse(ast, {
+    VariableDeclarator(path) {
+      if (path.node.id.type !== 'Identifier') return;
+      if (path.node.init?.type !== 'ObjectExpression') return;
+      const chaves = new Set();
+      let completo = true;
+      for (const prop of path.node.init.properties) {
+        if (prop.type === 'SpreadElement') { completo = false; continue; }
+        const k = prop.key?.name ?? prop.key?.value;
+        if (k) chaves.add(String(k));
+        else completo = false;
+      }
+      objetosLocais.set(path.node.id.name, { chaves, completo });
+    },
+  });
+}
+
+/** componente -> { props:Set, opaco:boolean } (opaco = spread não resolvível) */
 const passadas = new Map();
 for (const [, { ast }] of parsed) {
   traverse(ast, {
     JSXOpeningElement(path) {
       const nome = path.node.name.type === 'JSXIdentifier' ? path.node.name.name : null;
       if (!nome || !componentes.has(nome)) return;
-      const set = passadas.get(nome) ?? new Set();
+      const reg = passadas.get(nome) ?? { props: new Set(), opaco: false };
       for (const attr of path.node.attributes) {
-        if (attr.type === 'JSXSpreadAttribute') set.add('...spread');
-        else if (attr.name?.name) set.add(attr.name.name);
+        if (attr.type === 'JSXSpreadAttribute') {
+          const arg = attr.argument;
+          const resolvido = arg.type === 'Identifier' ? objetosLocais.get(arg.name) : null;
+          if (resolvido?.completo) for (const k of resolvido.chaves) reg.props.add(k);
+          else reg.opaco = true;
+        } else if (attr.name?.name) reg.props.add(attr.name.name);
       }
-      passadas.set(nome, set);
+      passadas.set(nome, reg);
     },
   });
 }
 
 let problemas = 0;
 for (const [nome, { declaradas, comDefault, file, code }] of componentes) {
-  const dadas = passadas.get(nome);
-  if (!dadas) continue;               // não instanciado via JSX neste repo
-  if (dadas.has('...spread')) continue; // spread — não dá para concluir
+  const reg = passadas.get(nome);
+  if (!reg) continue;        // não instanciado via JSX neste repo
+  if (reg.opaco) continue;   // spread não resolvível — não dá para concluir
+  const dadas = reg.props;
 
   for (const prop of declaradas) {
     // `children` chega pelos filhos do JSX, não como atributo
@@ -104,7 +131,7 @@ for (const [nome, { declaradas, comDefault, file, code }] of componentes) {
     problemas++;
   }
   for (const prop of dadas) {
-    if (prop === 'key' || prop === 'ref' || prop === '...spread') continue;
+    if (prop === 'key' || prop === 'ref') continue;
     if (declaradas.has(prop) || declaradas.has('...rest')) continue;
     console.error(`⚠ ${basename(file)}  <${nome}> recebe '${prop}', que não existe na assinatura`);
     problemas++;

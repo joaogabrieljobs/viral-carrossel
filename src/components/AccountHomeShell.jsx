@@ -179,7 +179,7 @@ function AccountHomeShell({
           <button
             type="button"
             onClick={() => setAccountTab?.('projects')}
-            title="Projetos"
+            aria-label="Projetos" title="Projetos"
             style={{
               display: 'flex',
               alignItems: 'center',

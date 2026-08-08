@@ -16,7 +16,7 @@ import { shouldShowOnboardingLanding, dismissOnboardingLanding } from '../utils/
 import { trackEvent } from '../utils/telemetry.js';
 import { SK } from '../utils/storage.js';
 
-export function useAccess({ setShellView }) {
+export function useAccess({ setShellView, onLeaveEditor }) {
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -39,7 +39,10 @@ export function useAccess({ setShellView }) {
     // Assinatura vive dentro do Perfil (legado: 'plan' → profile)
     setAccountTab(tab === 'plan' ? 'profile' : tab);
     setShellView('home');
-  }, []);
+    // sem isto o drawer do mobile reaparece aberto ao voltar pro editor,
+    // com header e strip de thumbs colapsados
+    onLeaveEditor?.();
+  }, [setShellView, onLeaveEditor]);
 
   const refreshAccess = useCallback(async () => {
     const session = await fetchAccessSession();

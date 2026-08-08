@@ -528,7 +528,7 @@ function SidebarContent({
                         <span style={importSub}>Substitui só a zona de imagem do card {activeIdx + 1}</span>
                       </span>
                     </button>
-                    <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
+                    <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} aria-label="MP4 / MOV / WebM até 60 MB. Substitui foto se houver." title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
                       <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar vídeo neste slide</span>
@@ -832,13 +832,13 @@ function SidebarContent({
                   {/* action buttons */}
                   <div style={{ position:'absolute', top:5, right:5, display:'flex', gap:4 }}>
                     {slide.imageQuery && (
-                      <button onClick={refreshImg} disabled={dalleLoading} title="Nova foto (mesmo tema)" style={{
+                      <button onClick={refreshImg} disabled={dalleLoading} aria-label="Nova foto (mesmo tema)" title="Nova foto (mesmo tema)" style={{
                         background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.1)',
                         color:'#fff', padding:'4px 5px', borderRadius:5, cursor:dalleLoading?'wait':'pointer', display:'flex',
                         opacity:dalleLoading?0.45:1,
                       }}><RefreshCw size={10}/></button>
                     )}
-                    <button onClick={()=>updateSlide({bgImage:null})} title="Remover imagem" style={{
+                    <button onClick={()=>updateSlide({bgImage:null})} aria-label="Remover imagem" title="Remover imagem" style={{
                       background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.1)',
                       color:'#fff', padding:'4px 5px', borderRadius:5, cursor:'pointer', display:'flex',
                     }}><Trash2 size={10}/></button>
@@ -1819,7 +1819,7 @@ function SidebarContent({
                         handleAvatarRotate: 0,
                         handleAvatarZoom: 100,
                       })}
-                      title="Remover foto do perfil"
+                      aria-label="Remover foto do perfil" title="Remover foto do perfil"
                       style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
                       <Trash2 size={11}/>
@@ -1993,7 +1993,7 @@ function SidebarContent({
                   </div>
                   <button
                     onClick={() => setBrand({ ...brand, logo: null })}
-                    title="Remover logo"
+                    aria-label="Remover logo" title="Remover logo"
                     style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                   >
                     <Trash2 size={11}/>
@@ -2266,7 +2266,7 @@ function SidebarContent({
                       <button
                         type="button"
                         onClick={() => setBrand({ ...brand, customTitleFont: null })}
-                        title="Remover fonte de título"
+                        aria-label="Remover fonte de título" title="Remover fonte de título"
                         style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
                       >
                         <Trash2 size={11}/>
@@ -2356,7 +2356,7 @@ function SidebarContent({
                       <button
                         type="button"
                         onClick={() => setBrand({ ...brand, customBodyFont: null })}
-                        title="Remover fonte de corpo"
+                        aria-label="Remover fonte de corpo" title="Remover fonte de corpo"
                         style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
                       >
                         <Trash2 size={11}/>
@@ -2748,7 +2748,7 @@ function SidebarContent({
                       type="button"
                       onClick={() => remixWithTone(opt.hint, opt.label)}
                       disabled={refining}
-                      title={opt.hint}
+                      aria-label={opt.hint} title={opt.hint}
                       style={{
                         display:'flex', flexDirection:'column', alignItems:'flex-start', gap:4,
                         padding:'10px 10px 11px', borderRadius:10, cursor: refining ? 'not-allowed' : 'pointer',

@@ -46,11 +46,11 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 
 **Frágil:**
 - **Tab órfã `'material'`** (`setTab('material'):17208`): não existe em `ALL_TABS` nem tem seção — "Ir para Material" abre sidebar vazia.
-- **Tab fantasma `'slide'`** (`:15354`, pós-geração mobile): renderiza união de ~15 seções de layout+imagem+texto — **fura o gating de modo** (usuário Criador ganha ferramentas Studio).
+- ~~**Tab fantasma `'slide'`**~~ **CORRIGIDO 2026-08-07**: pós-geração no mobile agora vai para `'narrativa'` (existe em todos os modos) em vez da tab inexistente que furava o gating.
 - **`ALL_TABS` + `modeRank` duplicados** palavra por palavra (`:9772` sidebar vs `:17038` bottom bar) — divergem em silêncio.
 - ~~**Query params**~~ **CORRIGIDO 2026-08-07**: `billing=*` agora é limpo da URL, e `?app=1` deixou de retornar cedo (descartava `login=*`/`billing=*` combinados — o portal Stripe volta com `?app=1`). Teste E2E CA-05 trava o comportamento.
-- **Teclado**: deps do handler global (`:15992`) omitem `photoPositionOpen` (stale) e não incluem `modesIntroOpen`/`landing`/`paywall` — setas/Delete agem no documento por baixo de modais.
-- `drawerOpen` não reseta ao trocar de view (`goAccount`, `openDoc`, `newDoc`) — drawer reaparece aberto.
+- ~~**Teclado**~~ **CORRIGIDO 2026-08-07**: `anyModalOpen` agora inclui `modesIntroOpen`/`landingOpen`/`paywallOpen`/`loginOpen`, e as deps do handler incluem `photoPositionOpen` (estava stale).
+- ~~`drawerOpen` não reseta ao trocar de view~~ **CORRIGIDO 2026-08-07**: `goAccount` fecha o drawer (`onLeaveEditor`).
 - `ModesIntroModal` irrecuperável após 1ª visita (nenhum trigger manual); tour + modes-intro auto-abrem empilhados (850ms vs 600ms); tour iniciado da home aponta seletores que só existem no editor.
 - Fallback dev de billing (`src/lib/billing.js:11`): falha de `/api/auth/session` em DEV retorna `active:true` — ok, mas mascarava paywall em teste local.
 
@@ -145,9 +145,11 @@ Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. E
 - `useExport` sem `trackEvent` / `blobFromSlideRef` / `downloadCanvasPng`
 - **`SidebarContent`: `setHookLibrary` e `niche`** — bug **pré-existente**, anterior a qualquer extração: `SidebarContent` sempre foi top-level e nunca teve esse escopo, então o botão "salvar hook na biblioteca" estava quebrado. Corrigido threadando as props.
 
-### Achados de acessibilidade (backlog)
+### Acessibilidade — parcialmente corrigido (2026-08-07)
 
-- Botão de submit da pesquisa de nicho (`ResearchPanel`) é só ícone, sem `aria-label` — o E2E precisou de seletor por classe. Mesmo padrão em outros botões-ícone; vale uma varredura de `aria-label` nos controles do editor.
+Varredura AST encontrou **48 `<button>` sem rótulo acessível** (só ícone, sem `aria-label`/`aria-labelledby`). Corrigidos **20** de forma mecânica e segura: os que já tinham `title` ganharam `aria-label` com o mesmo texto (`title` sozinho não é anunciado de forma confiável por leitor de tela). Mais o submit da pesquisa de nicho, que era o que forçava o E2E a usar seletor por classe.
+
+**Restam 28**, todos com ícone puro e sem `title` — precisam de decisão de conteúdo caso a caso, não dá para inferir com segurança. Backlog.
 
 ### Pendência de UX (decisão do produto)
 
@@ -181,3 +183,14 @@ Um susto pelo caminho: o modo parecia não persistir. Era erro do teste — `lsG
 ### Veredito
 
 Um bug real encontrado e corrigido (props do hook library). Nenhuma perda de componente, símbolo ou comportamento além das remoções deliberadas. Gate agora é `check-undefined` + `check-props` + 97 unit + 17 E2E.
+
+### Correções aplicadas na varredura final (2026-08-07)
+
+| Item | Efeito para o usuário |
+|---|---|
+| Atalhos de teclado sob overlays | Setas/Delete/F agiam no documento por baixo da landing, paywall, login e intro de modos; `photoPositionOpen` estava stale nas deps |
+| Drawer mobile ao sair do editor | Voltava aberto, com header e strip de thumbs colapsados |
+| Tab fantasma `'slide'` | Usuário no modo Criador recebia controles de Studio após gerar no mobile |
+| `lsGet` silencioso | Valor corrompido no localStorage caía no fallback **sem aviso** — foi o que disfarçou o falso alarme do gating de modos. Agora emite `console.warn` com a chave e o valor cru |
+| `hookLibrary` no spread da sidebar | Prop passada a quem não usa (limpeza; o `GenerateModal` continua recebendo) |
+| `check-props` resolvia spread | O checker pulava componentes com `{...props}` — o furo exato por onde o bug do hook library passou. Agora resolve objetos locais e só desiste quando o spread é realmente opaco |

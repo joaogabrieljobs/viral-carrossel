@@ -125,7 +125,7 @@ function ExportMoreFormats({
               style={menuItemStyle}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              title="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA"
+              aria-label="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA" title="Salva as imagens raw (sem texto) — útil pra reusar fotos geradas por IA"
             >
               <ImageIcon size={13} style={{ color:'var(--text-muted)' }}/>
               <span style={{ flex:1 }}>Apenas fotos limpas</span>

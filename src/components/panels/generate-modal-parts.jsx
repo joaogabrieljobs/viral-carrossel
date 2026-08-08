@@ -54,7 +54,7 @@ function ModePicker({ value, onChange }) {
                 transition:'all 0.12s',
                 display:'flex', flexDirection:'column', gap:3, minHeight:60,
               }}
-              title={m.desc}
+              aria-label={m.desc} title={m.desc}
             >
               <div style={{
                 fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
@@ -170,7 +170,7 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
                 key={p.id}
                 type="button"
                 onClick={() => setMaterial({ ...material, refProfileId: p.id })}
-                title={p.promptBlock.slice(0, 220) + '…'}
+                aria-label={p.promptBlock.slice(0, 220) + '…'} title={p.promptBlock.slice(0, 220) + '…'}
                 style={{
                   textAlign: 'left', padding: '10px 10px', borderRadius: 11,
                   border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,

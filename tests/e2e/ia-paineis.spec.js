@@ -65,9 +65,7 @@ test.describe('Painéis de IA', () => {
     const campo = page.getByPlaceholder(/nicho ou tema/i);
     await expect(campo).toBeVisible({ timeout: 10_000 });
     await campo.fill('nutrição');
-    // NOTA: este botão é só ícone, sem aria-label — daí o seletor por classe.
-    // Registrado como achado de acessibilidade (ver audit-produto).
-    await page.locator('.modal-panel').locator('.vc-btn-primary').first().click({ force: true });
+    await page.getByRole('button', { name: /^pesquisar$/i }).click({ force: true });
 
     // resultado da IA aparece no painel
     await expect(page.getByText(/9 em 10 nutricionistas/i)).toBeVisible({ timeout: 15_000 });

@@ -13,11 +13,22 @@ function trackEvent(name, props) {
 
 // Persistência leve em localStorage com fallback seguro
 const lsGet = (key, fallback) => {
+  let raw;
   try {
-    const raw = localStorage.getItem(key);
-    if (raw == null) return fallback;
+    raw = localStorage.getItem(key);
+  } catch {
+    return fallback; // storage privado/bloqueado — silêncio é correto aqui
+  }
+  if (raw == null) return fallback;
+  try {
     return JSON.parse(raw);
-  } catch { return fallback; }
+  } catch (e) {
+    // Valor corrompido (ou gravado sem JSON.stringify) cai no fallback, mas
+    // ANTES isso era silencioso: uma preferência era ignorada e o app parecia
+    // simplesmente "não lembrar" da escolha, sem pista nenhuma.
+    console.warn(`[lsGet] valor inválido em "${key}" — usando fallback:`, e.message, '| raw:', String(raw).slice(0, 80));
+    return fallback;
+  }
 };
 
 export {
