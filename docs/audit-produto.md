@@ -152,3 +152,32 @@ Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. E
 ### Pendência de UX (decisão do produto)
 
 Tab fantasma `'slide'`: após gerar no mobile, `setTab('slide')` renderiza a união de ~15 seções (layout+imagem+texto), **furando o gating de modos** — um usuário Criador recebe controles de Studio. Alternativas: (a) trocar por `'narrativa'`, que existe no modo Criador; (b) manter e assumir que pós-geração todo mundo vê tudo. Não mexi: é escolha de produto, não bug técnico.
+
+---
+
+## Auditoria do refactor (2026-08-07, pós-decomposição)
+
+Pergunta: a decomposição de 18.516 → 3.981 linhas quebrou alguma coisa? Três frentes independentes.
+
+### 1. Props entre componentes (`scripts/check-props.mjs`, novo)
+
+Classe de bug que `check-undefined` não pega: componente que antes lia o escopo do App agora recebe tudo por prop; se o call site esquece uma, chega `undefined` — sem erro de build, sem erro de escopo, e a feature só não funciona.
+
+**Achou 1 bug real, introduzido pela própria correção anterior:** `setHookLibrary`/`niche` foram parar no call site do `GenerateModal` (que os ignora) em vez do `SidebarContent` (que os usa via `{...sidebarProps}`). Ou seja, o botão "salvar hook na biblioteca" **continuava quebrado** apesar do commit que dizia tê-lo corrigido. Agora está em `sidebarProps`.
+
+Limitação conhecida: o checker pula componentes cujo call site usa spread — foi exatamente o furo que deixou esse bug passar. Vale evoluir para resolver o objeto do spread.
+
+### 2. Varredura dinâmica (`tests/e2e/smoke-ui.spec.js`, novo)
+
+4 testes que percorrem a UI inteira e reprovam em **qualquer** erro de console ou exceção: todas as abas nos 3 modos (com asserção de que o gating é crescente: 5 → 6 → 7 abas), os modais principais, home (perfil/projetos) e a landing rolada de ponta a ponta. **Todos passam.**
+
+Um susto pelo caminho: o modo parecia não persistir. Era erro do teste — `lsGet` faz `JSON.parse`, então o valor precisa ir com aspas; gravando string crua o app cai no fallback `'criador'` silenciosamente. O gating estava correto o tempo todo.
+
+### 3. Diff de superfície contra o commit pré-refactor
+
+- **Símbolos:** 1.326 antes → 1.660 depois. 26 sumiram, **todos intencionais**: `ALL_TABS`/`modeRank` (unificados em `EDITOR_TABS`), pipeline web_trend inteiro (backlog #9), presets de sanduíche órfãos, `buildGenerationImageLayerForCommons`, `__vcVideoUrlMap` (virou store com setter).
+- **Componentes renderizados:** 93 antes → 122 depois, **zero deixaram de ser renderizados**.
+
+### Veredito
+
+Um bug real encontrado e corrigido (props do hook library). Nenhuma perda de componente, símbolo ou comportamento além das remoções deliberadas. Gate agora é `check-undefined` + `check-props` + 97 unit + 17 E2E.

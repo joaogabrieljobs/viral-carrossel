@@ -2597,6 +2597,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
   }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
+    // hookLibrary/niche: usados pelo botão "salvar hook na biblioteca" (SidebarContent)
+    hookLibrary, setHookLibrary, niche,
     slide, slides, activeIdx, brand, setBrand, updateSlide,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
@@ -3832,8 +3834,6 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         material={material}
         setMaterial={setMaterial}
         hookLibrary={hookLibrary}
-        setHookLibrary={setHookLibrary}
-        niche={niche}
       />
       <ResearchPanel
         open={researchOpen}

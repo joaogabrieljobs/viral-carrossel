@@ -327,7 +327,7 @@ function HeroSlideCard({ style, imageSrc, label, aspect = '4 / 5' }) {
 }
 
 /** Faixa horizontal de previews 4:5 (carrosséis reais) */
-function CarouselSlideStrip({ isMobile, style }) {
+function CarouselSlideStrip({ isMobile, style = {} }) {
   return (
     <div
       style={{
