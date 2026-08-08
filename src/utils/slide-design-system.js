@@ -152,16 +152,6 @@ export const COMPOSITIONS = {
   },
 };
 
-/** Safe zones (% do card) por formato Instagram. */
-export const SAFE_ZONES = {
-  carrossel: { edge: 8, top: 14, bottom: 8, topRightReserved: 12 },
-  quadrado: { edge: 8, top: 12, bottom: 8, topRightReserved: 12 },
-  stories: { edge: 8, top: 14, bottom: 18, topRightReserved: 14 },
-};
-
-export function getSafeZone(fmt = 'carrossel') {
-  return SAFE_ZONES[fmt] || SAFE_ZONES.carrossel;
-}
 
 /** Visual preset → pacote criativo sugerido (pele + arco). */
 export const VISUAL_TO_CREATIVE_PRESET = {

@@ -2817,120 +2817,6 @@ const normalizeSlideImgMode = (m) => {
   return 'dalle';
 };
 
-// ─── WEB TREND (dev: Unsplash → Pexels → Commons | produção: só Commons no cliente)
-const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
-
-const COMMONS_STOP = new Set([
-  'the', 'a', 'an', 'and', 'or', 'for', 'not', 'are', 'but', 'com', 'como', 'de', 'da', 'do', 'das', 'dos',
-  'em', 'um', 'uma', 'o', 'os', 'as', 'no', 'na', 'nos', 'nas', 'por', 'que', 'se', 'ao', 'aos', 'à', 'às',
-  'é', 'e', 'ou', 'não', 'mais', 'muito', 'sobre', 'entre', 'sem', 'sua', 'seu', 'são', 'foi', 'ser', 'tem',
-  'já', 'apenas', 'isso', 'esse', 'essa', 'neste', 'nesta', 'pelo', 'pela', 'aos',
-]);
-
-/** Reforços em inglês quando o texto do slide indica tech / energia / IA (evita resultado tipo “feira de ciências”). */
-function expandTopicHintsForStockSearch(title, subtitle, imageQuery) {
-  const blob = `${title || ''} ${subtitle || ''} ${imageQuery || ''}`;
-  const hints = [];
-  const rules = [
-    [/\b(ia|i\.a\.|intelig[eê]ncia\s+artificial)\b/i, 'data center servers artificial intelligence infrastructure'],
-    [/data\s*center|datacenter|centros?\s+de\s+dados/i, 'data center server room network cables cooling'],
-    [/energia|energy|consumo|electricidade|electricity|power\b/i, 'electrical power infrastructure renewable energy grid'],
-    [/nuvem|cloud\s+computing|\bcloud\b/i, 'cloud computing server infrastructure'],
-    [/sustainable|sustent[aá]bilidade|carbono|emiss[oõ]es/i, 'sustainable energy solar wind infrastructure'],
-    [/big\s*tech|silicon\s+valley|startup\s+tech/i, 'technology office modern workspace'],
-    [/hackathon|feira\s+de\s+ci[eê]ncia|science\s+fair/i, 'science fair student project'],
-  ];
-  for (const [re, hint] of rules) {
-    if (re.test(blob)) hints.push(hint);
-  }
-  return [...new Set(hints)].slice(0, 3).join(' ');
-}
-
-/** Combina imageQuery (IA) com palavras do título/subtítulo + hints temáticos para a busca não fugir do tema. */
-function buildCommonsSearchQuery(imageQuery, title, subtitle, imgExtraPrompt = '') {
-  const q = (imageQuery || '').trim();
-  const extra = (imgExtraPrompt || '').trim();
-  const text = `${title || ''} ${subtitle || ''}`;
-  const words = text.match(/[\p{L}\p{N}]+/gu) || [];
-  const keywords = words
-    .filter(w => w.length > 2 && !COMMONS_STOP.has(w.toLowerCase()))
-    .slice(0, 18)
-    .join(' ');
-  const extraWords = extra.match(/[\p{L}\p{N}]+/gu) || [];
-  const extraPack = extraWords
-    .filter(w => w.length > 2 && !COMMONS_STOP.has(w.toLowerCase()))
-    .slice(0, 24)
-    .join(' ');
-  let merged = [keywords, q, extraPack].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  const hintPack = expandTopicHintsForStockSearch(title, subtitle, q);
-  if (hintPack) merged = `${merged} ${hintPack}`.replace(/\s+/g, ' ').trim();
-  if (merged.length > 280) merged = merged.slice(0, 280);
-  return merged || 'documentary photography';
-}
-
-const fetchWebTrendImage = async (query, seed = '', ctx = {}) => {
-  const qBase = buildCommonsSearchQuery(query, ctx.title, ctx.subtitle, ctx.imgExtraPrompt);
-
-  if (IS_LOCAL_DEV) {
-    try {
-      const params = new URLSearchParams({ q: qBase, seed: seed || '0' });
-      const res = await fetch(`/api/web-trend-search?${params}`);
-      if (res.ok) {
-        const j = await res.json();
-        if (j.url) return j.url;
-      }
-    } catch (e) {
-      console.warn('[Web trend] API local:', e.message);
-    }
-  }
-
-  const pickFromItems = (items, salt, hashKey) => {
-    if (!items.length) return null;
-    const raw = `${salt}:${hashKey}`;
-    const hash = Math.abs([...raw].reduce((a, c) => (Math.imul(31, a) + c.charCodeAt(0)) | 0, 0));
-    const idx = hash % items.length;
-    const ii = items[idx];
-    return (ii && (ii.thumburl || ii.url)) || null;
-  };
-  const runCommons = async (searchQ) => {
-    const params = new URLSearchParams({
-      action: 'query',
-      format: 'json',
-      origin: '*',
-      generator: 'search',
-      gsrsearch: searchQ,
-      gsrnamespace: '6',
-      gsrlimit: '30',
-      prop: 'imageinfo',
-      iiprop: 'url|mime|thumburl',
-      iiurlwidth: '1280',
-    });
-    const res = await fetch(`${COMMONS_API}?${params}`);
-    if (!res.ok) throw new Error(`Busca Web trend falhou (HTTP ${res.status}).`);
-    const data = await res.json();
-    const pages = data.query?.pages;
-    if (!pages) return [];
-    const out = [];
-    for (const p of Object.values(pages)) {
-      const ii = p.imageinfo?.[0];
-      if (!ii) continue;
-      const mime = (ii.mime || '').toLowerCase();
-      if (mime.includes('svg') || mime.includes('djvu') || mime.includes('pdf')) continue;
-      if (ii.thumburl || ii.url) out.push(ii);
-    }
-    return out;
-  };
-  let items = await runCommons(qBase);
-  let url = pickFromItems(items, seed || '0', qBase);
-  if (!url) {
-    const fb = 'photography documentary editorial';
-    items = await runCommons(fb);
-    url = pickFromItems(items, (seed || '0') + ':fb', fb);
-  }
-  if (!url) throw new Error('Nenhuma imagem encontrada. Tente palavras-chave em inglês (ex.: street, office, morning light).');
-  return url;
-};
-
 // ─── GPT IMAGE 2 (OpenAI) ─────────────────────────────────────────────────────
 // Migração de DALL·E 3 → gpt-image-2 (modelo flagship lançado em abril/2026):
 // - Fotorealismo significativamente melhor (rosto, pele, texturas)
@@ -4074,37 +3960,6 @@ const DEFAULT_CANVAS_ZONES_SANDWICH = {
   photo: { x: 6, y: 31, w: 88, h: 41 },
   bottom: { x: 6, y: 74, w: 88, h: 23 },
 };
-
-/** Rotações de zona «foto» no miolo (texto antes e depois, ordem editorial mantida pelo posicionamento). */
-const SANDWICH_ZONE_PRESETS = [
-  {
-    key: 'mid',
-    top: { x: 6, y: 7, w: 88, h: 24 },
-    photo: { x: 6, y: 33, w: 88, h: 39 },
-    bottom: { x: 6, y: 74, w: 88, h: 23 },
-  },
-  {
-    key: 'high',
-    top: { x: 6, y: 40, w: 88, h: 22 },
-    photo: { x: 6, y: 6, w: 88, h: 34 },
-    bottom: { x: 6, y: 68, w: 88, h: 29 },
-  },
-  {
-    key: 'low',
-    top: { x: 6, y: 6, w: 88, h: 24 },
-    photo: { x: 6, y: 32, w: 88, h: 40 },
-    bottom: { x: 6, y: 74, w: 88, h: 23 },
-  },
-];
-
-function sandwichZonesByRotationIndex(i) {
-  const p = SANDWICH_ZONE_PRESETS[(Math.abs(i) % SANDWICH_ZONE_PRESETS.length + SANDWICH_ZONE_PRESETS.length) % SANDWICH_ZONE_PRESETS.length];
-  return {
-    top: { ...p.top },
-    photo: { ...p.photo },
-    bottom: { ...p.bottom },
-  };
-}
 
 function slideHasPendingPhotoIntent(slide) {
   // Vídeo importado é "intenção de mídia visual" tanto quanto bgImage —
@@ -9984,8 +9839,6 @@ function SidebarContent({
                         type="button"
                         onClick={() => {
                           if (p.id === 'neutro') {
-                            const next = { ...slide };
-                            delete next.presentationImgAdjust;
                             updateSlide({ presentationImgAdjust: undefined });
                           } else {
                             updateSlide({ presentationImgAdjust: { ...p.vals } });
@@ -13239,20 +13092,6 @@ function buildGenerationImageLayer(presetId, topic, n, audience) {
 • Cada slide: imageQuery DIFERENTE.`;
 }
 
-/** Regras quando as imagens vêm de busca de fotos reais (Commons / Unsplash / Pexels via dev). */
-function buildGenerationImageLayerForCommons(topic, n, audience) {
-  const nicheStr = n ? ` (nicho: ${n})` : '';
-  const audStr = audience ? ` (público: ${audience})` : '';
-  return `imageQuery — MODO WEB TREND (busca em fototecas reais — não é geração de IA):
-• INGLÊS. Termos que um fotoeditor DIGITARIA no Google/Unsplash: substantivos de CENA REAL (objeto, infraestrutura, lugar, tecnologia visível).
-• OBRIGATÓRIO alinhar ao ASSUNTO DESTE SLIDE (título + subtítulo). Exemplos por domínio:
-  - IA / data center / energia da nuvem → "server rack data center cooling vents", "high voltage electrical substation at dusk", "fiber optic cables in network room", "rows of GPU servers in datacenter aisle" — NUNCA "school science fair", "volcano experiment", "kids classroom" se o texto é infraestrutura digital ou energia.
-  - Moda/varejo → "folded cotton shirts retail shelf", "clothing store interior".
-  - Saúde → "hospital corridor soft light", não laboratório escolar genérico salvo o slide ser sobre educação.
-• Se o slide fala de consumo de energia ou impacto ambiental da IA, prefira infraestrutura real (subestações, painéis solares, salas de servidores, cabos, industrial exterior) em vez de metáfora genérica "science".
-• Proibido só abstração ("growth", "future") sem objeto fotografável. Combine substantivo + contexto (luz, ângulo, ambiente).
-• 12-26 palavras. Varie entre slides. Alinhado ao tema "${topic}"${nicheStr}${audStr}.`;
-}
 
 function buildNarrativeModeReminder(modeId) {
   const m = GEN_MODE_BY_ID[modeId] || GEN_MODE_BY_ID.editorial;
