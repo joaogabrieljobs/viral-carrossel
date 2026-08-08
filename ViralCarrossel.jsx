@@ -113,6 +113,14 @@ import {
 } from './src/utils/generation-prompts.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import {
+  SlideCard,
+} from './src/components/card/SlideCard.jsx';
+import {
+  shouldShowOnboardingLanding,
+  dismissOnboardingLanding,
+  mkLibEntry,
+} from './src/utils/landing-gate.js';
+import {
   usePersistedState,
   useHistory,
 } from './src/hooks/useHistory.js';
@@ -369,25 +377,9 @@ import {
 
 
 
-/** Landing de introdução: entrada padrão do site até o utilizador clicar Entrar. */
-function shouldShowOnboardingLanding() {
-  if (typeof window === 'undefined') return false;
-  try {
-    const q = new URLSearchParams(window.location.search);
-    if (q.get('app') === '1' || q.get('studio') === '1') return false;
-    if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') return true;
-    return sessionStorage.getItem(SK.landingDismissed) !== '1';
-  } catch {
-    return true;
-  }
-}
 
-function dismissOnboardingLanding() {
-  try {
-    sessionStorage.setItem(SK.landingDismissed, '1');
-    localStorage.setItem(SK.landingDone, '1');
-  } catch { /* */ }
-}
+
+
 
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -482,24 +474,7 @@ const REFERENCE_PROFILE_BY_ID = Object.fromEntries(REFERENCE_PROFILES.map(p => [
 
 
 
-// ─── BIBLIOTECA + PERFIS DE MARCA ─────────────────────────────────────────────
-// Esquema novo de persistência (lazily migrado a partir do `vc_doc` antigo):
-//   vc_library = [{ id, name, status, createdAt, updatedAt, doc }]
-//   vc_brands  = [{ id, name, ...brand }]
-//   vc_active_doc_id   = string (qual carrossel está sendo editado agora)
-//   vc_active_brand_id = string (qual perfil de marca aplicar por padrão em novos carrosséis)
-// Cria uma entrada de biblioteca a partir de um doc completo.
-const mkLibEntry = (doc, name = 'Sem título') => {
-  const now = Date.now();
-  return {
-    id: uid(),
-    name,
-    status: 'draft',
-    createdAt: now,
-    updatedAt: now,
-    doc,
-  };
-};
+
 
 
 
@@ -697,23 +672,7 @@ ClassicLegadoInsetPhotoColumn.displayName = 'ClassicLegadoInsetPhotoColumn';
 
 
 
-// Memoiza SlideCard: re-renderiza apenas quando suas props relevantes mudam.
-// Isso é crítico no desktop, onde até 10 slides são renderizados simultaneamente.
-const SlideCard = React.memo(SlideCardInner, (prev, next) => {
-  if (prev.fmt !== next.fmt) return false;
-  if (prev.num !== next.num || prev.total !== next.total || prev.scale !== next.scale) return false;
-  if (prev.brand !== next.brand) return false;
-  if (prev.slide !== next.slide) return false;
-  if (prev.presentationImgFilter !== next.presentationImgFilter) return false;
-  if (prev.creativePreset !== next.creativePreset) return false;
-  if (prev.showCanvasChrome !== next.showCanvasChrome) return false;
-  if (prev.enableZoneSwapDrag !== next.enableZoneSwapDrag) return false;
-  if (prev.slideIndex !== next.slideIndex) return false;
-  if (prev.onCanvasZonePatch !== next.onCanvasZonePatch) return false;
-  if (prev.onPhotoZoneRequest !== next.onPhotoZoneRequest) return false;
-  if (prev.onPhotoZoneNativeFile !== next.onPhotoZoneNativeFile) return false;
-  return true;
-});
+
 
 // ─── UI PRIMITIVES ────────────────────────────────────────────────────────────
 
