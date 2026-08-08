@@ -1,28 +1,11 @@
+# Netlify serve APENAS a landing (produção do app = Vercel — DEC-A, docs/audit.md).
+# Funções serverless vivem só em api/ (convenção Vercel).
 [build]
   command = "npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Build do Vite usa proxy /api/anthropic (função Netlify abaixo) em produção — evita CORS no Claude.
-  VITE_ANTHROPIC_PROXY = "true"
-
-[functions]
-  directory = "netlify/functions"
-
-# Proxy Anthropic (tem de ficar ANTES do fallback SPA).
-[[redirects]]
-  from = "/api/anthropic/*"
-  to = "/.netlify/functions/anthropic-proxy"
-  status = 200
-  force = true
-
-# Extrair texto HTML de URLs (Fontes & referências → IA).
-[[redirects]]
-  from = "/api/fetch-source"
-  to = "/.netlify/functions/fetch-source"
-  status = 200
-  force = true
 
 # Ficheiros em `dist` (CSS/JS hashed) continuam servidos normalmente.
 # Esta regra só aplica quando o caminho não corresponde a nenhum ficheiro —

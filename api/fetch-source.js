@@ -1,17 +1,10 @@
 import { assertPublicHttpUrl, serverFetchUrlPlainText } from '../urlSourceFetch.js';
-
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-};
-
-function setCors(res) {
-  Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
-}
+import { applyCors } from './lib/cors.js';
 
 export default async function handler(req, res) {
-  setCors(res);
+  // Allowlist (api/lib/cors.js): sem isso o endpoint vira proxy aberto de
+  // leitura de URLs para qualquer site.
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
