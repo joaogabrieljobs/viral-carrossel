@@ -1,7 +1,7 @@
 # Spec — Task 11: fechamento-ci-cobertura
 
 **Épico:** docs/epics/suite-testes-confianca/README.md
-**Status:** Aprovada
+**Status:** Concluída
 
 ## 1. Objetivo
 Fechar o épico (OB-02/OB-04, DEC-007): CI roda unit+integração E E2E com artifacts (junit + traces), docs ensinam a rodar, checklist de cobertura dos fluxos críticos conferido contra o TDD §5.
