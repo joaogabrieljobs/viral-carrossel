@@ -96,13 +96,17 @@ export function useAccess({ setShellView }) {
       const session = await refreshAccess();
       if (cancelled) return;
 
-      if (q?.get('app') === '1' || q?.get('studio') === '1') {
+      // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a
+      // landing. NÃO retorna cedo: antes descartava silenciosamente qualquer
+      // `login=*`/`billing=*` que viesse na mesma URL — quem voltasse do portal
+      // com um desses params perdia o tratamento correspondente.
+      const pulaLanding = q?.get('app') === '1' || q?.get('studio') === '1';
+      if (pulaLanding) {
         dismissOnboardingLanding();
         setLandingOpen(false);
-        if (!session.active) setPaywallOpen(true);
-        return;
+        if (!session.active && !loginStatus && !billing) setPaywallOpen(true);
       }
-      if (q?.get('landing') === '1' || q?.get('intro') === '1' || q?.get('welcome') === '1') {
+      if (!pulaLanding && (q?.get('landing') === '1' || q?.get('intro') === '1' || q?.get('welcome') === '1')) {
         setLandingOpen(true);
       }
       if (billing === 'success' && session.active) {

@@ -82,4 +82,16 @@ test.describe('Jornadas de billing', () => {
     // logout dispara e o gate volta (landing ou paywall — sem sessão)
     await expect.poll(() => logoutChamado, { timeout: 10_000 }).toBe(true);
   });
+
+  test('CA-05 ?app=1 combinado com login=no_subscription não descarta o param', async ({ page }) => {
+    await mockApi(page, { session: SESSAO_ANONIMA });
+    // O portal Stripe volta com ?app=1; se vier junto um login=*, o handler
+    // desse login precisa rodar (antes o return early engolia).
+    await page.goto('/?app=1&login=no_subscription&email=sem%40teste.exemplo');
+
+    // paywall abre COM o e-mail pré-preenchido (comportamento do handler)
+    const email = page.locator('input[type="email"]').first();
+    await expect(email).toBeVisible({ timeout: 10_000 });
+    await expect(email).toHaveValue('sem@teste.exemplo');
+  });
 });

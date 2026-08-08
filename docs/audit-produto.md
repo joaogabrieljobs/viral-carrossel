@@ -48,7 +48,7 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 - **Tab órfã `'material'`** (`setTab('material'):17208`): não existe em `ALL_TABS` nem tem seção — "Ir para Material" abre sidebar vazia.
 - **Tab fantasma `'slide'`** (`:15354`, pós-geração mobile): renderiza união de ~15 seções de layout+imagem+texto — **fura o gating de modo** (usuário Criador ganha ferramentas Studio).
 - **`ALL_TABS` + `modeRank` duplicados** palavra por palavra (`:9772` sidebar vs `:17038` bottom bar) — divergem em silêncio.
-- **Query params**: `?billing=cancel` e `?billing=restored` nunca são limpos da URL (reload re-abre paywall / re-entra no studio); `?app=1` retorna cedo e descarta `login=*`/`billing=*` combinados (retorno do portal Stripe usa `?app=1`).
+- ~~**Query params**~~ **CORRIGIDO 2026-08-07**: `billing=*` agora é limpo da URL, e `?app=1` deixou de retornar cedo (descartava `login=*`/`billing=*` combinados — o portal Stripe volta com `?app=1`). Teste E2E CA-05 trava o comportamento.
 - **Teclado**: deps do handler global (`:15992`) omitem `photoPositionOpen` (stale) e não incluem `modesIntroOpen`/`landing`/`paywall` — setas/Delete agem no documento por baixo de modais.
 - `drawerOpen` não reseta ao trocar de view (`goAccount`, `openDoc`, `newDoc`) — drawer reaparece aberto.
 - `ModesIntroModal` irrecuperável após 1ª visita (nenhum trigger manual); tour + modes-intro auto-abrem empilhados (850ms vs 600ms); tour iniciado da home aponta seletores que só existem no editor.
@@ -145,3 +145,10 @@ Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. E
 - `useExport` sem `trackEvent` / `blobFromSlideRef` / `downloadCanvasPng`
 - **`SidebarContent`: `setHookLibrary` e `niche`** — bug **pré-existente**, anterior a qualquer extração: `SidebarContent` sempre foi top-level e nunca teve esse escopo, então o botão "salvar hook na biblioteca" estava quebrado. Corrigido threadando as props.
 
+### Achados de acessibilidade (backlog)
+
+- Botão de submit da pesquisa de nicho (`ResearchPanel`) é só ícone, sem `aria-label` — o E2E precisou de seletor por classe. Mesmo padrão em outros botões-ícone; vale uma varredura de `aria-label` nos controles do editor.
+
+### Pendência de UX (decisão do produto)
+
+Tab fantasma `'slide'`: após gerar no mobile, `setTab('slide')` renderiza a união de ~15 seções (layout+imagem+texto), **furando o gating de modos** — um usuário Criador recebe controles de Studio. Alternativas: (a) trocar por `'narrativa'`, que existe no modo Criador; (b) manter e assumir que pós-geração todo mundo vê tudo. Não mexi: é escolha de produto, não bug técnico.
