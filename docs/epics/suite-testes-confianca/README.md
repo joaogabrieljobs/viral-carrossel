@@ -15,7 +15,7 @@
 | 05 | seguranca-regressao | Origin fora da allowlist sem ACAO; `getSecret()` sem env → throw; `BILLING_DISABLED` ignorada em prod; proxy Anthropic anônimo → 401 | RF-12..RF-14 · DEC-005 | 03 | ✅ 2026-08-07 |
 | 06 | concorrencia-multiusuario | 5× `checkout→confirm→session` em `Promise.all`; cada resposta com cookie do próprio `customerId`, zero vazamento cruzado | RF-11 · DEC-004 | 03, 04 | ✅ 2026-08-07 |
 | 07 | e2e-skeleton-playwright | `npm run test:e2e` roda Playwright contra `vite preview`; landing renderiza sem erro de console; paywall bloqueia studio com `/api` mockado | RF-01, RF-15 · DEC-003, DEC-005 | 01 | ✅ 2026-08-07 |
-| 08 | e2e-jornadas-billing | Jornadas: comprar (checkout mockado → `?billing=success` → studio), restaurar, negar sem assinatura, logout | RF-07 (jornada), RF-15 | 07 | ⬜ |
+| 08 | e2e-jornadas-billing | Jornadas: comprar (checkout mockado → `?billing=success` → studio), restaurar, negar sem assinatura, logout | RF-07 (jornada), RF-15 | 07 | ✅ 2026-08-07 |
 | 09 | e2e-produto-export | Gerar carrossel com IA mockada (regressão `capRules`/`voiceBulk`), editar e exportar PNG + ZIP válidos | RF-02 | 07 | ⬜ |
 | 10 | e2e-multiusuario | 5 browser contexts paralelos comprando/entrando; sessões isoladas na UI | RF-11 · DEC-004 | 08 | ⬜ |
 | 11 | fechamento-ci-cobertura | Reporter junit + traces como artifacts; checklist de cobertura dos fluxos críticos = 100%; docs atualizados (STRIPE.md ganha seção "rodar testes") | OB-02, OB-04 · DEC-007 | 02..10 | ⬜ |

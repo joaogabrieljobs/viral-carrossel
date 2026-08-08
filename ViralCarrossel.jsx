@@ -29,6 +29,7 @@ import {
   fetchAccessSession,
   confirmCheckoutSession,
   openBillingPortal,
+  logoutAccess,
 } from './src/lib/billing.js';
 import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset } from './src/styles/visual-presets.jsx';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
@@ -14183,6 +14184,12 @@ export default function App() {
       alert(e?.message || 'Não foi possível abrir o portal de assinatura.');
     }
   }, []);
+  const handleLogout = useCallback(async () => {
+    await logoutAccess();
+    trackEvent('logout');
+    // Sessão morta no servidor — recarrega pro shell reavaliar (paywall/landing).
+    window.location.assign('/');
+  }, []);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -16158,6 +16165,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenSettings={() => setKeysOpen(true)}
           onContinueEditor={() => setShellView('project')}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
+          onLogout={access.billingDisabled ? undefined : handleLogout}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
@@ -17400,6 +17408,7 @@ function AccountHomeShell({
   exportDoc,
   askPrompt,
   onManageBilling,
+  onLogout,
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
@@ -17695,6 +17704,7 @@ function AccountHomeShell({
                 isMobile={isMobile}
                 onOpenSettings={onOpenSettings}
                 onManageBilling={onManageBilling}
+                onLogout={onLogout}
                 onOpenBrands={onOpenBrands}
                 currentPeriodEnd={currentPeriodEnd}
               />

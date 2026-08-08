@@ -316,6 +316,7 @@ export default function AccountProfile({
   onOpenSettings,
   onManageBilling,
   onOpenBrands,
+  onLogout,
   currentPeriodEnd,
 }) {
   const [profile, setProfile] = useState(() => loadUserProfile());
@@ -504,6 +505,24 @@ export default function AccountProfile({
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
               Billing desativado neste ambiente.
             </p>
+          )}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              style={{
+                height: 38,
+                borderRadius: 9999,
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Sair da conta
+            </button>
           )}
         </div>
 
