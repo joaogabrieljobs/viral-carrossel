@@ -428,7 +428,7 @@ const ClassicCanvasInner = React.forwardRef(({
             alignItems: alignInner,
           }}
         >
-        {slide.subtitle && (
+        {slide.subtitle && brand.subtitleVisible !== false && (
           culture ? (
             <div style={{ letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`, textShadow: shadow, width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
               <CultureRichParagraphs
@@ -676,7 +676,11 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     ) : slide.title}</h1>
   );
 
-  const subtitleEl = slide.subtitle ? (
+  // `brand.subtitleVisible === false` é assinatura de preset (ex.: Sports
+  // Editorial e Case Study Neon escondem o subtítulo para o título dominar).
+  // Este caminho ignorava a flag, então o mesmo preset mostrava subtítulo fora
+  // do modo composição e escondia dentro dele.
+  const subtitleEl = slide.subtitle && brand.subtitleVisible !== false ? (
     cultureRichText ? (
       <div style={{
         margin: 0,
