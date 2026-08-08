@@ -66,7 +66,7 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 | 4 | Limpar query params `billing=cancel/restored` da URL | §4 | ✅ 2026-08-07 (pendente: `?app=1` ainda engole params combinados) |
 | 5 | `EDITOR_TABS` fonte única; tab `'material'` → `narrativa` | §4 | ✅ 2026-08-07 (pendente: destino da tab fantasma `'slide'`) |
 | 6 | `visualPreset` persistido no doc; clamp de peso no `applyVisualPreset` | §3 | ✅ 2026-08-07 |
-| 7 | Bundle local de html2canvas/jsPDF (export offline + supply chain) | §3 | ⬜ |
-| 8 | Extrair prompts do monólito p/ módulo próprio; single source das faixas de caracteres | §2 | ⬜ |
-| 9 | Remover pipeline web_trend morto + `SAFE_ZONES` + builders órfãos + monólito legado da pasta pai | §1-3 | ⬜ |
-| 10 | Consolidar 3 implementações de proxy Anthropic e fetch-source | §1 | ⬜ |
+| 7 | Bundle local de html2canvas/jsPDF (chunks lazy do Vite) | §3 | ✅ 2026-08-07 |
+| 8 | Single source das faixas de caracteres (`MID_SUBTITLE_CHAR_BANDS`) ✅ 2026-08-07 · extração dos builders p/ módulo próprio segue pendente (follow-up) | §2 | ◐ |
+| 9 | Código morto removido (web_trend, SAFE_ZONES, sandwich presets, builder Commons, dead statement) ✅ 2026-08-07 · monólito legado `../ViralCarrossel.jsx` fica (fora do repo git — apagar manualmente se quiser) | §1-3 | ✅ |
+| 10 | Funções Netlify removidas (Netlify = só landing, DEC-A); fetch-source Vercel com allowlist; proxy dev do Vite mantido (dev-only) | §1 | ✅ 2026-08-07 |

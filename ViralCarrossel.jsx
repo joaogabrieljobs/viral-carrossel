@@ -12588,16 +12588,25 @@ function scaledCeiling(ceiling, densityId) {
   return Math.max(24, Math.round(ceiling * m));
 }
 
+/** FONTE ÚNICA das faixas de caracteres do subtítulo nos slides intermediários,
+ *  por modo narrativo. Consumida pelos overrides de densidade E pelas regras de
+ *  layout do prompt — antes os números viviam duplicados como prosa e como array
+ *  e podiam divergir em silêncio (audit-produto §2). */
+const MID_SUBTITLE_CHAR_BANDS = {
+  storytelling: [120, 280],
+  pain: [120, 280],
+  viral: [90, 220],
+  how_to: [160, 280],
+  sensacionalista: [85, 210],
+  jornalistico: [140, 300],
+};
+const midSubtitleBandFor = (modeId) => MID_SUBTITLE_CHAR_BANDS[modeId] || [200, 320];
+
 /** Instrução explícita de volume — só quando ≠ 1/1. */
 function buildSlideTextDensityOverrides(densityId, narrativeModeId) {
   if (!densityId || densityId === '1_1') return '';
   const label = SLIDE_TEXT_DENSITY_BY_ID[densityId]?.label || densityId;
-  let baseMid = [200, 320];
-  if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') baseMid = [120, 280];
-  else if (narrativeModeId === 'viral') baseMid = [90, 220];
-  else if (narrativeModeId === 'how_to') baseMid = [160, 280];
-  else if (narrativeModeId === 'sensacionalista') baseMid = [85, 210];
-  else if (narrativeModeId === 'jornalistico') baseMid = [140, 300];
+  const baseMid = midSubtitleBandFor(narrativeModeId);
 
   const mid = scaledCharBand(baseMid[0], baseMid[1], densityId);
   const hookMax = scaledCeiling(80, densityId);
@@ -12923,6 +12932,7 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1') {
+  const [midLo, midHi] = midSubtitleBandFor(narrativeModeId);
   if (isTendenciaCulturaPreset(creativePresetId)) {
     const bands = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
     const sandwichVol = `
@@ -12972,7 +12982,7 @@ ${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 REGRAS DE ESTRUTURA POR SLIDE (modo "viral" — retenção e ritmo, NÃO parágrafo de ensaio):
 O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras substituem o formato “subtítulo denso 200–320 caracteres analíticos”.
 
-- Slides intermediários: subtítulo tipicamente ENTRE 90 E 220 caracteres; pode ser MENOR quando for punch, cliffhanger ou frase quotável. Priorize loop, número concreto e virada — não explicação acadêmica longa.
+- Slides intermediários: subtítulo tipicamente ENTRE ${midLo} E ${midHi} caracteres; pode ser MENOR quando for punch, cliffhanger ou frase quotável. Priorize loop, número concreto e virada — não explicação acadêmica longa.
 - Título: curto, cortante, pode incluir número ou pergunta — não headline de relatório.
 - Um slide do meio deve carregar a frase “guardável” (share-trigger) quando o arco tiver slides suficientes.
 
@@ -12990,7 +13000,7 @@ ${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 REGRAS DE ESTRUTURA POR SLIDE (modo "passo-a-passo" — manual, não narrativa nem pitch):
 O MÉTODO acima manda: um passo por slide com "Passo N · …".
 
-- Slides intermediários: subtítulo tipicamente ENTRE 160 E 280 caracteres — imperativo + como fazer + erro ou exemplo; pode ultrapassar levemente se a instrução exigir checklist curto.
+- Slides intermediários: subtítulo tipicamente ENTRE ${midLo} E ${midHi} caracteres — imperativo + como fazer + erro ou exemplo; pode ultrapassar levemente se a instrução exigir checklist curto.
 - Título DEVE refletir sequência de passos (Passo 1, 2…) até o penúltimo ou até o bloco de “erro comum”, conforme o método.
 - PROIBIDO diluir em storytelling ou em tese de marca; mantenha linguagem de procedimento.
 
@@ -13008,7 +13018,7 @@ ${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 REGRAS DE ESTRUTURA POR SLIDE (modo "sensacionalista" — tensão alta, payoff honesto — NÃO parágrafo de ensaio):
 O método sensacionalista acima manda cortes rápidos e micro-ganchos.
 
-- Slides intermediários: subtítulo tipicamente ENTRE 85 E 210 caracteres — pode ser MENOR quando for tacada única ou cliffhanger. Priorize vigas de tensão e contraste visceral sobre explicação longa.
+- Slides intermediários: subtítulo tipicamente ENTRE ${midLo} E ${midHi} caracteres — pode ser MENOR quando for tacada única ou cliffhanger. Priorize vigas de tensão e contraste visceral sobre explicação longa.
 - Título: curto até médio — pode soar "capa" ou pergunta incômoda; evite headline de relatório corporativo.
 
 🪝 SLIDE 1 — gancho forte (ver método).
@@ -13031,7 +13041,7 @@ O método jornalístico prevalece. Slides devem ler como sequência de fio ou ca
 
 📖 MEIO — blocos de matéria pirâmide invertida:
    - Título: ângulo, fato-âncora ou antetítulo curto da peça DAQUELE slide.
-   - Subtítulo: 2-4 frases curtas OU um parágrafo denso factual: tipicamente ENTRE 140 E 300 caracteres; informação primeiro, ornamentação zero.
+   - Subtítulo: 2-4 frases curtas OU um parágrafo denso factual: tipicamente ENTRE ${midLo} E ${midHi} caracteres; informação primeiro, ornamentação zero.
 
 🔚 FINAL — editorial curto ou o que falta saber próximo — sem CTA influencer vazio.
 ${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
@@ -13052,7 +13062,7 @@ ${hookVisualHint}
 
 📖 SLIDES INTERMEDIÁRIOS (2 ao penúltimo) — texto DENSO e com CONTEÚDO:
    - Título: 5-12 palavras, ideia única em frase clara.
-   - Subtítulo: 2-4 frases. ENTRE 200 E 320 CARACTERES. Cada slide intermediário é onde MORA o conteúdo — explica o mecanismo, traz exemplo, contraste, dado, leitura. Não economize palavras aqui.
+   - Subtítulo: 2-4 frases. ENTRE ${midLo} E ${midHi} CARACTERES. Cada slide intermediário é onde MORA o conteúdo — explica o mecanismo, traz exemplo, contraste, dado, leitura. Não economize palavras aqui.
    - É aqui que o leitor deve sentir que está aprendendo algo de verdade. Use vírgulas, pontos, ritmo. Construa o argumento.
 
 🔚 SLIDE FINAL (CTA) — concisão elegante:
