@@ -180,7 +180,16 @@ function OverflowScaler({ containerStyle, deps = [], minScale = AUTOFIT_MIN_SCAL
     iterationsRef.current++;
     const clientH = el.clientHeight;
     if (clientH <= 0) return;
-    const contentH = el.scrollHeight;
+    // ATENÇÃO: `scrollHeight` só enxerga transbordo para BAIXO. Estas zonas usam
+    // `justify-content: flex-end` (layouts bl/bc/br), e nelas o conteúdo que não
+    // cabe sai pelo TOPO — scrollHeight === clientHeight e o scaler concluía que
+    // cabia, deixando o título cortado. Medir a soma real dos filhos resolve
+    // para qualquer valor de justify-content.
+    const cs = window.getComputedStyle(el);
+    const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    let filhosH = 0;
+    for (const filho of el.children) filhosH += filho.getBoundingClientRect().height;
+    const contentH = Math.max(el.scrollHeight, Math.ceil(filhosH + padV));
     if (contentH <= clientH + 1) return;
     // Desconta photo zone (altura fixa, não escala)
     const photoEl = el.querySelector('[data-vc-photo-zone="1"]');

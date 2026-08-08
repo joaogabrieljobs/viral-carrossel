@@ -123,6 +123,25 @@ const VC_TEXT_ZONE_STYLE = {
   boxSizing: 'border-box',
 };
 
+/**
+ * Deslocamento visual para o "overshoot" das fontes display.
+ *
+ * Archivo Black, Anton e Big Shoulders desenham glyphs mais altos que a caixa de
+ * linha; `getBoundingClientRect` mede a caixa, não a tinta. Com o leading apertado
+ * dos presets (~1.0, que é o que dá o visual denso) a primeira linha sangra acima
+ * do line box e a zona `overflow:hidden` corta o topo das letras.
+ *
+ * A correção é `position:relative; top:N` — desloca a TINTA para dentro da zona
+ * sem mudar a altura de layout do bloco. Padding no bloco não serve: em layouts
+ * `flex-end` (bl/bc/br) engordar o bloco empurra o topo para cima e piora o corte.
+ * Há folga na base (medida: ~12px) para absorver o deslocamento.
+ */
+function vcTitleOvershootShift(fontSizePx, leadingPct) {
+  const lh = (leadingPct ?? 105) / 100;
+  if (lh >= 1.15) return 0;
+  return Math.round(fontSizePx * 0.17);
+}
+
 /** Reforço de padding lateral em zonas texto canvas — tracking negativo + fontes grandes “comem” a margem antes do padding nominal. */
 function canvasClassicTitlePaddingXPx(f, slide) {
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
@@ -346,6 +365,8 @@ const ClassicCanvasInner = React.forwardRef(({
           fontFamily: titleFF,
           fontSize: f.w * 0.084 * (slide.titleSize / 100) * titleScale,
           lineHeight: (slide.titleLeading ?? 105) / 100,
+          position: 'relative',
+          top: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100) * titleScale, slide.titleLeading),
           fontWeight: slide.titleWeight ?? 800,
           letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
           margin: 0,
@@ -630,6 +651,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       color: displayTitleInk, fontFamily: titleFF,
       fontSize: f.w * 0.084 * (slide.titleSize / 100),
       lineHeight: (slide.titleLeading ?? 105) / 100,
+      position: 'relative',
+      top: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100), slide.titleLeading),
       fontWeight: slide.titleWeight ?? 800,
       letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
       margin: 0,
@@ -2090,6 +2113,8 @@ const SlideCardInner = React.forwardRef(({
                 color: displayTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
+                position: 'relative',
+                top: vcTitleOvershootShift(f.w*0.084*(slide.titleSize/100), slide.titleLeading),
                 fontWeight:slide.titleWeight ?? 800,
                 // tracking em centi-em: default -3 (-0.03em). User pode ir de -10 a +30 → -0.13em a +0.27em
                 letterSpacing:`${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
