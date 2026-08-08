@@ -16,5 +16,33 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Unit + integração (Vitest)
+        run: npm test -- --reporter=default --reporter=junit --outputFile=test-results/unit-junit.xml
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-junit
+          path: test-results/unit-junit.xml
+          if-no-files-found: ignore
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: E2E (Playwright)
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore

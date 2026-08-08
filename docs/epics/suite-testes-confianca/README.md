@@ -18,7 +18,7 @@
 | 08 | e2e-jornadas-billing | Jornadas: comprar (checkout mockado → `?billing=success` → studio), restaurar, negar sem assinatura, logout | RF-07 (jornada), RF-15 | 07 | ✅ 2026-08-07 |
 | 09 | e2e-produto-export | Gerar carrossel com IA mockada (regressão `capRules`/`voiceBulk`), editar e exportar PNG + ZIP válidos | RF-02 | 07 | ✅ 2026-08-07 |
 | 10 | e2e-multiusuario | 5 browser contexts paralelos comprando/entrando; sessões isoladas na UI | RF-11 · DEC-004 | 08 | ✅ 2026-08-07 |
-| 11 | fechamento-ci-cobertura | Reporter junit + traces como artifacts; checklist de cobertura dos fluxos críticos = 100%; docs atualizados (STRIPE.md ganha seção "rodar testes") | OB-02, OB-04 · DEC-007 | 02..10 | ⬜ |
+| 11 | fechamento-ci-cobertura | Reporter junit + traces como artifacts; checklist de cobertura dos fluxos críticos = 100%; docs atualizados (STRIPE.md ganha seção "rodar testes") | OB-02, OB-04 · DEC-007 | 02..10 | ✅ 2026-08-07 |
 
 ## Ordem sugerida e paralelismo
 
@@ -29,10 +29,10 @@
 
 ## Definição de pronto do épico
 
-- [ ] `npm test` verde cobre 100% dos fluxos de billing/auth listados no TDD §5 (métrica PRD §4)
-- [ ] ≥ 4 jornadas E2E passando (comprar, restaurar, negar, logout)
-- [ ] Cenário multiusuário ≥ 5 paralelos passando em integração E em E2E
-- [ ] 1 teste de regressão por achado de segurança corrigido (CORS, cookie secret, BILLING_DISABLED, proxy IA)
-- [ ] CI verde obrigatório em push na main
-- [ ] Suíte unit+integração termina em < 2 min local (RNF-01)
-- [ ] Nenhum teste toca rede externa nem dados pessoais reais (RNF-02/05)
+- [x] `npm test` verde cobre 100% dos fluxos de billing/auth listados no TDD §5 (métrica PRD §4)
+- [x] ≥ 4 jornadas E2E passando (comprar, restaurar, negar, logout)
+- [x] Cenário multiusuário ≥ 5 paralelos passando em integração E em E2E
+- [x] 1 teste de regressão por achado de segurança corrigido (CORS, cookie secret, BILLING_DISABLED, proxy IA)
+- [x] CI verde obrigatório em push na main
+- [x] Suíte unit+integração termina em < 2 min (~1s local) local (RNF-01)
+- [x] Nenhum teste toca rede externa nem dados pessoais reais (RNF-02/05)

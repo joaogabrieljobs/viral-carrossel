@@ -75,3 +75,12 @@ Com `vite` puro (sem `vercel dev`), o client em DEV faz fallback e deixa entrar 
 
 Cartões de teste Stripe: https://docs.stripe.com/testing  
 Ex.: `4242 4242 4242 4242`
+
+## Rodar os testes (suite de confiança)
+
+```bash
+npm test          # unit + integração (Vitest) — billing, auth, segurança, concorrência
+npm run test:e2e  # jornadas no build real (Playwright) — comprar, restaurar, negar, logout, export, 5 usuários
+```
+
+Tudo mockado (Stripe, Google, OpenAI) — nenhum teste toca rede real nem movimenta dinheiro. CI roda ambos em todo push na main (`.github/workflows/ci.yml`). Docs do pipeline: `docs/epics/suite-testes-confianca/`.

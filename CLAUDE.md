@@ -11,3 +11,9 @@ Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarros
 - Billing/auth: docs/STRIPE.md
 
 Regra: antes de implementar qualquer task, leia a spec correspondente e os documentos acima. Divergência entre código e documento → parar e reportar.
+
+## Testes
+
+- `npm test` — unit + integração (Vitest, `tests/unit` + `tests/integration`)
+- `npm run test:e2e` — Playwright contra `vite preview` (`tests/e2e`), `/api` sempre mockado
+- CI obrigatório verde antes de considerar deploy OK (2 jobs: test + e2e)
