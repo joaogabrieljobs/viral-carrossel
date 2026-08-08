@@ -17,6 +17,17 @@ export const SESSAO_ATIVA = {
  */
 export async function mockApi(page, opts = {}) {
   const session = opts.session ?? SESSAO_ANONIMA;
+  // Onboarding (tour z=120) e intro de modos auto-abrem ~600-850ms após o boot
+  // e interceptam cliques quando a CPU está saturada por outro worker. Semeia
+  // as flags de "já visto" antes do primeiro script da página.
+  if (opts.onboarding !== true) {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('vc_onboarding_done', '1');
+        localStorage.setItem('vc_modes_intro_done', '1');
+      } catch { /* storage bloqueado */ }
+    });
+  }
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;

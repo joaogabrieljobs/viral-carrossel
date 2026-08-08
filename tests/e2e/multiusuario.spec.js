@@ -17,6 +17,12 @@ test.describe('Multiusuário visual (RF-11)', () => {
     const jornada = async (u) => {
       const context = await browser.newContext();
       const page = await context.newPage();
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem('vc_onboarding_done', '1');
+          localStorage.setItem('vc_modes_intro_done', '1');
+        } catch { /* storage bloqueado */ }
+      });
       let sessao = { active: false, email: null, status: 'anonymous' };
 
       await page.route('**/api/**', async (route) => {

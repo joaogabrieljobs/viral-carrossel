@@ -4,6 +4,12 @@ import { mockApi, SESSAO_ANONIMA, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 test.describe('Jornadas de billing', () => {
   test('CA-01 comprar: paywall → e-mail → volta do Stripe → studio', async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('vc_onboarding_done', '1');
+        localStorage.setItem('vc_modes_intro_done', '1');
+      } catch { /* storage bloqueado */ }
+    });
     let confirmChamado = false;
     let sessaoAtual = SESSAO_ANONIMA;
     await page.route('**/api/**', async (route) => {
@@ -69,7 +75,9 @@ test.describe('Jornadas de billing', () => {
     await page.getByRole('button', { name: /perfil/i }).first().click();
     const sair = page.getByRole('button', { name: /sair da conta/i });
     await expect(sair).toBeVisible({ timeout: 10_000 });
-    await sair.click();
+    // noWaitAfter: o handler faz window.location.assign('/') — esperar o clique
+    // "assentar" numa página que já está navegando estoura sob CPU saturada.
+    await sair.click({ noWaitAfter: true });
 
     // logout dispara e o gate volta (landing ou paywall — sem sessão)
     await expect.poll(() => logoutChamado, { timeout: 10_000 }).toBe(true);
