@@ -117,6 +117,7 @@ import { useExport } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
 import { useLibrary } from './src/hooks/useLibrary.js';
 import { useToasts } from './src/hooks/useToasts.js';
+import { useAiSettings } from './src/hooks/useAiSettings.js';
 import {
   SlideCard,
 } from './src/components/card/SlideCard.jsx';
@@ -1044,66 +1045,7 @@ export default function App() {
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
   const [imageCropOpen, setImageCropOpen] = useState(false);
   const [photoPositionOpen, setPhotoPositionOpen] = useState(false);
-  // Configuração unificada de IA. Preferências (sem segredos) ficam no localStorage;
-  // chaves ficam na sessão por padrão e só persistem se o usuário autorizar.
-  const [aiSettings, setAISettings] = useState(() => {
-    try {
-      const savedConfig = JSON.parse(localStorage.getItem(SK.aiSettings) || '{}');
-      const savedKeys = JSON.parse(
-        localStorage.getItem(SK.aiKeys) ||
-        sessionStorage.getItem(SK.aiKeys) ||
-        '{}',
-      );
-      // Migração transparente da janela antiga.
-      const legacyOpenAI =
-        localStorage.getItem(SK.openaiKey) ||
-        sessionStorage.getItem(SK.openaiKey) ||
-        '';
-      const legacyAnthropic =
-        localStorage.getItem(SK.anthropicKey) ||
-        sessionStorage.getItem(SK.anthropicKey) ||
-        '';
-      const legacyClaudeModel = localStorage.getItem(SK.claudeModel);
-      return normalizeAISettings({
-        ...savedConfig,
-        keys: {
-          ...savedKeys,
-          openai: savedKeys.openai || legacyOpenAI,
-          anthropic: savedKeys.anthropic || legacyAnthropic,
-        },
-        textModels: {
-          ...(savedConfig.textModels || {}),
-          ...(!savedConfig.textModels?.anthropic && legacyClaudeModel
-            ? { anthropic: legacyClaudeModel === 'opus' ? 'claude-opus-5' : 'claude-sonnet-5' }
-            : {}),
-        },
-        persistKeys:
-          savedConfig.persistKeys ??
-          (localStorage.getItem(SK.openaiKeyPersist) === '1' ||
-            localStorage.getItem(SK.anthropicKeyPersist) === '1'),
-      });
-    } catch {
-      return normalizeAISettings(DEFAULT_AI_SETTINGS);
-    }
-  });
-  useEffect(() => {
-    setAIRuntimeSettings(aiSettings);
-    try {
-      const { keys, ...safeSettings } = aiSettings;
-      localStorage.setItem(SK.aiSettings, JSON.stringify(safeSettings));
-      const target = aiSettings.persistKeys ? localStorage : sessionStorage;
-      const other = aiSettings.persistKeys ? sessionStorage : localStorage;
-      target.setItem(SK.aiKeys, JSON.stringify(keys));
-      other.removeItem(SK.aiKeys);
-      // Remove cópias legadas para não deixar segredos duplicados.
-      localStorage.removeItem(SK.openaiKey);
-      sessionStorage.removeItem(SK.openaiKey);
-      localStorage.removeItem(SK.anthropicKey);
-      sessionStorage.removeItem(SK.anthropicKey);
-    } catch { /* storage privado/bloqueado */ }
-  }, [aiSettings]);
-  const openaiKey = aiSettings.keys.openai || '';
-  const anthropicKey = aiSettings.keys.anthropic || '';
+  const { aiSettings, setAISettings, openaiKey, anthropicKey } = useAiSettings();
   // Biblioteca de hooks aprovados (B2)
   const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
   // FASE 2 Narrative OS: Sistema de Modos (Criador/Diretor/Studio)
