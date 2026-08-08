@@ -10,3 +10,7 @@ dist
 awesome-design-md/
 ROADMAP.md
 .vercel
+
+# Playwright
+test-results/
+playwright-report/
