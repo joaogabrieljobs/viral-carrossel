@@ -75,20 +75,34 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 
 ## Decomposição do monólito — estado em 2026-08-07
 
-`ViralCarrossel.jsx`: **18.516 → 15.861 linhas** (−14%). Extraídos e validados (build + 97 unit + 10 E2E + CI):
+`ViralCarrossel.jsx`: **18.516 → 14.205 linhas (−23%)**. 11 módulos extraídos (4.653 linhas), cada um validado com `npm run build && npm test && npm run test:e2e`:
 
 | Módulo | Linhas | Conteúdo |
 |---|---|---|
-| `src/utils/generation-prompts.js` | 1.176 | 8 modos narrativos, pacotes criativos, densidade/faixas, material do usuário, 20+ builders de prompt |
+| `src/utils/generation-prompts.js` | 1.176 | modos narrativos, pacotes criativos, material do usuário, 20+ builders de prompt |
 | `src/styles/global-style.js` | 934 | CSS do design system |
-| `src/utils/ai-client.js` | 584 | callAI/callAIwithSearch (4 provedores), geração de imagem (cascata gpt-image, Z.ai, edits), estado BYOK |
+| `src/utils/ai-client.js` | 584 | callAI/callAIwithSearch (4 provedores), geração de imagem, estado BYOK |
+| `src/utils/canvas-zones.js` | 463 | zonas de canvas, auto-ajuste, layouts pós-geração |
+| `src/utils/canvas-layout.js` | 390 | margens, quebra de linha estimada, aperto de zona de texto |
+| `src/utils/doc-schema.js` | 279 | DEFAULT_BRAND/DOC, mkSlide, ensureDocShape |
+| `src/utils/brand-visuals.js` | 232 | perfis de referência, tintas legíveis, helpers de cor, BODY_FONTS |
+| `src/utils/image-storage.js` | 221 | compressão de imagem p/ localStorage, canvasToPngBlob |
+| `src/utils/text-spans.js` | 149 | intervalos UTF-16 de destaque, markdown bold |
+| `src/utils/storage.js` | 119 | chaves SK, lsSet com aviso de quota |
+| `src/utils/export-helpers.js` | 106 | download com Web Share, fix html2canvas |
 
-### Por que o resto ainda não saiu
+### Ferramenta: `scripts/extract-module.mjs`
 
-Tentativa de extração automatizada dos blocos puros restantes (canvas-layout, image-storage, text-spans — ~1.000 linhas) **falhou em verificação** e foi revertida: o build passava, mas o app quebrava em runtime (`typographyPatchFromBrand is not defined`) porque o detector de blocos top-level por chaves em coluna 0 corta errado em declarações com `};` aninhado. O E2E pegou (9/10 vermelho) — a rede de testes fez o trabalho dela.
+Extrator AST (`@babel/parser` + `@babel/traverse`). Substituiu a heurística de regex que cortava errado em blocos com `};` aninhado — perdia dependências (`typographyPatchFromBrand`), o build passava e o app quebrava em runtime.
 
-**Lições para a próxima rodada:**
-1. Detector precisa ser um parser real de AST (`acorn`/`@babel/parser`), não regex de chaves.
-2. `npm run build` **não** prova nada aqui: referência a nome inexistente no mesmo arquivo só explode em runtime. Gate obrigatório = `npm test && npm run test:e2e`.
-3. Componentes React grandes (`SlideCardInner` 1.382 l., `SidebarContent` 2.755 l., `App` 3.697 l., `AccountHomeShell` 837 l., `GenerateModal` 794 l.) dependem da árvore de render do card — extrair um sem os outros cria import circular. Ordem correta: primitivos de render → `SlideCardInner` → painéis → shells.
-4. Blocos puros restantes que valem a pena (por tamanho): `finalizeCanvasMarginsForAutoAdjust` (306), `canvasZonesFontScalePatch` (133), `vcImageFileToStorageDataUrl` (124), `DEFAULT_BRAND`/`DEFAULT_DOC`/`ensureDocShape`/`mkSlide` (~190), helpers de destaque UTF-16 (~150).
+O que ele garante antes de escrever: limites reais da declaração, fecho transitivo de dependências pelo escopo do programa, detecção de componente por **nó JSX real** (não menção em comentário), reparse do monólito e do módulo, e checagem de nomes órfãos. `--dry` mostra o plano sem tocar em nada.
+
+**Gate obrigatório:** `npm test && npm run test:e2e`. O build sozinho não detecta identificador inexistente no mesmo arquivo — foi o E2E que pegou a corrupção da tentativa anterior.
+
+### O que falta e por quê
+
+Restam ~14.200 linhas, quase todas **componentes React interdependentes**: `App` (3.697), `SidebarContent` (2.755), `SlideCardInner` (1.382), `AccountHomeShell` (837), `GenerateModal` (794), mais os renderizadores de canvas/legado. Extrair um sem os outros cria import circular — a ordem correta é primitivos de render → `SlideCardInner` → painéis → shells, e cada passo precisa do mesmo gate. Os blocos puros que sobraram somam <100 linhas (constantes de UI), ganho marginal.
+
+### Flake do E2E corrigido no caminho
+
+`OnboardingTour` (z-index 120) auto-abre ~850ms após o boot e interceptava cliques quando outro worker saturava a CPU. Os testes agora semeiam `vc_onboarding_done`/`vc_modes_intro_done` antes do primeiro script da página, e o logout usa `noWaitAfter` (o handler dispara `window.location.assign`). 3 runs consecutivos 10/10.
