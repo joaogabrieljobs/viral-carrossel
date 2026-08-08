@@ -2604,14 +2604,9 @@ const callAIwithSearch = async (userMsg, { json = false, maxTokens = 4096 } = {}
   });
 };
 
-const loadHtml2Canvas = () => new Promise((res, rej) => {
-  if (window.html2canvas) return res(window.html2canvas);
-  const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-  s.onload = () => res(window.html2canvas);
-  s.onerror = () => rej(new Error('html2canvas load failed'));
-  document.head.appendChild(s);
-});
+// Bundle local (chunk lazy do Vite) — antes vinha do cdnjs em runtime:
+// export quebrava offline e dependia de CDN de terceiro (audit-produto #7).
+const loadHtml2Canvas = async () => (await import('html2canvas')).default;
 
 /**
  * html2canvas 1.4.x rasteriza mal `<img>` com `object-fit` + `transform` (sanduíche Cultura) — faixa achatada/larga.
@@ -2664,15 +2659,8 @@ function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
   });
 }
 
-// Carrega jsPDF on-demand (UMD) — só baixa quando o usuário pedir export PDF
-const loadJsPdf = () => new Promise((res, rej) => {
-  if (window.jspdf?.jsPDF) return res(window.jspdf.jsPDF);
-  const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-  s.onload = () => res(window.jspdf?.jsPDF);
-  s.onerror = () => rej(new Error('jsPDF load failed'));
-  document.head.appendChild(s);
-});
+// Carrega jsPDF on-demand — bundle local (chunk lazy do Vite), sem CDN.
+const loadJsPdf = async () => (await import('jspdf')).jsPDF;
 
 /**
  * Safari iOS ignora `.click()` em `<input type="file" hidden>`. Mantém elemento ativo mas fora da vista.
