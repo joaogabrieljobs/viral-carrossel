@@ -113,6 +113,17 @@ import {
 } from './src/utils/generation-prompts.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import {
+  FONT_CAT_LABELS,
+  FontPairingPicker,
+  FontPicker,
+} from './src/components/ui/font-pickers.jsx';
+import {
+  layoutMiniBars,
+  LayoutMiniIcon,
+  ImageFocalMiniIcon,
+  PhotoRegionMiniIcon,
+} from './src/components/ui/mini-icons.jsx';
+import {
   Slider,
   Toggle,
   ColorRow,
@@ -464,55 +475,9 @@ const LAYOUTS = [
 /** Fallback de layout quando o slide tem id inválido / legacy — middle-center é o mais neutro. */
 const DEFAULT_LAYOUT = LAYOUTS.find(l => l.id === 'mc') || LAYOUTS[4];
 
-function layoutMiniBars(layoutId) {
-  const yByRow = { t: 10, m: 21.5, b: 33 };
-  const row = layoutId[0];
-  const col = layoutId[1];
-  const y = yByRow[row] ?? 21.5;
-  const anchor = col === 'l' ? 'start' : col === 'c' ? 'center' : 'end';
-  const tw = 17;
-  const th = 4;
-  const sw = 22;
-  const sh = 3;
-  const g = 1.5;
-  const totalH = th + g + sh;
-  const y0 = y - totalH / 2;
-  const pad = 6;
-  const W = 44;
-  let tx;
-  let sx;
-  if (anchor === 'start') { tx = pad; sx = pad; }
-  else if (anchor === 'center') { tx = (W - tw) / 2; sx = (W - sw) / 2; }
-  else { tx = W - pad - tw; sx = W - pad - sw; }
-  return {
-    frame: { x: 4, y: 4, w: 36, h: 36, r: 5 },
-    title: { x: tx, y: y0, w: tw, h: th },
-    sub: { x: sx, y: y0 + th + g, w: sw, h: sh },
-  };
-}
 
-function LayoutMiniIcon({ layoutId, active }) {
-  const { frame, title: t, sub: s } = layoutMiniBars(layoutId);
-  const frameStroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
-  const barFill = active ? 'rgba(255,255,255,0.95)' : '#6e6e73';
-  return (
-    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
-      <rect
-        x={frame.x}
-        y={frame.y}
-        width={frame.w}
-        height={frame.h}
-        rx={frame.r}
-        ry={frame.r}
-        fill="none"
-        stroke={frameStroke}
-        strokeWidth="1.25"
-      />
-      <rect x={t.x} y={t.y} width={t.w} height={t.h} rx="1.5" fill={barFill} />
-      <rect x={s.x} y={s.y} width={s.w} height={s.h} rx="1.25" fill={barFill} opacity="0.82" />
-    </svg>
-  );
-}
+
+
 
 /** Ponto de ancoragem da foto (background-position % por slide). — Mesmos ids que LAYOUTS (tl…br). */
 const IMAGE_FOCAL_XY = {
@@ -559,43 +524,7 @@ function activeImageFocalLayoutId(slide) {
   return bestD < 12 * 12 ? best : null;
 }
 
-function ImageFocalMiniIcon({ layoutId, active }) {
-  const frame = { x: 4, y: 4, w: 36, h: 36, r: 5 };
-  const centers = {
-    tl: [12, 13], tc: [22, 13], tr: [32, 13],
-    ml: [12, 22], mc: [22, 22], mr: [32, 22],
-    bl: [12, 31], bc: [22, 31], br: [32, 31],
-  };
-  const [cx, cy] = centers[layoutId] || [22, 22];
-  const bw = 15;
-  const bh = 10;
-  const frameStroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
-  const blobFill = active ? 'rgba(255,255,255,0.92)' : '#6e6e73';
-  return (
-    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
-      <rect
-        x={frame.x}
-        y={frame.y}
-        width={frame.w}
-        height={frame.h}
-        rx={frame.r}
-        ry={frame.r}
-        fill="none"
-        stroke={frameStroke}
-        strokeWidth="1.25"
-      />
-      <rect
-        x={cx - bw / 2}
-        y={cy - bh / 2}
-        width={bw}
-        height={bh}
-        rx="2"
-        fill={blobFill}
-        opacity="0.95"
-      />
-    </svg>
-  );
-}
+
 
 /** Região da foto no layout clássico (sem canvas / sem sanduíche cultura). */
 const PHOTO_REGION_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom', 'inset_h_narrow_mid']);
@@ -627,39 +556,7 @@ const CARD_VISUAL_STYLE_OPTIONS = [
   { id: 'inset_h_bottom', short: 'FOTO ↓', desc: 'Texto no topo, faixa de foto em baixo.' },
 ];
 
-function PhotoRegionMiniIcon({ regionId, active }) {
-  const frame = { x: 4, y: 4, w: 36, h: 36, r: 5 };
-  const stroke = active ? 'rgba(255,255,255,0.9)' : '#9a9a9e';
-  const fill = active ? 'rgba(255,255,255,0.9)' : '#6e6e73';
-  let inner = null;
-  if (regionId === 'full') {
-    inner = <rect x="9" y="9" width="26" height="26" rx="3" fill={fill} opacity={0.4} />;
-  } else if (regionId === 'inset_h_top') {
-    inner = <rect x="8" y="8" width="28" height="10" rx="2" fill={fill} />;
-  } else if (regionId === 'inset_h_middle') {
-    inner = <rect x="8" y="17" width="28" height="10" rx="2" fill={fill} />;
-  } else if (regionId === 'inset_h_bottom') {
-    inner = <rect x="8" y="26" width="28" height="10" rx="2" fill={fill} />;
-  } else if (regionId === 'inset_h_narrow_mid') {
-    inner = <rect x="10" y="19" width="24" height="7" rx="2" fill={fill} />;
-  }
-  return (
-    <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden style={{ display: 'block' }}>
-      <rect
-        x={frame.x}
-        y={frame.y}
-        width={frame.w}
-        height={frame.h}
-        rx={frame.r}
-        ry={frame.r}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.25"
-      />
-      {inner}
-    </svg>
-  );
-}
+
 
 
 
@@ -4218,118 +4115,9 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
 
 // ─── UI PRIMITIVES ────────────────────────────────────────────────────────────
 
-// Section wrapper
-// Agrupador de fontes por categoria com filtro lateral.
-// `fonts` é um array de { name, val, cat? }; cats reconhecidas:
-// 'sans', 'display', 'serif', 'editorial', 'mono'
-const FONT_CAT_LABELS = {
-  all:       'Todas',
-  sans:      'Sans',
-  display:   'Display',
-  serif:     'Serif',
-  editorial: 'Editorial',
-  mono:      'Mono',
-};
-const FontPairingPicker = ({ brand, onApply, children }) => {
-  const [showAll, setShowAll] = React.useState(false);
-  return (
-    <>
-      <S title="Pairings tipográficos" hint="Combinações curadas para carrosséis virais. “Todas as fontes” abre os pickers individuais.">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
-          {FONT_PAIRINGS.map((p) => {
-            const active = pairingMatchesBrand(brand, p);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onApply(p)}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                  background: active ? 'var(--accent-surface)' : 'var(--bg-card)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'grid',
-                  gap: 2,
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: p.titleFont, color: 'var(--text-primary)' }}>
-                  {p.name}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-                  {p.use} · título + corpo
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          style={{
-            marginTop: 8,
-            height: 34,
-            borderRadius: 9999,
-            border: '1px solid var(--border)',
-            background: 'var(--bg-pearl)',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          {showAll ? 'Ocultar fontes individuais' : 'Todas as fontes'}
-        </button>
-      </S>
-      {showAll ? children : null}
-    </>
-  );
-};
 
-const FontPicker = ({ title, fonts, active, onChange }) => {
-  const [cat, setCat] = React.useState('all');
-  const cats = React.useMemo(() => {
-    const s = new Set(fonts.map(f => f.cat || 'sans'));
-    return ['all', ...['sans','display','serif','editorial','mono'].filter(c => s.has(c))];
-  }, [fonts]);
-  const filtered = cat === 'all' ? fonts : fonts.filter(f => (f.cat || 'sans') === cat);
-  return (
-    <S title={title}>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:2 }}>
-        {cats.map(c => (
-          <button
-            key={c}
-            onClick={() => setCat(c)}
-            style={{
-              fontSize:11, padding:'4px 12px', borderRadius:9999, cursor:'pointer',
-              fontWeight:400, letterSpacing:'-0.011em',
-              transition:'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
-              background: cat === c ? 'var(--accent)' : 'var(--bg-pearl)',
-              border: `1px solid ${cat === c ? 'var(--accent)' : 'var(--hairline)'}`,
-              color: cat === c ? '#fff' : 'var(--text-secondary)',
-            }}
-          >{FONT_CAT_LABELS[c] || c}</button>
-        ))}
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, maxHeight:240, overflowY:'auto', paddingRight:4 }}>
-        {filtered.map(f => (
-          <button key={f.name} onClick={()=>onChange(f.val)}
-            style={{
-              padding:'9px 8px', borderRadius:6, fontSize:13, fontWeight:700, cursor:'pointer',
-              fontFamily:f.val, transition:'all 0.12s', textAlign:'left',
-              background: active===f.val ? 'var(--text-primary)' : 'var(--bg-card)',
-              border: `1px solid ${active===f.val ? 'transparent' : 'var(--border)'}`,
-              color: active===f.val ? 'var(--bg-base)' : 'var(--text-secondary)',
-              minHeight:36, display:'flex', alignItems:'center',
-            }}
-            title={f.name}
-          >{f.name}</button>
-        ))}
-      </div>
-    </S>
-  );
-};
+
+
 
 /**
  * ModeSwitcher — chip dropdown pra trocar entre Criador / Diretor / Studio.

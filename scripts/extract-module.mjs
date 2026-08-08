@@ -221,7 +221,11 @@ for (const node of ast.program.body) {
     if (selected.includes(nm) || !usedInModule(nm)) continue;
     if (s.type === 'ImportDefaultSpecifier') defaults.push(nm);
     else if (s.type === 'ImportNamespaceSpecifier') defaults.push(`* as ${nm}`);
-    else named.push(nm);
+    else {
+      // preserva alias: `import { SectionLabel as S }` — usar só `{ S }` quebra
+      const orig = s.imported?.name ?? nm;
+      named.push(orig === nm ? nm : `${orig} as ${nm}`);
+    }
   }
   if (!defaults.length && !named.length) continue;
   const clause = [defaults.join(', '), named.length ? `{ ${named.join(', ')} }` : '']
