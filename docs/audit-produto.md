@@ -73,36 +73,50 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 
 ---
 
-## Decomposição do monólito — estado em 2026-08-07
+## Decomposição do monólito — concluída em 2026-08-07
 
-`ViralCarrossel.jsx`: **18.516 → 14.205 linhas (−23%)**. 11 módulos extraídos (4.653 linhas), cada um validado com `npm run build && npm test && npm run test:e2e`:
+`ViralCarrossel.jsx`: **18.516 → 4.489 linhas (−76%)**. Restou o componente `App` (orquestração de estado e efeitos) mais um punhado de helpers de arquivo. Todo o resto virou módulo — **cada extração validada com `npm run build && npm test && npm run test:e2e` antes do commit**.
 
-| Módulo | Linhas | Conteúdo |
-|---|---|---|
-| `src/utils/generation-prompts.js` | 1.176 | modos narrativos, pacotes criativos, material do usuário, 20+ builders de prompt |
-| `src/styles/global-style.js` | 934 | CSS do design system |
-| `src/utils/ai-client.js` | 584 | callAI/callAIwithSearch (4 provedores), geração de imagem, estado BYOK |
-| `src/utils/canvas-zones.js` | 463 | zonas de canvas, auto-ajuste, layouts pós-geração |
-| `src/utils/canvas-layout.js` | 390 | margens, quebra de linha estimada, aperto de zona de texto |
-| `src/utils/doc-schema.js` | 279 | DEFAULT_BRAND/DOC, mkSlide, ensureDocShape |
-| `src/utils/brand-visuals.js` | 232 | perfis de referência, tintas legíveis, helpers de cor, BODY_FONTS |
-| `src/utils/image-storage.js` | 221 | compressão de imagem p/ localStorage, canvasToPngBlob |
-| `src/utils/text-spans.js` | 149 | intervalos UTF-16 de destaque, markdown bold |
-| `src/utils/storage.js` | 119 | chaves SK, lsSet com aviso de quota |
-| `src/utils/export-helpers.js` | 106 | download com Web Share, fix html2canvas |
+### Estrutura resultante
+
+```
+src/
+├─ components/
+│  ├─ card/        SlideCardInner (+ renderizadores de canvas), SlideCard,
+│  │               CanvasZonesOverlay, FullscreenViewer, FullscreenImageAdjustBar,
+│  │               render-primitives
+│  ├─ panels/      GenerateModal (+ partes), SidebarContent, ResearchPanel,
+│  │               HookVariationsModal, ExportMoreFormats, PerSlideImageRefBlock
+│  ├─ ui/          primitives (Toggle/Slider/ColorRow/…), editor-chrome
+│  │               (ModeSwitcher, formato, drawer mobile), font-pickers, mini-icons
+│  └─ AccountHomeShell, SidebarContent, (modais que já existiam)
+├─ hooks/          useHistory, usePersistedState
+├─ styles/         global-style (CSS do design system), visual-presets
+└─ utils/          generation-prompts, ai-client, canvas-zones, canvas-layout,
+                   doc-schema, brand-visuals, image-storage, text-spans, storage,
+                   export-helpers, telemetry, landing-gate, video-store, …
+```
 
 ### Ferramenta: `scripts/extract-module.mjs`
 
-Extrator AST (`@babel/parser` + `@babel/traverse`). Substituiu a heurística de regex que cortava errado em blocos com `};` aninhado — perdia dependências (`typographyPatchFromBrand`), o build passava e o app quebrava em runtime.
+Extrator AST (`@babel/parser` + `@babel/traverse`):
 
-O que ele garante antes de escrever: limites reais da declaração, fecho transitivo de dependências pelo escopo do programa, detecção de componente por **nó JSX real** (não menção em comentário), reparse do monólito e do módulo, e checagem de nomes órfãos. `--dry` mostra o plano sem tocar em nada.
+```bash
+node scripts/extract-module.mjs <destino> <Nome...> [--component] [--dry]
+```
 
-**Gate obrigatório:** `npm test && npm run test:e2e`. O build sozinho não detecta identificador inexistente no mesmo arquivo — foi o E2E que pegou a corrupção da tentativa anterior.
+Garantias antes de escrever: limites reais da declaração, fecho transitivo de dependências (Identifier **e JSXIdentifier**), detecção de componente por nó JSX real, preservação da forma dos imports (default/namespace/alias), reparse do monólito e do módulo, checagem de nomes órfãos. `--component` libera JSX/hooks e gera o import de React com os hooks usados.
 
-### O que falta e por quê
+### Três bugs que só o E2E pegou
 
-Restam ~14.200 linhas, quase todas **componentes React interdependentes**: `App` (3.697), `SidebarContent` (2.755), `SlideCardInner` (1.382), `AccountHomeShell` (837), `GenerateModal` (794), mais os renderizadores de canvas/legado. Extrair um sem os outros cria import circular — a ordem correta é primitivos de render → `SlideCardInner` → painéis → shells, e cada passo precisa do mesmo gate. Os blocos puros que sobraram somam <100 linhas (constantes de UI), ganho marginal.
+Nenhum deles quebrava o build — todos quebravam o app em runtime:
 
-### Flake do E2E corrigido no caminho
+1. **Fecho por regex** perdia dependências (`typographyPatchFromBrand`). Origem da reescrita em AST.
+2. **`JSXIdentifier` não visitado**: `<ClassicCanvasInner/>` não contava como dependência, então o componente ficava para trás.
+3. **Estado mutável compartilhado**: `__vcVideoUrlMap` era atribuído pelo App e lido pelo card; virar `import` o tornaria read-only. Resolvido movendo para `video-store.js` atrás de `setVideoUrlMap`/`getVideoUrl`.
 
-`OnboardingTour` (z-index 120) auto-abre ~850ms após o boot e interceptava cliques quando outro worker saturava a CPU. Os testes agora semeiam `vc_onboarding_done`/`vc_modes_intro_done` antes do primeiro script da página, e o logout usa `noWaitAfter` (o handler dispara `window.location.assign`). 3 runs consecutivos 10/10.
+**Regra que fica:** `npm run build` não valida escopo dentro de um mesmo arquivo JS. O gate real de refactor é `npm test && npm run test:e2e`.
+
+### O que ainda pode sair do `App`
+
+As 3.697 linhas de `App` são estado + efeitos + handlers de fluxo (geração, export, biblioteca, billing). Extrair exige converter blocos em hooks próprios (`useGeneration`, `useExport`, `useLibrary`), não mover texto — trabalho de design, não de ferramenta.
