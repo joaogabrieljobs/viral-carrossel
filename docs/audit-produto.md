@@ -123,7 +123,7 @@ As 3.697 linhas de `App` são estado + efeitos + handlers de fluxo (geração, e
 
 ### Hooks extraídos do `App` (2026-08-07)
 
-`ViralCarrossel.jsx`: 4.489 → **3.960 linhas**. O `App` em si saiu de 3.697 para ~3.170 (dos quais 1.236 são o JSX final).
+`ViralCarrossel.jsx`: 4.489 → **3.981 linhas** (18.516 → 3.981 no total: −79%). O `App` em si saiu de 3.697 para ~3.170 (dos quais 1.236 são o JSX final).
 
 | Hook | Linhas | Responsabilidade |
 |---|---|---|
