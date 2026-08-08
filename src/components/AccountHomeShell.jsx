@@ -796,7 +796,7 @@ function AccountHomeShell({
                         >
                           Confirmar eliminação
                         </button>
-                        <button type="button" onClick={() => setConfirmDeleteId(null)} style={{
+                        <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar eliminação" style={{
                           width: 32,
                           height: 32,
                           borderRadius: 8,

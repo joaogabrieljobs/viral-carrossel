@@ -3091,7 +3091,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 </button>
                 );
               })}
-              <button onClick={addSlide} style={{
+              <button onClick={addSlide} aria-label="Adicionar card ao carrossel" style={{
                 flexShrink:0, width:44, height:56, borderRadius:4,
                 border:'1px dashed var(--border)', background:'transparent',
                 color:'var(--text-muted)', cursor:'pointer', display:'flex',

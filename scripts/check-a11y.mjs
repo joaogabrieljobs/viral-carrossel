@@ -34,17 +34,36 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** um <button> tem rótulo se traz aria-* ou qualquer filho que renderize texto */
+/** Um <button> tem rótulo se traz aria-* ou renderiza texto em QUALQUER
+ *  profundidade — `<span><strong>{nome}</strong></span>` conta. Olhar só os
+ *  filhos diretos inflava o relatório com falsos positivos. */
+function renderizaTexto(node) {
+  return (node.children ?? []).some((c) => {
+    if (c.type === 'JSXText') return Boolean(c.value.trim());
+    if (c.type === 'JSXExpressionContainer') {
+      const e = c.expression;
+      if (e.type === 'JSXEmptyExpression') return false;
+      // `{<Icon/>}` não é texto; qualquer outra expressão pode renderizar texto
+      if (e.type === 'JSXElement' || e.type === 'JSXFragment') return renderizaTexto(e);
+      return true;
+    }
+    if (c.type === 'JSXElement' || c.type === 'JSXFragment') {
+      // ícone marcado como decorativo não conta como rótulo
+      const attrs = c.openingElement?.attributes ?? [];
+      const hidden = attrs.some(
+        (a) => a.type === 'JSXAttribute' && a.name.name === 'aria-hidden',
+      );
+      if (hidden) return false;
+      return renderizaTexto(c);
+    }
+    return false;
+  });
+}
+
 function temRotulo(node, attrs) {
   const nomes = attrs.map((a) => a.name.name);
   if (nomes.includes('aria-label') || nomes.includes('aria-labelledby')) return true;
-  return node.children.some(
-    (c) =>
-      (c.type === 'JSXText' && c.value.trim()) ||
-      (c.type === 'JSXExpressionContainer' &&
-        c.expression.type !== 'JSXEmptyExpression' &&
-        c.expression.type !== 'JSXElement'),
-  );
+  return renderizaTexto(node);
 }
 
 let semTitle = 0;

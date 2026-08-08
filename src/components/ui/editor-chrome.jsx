@@ -507,7 +507,7 @@ function RefineBtn({ onRefine, busy, variant = 'compact', label = 'Refinar com I
         >
           {busy ? <Loader2 size={11} style={{animation:'spin 0.8s linear infinite'}}/> : <Wand2 size={11}/>}
         </button>
-        <button onClick={()=>{setOpen(false);setTxt('');}} className="vc-btn vc-btn-ghost" style={{ height:36, padding:'0 10px' }}>
+        <button onClick={()=>{setOpen(false);setTxt('');}} aria-label="Cancelar refino" className="vc-btn vc-btn-ghost" style={{ height:36, padding:'0 10px' }}>
           <X size={12}/>
         </button>
       </div>

@@ -145,21 +145,27 @@ Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. E
 - `useExport` sem `trackEvent` / `blobFromSlideRef` / `downloadCanvasPng`
 - **`SidebarContent`: `setHookLibrary` e `niche`** — bug **pré-existente**, anterior a qualquer extração: `SidebarContent` sempre foi top-level e nunca teve esse escopo, então o botão "salvar hook na biblioteca" estava quebrado. Corrigido threadando as props.
 
-### Acessibilidade — parcialmente corrigido (2026-08-07)
+### Acessibilidade — resolvido (2026-08-07)
 
-Varredura AST encontrou **48 `<button>` sem rótulo acessível** (só ícone, sem `aria-label`/`aria-labelledby`). Corrigidos **20** de forma mecânica e segura: os que já tinham `title` ganharam `aria-label` com o mesmo texto (`title` sozinho não é anunciado de forma confiável por leitor de tela). Mais o submit da pesquisa de nicho, que era o que forçava o E2E a usar seletor por classe.
+Primeira varredura acusou 48 `<button>` sem rótulo acessível. **O número estava errado:** o detector olhava só os filhos diretos do `<button>`, então marcava como "sem rótulo" todo botão cujo texto vive aninhado (`<span><strong>{nome}</strong></span>`) — o padrão da maior parte do app. Corrigida a detecção para descer recursivamente e ignorar ícones com `aria-hidden`.
 
-**Restam 28**, todos com ícone puro e sem `title` — precisam de decisão de conteúdo caso a caso, não dá para inferir com segurança.
+Números reais: **20** botões tinham `title` e ganharam `aria-label` equivalente (`title` sozinho não é anunciado de forma confiável por leitor de tela) e **3** eram ícone puro de verdade:
 
-Ferramenta: **`scripts/check-a11y.mjs`** (`npm run check:a11y`).
+| Botão | Onde | Rótulo |
+|---|---|---|
+| `+` no fim da tira de miniaturas | editor | Adicionar card ao carrossel |
+| `✕` do campo de refino | aba Narrativa | Cancelar refino |
+| `✕` da confirmação de apagar | home → Projetos | Cancelar eliminação |
+
+Ferramenta: **`scripts/check-a11y.mjs`** (`npm run check:a11y`) — hoje reporta **0 pendências**.
 
 ```bash
-npm run check:a11y                    # lista as pendências com arquivo:linha
+npm run check:a11y                    # lista pendências com arquivo:linha
 node scripts/check-a11y.mjs --fix     # converte `title` em `aria-label` (seguro)
-node scripts/check-a11y.mjs --strict  # sai 1 se houver pendência — para o CI quando a fila zerar
+node scripts/check-a11y.mjs --strict  # sai 1 se houver pendência (pronto para o CI)
 ```
 
-Fora do `npm test` de propósito: com 28 pendências conhecidas o gate ficaria vermelho permanentemente. Trocar para `--strict` no CI quando a lista chegar a zero.
+Como a fila está zerada, `--strict` já pode entrar no CI para impedir regressão.
 
 ### Pendência de UX (decisão do produto)
 
