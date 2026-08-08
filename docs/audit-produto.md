@@ -149,7 +149,17 @@ Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. E
 
 Varredura AST encontrou **48 `<button>` sem rótulo acessível** (só ícone, sem `aria-label`/`aria-labelledby`). Corrigidos **20** de forma mecânica e segura: os que já tinham `title` ganharam `aria-label` com o mesmo texto (`title` sozinho não é anunciado de forma confiável por leitor de tela). Mais o submit da pesquisa de nicho, que era o que forçava o E2E a usar seletor por classe.
 
-**Restam 28**, todos com ícone puro e sem `title` — precisam de decisão de conteúdo caso a caso, não dá para inferir com segurança. Backlog.
+**Restam 28**, todos com ícone puro e sem `title` — precisam de decisão de conteúdo caso a caso, não dá para inferir com segurança.
+
+Ferramenta: **`scripts/check-a11y.mjs`** (`npm run check:a11y`).
+
+```bash
+npm run check:a11y                    # lista as pendências com arquivo:linha
+node scripts/check-a11y.mjs --fix     # converte `title` em `aria-label` (seguro)
+node scripts/check-a11y.mjs --strict  # sai 1 se houver pendência — para o CI quando a fila zerar
+```
+
+Fora do `npm test` de propósito: com 28 pendências conhecidas o gate ficaria vermelho permanentemente. Trocar para `--strict` no CI quando a lista chegar a zero.
 
 ### Pendência de UX (decisão do produto)
 

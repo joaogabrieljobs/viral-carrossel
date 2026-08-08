@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "check:undef": "node scripts/check-undefined.mjs",
-    "check:props": "node scripts/check-props.mjs"
+    "check:props": "node scripts/check-props.mjs",
+    "check:a11y": "node scripts/check-a11y.mjs"
   },
   "dependencies": {
     "gsap": "^3.13.0",
