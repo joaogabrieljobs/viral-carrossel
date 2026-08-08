@@ -122,7 +122,7 @@ export default defineConfig(({ mode }) => {
       // Code-splitting: separa vendor estável (react, lucide) do app code.
       // Quando só ViralCarrossel.jsx muda, vendor fica cacheado entre deploys
       // → user re-baixa só ~150KB em vez de ~640KB. Cache-control immutable
-      // (definido em netlify.toml) garante 1 ano de cache pros chunks vendor.
+      // (definido em vercel.json) garante 1 ano de cache pros chunks vendor.
       rollupOptions: {
         output: {
           manualChunks: {

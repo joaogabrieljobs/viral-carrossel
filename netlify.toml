@@ -1,38 +1,19 @@
-# Netlify serve APENAS a landing (produção do app = Vercel — DEC-A, docs/audit.md).
-# Funções serverless vivem só em api/ (convenção Vercel).
+# Netlify APOSENTADO (2026-08-07) — produção é a Vercel (DEC-A, docs/audit.md).
+#
+# Por quê: `api/` é convenção Vercel. No Netlify os endpoints `/api/stripe/*` e
+# `/api/auth/*` caíam no fallback SPA e devolviam HTML, então o paywall abria e
+# o checkout falhava — o link não vendia.
+#
+# Este site agora só redireciona (301) para a Vercel, preservando qualquer link
+# já divulgado. Não há build: `publish` aponta para um diretório com um
+# index.html mínimo, e a regra de redirect cobre tudo antes dele.
 [build]
-  command = "npm run build"
-  publish = "dist"
+  publish = "netlify-redirect"
+  command = "mkdir -p netlify-redirect && printf '<!doctype html><meta http-equiv=\"refresh\" content=\"0; url=https://viral-carrossel.vercel.app/\">' > netlify-redirect/index.html"
 
-[build.environment]
-  NODE_VERSION = "20"
-
-# Ficheiros em `dist` (CSS/JS hashed) continuam servidos normalmente.
-# Esta regra só aplica quando o caminho não corresponde a nenhum ficheiro —
-# típico de SPAs quando alguém abre uma URL diretamente ou recarrega.
+# Redireciona TUDO — inclusive /api/* — para a produção real.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
-
-# index.html NUNCA cacheia — assim o browser sempre puxa a versão nova que
-# referencia os chunks JS/CSS atuais. Sem isso, deploy novo deixa browsers com
-# HTML antigo apontando pra chunks que já não existem ("Failed to fetch...").
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-
-[[headers]]
-  for = "/"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-
-# Assets com hash (CSS/JS/imagens) podem cachear longo — o hash no nome
-# invalida automaticamente quando muda.
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+  to = "https://viral-carrossel.vercel.app/:splat"
+  status = 301
+  force = true

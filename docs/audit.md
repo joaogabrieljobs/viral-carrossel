@@ -14,7 +14,11 @@ Data: 2026-08-07 · Gerada pela Fase -1 do pipeline spec-driven-dev.
 - **Sem banco de dados.** Fonte da verdade: cookie `vc_access` assinado + estado da assinatura no Stripe (ver `docs/STRIPE.md`).
 - **Modelo de negócio:** 1 plano individual R$ 97/mês, BYOK (chave Anthropic/OpenAI do usuário).
 
-## Deploy — DIVERGÊNCIA CRÍTICA
+## Deploy — RESOLVIDO (2026-08-07): Vercel única
+
+Netlify **aposentado**. `netlify.toml` agora só faz 301 de tudo para `viral-carrossel.vercel.app`, preservando links já divulgados. Motivo: `api/` é convenção Vercel; no Netlify os endpoints de billing/auth caíam no fallback SPA e devolviam HTML — o paywall abria e o checkout falhava, então aquele link **não vendia**. Funções `netlify/functions/` removidas; Plausible corrigido (apontava para `viral-carroceis.netlify.app`, domínio que nem era o do site).
+
+## Histórico da divergência
 
 Dois alvos de deploy coexistem:
 

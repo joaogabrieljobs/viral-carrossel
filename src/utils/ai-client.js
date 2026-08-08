@@ -17,7 +17,7 @@ const IS_LOCAL_DEV =
   typeof window !== 'undefined' &&
   /^(localhost|127\.|0\.0|192\.168|10\.|\[::1\])/.test(window.location.hostname);
 
-/** Em build de produção (ex.: Netlify com VITE_ANTHROPIC_PROXY) usa a função serverless → sem CORS. */
+/** Em build de produção (VITE_ANTHROPIC_PROXY) usa a função serverless → sem CORS. */
 const USE_ANTHROPIC_PROXY =
   IS_LOCAL_DEV ||
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ANTHROPIC_PROXY === 'true');

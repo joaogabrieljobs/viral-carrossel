@@ -1,6 +1,6 @@
 # Viral. Carrossel Studio
 
-Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel**. Sem banco — cookie `vc_access` + Stripe são a fonte da verdade.
+Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** (`viral-carrossel.vercel.app`). Netlify aposentado em 2026-08-07 — só redireciona 301. Sem banco — cookie `vc_access` + Stripe são a fonte da verdade.
 
 ## Documentos de contexto (spec-driven)
 
