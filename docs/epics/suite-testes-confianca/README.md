@@ -12,7 +12,7 @@
 | 02 | unit-utils-puros | Testes de `src/utils/*` (parsers, formats, schema-migration, brand-helpers, hooks-library, wcag, slide-design-system) + `src/lib/billing.js` | RF-03 | 01 | ✅ 2026-08-07 |
 | 03 | integracao-auth | `session`, `logout`, `access.js` completo (expirado/ausente), Google OAuth mockado (state inválido, assinante, sem sub) via req/res fake | RF-04, RF-05, RF-06 · DEC-003 | 01 | ✅ 2026-08-07 |
 | 04 | integracao-stripe | `checkout` (e-mail inválido/novo/já ativo), `confirm` (paga/não paga/inválida), `portal` (401/ok), `webhook` (assinatura válida/inválida) com `vi.mock('stripe')` | RF-07..RF-10 · DEC-002 | 01 | ✅ 2026-08-07 |
-| 05 | seguranca-regressao | Origin fora da allowlist sem ACAO; `getSecret()` sem env → throw; `BILLING_DISABLED` ignorada em prod; proxy Anthropic anônimo → 401 | RF-12..RF-14 · DEC-005 | 03 | ⬜ |
+| 05 | seguranca-regressao | Origin fora da allowlist sem ACAO; `getSecret()` sem env → throw; `BILLING_DISABLED` ignorada em prod; proxy Anthropic anônimo → 401 | RF-12..RF-14 · DEC-005 | 03 | ✅ 2026-08-07 |
 | 06 | concorrencia-multiusuario | 5× `checkout→confirm→session` em `Promise.all`; cada resposta com cookie do próprio `customerId`, zero vazamento cruzado | RF-11 · DEC-004 | 03, 04 | ⬜ |
 | 07 | e2e-skeleton-playwright | `npm run test:e2e` roda Playwright contra `vite preview`; landing renderiza sem erro de console; paywall bloqueia studio com `/api` mockado | RF-01, RF-15 · DEC-003, DEC-005 | 01 | ⬜ |
 | 08 | e2e-jornadas-billing | Jornadas: comprar (checkout mockado → `?billing=success` → studio), restaurar, negar sem assinatura, logout | RF-07 (jornada), RF-15 | 07 | ⬜ |
