@@ -17,7 +17,7 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
-import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId } from './src/utils/video-store.js';
+import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
@@ -315,12 +315,6 @@ import {
 } from './src/config/ai-providers.js';
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
-// Permite os componentes de render (SlideCardInner, ClassicCanvasInner) lerem
-// o object URL de um vídeo sem precisar threadear via props.
-let __vcVideoUrlMap = {};
-function getVideoUrl(videoId) {
-  return videoId ? __vcVideoUrlMap[videoId] || null : null;
-}
 
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 // Plausible (carregado via index.html). Helper que é no-op se ad blocker bloquear
@@ -6677,7 +6671,7 @@ export default function App() {
   const [videoUrls, setVideoUrls] = useState({}); // { [videoId]: blobUrl }
   const videoUrlsRef = useRef({});
   videoUrlsRef.current = videoUrls;
-  // Wrapper que mantém __vcVideoUrlMap SINCRONIZADO com o setVideoUrls.
+  // Wrapper que mantém o cache de object URLs (video-store) SINCRONIZADO com setVideoUrls.
   // Sem isso, o renderer (que lê o map module-level via getVideoUrl) ficava
   // 1 render atrás — bloco do <video> nunca disparava porque getVideoUrl
   // retornava null no primeiro render após import. useEffect só roda DEPOIS
@@ -6685,13 +6679,13 @@ export default function App() {
   const setVideoUrlsSync = useCallback((nextOrFn) => {
     setVideoUrls(prev => {
       const next = typeof nextOrFn === 'function' ? nextOrFn(prev) : nextOrFn;
-      __vcVideoUrlMap = next;
+      setVideoUrlMap(next);
       videoUrlsRef.current = next;
       return next;
     });
   }, []);
   // Defesa em profundidade: mesmo se algo escapar, useEffect garante sync.
-  useEffect(() => { __vcVideoUrlMap = videoUrls; }, [videoUrls]);
+  useEffect(() => { setVideoUrlMap(videoUrls); }, [videoUrls]);
   // Refetch URLs sempre que algum slide aponta pra videoId que não temos URL gerada
   useEffect(() => {
     let cancelled = false;

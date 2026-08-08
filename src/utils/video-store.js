@@ -124,3 +124,17 @@ export async function videoStorageUsage() {
 export function newVideoId() {
   return 'vid_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
+
+// ─── Cache em memória das object URLs (blob:) por videoId ────────────────────
+// Estado mutável compartilhado entre o App (que grava) e os componentes de card
+// (que leem). Fica atrás de setter/getter porque `import` é read-only: atribuir
+// direto ao binding importado é erro de build.
+let _videoUrlMap = {};
+
+export function setVideoUrlMap(next) {
+  _videoUrlMap = next || {};
+}
+
+export function getVideoUrl(videoId) {
+  return videoId ? _videoUrlMap[videoId] || null : null;
+}
