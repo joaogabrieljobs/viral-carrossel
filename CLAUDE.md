@@ -12,6 +12,10 @@ Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarros
 
 Regra: antes de implementar qualquer task, leia a spec correspondente e os documentos acima. Divergência entre código e documento → parar e reportar.
 
+## Onde rodar os comandos
+
+O repositório é aninhado: o app vive em `viral-carrossel/viral-carrossel/`. A pasta pai tem um `package.json` só com atalhos que fazem `cd` para cá. Rodar `npm run <script>` da pasta errada dá `Missing script`.
+
 ## Testes
 
 - `npm test` — unit + integração (Vitest, `tests/unit` + `tests/integration`)
