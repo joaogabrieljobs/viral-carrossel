@@ -23,10 +23,12 @@ test.describe('Produto (RF-02)', () => {
     // home shell → editor
     const continuar = page.getByRole('button', { name: /continuar no editor/i });
     await expect(continuar).toBeVisible({ timeout: 10_000 });
-    await continuar.click();
+    await continuar.click({ force: true });
 
     // editor abre no empty state — aplica um template pra ter conteúdo real
-    await page.getByRole('button', { name: /abrir templates/i }).click();
+    // (force em tudo: o empty state tem animação contínua e o wait de
+    // estabilidade do Playwright nunca converge sob CPU dividida)
+    await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
     const modal = page.locator('.modal-panel');
     await expect(modal).toBeVisible({ timeout: 10_000 });
     await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
