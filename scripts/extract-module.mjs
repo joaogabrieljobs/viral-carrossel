@@ -110,6 +110,17 @@ function referencedTopLevel(name) {
             out.add(id);
           }
         },
+        // `<ClassicCanvasInner …/>` é JSXIdentifier, não Identifier — sem isto
+        // o fecho perde componentes usados só no JSX (o build passa e o app
+        // quebra em runtime).
+        JSXIdentifier(path) {
+          if (path.node.start < n.start || path.node.end > n.end) return;
+          const id = path.node.name;
+          if (id === name || !decls.has(id) || importedNames.has(id)) return;
+          if (path.parent.type === 'JSXAttribute') return;
+          if (path.parent.type === 'JSXMemberExpression' && path.parent.property === path.node) return;
+          out.add(id);
+        },
       },
       undefined,
       {},
