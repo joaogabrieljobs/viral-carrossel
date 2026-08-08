@@ -29,6 +29,8 @@ const MONO = 'ViralCarrossel.jsx';
 const argv = process.argv.slice(2);
 const dry = argv.includes('--dry');
 const force = argv.includes('--force');
+/** --component: permite JSX/hooks (extração de componentes React). */
+const asComponent = argv.includes('--component');
 const args = argv.filter((a) => !a.startsWith('--'));
 const [dest, ...seeds] = args;
 
@@ -156,8 +158,8 @@ while (queue.length) {
     process.exit(2);
   }
   seen.add(n);
-  if (looksLikeComponent(n)) {
-    console.error(`!! ${n} contém JSX/hooks (componente React) — extração abortada`);
+  if (!asComponent && looksLikeComponent(n)) {
+    console.error(`!! ${n} contém JSX/hooks (componente React) — use --component se for intencional`);
     process.exit(3);
   }
   selected.push(n);
@@ -178,26 +180,54 @@ for (const r of ranges) {
 
 const moduleBody = merged.map((r) => code.slice(r.start, r.end)).join('\n\n');
 
-// imports que o módulo precisa (de módulos já extraídos), a partir dos imports do monólito
+// imports que o módulo precisa, derivados dos imports do monólito.
+// Um identificador é "usado" quando aparece como Identifier/JSXIdentifier no
+// corpo movido — regex de palavra basta aqui porque nomes importados são únicos.
+const usedInModule = (nm) => new RegExp(`\\b${nm}\\b`).test(moduleBody);
+/** caminho relativo do destino (src/components/x.jsx) para o alvo de import do monólito */
+const destDir = dest.replace(/\/[^/]+$/, '');
+function rewriteSource(source) {
+  if (!source.startsWith('./src/')) return source;
+  const abs = source.replace('./src/', 'src/');
+  const from = destDir.split('/').filter(Boolean);
+  const to = abs.split('/');
+  let i = 0;
+  while (i < from.length && i < to.length - 1 && from[i] === to[i]) i++;
+  const ups = from.length - i;
+  const rel = (ups ? '../'.repeat(ups) : './') + to.slice(i).join('/');
+  return rel.startsWith('.') ? rel : './' + rel;
+}
+
 const neededImports = [];
+if (asComponent) {
+  const hooks = ['useState', 'useEffect', 'useLayoutEffect', 'useRef', 'useMemo', 'useCallback']
+    .filter(usedInModule);
+  const needsReact = /\bReact\./.test(moduleBody) || /<[A-Za-z]/.test(moduleBody);
+  if (needsReact || hooks.length) {
+    neededImports.push(
+      `import React${hooks.length ? `, { ${hooks.join(', ')} }` : ''} from 'react';`,
+    );
+  }
+}
 for (const node of ast.program.body) {
   if (node.type !== 'ImportDeclaration') continue;
   const source = node.source.value;
-  if (source.startsWith('lucide-react') || source.startsWith('react')) {
-    const used = node.specifiers
-      .map((s) => s.local.name)
-      .filter((nm) => new RegExp(`\\b${nm}\\b`).test(moduleBody));
-    if (used.length && source !== 'react') neededImports.push(`import { ${used.join(', ')} } from '${source}';`);
-    continue;
+  if (source === 'react') continue; // tratado acima
+  // preserva a forma do specifier: default, namespace ou named
+  const defaults = [];
+  const named = [];
+  for (const s of node.specifiers) {
+    const nm = s.local.name;
+    if (selected.includes(nm) || !usedInModule(nm)) continue;
+    if (s.type === 'ImportDefaultSpecifier') defaults.push(nm);
+    else if (s.type === 'ImportNamespaceSpecifier') defaults.push(`* as ${nm}`);
+    else named.push(nm);
   }
-  const rel = source.replace(/^\.\/src\//, './').replace(/^\.\//, './');
-  const used = node.specifiers
-    .map((s) => s.local.name)
-    .filter((nm) => !selected.includes(nm) && new RegExp(`\\b${nm}\\b`).test(moduleBody));
-  if (used.length) {
-    const from = source.startsWith('./src/') ? source.replace('./src/utils/', './').replace('./src/', '../') : rel;
-    neededImports.push(`import { ${used.join(', ')} } from '${from}';`);
-  }
+  if (!defaults.length && !named.length) continue;
+  const clause = [defaults.join(', '), named.length ? `{ ${named.join(', ')} }` : '']
+    .filter(Boolean)
+    .join(', ');
+  neededImports.push(`import ${clause} from '${rewriteSource(source)}';`);
 }
 
 const header =
