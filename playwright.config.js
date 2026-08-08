@@ -5,6 +5,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,
+  // 2 workers: o export renderiza 2160x2700 via html2canvas — com N workers
+  // dividindo CPU o teste de produto estoura timeout de forma flaky.
+  workers: 2,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['junit', { outputFile: 'test-results/e2e-junit.xml' }]] : 'list',
   use: {
