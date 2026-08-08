@@ -120,3 +120,28 @@ Nenhum deles quebrava o build — todos quebravam o app em runtime:
 ### O que ainda pode sair do `App`
 
 As 3.697 linhas de `App` são estado + efeitos + handlers de fluxo (geração, export, biblioteca, billing). Extrair exige converter blocos em hooks próprios (`useGeneration`, `useExport`, `useLibrary`), não mover texto — trabalho de design, não de ferramenta.
+
+### Hooks extraídos do `App` (2026-08-07)
+
+`ViralCarrossel.jsx`: 4.489 → **3.960 linhas**. O `App` em si saiu de 3.697 para ~3.170 (dos quais 1.236 são o JSX final).
+
+| Hook | Linhas | Responsabilidade |
+|---|---|---|
+| `src/hooks/useExport.js` | 250 | PNG por card, ZIP, fotos limpas, PDF — renderiza dos refs offscreen |
+| `src/hooks/useAccess.js` | ~175 | sessão Stripe, paywall, landing, login Google, boot de query params |
+| `src/hooks/useLibrary.js` | 142 | biblioteca multi-doc: abrir/criar/duplicar/apagar/exportar/importar |
+| `src/hooks/useAiSettings.js` | 76 | BYOK: provedores, modelos, chaves (sessão × localStorage) |
+| `src/hooks/useToasts.js` | 19 | fila de toasts + `setError` |
+
+**O que NÃO foi extraído, e por quê.** O bloco de geração (`handleGenerate` 295 l., `refineSlide`, `refineAll`, `generateCaption`, `applyTemplate`, `generateSlideImageAt`) referencia **52 símbolos do escopo do App**. Um `useGeneration` receberia 30+ parâmetros — assinatura pior que o problema. Extrair de verdade exige consolidar o estado do editor (slides/doc/flags de progresso) num reducer antes; é reestruturação de estado, não movimentação de código.
+
+### `scripts/check-undefined.mjs` — o gate que faltava
+
+Análise de escopo por AST em todos os arquivos, rodando dentro do `npm test`. Existe porque `vite build` não valida referência a nome inexistente dentro de um módulo. Na primeira execução apontou **10 bugs latentes**, todos invisíveis para o build:
+
+- `HookVariationsModal` sem `resolveMaterialPromptParts` (variações de gancho quebrariam)
+- `ResearchPanel` sem `_aiRuntimeSettings` (pesquisa de nicho)
+- `FullscreenViewer` sem `SlideCard`; `generation-prompts` sem `REFERENCE_PROFILE_BY_ID`
+- `useExport` sem `trackEvent` / `blobFromSlideRef` / `downloadCanvasPng`
+- **`SidebarContent`: `setHookLibrary` e `niche`** — bug **pré-existente**, anterior a qualquer extração: `SidebarContent` sempre foi top-level e nunca teve esse escopo, então o botão "salvar hook na biblioteca" estava quebrado. Corrigido threadando as props.
+
