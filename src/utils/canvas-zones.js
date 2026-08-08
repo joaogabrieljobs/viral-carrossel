@@ -191,16 +191,19 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
     const title = clampRect(zIn.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
     const sub = clampRect(zIn.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
     const gapTS = Math.max(0.5, sub.y - (title.y + title.h));
-    const newTitleH = Math.max(CANVAS_ZONE_MIN.h, title.h * rT);
     const newSubH = Math.max(CANVAS_ZONE_MIN.h, sub.h * rS);
+    /**
+     * `title.y` é fixo neste patch, então encolher a foto (que fica ACIMA do
+     * título) não abre um milímetro no rodapé — só apaga a foto de graça. A
+     * moldura da foto fica fora da conta; quem cede é o próprio bloco de texto.
+     */
+    const titleHCap = Math.max(
+      CANVAS_ZONE_MIN.h,
+      98 - title.y - gapTS - CANVAS_ZONE_MIN.h,
+    );
+    const newTitleH = Math.min(titleHCap, Math.max(CANVAS_ZONE_MIN.h, title.h * rT));
     const subY = title.y + newTitleH + gapTS;
-    let overflow = subY + newSubH - 98;
-    let photoNext = { ...photo };
-    if (overflow > 0) {
-      const shrink = Math.min(overflow + 0.75, Math.max(0, photoNext.h - CANVAS_ZONE_MIN.h));
-      photoNext.h = Math.max(CANVAS_ZONE_MIN.h, photoNext.h - shrink);
-      overflow -= shrink;
-    }
+    const overflow = subY + newSubH - 98;
     const adjSubH = overflow > 0
       ? Math.max(CANVAS_ZONE_MIN.h, newSubH - overflow)
       : newSubH;
@@ -209,7 +212,7 @@ function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
         ...canvas,
         zones: {
           ...zIn,
-          photo: clampRect(photoNext),
+          photo: clampRect(photo),
           title: clampRect({ ...title, h: newTitleH }),
           subtitle: clampRect({ ...sub, y: subY, h: adjSubH }),
         },

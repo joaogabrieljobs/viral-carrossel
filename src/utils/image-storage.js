@@ -1,5 +1,4 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import { S } from '../components/ui/SectionLabel.jsx';
 
 const VC_BG_SAVE_MAX_PX = 1536;
 const VC_BG_SAVE_JPEG_Q = 0.88;
