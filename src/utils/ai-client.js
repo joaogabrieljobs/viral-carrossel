@@ -552,6 +552,10 @@ const generateDALLEWithRetry = async (q, apiKey, imgParams = null, options = {},
   throw lastErr;
 };
 
+export function getAIRuntimeSettings() {
+  return _aiRuntimeSettings;
+}
+
 export {
   IS_LOCAL_DEV,
   USE_ANTHROPIC_PROXY,

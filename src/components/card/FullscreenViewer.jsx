@@ -4,6 +4,7 @@ import { X, SlidersHorizontal } from 'lucide-react';
 import { useScrollLock } from '../../hooks/useScrollLock.js';
 import { FORMATS } from '../../utils/formats.js';
 import { FULLSCREEN_IMG_ADJ_ROWS, FullscreenImageAdjustBar } from './FullscreenImageAdjustBar.jsx';
+import { SlideCard } from './SlideCard.jsx';
 
 /** Ajustes de imagem apenas para preview (ex.: tela cheia); valores típicos −50…+50, 0 = neutro. */
 const PRESENTATION_IMG_ADJ_KEYS = ['exposure', 'brightness', 'contrast', 'color', 'blacks', 'tonalidade'];

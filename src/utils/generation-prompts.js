@@ -9,6 +9,7 @@ import {
   GraduationCap, ScrollText, Megaphone,
 } from 'lucide-react';
 import { TEMPLATES, PALETTES } from './design-data.js';
+import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
 // de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
@@ -1125,6 +1126,7 @@ Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (
 }
 
 export {
+  resolveMaterialPromptParts,
   quickTemplateIdFromPreset,
   isQuickTemplatePreset,
   QUICK_TEMPLATE_CREATIVE_PRESET_ENTRIES,

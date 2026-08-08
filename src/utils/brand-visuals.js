@@ -220,7 +220,10 @@ const REFERENCE_PROFILES = [
   },
 ];
 
+const REFERENCE_PROFILE_BY_ID = Object.fromEntries(REFERENCE_PROFILES.map(p => [p.id, p]));
+
 export {
+  REFERENCE_PROFILE_BY_ID,
   vcHexToRgb,
   vcNormalizeHex,
   vcRelLuminance01,

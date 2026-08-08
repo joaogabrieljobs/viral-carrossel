@@ -132,6 +132,8 @@ const visibleEditorTabs = (appMode) =>
   EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
 
 function SidebarContent({
+  setHookLibrary,
+  niche,
   slide, slides, activeIdx, brand, setBrand, updateSlide,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,

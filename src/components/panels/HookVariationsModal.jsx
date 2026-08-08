@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw, X, Zap, ChevronRight, Instagram } from 'lucide-react';
 import { buildBrandBlock, buildNarrativeModeReminder, buildHookVariationRules } from '../../utils/generation-prompts.js';
 import { callAI } from '../../utils/ai-client.js';
+import { resolveMaterialPromptParts } from '../../utils/generation-prompts.js';
 
 function HookVariationsModal({
   open,

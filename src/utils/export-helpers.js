@@ -1,3 +1,4 @@
+import { canvasToPngBlob } from './image-storage.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 
 /**
@@ -104,3 +105,9 @@ export {
   vcPreferFileShareForDownloads,
   downloadBlob,
 };
+
+/** canvas → PNG baixado (usa canvasToPngBlob + downloadBlob). */
+export async function downloadCanvasPng(canvas, filename) {
+  const blob = await canvasToPngBlob(canvas);
+  await downloadBlob(blob, filename);
+}
