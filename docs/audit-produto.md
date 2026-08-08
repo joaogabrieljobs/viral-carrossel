@@ -70,3 +70,25 @@ Sem router; tudo state-in-component. Shell em 3 níveis: early-returns (landing 
 | 8 | Faixas com fonte única + prompts extraídos para `src/utils/generation-prompts.js` (~1.100 linhas: GEN_MODES, pacotes criativos, densidade, material, 20+ builders; `attachGenerationCanvasLayouts` ficou no monólito por acoplamento ao canvas) | §2 | ✅ 2026-08-07 |
 | 9 | Código morto removido (web_trend, SAFE_ZONES, sandwich presets, builder Commons, dead statement) ✅ 2026-08-07 · monólito legado `../ViralCarrossel.jsx` fica (fora do repo git — apagar manualmente se quiser) | §1-3 | ✅ |
 | 10 | Funções Netlify removidas (Netlify = só landing, DEC-A); fetch-source Vercel com allowlist; proxy dev do Vite mantido (dev-only) | §1 | ✅ 2026-08-07 |
+
+---
+
+## Decomposição do monólito — estado em 2026-08-07
+
+`ViralCarrossel.jsx`: **18.516 → 15.861 linhas** (−14%). Extraídos e validados (build + 97 unit + 10 E2E + CI):
+
+| Módulo | Linhas | Conteúdo |
+|---|---|---|
+| `src/utils/generation-prompts.js` | 1.176 | 8 modos narrativos, pacotes criativos, densidade/faixas, material do usuário, 20+ builders de prompt |
+| `src/styles/global-style.js` | 934 | CSS do design system |
+| `src/utils/ai-client.js` | 584 | callAI/callAIwithSearch (4 provedores), geração de imagem (cascata gpt-image, Z.ai, edits), estado BYOK |
+
+### Por que o resto ainda não saiu
+
+Tentativa de extração automatizada dos blocos puros restantes (canvas-layout, image-storage, text-spans — ~1.000 linhas) **falhou em verificação** e foi revertida: o build passava, mas o app quebrava em runtime (`typographyPatchFromBrand is not defined`) porque o detector de blocos top-level por chaves em coluna 0 corta errado em declarações com `};` aninhado. O E2E pegou (9/10 vermelho) — a rede de testes fez o trabalho dela.
+
+**Lições para a próxima rodada:**
+1. Detector precisa ser um parser real de AST (`acorn`/`@babel/parser`), não regex de chaves.
+2. `npm run build` **não** prova nada aqui: referência a nome inexistente no mesmo arquivo só explode em runtime. Gate obrigatório = `npm test && npm run test:e2e`.
+3. Componentes React grandes (`SlideCardInner` 1.382 l., `SidebarContent` 2.755 l., `App` 3.697 l., `AccountHomeShell` 837 l., `GenerateModal` 794 l.) dependem da árvore de render do card — extrair um sem os outros cria import circular. Ordem correta: primitivos de render → `SlideCardInner` → painéis → shells.
+4. Blocos puros restantes que valem a pena (por tamanho): `finalizeCanvasMarginsForAutoAdjust` (306), `canvasZonesFontScalePatch` (133), `vcImageFileToStorageDataUrl` (124), `DEFAULT_BRAND`/`DEFAULT_DOC`/`ensureDocShape`/`mkSlide` (~190), helpers de destaque UTF-16 (~150).
