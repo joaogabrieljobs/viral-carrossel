@@ -13,7 +13,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { elementOffsetStyle, hasElementOffset } from '../../utils/card-elements.js';
+import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
@@ -296,7 +296,7 @@ const ClassicCanvasInner = React.forwardRef(({
         )}
         {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
           <div style={{
-            position:'absolute', inset:0,
+            position:'absolute', inset:0, pointerEvents:'none',
             background: cultureCoverOnly
               ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
               : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
@@ -1089,6 +1089,17 @@ const SlideCardInner = React.forwardRef(({
     if (transformBase && off) style.transform = `${transformBase} ${off.transform}`;
     return { ...(drag || {}), 'data-vc-movable': chave, style };
   }, [slide, f, bindDrag]);
+
+  /**
+   * Só os handlers, sem aplicar `translate`. É o caso da foto em tela cheia:
+   * ela cobre o card, e empurrá-la deixaria faixa vazia na borda — o
+   * deslocamento dela entra no `background-position` (reenquadra).
+   */
+  const movArrasto = React.useCallback((chave, estiloBase) => {
+    const drag = bindDrag(chave);
+    if (!drag) return { style: estiloBase };
+    return { ...drag, 'data-vc-movable': chave, style: { ...estiloBase, ...drag.style } };
+  }, [bindDrag]);
   const onPhotoZoneClick = React.useCallback(() => {
     photoReqRef.current?.(slideIdx);
   }, [slideIdx]);
@@ -1100,7 +1111,13 @@ const SlideCardInner = React.forwardRef(({
   const isBebas = brand.titleFont?.includes('Bebas');
   const imgModeNorm = normalizeSlideImgMode(slide.imgMode);
   const bgFit = slide.bgFit ?? 'custom';
-  const bgPos = `${slide.bgX}% ${slide.bgY}%`;
+  // Arrastar a foto reenquadra em vez de deslocar a camada: um fundo `inset:0`
+  // empurrado para o lado deixaria faixa vazia na borda. O offset de `photo`
+  // entra no background-position, que é o mesmo que os sliders de enquadramento
+  // mexem — e o sinal é invertido porque puxar a imagem para a direita mostra
+  // o lado esquerdo dela.
+  const photoOff = getElementOffset(slide, 'photo');
+  const bgPos = `${clampPct0a100((slide.bgX ?? 50) - photoOff.x)}% ${clampPct0a100((slide.bgY ?? 50) - photoOff.y)}%`;
   const bgScale = (slide.bgZoom ?? 100) / 100;
 
   const [imgReady, setImgReady] = React.useState(false);
@@ -1902,7 +1919,7 @@ const SlideCardInner = React.forwardRef(({
     >
       {/* BG Image — bgFit: cover (preenche) | contain (inteira) | custom (zoom % legado) */}
       {slide.bgImage && imgReady && !imgErr && (
-        <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
+        <div {...movArrasto('photo', { position:'absolute', inset:0, overflow:'hidden' })}>
           <div style={{
             position:'absolute', inset:0,
             backgroundImage:`url(${slide.bgImage})`,
@@ -1925,7 +1942,11 @@ const SlideCardInner = React.forwardRef(({
       )}
       {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
         <div style={{
-          position:'absolute', inset:0,
+          // Decorativo: sem `pointer-events:none` este gradiente cobre o card
+          // inteiro e engole o ponteiro — era o motivo de o arrasto "so
+          // funcionar em alguns cards" (os sem foto, ou nos ornamentos, que
+          // ficam num zIndex acima dele).
+          position:'absolute', inset:0, pointerEvents:'none',
           background: cultureCoverOnly
             ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
             : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
@@ -2187,7 +2208,7 @@ const SlideCardInner = React.forwardRef(({
                   textShadow: shadow,
                 }}>{slide.eyebrowText}</span>
               )}
-              <h1 style={{
+              <h1 {...mov('title', {
                 color: displayTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
@@ -2202,7 +2223,7 @@ const SlideCardInner = React.forwardRef(({
                   slide.titleCase === 'lower' ? 'lowercase' :
                   isBebas ? 'uppercase' : 'none',
                 textShadow: shadow,
-              }}>{cultureRichText ? (
+              })}>{cultureRichText ? (
                 <CultureInlineRich
                   text={slide.title || ''}
                   destaqueSpans={slide.destaqueSpans?.title}
@@ -2220,12 +2241,12 @@ const SlideCardInner = React.forwardRef(({
                   não competir com eyebrow+título). */}
               {slide.subtitle && brand.subtitleVisible !== false && (
                 cultureRichText ? (
-                  <div style={{
+                  <div {...mov('subtitle', {
                     margin:0,
                     maxWidth:'100%',
                     letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                     textShadow: shadow,
-                  }}>
+                  })}>
                     <CultureRichParagraphs
                       text={slide.subtitle}
                       destaqueSpans={slide.destaqueSpans?.subtitle}
@@ -2240,7 +2261,7 @@ const SlideCardInner = React.forwardRef(({
                     />
                   </div>
                 ) : (
-                <p style={{
+                <p {...mov('subtitle', {
                   color: displayBodyInk, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
@@ -2251,7 +2272,7 @@ const SlideCardInner = React.forwardRef(({
                   textTransform: brand.subtitleCase === 'upper' ? 'uppercase'
                     : brand.subtitleCase === 'lower' ? 'lowercase' : 'none',
                   fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
-                }}>{slide.subtitle}</p>
+                })}>{slide.subtitle}</p>
               ))}
               {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
                   do título. Suporta strikethroughText pra preço antigo riscado:

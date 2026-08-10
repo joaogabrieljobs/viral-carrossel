@@ -19,8 +19,9 @@
 /** Elementos que podem ser arrastados, na ordem em que aparecem no painel. */
 export const MOVABLE_ELEMENTS = [
   { key: 'text', label: 'Bloco de texto' },
+  { key: 'title', label: 'Título' },
   { key: 'subtitle', label: 'Subtítulo' },
-  { key: 'photo', label: 'Foto' },
+  { key: 'photo', label: 'Foto (enquadramento)' },
   { key: 'headerBar', label: 'Barra editorial' },
   { key: 'pageBadge', label: 'Contador N/M' },
   { key: 'handleBadge', label: 'Badge do @' },
@@ -34,6 +35,13 @@ export const MOVABLE_ELEMENT_KEYS = MOVABLE_ELEMENTS.map((e) => e.key);
 
 /** Limite do arrasto, em % do card. Deixa sair da borda mas não sumir. */
 const LIMITE_PCT = 60;
+
+/** Percentagem de enquadramento de foto (background-position aceita 0..100). */
+export function clampPct0a100(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, n));
+}
 
 export function clampOffsetPct(v) {
   const n = Number(v);

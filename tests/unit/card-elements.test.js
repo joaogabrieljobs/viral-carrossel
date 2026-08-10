@@ -7,6 +7,7 @@ import {
   elementOffsetStyle,
   offsetAfterDrag,
   resetElementOffsetsPatch,
+  clampPct0a100,
 } from '../../src/utils/card-elements.js';
 
 const F = { w: 1080, h: 1350 };
@@ -67,5 +68,22 @@ describe('offsets de elementos do card', () => {
     const chaves = MOVABLE_ELEMENTS.map((e) => e.key);
     expect(new Set(chaves).size).toBe(chaves.length);
     for (const e of MOVABLE_ELEMENTS) expect(e.label.length).toBeGreaterThan(2);
+  });
+});
+
+describe('enquadramento da foto pelo arrasto', () => {
+  it('desloca o background-position no sentido do gesto', () => {
+    // Puxar a foto para a direita tem de revelar o lado ESQUERDO dela — por
+    // isso o offset entra invertido no background-position.
+    const bgX = 50, bgY = 50;
+    const off = { x: 10, y: -10 };
+    expect(clampPct0a100(bgX - off.x)).toBe(40);
+    expect(clampPct0a100(bgY - off.y)).toBe(60);
+  });
+
+  it('mantém o enquadramento dentro de 0..100', () => {
+    expect(clampPct0a100(-30)).toBe(0);
+    expect(clampPct0a100(180)).toBe(100);
+    expect(clampPct0a100(undefined)).toBe(50);
   });
 });
