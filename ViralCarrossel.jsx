@@ -3560,7 +3560,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                         onPhotoZoneRequest={openPhotoZoneImport}
                         onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                         enableZoneSwapDrag={canvasEditMode}
-                        movableElements={i === activeIdx && !canvasEditMode}
+                        movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}
                       />
                       {showPreviewAlignGrid ? (

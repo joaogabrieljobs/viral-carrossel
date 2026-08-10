@@ -19,6 +19,7 @@
 /** Elementos que podem ser arrastados, na ordem em que aparecem no painel. */
 export const MOVABLE_ELEMENTS = [
   { key: 'text', label: 'Bloco de texto' },
+  { key: 'subtitle', label: 'Subtítulo' },
   { key: 'photo', label: 'Foto' },
   { key: 'headerBar', label: 'Barra editorial' },
   { key: 'pageBadge', label: 'Contador N/M' },

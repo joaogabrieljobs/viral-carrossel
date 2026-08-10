@@ -160,7 +160,8 @@ function CultureRichParagraphs({
 //   <OverflowScaler containerStyle={{...}} deps={[title, subtitle, body]} minScale={0.7}>
 //     {(scale) => (<>... fontSize={baseSize * scale} ...</>)}
 //   </OverflowScaler>
-function OverflowScaler({ containerStyle, deps = [], minScale = AUTOFIT_MIN_SCALE, children }) {
+/** `containerProps` passa handlers ao contentor (usado pelo arrasto livre). */
+function OverflowScaler({ containerStyle, containerProps = null, deps = [], minScale = AUTOFIT_MIN_SCALE, children }) {
   const ref = React.useRef(null);
   const [scale, setScale] = React.useState(1);
   const iterationsRef = React.useRef(0);
@@ -218,7 +219,7 @@ function OverflowScaler({ containerStyle, deps = [], minScale = AUTOFIT_MIN_SCAL
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return (
-    <div ref={ref} style={containerStyle}>
+    <div ref={ref} {...(containerProps || {})} style={{ ...containerStyle, ...(containerProps?.style || {}) }}>
       {children(scale)}
     </div>
   );

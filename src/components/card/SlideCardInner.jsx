@@ -638,7 +638,13 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   photoRegionId,
   onPhotoZoneClick,
   showCanvasChrome,
+  /** `(chave, estiloBase) => props` do arrasto livre; vem do SlideCardInner. */
+  mov = null,
 }, ref) => {
+  const movOu = React.useCallback(
+    (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
+    [mov],
+  );
   const pr = photoRegionId;
   const bandFrac = pr === 'inset_h_narrow_mid' ? 0.28 : 0.36;
   const sideM = f.w * 0.06;
@@ -748,7 +754,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     <div
       role={bandClickable ? 'button' : undefined}
       onClick={bandClickable ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
-      style={{
+      {...movOu('photo', {
         flex: '0 0 auto',
         height: bandH,
         marginLeft: sideM,
@@ -760,7 +766,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         zIndex: 2,
         boxShadow: 'var(--shadow-product)',
         cursor: bandClickable ? 'pointer' : undefined,
-      }}
+      })}
     >
       {slide.bgImage && imgReady && !imgErr ? (
         <>
@@ -805,7 +811,10 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     flexDirection: 'column',
     justifyContent: L.jc,
     alignItems: L.ai,
-    overflow: 'hidden',
+    // Deslocado, quem recorta passa a ser a borda do card — senão arrastar o
+    // texto para fora da coluna só o cortava.
+    overflow: (hasElementOffset(slide, 'text') || hasElementOffset(slide, 'subtitle'))
+      ? 'visible' : 'hidden',
     textAlign: slide.align,
     ...VC_TEXT_ZONE_STYLE,
   };
@@ -815,7 +824,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     mainColumn = (
       <>
         {photoBand}
-        <div style={{ ...textColBase, padding: `${f.h * 0.014}px ${padH}px ${f.h * 0.02}px`, gap: f.h * 0.01 }}>
+        <div {...movOu('text', { ...textColBase, padding: `${f.h * 0.014}px ${padH}px ${f.h * 0.02}px`, gap: f.h * 0.01 })}>
           {bothText}
         </div>
       </>
@@ -823,7 +832,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   } else if (pr === 'inset_h_bottom') {
     mainColumn = (
       <>
-        <div style={{ ...textColBase, padding: `${f.h * 0.04}px ${padH}px ${f.h * 0.012}px` }}>
+        <div {...movOu('text', { ...textColBase, padding: `${f.h * 0.04}px ${padH}px ${f.h * 0.012}px` })}>
           {bothText}
         </div>
         {photoBand}
@@ -832,21 +841,21 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   } else {
     mainColumn = (
       <>
-        <div style={{
+        <div {...movOu('text', {
           ...textColBase,
           flex: '1 1 0',
           justifyContent: 'center',
           padding: `${f.h * 0.02}px ${padH}px ${f.h * 0.01}px`,
-        }}>
+        })}>
           {titleOnlyWrapped}
         </div>
         {photoBand}
-        <div style={{
+        <div {...movOu('subtitle', {
           ...textColBase,
           flex: '1 1 0',
           justifyContent: 'center',
           padding: `${f.h * 0.01}px ${padH}px ${f.h * 0.02}px`,
-        }}>
+        })}>
           {subOnlyWrapped}
         </div>
       </>
@@ -1225,10 +1234,10 @@ const SlideCardInner = React.forwardRef(({
       >
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
-          <div style={{
+          <div {...mov('headerBar', {
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
-          }}>
+          })}>
             <span style={{
               fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -1253,6 +1262,7 @@ const SlideCardInner = React.forwardRef(({
         )}
 
         <OverflowScaler
+          containerProps={mov('text')}
           containerStyle={{
             ...pctBox(topR, f),
             ...VC_TEXT_ZONE_STYLE,
@@ -1325,10 +1335,10 @@ const SlideCardInner = React.forwardRef(({
 
         {cultureVariantForLayout === 'sandwich' && (
           <div
-            style={{
+            {...mov('photo', {
               ...sandwichPhotoBoxStyle,
               cursor: sandwichPhotoInteractive ? 'pointer' : undefined,
-            }}
+            })}
             onClick={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
             role={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? 'button' : undefined}
           >
@@ -1403,6 +1413,7 @@ const SlideCardInner = React.forwardRef(({
         )}
 
         <OverflowScaler
+          containerProps={mov('subtitle')}
           containerStyle={{
             ...pctBox(botR, f),
             ...VC_TEXT_ZONE_STYLE,
@@ -1508,10 +1519,10 @@ const SlideCardInner = React.forwardRef(({
       >
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
-          <div style={{
+          <div {...mov('headerBar', {
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
-          }}>
+          })}>
             <span style={{
               fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -1547,6 +1558,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         <OverflowScaler
+          containerProps={mov('text')}
           containerStyle={{
             position:'absolute',
             top: f.h * (hasBar ? 0.09 : 0.065),
@@ -1879,6 +1891,7 @@ const SlideCardInner = React.forwardRef(({
         photoRegionId={normalizePhotoRegion(slide)}
         onPhotoZoneClick={onPhotoZoneClick}
         showCanvasChrome={showCanvasChrome}
+        mov={mov}
       />
     );
   } else {
@@ -2119,10 +2132,14 @@ const SlideCardInner = React.forwardRef(({
             justifyContent:L.jc, alignItems:L.ai,
             textAlign:slide.align,
             overflow: textoDeslocado ? 'visible' : 'hidden',
-            pointerEvents: movableElements ? 'auto' : 'none',
+            // A moldura cobre o card inteiro (inset:0). Deixá-la clicável
+            // engolia o clique da zona da foto — só o bloco de texto por dentro
+            // é que recebe ponteiro.
+            pointerEvents: 'none',
             ...VC_TEXT_ZONE_STYLE,
           }}>
             <div {...mov('text', {
+              pointerEvents: movableElements ? 'auto' : 'none',
               background:textBgColor,
               backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
               borderRadius: slide.textBg ? f.w*0.025 : 0,
