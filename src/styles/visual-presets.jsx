@@ -1,11 +1,16 @@
 /**
- * 12 padrões visuais para carrosséis virais — a estrutura veio de referências
- * reais (NBA news, case study neon, editorial magazine, luxury, viral hype).
+ * 12 padrões visuais para carrosséis virais.
  *
- * REGRA: copiamos o LAYOUT das referências, nunca o texto. Nenhum preset pode
- * conter nome de marca, handle ou frase de terceiro — isso vazava para o
- * carrossel do usuário. Use os tokens de `src/utils/preset-tokens.js`:
- * `{handle}`, `{marca}`, `{ano}`, ou um placeholder genérico ("SUA CATEGORIA").
+ * REGRA: copiamos o LAYOUT das referências, nunca o texto — e isso vale também
+ * para os comentários deste ficheiro. Nenhum preset pode conter nome de marca,
+ * handle, frase de terceiro ou nome inventado de publicação: tudo isso vaza
+ * para o carrossel do usuário. Use os tokens de `src/utils/preset-tokens.js`
+ * (`{handle}`, `{marca}`, `{ano}`) ou um placeholder genérico em português
+ * ("SUA CATEGORIA", "SUA EDITORIA").
+ *
+ * REGRA DE CONTRASTE: título, subtítulo e texto ≥ 4.5:1 contra o fundo; o
+ * accent ≥ 3:1, porque é usado em traço de riscado e em palavras destacadas.
+ * `tests/unit/visual-presets.test.js` reprova quem baixar disso.
  *
  * Cada preset define overrides de marca (cores, fontes, tipografia) e, opcionalmente,
  * `creativePreset` sugerido para alinhar pele + arco narrativo. O utilizador pode
@@ -31,12 +36,7 @@ import { clampTitleWeight } from '../utils/slide-design-system.js';
 // BODY_FONTS:
 //   0 Inter Tight · 1 Inter · 2 DM Sans · ...
 
-// ───────────────────────────────────────────────────────────────────────────
-// Helpers para SVG previews — cada preset reusa esses primitivos pra
-// manter consistência visual entre as 12 minis.
-// ───────────────────────────────────────────────────────────────────────────
-
-/** Cartão base do preview — bg color + clip path. Children desenham por cima. */
+/** Cartão base do preview — bg color + clip. Children desenham por cima. */
 function PreviewCard({ bg, children, gradient = null }) {
   return (
     <svg viewBox="0 0 60 75" width="60" height="75" style={{ display:'block', borderRadius:6, overflow:'hidden' }}>
@@ -44,21 +44,6 @@ function PreviewCard({ bg, children, gradient = null }) {
       {children}
     </svg>
   );
-}
-
-/** Texto fake usando rects — simula linhas de título sem renderizar texto real. */
-function TextLines({ y, color, count = 2, widths = [50, 35], height = 4, gap = 1, x = 5 }) {
-  return widths.slice(0, count).map((w, i) => (
-    <rect
-      key={i}
-      x={x}
-      y={y + i * (height + gap)}
-      width={w}
-      height={height}
-      fill={color}
-      rx={1}
-    />
-  ));
 }
 
 /**
@@ -287,9 +272,8 @@ const FF = {
 };
 
 export const VISUAL_PRESETS = [
-  // 1. Sports Editorial — NBA-style: foto BG + título ROSA PASTEL bold +
-  //    header bar 3-col MAIÚSCULAS + badge "N/M" canto sup direito.
-  //    Ref: IMG_5302 (Damian Lillard NBA).
+  // 1. Sports Editorial — foto de fundo + título rosa pastel bold, barra
+  //    editorial de 3 colunas em maiúsculas e contador N/M no canto superior.
   {
     id: 'sports_editorial',
     label: 'Sports Editorial',
@@ -310,7 +294,7 @@ export const VISUAL_PRESETS = [
       textSubLeading: 140,
       // Header bar 3 colunas — placeholder editorial
       cultureHeaderLeft: 'DESTAQUE',
-      cultureHeaderCenter: 'NEWS',
+      cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '{ano}',
       // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
       showPageBadge: true,
@@ -322,23 +306,10 @@ export const VISUAL_PRESETS = [
       layout: 'bl',       // bottom-left
       align: 'left',      // texto alinhado à esquerda
     },
-    preview: () => (
-      <PreviewCard bg="#0a0a0a">
-        {/* header bar com 3 colunas */}
-        <rect x="3" y="3" width="14" height="2" fill="#cfcfcf" />
-        <rect x="22" y="3" width="14" height="2" fill="#cfcfcf" />
-        <rect x="46" y="2" width="10" height="4" fill="#2a2a2a" rx="2" />
-        <rect x="48" y="3" width="6" height="2" fill="#cfcfcf" />
-        {/* "foto" abstrata */}
-        <rect x="0" y="9" width="60" height="40" fill="#3a3a3a" />
-        {/* título bold */}
-        <TextLines y={52} color="#ffffff" count={3} widths={[52, 48, 38]} height={5} gap={1} x={4} />
-      </PreviewCard>
-    ),
   },
 
-  // 2. Case Study Neon — pill CTA verde-neon + estrela 8-pontas + foto BG.
-  //    Ref: IMG_5304 (NMLSS Academy show case).
+  // 2. Case Study Neon — pill de CTA verde-neon, estrela de 8 pontas e foto
+  //    de fundo. Serve prova social: resultado de um caso concreto.
   {
     id: 'case_study_neon',
     creativePreset: 'quick_decodificacao',
@@ -364,34 +335,21 @@ export const VISUAL_PRESETS = [
       showPageBadge: true,
       // Star ornament 8-pontas centralizado acima do eyebrow
       showStarOrnament: true,
-      // Footer pill verde-neon com seta no rodapé
-      footerPillText: 'ESTUDO DE CASO',
+      // Pill do rodapé é CTA — não repete o rótulo que já está no header.
+      footerPillText: 'VEJA O CASO COMPLETO',
       // Subtítulo OFF — só eyebrow + título dominam
       subtitleVisible: false,
     },
     slideDefaults: {
       layout: 'bl',
       align: 'left',
-      eyebrowText: 'O TÍTULO DE APOIO ENTRA AQUI',
+      eyebrowText: 'O RESULTADO EM UMA LINHA',
     },
-    preview: () => (
-      <PreviewCard bg="#0c0c10">
-        <rect x="3" y="3" width="11" height="2" fill="#9d9d9d" />
-        <rect x="40" y="3" width="14" height="2" fill="#9d9d9d" />
-        <rect x="0" y="9" width="60" height="38" fill="#3a3640" />
-        {/* estrela neon-green */}
-        <circle cx="30" cy="48" r="1.8" fill="#c0ff32" />
-        <TextLines y={52} color="#ffffff" count={2} widths={[48, 42]} height={4} gap={1.5} x={6} />
-        {/* pill CTA */}
-        <rect x="14" y="65" width="32" height="6" fill="#c0ff32" rx="3" />
-        <rect x="40" y="67" width="3" height="2" fill="#0c0c10" />
-      </PreviewCard>
-    ),
   },
 
-  // 3. Mood Sépia — título cream centralizado + hashtag pill (sem seta).
-  //    Ref: IMG_5305 (Correr Não Me Cura. Mas Me Segura.). Estilo mood
-  //    reflexivo / quote — minimal, sem header bar nem badge.
+  // 3. Mood Sépia — frase centralizada em creme sobre marrom quente, com pill
+  //    de hashtag sem seta. Sem barra editorial nem contador: é um cartão de
+  //    citação. Par cromático com o Reflexivo Serif, que usa cinza frio.
   {
     id: 'mood_sepia',
     creativePreset: 'quick_comportamento',
@@ -427,36 +385,27 @@ export const VISUAL_PRESETS = [
     slideDefaults: {
       layout: 'bc',
       align: 'center',
-      eyebrowText: '',  // sem eyebrow
     },
-    preview: () => (
-      <PreviewCard bg="#1a1612">
-        <rect x="0" y="0" width="60" height="50" fill="#2a2218" />
-        {/* "luzes" abstratas */}
-        <circle cx="12" cy="22" r="1.2" fill="#fbbf24" opacity="0.6" />
-        <circle cx="44" cy="18" r="1" fill="#fbbf24" opacity="0.5" />
-        <circle cx="50" cy="30" r="0.8" fill="#fbbf24" opacity="0.4" />
-        <TextLines y={42} color="#fff5d1" count={2} widths={[36, 42]} height={5} gap={1} x={9} />
-        {/* pill hashtag */}
-        <rect x="20" y="60" width="20" height="5" fill="#3a3024" stroke="#fbbf24" strokeWidth="0.4" rx="2.5" />
-        <rect x="24" y="62" width="12" height="1.5" fill="#fbbf24" />
-      </PreviewCard>
-    ),
   },
 
-  // 4. Bold Promo Pink — promo com strikethrough pro preço.
-  //    Ref: IMG_5308 (Gary — Conheça o Gary, gratuito).
+  // 4. Bold Promo Pink — oferta com preço riscado.
+  //
+  //    O rosa era #ec4899: o título branco ficava em 3.53:1 e o traço vermelho
+  //    do riscado em 1.37:1 — ou seja, o elemento que dá nome ao padrão era
+  //    invisível. Rosa aprofundado para #be185d (branco sobe a 6.04) e o traço
+  //    passou a âmbar, que contrasta com o fundo e se distingue do texto claro
+  //    que ele cruza — vermelho sobre rosa nunca ia funcionar.
   {
     id: 'bold_promo_rosa',
     creativePreset: 'quick_erro_comum',
     label: 'Bold Promo Pink',
-    desc: 'Display branco · strikethrough vermelho pra oferta promo',
+    desc: 'Display branco · preço riscado em âmbar sobre rosa profundo',
     brand: {
-      bg: '#ec4899',
+      bg: '#be185d',
       titleColor: '#ffffff',
-      subtitleColor: '#fce7f3',
-      textColor: '#fbcfe8',
-      accent: '#dc2626',  // vermelho pro strikethrough
+      subtitleColor: '#ffe4ef',
+      textColor: '#fce7f3',
+      accent: '#fbbf24',  // âmbar — traço do riscado
       titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
@@ -480,40 +429,33 @@ export const VISUAL_PRESETS = [
       strikethroughText: 'DE R$00',
       afterTitleText: 'POR R$00 (SUA OFERTA)',
     },
-    preview: () => (
-      <PreviewCard bg="#ec4899" gradient="linear-gradient(180deg, #f472b6 0%, #ec4899 70%, #be185d 100%)">
-        <rect x="0" y="0" width="60" height="50" fill="#be185d" opacity="0.5" />
-        {/* silhueta de pessoa */}
-        <circle cx="30" cy="20" r="9" fill="#9d174d" opacity="0.7" />
-        <rect x="22" y="28" width="16" height="18" fill="#9d174d" opacity="0.7" rx="2" />
-        <TextLines y={50} color="#ffffff" count={3} widths={[52, 48, 38]} height={4} gap={1} x={4} />
-        {/* strikethrough */}
-        <rect x="6" y="68" width="18" height="2" fill="#fff" opacity="0.6" />
-        <line x1="6" y1="69" x2="24" y2="69" stroke="#dc2626" strokeWidth="0.6" />
-        <rect x="26" y="68" width="22" height="2" fill="#fff" />
-      </PreviewCard>
-    ),
   },
 
-  // 5. Reflexivo Cream — título AMARELO CREAM centralizado + pill cinza
-  //    escuro com handle. Ref: IMG_5309 (Jonathan Cadore maratona).
+  // 5. Reflexivo Serif — título creme centralizado sobre cinza frio, com pill
+  //    de handle no rodapé.
+  //
+  //    Era um clone do Mood Sépia: mesmo fundo #1a1612, mesmo accent #fbbf24,
+  //    mesma Archivo Black, título quase da mesma cor. Duas entradas na grade
+  //    para o mesmo cartão. Ficou com identidade própria — serifa alta em
+  //    caixa normal sobre grafite frio, contra o display em maiúsculas sobre
+  //    marrom quente do Mood Sépia.
   {
     id: 'reflexivo_cream',
     creativePreset: 'quick_decodificacao',
-    label: 'Reflexivo Cream',
-    desc: 'Título cream centralizado · pill handle no rodapé · header 2-col',
+    label: 'Reflexivo Serif',
+    desc: 'Serifa creme centrada sobre grafite frio · pill de handle no rodapé',
     brand: {
-      bg: '#1a1612',
-      titleColor: '#f3e8c0',  // AMARELO CREAM — assinatura do estilo
-      subtitleColor: '#f3e8c0',  // eyebrow mesma cor
-      textColor: '#d4c290',
-      accent: '#fbbf24',
-      titleFont: FF.archivoBlack,  // condensado extra-bold pra escala
+      bg: '#16171c',
+      titleColor: '#f0ead6',
+      subtitleColor: '#f0ead6',
+      textColor: '#bdb8a8',
+      accent: '#c9a227',
+      titleFont: FF.playfair,  // serifa alta — contraponto ao display do Sépia
       bodyFont: FF.inter,
-      textTitleWeight: 800,
-      textTitleCase: 'upper',
-      textTitleTracking: -1,
-      textTitleLeading: 100,
+      textTitleWeight: 700,
+      textTitleCase: 'normal',
+      textTitleTracking: -2,
+      textTitleLeading: 106,
       textSubLeading: 145,
       // Header 2-col (centro vazio)
       cultureHeaderLeft: 'SUA EDITORIA',
@@ -523,7 +465,7 @@ export const VISUAL_PRESETS = [
       // Footer pill cinza-escuro (não accent)
       footerPillText: '{handle}',
       footerPillBg: 'rgba(255,255,255,0.12)',  // cinza translúcido
-      footerPillFg: '#f3e8c0',  // cream
+      footerPillFg: '#f0ead6',
       // Subtítulo OFF — só eyebrow + título cream dominam
       subtitleVisible: false,
     },
@@ -532,25 +474,11 @@ export const VISUAL_PRESETS = [
       align: 'center',  // título centralizado
       eyebrowText: 'O TÍTULO DE APOIO ENTRA AQUI',
     },
-    preview: () => (
-      <PreviewCard bg="#3e3527">
-        {/* eyebrow */}
-        <rect x="3" y="3" width="12" height="2" fill="#8d7d62" />
-        <rect x="40" y="3" width="14" height="2" fill="#8d7d62" />
-        {/* foto */}
-        <rect x="0" y="9" width="60" height="48" fill="#5a4d36" />
-        <circle cx="30" cy="32" r="8" fill="#8d7d62" opacity="0.6" />
-        <TextLines y={50} color="#f5e8d0" count={2} widths={[40, 50]} height={4} gap={1} x={5} />
-        {/* pill com handle */}
-        <rect x="16" y="65" width="28" height="6" fill="#8d7d62" rx="3" opacity="0.4" />
-        <rect x="20" y="67" width="20" height="2" fill="#f5e8d0" />
-      </PreviewCard>
-    ),
   },
 
-  // 6. Tabloid Keywords — sans branco + accent verde-menta · vibe noticiário.
-  //    Ref: IMG_5310 (Chora Não LinkedIn — CEO tóxico). User marca palavras-
-  //    chave usando "Marcar Destaque" pra ter as palavras coloridas (accent).
+  // 6. Tabloid Keywords — display branco sobre preto com accent verde-menta.
+  //    O usuário marca palavras com "Destaque" para elas saírem na cor accent,
+  //    como manchete de plantão.
   {
     id: 'tabloid_keywords',
     creativePreset: 'quick_tendencia',
@@ -570,12 +498,12 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 100,
       textSubLeading: 140,
       cultureHeaderLeft: '{marca}',
-      cultureHeaderCenter: 'POSTNEWS',
+      cultureHeaderCenter: 'SUA EDITORIA',
       cultureHeaderYear: '',
       showPageBadge: true,
       showStarOrnament: false,
-      // Pill verde-menta com hashtag no rodapé
-      footerPillText: 'SUA CHAMADA AQUI',
+      // Pill verde-menta no rodapé
+      footerPillText: '#SUAHASHTAG',
       footerPillBg: '#34d399',
       footerPillFg: '#0a0a0a',
       footerPillArrow: false,
@@ -587,28 +515,10 @@ export const VISUAL_PRESETS = [
       layout: 'bl',
       align: 'left',
     },
-    preview: () => (
-      <PreviewCard bg="#0a0a0a">
-        <rect x="3" y="3" width="18" height="2" fill="#9d9d9d" />
-        <rect x="38" y="3" width="14" height="2" fill="#9d9d9d" />
-        <circle cx="8" cy="11" r="3" fill="#34d399" />
-        <text x="6.5" y="13" fontSize="3.5" fill="#0a0a0a" fontWeight="900">E</text>
-        {/* foto */}
-        <rect x="0" y="17" width="60" height="32" fill="#2a2a2a" />
-        {/* título com palavras coloridas */}
-        <rect x="4" y="52" width="20" height="4" fill="#ffffff" rx="0.5" />
-        <rect x="26" y="52" width="14" height="4" fill="#34d399" rx="0.5" />
-        <rect x="4" y="57" width="18" height="4" fill="#34d399" rx="0.5" />
-        <rect x="24" y="57" width="20" height="4" fill="#ffffff" rx="0.5" />
-        {/* pill verde no rodapé */}
-        <rect x="14" y="67" width="32" height="5" fill="#34d399" rx="2.5" />
-      </PreviewCard>
-    ),
   },
 
-  // 7. Editorial Magazine — Playfair serif + sans · estilo capa de revista.
-  //    Ref: IMG_5322 (The Claude Workflow). Título serif elegante centralizado
-  //    no TOPO da foto (não no rodapé), like um lookbook editorial.
+  // 7. Editorial Magazine — serifa elegante centrada no TOPO da foto, não no
+  //    rodapé, como capa de lookbook.
   {
     id: 'editorial_magazine',
     creativePreset: 'tendencia_cultura',
@@ -619,7 +529,10 @@ export const VISUAL_PRESETS = [
       titleColor: '#ffffff',
       subtitleColor: '#ffffff',
       textColor: '#e8e8e8',
-      accent: '#dc2626',
+      // Era #dc2626: 2.38:1 contra o azul-marinho, ou seja, palavra destacada
+      // ficava menos legível que o texto normal. Ouro resolve e combina melhor
+      // com o marinho da capa.
+      accent: '#fbbf24',
       titleFont: FF.playfair,  // serif elegante
       bodyFont: FF.dmSans,
       textTitleWeight: 700,
@@ -641,26 +554,10 @@ export const VISUAL_PRESETS = [
       layout: 'tc',  // top-center — título no TOPO da foto
       align: 'center',
     },
-    preview: () => (
-      <PreviewCard bg="#1e3a5f" gradient="linear-gradient(180deg, #2a4870 0%, #1e3a5f 100%)">
-        {/* título serif centralizado em cima */}
-        <rect x="10" y="9" width="40" height="4" fill="#ffffff" rx="0.5" />
-        <rect x="6" y="15" width="48" height="6" fill="#ffffff" rx="1" />
-        <rect x="18" y="24" width="24" height="2" fill="#ffffff" opacity="0.7" />
-        {/* "pessoa" */}
-        <circle cx="30" cy="44" r="9" fill="#cd5050" opacity="0.65" />
-        <rect x="22" y="50" width="16" height="20" fill="#cd5050" opacity="0.65" rx="2" />
-        {/* likes counter */}
-        <circle cx="55" cy="46" r="1.5" fill="#ffffff" />
-        <rect x="53" y="50" width="4" height="1.5" fill="#ffffff" />
-        <circle cx="55" cy="56" r="1.5" fill="none" stroke="#ffffff" strokeWidth="0.5" />
-      </PreviewCard>
-    ),
   },
 
-  // 8. Luxury Hybrid — sans bold branco + accent dourado.
-  //    Ref: IMG_5323 (Trends viralizando na gringa). Versão simplificada
-  //    sem mistura tipográfica complexa — paleta marrom premium + dourado.
+  // 8. Luxury Hybrid — display branco sobre marrom premium com accent dourado.
+  //    Sem mistura tipográfica: o luxo vem da paleta, não de duas fontes.
   {
     id: 'luxury_hybrid',
     creativePreset: 'quick_decodificacao',
@@ -679,8 +576,8 @@ export const VISUAL_PRESETS = [
       textTitleTracking: -1,
       textTitleLeading: 100,
       textSubLeading: 145,
-      cultureHeaderLeft: 'TRENDS',
-      cultureHeaderCenter: 'LUXURY EDITION',
+      cultureHeaderLeft: 'TENDÊNCIAS',
+      cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '{ano}',
       showPageBadge: true,
       showStarOrnament: false,
@@ -693,28 +590,10 @@ export const VISUAL_PRESETS = [
       layout: 'tl',  // top-left — título alto na foto
       align: 'left',
     },
-    preview: () => (
-      <PreviewCard bg="#3e2418">
-        {/* textura "7" grande de fundo */}
-        <text x="6" y="35" fontSize="35" fill="#5a3424" fontWeight="900" opacity="0.5">7</text>
-        {/* título sans bold */}
-        <rect x="4" y="14" width="44" height="4" fill="#ffffff" rx="0.5" />
-        <rect x="4" y="20" width="38" height="4" fill="#ffffff" rx="0.5" />
-        {/* script dourada — simula com texto italic */}
-        <text x="8" y="36" fontSize="9" fill="#d4af37" fontStyle="italic" fontWeight="700">na</text>
-        <text x="18" y="37" fontSize="11" fill="#d4af37" fontStyle="italic" fontWeight="700">GR</text>
-        <rect x="4" y="42" width="36" height="2" fill="#d4c19a" />
-        {/* produto */}
-        <rect x="8" y="52" width="14" height="14" fill="#5a3424" rx="2" />
-        <circle cx="36" cy="60" r="3" fill="#aaff00" opacity="0.7" />
-        <circle cx="44" cy="62" r="3" fill="#aaff00" opacity="0.7" />
-        <circle cx="40" cy="68" r="3" fill="#aaff00" opacity="0.7" />
-      </PreviewCard>
-    ),
   },
 
-  // 9. Viral Hype Dark — preto + vermelho dramático + "ARRASTA PRO LADO →".
-  //    Ref: IMG_5324 (Segredo Exposto — fogo viral). Visual de alta tensão.
+  // 9. Viral Hype Dark — preto e vermelho de alta tensão, com pill branco
+  //    "ARRASTA PRO LADO" convidando ao swipe.
   {
     id: 'viral_hype_dark',
     creativePreset: 'quick_erro_comum',
@@ -748,27 +627,10 @@ export const VISUAL_PRESETS = [
       layout: 'bl',
       align: 'left',
     },
-    preview: () => (
-      <PreviewCard bg="#0a0a0a">
-        {/* page badges canto */}
-        <rect x="3" y="3" width="6" height="5" fill="#2a2a2a" rx="1" />
-        <rect x="51" y="3" width="6" height="5" fill="#2a2a2a" rx="1" />
-        {/* foto dramática vermelha */}
-        <rect x="0" y="11" width="60" height="40" fill="#2a0a0a" />
-        <circle cx="22" cy="28" r="6" fill="#ef4444" opacity="0.6" />
-        <rect x="14" y="32" width="22" height="14" fill="#ef4444" opacity="0.4" rx="2" />
-        {/* título BIG */}
-        <TextLines y={54} color="#ffffff" count={3} widths={[52, 48, 30]} height={4} gap={1} x={4} />
-        {/* "ARRASTA PRO LADO →" */}
-        <rect x="14" y="69" width="22" height="1.5" fill="#9d9d9d" />
-        <rect x="38" y="69" width="3" height="1.5" fill="#9d9d9d" />
-      </PreviewCard>
-    ),
   },
 
-  // 10. Cinematic Hybrid — serifa vermelha · vibe cinema noir.
-  //     Ref: IMG_5326 (Como Gerar imagens no Canva). Versão simplificada
-  //     usando serifa vermelha pra título inteiro (sem mistura sans+serif).
+  // 10. Cinematic Hybrid — serifa vermelha em caixa normal, vibe noir. Uma
+  //     fonte só para o título inteiro, sem mistura sans+serif.
   {
     id: 'cinematic_hybrid',
     creativePreset: 'tendencia_cultura',
@@ -776,10 +638,13 @@ export const VISUAL_PRESETS = [
     desc: 'Serifa vermelha cinematic · vibe cinema noir filme',
     brand: {
       bg: '#0c1018',
-      titleColor: '#dc2626',  // VERMELHO cinematic
+      // #dc2626 dava 3.94:1 numa serifa de traço fino — passava raspando no
+      // mínimo de texto grande e sumia quando o título encolhia. #ef4444 sobe
+      // para 5.06:1 sem perder o vermelho.
+      titleColor: '#ef4444',
       subtitleColor: '#ffffff',
       textColor: '#cfcfcf',
-      accent: '#dc2626',
+      accent: '#ef4444',
       titleFont: FF.yeseva,  // Yeseva One — serif elegante cursive-like
       bodyFont: FF.inter,
       textTitleWeight: 400,  // serif natural
@@ -800,38 +665,24 @@ export const VISUAL_PRESETS = [
       layout: 'bl',
       align: 'left',
     },
-    preview: () => (
-      <PreviewCard bg="#0c1018">
-        {/* BG cinema */}
-        <rect x="0" y="0" width="60" height="60" fill="#1a1f28" />
-        <rect x="4" y="6" width="3" height="8" fill="#22c55e" opacity="0.7" />
-        <rect x="8" y="4" width="3" height="10" fill="#22c55e" opacity="0.5" />
-        {/* pessoa */}
-        <circle cx="36" cy="26" r="6" fill="#3a3024" opacity="0.7" />
-        <rect x="28" y="30" width="16" height="20" fill="#2a2118" opacity="0.7" rx="2" />
-        {/* texto misto */}
-        <rect x="6" y="54" width="14" height="2.5" fill="#ffffff" />
-        <text x="6" y="66" fontSize="11" fill="#dc2626" fontStyle="italic" fontWeight="700">Gera</text>
-        <text x="36" y="66" fontSize="11" fill="#dc2626" fontStyle="italic" fontWeight="700">r</text>
-        <rect x="20" y="70" width="20" height="2" fill="#ffffff" opacity="0.6" />
-      </PreviewCard>
-    ),
   },
 
-  // 11. Authority Black — display gigante + footer 3 colunas.
-  //     Ref: IMG_5327 (7 Secrets — estátua vermelha). Documentário/autoridade.
-  //     Usa footer bar 3-col (feature nova) com label/value por coluna.
+  // 11. Authority Black — display gigante e rodapé de ficha técnica em 3
+  //     colunas ("rótulo|valor" em cada uma). Tom documentário.
   {
     id: 'authority_black',
     creativePreset: 'quick_erro_comum',
     label: 'Authority Black',
-    desc: 'Display branco gigante · footer 3-col Topic/By/Save',
+    desc: 'Display branco gigante · rodapé 3 colunas tipo ficha técnica',
     brand: {
       bg: '#0a0a0a',
       titleColor: '#ffffff',
       subtitleColor: '#ffffff',
       textColor: '#e8e8e8',
-      accent: '#dc2626',
+      // Era #dc2626 (4.10:1). Âmbar sobe para 11.86:1 e ainda separa este
+      // padrão do Viral Hype Dark, que também é display branco sobre preto —
+      // com o mesmo vermelho os dois viravam o mesmo cartão na grade.
+      accent: '#fbbf24',
       titleFont: FF.archivoBlack,
       bodyFont: FF.interTight,
       textTitleWeight: 800,
@@ -843,8 +694,8 @@ export const VISUAL_PRESETS = [
       cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '',
       showPageBadge: false,
-      // Footer 3-col (feature nova): "LABEL|VALUE" por coluna
-      footerBarLeft: 'Tema|Instagram',
+      // Footer 3 colunas: "RÓTULO|VALOR" em cada uma
+      footerBarLeft: 'Tema|Sua editoria',
       footerBarCenter: 'Conteúdo por|{marca}',
       footerBarRight: 'Não esqueça|de salvar',
       // Subtítulo sutil branco regular abaixo do título grande
@@ -855,25 +706,6 @@ export const VISUAL_PRESETS = [
       layout: 'mc',  // mid-center pra dar espaço pro footer
       align: 'center',
     },
-    preview: () => (
-      <PreviewCard bg="#0a0a0a">
-        {/* header centro */}
-        <rect x="20" y="4" width="20" height="2" fill="#9d9d9d" />
-        {/* "estátua" vermelha */}
-        <rect x="0" y="9" width="60" height="46" fill="#0a0a0a" />
-        <ellipse cx="30" cy="22" rx="10" ry="13" fill="#dc2626" opacity="0.75" />
-        <rect x="20" y="32" width="20" height="20" fill="#dc2626" opacity="0.5" />
-        {/* título */}
-        <TextLines y={43} color="#ffffff" count={2} widths={[44, 50]} height={4} gap={1} x={5} />
-        {/* footer 3 colunas */}
-        <rect x="4"  y="68" width="12" height="1.5" fill="#9d9d9d" />
-        <rect x="4"  y="71" width="14" height="1.5" fill="#ffffff" />
-        <rect x="22" y="68" width="16" height="1.5" fill="#9d9d9d" />
-        <rect x="22" y="71" width="14" height="1.5" fill="#ffffff" />
-        <rect x="44" y="68" width="12" height="1.5" fill="#9d9d9d" />
-        <rect x="44" y="71" width="14" height="1.5" fill="#ffffff" />
-      </PreviewCard>
-    ),
   },
 
   // 12. Minimal Clean — sem foto, fundo creme, tipografia centrada.
@@ -910,22 +742,6 @@ export const VISUAL_PRESETS = [
       layout: 'mc',  // mid-center
       align: 'center',
     },
-    preview: () => (
-      <PreviewCard bg="#fafaf6">
-        {/* eyebrow pequeno */}
-        <rect x="22" y="14" width="16" height="2" fill="#9d9d9d" rx="0.5" />
-        {/* título centrado */}
-        <rect x="8" y="22" width="44" height="4" fill="#0a0a0a" rx="0.5" />
-        <rect x="14" y="28" width="32" height="4" fill="#0a0a0a" rx="0.5" />
-        {/* subtítulo */}
-        <rect x="14" y="40" width="32" height="2" fill="#5a5a5a" rx="0.5" />
-        <rect x="16" y="44" width="28" height="2" fill="#5a5a5a" rx="0.5" />
-        {/* dot accent */}
-        <circle cx="30" cy="58" r="1.5" fill="#1a1a1a" />
-        {/* footer text */}
-        <rect x="22" y="68" width="16" height="1.5" fill="#9d9d9d" />
-      </PreviewCard>
-    ),
   },
 ];
 
@@ -946,7 +762,10 @@ export const PRESET_BRAND_SIGNATURE_KEYS = [
   'cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
   'footerPillText', 'footerPillBg', 'footerPillFg', 'footerPillArrow',
   'footerBarLeft', 'footerBarCenter', 'footerBarRight',
-  'showPageBadge', 'showStarOrnament', 'subtitleVisible',
+  'showPageBadge', 'showStarOrnament',
+  // Estilo do subtítulo também é assinatura: sem isto o itálico do Cinematic e
+  // o MAIÚSCULAS do Editorial sobreviviam ao trocar para o Minimal Clean.
+  'subtitleVisible', 'subtitleWeight', 'subtitleCase', 'subtitleItalic',
 ];
 
 /** Mesma lógica, nos campos que vivem no slide. */
