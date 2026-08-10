@@ -1008,12 +1008,33 @@ export default function App() {
   }, [doc, activeDocId]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  /**
+   * Quadro do desktop: os cards ficam numa fila que rola na horizontal. Clicar
+   * numa miniatura só mudava `activeIdx` — o quadro não andava, então a partir
+   * do 5.º card o slide selecionado ficava fora da janela sem nenhuma pista de
+   * como chegar lá. Aqui trazemos o card ativo para a vista.
+   */
+  const boardScrollRef = useRef(null);
+  const boardCardRefs = useRef([]);
   const [tab, setTab] = useState('brand');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [canvasEditMode, setCanvasEditMode] = useState(false);
   const [showPreviewAlignGrid, setShowPreviewAlignGrid] = useState(() => {
     try { return localStorage.getItem(SK.previewGrid) === '1'; } catch { return false; }
   });
+  useEffect(() => {
+    const alvo = boardCardRefs.current[activeIdx];
+    const quadro = boardScrollRef.current;
+    if (!alvo || !quadro) return;
+    const rc = quadro.getBoundingClientRect();
+    const ra = alvo.getBoundingClientRect();
+    // Só mexe quando o card realmente está (parcialmente) fora — evita puxar o
+    // quadro a cada clique num card já visível.
+    if (ra.left >= rc.left - 1 && ra.right <= rc.right + 1) return;
+    const delta = (ra.left + ra.width / 2) - (rc.left + rc.width / 2);
+    quadro.scrollBy({ left: delta, behavior: 'smooth' });
+  }, [activeIdx]);
+
   /** QA: simula leitura à distância do polegar (tipo menor no preview). */
   const [thumbQaMode, setThumbQaMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -2982,7 +3003,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       </header>
 
       {/* ── BODY ── */}
-      <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+      <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
 
         {/* Desktop sidebar — glass dark panel premium (Narrative OS) */}
         {!isMobile && (
@@ -3105,7 +3126,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           </div>
 
           {/* ── MAIN CANVAS AREA ── */}
-          <div style={{ flex:1, overflow:'auto' }}>
+          <div ref={boardScrollRef} style={{ flex:1, overflow:'auto' }}>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{
@@ -3482,6 +3503,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 {slides.map((s,i)=>(
                   <div
                     key={s.id}
+                    ref={(el) => { boardCardRefs.current[i] = el; }}
                     style={{ flexShrink:0, animation:`fadeUp 0.2s ${i*0.04}s both var(--ease-smooth)` }}
                     onDragOver={(e) => {
                       if (!canvasEditMode) return;
@@ -3623,6 +3645,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     />
                   </div>
                 ))}
+                {/* Respiro no fim da fila: o padding-right do contentor flex não
+                    entra no scrollWidth, e sem isto o último card fica colado
+                    à borda quando se rola até ao fim. */}
+                <div aria-hidden style={{ flexShrink:0, width:4 }}/>
               </div>
             )}
           </div>

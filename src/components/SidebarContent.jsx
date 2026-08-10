@@ -790,6 +790,46 @@ function SidebarContent({
               </button>
             </S>)}
 
+            {(tab==='narrativa'||tab==='slide') && (
+              <S
+                title="Textos de assinatura deste card"
+                hint="Vêm preenchidos pelos padrões visuais (Bold Promo, Case Study…). São por card — deixe vazio para esconder."
+              >
+                <div>
+                  <label className="vc-label-sm">Sobrelinha (acima do título)</label>
+                  <input
+                    value={slide.eyebrowText ?? ''}
+                    onChange={e=>updateSlide({ eyebrowText: e.target.value })}
+                    className="vc-input"
+                    placeholder="Sua categoria"
+                    style={{ fontSize:12 }}
+                  />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div>
+                    <label className="vc-label-sm">Riscado</label>
+                    <input
+                      value={slide.strikethroughText ?? ''}
+                      onChange={e=>updateSlide({ strikethroughText: e.target.value })}
+                      className="vc-input"
+                      placeholder="De R$00"
+                      style={{ fontSize:12 }}
+                    />
+                  </div>
+                  <div>
+                    <label className="vc-label-sm">Depois do título</label>
+                    <input
+                      value={slide.afterTitleText ?? ''}
+                      onChange={e=>updateSlide({ afterTitleText: e.target.value })}
+                      className="vc-input"
+                      placeholder="por R$00"
+                      style={{ fontSize:12 }}
+                    />
+                  </div>
+                </div>
+              </S>
+            )}
+
             {(tab==='imagem'||tab==='slide') && (
               <PerSlideImageRefBlock
                 slide={slide}
@@ -1950,20 +1990,33 @@ function SidebarContent({
               </div>
             </S>)}
 
-            {tab==='brand' && (creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout)) && (
-              <S title="Barra editorial (opcional)" hint="Aparece fina no topo dos cards no pacote Tendência/Cultura, como nas referências tipo brandsdecoded.">
+            {tab==='brand' && (
+              <S
+                title="Barra editorial (topo)"
+                hint="Faixa fina no topo do card. Vem preenchida pelos padrões visuais — aqui você troca por texto seu. Deixe vazio para esconder."
+              >
                 <div>
-                  <label className="vc-label-sm">Texto à esquerda (ex.: Powered by…)</label>
+                  <label className="vc-label-sm">Esquerda</label>
                   <input
                     value={brand.cultureHeaderLeft ?? ''}
                     onChange={e=>setBrand({ ...brand, cultureHeaderLeft: e.target.value })}
                     className="vc-input"
-                    placeholder="Powered by Content Machine"
+                    placeholder="@seu.perfil"
                     style={{ fontSize:12 }}
                   />
                 </div>
                 <div>
-                  <label className="vc-label-sm">Ano (direita)</label>
+                  <label className="vc-label-sm">Centro</label>
+                  <input
+                    value={brand.cultureHeaderCenter ?? ''}
+                    onChange={e=>setBrand({ ...brand, cultureHeaderCenter: e.target.value })}
+                    className="vc-input"
+                    placeholder="Sua categoria"
+                    style={{ fontSize:12 }}
+                  />
+                </div>
+                <div>
+                  <label className="vc-label-sm">Direita (ano)</label>
                   <input
                     value={brand.cultureHeaderYear ?? ''}
                     onChange={e=>setBrand({ ...brand, cultureHeaderYear: e.target.value })}
@@ -1972,6 +2025,101 @@ function SidebarContent({
                     style={{ fontSize:12 }}
                   />
                 </div>
+              </S>
+            )}
+
+            {tab==='brand' && (
+              <S
+                title="Selo do rodapé (pill)"
+                hint="Cápsula centrada na base do card — CTA, hashtag ou handle. Vazio esconde."
+              >
+                <div>
+                  <label className="vc-label-sm">Texto</label>
+                  <input
+                    value={brand.footerPillText ?? ''}
+                    onChange={e=>setBrand({ ...brand, footerPillText: e.target.value })}
+                    className="vc-input"
+                    placeholder="#suahashtag"
+                    style={{ fontSize:12 }}
+                  />
+                </div>
+                {String(brand.footerPillText || '').trim() ? (
+                  <>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                      <div>
+                        <label className="vc-label-sm">Fundo</label>
+                        <input
+                          type="color"
+                          value={brand.footerPillBg || brand.accent || '#0a0a0a'}
+                          onChange={e=>setBrand({ ...brand, footerPillBg: e.target.value })}
+                          aria-label="Cor de fundo do selo"
+                          style={{ width:'100%', height:32, padding:0, border:'1px solid var(--border)', borderRadius:6, background:'none', cursor:'pointer' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="vc-label-sm">Texto</label>
+                        <input
+                          type="color"
+                          value={brand.footerPillFg || '#ffffff'}
+                          onChange={e=>setBrand({ ...brand, footerPillFg: e.target.value })}
+                          aria-label="Cor do texto do selo"
+                          style={{ width:'100%', height:32, padding:0, border:'1px solid var(--border)', borderRadius:6, background:'none', cursor:'pointer' }}
+                        />
+                      </div>
+                    </div>
+                    <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--text-secondary)', cursor:'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={brand.footerPillArrow !== false}
+                        onChange={e=>setBrand({ ...brand, footerPillArrow: e.target.checked })}
+                      />
+                      Mostrar seta circular
+                    </label>
+                  </>
+                ) : null}
+              </S>
+            )}
+
+            {tab==='brand' && (
+              <S
+                title="Barra do rodapé (3 colunas)"
+                hint="Rodapé estilo ficha técnica. Use «rótulo|valor» para duas linhas — ex.: «Tema|Growth». Vazio esconde a coluna."
+              >
+                {[
+                  ['footerBarLeft', 'Esquerda', 'Tema|Growth'],
+                  ['footerBarCenter', 'Centro', 'Por|@seu.perfil'],
+                  ['footerBarRight', 'Direita', 'Salve|↓'],
+                ].map(([campo, rotulo, exemplo]) => (
+                  <div key={campo}>
+                    <label className="vc-label-sm">{rotulo}</label>
+                    <input
+                      value={brand[campo] ?? ''}
+                      onChange={e=>setBrand({ ...brand, [campo]: e.target.value })}
+                      className="vc-input"
+                      placeholder={exemplo}
+                      style={{ fontSize:12 }}
+                    />
+                  </div>
+                ))}
+              </S>
+            )}
+
+            {tab==='brand' && (
+              <S title="Ornamentos" hint="Detalhes de assinatura que os padrões visuais ligam ou desligam.">
+                {[
+                  ['showStarOrnament', 'Estrela de 8 pontas acima do título', false],
+                  ['showPageBadge', 'Contador N/M no canto superior', false],
+                  ['subtitleVisible', 'Mostrar subtítulo', true],
+                ].map(([campo, rotulo, padrao]) => (
+                  <label key={campo} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--text-secondary)', cursor:'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={brand[campo] ?? padrao}
+                      onChange={e=>setBrand({ ...brand, [campo]: e.target.checked })}
+                    />
+                    {rotulo}
+                  </label>
+                ))}
               </S>
             )}
 

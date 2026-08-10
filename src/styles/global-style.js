@@ -189,6 +189,21 @@ export const GLOBAL_STYLE = `
   ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.32); }
 
+  /* Dentro do editor a superfície é escura: um thumb preto a 18% ficava
+     invisível — o quadro rolava e ninguém via que dava para rolar. */
+  .vc-editor-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+  .vc-editor-shell ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.20);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 99px;
+  }
+  .vc-editor-shell ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.38);
+    background-clip: padding-box;
+  }
+  .vc-editor-shell, .vc-editor-shell * { scrollbar-color: rgba(255,255,255,0.24) transparent; }
+
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }

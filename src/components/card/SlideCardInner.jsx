@@ -142,6 +142,31 @@ function vcTitleOvershootShift(fontSizePx, leadingPct) {
   return Math.round(fontSizePx * 0.17);
 }
 
+/**
+ * Faixa do rodapé ocupada pelos ornamentos de preset — pill de CTA/hashtag e
+ * footer bar de 3 colunas.
+ *
+ * Os dois são `position:absolute` com `zIndex:25`, então não empurram nada: o
+ * bloco de texto (que em bl/bc/br é `justify-content:flex-end`) encosta a base
+ * do título no padding e passa por baixo do ornamento. Aqui devolvemos a altura
+ * em px que o padding inferior precisa reservar, já com respiro.
+ */
+function vcFooterOrnamentReservePx(brand, f) {
+  let reserva = 0;
+  if (String(brand.footerPillText || '').trim()) {
+    const alturaPill = f.h * 0.024 + f.w * 0.026 * 1.25;
+    reserva = Math.max(reserva, f.h * 0.058 + alturaPill);
+  }
+  const colunas = [brand.footerBarLeft, brand.footerBarCenter, brand.footerBarRight];
+  if (colunas.some((c) => String(c || '').trim())) {
+    // `label|valor` renderiza duas linhas; só label, uma.
+    const temValor = colunas.some((c) => String(c || '').includes('|'));
+    const alturaBar = f.w * 0.020 * 1.3 + (temValor ? f.h * 0.004 + f.w * 0.022 * 1.3 : 0);
+    reserva = Math.max(reserva, f.h * 0.038 + alturaBar);
+  }
+  return reserva > 0 ? reserva + f.h * 0.018 : 0;
+}
+
 /** Reforço de padding lateral em zonas texto canvas — tracking negativo + fontes grandes “comem” a margem antes do padding nominal. */
 function canvasClassicTitlePaddingXPx(f, slide) {
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
@@ -2048,7 +2073,10 @@ const SlideCardInner = React.forwardRef(({
         const inset = (slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET);
         const padH = f.w * (0.04 + inset * 0.004);
         const padVTop = f.h * (0.09 + inset * 0.003);
-        const padVBot = f.h * (0.06 + inset * 0.003);
+        const padVBot = Math.max(
+          f.h * (0.06 + inset * 0.003),
+          vcFooterOrnamentReservePx(brand, f),
+        );
         const shadow = slide.textShadow !== false
           ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
           : 'none';
