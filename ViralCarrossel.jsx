@@ -1550,6 +1550,15 @@ export default function App() {
     setSlides(s => s.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)));
   }, []);
 
+  /** Novo deslocamento de um elemento do card (arrasto direto na pré-visualização). */
+  const patchElementOffsetAt = useCallback((idx, chave, offset) => {
+    setSlides((prev) => prev.map((s, i) => (
+      i === idx
+        ? { ...s, elementOffsets: { ...(s.elementOffsets || {}), [chave]: offset } }
+        : s
+    )));
+  }, []);
+
   const patchCanvasZonesAt = useCallback((idx, zonePatch) => {
     setSlides((prev) => {
       const sl = prev[idx];
@@ -3300,6 +3309,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                     onPhotoZoneRequest={openPhotoZoneImport}
                     onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                     enableZoneSwapDrag={canvasEditMode}
+                    movableElements={!canvasEditMode}
+                    onElementOffsetChange={patchElementOffsetAt}
                   />
                   {showPreviewAlignGrid ? (
                     <div
@@ -3549,6 +3560,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                         onPhotoZoneRequest={openPhotoZoneImport}
                         onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
                         enableZoneSwapDrag={canvasEditMode}
+                        movableElements={i === activeIdx && !canvasEditMode}
+                        onElementOffsetChange={patchElementOffsetAt}
                       />
                       {showPreviewAlignGrid ? (
                         <div

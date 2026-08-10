@@ -13,6 +13,8 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
+import { elementOffsetStyle, hasElementOffset } from '../../utils/card-elements.js';
+import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
@@ -1020,6 +1022,10 @@ const SlideCardInner = React.forwardRef(({
   /** `(slideIdx, ev) => void` — `<input type=file>` sobre a zona (WebKit/iOS). */
   onPhotoZoneNativeFile = null,
   enableZoneSwapDrag = false,
+  /** Arrastar elementos soltos (texto, ornamentos) com o ponteiro. */
+  movableElements = false,
+  /** `(chave, {x, y}) => void` — novo deslocamento, em % do card. */
+  onElementOffsetChange = null,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
@@ -1049,6 +1055,31 @@ const SlideCardInner = React.forwardRef(({
   const onCanvasPatch = React.useCallback((p) => {
     zonePatchRef.current?.(slideIdx, p);
   }, [slideIdx]);
+
+  // Arrastar elemento solto. `mov(chave)` devolve as props do elemento (ou null
+  // quando o modo está desligado, e aí espalhar `{...null}` é inofensivo).
+  const offsetRef = React.useRef(onElementOffsetChange);
+  offsetRef.current = onElementOffsetChange;
+  const aoMover = React.useCallback((chave, off) => {
+    offsetRef.current?.(slideIdx, chave, off);
+  }, [slideIdx]);
+  const bindDrag = useElementDrag({
+    f, slide, onOffsetChange: aoMover,
+    enabled: !!(movableElements && onElementOffsetChange),
+    interactionScale: scale,
+  });
+  /** Props de arrasto + deslocamento gravado, prontas para espalhar. */
+  const mov = React.useCallback((chave, estiloBase) => {
+    const off = elementOffsetStyle(slide, chave, f);
+    const drag = bindDrag(chave);
+    if (!off && !drag) return estiloBase ? { style: estiloBase } : null;
+    // O selo do rodapé já usa translateX(-50%) para centrar; sobrescrever o
+    // transform mandava-o para a esquerda no primeiro pixel de arrasto.
+    const transformBase = estiloBase?.transform;
+    const style = { ...(estiloBase || {}), ...(drag?.style || {}), ...(off || {}) };
+    if (transformBase && off) style.transform = `${transformBase} ${off.transform}`;
+    return { ...(drag || {}), 'data-vc-movable': chave, style };
+  }, [slide, f, bindDrag]);
   const onPhotoZoneClick = React.useCallback(() => {
     photoReqRef.current?.(slideIdx);
   }, [slideIdx]);
@@ -1910,13 +1941,14 @@ const SlideCardInner = React.forwardRef(({
         return (
           <>
             {hasHeaderBar && (
-              <div style={{
+              <div {...mov('headerBar', {
                 position:'absolute', top:f.h*0.028, left:f.w*0.05,
                 right: hasPageBadge ? f.w*0.16 : f.w*0.05,
                 zIndex:25,
                 display:'flex', justifyContent:'space-between', alignItems:'center',
-                gap:f.w*0.02, pointerEvents:'none',
-              }}>
+                gap:f.w*0.02,
+                pointerEvents: movableElements ? 'auto' : 'none',
+              })}>
                 <span style={{
                   fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
                   fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
@@ -1936,15 +1968,15 @@ const SlideCardInner = React.forwardRef(({
               </div>
             )}
             {hasPageBadge && (
-              <div style={{
+              <div {...mov('pageBadge', {
                 position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                 background: badgeBg, color: badgeColor,
                 padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:9999,
                 fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
                 letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
                 backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
-                pointerEvents:'none',
-              }}>{num}/{total}</div>
+                pointerEvents: movableElements ? 'auto' : 'none',
+              })}>{num}/{total}</div>
             )}
           </>
         );
@@ -2021,7 +2053,7 @@ const SlideCardInner = React.forwardRef(({
 
       {/* Handle badge */}
       {brand.showHandle && slide.showHandle && !hideInstaBadge && (
-        <div style={{
+        <div {...mov('handleBadge', {
           ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
           background:'rgba(255,255,255,0.08)',
@@ -2029,7 +2061,7 @@ const SlideCardInner = React.forwardRef(({
           padding:`${f.h*0.01}px ${f.w*0.022}px`,
           borderRadius:999,
           border:'1px solid rgba(255,255,255,0.12)',
-        }}>
+        })}>
           <div style={{
             width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
             background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
@@ -2075,6 +2107,10 @@ const SlideCardInner = React.forwardRef(({
         const textBgColor = slide.textBg
           ? `rgba(0,0,0,${(slide.textBgOpacity ?? 55) / 100 * 0.75})`
           : 'transparent';
+        // Com o bloco deslocado, a moldura não pode recortar: quem limita passa
+        // a ser a borda do card. Vale no editor e na exportação — senão o que
+        // se vê ao arrastar não é o que sai no PNG.
+        const textoDeslocado = hasElementOffset(slide, 'text');
         return (
           <div style={{
             position:'absolute', inset:0,
@@ -2082,10 +2118,11 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', flexDirection:'column',
             justifyContent:L.jc, alignItems:L.ai,
             textAlign:slide.align,
-            overflow: 'hidden',
+            overflow: textoDeslocado ? 'visible' : 'hidden',
+            pointerEvents: movableElements ? 'auto' : 'none',
             ...VC_TEXT_ZONE_STYLE,
           }}>
-            <div style={{
+            <div {...mov('text', {
               background:textBgColor,
               backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
               borderRadius: slide.textBg ? f.w*0.025 : 0,
@@ -2098,7 +2135,7 @@ const SlideCardInner = React.forwardRef(({
                                           'flex-start',
               gap: f.h*0.018,
               maxWidth:'92%',
-            }}>
+            })}>
               {/* Star ornament (8-pontas) — usado em presets como Case Study Neon.
                   Centrado independente do align do título. */}
               {brand.showStarOrnament && (
@@ -2258,11 +2295,11 @@ const SlideCardInner = React.forwardRef(({
           );
         };
         return (
-          <div style={{
+          <div {...mov('footerBar', {
             position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
             zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-            gap: f.w*0.02, pointerEvents:'none',
-          }}>
+            gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
+          })}>
             <Col data={fLeft}/>
             <Col data={fCenter}/>
             <Col data={fRight}/>
@@ -2282,11 +2319,11 @@ const SlideCardInner = React.forwardRef(({
         // Padding-right encolhe quando não tem seta (visual mais compacto).
         const padRight = showArrow ? f.w*0.014 : f.w*0.028;
         return (
-          <div style={{
+          <div {...mov('pill', {
             position:'absolute', bottom: f.h*0.058,
             left:'50%', transform:'translateX(-50%)',
-            zIndex:25, pointerEvents:'none',
-          }}>
+            zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
+          })}>
             <div style={{
               background: pillBg, color: pillFg,
               padding: `${f.h*0.012}px ${padRight}px ${f.h*0.012}px ${f.w*0.028}px`,
@@ -2332,7 +2369,7 @@ const SlideCardInner = React.forwardRef(({
         if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
         if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
         if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
-        return <div style={style} aria-hidden/>;
+        return <div {...mov('logo', style)} aria-hidden/>;
       })()}
     </div>
   );

@@ -69,6 +69,12 @@ const mkSlide = (n = 1, brand = null) => {
   /** Tamanho do bloco de texto abaixo da foto (sanduíche / Cultura). Default = subtítulo. */
   bodyAfterSize: t.bodyAfterSize,
   customBg: null, showHandle: true,
+  /**
+   * Deslocamento livre de cada elemento (arrasto direto na pré-visualização),
+   * em % das dimensões do card. `{}` = tudo no lugar do layout.
+   * Ver src/utils/card-elements.js.
+   */
+  elementOffsets: {},
   // text-on-image controls
   textShadow: false,  // drop shadow — desligado por defeito (toggle «Sombra no texto»)
   textBg: false,      // pill/box background behind text block

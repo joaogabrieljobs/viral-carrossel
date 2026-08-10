@@ -15,6 +15,7 @@ import { DEFAULT_PRESENTATION_IMG_ADJUST, presentationAdjustIsNeutral, presentat
 import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
 import { ExportMoreFormats } from './panels/ExportMoreFormats.jsx';
 import { RefineBtn } from './ui/editor-chrome.jsx';
+import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch } from '../utils/card-elements.js';
 import { FontPairingPicker, FontPicker } from './ui/font-pickers.jsx';
 import { LayoutMiniIcon, ImageFocalMiniIcon, PhotoRegionMiniIcon } from './ui/mini-icons.jsx';
 import { Slider, Toggle, ColorRow } from './ui/primitives.jsx';
@@ -1508,6 +1509,57 @@ function SidebarContent({
                 </p>
               </div>
             </S>)}
+
+            {(tab==='layout'||tab==='slide') && (() => {
+              const movidos = MOVABLE_ELEMENTS.filter((e) => hasElementOffset(slide, e.key));
+              return (
+                <S
+                  title="Posição livre"
+                  hint="Clique no meio de qualquer elemento do card e arraste. Vale para texto, foto, barra editorial, selo e ornamentos."
+                >
+                  {movidos.length ? (
+                    <>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                        {movidos.map((e) => (
+                          <button
+                            key={e.key}
+                            type="button"
+                            onClick={() => updateSlide(resetElementOffsetsPatch(slide, e.key))}
+                            title={`Repor ${e.label.toLowerCase()} no lugar do layout`}
+                            style={{
+                              display:'inline-flex', alignItems:'center', gap:5,
+                              fontSize:11, padding:'6px 10px', borderRadius:9999,
+                              border:'1px solid var(--hairline)', background:'var(--bg-card)',
+                              color:'var(--text-secondary)', fontFamily:'var(--font-ui)',
+                              cursor:'pointer', letterSpacing:'-0.011em',
+                            }}
+                          >
+                            {e.label}<X size={10} aria-hidden/>
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateSlide(resetElementOffsetsPatch(slide))}
+                        style={{
+                          alignSelf:'flex-start', fontSize:11, padding:'7px 14px',
+                          borderRadius:9999, border:'1px solid var(--hairline)',
+                          background:'var(--bg-card)', color:'var(--text-secondary)',
+                          fontFamily:'var(--font-ui)', fontWeight:600, cursor:'pointer',
+                        }}
+                      >
+                        Repor tudo
+                      </button>
+                    </>
+                  ) : (
+                    <p style={{ fontSize:11, color:'var(--text-muted)', margin:0, lineHeight:1.5, fontFamily:'var(--font-ui)' }}>
+                      Nada foi movido neste card. Arraste um elemento na pré-visualização
+                      e ele aparece aqui para repor.
+                    </p>
+                  )}
+                </S>
+              );
+            })()}
 
             {(tab==='layout'||tab==='slide') && (<S title="Operações">
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
