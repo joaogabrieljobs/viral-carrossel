@@ -246,7 +246,14 @@ const ClassicCanvasInner = React.forwardRef(({
   swapSlideIdx = null,
   swapZoneKeys,
   interactionScale = 1,
+  /** Arrasto livre; vem do SlideCardInner. Ausente quando o chrome de zonas
+   *  esta ligado — aí quem posiciona e o overlay de zonas. */
+  mov = null,
 }, ref) => {
+  const movOu = React.useCallback(
+    (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
+    [mov],
+  );
   const zcv = slide.canvas.zones;
   const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || DEFAULT_LAYOUT;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
@@ -339,7 +346,7 @@ const ClassicCanvasInner = React.forwardRef(({
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <div
-        style={photoZoneBoxStyle}
+        {...movOu('photo', photoZoneBoxStyle)}
         onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
         role={photoZoneInteractive && !photoZoneNativeHit ? 'button' : undefined}
       >
@@ -357,6 +364,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </div>
 
       <OverflowScaler
+        containerProps={movOu('title')}
         containerStyle={{
           ...pctBox(tr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -425,6 +433,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </OverflowScaler>
 
       <OverflowScaler
+        containerProps={movOu('subtitle')}
         containerStyle={{
           ...pctBox(sr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -1874,6 +1883,7 @@ const SlideCardInner = React.forwardRef(({
         swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
         swapZoneKeys={undefined}
         interactionScale={scale}
+        mov={showCanvasChrome ? null : mov}
       />
     );
   } else if (normalizePhotoRegion(slide) !== 'full' && !cvEnabled && !(sandwich || cultureStatFlat)) {
