@@ -12,7 +12,7 @@ import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentat
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
-import { resolvePresetText } from '../../utils/preset-tokens.js';
+import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
@@ -558,14 +558,12 @@ const ClassicCanvasInner = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${brand.titleColor}` }}/>
-                </div>
+                <VcHandleAvatarFallback f={f} bg={bg} />
               )}
             </div>
           </div>
           <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
-            {brand.handle}
+            {vcHandleLabel(brand)}
           </span>
         </div>
       )}
@@ -979,14 +977,12 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '54%', height: '54%', borderRadius: '50%', border: `${f.w * 0.004}px solid ${brand.titleColor}` }}/>
-                </div>
+                <VcHandleAvatarFallback f={f} bg={bg} />
               )}
             </div>
           </div>
           <span style={{ color: brand.titleColor, fontSize: f.w * 0.022, fontWeight: 600, fontFamily: bodyFF, letterSpacing: '-0.01em' }}>
-            {brand.handle}
+            {vcHandleLabel(brand)}
           </span>
         </div>
       )}
@@ -1772,14 +1768,12 @@ const SlideCardInner = React.forwardRef(({
                     style={vcHandleAvatarImgStyle(brand)}
                   />
                 ) : (
-                  <div style={{ width:'100%', height:'100%', borderRadius:'50%', background: bgSolid, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${cr.titleInk}` }}/>
-                  </div>
+                  <VcHandleAvatarFallback f={f} bg={bgSolid} />
                 )}
               </div>
             </div>
             <span style={{ color: cr.titleInk, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
-              {brand.handle}
+              {vcHandleLabel(brand)}
             </span>
           </div>
         )}
@@ -2056,14 +2050,12 @@ const SlideCardInner = React.forwardRef(({
                   style={vcHandleAvatarImgStyle(brand)}
                 />
               ) : (
-                <div style={{ width:'100%', height:'100%', borderRadius:'50%', background:bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <div style={{ width:'54%', height:'54%', borderRadius:'50%', border:`${f.w*0.004}px solid ${brand.titleColor}` }}/>
-                </div>
+                <VcHandleAvatarFallback f={f} bg={bg} />
               )}
             </div>
           </div>
           <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
-            {brand.handle}
+            {vcHandleLabel(brand)}
           </span>
         </div>
       )}
@@ -2426,6 +2418,32 @@ function vcHandleBadgeBoxPositionStyle(brand) {
     top: `${y}%`,
     zIndex: 22,
   };
+}
+
+/**
+ * Badge do @ sem foto carregada. Era um anel vazio, que lido em miniatura
+ * parece defeito de render; um emoji de foto diz "põe a tua aqui".
+ */
+const VC_HANDLE_AVATAR_EMOJI = '📷';
+
+/** Texto do badge do @. Sem handle configurado mostra o placeholder, senão o
+ *  badge saía como um anel solto sem nada ao lado. */
+function vcHandleLabel(brand) {
+  const h = String(brand?.handle || '').trim();
+  if (!h) return PLACEHOLDER_HANDLE;
+  return h.startsWith('@') ? h : `@${h}`;
+}
+
+function VcHandleAvatarFallback({ f, bg }) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', borderRadius: '50%', background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: f.w * 0.017, lineHeight: 1, userSelect: 'none',
+    }}>
+      <span aria-hidden>{VC_HANDLE_AVATAR_EMOJI}</span>
+    </div>
+  );
 }
 
 /** Foto do @ no badge: posição, rotação completa e zoom dentro do círculo (object-fit + transform). */

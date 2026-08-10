@@ -7,14 +7,14 @@
  *
  * Agora o preset escreve um token e o card resolve na hora do render:
  *
- *   '{handle}'    → @dousuario (ou '@seu.perfil' se ainda não configurou)
+ *   '{handle}'    → @dousuario (ou '@seuperfil' se ainda não configurou)
  *   '{ano}'       → ano corrente (não envelhece como '2025' fixo)
  *   '{marca}'     → nome do perfil de marca ativo (ou 'SUA MARCA')
  *
  * Texto sem token passa intacto.
  */
 
-const PLACEHOLDER_HANDLE = '@seu.perfil';
+const PLACEHOLDER_HANDLE = '@seuperfil';
 const PLACEHOLDER_MARCA = 'SUA MARCA';
 
 /** handle da marca, normalizado com @ e sem espaços */

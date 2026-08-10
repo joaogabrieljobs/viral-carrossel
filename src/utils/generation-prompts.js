@@ -196,7 +196,9 @@ const buildBrandBlock = (brand) => {
   if (brand?.bio?.trim())         parts.push(`• Sobre o perfil: ${brand.bio.trim()}`);
   if (brand?.positioning?.trim()) parts.push(`• Posicionamento: ${brand.positioning.trim()}`);
   if (brand?.signature?.trim())   parts.push(`• Assinatura/CTA recorrente: ${brand.signature.trim()}`);
-  if (brand?.handle?.trim() && brand.handle !== '@seu.perfil')
+  // Placeholder não é identidade — não vai como contexto para a IA. Aceita a
+  // grafia antiga porque brands salvos antes da troca ainda a carregam.
+  if (brand?.handle?.trim() && !['@seuperfil', '@seu.perfil'].includes(brand.handle.trim()))
     parts.push(`• Perfil: ${brand.handle.trim()}`);
   if (!parts.length) return '';
   return `\nIDENTIDADE VERBAL DA MARCA (use como contexto de tom, voz e coerência):\n${parts.join('\n')}\n`;

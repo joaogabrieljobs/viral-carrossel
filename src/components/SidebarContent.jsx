@@ -1758,7 +1758,7 @@ function SidebarContent({
                 <input
                   value={brand.handle || ''}
                   onChange={e=>setBrand({...brand,handle:e.target.value})}
-                  placeholder="@seu.perfil"
+                  placeholder="@seuperfil"
                   className="vc-input"
                 />
               </div>
@@ -1952,19 +1952,27 @@ function SidebarContent({
                       e.currentTarget.style.background='var(--bg-card)';
                     }}
                   >
+                    {/* Mesmo placeholder que o card usa sem foto: o anel do
+                        Instagram com o emoji dentro, para o painel mostrar o
+                        que sai impresso. */}
                     <span style={{
-                      width:32, height:32, borderRadius:'50%', flexShrink:0,
+                      width:36, height:36, borderRadius:'50%', flexShrink:0,
+                      background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
+                      padding:2, boxSizing:'border-box',
                       display:'flex', alignItems:'center', justifyContent:'center',
-                      background:'var(--accent-surface)', color:'var(--accent)',
                     }} aria-hidden>
-                      <Upload size={14} strokeWidth={2.25}/>
+                      <span style={{
+                        width:'100%', height:'100%', borderRadius:'50%',
+                        background:'var(--bg-elevated)', fontSize:15, lineHeight:1,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>📷</span>
                     </span>
                     <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
                       <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
                         Carregar foto de perfil
                       </span>
                       <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                        PNG · JPG · WebP — até 2&nbsp;MB
+                        Sem foto, os cards mostram 📷 · PNG · JPG · WebP até 2&nbsp;MB
                       </span>
                     </span>
                     <input
@@ -2001,7 +2009,7 @@ function SidebarContent({
                     value={brand.cultureHeaderLeft ?? ''}
                     onChange={e=>setBrand({ ...brand, cultureHeaderLeft: e.target.value })}
                     className="vc-input"
-                    placeholder="@seu.perfil"
+                    placeholder="@seuperfil"
                     style={{ fontSize:12 }}
                   />
                 </div>
@@ -2087,7 +2095,7 @@ function SidebarContent({
               >
                 {[
                   ['footerBarLeft', 'Esquerda', 'Tema|Growth'],
-                  ['footerBarCenter', 'Centro', 'Por|@seu.perfil'],
+                  ['footerBarCenter', 'Centro', 'Por|@seuperfil'],
                   ['footerBarRight', 'Direita', 'Salve|↓'],
                 ].map(([campo, rotulo, exemplo]) => (
                   <div key={campo}>
