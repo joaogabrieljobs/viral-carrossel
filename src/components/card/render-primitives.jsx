@@ -188,13 +188,19 @@ function OverflowScaler({ containerStyle, containerProps = null, deps = [], minS
     // para qualquer valor de justify-content.
     const cs = window.getComputedStyle(el);
     const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    // UNIDADES: `clientHeight` e `offsetHeight` são px de LAYOUT; o
+    // `getBoundingClientRect` é px de ECRÃ, já multiplicado pelo `scale()` da
+    // pré-visualização. Misturar os dois fazia a soma dos filhos sair 3× menor
+    // na fila do desktop (escala 0.333) e o scaler concluía que cabia — o
+    // título voltava a ser cortado, e só fora da escala 1 (a exportação, onde
+    // isto foi testado da primeira vez, tem escala 1 e passava).
     let filhosH = 0;
-    for (const filho of el.children) filhosH += filho.getBoundingClientRect().height;
+    for (const filho of el.children) filhosH += filho.offsetHeight || 0;
     const contentH = Math.max(el.scrollHeight, Math.ceil(filhosH + padV));
     if (contentH <= clientH + 1) return;
     // Desconta photo zone (altura fixa, não escala)
     const photoEl = el.querySelector('[data-vc-photo-zone="1"]');
-    const photoH = photoEl ? photoEl.getBoundingClientRect().height : 0;
+    const photoH = photoEl ? photoEl.offsetHeight || 0 : 0;
     const textContentH = Math.max(1, contentH - photoH);
     const availForText = Math.max(1, clientH - photoH);
     // Estimativa: scale precisa ajustar pela razão de área (h escalada ≈ h × scale)
