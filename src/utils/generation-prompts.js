@@ -306,7 +306,10 @@ async function fetchPlainTextFromUrl(url) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 22000);
   try {
-    const res = await fetch(`${FETCH_SOURCE_API}?${qp}`, { signal: ctl.signal });
+    const res = await fetch(`${FETCH_SOURCE_API}?${qp}`, {
+      signal: ctl.signal,
+      credentials: 'include',
+    });
     const ct = (res.headers.get('content-type') || '').toLowerCase();
     const j =
       ct.includes('application/json')

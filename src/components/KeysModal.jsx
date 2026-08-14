@@ -541,7 +541,7 @@ export default function KeysModal({
                     Manter chaves neste navegador
                   </strong>
                   <span style={{ display: 'block', marginTop: 3, fontSize: 10, lineHeight: 1.45, color: 'var(--text-muted)' }}>
-                    Desmarcado: somem ao fechar a aba. Marcado: ficam no armazenamento local deste navegador.
+                    Desmarcado (recomendado): somem ao fechar a aba. Marcado: ficam no localStorage — qualquer script XSS nesta origem pode lê-las.
                   </span>
                 </span>
               </label>

@@ -9,10 +9,9 @@ const PROVIDERS = {
 };
 
 import { applyCors } from '../lib/cors.js';
-
-function cors(req, res) {
-  applyCors(req, res);
-}
+import { requireActiveSubscription } from '../lib/require-access.js';
+import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
 
 function readBody(req) {
   if (!req.body) return {};
@@ -22,10 +21,28 @@ function readBody(req) {
   return req.body;
 }
 
+async function fetchProviderImageAsBase64(imageUrl) {
+  // Revalida URL pública — evita SSRF se o upstream devolver URL interna.
+  const safe = assertPublicHttpUrl(imageUrl);
+  const imageResponse = await fetch(safe, { redirect: 'error' });
+  if (!imageResponse.ok) {
+    throw new Error('Não foi possível baixar a imagem gerada.');
+  }
+  const mime = imageResponse.headers.get('content-type') || 'image/png';
+  const bytes = Buffer.from(await imageResponse.arrayBuffer());
+  return { b64_json: bytes.toString('base64'), mime };
+}
+
 export default async function handler(req, res) {
-  cors(req, res);
+  applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: { message: 'Method not allowed' } });
+
+  const limited = consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'compatible' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec, true);
+
+  const access = await requireActiveSubscription(req, res, { errorShape: 'nested' });
+  if (!access) return;
 
   const { provider, operation = 'chat', apiKey, payload } = readBody(req);
   const target = PROVIDERS[provider]?.[operation];
@@ -53,16 +70,17 @@ export default async function handler(req, res) {
       const data = JSON.parse(raw);
       const imageUrl = data?.data?.[0]?.url;
       if (imageUrl) {
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) {
-          return res.status(502).json({ error: { message: 'Não foi possível baixar a imagem gerada.' } });
+        try {
+          const { b64_json, mime } = await fetchProviderImageAsBase64(imageUrl);
+          return res.status(200).json({
+            ...data,
+            data: [{ ...data.data[0], url: undefined, b64_json, mime }],
+          });
+        } catch (e) {
+          return res.status(502).json({
+            error: { message: e?.message || 'Não foi possível baixar a imagem gerada.' },
+          });
         }
-        const mime = imageResponse.headers.get('content-type') || 'image/png';
-        const bytes = Buffer.from(await imageResponse.arrayBuffer());
-        return res.status(200).json({
-          ...data,
-          data: [{ ...data.data[0], url: undefined, b64_json: bytes.toString('base64'), mime }],
-        });
       }
     }
     res.status(upstream.status);

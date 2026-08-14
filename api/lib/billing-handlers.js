@@ -53,7 +53,6 @@ export async function handleSession(req, res) {
       return res.status(200).json({
         active: false,
         email: access.email,
-        customerId: access.customerId,
         status: 'inactive',
       });
     }
@@ -61,15 +60,14 @@ export async function handleSession(req, res) {
     return res.status(200).json({
       active: true,
       email: access.email,
-      customerId: access.customerId,
       status: sub.status,
       currentPeriodEnd: sub.current_period_end
         ? new Date(sub.current_period_end * 1000).toISOString()
         : null,
     });
   } catch (e) {
-    console.error('[auth/session]', e);
-    return res.status(500).json({ active: false, error: e.message || 'session_error' });
+    console.error('[auth/session]', e?.message || e);
+    return res.status(500).json({ active: false, error: 'session_error' });
   }
 }
 
@@ -82,6 +80,10 @@ export async function handleCheckout(req, res) {
   if (billingDisabled()) {
     return res.status(400).json({ error: 'Billing desativado neste ambiente' });
   }
+
+  const { consumeRateLimit, rateLimitResponse } = await import('./rate-limit.js');
+  const limited = consumeRateLimit(req, { limit: 8, windowMs: 60_000, keyPrefix: 'checkout' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   try {
     const { email } = readJson(req);
@@ -184,11 +186,10 @@ export async function handleConfirm(req, res) {
     return res.status(200).json({
       active: true,
       email,
-      customerId,
     });
   } catch (e) {
-    console.error('[stripe/confirm]', e);
-    return res.status(500).json({ error: e.message || 'confirm_error' });
+    console.error('[stripe/confirm]', e?.message || e);
+    return res.status(500).json({ error: 'confirm_error' });
   }
 }
 

@@ -33,14 +33,16 @@ describe('GET /api/auth/session (RF-04)', () => {
     stripeMock.subscriptions.list.mockResolvedValue({ data: [subAtiva('cus_1')] });
     const res = makeRes();
     await sessionHandler(makeReq({ cookie: cookieFor('cus_1', 'user1@teste.exemplo') }), res);
-    expect(res.body).toMatchObject({ active: true, email: 'user1@teste.exemplo', customerId: 'cus_1', status: 'active' });
+    expect(res.body).toMatchObject({ active: true, email: 'user1@teste.exemplo', status: 'active' });
+    expect(res.body.customerId).toBeUndefined();
     expect(typeof res.body.currentPeriodEnd).toBe('string');
   });
 
   it('cookie válido sem assinatura → inactive', async () => {
     const res = makeRes();
     await sessionHandler(makeReq({ cookie: cookieFor('cus_2', 'user2@teste.exemplo') }), res);
-    expect(res.body).toMatchObject({ active: false, status: 'inactive', customerId: 'cus_2' });
+    expect(res.body).toMatchObject({ active: false, status: 'inactive', email: 'user2@teste.exemplo' });
+    expect(res.body.customerId).toBeUndefined();
   });
 
   it('cookie adulterado → anonymous (não vaza erro)', async () => {

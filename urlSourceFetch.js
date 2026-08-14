@@ -1,6 +1,6 @@
 /**
  * Busca públicas http(s), conversão rudimentar HTML→texto e validação anti-SSRF.
- * Partilhado entre Vite (dev) e Netlify Functions (produção).
+ * Partilhado entre Vite (dev) e funções serverless (produção).
  */
 
 /** @param {string} host */
@@ -96,24 +96,57 @@ export function htmlToPlainText(html, maxLen = 48000) {
   return out;
 }
 
-/** @param {string} urlString */
-export async function serverFetchUrlPlainText(urlString) {
-  const safe = assertPublicHttpUrl(urlString);
+const MAX_REDIRECTS = 5;
 
-  const ac = new AbortController();
-  const to = setTimeout(() => ac.abort(), 18500);
+/**
+ * Fetch GET com redirects manuais — cada hop revalida anti-SSRF.
+ * @param {string} urlString
+ * @param {RequestInit} init
+ */
+export async function fetchPublicHttp(urlString, init = {}) {
+  let current = assertPublicHttpUrl(urlString);
+  const ac = init.signal || new AbortController().signal;
 
-  try {
-    const res = await fetch(safe, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: ac.signal,
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await fetch(current, {
+      ...init,
+      method: init.method || 'GET',
+      redirect: 'manual',
+      signal: ac,
       headers: {
         'User-Agent':
           'ViralCarrossel/1.0 (+https://github.com) texto para resumo editorial',
         Accept: 'text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+        ...(init.headers || {}),
       },
     });
+
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) throw new Error(`Redirect sem Location (HTTP ${res.status})`);
+      let next;
+      try {
+        next = new URL(loc, current).toString();
+      } catch {
+        throw new Error('Redirect inválido');
+      }
+      current = assertPublicHttpUrl(next);
+      continue;
+    }
+
+    return res;
+  }
+
+  throw new Error('Demasiados redirects');
+}
+
+/** @param {string} urlString */
+export async function serverFetchUrlPlainText(urlString) {
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 18500);
+
+  try {
+    const res = await fetchPublicHttp(urlString, { signal: ac.signal });
 
     if (!res.ok) {
       throw new Error(`Servidor devolveu HTTP ${res.status}`);

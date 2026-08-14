@@ -1,10 +1,11 @@
 /**
- * Proxy server-side para api.anthropic.com — evita CORS no browser em produção.
- * Configure ANTHROPIC_API_KEY em Vercel → Project → Settings → Environment Variables.
+ * Proxy Anthropic — exige assinatura ativa (ou BILLING_DISABLED em non-prod).
+ * BYOK via x-anthropic-key; sem key própria, usa ANTHROPIC_API_KEY do host.
  */
 
 import { applyCors } from '../../lib/cors.js';
-import { readAccessCookie, billingDisabled } from '../../lib/access.js';
+import { requireActiveSubscription } from '../../lib/require-access.js';
+import { consumeRateLimit, rateLimitResponse } from '../../lib/rate-limit.js';
 
 const TARGET = 'https://api.anthropic.com/v1/messages';
 
@@ -22,26 +23,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: { message: 'Method Not Allowed' } });
   }
 
+  const limited = consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'anthropic' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec, true);
+
+  const access = await requireActiveSubscription(req, res, { errorShape: 'nested' });
+  if (!access) return;
+
   const userKey = String(
     req.headers['x-anthropic-key'] || req.headers['X-Anthropic-Key'] || '',
   ).trim();
   const envKey = String(process.env.ANTHROPIC_API_KEY || '').trim();
-
-  // Chave do host (fallback) só para assinante com sessão válida — sem isso,
-  // qualquer requisição anônima consumiria a ANTHROPIC_API_KEY da Vercel.
-  let key = userKey;
-  if (!key && envKey) {
-    const hasSession = billingDisabled() || Boolean(readAccessCookie(req)?.customerId);
-    if (hasSession) key = envKey;
-    else {
-      return res.status(401).json({
-        error: {
-          message:
-            'Sem chave própria e sem sessão de assinante. Adicione sua chave Anthropic no ícone de chaves (⚙) ou faça login pela assinatura.',
-        },
-      });
-    }
-  }
+  const key = userKey || envKey;
 
   if (!key) {
     return res.status(503).json({

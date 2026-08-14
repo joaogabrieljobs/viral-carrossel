@@ -50,7 +50,6 @@ export default async function handler(request) {
         console.log('[stripe/webhook] checkout.session.completed', {
           id: session.id,
           customer: session.customer,
-          email: session.customer_details?.email || session.customer_email,
         });
         break;
       }

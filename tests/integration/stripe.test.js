@@ -92,7 +92,8 @@ describe('POST /api/stripe/confirm (RF-08)', () => {
     const res = makeRes();
     await confirmHandler(post({ sessionId: 'cs_ok' }), res);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toMatchObject({ active: true, email: 'user7@teste.exemplo', customerId: 'cus_7' });
+    expect(res.body).toMatchObject({ active: true, email: 'user7@teste.exemplo' });
+    expect(res.body.customerId).toBeUndefined();
     expect(cookieValue(res, COOKIE_NAME)).toBeTruthy();
   });
 });

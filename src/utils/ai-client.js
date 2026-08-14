@@ -89,6 +89,7 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   try {
     res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
+      credentials: 'include',
       headers,
       body: JSON.stringify(body),
     });
@@ -198,7 +199,12 @@ const callCompatibleChat = async (
 
   let res;
   try {
-    res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    res = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify(body),
+    });
   } catch (error) {
     throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
   }
@@ -339,7 +345,12 @@ async function generateZaiImage(q, imgParams, imgExtraPrompt) {
 
   let res;
   try {
-    res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    res = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify(body),
+    });
   } catch (error) {
     throw enhanceNetworkError(error, 'Z.ai Image');
   }
