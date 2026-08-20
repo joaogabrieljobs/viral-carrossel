@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { startCheckout } from '../lib/billing.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
+import BrandLogo from './BrandLogo.jsx';
 
 const PRICE_LABEL = 'R$ 97';
 const PRICE_PERIOD = '/mês';

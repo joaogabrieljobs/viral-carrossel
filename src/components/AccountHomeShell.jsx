@@ -1,7 +1,8 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useMemo } from 'react';
-import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, Flame, ChevronRight, Settings, Layers, User } from 'lucide-react';
+import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, ChevronRight, Settings, Layers, User } from 'lucide-react';
 import AccountProfile from './AccountProfile.jsx';
+import BrandLogo from './BrandLogo.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS, IMAGE_PROVIDERS, TEXT_PROVIDERS } from '../config/ai-providers.js';
@@ -193,24 +194,12 @@ function AccountHomeShell({
               textAlign: 'left',
             }}
           >
-            <div style={{
-              width: 34, height: 34, borderRadius: 10, background: 'var(--logo-mark-bg)',
-              display: 'grid', placeItems: 'center', flexShrink: 0,
-              border: '1px solid var(--border)',
-            }}>
-              <Flame size={16} color="var(--logo-mark-fg)" />
-            </div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+              <BrandLogo height={isMobile ? 24 : 28} style={{ maxWidth: isMobile ? 160 : 210 }} />
               <div style={{
-                fontSize: 17, fontWeight: 600, letterSpacing: '-0.022em',
-                fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1.2,
-              }}>
-                Viral<span style={{ color: 'var(--accent)' }}>.</span>
-              </div>
-              <div style={{
-                marginTop: 2, fontSize: 11, color: 'var(--text-muted)',
+                fontSize: 11, color: 'var(--text-muted)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                maxWidth: isMobile ? 140 : 180,
+                maxWidth: isMobile ? 160 : 220,
               }}>
                 {accessEmail || 'Studio · dados neste aparelho'}
               </div>

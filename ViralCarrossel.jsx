@@ -7,7 +7,7 @@ import {
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
   FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Type, Quote, BookOpen, Image as ImageIcon,
-  ArrowUp, ArrowDown, Zap, Flame, Lightbulb, Highlighter,
+  ArrowUp, ArrowDown, Zap, Lightbulb, Highlighter,
   ChevronRight, ChevronLeft, ChevronDown, Check, Instagram, Settings, Maximize2, Minus,
   Home, Layers, SlidersHorizontal, User,
   Newspaper, Brain, HeartHandshake, GraduationCap, ScrollText, Megaphone,
@@ -22,6 +22,7 @@ import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import OnboardingLanding from './src/components/OnboardingLanding.jsx';
+import BrandLogo from './src/components/BrandLogo.jsx';
 import Paywall from './src/components/Paywall.jsx';
 import LoginModal from './src/components/LoginModal.jsx';
 import AccountProfile from './src/components/AccountProfile.jsx';
@@ -2875,21 +2876,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   <Home size={15} />
                 </button>
                 <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
-                  <div style={{
-                    width:32, height:32, borderRadius:8, background:'var(--logo-mark-bg)',
-                    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                  }}>
-                    <Flame size={14} color="var(--logo-mark-fg)"/>
-                  </div>
-                  <div style={{ minWidth:0, flex:1 }}>
-                    <div style={{
-                      fontSize:14, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em',
-                      lineHeight:1.1, fontFamily:'var(--font-display)',
-                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                    }}>
-                      Viral<span style={{ color:'var(--accent)' }}>.</span>
-                    </div>
-                  </div>
+                  <BrandLogo height={22} style={{ maxWidth: 'min(100%, 168px)' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -2916,19 +2903,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           <>
         {/* Esquerda — marca + Projetos */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 8, background: 'var(--logo-mark-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Flame size={14} color="var(--logo-mark-fg)" />
-          </div>
+          <BrandLogo height={26} style={{ maxWidth: 220 }} />
           <div style={{ minWidth: 0 }}>
-            <div style={{
-              fontSize: 15, fontWeight: 600, color: 'var(--text-primary)',
-              letterSpacing: '-0.022em', lineHeight: 1, fontFamily: 'var(--font-display)',
-            }}>
-              Viral<span style={{ color: 'var(--accent)' }}>.</span>
-            </div>
             {activeEntry && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
                 <button

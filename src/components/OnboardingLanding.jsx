@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Sparkles, Flame, ArrowRight, ChevronDown,
+  Sparkles, ArrowRight, ChevronDown,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
   BookOpen, Layers, Image, FileText, Check, X,
   CameraOff, Bookmark, MessageSquare,
 } from 'lucide-react';
+import BrandLogo from './BrandLogo.jsx';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
 /** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND + IMAGENS VIRACAL CARRECEL) */
 const IMG = {
+  logo: '/landing/logo-viral-carrossel-studio.png',
   heroStage: '/landing/hero-stage-segredo.webp',
   heroSlides: [
     '/landing/creator-reaction.png',
@@ -603,21 +605,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           borderBottom: '1px solid var(--glass-border-strong)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: 'var(--logo-mark-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Flame size={14} color="var(--logo-mark-fg)" />
-          </div>
-          <span style={{
-            fontSize: 15, fontWeight: 600, letterSpacing: '-0.022em',
-            fontFamily: 'var(--font-display)',
-          }}>
-            Viral<span style={{ color: 'var(--accent)' }}>.</span>
-          </span>
-        </div>
+        <BrandLogo height={26} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {onLogin && (
             <button
@@ -735,21 +723,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           margin: '0 auto',
           width: '100%',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: 'var(--logo-mark-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Flame size={18} color="var(--logo-mark-fg)" />
-            </div>
-            <span style={{
-              fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
-              fontFamily: 'var(--font-display)',
-            }}>
-              Viral<span style={{ color: 'var(--accent)' }}>.</span>
-            </span>
-          </div>
+          <BrandLogo height={isMobile ? 28 : 34} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {onLogin && (
               <button
@@ -2571,20 +2545,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         gap: 24,
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 8,
-              background: 'var(--logo-mark-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Flame size={14} color="var(--logo-mark-fg)" />
-            </div>
-            <span style={{
-              fontSize: 16, fontWeight: 600, letterSpacing: '-0.022em',
-              fontFamily: 'var(--font-display)',
-            }}>
-              Viral<span style={{ color: 'var(--accent)' }}>.</span>
-            </span>
+          <div style={{ marginBottom: 10 }}>
+            <BrandLogo height={isMobile ? 26 : 30} />
           </div>
           <p style={{
             margin: 0,
