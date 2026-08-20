@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, SlidersHorizontal, Settings, Check, ChevronRight } from 'lucide-react';
+import BrandLogo from './BrandLogo.jsx';
 
 export default function ModesIntroModal({ open, onSelect, onClose, currentMode = 'criador' }) {
   if (!open) return null;
@@ -40,24 +41,21 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
-            width: 64, height: 64, borderRadius: 18,
-            background: 'linear-gradient(135deg, rgba(255,45,141,0.18) 0%, rgba(143,125,255,0.10) 100%)',
-            border: '1px solid var(--glass-border-strong)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex',
+            justifyContent: 'center',
             marginBottom: 16,
-            boxShadow: '0 0 32px rgba(255, 45, 141, 0.24)',
           }}>
-            <Sparkles size={28} strokeWidth={2} style={{ color: 'var(--accent)' }}/>
+            <BrandLogo height={40} style={{ maxWidth: 'min(100%, 280px)', marginInline: 'auto' }} />
           </div>
           <h2
             id="modes-intro-title"
             style={{
-              fontSize: 28, fontWeight: 700, color: 'var(--text-primary)',
-              letterSpacing: '-0.022em', lineHeight: 1.15, margin: '0 0 8px',
+              fontSize: 22, fontWeight: 600, color: 'var(--text-primary)',
+              letterSpacing: '-0.022em', lineHeight: 1.2, margin: '0 0 8px',
               fontFamily: 'var(--font-display)',
             }}
           >
-            Bem-vindo ao <span style={{ color: 'var(--accent)' }}>Narrative OS</span>
+            Bem-vindo
           </h2>
           <p style={{
             fontSize: 15, color: 'var(--text-secondary)',

@@ -3131,14 +3131,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   <div style={{
                     width: isMobile ? 64 : 72,
                     height: isMobile ? 64 : 72,
-                    borderRadius:18,
-                    background:'var(--accent)',
-                    display:'flex',
-                    alignItems:'center',
-                    justifyContent:'center',
-                    margin:'0 auto 24px',
+                    borderRadius: 18,
+                    margin: '0 auto 24px',
+                    overflow: 'hidden',
+                    boxShadow: '0 0 28px rgba(255, 45, 141, 0.28)',
                   }}>
-                    <Sparkles size={isMobile ? 28 : 32} color="#fff"/>
+                    <BrandLogo variant="mark" height={isMobile ? 64 : 72} style={{ borderRadius: 18 }} />
                   </div>
                   <div style={{
                     fontSize: isMobile ? 28 : 40,

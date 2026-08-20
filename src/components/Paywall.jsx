@@ -77,6 +77,9 @@ export default function Paywall({
           boxShadow: '0 8px 32px rgba(255, 45, 141, 0.12)',
         }}
       >
+        <div style={{ marginBottom: 16 }}>
+          <BrandLogo height={isMobile ? 26 : 30} />
+        </div>
         <p style={{
           margin: '0 0 8px',
           fontFamily: 'var(--font-mono, monospace)',
@@ -96,7 +99,7 @@ export default function Paywall({
           fontFamily: 'var(--font-display, Inter, sans-serif)',
           lineHeight: 1.15,
         }}>
-          Acesso ao studio Viral.
+          Acesso ao studio completo
         </h1>
         <p style={{
           margin: '0 0 24px',
