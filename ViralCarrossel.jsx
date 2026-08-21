@@ -32,7 +32,7 @@ import {
   openBillingPortal,
   logoutAccess,
 } from './src/lib/billing.js';
-import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset } from './src/styles/visual-presets.jsx';
+import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
@@ -2461,13 +2461,12 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
   // Aplica um template pronto (preenche slides + brand + composições)
   const applyTemplate = useCallback((tpl) => {
     const palette = PALETTES[tpl.palette] || PALETTES[0];
-    const pairing = FONT_PAIRINGS.find((p) => p.id === tpl.pairingId);
-    const titleFont = pairing
-      ? { val: pairing.titleFont }
-      : (TITLE_FONTS[tpl.titleFont] || TITLE_FONTS[0]);
-    const bodyFont = pairing
-      ? { val: pairing.bodyFont }
-      : (BODY_FONTS[tpl.bodyFont] || BODY_FONTS[0]);
+    // Fontes vêm SÓ do pairing — os índices titleFont/bodyFont dos templates
+    // eram ignorados aqui mas exibidos no preview do modal, então o card do
+    // modal podia mostrar uma fonte que nunca seria aplicada.
+    const pairing = FONT_PAIRINGS.find((p) => p.id === tpl.pairingId) || FONT_PAIRINGS[0];
+    const titleFont = { val: pairing.titleFont };
+    const bodyFont = { val: pairing.bodyFont };
     const zonesByKey = {
       cover: DEFAULT_CANVAS_ZONES_COVER_FULLBLEED,
       classic: DEFAULT_CANVAS_ZONES_CLASSIC,
@@ -2476,8 +2475,13 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     };
     let newSlides = [];
     history.set((d) => {
+      // Assinatura do template (barra editorial, contador, selo) substitui a
+      // anterior por inteiro — a mesma regra anti-acúmulo dos padrões visuais.
+      const brandLimpo = { ...d.brand };
+      for (const k of PRESET_BRAND_SIGNATURE_KEYS) delete brandLimpo[k];
       const nextBrand = {
-        ...d.brand,
+        ...brandLimpo,
+        ...(tpl.signature || {}),
         bg: palette.bg,
         titleColor: palette.title,
         subtitleColor: palette.subtitle,
