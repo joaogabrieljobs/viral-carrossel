@@ -173,6 +173,24 @@ export function suggestCreativePresetForVisual(visualPresetId) {
   return VISUAL_TO_CREATIVE_PRESET[visualPresetId] || null;
 }
 
+/**
+ * Ponte inversa, CURADA: pacote criativo → padrão visual que melhor veste
+ * aquele arco. Não é a inversa mecânica de VISUAL_TO_CREATIVE_PRESET (vários
+ * padrões partilham o mesmo pacote); é uma escolha editorial de 1-para-1 para
+ * o picker poder marcar "combina com seu conteúdo".
+ */
+export const SUGGESTED_VISUAL_PRESET_BY_CREATIVE = {
+  quick_erro_comum: 'authority_black',      // autoridade escura + ficha técnica
+  quick_tendencia: 'tabloid_keywords',      // manchete de plantão + destaques
+  quick_decodificacao: 'case_study_neon',   // estudo de caso com prova
+  quick_comportamento: 'mood_sepia',        // reflexivo, quote-driven
+  tendencia_cultura: 'editorial_magazine',  // capa de revista
+};
+
+export function suggestVisualPresetForCreative(creativePresetId) {
+  return SUGGESTED_VISUAL_PRESET_BY_CREATIVE[creativePresetId] || null;
+}
+
 export function getComposition(id) {
   return COMPOSITIONS[id] || null;
 }

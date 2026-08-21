@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { TEMPLATES, PALETTES } from '../../src/utils/design-data.js';
-import { FONT_PAIRINGS, COMPOSITIONS } from '../../src/utils/slide-design-system.js';
-import { PRESET_BRAND_SIGNATURE_KEYS } from '../../src/styles/visual-presets.jsx';
+import {
+  FONT_PAIRINGS, COMPOSITIONS,
+  SUGGESTED_VISUAL_PRESET_BY_CREATIVE,
+  suggestVisualPresetForCreative, suggestCreativePresetForVisual,
+} from '../../src/utils/slide-design-system.js';
+import { PRESET_BRAND_SIGNATURE_KEYS, VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
 
 describe('templates — integridade estrutural', () => {
   it('todo template referencia paleta, pairing e composições existentes', () => {
@@ -90,5 +94,33 @@ describe('templates — regras de copy', () => {
         expect(String(s.subtitle || '').length, `${t.id}: subtítulo de "${s.title}"`).toBeLessThanOrEqual(120);
       }
     }
+  });
+});
+
+describe('ponte pacote criativo ↔ padrão visual', () => {
+  it('todo template sugere um padrão visual que existe', () => {
+    for (const t of TEMPLATES) {
+      const sugerido = suggestVisualPresetForCreative(t.creativePreset);
+      expect(sugerido, `${t.id} (${t.creativePreset}) sem padrão sugerido`).toBeTruthy();
+      expect(
+        VISUAL_PRESETS.some((p) => p.id === sugerido),
+        `${t.id} sugere "${sugerido}", que não existe`,
+      ).toBe(true);
+    }
+  });
+
+  it('a sugestão é coerente com a volta (padrão → pacote)', () => {
+    // A ponte é curada, não a inversa mecânica — vários padrões partilham o
+    // mesmo pacote. Mas o padrão escolhido tem de apontar de volta ao pacote
+    // que o sugeriu, senão a etiqueta "COMBINA" mente.
+    for (const [creative, visual] of Object.entries(SUGGESTED_VISUAL_PRESET_BY_CREATIVE)) {
+      expect(suggestCreativePresetForVisual(visual), `${visual} não volta para ${creative}`)
+        .toBe(creative);
+    }
+  });
+
+  it('nenhum padrão visual é sugerido para dois pacotes diferentes', () => {
+    const usados = Object.values(SUGGESTED_VISUAL_PRESET_BY_CREATIVE);
+    expect(new Set(usados).size, `sugestão repetida: ${usados.join(', ')}`).toBe(usados.length);
   });
 });

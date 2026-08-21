@@ -20,6 +20,8 @@ export default function VisualStylePicker({
   onChange,
   presets,
   title = 'Escolha o Padrão Visual do seu Carrossel',
+  /** id do padrão que combina com o conteúdo atual (ponte template/IA → visual). */
+  suggestedId = null,
 }) {
   return (
     <div role="group" aria-label={title}>
@@ -38,6 +40,7 @@ export default function VisualStylePicker({
       >
         {presets.map((p) => {
           const isActive = value === p.id;
+          const isSuggested = !isActive && suggestedId === p.id;
           return (
             <button
               key={p.id}
@@ -55,7 +58,7 @@ export default function VisualStylePicker({
                 borderRadius: 11,
                 cursor: 'pointer',
                 background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
-                border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--hairline)'}`,
+                border: `1.5px solid ${isActive ? 'var(--accent)' : isSuggested ? 'var(--text-muted)' : 'var(--hairline)'}`,
                 transition: 'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                 textAlign: 'center',
                 fontFamily: 'var(--font-ui)',
@@ -83,6 +86,17 @@ export default function VisualStylePicker({
                 >
                   <Check size={11} strokeWidth={3} />
                 </span>
+              )}
+              {/* Chip discreto: este padrão veste o arco/pacote criativo atual.
+                  Some quando o padrão está selecionado (o check já comunica). */}
+              {isSuggested && (
+                <span style={{
+                  position: 'absolute', top: -7, left: '50%', transform: 'translateX(-50%)',
+                  fontSize: 8.5, fontWeight: 700, letterSpacing: '0.04em',
+                  padding: '2px 7px', borderRadius: 999, whiteSpace: 'nowrap',
+                  background: 'var(--accent)', color: '#fff',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                }}>COMBINA</span>
               )}
               {/* Mini-preview SVG — gerado a partir dos campos do preset
                   (header bar, badge, star, eyebrow, título, subtítulo, pill,

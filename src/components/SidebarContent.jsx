@@ -16,6 +16,7 @@ import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
 import { ExportMoreFormats } from './panels/ExportMoreFormats.jsx';
 import { RefineBtn } from './ui/editor-chrome.jsx';
 import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch } from '../utils/card-elements.js';
+import { suggestVisualPresetForCreative } from '../utils/slide-design-system.js';
 import { FontPairingPicker, FontPicker } from './ui/font-pickers.jsx';
 import { LayoutMiniIcon, ImageFocalMiniIcon, PhotoRegionMiniIcon } from './ui/mini-icons.jsx';
 import { Slider, Toggle, ColorRow } from './ui/primitives.jsx';
@@ -1606,6 +1607,7 @@ function SidebarContent({
               onChange={applyVisualPresetCb}
               presets={VISUAL_PRESETS}
               title=""
+              suggestedId={suggestVisualPresetForCreative(creativePreset)}
             />
           </>
         )}
