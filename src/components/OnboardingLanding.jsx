@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles, ArrowRight,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
-  BookOpen, Layers, Image, FileText, Check, X,
+  BookOpen, Layers, Image, FileText, Check,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
@@ -38,6 +38,22 @@ const IMG = {
     '/landing/sample-16.webp',
   ],
 };
+
+const COVER_META = [
+  { name: 'Erro comum', segment: 'Marketing' },
+  { name: 'Tendência', segment: 'Criadores' },
+  { name: 'Marca', segment: 'Mentoria' },
+  { name: 'Virada', segment: 'Consultoria' },
+  { name: 'Prova social', segment: 'E-commerce' },
+  { name: 'Bastidores', segment: 'Criadores' },
+  { name: 'Framework', segment: 'Tecnologia' },
+  { name: 'Antes e depois', segment: 'Marketing' },
+];
+
+const SAMPLE_COVERS = IMG.carouselSamples.map((src, i) => ({
+  src,
+  ...COVER_META[i % COVER_META.length],
+}));
 
 const STEPS = [
   {
@@ -124,51 +140,11 @@ const OUTCOMES = [
   },
 ];
 
-const CONTRAST_WITHOUT = [
-  'Entrega frases que poderiam servir para qualquer tema.',
-  'Repete fórmulas sem desenvolver um ponto de vista.',
-  'Trata cada slide como uma peça isolada.',
-  'Deixa design, legenda e exportação para você resolver depois.',
-];
-
-const CONTRAST_WITH = [
-  'Parte de uma tese clara e conduz o leitor até a conclusão.',
-  'Define a função de cada card dentro do argumento.',
-  'Mantém texto e identidade visual na mesma direção.',
-  'Entrega o post completo, com espaço para você refinar o que importa.',
-];
-
-const GENERATION_LAYERS = [
-  {
-    n: '01',
-    icon: BookOpen,
-    title: 'Encontra a ideia central',
-    body: 'Separa o que é assunto do que realmente merece virar tese — e cria um gancho que abre essa conversa.',
-  },
-  {
-    n: '02',
-    icon: Layers,
-    title: 'Constrói o arco',
-    body: 'Dá uma função a cada card para que a leitura avance, em vez de repetir a mesma ideia com palavras diferentes.',
-  },
-  {
-    n: '03',
-    icon: Image,
-    title: 'Traduz em visual',
-    body: 'Aplica layout, tipografia, paleta e imagens sem apagar a personalidade da sua marca.',
-  },
-  {
-    n: '04',
-    icon: FileText,
-    title: 'Completa o post',
-    body: 'Gera a legenda como continuação do raciocínio, não como um texto genérico colado no final.',
-  },
-  {
-    n: '05',
-    icon: Download,
-    title: 'Entrega para publicar',
-    body: 'Exporte em PNG ou PDF, nas proporções certas para o feed, sem reconstruir tudo em outro editor.',
-  },
+const CONTRAST_ROWS = [
+  { left: '5 frases isoladas', right: 'uma tese' },
+  { left: 'cards repetitivos', right: 'um arco' },
+  { left: 'visual genérico', right: 'uma identidade' },
+  { left: 'rascunho', right: 'arquivo publicável' },
 ];
 
 const FAQ = [
@@ -224,56 +200,218 @@ const PLAN_FEATURES = [
   'Cancelamento pelo portal do cliente',
 ];
 
-/** Faixa horizontal de previews 4:5 (carrosséis reais) */
-function CarouselSlideStrip({ isMobile, style = {} }) {
+/** Carrossel interativo de capas 4:5 — drag + snap ao centro */
+function CoverCarousel({ isMobile, samples, onUseStyle }) {
+  const n = samples?.length || 0;
+  const cardW = isMobile ? 168 : 220;
+  const gap = isMobile ? 14 : 20;
+  const step = cardW + gap;
+
+  const [index, setIndex] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  const dragRef = useRef({ active: false, startX: 0, baseOffset: 0, moved: false });
+  const indexRef = useRef(0);
+  const offsetRef = useRef(0);
+
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => setReducedMotion(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
+
+  const clampIndex = (i) => Math.max(0, Math.min(n - 1, i));
+
+  const settleTo = (i, fromOffset) => {
+    const next = clampIndex(i);
+    const target = -next * step;
+    setIndex(next);
+    if (reducedMotion) {
+      setOffset(target);
+      setDragging(false);
+      return;
+    }
+    setDragging(false);
+    // Force style flush then animate via CSS transition
+    setOffset(fromOffset ?? offsetRef.current);
+    requestAnimationFrame(() => setOffset(target));
+  };
+
+  const onPointerDown = (e) => {
+    if (n < 2) return;
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      baseOffset: offsetRef.current,
+      moved: false,
+    };
+    setDragging(true);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    const d = dragRef.current;
+    if (!d.active) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 3) d.moved = true;
+    const min = -(n - 1) * step;
+    const next = Math.max(min - step * 0.35, Math.min(step * 0.35, d.baseOffset + dx));
+    setOffset(next);
+  };
+
+  const endDrag = () => {
+    const d = dragRef.current;
+    if (!d.active) return;
+    d.active = false;
+    const nearest = Math.round(-offsetRef.current / step);
+    settleTo(nearest, offsetRef.current);
+  };
+
+  const active = samples?.[index] || samples?.[0];
+  const trackTransition = dragging || reducedMotion
+    ? 'none'
+    : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+
   return (
-    <div
-      style={{
-        overflow: 'hidden',
-        maskImage: 'linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)',
-        ...style,
-      }}
-    >
+    <div style={{ width: '100%' }}>
       <div
-        className="vc-landing-carousel-track"
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Estilos de capa"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         style={{
-          display: 'flex',
-          gap: isMobile ? 10 : 14,
-          width: 'max-content',
-          padding: isMobile ? '0 16px' : '0 clamp(24px, 5vw, 48px)',
+          overflow: 'hidden',
+          touchAction: 'pan-y',
+          cursor: dragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          maskImage: 'linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)',
+          padding: isMobile ? '8px 0 4px' : '12px 0 8px',
         }}
       >
-        {[...IMG.carouselSamples, ...IMG.carouselSamples].map((src, i) => (
-          <div
-            key={`${src}-${i}`}
+        <div
+          style={{
+            display: 'flex',
+            gap,
+            width: 'max-content',
+            transform: `translateX(calc(50% - ${cardW / 2}px + ${offset}px))`,
+            transition: trackTransition,
+            willChange: 'transform',
+          }}
+        >
+          {(samples || []).map((item, i) => {
+            const dist = Math.abs(i - index);
+            const isCenter = i === index;
+            const scale = isCenter ? 1 : dist === 1 ? 0.86 : 0.8;
+            return (
+              <div
+                key={`${item.src}-${i}`}
+                onClick={() => {
+                  if (dragRef.current.moved) return;
+                  settleTo(i);
+                }}
+                style={{
+                  flexShrink: 0,
+                  width: cardW,
+                  aspectRatio: '4 / 5',
+                  borderRadius: 16,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: isCenter
+                    ? '0 8px 28px rgba(0,0,0,0.35)'
+                    : '0 4px 16px rgba(0,0,0,0.22)',
+                  overflow: 'hidden',
+                  background: 'var(--bg-secondary)',
+                  transform: `scale(${scale})`,
+                  transition: reducedMotion
+                    ? 'none'
+                    : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+                  opacity: isCenter ? 1 : 0.72,
+                }}
+              >
+                <img
+                  src={item.src}
+                  alt=""
+                  width={720}
+                  height={900}
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {active && (
+        <div style={{
+          textAlign: 'center',
+          padding: isMobile ? '16px 16px 0' : '20px clamp(24px, 5vw, 48px) 0',
+        }}>
+          <p style={{
+            margin: '0 0 4px',
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: 600,
+            letterSpacing: '-0.018em',
+            color: 'var(--text-primary)',
+          }}>
+            {active.name}
+          </p>
+          <p style={{
+            margin: '0 0 16px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+            fontWeight: 600,
+          }}>
+            {active.segment}
+          </p>
+          <button
+            type="button"
+            className="vc-landing-cta"
+            onClick={() => onUseStyle?.()}
             style={{
-              flexShrink: 0,
-              width: isMobile ? 152 : 200,
-              aspectRatio: '4 / 5',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--glass-border-strong)',
-              boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
-              overflow: 'hidden',
-              background: 'var(--bg-secondary)',
+              height: 44,
+              padding: '0 22px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'var(--bg-glass)',
+              color: 'var(--text-primary)',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
             }}
           >
-            <img
-              src={src}
-              alt=""
-              width={720}
-              height={900}
-              loading="lazy"
-              decoding="async"
-              style={{
-                display: 'block',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          </div>
-        ))}
-      </div>
+            Usar este estilo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -370,9 +508,9 @@ function RevealSection({ children, variant = 'rise', style, className = '', eage
 
 export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
   const heroRef = useRef(null);
+  const [activeMode, setActiveMode] = useState('criador');
+  const [navOpen, setNavOpen] = useState(false);
 
-  // Refs pros efeitos GSAP (reveal de texto, parallax de imagem e header
-  // fixo) — ver src/hooks/useLandingGsapEffects.js pra a lógica em si.
   const heroTitleRef = useRef(null);
   const notEditorTitleRef = useRef(null);
   const ctaSectionRef = useRef(null);
@@ -383,13 +521,27 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
   const modosImageRef = useRef(null);
   const stepsGridRef = useRef(null);
 
+  const scrollToId = (id) => {
+    setNavOpen(false);
+    const shell = document.querySelector('.vc-landing-shell');
+    const target = document.getElementById(id);
+    if (!target) return;
+    if (shell) {
+      const shellRect = shell.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      shell.scrollTop += targetRect.top - shellRect.top - 88;
+    } else {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   useLandingGsapEffects({
     splitRefs: [heroTitleRef, notEditorTitleRef],
     parallaxLayers: [
-      { ref: heroBgRef, speed: 0.65 },
-      { ref: problemImageRef, speed: 0.32 },
-      { ref: modosImageRef, speed: 0.28 },
-      { ref: stepsGridRef, speed: 0.18 },
+      { ref: heroBgRef, speed: 0.35 },
+      { ref: problemImageRef, speed: 0.22 },
+      { ref: modosImageRef, speed: 0.18 },
+      { ref: stepsGridRef, speed: 0.12 },
     ],
     ctaSectionRef,
     ctaImageRef,
@@ -399,125 +551,172 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
     isMobile,
   });
 
+  const activeModeData = MODES.find((m) => m.id === activeMode) || MODES[0];
+
+  const eyebrowStyle = {
+    margin: '0 0 8px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--text-muted)',
+    fontWeight: 600,
+  };
+
+  const sectionTitleStyle = {
+    margin: '0 0 12px',
+    fontSize: isMobile ? 'clamp(1.75rem, 7vw, 2.25rem)' : 'clamp(2.25rem, 4vw, 3.1rem)',
+    fontWeight: 600,
+    letterSpacing: '-0.028em',
+    fontFamily: 'var(--font-display)',
+    lineHeight: 1.04,
+    color: 'var(--text-primary)',
+  };
+
   return (
     <div
       className="vc-onboarding-landing"
       style={{
         minHeight: '100vh',
         width: '100%',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
+        background: 'var(--ld-bg)',
+        color: 'var(--ld-text)',
         fontFamily: 'var(--font-ui)',
         overflowX: 'hidden',
+        '--ld-bg': '#0B0A10',
+        '--ld-bg-2': '#121119',
+        '--ld-elevated': 'rgba(255,255,255,0.055)',
+        '--ld-text': '#F5F3F4',
+        '--ld-text-2': '#AAA6AD',
+        '--ld-muted': '#76727C',
+        '--ld-accent': '#FF2D8D',
+        '--ld-accent-press': '#E8257D',
+        '--ld-border': 'rgba(255,255,255,0.10)',
+        '--bg-primary': '#0B0A10',
+        '--bg-secondary': '#121119',
+        '--bg-tertiary': '#16141e',
+        '--bg-glass': 'rgba(255,255,255,0.055)',
+        '--bg-glass-strong': 'rgba(255,255,255,0.08)',
+        '--text-primary': '#F5F3F4',
+        '--text-secondary': '#AAA6AD',
+        '--text-muted': '#76727C',
+        '--accent': '#FF2D8D',
+        '--accent-hover': '#E8257D',
+        '--accent-surface': 'rgba(255,45,141,0.12)',
+        '--hairline': 'rgba(255,255,255,0.10)',
+        '--glass-border': 'rgba(255,255,255,0.10)',
+        '--glass-border-strong': 'rgba(255,255,255,0.14)',
+        '--shadow-pink': '0 8px 24px rgba(255, 45, 141, 0.18)',
+        '--gradient-bg': '#0B0A10',
       }}
     >
       <style>{`
-        @keyframes vcLandingFloat {
-          0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
-          50% { transform: translateY(-10px) rotate(var(--rot, 0deg)); }
-        }
-        @keyframes vcLandingPulse {
-          0%, 100% { opacity: 0.45; transform: scale(1); }
-          50% { opacity: 0.75; transform: scale(1.06); }
-        }
-        @keyframes vcLandingScrollCue {
-          0%, 100% { transform: translateY(0); opacity: 0.7; }
-          50% { transform: translateY(5px); opacity: 1; }
-        }
-        .vc-landing-scroll-cue {
-          animation: vcLandingScrollCue 1.8s ease-in-out infinite;
+        .vc-landing-marquee-track {
+          animation: vcLandingMarquee 32s linear infinite;
         }
         @keyframes vcLandingMarquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        @keyframes vcLandingCarouselMarquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .vc-landing-slide-card {
-          animation: vcLandingFloat 5.5s ease-in-out infinite;
-        }
-        .vc-landing-slide-card:nth-child(2) { animation-delay: -1.2s; }
-        .vc-landing-slide-card:nth-child(3) { animation-delay: -2.4s; }
-        .vc-landing-glow {
-          animation: vcLandingPulse 8s ease-in-out infinite;
-        }
-        .vc-landing-marquee-track {
-          animation: vcLandingMarquee 28s linear infinite;
-        }
-        .vc-landing-carousel-track {
-          animation: vcLandingCarouselMarquee 36s linear infinite;
-        }
         @media (prefers-reduced-motion: reduce) {
-          .vc-landing-slide-card,
-          .vc-landing-glow,
-          .vc-landing-marquee-track,
-          .vc-landing-carousel-track,
-          .vc-landing-scroll-cue {
-            animation: none !important;
-          }
+          .vc-landing-marquee-track { animation: none !important; }
         }
-        .vc-landing-cta:active { transform: scale(0.95); }
+        .vc-landing-cta:active { transform: scale(0.98); }
         .vc-landing-cta {
-          transition: transform var(--motion-fast) var(--ease-smooth),
-                      background var(--motion-base) var(--ease-smooth),
-                      box-shadow var(--motion-base) var(--ease-smooth);
+          transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
         }
-        .vc-landing-cta:hover {
+        .vc-landing-cta.primary:hover {
           background: var(--accent-hover) !important;
-          box-shadow: 0 8px 32px rgba(255, 45, 141, 0.35);
+          box-shadow: 0 8px 24px rgba(255, 45, 141, 0.22);
         }
-        .vc-landing-cap-chip:hover {
-          border-color: var(--glass-border-strong);
-          background: var(--bg-glass-strong);
-        }
+        .vc-landing-cap-chip:hover,
         .vc-landing-gen-layer:hover {
-          border-color: rgba(255, 45, 141, 0.35);
-          background: var(--bg-glass-strong);
+          border-color: rgba(255,255,255,0.16);
+          background: rgba(255,255,255,0.08);
+          transform: translateY(-2px);
+        }
+        .vc-landing-gen-layer {
+          transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+        }
+        .vc-landing-nav-link {
+          background: none; border: none; cursor: pointer;
+          color: var(--text-secondary); font-size: 13px; font-weight: 540;
+          font-family: var(--font-ui); padding: 8px 10px; border-radius: 999px;
+        }
+        .vc-landing-nav-link:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+        .vc-landing-mode-seg {
+          position: relative; display: inline-flex; padding: 4px; width: min(100%, 420px);
+          border-radius: 999px; border: 1px solid var(--hairline);
+          background: rgba(255,255,255,0.04);
+        }
+        .vc-landing-mode-seg button {
+          position: relative; z-index: 1; border: none; background: transparent;
+          color: var(--text-secondary); font-size: 14px; font-weight: 600;
+          font-family: var(--font-ui); padding: 10px 18px; border-radius: 999px;
+          cursor: pointer; transition: color 0.25s ease;
+        }
+        .vc-landing-mode-seg button[aria-selected="true"] { color: var(--text-primary); }
+        .vc-landing-mode-pill {
+          position: absolute; top: 4px; bottom: 4px; border-radius: 999px;
+          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,45,141,0.45);
+          transition: left 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+          pointer-events: none;
         }
       `}</style>
 
-      {/* Header fixo — some no topo do hero, entra com transição suave (GSAP)
-          assim que o usuário rola além do hero. Estado inicial (oculto) já
-          vem no style pra não piscar antes do JS montar. */}
+      {/* Nav flutuante */}
       <div
         ref={stickyHeaderRef}
+        data-always-visible="true"
         style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 20,
-          opacity: 0,
-          transform: 'translateY(-100%)',
+          top: isMobile ? 10 : 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 30,
+          width: isMobile ? 'calc(100% - 20px)' : 'min(920px, calc(100% - 32px))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: isMobile ? '10px 16px' : '10px clamp(24px, 5vw, 48px)',
-          background: 'var(--bg-glass-strong)',
-          backdropFilter: 'blur(18px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-          borderBottom: '1px solid var(--glass-border-strong)',
+          gap: 8,
+          padding: isMobile ? '8px 10px' : '8px 12px 8px 16px',
+          borderRadius: 999,
+          background: 'rgba(11,10,16,0.72)',
+          backdropFilter: 'blur(20px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
         }}
       >
-        <BrandLogo height={26} />
+        <BrandLogo height={22} />
+        {!isMobile && (
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button type="button" className="vc-landing-nav-link" onClick={() => scrollToId('produto')}>Produto</button>
+            <button type="button" className="vc-landing-nav-link" onClick={() => scrollToId('templates')}>Templates</button>
+            <button type="button" className="vc-landing-nav-link" onClick={() => scrollToId('como-funciona')}>Como funciona</button>
+            <button type="button" className="vc-landing-nav-link" onClick={() => scrollToId('planos')}>Preço</button>
+          </nav>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isMobile && (
+            <button
+              type="button"
+              className="vc-landing-nav-link"
+              onClick={() => setNavOpen((v) => !v)}
+              aria-expanded={navOpen}
+              aria-label="Menu"
+            >
+              Menu
+            </button>
+          )}
           {onLogin && (
             <button
               type="button"
               onClick={onLogin}
               style={{
-                height: 36,
-                padding: '0 14px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-primary)',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
+                height: 36, padding: '0 14px', borderRadius: 999, border: 'none',
+                background: 'transparent', color: 'var(--text-primary)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-ui)',
               }}
             >
               Entrar
@@ -525,471 +724,253 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           )}
           <button
             type="button"
-            className="vc-landing-cta"
-            onClick={() => {
-              const shell = document.querySelector('.vc-landing-shell');
-              const target = document.getElementById('como-funciona');
-              if (shell && target) {
-                const shellRect = shell.getBoundingClientRect();
-                const targetRect = target.getBoundingClientRect();
-                shell.scrollTop += targetRect.top - shellRect.top - 24;
-              } else {
-                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }}
+            className="vc-landing-cta primary"
+            onClick={onEnter}
             style={{
-              height: 36,
-              padding: '0 18px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--glass-border-strong)',
-              background: 'var(--bg-glass)',
-              color: 'var(--text-primary)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
+              height: 36, padding: '0 16px', borderRadius: 999, border: 'none',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-ui)',
             }}
           >
-            Conhecer o studio
+            Começar
           </button>
         </div>
       </div>
+      {isMobile && navOpen && (
+        <div style={{
+          position: 'fixed', top: 64, left: 10, right: 10, zIndex: 29,
+          padding: 12, borderRadius: 16, background: 'rgba(11,10,16,0.92)',
+          border: '1px solid var(--hairline)', backdropFilter: 'blur(16px)',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          {[
+            ['produto', 'Produto'],
+            ['templates', 'Templates'],
+            ['como-funciona', 'Como funciona'],
+            ['planos', 'Preço'],
+          ].map(([id, label]) => (
+            <button key={id} type="button" className="vc-landing-nav-link" onClick={() => scrollToId(id)} style={{ textAlign: 'left' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Ambient layers */}
-      <div aria-hidden style={{
-        position: 'fixed',
-        inset: 0,
-        pointerEvents: 'none',
-        zIndex: 0,
-        background: `
-          radial-gradient(ellipse 80% 60% at 85% 15%, rgba(255, 45, 141, 0.14) 0%, transparent 55%),
-          radial-gradient(ellipse 70% 50% at 10% 85%, rgba(143, 125, 255, 0.10) 0%, transparent 50%),
-          var(--gradient-bg)
-        `,
-      }} />
-
-      {/* ── HERO — full-bleed cinematográfico ── */}
+      {/* HERO split */}
       <header
         ref={heroRef}
         style={{
           position: 'relative',
           zIndex: 1,
-          minHeight: isMobile ? '92svh' : '100svh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          minHeight: isMobile ? 'auto' : '100svh',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1.05fr',
+          gap: 0,
+          paddingTop: isMobile ? 72 : 88,
+          background: 'var(--ld-bg)',
         }}
       >
-        {/* Fundo — foto real em alta resolução (1920px, otimizada a partir do
-            original 2752×1536 enviado pelo usuário), sem precisar de blur pra
-            disfarçar baixa resolução como na versão anterior. Overlay escuro
-            só o suficiente pra garantir contraste do texto por cima. Ken
-            Burns (GSAP, no ref) dá o movimento contínuo que o vídeo do site
-            de referência tinha. */}
-        <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: isMobile ? '32px 20px 28px' : '48px clamp(28px, 5vw, 64px) 64px',
+          maxWidth: 560,
+        }}>
+          <p style={{ ...eyebrowStyle, marginBottom: 16 }}>Viral. Carrossel Studio</p>
+          <h1
+            ref={heroTitleRef}
+            style={{
+              margin: '0 0 20px',
+              fontSize: isMobile ? 'clamp(2.2rem, 9vw, 2.8rem)' : 'clamp(2.75rem, 5vw, 4.25rem)',
+              fontWeight: 600,
+              letterSpacing: '-0.035em',
+              lineHeight: 1.0,
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            Sua ideia merece
+            <br />
+            mais que slides bonitos.
+          </h1>
+          <p style={{
+            margin: '0 0 28px',
+            fontSize: isMobile ? 16 : 18,
+            lineHeight: 1.55,
+            color: 'var(--text-secondary)',
+            maxWidth: '36ch',
+          }}>
+            Transforme um tema em uma narrativa pronta para prender, convencer e publicar.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="vc-landing-cta primary"
+              onClick={onEnter}
+              style={{
+                height: 52, padding: '0 26px', borderRadius: 999, border: 'none',
+                background: 'var(--accent)', color: '#fff', fontSize: 16, fontWeight: 600,
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10,
+                fontFamily: 'var(--font-ui)', boxShadow: 'var(--shadow-pink)',
+              }}
+            >
+              Começar um carrossel
+              <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToId('produto')}
+              style={{
+                height: 52, padding: '0 22px', borderRadius: 999,
+                border: '1px solid var(--hairline)', background: 'transparent',
+                color: 'var(--text-primary)', fontSize: 15, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-ui)',
+              }}
+            >
+              Ver o produto
+            </button>
+          </div>
+        </div>
+
+        <div style={{
+          position: 'relative',
+          minHeight: isMobile ? 320 : 'auto',
+          overflow: 'hidden',
+          background: 'var(--ld-bg-2)',
+        }}>
           <img
             ref={heroBgRef}
             src={IMG.heroPhoto}
             alt=""
             style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              // A foto é bem larga (paisagem) e ele fica no lado direito.
-              // Num crop retrato (mobile), "center" corta bem no meio e some
-              // com ele quase todo — desloca a âncora horizontal pra ~72%
-              // pra manter o rosto dele dentro do enquadramento.
-              objectPosition: isMobile ? '72% 18%' : 'center 30%',
-              filter: 'saturate(104%)',
-              transform: 'scale(1.04)',
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: 'cover', objectPosition: isMobile ? '72% 18%' : '62% 28%',
+              opacity: 0.55,
             }}
           />
           <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: `
-              linear-gradient(180deg, rgba(14,12,20,0.5) 0%, rgba(14,12,20,0.38) 38%, rgba(14,12,20,0.94) 100%),
-              radial-gradient(ellipse 70% 55% at 50% 20%, rgba(255,45,141,0.14) 0%, transparent 60%)
-            `,
+            position: 'absolute', inset: 0,
+            background: isMobile
+              ? 'linear-gradient(180deg, #0B0A10 0%, transparent 28%, rgba(11,10,16,0.55) 100%)'
+              : 'linear-gradient(90deg, #0B0A10 0%, rgba(11,10,16,0.35) 28%, transparent 55%)',
           }} />
-        </div>
-
-        <nav style={{
-          position: 'relative',
-          zIndex: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: isMobile
-            ? 'calc(16px + env(safe-area-inset-top, 0)) 16px 0'
-            : 'calc(20px + env(safe-area-inset-top, 0)) clamp(24px, 5vw, 48px) 0',
-          maxWidth: 1280,
-          margin: '0 auto',
-          width: '100%',
-        }}>
-          <BrandLogo height={isMobile ? 28 : 34} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {onLogin && (
-              <button
-                type="button"
-                onClick={onLogin}
-                style={{
-                  height: 40,
-                  padding: '0 16px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid transparent',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                Entrar
-              </button>
-            )}
-            <button
-              type="button"
-              className="vc-landing-cta"
-              onClick={() => {
-                const shell = document.querySelector('.vc-landing-shell');
-                const target = document.getElementById('como-funciona');
-                if (shell && target) {
-                  const shellRect = shell.getBoundingClientRect();
-                  const targetRect = target.getBoundingClientRect();
-                  shell.scrollTop += targetRect.top - shellRect.top - 24;
-                } else {
-                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }}
+          <div style={{
+            position: 'relative', zIndex: 1, height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: isMobile ? '24px 16px 40px' : '48px 40px',
+          }}>
+            <img
+              src={IMG.modosPlatform}
+              alt="Interface do Viral. Carrossel Studio"
               style={{
-                height: 40,
-                padding: '0 20px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid var(--glass-border-strong)',
-                background: 'var(--bg-glass)',
-                backdropFilter: 'blur(18px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-                color: 'var(--text-primary)',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
+                width: '100%', maxWidth: isMobile ? 420 : 560,
+                borderRadius: 16, border: '1px solid var(--hairline)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
+                display: 'block',
               }}
-            >
-              Conhecer o studio
-            </button>
+            />
           </div>
-        </nav>
-
-        <div style={{
-          position: 'relative',
-          zIndex: 2,
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          // No mobile o rosto dele fica na metade de cima da foto — texto
-          // centralizado caía bem em cima do rosto. Jogando pro final
-          // (flex-end) o texto desce pra área do suéter (mais neutra,
-          // melhor contraste) em vez de sobrepor o rosto.
-          justifyContent: isMobile ? 'flex-end' : 'center',
-          textAlign: 'center',
-          gap: isMobile ? 20 : 24,
-          width: 'min(1100px, 92vw)',
-          margin: '0 auto',
-          padding: isMobile ? '48px 20px 56px' : '64px clamp(24px, 5vw, 48px) 96px',
-        }}>
-          <p className="section-label" style={{
-            margin: 0,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'var(--accent)',
-            fontWeight: 600,
-          }}>
-            Viral. · Studio editorial com IA
-          </p>
-          <h1 ref={heroTitleRef} style={{
-            margin: 0,
-            maxWidth: '100%',
-            fontSize: isMobile ? 'clamp(2.4rem, 11vw, 3.1rem)' : 'clamp(3.2rem, 6vw, 5.25rem)',
-            fontWeight: 600,
-            letterSpacing: '-0.03em',
-            // 1.02 era apertado demais: o SplitText embrulha cada linha numa
-            // caixa com overflow:hidden do tamanho exato da linha (pro efeito
-            // de reveal). Com pouca folga, descendentes de letras como "g"
-            // (gancho) ficam por baixo da caixa e são cortados. 1.14 dá
-            // espaço suficiente sem perder o aperto visual do display.
-            lineHeight: 1.14,
-            fontFamily: 'var(--font-display)',
-          }}>
-            Sua ideia já é boa.
-            <br />
-            Agora ela precisa{' '}
-            <span style={{ color: 'var(--accent)' }}>prender até o fim.</span>
-          </h1>
-          <p style={{
-            margin: 0,
-            fontSize: isMobile ? 16 : 19,
-            lineHeight: 1.5,
-            letterSpacing: '-0.011em',
-            color: 'var(--text-secondary)',
-            maxWidth: '48ch',
-          }}>
-            Transforme um tema em narrativa, slides, visual e legenda — tudo no mesmo fluxo,
-            com a identidade da sua marca e espaço para deixar cada palavra com a sua cara.
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
-            <button
-              type="button"
-              className="vc-landing-cta"
-              onClick={onEnter}
-              style={{
-                height: 52,
-                padding: '0 28px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                fontFamily: 'var(--font-ui)',
-                boxShadow: 'var(--shadow-pink)',
-              }}
-            >
-              <Sparkles size={18} />
-              Criar meu primeiro carrossel
-              <ArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                const shell = document.querySelector('.vc-landing-shell');
-                const target = document.getElementById('como-funciona');
-                if (shell && target) {
-                  const shellRect = shell.getBoundingClientRect();
-                  const targetRect = target.getBoundingClientRect();
-                  shell.scrollTop += targetRect.top - shellRect.top - 24;
-                } else {
-                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }}
-              style={{
-                height: 52,
-                padding: '0 24px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1px solid var(--glass-border-strong)',
-                background: 'var(--bg-glass)',
-                backdropFilter: 'blur(18px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-                color: 'var(--text-primary)',
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
-              }}
-            >
-              Ver como funciona
-            </button>
-          </div>
-          <p style={{
-            margin: 0,
-            fontSize: 13,
-            lineHeight: 1.45,
-            color: 'var(--text-muted)',
-            maxWidth: '42ch',
-          }}>
-            Do tema ao arquivo pronto para publicar. Sem começar do zero em cada slide.
-          </p>
         </div>
       </header>
 
-      {/* ── SHOWCASE criador + mobile (logo após o hero) ── */}
+      {/* ── PRODUTO ── */}
       <RevealSection
-        variant="scale"
+        variant="rise"
+        id="produto"
         style={{
           position: 'relative',
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '32px 16px 28px' : '48px clamp(24px, 5vw, 48px) 40px',
+          padding: isMobile ? '40px 16px 28px' : '64px clamp(24px, 5vw, 48px) 40px',
         }}
       >
+        <p style={eyebrowStyle}>Demonstração</p>
+        <h2 style={sectionTitleStyle}>O studio em ação.</h2>
         <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Da ideia ao feed</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 24 : 32,
-          fontWeight: 600,
-          letterSpacing: '-0.022em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
+          margin: '0 0 28px', fontSize: 18, lineHeight: 1.55,
+          color: 'var(--text-secondary)', maxWidth: '48ch',
         }}>
-          Um tema. Uma linha de raciocínio.
-          <br />
-          Um carrossel inteiro.
-        </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '48ch',
-        }}>
-          Veja a mesma ideia ganhar gancho, ritmo, identidade visual e um fechamento que faz sentido.
+          Do tema ao arquivo: narrativa, slides, marca e exportação no mesmo projeto —
+          com a interface real do Viral.
         </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.05fr 0.95fr',
-          gap: 16,
-          alignItems: 'stretch',
-        }}>
-          <div style={{
-            position: 'relative',
-            height: isMobile ? 320 : 440,
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
+        <LandingImage
+          ref={modosImageRef}
+          src={IMG.modosPlatform}
+          alt="Editor do Viral. Carrossel Studio"
+          rounded={16}
+          style={{
             border: '1px solid var(--hairline)',
-          }}>
-            <LandingImage
-              src={IMG.showcaseWindowPhone}
-              alt="Criadora revisando o carrossel publicado no Instagram"
-              rounded={0}
-              style={{
-                border: 'none',
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center 20%',
-              }}
-            />
-          </div>
-          <div style={{
-            position: 'relative',
-            height: isMobile ? 320 : 440,
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            border: '1px solid var(--hairline)',
-          }}>
-            <LandingImage
-              src={IMG.showcasePhoneNike}
-              alt="Exemplo de carrossel publicado no feed do Instagram"
-              rounded={0}
-              style={{
-                border: 'none',
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          </div>
-        </div>
+            boxShadow: '0 20px 56px rgba(0,0,0,0.4)',
+          }}
+        />
       </RevealSection>
 
-      {/* ── PROBLEMA EDITORIAL ── */}
+      {/* ── TEMPLATES / GALERIA ── */}
+      <RevealSection
+        variant="scale"
+        id="templates"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          padding: isMobile ? '28px 0 40px' : '36px 0 56px',
+          background: 'var(--ld-bg-2)',
+        }}
+      >
+        <div style={{
+          maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '0 16px 8px' : '0 clamp(24px, 5vw, 48px) 12px',
+        }}>
+          <p style={eyebrowStyle}>Resultados</p>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 8 }}>Capas que já saíram do studio.</h2>
+          <p style={{
+            margin: '0 0 8px', fontSize: 17, lineHeight: 1.5,
+            color: 'var(--text-secondary)', maxWidth: '42ch',
+          }}>
+            Arraste para explorar. Escolha um estilo e comece a partir dele.
+          </p>
+        </div>
+        <CoverCarousel isMobile={isMobile} samples={SAMPLE_COVERS} onUseStyle={onEnter} />
+      </RevealSection>
+
+      {/* ── PROBLEMA ── */}
       <RevealSection
         variant="rise"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '0 16px 16px' : '0 clamp(24px, 5vw, 48px) 20px',
+          position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '40px 16px 32px' : '64px clamp(24px, 5vw, 48px) 40px',
         }}
       >
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1.05fr',
-          gap: isMobile ? 24 : 40,
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: isMobile ? 28 : 48,
           alignItems: 'center',
-          padding: isMobile ? '28px 20px' : '36px 40px',
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid var(--hairline)',
-          background: 'var(--bg-secondary)',
         }}>
           <div>
-            <p style={{
-              margin: '0 0 20px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-            }}>O trabalho que ninguém vê</p>
-            <blockquote style={{
-              margin: '0 0 16px',
-              padding: 0,
-              border: 'none',
-              fontSize: isMobile ? 20 : 26,
-              fontWeight: 600,
-              letterSpacing: '-0.022em',
-              lineHeight: 1.25,
-              fontFamily: 'var(--font-display)',
-              color: 'var(--text-primary)',
-            }}>
+            <p style={eyebrowStyle}>O trabalho que ninguém vê</p>
+            <h2 style={sectionTitleStyle}>
               O difícil não é fazer slides.
               <br />
-              <span style={{ color: 'var(--accent)' }}>É saber o que cada slide precisa dizer.</span>
-            </blockquote>
+              É saber o que cada slide precisa dizer.
+            </h2>
             <p style={{
-              margin: '0 0 24px',
-              fontSize: 15,
-              lineHeight: 1.47,
+              margin: '0 0 24px', fontSize: 17, lineHeight: 1.55,
               color: 'var(--text-secondary)',
             }}>
               Uma boa ideia costuma se perder entre o documento em branco, o prompt genérico
               e horas ajustando detalhes. Quando tudo fica pronto, os slides até parecem bonitos —
               mas não levam o leitor a lugar nenhum.
             </p>
-            <ul style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
               {PAIN_POINTS.map((line) => (
-                <li
-                  key={line}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                    fontSize: 15,
-                    lineHeight: 1.47,
-                    color: 'var(--text-secondary)',
-                  }}
-                >
+                <li key={line} style={{
+                  display: 'flex', gap: 12, alignItems: 'flex-start',
+                  fontSize: 16, lineHeight: 1.5, color: 'var(--text-secondary)',
+                }}>
                   <span style={{
-                    flexShrink: 0,
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
-                    marginTop: 8,
+                    flexShrink: 0, width: 6, height: 6, borderRadius: '50%',
+                    background: 'var(--accent)', marginTop: 9,
                   }} aria-hidden />
                   {line}
                 </li>
@@ -999,555 +980,184 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           <LandingImage
             ref={problemImageRef}
             src={IMG.problem}
-            alt="Interface de dados e criação com IA"
+            alt="Fluxo de criação com IA"
+            rounded={16}
+            style={{ border: '1px solid var(--hairline)' }}
           />
         </div>
       </RevealSection>
 
-      <RevealSection
-        variant="rise"
-        eager
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          padding: isMobile ? '12px 0 20px' : '16px 0 24px',
-          overflow: 'hidden',
-        }}
-      >
-        <CarouselSlideStrip isMobile={isMobile} />
-      </RevealSection>
-
-      {/* ── NÃO É EDITOR ── */}
+      {/* ── COMO O VIRAL RESOLVE ── */}
       <RevealSection
         variant="rise"
         id="nao-editor"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 24px' : '32px clamp(24px, 5vw, 48px) 28px',
+          position: 'relative', zIndex: 1, maxWidth: 800, margin: '0 auto',
+          padding: isMobile ? '24px 16px 48px' : '32px clamp(24px, 5vw, 48px) 64px',
         }}
       >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Um studio, não só um editor</p>
-        <h2 ref={notEditorTitleRef} style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 28 : 40,
-          fontWeight: 600,
-          letterSpacing: '-0.028em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.1,
-          maxWidth: '22ch',
-        }}>
-          O Viral. não começa pela caixa de texto.
-          Começa pelo que você quer fazer alguém perceber.
+        <p style={eyebrowStyle}>Um studio, não só um editor</p>
+        <h2 ref={notEditorTitleRef} style={sectionTitleStyle}>
+          O Viral. começa pelo que você quer fazer alguém perceber.
         </h2>
         <p style={{
-          margin: '0 0 32px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
+          margin: '0 0 32px', fontSize: 17, lineHeight: 1.55,
+          color: 'var(--text-secondary)', maxWidth: '52ch',
         }}>
-          Você traz o tema, uma referência ou um material bruto. O studio organiza a tese,
-          constrói o arco e transforma essa direção em um carrossel pronto para ser refinado.
+          Você traz o tema. O studio organiza a tese, constrói o arco e transforma
+          essa direção em um carrossel pronto para refinar.
         </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile
-            ? '1fr'
-            : 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 12,
-        }}>
-          {GENERATION_LAYERS.map(({ n, icon: Icon, title, body }) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {GENERATION_LAYERS.map(({ n, title, body }, i) => (
             <div
               key={title}
               className="vc-landing-gen-layer"
               style={{
-                padding: '20px 18px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-                backdropFilter: 'blur(12px)',
-                transition: 'border-color 0.2s, background 0.2s',
+                display: 'grid',
+                gridTemplateColumns: '56px 1fr',
+                gap: 16,
+                padding: '20px 0',
+                borderTop: i === 0 ? '1px solid var(--hairline)' : undefined,
+                borderBottom: '1px solid var(--hairline)',
               }}
             >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 14,
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: 'var(--accent-surface)',
-                  color: 'var(--accent)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Icon size={18} strokeWidth={2} />
-                </div>
-                <span style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.06em',
-                  color: 'var(--text-muted)',
-                  fontWeight: 600,
-                }}>{n}</span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
+                letterSpacing: '0.06em', color: 'var(--accent)', paddingTop: 2,
+              }}>{n}</span>
+              <div>
+                <h3 style={{
+                  margin: '0 0 4px', fontSize: 18, fontWeight: 600,
+                  letterSpacing: '-0.012em',
+                }}>{title}</h3>
+                <p style={{ margin: 0, fontSize: 16, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{body}</p>
               </div>
-              <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: '-0.018em',
-              }}>{title}</h3>
-              <p style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.45,
-                color: 'var(--text-secondary)',
-              }}>{body}</p>
             </div>
           ))}
         </div>
       </RevealSection>
 
-      {/* ── OUTCOMES ── */}
-      <RevealSection
-        variant="rise"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 24px' : '28px clamp(24px, 5vw, 48px) 32px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>O que sai do studio</p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
-          gap: 12,
-          marginTop: 20,
-        }}>
-          {OUTCOMES.map(({ title, body }) => (
-            <div
-              key={title}
-              style={{
-                padding: '20px 18px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-secondary)',
-              }}
-            >
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: 'var(--accent-surface)',
-                color: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 14,
-              }}>
-                <Check size={16} strokeWidth={2.5} />
-              </div>
-              <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: '-0.016em',
-              }}>{title}</h3>
-              <p style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.45,
-                color: 'var(--text-secondary)',
-              }}>{body}</p>
-            </div>
-          ))}
-        </div>
-      </RevealSection>
-
-      {/* ── CONTRASTE ── */}
-      <RevealSection
-        variant="rise"
-        id="contraste"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '8px 16px 28px' : '12px clamp(24px, 5vw, 48px) 36px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Existe uma diferença</p>
-        <h2 style={{
-          margin: '0 0 28px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-          maxWidth: '20ch',
-        }}>
-          Gerar texto é fácil.
-          <br />
-          Construir uma leitura é outra coisa.
-        </h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-          gap: 16,
-        }}>
-          <div style={{
-            padding: isMobile ? 22 : 28,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid var(--hairline)',
-            background: 'var(--bg-secondary)',
-          }}>
-            <p style={{
-              margin: '0 0 20px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-            }}>Um prompt solto</p>
-            <ul style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}>
-              {CONTRAST_WITHOUT.map((line) => (
-                <li key={line} style={{
-                  display: 'flex',
-                  gap: 12,
-                  alignItems: 'flex-start',
-                  fontSize: 15,
-                  lineHeight: 1.45,
-                  color: 'var(--text-secondary)',
-                }}>
-                  <X size={16} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: 3 }} aria-hidden />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div style={{
-            padding: isMobile ? 22 : 28,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid rgba(255, 45, 141, 0.35)',
-            background: 'linear-gradient(160deg, rgba(255,45,141,0.1) 0%, rgba(14,12,20,0.4) 100%)',
-          }}>
-            <p style={{
-              margin: '0 0 20px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--accent)',
-              fontWeight: 600,
-            }}>No Viral.</p>
-            <ul style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}>
-              {CONTRAST_WITH.map((line) => (
-                <li key={line} style={{
-                  display: 'flex',
-                  gap: 12,
-                  alignItems: 'flex-start',
-                  fontSize: 15,
-                  lineHeight: 1.45,
-                  color: 'var(--text-primary)',
-                }}>
-                  <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 3 }} aria-hidden />
-                  {line}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              className="vc-landing-cta"
-              onClick={onEnter}
-              style={{
-                marginTop: 24,
-                height: 46,
-                padding: '0 22px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                fontFamily: 'var(--font-ui)',
-                boxShadow: 'var(--shadow-pink)',
-              }}
-            >
-              <Sparkles size={16} />
-              Criar meu primeiro carrossel
-              <ArrowRight size={14} />
-            </button>
-          </div>
-        </div>
-      </RevealSection>
-
-      {/* ── MODOS ── */}
+      {/* ── MODOS SEGMENTED ── */}
       <RevealSection
         variant="rise"
         id="modos"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '8px 16px 20px' : '16px clamp(24px, 5vw, 48px) 24px',
+          position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '24px 16px 48px' : '40px clamp(24px, 5vw, 48px) 64px',
+          background: 'transparent',
         }}
       >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Você decide até onde quer ir</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 28 : 40,
-          fontWeight: 600,
-          letterSpacing: '-0.028em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.1,
-        }}>
-          Comece rápido.
+        <p style={eyebrowStyle}>Você decide até onde quer ir</p>
+        <h2 style={sectionTitleStyle}>
+          Comece simples.
           <br />
-          <span style={{ color: 'var(--accent)' }}>Assuma o controle quando quiser.</span>
+          Revele mais controle somente quando precisar.
         </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '54ch',
-        }}>
-          Há dias em que você só quer publicar uma boa ideia. Em outros, quer ajustar cada pausa,
-          cada imagem e cada palavra. O Viral. acompanha os dois ritmos sem obrigar você a virar designer.
-        </p>
-
-        <LandingImage
-          ref={modosImageRef}
-          src={IMG.modosPlatform}
-          alt="Plataforma Viral Carrossel — editor com geração de narrativa, slides e imagens por IA"
-          rounded="var(--radius-xl)"
-          style={{
-            marginBottom: isMobile ? 24 : 32,
-            border: '1px solid var(--glass-border-strong)',
-            boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
-          }}
-        />
-
-        <div style={{
-          padding: isMobile ? 20 : 28,
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid var(--glass-border)',
-          background: 'linear-gradient(135deg, rgba(255,45,141,0.06) 0%, rgba(143,125,255,0.04) 100%)',
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: 12,
-          }}>
-            {MODES.map(({ id, label, tag, desc }) => (
-              <div
-                key={id}
-                style={{
-                  padding: '16px 18px',
-                  borderRadius: 'var(--radius-md)',
-                  border: `1px solid ${id === 'criador' ? 'rgba(255,45,141,0.4)' : 'var(--hairline)'}`,
-                  background: id === 'criador' ? 'var(--accent-surface)' : 'var(--bg-glass)',
-                }}
+        <div style={{ margin: '28px 0 24px' }}>
+          <div
+            className="vc-landing-mode-seg"
+            role="tablist"
+            aria-label="Modos de trabalho"
+            style={{ width: isMobile ? '100%' : 'auto' }}
+          >
+            <span
+              className="vc-landing-mode-pill"
+              style={{
+                left: `calc(4px + ${MODES.findIndex((m) => m.id === activeMode)} * ((100% - 8px) / ${MODES.length}))`,
+                width: `calc((100% - 8px) / ${MODES.length})`,
+              }}
+            />
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={activeMode === m.id}
+                onClick={() => setActiveMode(m.id)}
+                style={{ flex: 1, minWidth: isMobile ? 0 : 110 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
-                  {tag && (
-                    <span style={{
-                      fontSize: 9,
-                      fontFamily: 'var(--font-mono)',
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      color: 'var(--accent)',
-                      fontWeight: 700,
-                    }}>{tag}</span>
-                  )}
-                </div>
-                <p style={{
-                  margin: 0,
-                  fontSize: 13,
-                  lineHeight: 1.45,
-                  color: 'var(--text-secondary)',
-                }}>{desc}</p>
-              </div>
+                {m.label}
+              </button>
             ))}
           </div>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 16,
-            alignItems: 'center',
-            marginTop: 24,
-          }}>
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '0.9fr 1.1fr',
+          gap: 24,
+          alignItems: 'center',
+          padding: isMobile ? 20 : 28,
+          borderRadius: 24,
+          background: 'var(--ld-elevated)',
+          border: '1px solid var(--hairline)',
+        }}>
+          <div>
+            {activeModeData.tag && (
+              <p style={{
+                ...eyebrowStyle, color: 'var(--accent)', marginBottom: 10,
+              }}>{activeModeData.tag}</p>
+            )}
+            <h3 style={{
+              margin: '0 0 10px', fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em',
+            }}>{activeModeData.label}</h3>
+            <p style={{
+              margin: '0 0 20px', fontSize: 16, lineHeight: 1.55, color: 'var(--text-secondary)',
+            }}>{activeModeData.desc}</p>
             <button
               type="button"
-              className="vc-landing-cta"
+              className="vc-landing-cta primary"
               onClick={onEnter}
               style={{
-                height: 48,
-                padding: '0 24px',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                fontFamily: 'var(--font-ui)',
-                boxShadow: 'var(--shadow-pink)',
+                height: 44, padding: '0 20px', borderRadius: 999, border: 'none',
+                background: 'var(--accent)', color: '#fff', fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-ui)',
               }}
             >
-              <Sparkles size={16} />
-              Começar no modo Criador
-              <ArrowRight size={14} />
+              Entrar no modo {activeModeData.label}
             </button>
-            <p style={{
-              margin: 0,
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              lineHeight: 1.47,
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.02em',
-            }}>
-              Troque de modo a qualquer momento — sem perder o projeto.
-            </p>
           </div>
+          <LandingImage
+            src={IMG.modosPlatform}
+            alt={`Modo ${activeModeData.label}`}
+            rounded={16}
+            style={{ border: '1px solid var(--hairline)' }}
+          />
         </div>
       </RevealSection>
 
       {/* ── COMO FUNCIONA ── */}
       <RevealSection
-        variant="clip"
+        variant="rise"
         id="como-funciona"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 16px' : '28px clamp(24px, 5vw, 48px) 20px',
+          position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '24px 16px 40px' : '32px clamp(24px, 5vw, 48px) 56px',
         }}
       >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Do primeiro insight ao último card</p>
-        <h2 style={{
-          margin: '0 0 28px',
-          fontSize: isMobile ? 28 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-        }}>
-          Do primeiro insight ao último card
-        </h2>
-        <div ref={stepsGridRef} style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-          gap: 16,
-        }}>
+        <p style={eyebrowStyle}>Do primeiro insight ao último card</p>
+        <h2 style={sectionTitleStyle}>Quatro passos. Uma linha de raciocínio.</h2>
+        <div
+          ref={stepsGridRef}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+            gap: 16,
+            marginTop: 28,
+          }}
+        >
           {STEPS.map(({ n, title, body, image }) => (
-            <div
-              key={n}
-              style={{
-                padding: 0,
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-                backdropFilter: 'blur(12px)',
-                overflow: 'hidden',
-              }}
-            >
+            <div key={n} style={{
+              padding: 0, borderRadius: 16, border: '1px solid var(--hairline)',
+              background: 'var(--ld-elevated)', overflow: 'hidden',
+            }}>
               <LandingImage src={image} alt="" rounded={0} style={{ border: 'none', borderRadius: 0 }} />
-              <div style={{ padding: 24 }}>
+              <div style={{ padding: isMobile ? 20 : 28 }}>
                 <div style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 13,
-                  color: 'var(--accent)',
-                  letterSpacing: '0.06em',
-                  marginBottom: 16,
-                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)',
+                  letterSpacing: '0.06em', marginBottom: 12, fontWeight: 600,
                 }}>{n}</div>
-                <h3 style={{
-                  margin: '0 0 10px',
-                  fontSize: 20,
-                  fontWeight: 600,
-                  letterSpacing: '-0.02em',
-                }}>{title}</h3>
-                <p style={{
-                  margin: 0,
-                  fontSize: 15,
-                  lineHeight: 1.47,
-                  color: 'var(--text-secondary)',
-                }}>{body}</p>
+                <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600, letterSpacing: '-0.012em' }}>{title}</h3>
+                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{body}</p>
               </div>
             </div>
           ))}
@@ -1555,23 +1165,13 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
           <button
             type="button"
-            className="vc-landing-cta"
+            className="vc-landing-cta primary"
             onClick={onEnter}
             style={{
-              height: 52,
-              padding: '0 28px',
-              borderRadius: 'var(--radius-pill)',
-              border: 'none',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-              fontFamily: 'var(--font-ui)',
-              boxShadow: 'var(--shadow-pink)',
+              height: 52, padding: '0 28px', borderRadius: 999, border: 'none',
+              background: 'var(--accent)', color: '#fff', fontSize: 16, fontWeight: 600,
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10,
+              fontFamily: 'var(--font-ui)', boxShadow: 'var(--shadow-pink)',
             }}
           >
             Quero transformar uma ideia em carrossel
@@ -1580,86 +1180,133 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── MONTAGE — capabilities marquee ── */}
+      {/* ── CONTRASTE ── */}
+      <RevealSection
+        variant="rise"
+        id="contraste"
+        style={{
+          position: 'relative', zIndex: 1, maxWidth: 720, margin: '0 auto',
+          padding: isMobile ? '24px 16px 48px' : '32px 24px 64px',
+        }}
+      >
+        <p style={eyebrowStyle}>Existe uma diferença</p>
+        <h2 style={sectionTitleStyle}>
+          Gerar texto é fácil.
+          <br />
+          Construir uma leitura é outra coisa.
+        </h2>
+        <div style={{
+          marginTop: 28, borderRadius: 16, border: '1px solid var(--hairline)',
+          overflow: 'hidden', background: 'var(--ld-elevated)',
+        }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 28px 1fr', gap: 8,
+            padding: '14px 18px', borderBottom: '1px solid var(--hairline)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
+            textTransform: 'uppercase', fontWeight: 600, color: 'var(--text-muted)',
+          }}>
+            <span>Prompt solto</span>
+            <span />
+            <span style={{ color: 'var(--accent)' }}>Viral.</span>
+          </div>
+          {CONTRAST_ROWS.map(({ left, right }) => (
+            <div key={left} style={{
+              display: 'grid', gridTemplateColumns: '1fr 28px 1fr', gap: 8,
+              padding: '16px 18px', borderBottom: '1px solid var(--hairline)',
+              fontSize: 15, lineHeight: 1.4,
+            }}>
+              <span style={{ color: 'var(--text-muted)' }}>{left}</span>
+              <span style={{ color: 'var(--text-muted)', textAlign: 'center' }}>→</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{right}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 24 }}>
+          <button
+            type="button"
+            className="vc-landing-cta primary"
+            onClick={onEnter}
+            style={{
+              height: 48, padding: '0 24px', borderRadius: 999, border: 'none',
+              background: 'var(--accent)', color: '#fff', fontSize: 15, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'var(--font-ui)',
+            }}
+          >
+            Criar meu primeiro carrossel
+          </button>
+        </div>
+      </RevealSection>
+
+      {/* ── OUTCOMES ── */}
+      <RevealSection
+        variant="rise"
+        style={{
+          position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '16px 16px 40px' : '24px clamp(24px, 5vw, 48px) 56px',
+        }}
+      >
+        <p style={eyebrowStyle}>O que sai do studio</p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 12, marginTop: 20,
+        }}>
+          {OUTCOMES.slice(0, 3).map(({ title, body }) => (
+            <div key={title} style={{
+              padding: '24px 22px', borderRadius: 16,
+              background: 'var(--ld-elevated)', border: '1px solid var(--hairline)',
+            }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600, letterSpacing: '-0.012em' }}>{title}</h3>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{body}</p>
+            </div>
+          ))}
+        </div>
+        {OUTCOMES[3] && (
+          <div style={{
+            marginTop: 12, padding: '24px 22px', borderRadius: 16,
+            background: 'var(--ld-elevated)', border: '1px solid var(--hairline)',
+            maxWidth: isMobile ? '100%' : '66%',
+          }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600 }}>{OUTCOMES[3].title}</h3>
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{OUTCOMES[3].body}</p>
+          </div>
+        )}
+      </RevealSection>
+
+      {/* ── CAPACIDADES ── */}
       <RevealSection
         variant="scale"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          padding: isMobile ? '20px 0 32px' : '28px 0 40px',
-          overflow: 'hidden',
+          position: 'relative', zIndex: 1, padding: isMobile ? '24px 0 40px' : '32px 0 56px',
+          overflow: 'hidden', background: 'var(--ld-bg-2)',
         }}
       >
         <div style={{
-          padding: isMobile ? '0 16px 12px' : '0 clamp(24px, 5vw, 48px) 16px',
-          maxWidth: 1200,
-          margin: '0 auto',
+          padding: isMobile ? '0 16px 16px' : '0 clamp(24px, 5vw, 48px) 20px',
+          maxWidth: 1200, margin: '0 auto',
         }}>
-          <p style={{
-            margin: '0 0 8px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            fontWeight: 600,
-          }}>Tudo no mesmo fluxo</p>
-          <h2 style={{
-            margin: '0 0 12px',
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: 600,
-            letterSpacing: '-0.022em',
-            fontFamily: 'var(--font-display)',
-          }}>Menos troca de abas.
-          Mais atenção na ideia.</h2>
-          <p style={{
-            margin: 0,
-            fontSize: 15,
-            lineHeight: 1.47,
-            color: 'var(--text-secondary)',
-            maxWidth: '48ch',
-          }}>
+          <p style={eyebrowStyle}>Tudo no mesmo fluxo</p>
+          <h2 style={sectionTitleStyle}>Menos troca de abas. Mais atenção na ideia.</h2>
+          <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: 'var(--text-secondary)', maxWidth: '48ch' }}>
             Pesquisa, escrita, direção visual, refinamento e exportação reunidos em um único projeto.
           </p>
         </div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)' }}>
-          <div
-            className="vc-landing-marquee-track"
-            style={{
-              display: 'flex',
-              gap: 12,
-              width: 'max-content',
-              padding: '8px 0',
-            }}
-          >
+          <div className="vc-landing-marquee-track" style={{ display: 'flex', gap: 12, width: 'max-content', padding: '8px 0' }}>
             {[...CAPABILITIES, ...CAPABILITIES].map(({ icon: Icon, label, hint }, i) => (
-              <div
-                key={`${label}-${i}`}
-                className="vc-landing-cap-chip"
-                style={{
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 14,
-                  padding: '16px 20px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--hairline)',
-                  background: 'var(--bg-tertiary)',
-                  minWidth: 220,
-                  transition: 'border-color 0.2s, background 0.2s',
-                }}
-              >
+              <div key={`${label}-${i}`} className="vc-landing-cap-chip" style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14,
+                padding: '16px 20px', borderRadius: 12, border: '1px solid var(--hairline)',
+                background: 'rgba(255,255,255,0.04)', minWidth: 240,
+              }}>
                 <div style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  background: 'var(--accent-surface)',
-                  color: 'var(--accent)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
+                  width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.06)',
+                  color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <Icon size={18} strokeWidth={2} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.014em' }}>{label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{hint}</div>
                 </div>
               </div>
@@ -1673,218 +1320,62 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         variant="rise"
         id="planos"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 40px' : '28px clamp(24px, 5vw, 48px) 64px',
+          position: 'relative', zIndex: 1, maxWidth: 720, margin: '0 auto',
+          padding: isMobile ? '40px 16px 48px' : '56px 24px 64px',
         }}
       >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Um plano. O studio inteiro.</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-        }}>
+        <p style={eyebrowStyle}>Um plano. O studio inteiro.</p>
+        <h2 style={sectionTitleStyle}>
           Você paga pelo studio.
           <br />
-          A sua produção continua nas suas mãos.
+          A produção continua nas suas mãos.
         </h2>
         <p style={{
-          margin: '0 0 32px',
-          fontSize: 17,
-          lineHeight: 1.47,
+          margin: '0 0 28px', fontSize: 17, lineHeight: 1.55,
           color: 'var(--text-secondary)',
-          maxWidth: '52ch',
         }}>
           Conecte a sua própria chave de IA e escolha o provedor que prefere.
-          Assim, você acompanha o consumo diretamente e não fica preso a pacotes de posts ou créditos escondidos.
+          Sem pacotes de posts nem créditos escondidos.
         </p>
-
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr',
-          gap: 16,
-          alignItems: 'stretch',
+          padding: isMobile ? 24 : 32, borderRadius: 24,
+          border: '1px solid var(--hairline)', background: 'var(--ld-elevated)',
         }}>
-          <div style={{
-            padding: isMobile ? 24 : 32,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid rgba(255, 45, 141, 0.4)',
-            background: 'linear-gradient(160deg, rgba(255,45,141,0.12) 0%, rgba(14,12,20,0.5) 55%)',
-            boxShadow: 'var(--shadow-pink)',
-          }}>
-            <div style={{
-              display: 'inline-flex',
-              padding: '4px 10px',
-              borderRadius: 999,
-              background: 'var(--accent-surface)',
-              color: 'var(--accent)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              marginBottom: 16,
-            }}>
-              Plano individual
-            </div>
-            <h3 style={{
-              margin: '0 0 8px',
-              fontSize: 22,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-            }}>Viral. Studio</h3>
-            <div style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 8,
-              marginBottom: 8,
-            }}>
-              <span style={{
-                fontSize: isMobile ? 40 : 48,
-                fontWeight: 600,
-                letterSpacing: '-0.03em',
-              }}>R$ 97</span>
-              <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>/mês</span>
-            </div>
-            <p style={{
-              margin: '0 0 24px',
-              fontSize: 14,
-              color: 'var(--text-secondary)',
-            }}>
-              ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong>
-              {' '}— equivalente a cerca de R$ 66/mês
-            </p>
-            <ul style={{
-              margin: '0 0 28px',
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}>
-              {PLAN_FEATURES.map((line) => (
-                <li key={line} style={{
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'flex-start',
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  color: 'var(--text-secondary)',
-                }}>
-                  <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 2 }} />
-                  {line}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              className="vc-landing-cta"
-              onClick={onEnter}
-              style={{
-                width: '100%',
-                height: 52,
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                fontFamily: 'var(--font-ui)',
-                boxShadow: 'var(--shadow-pink)',
-              }}
-            >
-              <Sparkles size={18} />
-              Entrar no Viral. Studio
-              <ArrowRight size={16} />
-            </button>
-            {onLogin && (
-              <button
-                type="button"
-                onClick={onLogin}
-                style={{
-                  marginTop: 12,
-                  width: '100%',
-                  height: 44,
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--glass-border-strong)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                Já assina? Entrar
-              </button>
-            )}
-            <p style={{
-              margin: '14px 0 0',
-              fontSize: 12,
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.03em',
-            }}>
-              Use sua própria chave de IA · Cancele quando quiser
-            </p>
+          <p style={{ ...eyebrowStyle, color: 'var(--accent)' }}>Plano individual</p>
+          <h3 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 600 }}>Viral. Studio</h3>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: isMobile ? 40 : 48, fontWeight: 600, letterSpacing: '-0.03em' }}>R$ 97</span>
+            <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>/mês</span>
           </div>
-
-          <div style={{
-            padding: isMobile ? 22 : 28,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid var(--hairline)',
-            background: 'var(--bg-secondary)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: 16,
+          <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--text-secondary)' }}>
+            ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong> — cerca de R$ 66/mês
+          </p>
+          <ul style={{ margin: '0 0 28px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {PLAN_FEATURES.map((line) => (
+              <li key={line} style={{ display: 'flex', gap: 10, fontSize: 14, lineHeight: 1.4, color: 'var(--text-secondary)' }}>
+                <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 2 }} />
+                {line}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="vc-landing-cta primary"
+            onClick={onEnter}
+            style={{
+              width: '100%', height: 52, borderRadius: 999, border: 'none',
+              background: 'var(--accent)', color: '#fff', fontSize: 16, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'var(--font-ui)', boxShadow: 'var(--shadow-pink)',
+            }}
+          >
+            Entrar no Viral. Studio
+          </button>
+          <p style={{
+            margin: '14px 0 0', fontSize: 12, textAlign: 'center', color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
           }}>
-            <p style={{
-              margin: 0,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-            }}>Por que conectar sua chave?</p>
-            <p style={{
-              margin: 0,
-              fontSize: 16,
-              lineHeight: 1.5,
-              color: 'var(--text-secondary)',
-            }}>
-              Em vez de esconder o consumo em pacotes de créditos, o Viral. deixa você
-              escolher o provedor, acompanhar os gastos e trocar de modelo quando quiser.
-            </p>
-            <p style={{
-              margin: 0,
-              fontSize: 14,
-              lineHeight: 1.45,
-              color: 'var(--text-muted)',
-            }}>
-              Você paga pelo studio. A geração fica na sua conta de IA — com transparência e controle.
-            </p>
-          </div>
+            Use sua própria chave de IA · Cancele quando quiser
+          </p>
         </div>
       </RevealSection>
 
@@ -1892,57 +1383,28 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
       <RevealSection
         variant="rise"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 720,
-          margin: '0 auto',
-          padding: isMobile ? '0 16px 64px' : '0 24px 80px',
+          position: 'relative', zIndex: 1, maxWidth: 720, margin: '0 auto',
+          padding: isMobile ? '0 16px 56px' : '0 24px 72px',
         }}
       >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Dúvidas</p>
-        <h2 style={{
-          margin: '0 0 32px',
-          fontSize: isMobile ? 24 : 30,
-          fontWeight: 600,
-          letterSpacing: '-0.022em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.15,
-        }}>
-          Antes de assinar
-        </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p style={eyebrowStyle}>Dúvidas</p>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: 28 }}>Antes de assinar</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {FAQ.map(({ q, a }) => (
-            <div
-              key={q}
-              style={{
-                padding: '20px 22px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-              }}
-            >
-              <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: '-0.016em',
-                color: 'var(--text-primary)',
-              }}>{q}</h3>
+            <details key={q} style={{
+              borderBottom: '1px solid var(--hairline)', padding: '18px 0',
+            }}>
+              <summary style={{
+                cursor: 'pointer', fontSize: 16, fontWeight: 600, letterSpacing: '-0.014em',
+                listStyle: 'none', display: 'flex', justifyContent: 'space-between', gap: 16,
+              }}>
+                {q}
+                <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>+</span>
+              </summary>
               <p style={{
-                margin: 0,
-                fontSize: 15,
-                lineHeight: 1.47,
-                color: 'var(--text-secondary)',
+                margin: '12px 0 0', fontSize: 15, lineHeight: 1.55, color: 'var(--text-secondary)',
               }}>{a}</p>
-            </div>
+            </details>
           ))}
         </div>
       </RevealSection>
@@ -1950,175 +1412,106 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
       {/* ── CTA FINAL ── */}
       <RevealSection
         variant="rise"
-        eager
         style={{
-          position: 'relative',
-          zIndex: 1,
-          textAlign: 'center',
-          padding: isMobile ? '48px 16px 64px' : '80px 24px 96px',
+          position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto',
+          padding: isMobile ? '0 16px 56px' : '0 clamp(24px, 5vw, 48px) 80px',
         }}
       >
-        <div ref={ctaSectionRef} style={{
-          position: 'relative',
-          maxWidth: 720,
-          margin: '0 auto',
-          padding: isMobile ? '40px 24px' : '56px 48px',
-          borderRadius: 'var(--radius-xl)',
-          border: '1px solid rgba(255, 45, 141, 0.28)',
-          overflow: 'hidden',
-          boxShadow: 'var(--shadow-pink)',
-        }}>
+        <div
+          ref={ctaSectionRef}
+          style={{
+            position: 'relative', overflow: 'hidden', borderRadius: 24,
+            border: '1px solid var(--hairline)', padding: isMobile ? '40px 24px' : '64px 48px',
+            textAlign: 'center', background: 'var(--ld-bg-2)',
+          }}
+        >
           <img
             ref={ctaImageRef}
             src={IMG.cta}
             alt=""
             aria-hidden
             style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              opacity: 0.32,
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: 'cover', opacity: 0.18, pointerEvents: 'none',
             }}
           />
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(165deg, rgba(14,12,20,0.88) 0%, rgba(14,12,20,0.72) 100%)',
-          }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
-          <p style={{
-            margin: '0 0 8px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--accent)',
-            fontWeight: 600,
-          }}>Sua próxima ideia já pode virar post</p>
-          <h2 style={{
-            margin: '0 0 12px',
-            fontSize: isMobile ? 26 : 36,
-            fontWeight: 600,
-            letterSpacing: '-0.028em',
-            fontFamily: 'var(--font-display)',
-            lineHeight: 1.12,
-          }}>
-            Pare de acumular rascunhos.
-            <br />
-            Publique o que você já tem para dizer.
-          </h2>
-          <p style={{
-            margin: '0 auto 32px',
-            maxWidth: '44ch',
-            fontSize: 17,
-            color: 'var(--text-secondary)',
-            lineHeight: 1.47,
-          }}>
-            Entre no studio, escolha uma direção e transforme seu tema em um carrossel completo.
-            O Viral. organiza o caminho. Você decide a versão final.
-          </p>
-          <button
-            type="button"
-            className="vc-landing-cta"
-            onClick={onEnter}
-            style={{
-              height: 56,
-              padding: '0 36px',
-              borderRadius: 'var(--radius-pill)',
-              border: 'none',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontSize: 17,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-              fontFamily: 'var(--font-ui)',
-              boxShadow: 'var(--shadow-pink)',
-            }}
-          >
-            <Sparkles size={20} />
-            Criar meu primeiro carrossel
-          </button>
-          <p style={{
-            margin: '20px 0 0',
-            fontSize: 12,
-            color: 'var(--text-muted)',
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '0.04em',
-          }}>
-            Studio completo · R$ 97/mês · Sua chave de IA · Sem limite imposto pelo produto
-          </p>
+            <p style={{ ...eyebrowStyle, color: 'var(--accent)' }}>Sua próxima ideia já pode virar post</p>
+            <h2 style={sectionTitleStyle}>
+              Pare de acumular rascunhos.
+              <br />
+              Publique o que você já tem para dizer.
+            </h2>
+            <p style={{
+              margin: '0 auto 28px', maxWidth: '44ch', fontSize: 17,
+              color: 'var(--text-secondary)', lineHeight: 1.55,
+            }}>
+              Entre no studio, escolha uma direção e transforme seu tema em um carrossel completo.
+              O Viral. organiza o caminho. Você decide a versão final.
+            </p>
+            <button
+              type="button"
+              className="vc-landing-cta primary"
+              onClick={onEnter}
+              style={{
+                height: 56, padding: '0 32px', borderRadius: 999, border: 'none',
+                background: 'var(--accent)', color: '#fff', fontSize: 17, fontWeight: 600,
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10,
+                fontFamily: 'var(--font-ui)', boxShadow: 'var(--shadow-pink)',
+              }}
+            >
+              <Sparkles size={18} />
+              Criar meu primeiro carrossel
+            </button>
+            <p style={{
+              margin: '18px 0 0', fontSize: 12, color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+            }}>
+              Studio completo · R$ 97/mês · Sua chave de IA · Sem limite imposto pelo produto
+            </p>
           </div>
         </div>
       </RevealSection>
 
       {/* ── FOOTER ── */}
       <footer style={{
-        position: 'relative',
-        zIndex: 1,
-        borderTop: '1px solid var(--hairline)',
+        position: 'relative', zIndex: 1, borderTop: '1px solid var(--hairline)',
         padding: isMobile
           ? '32px 16px calc(40px + env(safe-area-inset-bottom))'
           : '40px clamp(24px, 5vw, 48px) calc(48px + env(safe-area-inset-bottom))',
-        maxWidth: 1200,
-        margin: '0 auto',
-        width: '100%',
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
+        maxWidth: 1200, margin: '0 auto', width: '100%',
+        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
         alignItems: isMobile ? 'flex-start' : 'center',
-        justifyContent: 'space-between',
-        gap: 24,
+        justifyContent: 'space-between', gap: 24,
       }}>
         <div>
           <div style={{ marginBottom: 10 }}>
             <BrandLogo height={isMobile ? 26 : 30} />
           </div>
-          <p style={{
-            margin: 0,
-            fontSize: 14,
-            lineHeight: 1.47,
-            color: 'var(--text-muted)',
-            maxWidth: '36ch',
-          }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.47, color: 'var(--text-muted)', maxWidth: '36ch' }}>
             Da ideia ao post — com argumento, identidade e direção.
           </p>
         </div>
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: isMobile ? 'flex-start' : 'flex-end',
-          gap: 12,
+          display: 'flex', flexDirection: 'column',
+          alignItems: isMobile ? 'flex-start' : 'flex-end', gap: 12,
         }}>
           <button
             type="button"
             className="vc-landing-cta"
             onClick={onEnter}
             style={{
-              height: 44,
-              padding: '0 24px',
-              borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--glass-border-strong)',
-              background: 'var(--bg-glass)',
-              color: 'var(--text-primary)',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
+              height: 44, padding: '0 24px', borderRadius: 999,
+              border: '1px solid var(--hairline)', background: 'transparent',
+              color: 'var(--text-primary)', fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'var(--font-ui)',
             }}
           >
             Criar meu primeiro carrossel
           </button>
           <p style={{
-            margin: 0,
-            fontSize: 11,
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
+            margin: 0, fontSize: 11, fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
           }}>
             © {new Date().getFullYear()} Viral. Todos os direitos reservados.
           </p>

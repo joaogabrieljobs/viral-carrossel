@@ -134,16 +134,21 @@ export function useLandingGsapEffects({
         }
 
         // 4) Header fixo — aparece com tween suave depois que o hero sai de vista.
+        // Nav flutuante com data-always-visible fica sempre no lugar (sem tween).
         if (stickyHeaderRef?.current && heroSectionRef?.current) {
           const headerEl = stickyHeaderRef.current;
-          gsap.set(headerEl, { yPercent: -100, autoAlpha: 0 });
-          ScrollTrigger.create({
-            scroller,
-            trigger: heroSectionRef.current,
-            start: 'bottom top',
-            onEnter: () => gsap.to(headerEl, { yPercent: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out' }),
-            onLeaveBack: () => gsap.to(headerEl, { yPercent: -100, autoAlpha: 0, duration: 0.35, ease: 'power2.in' }),
-          });
+          if (headerEl.dataset.alwaysVisible === 'true') {
+            gsap.set(headerEl, { clearProps: 'transform,opacity,visibility' });
+          } else {
+            gsap.set(headerEl, { yPercent: -100, autoAlpha: 0 });
+            ScrollTrigger.create({
+              scroller,
+              trigger: heroSectionRef.current,
+              start: 'bottom top',
+              onEnter: () => gsap.to(headerEl, { yPercent: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out' }),
+              onLeaveBack: () => gsap.to(headerEl, { yPercent: -100, autoAlpha: 0, duration: 0.35, ease: 'power2.in' }),
+            });
+          }
         }
 
         // 5) Ken Burns — zoom lento e contínuo no fundo do hero (substitui o
