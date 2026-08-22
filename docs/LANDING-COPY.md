@@ -23,17 +23,17 @@ Viral. · Studio editorial com IA
 **Headline**
 
 ```text
-Sua ideia já é boa.
-Agora ela precisa prender até o fim.
+Crie carrosséis que prendem até o fim,
+viralizam e constroem autoridade.
 ```
 
-Usar `prender até o fim.` na cor de destaque.
+Usar `prendem até o fim,` na cor de destaque.
 
 **Subheadline**
 
 ```text
-Transforme um tema em narrativa, slides, visual e legenda — tudo no mesmo fluxo,
-com a identidade da sua marca e espaço para deixar cada palavra com a sua cara.
+Conheça nosso studio que une design, copy e tendências —
+gerados por agentes ultra avançados.
 ```
 
 **CTA principal**
@@ -51,7 +51,7 @@ Ver como funciona
 **Microcopy abaixo do CTA**
 
 ```text
-Do tema ao arquivo pronto para publicar. Sem começar do zero em cada slide.
+Design, copy e tendências no mesmo fluxo — do tema ao arquivo pronto.
 ```
 
 **Navegação**

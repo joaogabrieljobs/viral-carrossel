@@ -722,10 +722,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             lineHeight: 1.14,
             fontFamily: 'var(--font-display)',
           }}>
-            Sua ideia já é boa.
+            Crie carrosséis que{' '}
+            <span style={{ color: 'var(--accent)' }}>prendem até o fim,</span>
             <br />
-            Agora ela precisa{' '}
-            <span style={{ color: 'var(--accent)' }}>prender até o fim.</span>
+            viralizam e constroem autoridade.
           </h1>
           <p style={{
             margin: 0,
@@ -733,10 +733,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             lineHeight: 1.5,
             letterSpacing: '-0.011em',
             color: 'var(--text-secondary)',
-            maxWidth: '48ch',
+            maxWidth: '46ch',
           }}>
-            Transforme um tema em narrativa, slides, visual e legenda — tudo no mesmo fluxo,
-            com a identidade da sua marca e espaço para deixar cada palavra com a sua cara.
+            Conheça nosso studio que une design, copy e tendências —
+            gerados por agentes ultra avançados.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
             <button
@@ -803,7 +803,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-muted)',
             maxWidth: '42ch',
           }}>
-            Do tema ao arquivo pronto para publicar. Sem começar do zero em cada slide.
+            Design, copy e tendências no mesmo fluxo — do tema ao arquivo pronto.
           </p>
         </div>
       </header>
