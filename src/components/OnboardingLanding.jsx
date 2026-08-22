@@ -3,7 +3,6 @@ import {
   Sparkles, ArrowRight, ChevronDown,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
   BookOpen, Layers, Image, FileText, Check, X,
-  CameraOff, Bookmark, MessageSquare,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
@@ -130,33 +129,6 @@ const CONTRAST_WITH = [
   'Legenda + export prontos — você só refina o que importa.',
 ];
 
-const SWIPE_RULES = [
-  {
-    n: '01',
-    title: 'Slide 1 abre curiosidade',
-    body: 'Promete uma resposta sem entregar tudo. Sem lacuna, o feed passa reto.',
-  },
-  {
-    n: '02',
-    title: 'Slide 2 não começa frio',
-    body: 'O Instagram pode mostrar o post a partir do segundo card — ele também precisa prender.',
-  },
-  {
-    n: '03',
-    title: 'Cada card tem função',
-    body: 'Lista, provocação, prova ou fecho. Sem “encher linguiça” no meio do arco.',
-  },
-  {
-    n: '04',
-    title: 'Número > adjetivo',
-    body: 'Dado concreto segura mais atenção do que “resultado incrível” ou “mudança silenciosa”.',
-  },
-  {
-    n: '05',
-    title: 'CTA que pede ação real',
-    body: 'Convite específico (salvar, marcar, comentar) — não “curta e siga” genérico.',
-  },
-];
 
 const GENERATION_LAYERS = [
   {
@@ -230,44 +202,6 @@ const FAQ = [
   },
 ];
 
-const NO_CAMERA_POINTS = [
-  {
-    icon: CameraOff,
-    title: 'Sem câmera obrigatória',
-    body: 'Carrossel cresce pela ideia. Você não precisa gravar, editar Reels nem “aparecer todo dia”.',
-  },
-  {
-    icon: Bookmark,
-    title: 'Formato que o feed guarda',
-    body: 'Swipe, salvamento e profundidade — carrossel aceita tese e dado, não só gancho de 3 segundos.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Tema em alta → ângulo do seu nicho',
-    body: 'Surfa o que já tem atenção e traz pro seu posicionamento — sem inventar trend do zero.',
-  },
-];
-
-const VALUE_STACK = [
-  {
-    icon: MessageSquare,
-    label: 'Chat / LLM',
-    role: 'Escreve texto',
-    gap: 'Sem arco, sem slides, sem export.',
-  },
-  {
-    icon: Layout,
-    label: 'Canva',
-    role: 'Monta layout',
-    gap: 'Você ainda escreve e estrutura o argumento.',
-  },
-  {
-    icon: Download,
-    label: 'Export solto',
-    role: 'Recorta e sobe',
-    gap: 'Três abas. Zero fluxo editorial.',
-  },
-];
 
 const PLAN_FEATURES = [
   'Studio completo — Criador, Diretor e Studio',
@@ -839,15 +773,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </header>
 
-      {/* ── ÂNCORA DE VALOR (logo após o hero) ── */}
+      {/* ── SHOWCASE criador + mobile (logo após o hero) ── */}
       <RevealSection
-        variant="rise"
+        variant="scale"
         style={{
           position: 'relative',
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '32px 16px 20px' : '48px clamp(24px, 5vw, 48px) 28px',
+          padding: isMobile ? '32px 16px 28px' : '48px clamp(24px, 5vw, 48px) 40px',
         }}
       >
         <p style={{
@@ -858,119 +792,66 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Uma aba</p>
+        }}>Na prática</p>
         <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
+          margin: '0 0 28px',
+          fontSize: isMobile ? 24 : 32,
           fontWeight: 600,
-          letterSpacing: '-0.024em',
+          letterSpacing: '-0.022em',
           fontFamily: 'var(--font-display)',
           lineHeight: 1.12,
-          maxWidth: '20ch',
         }}>
-          Canva escreve layout.
-          <br />
-          Chat escreve texto.
-          <br />
-          <span style={{ color: 'var(--accent)' }}>Viral. fecha o post.</span>
+          Do café ao post publicado
         </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Três ferramentas soltas = três abas e zero arco. O studio junta narrativa,
-          marca e export — a geração fica na sua chave de IA.
-        </p>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: 12,
-          marginBottom: 16,
+          gridTemplateColumns: isMobile ? '1fr' : '1.05fr 0.95fr',
+          gap: 16,
+          alignItems: 'stretch',
         }}>
-          {VALUE_STACK.map(({ icon: Icon, label, role, gap }) => (
-            <div
-              key={label}
-              style={{
-                padding: '20px 18px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-              }}
-            >
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
-              }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 9,
-                  background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon size={16} />
-                </div>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
-              </div>
-              <p style={{
-                margin: '0 0 6px',
-                fontSize: 14,
-                color: 'var(--text-secondary)',
-              }}>{role}</p>
-              <p style={{
-                margin: 0,
-                fontSize: 13,
-                color: 'var(--text-muted)',
-                lineHeight: 1.4,
-              }}>{gap}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          padding: isMobile ? '18px 16px' : '20px 24px',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid rgba(255, 45, 141, 0.35)',
-          background: 'var(--accent-surface)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 12,
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <p style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 600,
-            letterSpacing: '-0.014em',
-            maxWidth: '42ch',
-            lineHeight: 1.4,
+          <div style={{
+            position: 'relative',
+            height: isMobile ? 320 : 440,
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            border: '1px solid var(--hairline)',
           }}>
-            Um fluxo. Um export. Sem montar o argumento em três apps.
-          </p>
-          <button
-            type="button"
-            className="vc-landing-cta"
-            onClick={onEnter}
-            style={{
-              height: 44,
-              padding: '0 20px',
-              borderRadius: 'var(--radius-pill)',
-              border: 'none',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: 'var(--font-ui)',
-              flexShrink: 0,
-            }}
-          >
-            Ver plano e assinar
-            <ArrowRight size={14} />
-          </button>
+            <LandingImage
+              src={IMG.showcaseWindowPhone}
+              alt="Criadora revisando o carrossel publicado no Instagram"
+              rounded={0}
+              style={{
+                border: 'none',
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 20%',
+              }}
+            />
+          </div>
+          <div style={{
+            position: 'relative',
+            height: isMobile ? 320 : 440,
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            border: '1px solid var(--hairline)',
+          }}>
+            <LandingImage
+              src={IMG.showcasePhoneNike}
+              alt="Exemplo de carrossel publicado no feed do Instagram"
+              rounded={0}
+              style={{
+                border: 'none',
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          </div>
         </div>
       </RevealSection>
 
@@ -1437,102 +1318,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── SEM APARECER / POR QUE CARROSSEL ── */}
-      <RevealSection
-        variant="rise"
-        id="sem-aparecer"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 28px' : '32px clamp(24px, 5vw, 48px) 40px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Formato</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-          maxWidth: '18ch',
-        }}>
-          Cresce pela ideia.
-          <br />
-          <span style={{ color: 'var(--accent)' }}>Não pela câmera.</span>
-        </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Guru manda gravar Reels todo dia. Carrossel entrega tese, salvamento e
-          autoridade — sem travar na lente. O Viral. existe pra esse formato.
-        </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: 12,
-          marginBottom: 24,
-        }}>
-          {NO_CAMERA_POINTS.map(({ icon: Icon, title, body }) => (
-            <div
-              key={title}
-              style={{
-                padding: '22px 20px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-secondary)',
-              }}
-            >
-              <div style={{
-                width: 40, height: 40, borderRadius: 10,
-                background: 'var(--accent-surface)', color: 'var(--accent)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: 14,
-              }}>
-                <Icon size={18} strokeWidth={2} />
-              </div>
-              <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 17,
-                fontWeight: 600,
-                letterSpacing: '-0.018em',
-              }}>{title}</h3>
-              <p style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.45,
-                color: 'var(--text-secondary)',
-              }}>{body}</p>
-            </div>
-          ))}
-        </div>
-        <p style={{
-          margin: 0,
-          fontSize: 13,
-          color: 'var(--text-muted)',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.02em',
-          lineHeight: 1.5,
-        }}>
-          Benchmarks públicos (ex.: Socialinsider) repetem: carrossel segue entre os formatos
-          com mais engajamento e salvamento — o Viral. otimiza o arco pra esse jogo.
-        </p>
-      </RevealSection>
-
       {/* ── MODOS ── */}
       <RevealSection
         variant="rise"
@@ -1765,88 +1550,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── ANATOMIA DO SWIPE ── */}
-      <RevealSection
-        variant="rise"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '24px 16px 28px' : '36px clamp(24px, 5vw, 48px) 40px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Editorial</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-          maxWidth: '18ch',
-        }}>
-          O que faz o swipe continuar.
-        </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '50ch',
-        }}>
-          Regras embutidas no fluxo — o tipo de coisa que some quando você pede
-          “faz um carrossel” num chat solto.
-        </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, 1fr)',
-          gap: 12,
-        }}>
-          {SWIPE_RULES.map(({ n, title, body }) => (
-            <div
-              key={n}
-              style={{
-                padding: '18px 16px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-              }}
-            >
-              <div style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: 'var(--accent)',
-                letterSpacing: '0.06em',
-                fontWeight: 600,
-                marginBottom: 12,
-              }}>{n}</div>
-              <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 15,
-                fontWeight: 600,
-                letterSpacing: '-0.016em',
-                lineHeight: 1.3,
-              }}>{title}</h3>
-              <p style={{
-                margin: 0,
-                fontSize: 13,
-                lineHeight: 1.45,
-                color: 'var(--text-secondary)',
-              }}>{body}</p>
-            </div>
-          ))}
-        </div>
-      </RevealSection>
-
       {/* ── MONTAGE — capabilities marquee ── */}
       <RevealSection
         variant="scale"
@@ -1930,94 +1633,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </RevealSection>
-
-      {/* ── SHOWCASE criador + mobile ── */}
-      <RevealSection
-        variant="scale"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '0 16px 40px' : '0 clamp(24px, 5vw, 48px) 48px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Na prática</p>
-        <h2 style={{
-          margin: '0 0 28px',
-          fontSize: isMobile ? 24 : 32,
-          fontWeight: 600,
-          letterSpacing: '-0.022em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-        }}>
-          Do café ao post publicado
-        </h2>
-        {/* As duas fotos têm proporções bem diferentes (showcase é retrato
-            0.8, mobile é paisagem 1.85) — lado a lado num grid comum, isso
-            deixava uma sobrando bem mais alta que a outra e um vão vazio do
-            lado da menor. Fix: cada uma vira um painel de altura fixa e igual
-            (object-fit:cover), então as duas preenchem a mesma caixa
-            independente da proporção original da imagem. */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.05fr 0.95fr',
-          gap: 16,
-          alignItems: 'stretch',
-        }}>
-          <div style={{
-            position: 'relative',
-            height: isMobile ? 320 : 440,
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            border: '1px solid var(--hairline)',
-          }}>
-            <LandingImage
-              src={IMG.showcaseWindowPhone}
-              alt="Criadora revisando o carrossel publicado no Instagram"
-              rounded={0}
-              style={{
-                border: 'none',
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center 20%',
-              }}
-            />
-          </div>
-          <div style={{
-            position: 'relative',
-            height: isMobile ? 320 : 440,
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            border: '1px solid var(--hairline)',
-          }}>
-            <LandingImage
-              src={IMG.showcasePhoneNike}
-              alt="Exemplo de carrossel publicado no feed do Instagram"
-              rounded={0}
-              style={{
-                border: 'none',
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
           </div>
         </div>
       </RevealSection>
