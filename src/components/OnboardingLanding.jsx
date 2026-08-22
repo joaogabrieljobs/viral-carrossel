@@ -1027,7 +1027,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         }}
       >
         <p style={{
-          margin: '0 0 8px',
+          margin: '0 0 10px',
           fontFamily: 'var(--font-mono)',
           fontSize: 11,
           letterSpacing: '0.12em',
@@ -1036,23 +1036,24 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           fontWeight: 600,
         }}>Um studio, não só um editor</p>
         <h2 ref={notEditorTitleRef} style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 28 : 40,
+          margin: '0 0 14px',
+          fontSize: isMobile ? 24 : 38,
           fontWeight: 600,
           letterSpacing: '-0.028em',
           fontFamily: 'var(--font-display)',
-          lineHeight: 1.1,
-          maxWidth: '22ch',
+          lineHeight: 1.18,
+          maxWidth: isMobile ? '22em' : '18ch',
         }}>
-          O Viral. não começa pela caixa de texto.
+          O Viral. não começa pela caixa&nbsp;de&nbsp;texto.
+          <br />
           Começa pelo que você quer fazer alguém perceber.
         </h2>
         <p style={{
-          margin: '0 0 32px',
-          fontSize: 17,
-          lineHeight: 1.47,
+          margin: '0 0 28px',
+          fontSize: isMobile ? 15 : 17,
+          lineHeight: 1.55,
           color: 'var(--text-secondary)',
-          maxWidth: '52ch',
+          maxWidth: isMobile ? '100%' : '48ch',
         }}>
           Você traz o tema, uma referência ou um material bruto. O studio organiza a tese,
           constrói o arco e transforma essa direção em um carrossel pronto para ser refinado.
@@ -1061,15 +1062,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           display: 'grid',
           gridTemplateColumns: isMobile
             ? '1fr'
-            : 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 12,
+            : 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: isMobile ? 10 : 12,
         }}>
           {GENERATION_LAYERS.map(({ n, icon: Icon, title, body }) => (
             <div
               key={title}
               className="vc-landing-gen-layer"
               style={{
-                padding: '20px 18px',
+                padding: isMobile ? '18px 16px' : '20px 18px',
                 borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--hairline)',
                 background: 'var(--bg-glass)',
@@ -1081,11 +1082,11 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 14,
+                marginBottom: 12,
               }}>
                 <div style={{
-                  width: 40,
-                  height: 40,
+                  width: 36,
+                  height: 36,
                   borderRadius: 10,
                   background: 'var(--accent-surface)',
                   color: 'var(--accent)',
@@ -1093,7 +1094,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <Icon size={18} strokeWidth={2} />
+                  <Icon size={17} strokeWidth={2} />
                 </div>
                 <span style={{
                   fontFamily: 'var(--font-mono)',
@@ -1104,15 +1105,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 }}>{n}</span>
               </div>
               <h3 style={{
-                margin: '0 0 8px',
-                fontSize: 16,
+                margin: '0 0 6px',
+                fontSize: isMobile ? 16 : 17,
                 fontWeight: 600,
                 letterSpacing: '-0.018em',
               }}>{title}</h3>
               <p style={{
                 margin: 0,
-                fontSize: 14,
-                lineHeight: 1.45,
+                fontSize: isMobile ? 14 : 14,
+                lineHeight: 1.5,
                 color: 'var(--text-secondary)',
               }}>{body}</p>
             </div>
