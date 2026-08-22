@@ -140,6 +140,14 @@ const OUTCOMES = [
   },
 ];
 
+const GENERATION_LAYERS = [
+  { n: '01', icon: BookOpen, title: 'Ideia', body: 'O que precisa ser dito.' },
+  { n: '02', icon: Layers, title: 'Arco', body: 'Como a leitura avança.' },
+  { n: '03', icon: Image, title: 'Visual', body: 'Como a ideia ganha forma.' },
+  { n: '04', icon: FileText, title: 'Legenda', body: 'Como a conversa continua.' },
+  { n: '05', icon: Download, title: 'Publicação', body: 'Como o projeto chega ao feed.' },
+];
+
 const CONTRAST_ROWS = [
   { left: '5 frases isoladas', right: 'uma tese' },
   { left: 'cards repetitivos', right: 'um arco' },
