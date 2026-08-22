@@ -244,8 +244,7 @@ Do primeiro insight ao último card
 |---|---|---|
 | 01 | Traga uma ideia | Digite um tema, cole um texto ou use uma referência. Você pode começar com algo pronto ou apenas com aquela ideia que ainda está meio solta. |
 | 02 | Escolha a direção | Defina o tipo de narrativa e a identidade visual. O Viral. organiza o argumento e cria o carrossel inteiro. |
-| 03 | Deixe com a sua cara | Reescreva uma frase, troque uma imagem ou aprofunde um card. Você mantém a decisão final. |
-| 04 | Exporte e publique | Baixe em PNG ou PDF nas dimensões certas para Instagram, sem remontar o projeto em outro lugar. |
+| 03 | Refine e publique | Ajuste frases e imagens com a sua cara, depois exporte em PNG ou PDF nas dimensões certas — sem remontar o projeto em outro lugar. |
 
 **CTA do bloco**
 

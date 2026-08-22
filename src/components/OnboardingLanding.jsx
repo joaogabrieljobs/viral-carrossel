@@ -54,14 +54,8 @@ const STEPS = [
   },
   {
     n: '03',
-    title: 'Deixe com a sua cara',
-    body: 'Reescreva uma frase, troque uma imagem ou aprofunde um card. Você mantém a decisão final.',
-    image: IMG.steps[2],
-  },
-  {
-    n: '04',
-    title: 'Exporte e publique',
-    body: 'Baixe em PNG ou PDF nas dimensões certas para Instagram, sem remontar o projeto em outro lugar.',
+    title: 'Refine e publique',
+    body: 'Ajuste frases e imagens com a sua cara, depois exporte em PNG ou PDF nas dimensões certas — sem remontar o projeto em outro lugar.',
     image: IMG.steps[2],
   },
 ];
@@ -1511,7 +1505,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </h2>
         <div ref={stepsGridRef} style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: 16,
         }}>
           {STEPS.map(({ n, title, body, image }) => (
