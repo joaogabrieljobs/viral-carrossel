@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Sparkles, ArrowRight, ChevronDown,
+  Sparkles, ArrowRight,
   Wand2, Download, Palette, TrendingUp, Layout, Instagram,
   BookOpen, Layers, Image, FileText, Check, X,
 } from 'lucide-react';
@@ -42,31 +42,39 @@ const IMG = {
 const STEPS = [
   {
     n: '01',
-    title: 'Escolha o arco',
-    body: 'Tendência quente, erro que todo mundo comete, decodificação de marca ou mudança de comportamento. Você define o tema — a IA monta a narrativa em slides.',
+    title: 'Traga uma ideia',
+    body: 'Digite um tema, cole um texto ou use uma referência. Você pode começar com algo pronto ou apenas com aquela ideia que ainda está meio solta.',
     image: IMG.steps[0],
   },
   {
     n: '02',
-    title: 'Gere e refine',
-    body: 'Gancho na capa, corpo argumentativo e legenda pronta num fluxo. Ajuste tom, troque imagens, teste variações de tese até a versão que para o scroll.',
+    title: 'Escolha a direção',
+    body: 'Defina o tipo de narrativa e a identidade visual. O Viral. organiza o argumento e cria o carrossel inteiro.',
     image: IMG.steps[1],
   },
   {
     n: '03',
-    title: 'Publique no feed',
-    body: 'Exporte PNG slide a slide ou PDF multipágina em 4:5, quadrado ou stories — dimensões reais do Instagram, sem redimensionar no Canva.',
+    title: 'Deixe com a sua cara',
+    body: 'Reescreva uma frase, troque uma imagem ou aprofunde um card. Você mantém a decisão final.',
+    image: IMG.steps[2],
+  },
+  {
+    n: '04',
+    title: 'Exporte e publique',
+    body: 'Baixe em PNG ou PDF nas dimensões certas para Instagram, sem remontar o projeto em outro lugar.',
     image: IMG.steps[2],
   },
 ];
 
 const CAPABILITIES = [
-  { icon: Layout, label: 'Templates virais', hint: 'Erro comum · Tendência · Marca · Comportamento' },
-  { icon: Palette, label: 'Identidade de marca', hint: '8 paletas · 8 fontes de título · @handle' },
-  { icon: TrendingUp, label: 'Pesquisa de nicho', hint: 'Tendências reais da web, ao vivo' },
-  { icon: Wand2, label: 'Variações de gancho', hint: '5 teses contraintuitivas por tema' },
-  { icon: Download, label: 'Export HD', hint: 'PNG individual ou PDF completo' },
-  { icon: Instagram, label: 'Feito pro celular', hint: 'Editor, preview e export no mobile' },
+  { icon: Layout, label: '16 sistemas editoriais', hint: 'Marketing · Criadores · Mentoria · Consultoria · Tecnologia · E-commerce e mais' },
+  { icon: BookOpen, label: 'Narrativas completas', hint: 'Gancho · contexto · tensão · virada · aplicação · CTA' },
+  { icon: Palette, label: 'Identidade de marca', hint: 'Paleta · tipografia · assinatura · fontes próprias' },
+  { icon: TrendingUp, label: 'Pesquisa de nicho', hint: 'Tendências e referências da web para alimentar a pauta' },
+  { icon: Wand2, label: 'Variações de gancho', hint: 'Compare diferentes teses antes de escolher a capa' },
+  { icon: Image, label: 'Imagens no fluxo', hint: 'Pesquise, envie ou gere imagens sem sair do projeto' },
+  { icon: Download, label: 'Exportação pronta', hint: 'PNG individual ou PDF completo nas proporções do feed' },
+  { icon: Instagram, label: 'Feito para continuar no celular', hint: 'Crie, revise e exporte sem depender do computador' },
 ];
 
 const MODES = [
@@ -74,142 +82,146 @@ const MODES = [
     id: 'criador',
     label: 'Criador',
     tag: 'Comece aqui',
-    desc: 'Tema + gerar. Carrossel, legenda e export em minutos — sem painel técnico, sem tutorial.',
+    desc: 'Escreva o tema e receba uma primeira versão completa: narrativa, slides, legenda e visual.',
   },
   {
     id: 'diretor',
     label: 'Diretor',
-    tag: null,
-    desc: 'Refina gancho, tom e tipografia slide a slide. Controle editorial sem virar designer.',
+    tag: 'Refine a ideia',
+    desc: 'Ajuste gancho, tom, ordem, imagens e tipografia até o carrossel soar como você.',
   },
   {
     id: 'studio',
     label: 'Studio',
-    tag: 'Pro',
-    desc: 'Grids, tracking e composição livre. Quando você quer cada pixel no lugar.',
+    tag: 'Controle visual',
+    desc: 'Trabalhe grids, tracking, composição e detalhes de cada página quando cada pixel importa.',
   },
 ];
 
 const PAIN_POINTS = [
-  'Ideia na cabeça, slide em branco no Figma.',
-  'Legenda genérica que não segura até o último card.',
-  'Horas ajustando fonte e cor em vez de publicar.',
+  'Você sabe o tema, mas trava na primeira frase.',
+  'Cada card parece bom sozinho, mas o conjunto não conta uma história.',
+  'O texto nasce em uma ferramenta, o visual em outra e a legenda fica para depois.',
+  'Você gasta mais energia montando o post do que desenvolvendo a ideia.',
 ];
 
 const OUTCOMES = [
   {
-    title: 'Carrossel completo',
-    body: 'Narrativa + slides + legenda num fluxo — não um rascunho pra “terminar depois”.',
+    title: 'Uma história que avança',
+    body: 'Cada card abre espaço para o próximo. O leitor entende onde está e por que vale continuar.',
   },
   {
-    title: 'Ganchos pra testar',
-    body: 'Variações de tese no mesmo tema, pra escolher a capa que para o scroll.',
+    title: 'Ganchos que você pode escolher',
+    body: 'Teste diferentes entradas para a mesma ideia e encontre a que soa mais forte — e mais sua.',
   },
   {
-    title: 'Marca já aplicada',
-    body: 'Paleta, tipografia e handle no visual — sem redesenhar no Canva.',
+    title: 'Sua marca em cada página',
+    body: 'Cores, fontes, ritmo e assinatura visual aplicados desde o começo, não como retoque final.',
   },
   {
-    title: 'Arquivo publicável',
-    body: 'PNG ou PDF nas medidas do Instagram. Export e publica.',
+    title: 'Um post realmente terminado',
+    body: 'Slides, legenda e arquivos de publicação no mesmo projeto. Menos pontas soltas antes de postar.',
   },
 ];
 
 const CONTRAST_WITHOUT = [
-  'Texto genérico: “não é X, é Y”, “revolução silenciosa”…',
-  'Zero arco — cada slide parece um post isolado.',
-  'Emojis decorativos, quase nenhum dado concreto.',
-  'Você ainda precisa montar layout, exportar e escrever legenda.',
+  'Entrega frases que poderiam servir para qualquer tema.',
+  'Repete fórmulas sem desenvolver um ponto de vista.',
+  'Trata cada slide como uma peça isolada.',
+  'Deixa design, legenda e exportação para você resolver depois.',
 ];
 
 const CONTRAST_WITH = [
-  'Gancho com tese clara e ritmo até o CTA.',
-  'Estrutura de argumento: cada card tem função no swipe.',
-  'Identidade visual da marca já no frame.',
-  'Legenda + export prontos — você só refina o que importa.',
+  'Parte de uma tese clara e conduz o leitor até a conclusão.',
+  'Define a função de cada card dentro do argumento.',
+  'Mantém texto e identidade visual na mesma direção.',
+  'Entrega o post completo, com espaço para você refinar o que importa.',
 ];
-
 
 const GENERATION_LAYERS = [
   {
     n: '01',
     icon: BookOpen,
-    title: 'Gera narrativa',
-    body: 'Gancho, tese e arco editorial — do primeiro slide ao CTA, com o tom da sua marca.',
+    title: 'Encontra a ideia central',
+    body: 'Separa o que é assunto do que realmente merece virar tese — e cria um gancho que abre essa conversa.',
   },
   {
     n: '02',
     icon: Layers,
-    title: 'Gera estrutura',
-    body: 'Quantidade de cards, ritmo entre slides e função de cada frame no argumento.',
+    title: 'Constrói o arco',
+    body: 'Dá uma função a cada card para que a leitura avance, em vez de repetir a mesma ideia com palavras diferentes.',
   },
   {
     n: '03',
     icon: Image,
-    title: 'Gera visual',
-    body: 'Layout, tipografia, paleta e imagens sugeridas ou geradas — identidade já aplicada.',
+    title: 'Traduz em visual',
+    body: 'Aplica layout, tipografia, paleta e imagens sem apagar a personalidade da sua marca.',
   },
   {
     n: '04',
     icon: FileText,
-    title: 'Gera legenda',
-    body: 'Texto do post pronto pra colar: contexto, desenvolvimento e fechamento que segura o swipe.',
+    title: 'Completa o post',
+    body: 'Gera a legenda como continuação do raciocínio, não como um texto genérico colado no final.',
   },
   {
     n: '05',
     icon: Download,
-    title: 'Gera exportação',
-    body: 'PNG slide a slide ou PDF multipágina em 4:5, quadrado ou stories — dimensões reais do feed.',
+    title: 'Entrega para publicar',
+    body: 'Exporte em PNG ou PDF, nas proporções certas para o feed, sem reconstruir tudo em outro editor.',
   },
 ];
 
 const FAQ = [
   {
-    q: 'O Viral. é gratuito?',
-    a: 'Não. A assinatura individual custa R$ 97/mês (ou R$ 790/ano) e libera o studio completo. A geração usa a sua chave do provedor de IA escolhido — não cobramos por carrossel.',
+    q: 'Quanto custa o Viral.?',
+    a: 'O plano individual custa R$ 97 por mês ou R$ 790 por ano. Os dois liberam o studio completo. A geração de texto e imagem usa a chave de IA conectada por você.',
   },
   {
-    q: 'Vocês vendem créditos de imagem como outros apps?',
-    a: 'Não. Ferramentas que “incluem IA” cobram créditos e limitam volume. No Viral. você traz a sua chave: o studio é o produto; o gasto com LLM fica na sua conta, sem teto artificial de posts.',
+    q: 'Por que preciso conectar uma chave de IA?',
+    a: 'Porque preferimos dar transparência e controle a você. Em vez de esconder o consumo dentro de pacotes de créditos, o Viral. deixa você escolher o provedor, acompanhar os gastos e trocar de modelo quando quiser.',
   },
   {
-    q: 'Como funciona a geração com IA?',
-    a: 'O Viral. é a interface. Você escolhe entre OpenAI, Anthropic, Z.ai ou Kimi e conecta sua chave. Cada geração consome créditos diretamente na sua conta — você controla quanto gasta e quanto publica.',
+    q: 'Isso significa que existe um custo além da assinatura?',
+    a: 'Sim. O acesso ao studio é a assinatura. As gerações são cobradas pelo provedor de IA escolhido, diretamente na sua conta. O valor varia conforme o modelo e a quantidade de conteúdo gerado.',
   },
   {
-    q: 'Tem limite de carrosséis por mês?',
-    a: 'Não. Sem teto artificial no studio. O limite prático é o orçamento da sua chave de API e o quanto você quer produzir.',
+    q: 'Existe limite de carrosséis?',
+    a: 'O Viral. não impõe um teto mensal de projetos. O limite prático depende apenas do saldo ou orçamento configurado na sua chave de IA.',
   },
   {
-    q: 'Como assino e como cancelo?',
-    a: 'Assine com cartão no checkout. Depois, o botão Plano na home abre o portal do cliente para atualizar pagamento ou cancelar — sem fidelidade escondida.',
+    q: 'Preciso ser designer ou copywriter?',
+    a: 'Não. O modo Criador entrega uma primeira versão completa. Se quiser mais controle, você pode avançar para os modos Diretor e Studio sem precisar dominar uma ferramenta profissional de design.',
   },
   {
-    q: 'Preciso aparecer ou gravar Reels?',
-    a: 'Não. O Viral. é feito pra carrossel: autoridade pela tese e pelo arco, não pela câmera. Cresce pela ideia — sem dancinha e sem travar na lente.',
+    q: 'ChatGPT ou Claude não fazem isso sozinhos?',
+    a: 'Eles ajudam a gerar texto. O Viral. transforma esse texto em um projeto editorial: organiza o arco, distribui a ideia entre os cards, aplica sua identidade visual, prepara a legenda e exporta tudo nas dimensões corretas.',
   },
   {
-    q: 'ChatGPT ou Claude sozinhos não bastam?',
-    a: 'Eles geram texto. O Viral. organiza o post: arco narrativo, estrutura de slides, visual com a sua marca, legenda e export nas medidas do Instagram — num só lugar.',
+    q: 'Ainda vou precisar do Canva?',
+    a: 'Não para o fluxo principal. Você pode criar, editar e exportar dentro do Viral. Se quiser um tratamento muito específico fora do produto, o arquivo exportado continua sendo seu.',
   },
   {
-    q: 'Ainda preciso do Canva?',
-    a: 'Não no fluxo principal. Você gera, ajusta e baixa PNG ou PDF direto do studio. Canva só se quiser um retoque pontual fora do produto.',
+    q: 'Posso usar minha própria identidade visual?',
+    a: 'Sim. Você pode configurar cores, tipografia, assinatura e outros elementos da marca para manter consistência entre os projetos.',
   },
   {
     q: 'Funciona no celular?',
-    a: 'Sim. Editor, preview, geração e export foram feitos mobile-first — navegação por slides e fluxo pensado pra publicar do telefone.',
+    a: 'Sim. O fluxo de criação, revisão, preview e exportação foi pensado para funcionar também no celular.',
+  },
+  {
+    q: 'Como cancelo?',
+    a: 'O cancelamento é feito pelo portal do cliente, sem fidelidade. Seu acesso permanece ativo até o fim do período já pago.',
   },
 ];
 
-
 const PLAN_FEATURES = [
-  'Studio completo — Criador, Diretor e Studio',
-  'Narrativa, estrutura, visual, legenda e export',
-  'Identidade de marca no fluxo',
-  'BYOK — escolha seu provedor e use sua chave',
-  'Sem limite artificial de carrosséis',
-  'Cancele quando quiser no portal do cliente',
+  'Acesso aos modos Criador, Diretor e Studio',
+  'Narrativa, slides, visual, legenda e exportação',
+  '16 sistemas editoriais para diferentes nichos',
+  'Perfis de marca, fontes e paletas próprias',
+  'Compatível com diferentes provedores de IA',
+  'Sem limite de carrosséis imposto pelo studio',
+  'Cancelamento pelo portal do cliente',
 ];
 
 /** Faixa horizontal de previews 4:5 (carrosséis reais) */
@@ -514,7 +526,17 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           <button
             type="button"
             className="vc-landing-cta"
-            onClick={onEnter}
+            onClick={() => {
+              const shell = document.querySelector('.vc-landing-shell');
+              const target = document.getElementById('como-funciona');
+              if (shell && target) {
+                const shellRect = shell.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                shell.scrollTop += targetRect.top - shellRect.top - 24;
+              } else {
+                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
             style={{
               height: 36,
               padding: '0 18px',
@@ -528,7 +550,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontFamily: 'var(--font-ui)',
             }}
           >
-            Começar agora
+            Conhecer o studio
           </button>
         </div>
       </div>
@@ -632,7 +654,17 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             <button
               type="button"
               className="vc-landing-cta"
-              onClick={onEnter}
+              onClick={() => {
+                const shell = document.querySelector('.vc-landing-shell');
+                const target = document.getElementById('como-funciona');
+                if (shell && target) {
+                  const shellRect = shell.getBoundingClientRect();
+                  const targetRect = target.getBoundingClientRect();
+                  shell.scrollTop += targetRect.top - shellRect.top - 24;
+                } else {
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
               style={{
                 height: 40,
                 padding: '0 20px',
@@ -648,7 +680,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 fontFamily: 'var(--font-ui)',
               }}
             >
-              Começar agora
+              Conhecer o studio
             </button>
           </div>
         </nav>
@@ -680,7 +712,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--accent)',
             fontWeight: 600,
           }}>
-            Narrative OS · Carrossel Studio
+            Viral. · Studio editorial com IA
           </p>
           <h1 ref={heroTitleRef} style={{
             margin: 0,
@@ -696,9 +728,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             lineHeight: 1.14,
             fontFamily: 'var(--font-display)',
           }}>
-            Carrossel que prende
+            Sua ideia já é boa.
             <br />
-            <span style={{ color: 'var(--accent)' }}>do gancho ao CTA.</span>
+            Agora ela precisa{' '}
+            <span style={{ color: 'var(--accent)' }}>prender até o fim.</span>
           </h1>
           <p style={{
             margin: 0,
@@ -706,11 +739,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             lineHeight: 1.5,
             letterSpacing: '-0.011em',
             color: 'var(--text-secondary)',
-            maxWidth: '46ch',
+            maxWidth: '48ch',
           }}>
-            Você traz o tema e a sua chave de IA. O Viral. entrega narrativa, slides,
-            legenda e arquivo publicável — com a identidade da marca. Sem Canva genérico.
-            Sem limite artificial de posts.
+            Transforme um tema em narrativa, slides, visual e legenda — tudo no mesmo fluxo,
+            com a identidade da sua marca e espaço para deixar cada palavra com a sua cara.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
             <button
@@ -738,38 +770,47 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               Criar meu primeiro carrossel
               <ArrowRight size={16} />
             </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                const shell = document.querySelector('.vc-landing-shell');
+                const target = document.getElementById('como-funciona');
+                if (shell && target) {
+                  const shellRect = shell.getBoundingClientRect();
+                  const targetRect = target.getBoundingClientRect();
+                  shell.scrollTop += targetRect.top - shellRect.top - 24;
+                } else {
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              style={{
+                height: 52,
+                padding: '0 24px',
+                borderRadius: 'var(--radius-pill)',
+                border: '1px solid var(--glass-border-strong)',
+                background: 'var(--bg-glass)',
+                backdropFilter: 'blur(18px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+                color: 'var(--text-primary)',
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              Ver como funciona
+            </button>
           </div>
-          <a
-            href="#como-funciona"
-            onClick={(e) => {
-              e.preventDefault();
-              const shell = document.querySelector('.vc-landing-shell');
-              const target = document.getElementById('como-funciona');
-              if (shell && target) {
-                const shellRect = shell.getBoundingClientRect();
-                const targetRect = target.getBoundingClientRect();
-                shell.scrollTop += targetRect.top - shellRect.top - 24;
-              } else {
-                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }}
-            style={{
-              display: 'inline-flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              color: 'var(--text-muted)',
-              fontSize: 12,
-              textDecoration: 'none',
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              marginTop: isMobile ? 12 : 20,
-            }}
-          >
-            Como funciona
-            <ChevronDown size={16} className="vc-landing-scroll-cue" />
-          </a>
+          <p style={{
+            margin: 0,
+            fontSize: 13,
+            lineHeight: 1.45,
+            color: 'var(--text-muted)',
+            maxWidth: '42ch',
+          }}>
+            Do tema ao arquivo pronto para publicar. Sem começar do zero em cada slide.
+          </p>
         </div>
       </header>
 
@@ -792,17 +833,28 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Na prática</p>
+        }}>Da ideia ao feed</p>
         <h2 style={{
-          margin: '0 0 28px',
+          margin: '0 0 12px',
           fontSize: isMobile ? 24 : 32,
           fontWeight: 600,
           letterSpacing: '-0.022em',
           fontFamily: 'var(--font-display)',
           lineHeight: 1.12,
         }}>
-          Do café ao post publicado
+          Um tema. Uma linha de raciocínio.
+          <br />
+          Um carrossel inteiro.
         </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '48ch',
+        }}>
+          Veja a mesma ideia ganhar gancho, ritmo, identidade visual e um fechamento que faz sentido.
+        </p>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : '1.05fr 0.95fr',
@@ -885,9 +937,9 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
               fontWeight: 600,
-            }}>O problema</p>
+            }}>O trabalho que ninguém vê</p>
             <blockquote style={{
-              margin: '0 0 24px',
+              margin: '0 0 16px',
               padding: 0,
               border: 'none',
               fontSize: isMobile ? 20 : 26,
@@ -897,10 +949,20 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontFamily: 'var(--font-display)',
               color: 'var(--text-primary)',
             }}>
-              Carrossel bom não é slide bonito.
+              O difícil não é fazer slides.
               <br />
-              <span style={{ color: 'var(--accent)' }}>É arco narrativo que segura até o fim.</span>
+              <span style={{ color: 'var(--accent)' }}>É saber o que cada slide precisa dizer.</span>
             </blockquote>
+            <p style={{
+              margin: '0 0 24px',
+              fontSize: 15,
+              lineHeight: 1.47,
+              color: 'var(--text-secondary)',
+            }}>
+              Uma boa ideia costuma se perder entre o documento em branco, o prompt genérico
+              e horas ajustando detalhes. Quando tudo fica pronto, os slides até parecem bonitos —
+              mas não levam o leitor a lugar nenhum.
+            </p>
             <ul style={{
               margin: 0,
               padding: 0,
@@ -933,15 +995,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 </li>
               ))}
             </ul>
-            <p style={{
-              margin: '24px 0 0',
-              fontSize: 15,
-              lineHeight: 1.47,
-              color: 'var(--text-muted)',
-              fontStyle: 'italic',
-            }}>
-              O Viral. existe pra fechar essa lacuna — do insight ao post publicável.
-            </p>
           </div>
           <LandingImage
             ref={problemImageRef}
@@ -984,7 +1037,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Posicionamento</p>
+        }}>Um studio, não só um editor</p>
         <h2 ref={notEditorTitleRef} style={{
           margin: '0 0 12px',
           fontSize: isMobile ? 28 : 40,
@@ -992,9 +1045,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           letterSpacing: '-0.028em',
           fontFamily: 'var(--font-display)',
           lineHeight: 1.1,
-          maxWidth: '16ch',
+          maxWidth: '22ch',
         }}>
-          Não é um editor de carrossel.
+          O Viral. não começa pela caixa de texto.
+          Começa pelo que você quer fazer alguém perceber.
         </h2>
         <p style={{
           margin: '0 0 32px',
@@ -1003,8 +1057,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           color: 'var(--text-secondary)',
           maxWidth: '52ch',
         }}>
-          Editor só arrasta caixa. O Viral. parte do tema e entrega o post inteiro —
-          cada camada gerada num fluxo, não montada slide a slide no Canva.
+          Você traz o tema, uma referência ou um material bruto. O studio organiza a tese,
+          constrói o arco e transforma essa direção em um carrossel pronto para ser refinado.
         </p>
         <div style={{
           display: 'grid',
@@ -1088,31 +1142,12 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Resultado</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-        }}>
-          O que sai pronto — não rascunho.
-        </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '50ch',
-        }}>
-          Chat gera parágrafo. Viral. gera post publicável — na sua chave de IA,
-          sem teto artificial de carrosséis no studio.
-        </p>
+        }}>O que sai do studio</p>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
           gap: 12,
+          marginTop: 20,
         }}>
           {OUTCOMES.map(({ title, body }) => (
             <div
@@ -1174,28 +1209,20 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Mesmo tema. Processo diferente.</p>
+        }}>Existe uma diferença</p>
         <h2 style={{
-          margin: '0 0 12px',
+          margin: '0 0 28px',
           fontSize: isMobile ? 26 : 36,
           fontWeight: 600,
           letterSpacing: '-0.024em',
           fontFamily: 'var(--font-display)',
           lineHeight: 1.12,
-          maxWidth: '18ch',
+          maxWidth: '20ch',
         }}>
-          Prompt solto vs studio editorial.
+          Gerar texto é fácil.
+          <br />
+          Construir uma leitura é outra coisa.
         </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Não é “uma IA melhor”. É o mesmo tipo de modelo, com um fluxo que força
-          arco, marca e export — em vez de texto genérico pra você montar depois.
-        </p>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
@@ -1208,20 +1235,14 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             background: 'var(--bg-secondary)',
           }}>
             <p style={{
-              margin: '0 0 16px',
+              margin: '0 0 20px',
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
               fontWeight: 600,
-            }}>Sem Viral.</p>
-            <h3 style={{
-              margin: '0 0 20px',
-              fontSize: 20,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-            }}>ChatGPT / Claude direto</h3>
+            }}>Um prompt solto</p>
             <ul style={{
               margin: 0,
               padding: 0,
@@ -1252,20 +1273,14 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             background: 'linear-gradient(160deg, rgba(255,45,141,0.1) 0%, rgba(14,12,20,0.4) 100%)',
           }}>
             <p style={{
-              margin: '0 0 16px',
+              margin: '0 0 20px',
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: 'var(--accent)',
               fontWeight: 600,
-            }}>Com Viral.</p>
-            <h3 style={{
-              margin: '0 0 20px',
-              fontSize: 20,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-            }}>Studio de carrossel</h3>
+            }}>No Viral.</p>
             <ul style={{
               margin: 0,
               padding: 0,
@@ -1311,7 +1326,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               }}
             >
               <Sparkles size={16} />
-              Gerar meu primeiro carrossel
+              Criar meu primeiro carrossel
               <ArrowRight size={14} />
             </button>
           </div>
@@ -1338,7 +1353,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Modos de trabalho</p>
+        }}>Você decide até onde quer ir</p>
         <h2 style={{
           margin: '0 0 12px',
           fontSize: isMobile ? 28 : 40,
@@ -1347,9 +1362,9 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           fontFamily: 'var(--font-display)',
           lineHeight: 1.1,
         }}>
-          Publique hoje.
+          Comece rápido.
           <br />
-          <span style={{ color: 'var(--accent)' }}>Aprofunde quando quiser.</span>
+          <span style={{ color: 'var(--accent)' }}>Assuma o controle quando quiser.</span>
         </h2>
         <p style={{
           margin: '0 0 28px',
@@ -1358,9 +1373,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           color: 'var(--text-secondary)',
           maxWidth: '54ch',
         }}>
-          Você não precisa ser designer nem copywriter. No modo Criador, um tema vira
-          post completo — narrativa, slides, legenda e arquivo pronto pro feed.
-          A geração roda na sua chave de IA; o Viral. é o studio onde isso vira post.
+          Há dias em que você só quer publicar uma boa ideia. Em outros, quer ajustar cada pausa,
+          cada imagem e cada palavra. O Viral. acompanha os dois ritmos sem obrigar você a virar designer.
         </p>
 
         <LandingImage
@@ -1484,30 +1498,20 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Fluxo</p>
+        }}>Do primeiro insight ao último card</p>
         <h2 style={{
-          margin: '0 0 12px',
+          margin: '0 0 28px',
           fontSize: isMobile ? 28 : 36,
           fontWeight: 600,
           letterSpacing: '-0.024em',
           fontFamily: 'var(--font-display)',
           lineHeight: 1.12,
         }}>
-          Do tema ao arquivo final.
+          Do primeiro insight ao último card
         </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Três etapas. Você não precisa ser copywriter nem designer —
-          só saber o que quer dizer.
-        </p>
         <div ref={stepsGridRef} style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
           gap: 16,
         }}>
           {STEPS.map(({ n, title, body, image }) => (
@@ -1548,6 +1552,32 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             </div>
           ))}
         </div>
+        <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="vc-landing-cta"
+            onClick={onEnter}
+            style={{
+              height: 52,
+              padding: '0 28px',
+              borderRadius: 'var(--radius-pill)',
+              border: 'none',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              fontFamily: 'var(--font-ui)',
+              boxShadow: 'var(--shadow-pink)',
+            }}
+          >
+            Quero transformar uma ideia em carrossel
+            <ArrowRight size={16} />
+          </button>
+        </div>
       </RevealSection>
 
       {/* ── MONTAGE — capabilities marquee ── */}
@@ -1573,14 +1603,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
             fontWeight: 600,
-          }}>Capacidades</p>
+          }}>Tudo no mesmo fluxo</p>
           <h2 style={{
             margin: '0 0 12px',
             fontSize: isMobile ? 24 : 32,
             fontWeight: 600,
             letterSpacing: '-0.022em',
             fontFamily: 'var(--font-display)',
-          }}>Tudo que um criador precisa</h2>
+          }}>Menos troca de abas.
+          Mais atenção na ideia.</h2>
           <p style={{
             margin: 0,
             fontSize: 15,
@@ -1588,7 +1619,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-secondary)',
             maxWidth: '48ch',
           }}>
-            Pesquisa, escrita, visual e export num só lugar — sem trocar de aba a cada slide.
+            Pesquisa, escrita, direção visual, refinamento e exportação reunidos em um único projeto.
           </p>
         </div>
         <div style={{ overflow: 'hidden', maskImage: 'linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)' }}>
@@ -1657,7 +1688,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           textTransform: 'uppercase',
           color: 'var(--text-muted)',
           fontWeight: 600,
-        }}>Planos</p>
+        }}>Um plano. O studio inteiro.</p>
         <h2 style={{
           margin: '0 0 12px',
           fontSize: isMobile ? 26 : 36,
@@ -1666,7 +1697,9 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           fontFamily: 'var(--font-display)',
           lineHeight: 1.12,
         }}>
-          Um plano. Studio completo.
+          Você paga pelo studio.
+          <br />
+          A sua produção continua nas suas mãos.
         </h2>
         <p style={{
           margin: '0 0 32px',
@@ -1675,8 +1708,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           color: 'var(--text-secondary)',
           maxWidth: '52ch',
         }}>
-          Sem créditos de imagem embutidos. Sem trava de “N carrosséis”.
-          Você assina o acesso — a geração roda na sua chave.
+          Conecte a sua própria chave de IA e escolha o provedor que prefere.
+          Assim, você acompanha o consumo diretamente e não fica preso a pacotes de posts ou créditos escondidos.
         </p>
 
         <div style={{
@@ -1705,7 +1738,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontWeight: 700,
               marginBottom: 16,
             }}>
-              Individual · recomendado
+              Plano individual
             </div>
             <h3 style={{
               margin: '0 0 8px',
@@ -1731,8 +1764,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontSize: 14,
               color: 'var(--text-secondary)',
             }}>
-              Ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong>
-              {' '}(~R$ 66/mês) — mesmo acesso, menos no cartão.
+              ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong>
+              {' '}— equivalente a cerca de R$ 66/mês
             </p>
             <ul style={{
               margin: '0 0 28px',
@@ -1779,7 +1812,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               }}
             >
               <Sparkles size={18} />
-              Assinar e entrar no studio
+              Entrar no Viral. Studio
               <ArrowRight size={16} />
             </button>
             {onLogin && (
@@ -1811,7 +1844,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontFamily: 'var(--font-mono)',
               letterSpacing: '0.03em',
             }}>
-              Sem fidelidade · Cancele quando quiser
+              Use sua própria chave de IA · Cancele quando quiser
             </p>
           </div>
 
@@ -1833,16 +1866,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
               fontWeight: 600,
-            }}>Por que não créditos?</p>
+            }}>Por que conectar sua chave?</p>
             <p style={{
               margin: 0,
               fontSize: 16,
               lineHeight: 1.5,
               color: 'var(--text-secondary)',
             }}>
-              Apps que “incluem IA” vendem pacote de imagem e travam volume.
-              Aqui o produto é o <strong style={{ color: 'var(--text-primary)' }}>studio</strong>:
-              fluxo editorial, marca e export. A LLM é sua — você escolhe quanto gerar.
+              Em vez de esconder o consumo em pacotes de créditos, o Viral. deixa você
+              escolher o provedor, acompanhar os gastos e trocar de modelo quando quiser.
             </p>
             <p style={{
               margin: 0,
@@ -1850,8 +1882,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               lineHeight: 1.45,
               color: 'var(--text-muted)',
             }}>
-              Método no chat (curso) ensina. Prompt solto gera texto.
-              Viral. entrega o arquivo pronto pra postar no browser.
+              Você paga pelo studio. A geração fica na sua conta de IA — com transparência e controle.
             </p>
           </div>
         </div>
@@ -1965,7 +1996,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             textTransform: 'uppercase',
             color: 'var(--accent)',
             fontWeight: 600,
-          }}>Próximo passo</p>
+          }}>Sua próxima ideia já pode virar post</p>
           <h2 style={{
             margin: '0 0 12px',
             fontSize: isMobile ? 26 : 36,
@@ -1974,9 +2005,9 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             fontFamily: 'var(--font-display)',
             lineHeight: 1.12,
           }}>
-            O feed não espera.
+            Pare de acumular rascunhos.
             <br />
-            Seu carrossel pode sair hoje.
+            Publique o que você já tem para dizer.
           </h2>
           <p style={{
             margin: '0 auto 32px',
@@ -1985,8 +2016,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-secondary)',
             lineHeight: 1.47,
           }}>
-            Entre no studio, escolha um template ou digite um tema,
-            e deixe a IA montar gancho, slides e legenda — você só refina o que importa.
+            Entre no studio, escolha uma direção e transforme seu tema em um carrossel completo.
+            O Viral. organiza o caminho. Você decide a versão final.
           </p>
           <button
             type="button"
@@ -2019,7 +2050,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            Acesso ao studio · R$ 97/mês · Sua chave de IA · Sem limite de carrosséis
+            Studio completo · R$ 97/mês · Sua chave de IA · Sem limite imposto pelo produto
           </p>
           </div>
         </div>
@@ -2053,7 +2084,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-muted)',
             maxWidth: '36ch',
           }}>
-            Carrossel Studio com IA — do insight editorial ao post publicável.
+            Da ideia ao post — com argumento, identidade e direção.
           </p>
         </div>
         <div style={{
@@ -2079,7 +2110,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               fontFamily: 'var(--font-ui)',
             }}
           >
-            Começar agora
+            Criar meu primeiro carrossel
           </button>
           <p style={{
             margin: 0,
@@ -2089,7 +2120,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
           }}>
-            © {new Date().getFullYear()} · Narrative OS
+            © {new Date().getFullYear()} Viral. Todos os direitos reservados.
           </p>
         </div>
       </footer>
