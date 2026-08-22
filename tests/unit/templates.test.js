@@ -124,3 +124,76 @@ describe('ponte pacote criativo ↔ padrão visual', () => {
     expect(new Set(usados).size, `sugestão repetida: ${usados.join(', ')}`).toBe(usados.length);
   });
 });
+
+describe('paletas — legibilidade em qualquer template', () => {
+  /** Contraste WCAG 2.x entre duas cores sólidas. */
+  const lum = (h) => {
+    const v = h.replace('#', '').match(/../g).map((x) => parseInt(x, 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  };
+  const ct = (a, b) => {
+    const [x, y] = [lum(a), lum(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+
+  it('título, subtítulo e corpo passam 4.5:1 sobre o fundo', () => {
+    const falhas = [];
+    for (const p of PALETTES) {
+      for (const campo of ['title', 'subtitle', 'text']) {
+        const r = ct(p[campo], p.bg);
+        if (r < 4.5) falhas.push(`${p.name}.${campo} ${r.toFixed(2)}:1`);
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  it('accent passa 3:1 — é riscado, palavra destacada e selo', () => {
+    // Duas paletas da biblioteca de capas chegaram reprovando: âmbar sobre
+    // areia (2.9:1) e verde elétrico sobre pedra (1.0:1, invisível).
+    const falhas = [];
+    for (const p of PALETTES) {
+      const r = ct(p.accent, p.bg);
+      if (r < 3) falhas.push(`${p.name} ${r.toFixed(2)}:1`);
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  it('nenhuma paleta é duplicata cromática de outra', () => {
+    const chaves = PALETTES.map((p) => `${p.bg}|${p.title}|${p.accent}`);
+    expect(new Set(chaves).size, 'paleta repetida').toBe(chaves.length);
+  });
+});
+
+describe('templates — catálogo navegável', () => {
+  it('todo template declara categoria conhecida', () => {
+    for (const t of TEMPLATES) {
+      expect(['angulo', 'nicho'], `${t.id}: categoria "${t.categoria}"`).toContain(t.categoria);
+    }
+  });
+
+  it('id, nome e descrição são únicos', () => {
+    for (const campo of ['id', 'name', 'desc']) {
+      const vistos = TEMPLATES.map((t) => t[campo]);
+      expect(new Set(vistos).size, `${campo} duplicado`).toBe(vistos.length);
+    }
+  });
+
+  it('cada template tem paleta própria — a grade não pode ter dois cards iguais', () => {
+    const usadas = TEMPLATES.map((t) => t.palette);
+    expect(new Set(usadas).size, `paleta repetida entre templates: ${usadas.join(', ')}`)
+      .toBe(usadas.length);
+  });
+
+  it('nenhum texto de template carrega marca de terceiro', () => {
+    const proibidos = ['coldplay', 'linkedin', 'instagram', 'canva', 'nmlss', 'cadore', 'nba'];
+    const achados = [];
+    for (const t of TEMPLATES) {
+      for (const s of t.slides) {
+        const texto = `${s.title} ${s.subtitle || ''} ${s.body || ''}`.toLowerCase();
+        for (const termo of proibidos) if (texto.includes(termo)) achados.push(`${t.id}: ${termo}`);
+      }
+    }
+    expect(achados).toEqual([]);
+  });
+});

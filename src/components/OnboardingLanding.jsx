@@ -8,15 +8,9 @@ import {
 import BrandLogo from './BrandLogo.jsx';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
-/** Assets em public/landing/ (origem: IMAGENS CARROCEIS P LAND + IMAGENS VIRACAL CARRECEL) */
+/** Assets em public/landing/ — samples otimizados WebP (slides editoriais) */
 const IMG = {
   logo: '/landing/logo-viral-carrossel-studio.png',
-  heroStage: '/landing/hero-stage-segredo.webp',
-  heroSlides: [
-    '/landing/creator-reaction.png',
-    '/landing/carousel-07.png',
-    '/landing/hero-slide-3.png',
-  ],
   problem: '/landing/section-problem.png',
   steps: ['/landing/step-01-imersao.webp', '/landing/step-02-refine.webp', '/landing/step-03-publicar.webp'],
   cta: '/landing/analytics-screen.png',
@@ -27,13 +21,22 @@ const IMG = {
   showcasePhoneNike: '/landing/showcase-phone-rosa.webp',
   modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
-    '/landing/carousel-01.png',
-    '/landing/carousel-02.png',
-    '/landing/carousel-03.png',
-    '/landing/carousel-04.png',
-    '/landing/carousel-05.png',
-    '/landing/carousel-06.png',
-    '/landing/carousel-07.png',
+    '/landing/sample-01.webp',
+    '/landing/sample-02.webp',
+    '/landing/sample-03.webp',
+    '/landing/sample-04.webp',
+    '/landing/sample-05.webp',
+    '/landing/sample-06.webp',
+    '/landing/sample-07.webp',
+    '/landing/sample-08.webp',
+    '/landing/sample-09.webp',
+    '/landing/sample-10.webp',
+    '/landing/sample-11.webp',
+    '/landing/sample-12.webp',
+    '/landing/sample-13.webp',
+    '/landing/sample-14.webp',
+    '/landing/sample-15.webp',
+    '/landing/sample-16.webp',
   ],
 };
 
@@ -275,59 +278,6 @@ const PLAN_FEATURES = [
   'Cancele quando quiser no portal do cliente',
 ];
 
-/** Cartão flutuante do hero — preview real de slide */
-function HeroSlideCard({ style, imageSrc, label, aspect = '4 / 5' }) {
-  return (
-    <div
-      className="vc-landing-slide-card"
-      style={{
-        position: 'absolute',
-        width: 'clamp(120px, 22vw, 168px)',
-        aspectRatio: aspect,
-        borderRadius: 16,
-        border: '1px solid var(--glass-border-strong)',
-        boxShadow: 'var(--shadow-lg), var(--shadow-pink)',
-        overflow: 'hidden',
-        ...style,
-      }}
-    >
-      <img
-        src={imageSrc}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
-      />
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(to top, rgba(14,12,20,0.75) 0%, transparent 55%)',
-        pointerEvents: 'none',
-      }} />
-      {label && (
-        <div style={{
-          position: 'absolute',
-          bottom: 10,
-          left: 10,
-          right: 10,
-          fontSize: 10,
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.85)',
-          fontWeight: 600,
-        }}>{label}</div>
-      )}
-    </div>
-  );
-}
-
 /** Faixa horizontal de previews 4:5 (carrosséis reais) */
 function CarouselSlideStrip({ isMobile, style = {} }) {
   return (
@@ -364,6 +314,8 @@ function CarouselSlideStrip({ isMobile, style = {} }) {
             <img
               src={src}
               alt=""
+              width={720}
+              height={900}
               loading="lazy"
               decoding="async"
               style={{
@@ -481,7 +433,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
   const ctaImageRef = useRef(null);
   const stickyHeaderRef = useRef(null);
   const heroBgRef = useRef(null);
-  const previewStageRef = useRef(null);
   const problemImageRef = useRef(null);
   const modosImageRef = useRef(null);
   const stepsGridRef = useRef(null);
@@ -490,7 +441,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
     splitRefs: [heroTitleRef, notEditorTitleRef],
     parallaxLayers: [
       { ref: heroBgRef, speed: 0.65 },
-      { ref: previewStageRef, speed: 0.4 },
       { ref: problemImageRef, speed: 0.32 },
       { ref: modosImageRef, speed: 0.28 },
       { ref: stepsGridRef, speed: 0.18 },
@@ -889,70 +839,138 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </header>
 
-      {/* ── PREVIEW DO PRODUTO — composição que antes vivia dentro do hero ── */}
+      {/* ── ÂNCORA DE VALOR (logo após o hero) ── */}
       <RevealSection
-        variant="scale"
-        eager
+        variant="rise"
         style={{
           position: 'relative',
           zIndex: 1,
           maxWidth: 1200,
           margin: '0 auto',
-          padding: isMobile ? '32px 16px 8px' : '56px clamp(24px, 5vw, 48px) 8px',
+          padding: isMobile ? '32px 16px 20px' : '48px clamp(24px, 5vw, 48px) 28px',
         }}
       >
-        <div ref={previewStageRef} style={{
-          position: 'relative',
-          maxWidth: 760,
-          margin: '0 auto',
-          height: isMobile ? 'auto' : 440,
-          minHeight: isMobile ? 0 : 360,
+        <p style={{
+          margin: '0 0 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          fontWeight: 600,
+        }}>Uma aba</p>
+        <h2 style={{
+          margin: '0 0 12px',
+          fontSize: isMobile ? 26 : 36,
+          fontWeight: 600,
+          letterSpacing: '-0.024em',
+          fontFamily: 'var(--font-display)',
+          lineHeight: 1.12,
+          maxWidth: '20ch',
         }}>
-          <div
-            className="vc-landing-glow"
-            aria-hidden
+          Canva escreve layout.
+          <br />
+          Chat escreve texto.
+          <br />
+          <span style={{ color: 'var(--accent)' }}>Viral. fecha o post.</span>
+        </h2>
+        <p style={{
+          margin: '0 0 28px',
+          fontSize: 17,
+          lineHeight: 1.47,
+          color: 'var(--text-secondary)',
+          maxWidth: '52ch',
+        }}>
+          Três ferramentas soltas = três abas e zero arco. O studio junta narrativa,
+          marca e export — a geração fica na sua chave de IA.
+        </p>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 16,
+        }}>
+          {VALUE_STACK.map(({ icon: Icon, label, role, gap }) => (
+            <div
+              key={label}
+              style={{
+                padding: '20px 18px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-glass)',
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={16} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
+              </div>
+              <p style={{
+                margin: '0 0 6px',
+                fontSize: 14,
+                color: 'var(--text-secondary)',
+              }}>{role}</p>
+              <p style={{
+                margin: 0,
+                fontSize: 13,
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+              }}>{gap}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{
+          padding: isMobile ? '18px 16px' : '20px 24px',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid rgba(255, 45, 141, 0.35)',
+          background: 'var(--accent-surface)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <p style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: '-0.014em',
+            maxWidth: '42ch',
+            lineHeight: 1.4,
+          }}>
+            Um fluxo. Um export. Sem montar o argumento em três apps.
+          </p>
+          <button
+            type="button"
+            className="vc-landing-cta"
+            onClick={onEnter}
             style={{
-              position: 'absolute',
-              width: '80%',
-              height: '80%',
-              top: '10%',
-              left: '10%',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,45,141,0.22) 0%, transparent 70%)',
-              filter: 'blur(48px)',
-              zIndex: 0,
+              height: 44,
+              padding: '0 20px',
+              borderRadius: 'var(--radius-pill)',
+              border: 'none',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontFamily: 'var(--font-ui)',
+              flexShrink: 0,
             }}
-          />
-          <LandingImage
-            src={IMG.heroStage}
-            alt="Preview do editor Viral Carrossel com export para Instagram"
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
-            }}
-            rounded="var(--radius-xl)"
-          />
-          {!isMobile && (
-            <>
-              <HeroSlideCard
-                imageSrc={IMG.heroSlides[0]}
-                label="Slide 01"
-                style={{ top: '6%', left: '-4%', '--rot': '-8deg', zIndex: 3 }}
-              />
-              <HeroSlideCard
-                imageSrc={IMG.heroSlides[1]}
-                label="Slide 05"
-                aspect="480 / 834"
-                style={{ top: '8%', right: '-2%', '--rot': '6deg', zIndex: 4, width: 'clamp(140px, 24vw, 190px)' }}
-              />
-              <HeroSlideCard
-                imageSrc={IMG.heroSlides[2]}
-                label="Slide 09"
-                style={{ bottom: '4%', left: '12%', '--rot': '-3deg', zIndex: 2 }}
-              />
-            </>
-          )}
+          >
+            Ver plano e assinar
+            <ArrowRight size={14} />
+          </button>
         </div>
       </RevealSection>
 
@@ -2001,141 +2019,6 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               }}
             />
           </div>
-        </div>
-      </RevealSection>
-
-      {/* ── ÂNCORA DE VALOR ── */}
-      <RevealSection
-        variant="rise"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '24px 16px 20px' : '40px clamp(24px, 5vw, 48px) 28px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Uma aba</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-          maxWidth: '20ch',
-        }}>
-          Canva escreve layout.
-          <br />
-          Chat escreve texto.
-          <br />
-          <span style={{ color: 'var(--accent)' }}>Viral. fecha o post.</span>
-        </h2>
-        <p style={{
-          margin: '0 0 28px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Três ferramentas soltas = três abas e zero arco. O studio junta narrativa,
-          marca e export — a geração fica na sua chave de IA.
-        </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: 12,
-          marginBottom: 16,
-        }}>
-          {VALUE_STACK.map(({ icon: Icon, label, role, gap }) => (
-            <div
-              key={label}
-              style={{
-                padding: '20px 18px',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-glass)',
-              }}
-            >
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
-              }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 9,
-                  background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon size={16} />
-                </div>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
-              </div>
-              <p style={{
-                margin: '0 0 6px',
-                fontSize: 14,
-                color: 'var(--text-secondary)',
-              }}>{role}</p>
-              <p style={{
-                margin: 0,
-                fontSize: 13,
-                color: 'var(--text-muted)',
-                lineHeight: 1.4,
-              }}>{gap}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          padding: isMobile ? '18px 16px' : '20px 24px',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid rgba(255, 45, 141, 0.35)',
-          background: 'var(--accent-surface)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 12,
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <p style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 600,
-            letterSpacing: '-0.014em',
-            maxWidth: '42ch',
-            lineHeight: 1.4,
-          }}>
-            Um fluxo. Um export. Sem montar o argumento em três apps.
-          </p>
-          <button
-            type="button"
-            className="vc-landing-cta"
-            onClick={onEnter}
-            style={{
-              height: 44,
-              padding: '0 20px',
-              borderRadius: 'var(--radius-pill)',
-              border: 'none',
-              background: 'var(--accent)',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: 'var(--font-ui)',
-              flexShrink: 0,
-            }}
-          >
-            Ver plano e assinar
-            <ArrowRight size={14} />
-          </button>
         </div>
       </RevealSection>
 

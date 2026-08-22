@@ -45,6 +45,55 @@ export const FONT_PAIRINGS = [
     textTitleWeight: 700,
     use: 'How-to, checklist',
   },
+  // ── Pares editoriais (biblioteca de capas) ────────────────────────────────
+  {
+    id: 'manifesto_brutal',
+    name: 'Manifesto brutal',
+    titleFont: '"Anton", sans-serif',
+    bodyFont: '"Inter Tight", sans-serif',
+    textTitleWeight: 400,          // Anton só tem 400; pedir 700 dá faux-bold
+    use: 'Manifesto, provocação',
+  },
+  {
+    id: 'display_condensado',
+    name: 'Display condensado',
+    titleFont: '"Archivo Black", sans-serif',
+    bodyFont: '"Inter Tight", sans-serif',
+    textTitleWeight: 400,          // Archivo Black já é o peso; 700+ borra
+    use: 'Marketing, serviço, e-commerce',
+  },
+  {
+    id: 'serif_alto_contraste',
+    name: 'Serifa alto contraste',
+    titleFont: '"Playfair Display", serif',
+    bodyFont: '"Inter", sans-serif',
+    textTitleWeight: 700,
+    use: 'Mentoria, marca premium',
+  },
+  {
+    id: 'grotesca_tecnica',
+    name: 'Grotesca técnica',
+    titleFont: '"Space Grotesk", sans-serif',
+    bodyFont: '"Inter Tight", sans-serif',
+    textTitleWeight: 700,
+    use: 'Tecnologia, produto',
+  },
+  {
+    id: 'suica_editorial',
+    name: 'Suíça editorial',
+    titleFont: '"Familjen Grotesk", sans-serif',
+    bodyFont: '"Inter", sans-serif',
+    textTitleWeight: 700,
+    use: 'Consultoria, diagnóstico',
+  },
+  {
+    id: 'quote_serif',
+    name: 'Serifa de citação',
+    titleFont: '"Instrument Serif", serif',
+    bodyFont: '"Inter", sans-serif',
+    textTitleWeight: 400,
+    use: 'Ideia central, ensaio',
+  },
 ];
 
 /** Floor do AutoFit / OverflowScaler — abaixo disso o hook viral morre. */
@@ -185,6 +234,7 @@ export const SUGGESTED_VISUAL_PRESET_BY_CREATIVE = {
   quick_decodificacao: 'case_study_neon',   // estudo de caso com prova
   quick_comportamento: 'mood_sepia',        // reflexivo, quote-driven
   tendencia_cultura: 'editorial_magazine',  // capa de revista
+  livre: 'minimal_clean',                   // sem pacote: tipografia limpa
 };
 
 export function suggestVisualPresetForCreative(creativePresetId) {
