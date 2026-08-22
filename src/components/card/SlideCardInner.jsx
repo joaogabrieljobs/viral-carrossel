@@ -156,7 +156,13 @@ function vcTitleOvershootShift(fontSizePx, leadingPct) {
 function vcFooterOrnamentReservePx(brand, f) {
   let reserva = 0;
   if (String(brand.footerPillText || '').trim()) {
-    const alturaPill = f.h * 0.024 + f.w * 0.026 * 1.25;
+    // A seta circular (f.w*0.05) é MAIS ALTA que a linha de texto do selo
+    // (f.w*0.026). Medir só pelo texto subdimensionava a faixa em ~19px e o
+    // título encostava 10px dentro do selo — exatamente nos três padrões que
+    // usam seta, e em nenhum dos que a desligam.
+    const comSeta = brand.footerPillArrow !== false;
+    const alturaConteudo = Math.max(f.w * 0.026 * 1.25, comSeta ? f.w * 0.05 : 0);
+    const alturaPill = f.h * 0.024 + alturaConteudo;
     reserva = Math.max(reserva, f.h * 0.058 + alturaPill);
   }
   const colunas = [brand.footerBarLeft, brand.footerBarCenter, brand.footerBarRight];
