@@ -595,7 +595,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               // Num crop retrato (mobile), "center" corta bem no meio e some
               // com ele quase todo — desloca a âncora horizontal pra ~72%
               // pra manter o rosto dele dentro do enquadramento.
-              objectPosition: isMobile ? '72% 18%' : 'center 30%',
+              objectPosition: isMobile ? '72% 12%' : '68% 28%',
               filter: 'saturate(104%)',
               transform: 'scale(1.04)',
             }}
@@ -603,10 +603,14 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: `
-              linear-gradient(180deg, rgba(14,12,20,0.5) 0%, rgba(14,12,20,0.38) 38%, rgba(14,12,20,0.94) 100%),
-              radial-gradient(ellipse 70% 55% at 50% 20%, rgba(255,45,141,0.14) 0%, transparent 60%)
-            `,
+            background: isMobile
+              ? `
+                linear-gradient(180deg, rgba(14,12,20,0.35) 0%, rgba(14,12,20,0.2) 32%, rgba(14,12,20,0.88) 72%, rgba(14,12,20,0.96) 100%)
+              `
+              : `
+                linear-gradient(90deg, rgba(14,12,20,0.92) 0%, rgba(14,12,20,0.72) 38%, rgba(14,12,20,0.25) 68%, rgba(14,12,20,0.4) 100%),
+                linear-gradient(180deg, rgba(14,12,20,0.35) 0%, transparent 40%, rgba(14,12,20,0.55) 100%)
+              `,
           }} />
         </div>
 
@@ -685,23 +689,21 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          // No mobile o rosto dele fica na metade de cima da foto — texto
-          // centralizado caía bem em cima do rosto. Jogando pro final
-          // (flex-end) o texto desce pra área do suéter (mais neutra,
-          // melhor contraste) em vez de sobrepor o rosto.
+          alignItems: isMobile ? 'center' : 'flex-start',
           justifyContent: isMobile ? 'flex-end' : 'center',
-          textAlign: 'center',
-          gap: isMobile ? 20 : 24,
-          width: 'min(1100px, 92vw)',
+          textAlign: isMobile ? 'center' : 'left',
+          gap: isMobile ? 14 : 18,
+          width: isMobile ? 'min(100%, 92vw)' : 'min(1280px, 92vw)',
           margin: '0 auto',
-          padding: isMobile ? '48px 20px 56px' : '64px clamp(24px, 5vw, 48px) 96px',
+          padding: isMobile
+            ? '24px 20px calc(28px + env(safe-area-inset-bottom, 0px))'
+            : '48px clamp(24px, 5vw, 48px) 72px',
         }}>
           <p className="section-label" style={{
             margin: 0,
             fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            letterSpacing: '0.16em',
+            fontSize: 11,
+            letterSpacing: '0.14em',
             textTransform: 'uppercase',
             color: 'var(--accent)',
             fontWeight: 600,
@@ -710,59 +712,60 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           </p>
           <h1 ref={heroTitleRef} style={{
             margin: 0,
-            maxWidth: '100%',
-            fontSize: isMobile ? 'clamp(2.4rem, 11vw, 3.1rem)' : 'clamp(3.2rem, 6vw, 5.25rem)',
+            maxWidth: isMobile ? '16ch' : '22ch',
+            fontSize: isMobile ? 'clamp(1.65rem, 6.8vw, 1.95rem)' : 'clamp(2.35rem, 3.4vw, 3.2rem)',
             fontWeight: 600,
             letterSpacing: '-0.03em',
-            // 1.02 era apertado demais: o SplitText embrulha cada linha numa
-            // caixa com overflow:hidden do tamanho exato da linha (pro efeito
-            // de reveal). Com pouca folga, descendentes de letras como "g"
-            // (gancho) ficam por baixo da caixa e são cortados. 1.14 dá
-            // espaço suficiente sem perder o aperto visual do display.
-            lineHeight: 1.14,
+            lineHeight: 1.12,
             fontFamily: 'var(--font-display)',
           }}>
             Crie carrosséis que{' '}
             <span style={{ color: 'var(--accent)' }}>prendem até o fim,</span>
-            <br />
-            viralizam e constroem autoridade.
+            {' '}viralizam e constroem autoridade.
           </h1>
           <p style={{
             margin: 0,
-            fontSize: isMobile ? 16 : 19,
+            fontSize: isMobile ? 14 : 17,
             lineHeight: 1.5,
             letterSpacing: '-0.011em',
             color: 'var(--text-secondary)',
-            maxWidth: '46ch',
+            maxWidth: isMobile ? '34ch' : '38ch',
           }}>
             Conheça nosso studio que une design, copy e tendências —
             gerados por agentes ultra avançados.
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            alignItems: 'center',
+            justifyContent: isMobile ? 'center' : 'flex-start',
+            marginTop: 4,
+          }}>
             <button
               type="button"
               className="vc-landing-cta"
               onClick={onEnter}
               style={{
-                height: 52,
-                padding: '0 28px',
+                height: isMobile ? 46 : 50,
+                padding: isMobile ? '0 20px' : '0 24px',
                 borderRadius: 'var(--radius-pill)',
                 border: 'none',
                 background: 'var(--accent)',
                 color: '#fff',
-                fontSize: 16,
+                fontSize: isMobile ? 14 : 15,
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 10,
+                gap: 8,
                 fontFamily: 'var(--font-ui)',
                 boxShadow: 'var(--shadow-pink)',
               }}
             >
-              <Sparkles size={18} />
+              <Sparkles size={16} />
               Criar meu primeiro carrossel
-              <ArrowRight size={16} />
+              <ArrowRight size={14} />
             </button>
             <button
               type="button"
@@ -779,15 +782,15 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 }
               }}
               style={{
-                height: 52,
-                padding: '0 24px',
+                height: isMobile ? 46 : 50,
+                padding: isMobile ? '0 18px' : '0 22px',
                 borderRadius: 'var(--radius-pill)',
                 border: '1px solid var(--glass-border-strong)',
                 background: 'var(--bg-glass)',
                 backdropFilter: 'blur(18px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(18px) saturate(180%)',
                 color: 'var(--text-primary)',
-                fontSize: 15,
+                fontSize: isMobile ? 13 : 14,
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontFamily: 'var(--font-ui)',
@@ -798,10 +801,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           </div>
           <p style={{
             margin: 0,
-            fontSize: 13,
+            fontSize: 12,
             lineHeight: 1.45,
             color: 'var(--text-muted)',
-            maxWidth: '42ch',
+            maxWidth: '40ch',
           }}>
             Design, copy e tendências no mesmo fluxo — do tema ao arquivo pronto.
           </p>
