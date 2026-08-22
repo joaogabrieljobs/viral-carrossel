@@ -12,43 +12,52 @@ Fonte de verdade alinhada a `src/components/OnboardingLanding.jsx`.
 
 ---
 
-## 1. Hero (split editorial)
+## 1. Hero
 
 **Eyebrow**
 
 ```text
-Viral. Carrossel Studio
+Viral. · Studio editorial com IA
 ```
 
 **Headline**
 
 ```text
-Sua ideia merece
-mais que slides bonitos.
+Sua ideia já é boa.
+Agora ela precisa prender até o fim.
 ```
+
+Usar `prender até o fim.` na cor de destaque.
 
 **Subheadline**
 
 ```text
-Transforme um tema em uma narrativa pronta para prender, convencer e publicar.
+Transforme um tema em narrativa, slides, visual e legenda — tudo no mesmo fluxo,
+com a identidade da sua marca e espaço para deixar cada palavra com a sua cara.
 ```
 
 **CTA principal**
 
 ```text
-Começar um carrossel
+Criar meu primeiro carrossel
 ```
 
 **CTA secundário**
 
 ```text
-Ver o produto
+Ver como funciona
 ```
 
-**Navegação flutuante**
+**Microcopy abaixo do CTA**
 
-- `Produto` · `Templates` · `Como funciona` · `Preço`
-- `Entrar` · `Começar`
+```text
+Do tema ao arquivo pronto para publicar. Sem começar do zero em cada slide.
+```
+
+**Navegação**
+
+- `Entrar`
+- `Conhecer o studio`
 
 ---
 
