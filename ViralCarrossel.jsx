@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   Sparkles, Search, Download, Trash2, Copy,
   Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2,
@@ -21,10 +21,7 @@ import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
-import OnboardingLanding from './src/components/OnboardingLanding.jsx';
 import BrandLogo from './src/components/BrandLogo.jsx';
-import Paywall from './src/components/Paywall.jsx';
-import LoginModal from './src/components/LoginModal.jsx';
 import AccountProfile from './src/components/AccountProfile.jsx';
 import {
   fetchAccessSession,
@@ -36,16 +33,7 @@ import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverrid
 import { useScrollLock } from './src/hooks/useScrollLock.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
-import ModesIntroModal from './src/components/ModesIntroModal.jsx';
 import PromptDialog from './src/components/PromptDialog.jsx';
-import OnboardingTour from './src/components/OnboardingTour.jsx';
-import HelpModal from './src/components/HelpModal.jsx';
-import BrandsModal from './src/components/BrandsModal.jsx';
-import LibraryModal from './src/components/LibraryModal.jsx';
-import ImageCropModal from './src/components/ImageCropModal.jsx';
-import PhotoPositionModal from './src/components/PhotoPositionModal.jsx';
-import KeysModal from './src/components/KeysModal.jsx';
-import TemplatesModal from './src/components/TemplatesModal.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { FORMATS } from './src/utils/formats.js';
@@ -375,6 +363,19 @@ import {
   normalizeAISettings,
   TEXT_PROVIDERS,
 } from './src/config/ai-providers.js';
+
+const OnboardingLanding = lazy(() => import('./src/components/OnboardingLanding.jsx'));
+const Paywall = lazy(() => import('./src/components/Paywall.jsx'));
+const LoginModal = lazy(() => import('./src/components/LoginModal.jsx'));
+const ModesIntroModal = lazy(() => import('./src/components/ModesIntroModal.jsx'));
+const OnboardingTour = lazy(() => import('./src/components/OnboardingTour.jsx'));
+const HelpModal = lazy(() => import('./src/components/HelpModal.jsx'));
+const BrandsModal = lazy(() => import('./src/components/BrandsModal.jsx'));
+const LibraryModal = lazy(() => import('./src/components/LibraryModal.jsx'));
+const ImageCropModal = lazy(() => import('./src/components/ImageCropModal.jsx'));
+const PhotoPositionModal = lazy(() => import('./src/components/PhotoPositionModal.jsx'));
+const KeysModal = lazy(() => import('./src/components/KeysModal.jsx'));
+const TemplatesModal = lazy(() => import('./src/components/TemplatesModal.jsx'));
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 
@@ -2698,22 +2699,24 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         }}
       >
         <style>{GLOBAL_STYLE}</style>
-        <OnboardingLanding
-          onEnter={completeLanding}
-          onLogin={() => { setLoginHint(''); setLoginOpen(true); }}
-          isMobile={isMobile}
-        />
-        <LoginModal
-          open={loginOpen}
-          onClose={() => setLoginOpen(false)}
-          initialEmail={paywallEmail}
-          hint={loginHint}
-          onAlreadyActive={async () => {
-            await refreshAccess();
-            setLoginOpen(false);
-            enterStudio();
-          }}
-        />
+        <Suspense fallback={null}>
+          <OnboardingLanding
+            onEnter={completeLanding}
+            onLogin={() => { setLoginHint(''); setLoginOpen(true); }}
+            isMobile={isMobile}
+          />
+          <LoginModal
+            open={loginOpen}
+            onClose={() => setLoginOpen(false)}
+            initialEmail={paywallEmail}
+            hint={loginHint}
+            onAlreadyActive={async () => {
+              await refreshAccess();
+              setLoginOpen(false);
+              enterStudio();
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -2747,27 +2750,29 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         }}
       >
         <style>{GLOBAL_STYLE}</style>
-        <Paywall
-          isMobile={isMobile}
-          initialEmail={paywallEmail}
-          loginHint={loginHint}
-          onBack={reopenLanding}
-          onAlreadyActive={async () => {
-            await refreshAccess();
-            enterStudio();
-          }}
-        />
-        <LoginModal
-          open={loginOpen}
-          onClose={() => setLoginOpen(false)}
-          initialEmail={paywallEmail}
-          hint={loginHint}
-          onAlreadyActive={async () => {
-            await refreshAccess();
-            setLoginOpen(false);
-            enterStudio();
-          }}
-        />
+        <Suspense fallback={null}>
+          <Paywall
+            isMobile={isMobile}
+            initialEmail={paywallEmail}
+            loginHint={loginHint}
+            onBack={reopenLanding}
+            onAlreadyActive={async () => {
+              await refreshAccess();
+              enterStudio();
+            }}
+          />
+          <LoginModal
+            open={loginOpen}
+            onClose={() => setLoginOpen(false)}
+            initialEmail={paywallEmail}
+            hint={loginHint}
+            onAlreadyActive={async () => {
+              await refreshAccess();
+              setLoginOpen(false);
+              enterStudio();
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -3744,6 +3749,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       {/* Toast notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast}/>
 
+      {/* Lazy modals — fora do chunk inicial do studio */}
+      <Suspense fallback={null}>
       {/* Onboarding dos 3 modos — primeira visita ou reabrível via ? */}
       <ModesIntroModal
         open={modesIntroOpen}
@@ -3973,6 +3980,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
         onSave={saveCurrentBrandAsProfile}
         onDelete={deleteBrand}
       />
+      </Suspense>
 
       {/* Export progress FAB */}
       {exporting && exportProgress.total > 1 && (

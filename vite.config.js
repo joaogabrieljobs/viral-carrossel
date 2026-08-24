@@ -125,9 +125,17 @@ export default defineConfig(({ mode }) => {
       // (definido em vercel.json) garante 1 ano de cache pros chunks vendor.
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom'],
-            'lucide-icons': ['lucide-react'],
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/lucide-react')) {
+              return 'lucide-icons';
+            }
+            if (id.includes('node_modules/gsap') || id.includes('/hooks/gsapSetup')) {
+              return 'gsap-vendor';
+            }
+            return undefined;
           },
         },
       },

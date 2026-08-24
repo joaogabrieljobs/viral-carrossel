@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from '../ViralCarrossel.jsx';
+import { shouldShowOnboardingLanding } from './utils/landing-gate.js';
+import { GLOBAL_STYLE } from './styles/global-style.js';
 
 /** Mostra o erro em vez de página em branco quando o render falha (ex.: dados corruptos). */
 class RootErrorBoundary extends React.Component {
@@ -52,6 +53,32 @@ class RootErrorBoundary extends React.Component {
   }
 }
 
+function BootScreen() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#0e0c14',
+      color: '#8a8696',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: 14,
+    }}>
+      <style>{GLOBAL_STYLE}</style>
+      A carregar…
+    </div>
+  );
+}
+
+// Landing first paint sem o monólito do studio; quem já passou pela intro
+// vai direto ao ViralCarrossel.
+const App = lazy(() => (
+  shouldShowOnboardingLanding()
+    ? import('./LandingFirst.jsx')
+    : import('../ViralCarrossel.jsx')
+));
+
 const rootEl = document.getElementById('root');
 if (!rootEl) {
   throw new Error('index.html sem #root');
@@ -60,7 +87,9 @@ if (!rootEl) {
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <RootErrorBoundary>
-      <App />
+      <Suspense fallback={<BootScreen />}>
+        <App />
+      </Suspense>
     </RootErrorBoundary>
   </React.StrictMode>,
 );

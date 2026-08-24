@@ -14,7 +14,6 @@ const IMG = {
   steps: ['/landing/step-01-imersao.webp', '/landing/step-02-refine.webp', '/landing/step-03-publicar.webp'],
   cta: '/landing/analytics-screen.png',
   mobile: '/landing/phone-feed.png',
-  showcase: '/landing/showcase-creator.png',
   heroPhoto: '/landing/hero-creator-photo.jpg',
   showcaseWindowPhone: '/landing/showcase-window-phone.jpg',
   showcasePhoneNike: '/landing/showcase-phone-rosa.webp',
@@ -585,6 +584,10 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             ref={heroBgRef}
             src={IMG.heroPhoto}
             alt=""
+            width={1920}
+            height={1080}
+            fetchPriority="high"
+            decoding="async"
             style={{
               position: 'absolute',
               inset: 0,
@@ -1058,14 +1061,23 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           Você traz o tema, uma referência ou um material bruto. O studio organiza a tese,
           constrói o arco e transforma essa direção em um carrossel pronto para ser refinado.
         </p>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile
-            ? '1fr'
-            : 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: isMobile ? 10 : 12,
-        }}>
-          {GENERATION_LAYERS.map(({ n, icon: Icon, title, body }) => (
+        <div
+          className="vc-landing-gen-grid"
+          style={{
+            display: 'grid',
+            gap: isMobile ? 10 : 12,
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, 1fr)',
+          }}
+        >
+          {GENERATION_LAYERS.map(({ n, icon: Icon, title, body }, i) => {
+            // Desktop: 3 cards por linha (span 2 de 6). Na 2ª linha (itens 4–5),
+            // centrar o par em vez de deixar um órfão à esquerda.
+            const desktopSpan = isMobile
+              ? undefined
+              : i >= 3
+                ? { gridColumn: `${2 + (i - 3) * 2} / span 2` }
+                : { gridColumn: 'span 2' };
+            return (
             <div
               key={title}
               className="vc-landing-gen-layer"
@@ -1075,7 +1087,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 border: '1px solid var(--hairline)',
                 background: 'var(--bg-glass)',
                 backdropFilter: 'blur(12px)',
-                transition: 'border-color 0.2s, background 0.2s',
+                transition: 'border-color 0.2s, background 0.2s, transform 0.2s',
+                ...desktopSpan,
               }}
             >
               <div style={{
@@ -1117,7 +1130,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 color: 'var(--text-secondary)',
               }}>{body}</p>
             </div>
-          ))}
+            );
+          })}
         </div>
       </RevealSection>
 
