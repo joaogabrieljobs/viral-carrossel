@@ -13,7 +13,7 @@ Hoje o assinante paga R$ 97 e ainda tem de configurar chave de API para gerar im
 
 | ID | Decisão |
 |---|---|
-| D-01 | **Só imagem** via plataforma (SJinn → GPT Image 2). **Texto continua BYOK.** |
+| D-01 | **Imagem** via plataforma (SJinn → GPT Image 2). **Texto incluso** via Anthropic no servidor (`ANTHROPIC_API_KEY`). BYOK de texto só se o user escolher outro provedor. |
 | D-02 | Quatro planos: **Essencial · Criador · Pro · Max**. |
 | D-03 | Preços mensais: **R$ 19,90 · R$ 97 · R$ 197 · R$ 297**. |
 | D-04 | Quotas SJinn/mês: **0 · 50 · 150 · 300** imagens. |
@@ -28,10 +28,10 @@ Hoje o assinante paga R$ 97 e ainda tem de configurar chave de API para gerar im
 
 | Plano | Preço/mês | Imagens SJinn | Texto | Imagem plataforma | Escape BYOK imagem |
 |---|---|---|---|---|---|
-| **Essencial** | R$ 19,90 | 0 | BYOK | Não (só upload) | Sim, em Configurações |
-| **Criador** | R$ 97 | 50 | BYOK | Sim (SJinn) | Sim, em Configurações |
-| **Pro** | R$ 197 | 150 | BYOK | Sim (SJinn) | Sim, em Configurações |
-| **Max** | R$ 297 | 300 | BYOK | Sim (SJinn) | Sim, em Configurações |
+| **Essencial** | R$ 19,90 | 0 | Incluso (Claude) | Não (só upload) | Sim, em Configurações |
+| **Criador** | R$ 97 | 50 | Incluso (Claude) | Sim (SJinn) | Sim, em Configurações |
+| **Pro** | R$ 197 | 150 | Incluso (Claude) | Sim (SJinn) | Sim, em Configurações |
+| **Max** | R$ 297 | 300 | Incluso (Claude) | Sim (SJinn) | Sim, em Configurações |
 
 Anual: manter lógica de ~2 meses grátis por tier (preços anuais a definir no Stripe Dashboard).
 
@@ -84,8 +84,8 @@ Browser (BYOK avançado) ──fluxo actual──▶ OpenAI/Z.ai (chave do user)
 - **RF-05:** Essencial bloqueia geração plataforma; upgrade path claro.
 - **RF-06:** Toggle BYOK imagem em Configurações com copy anti-confusão.
 - **RF-07:** Com BYOK ON, geração não decrementa quota SJinn.
-- **RF-08:** Texto continua a exigir chave do user (inalterado no MVP).
-- **RF-09:** Landing + Paywall + FAQ reflectem 4 planos e a regra texto BYOK / imagem inclusa.
+- **RF-08:** Texto incluso no plano via Anthropic no servidor; BYOK de texto opcional (Z.ai/OpenAI/Kimi) em Configurações.
+- **RF-09:** Landing + Paywall + FAQ reflectem 4 planos e a regra texto incluso / imagem inclusa (quota).
 - **RF-10:** Testes: quota (0 → bloqueio), consumo atómico, BYOK não consome, acesso sem assinatura 401/402.
 
 ## 8. Fora de escopo (MVP)

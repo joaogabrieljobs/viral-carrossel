@@ -14,27 +14,27 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Z.ai Flash — texto barato/grátis',
-    textProvider: 'zai',
-    textModel: 'glm-4.7-flash',
-    imageProvider: 'zai',
-    imageModel: 'cogview-4-250304',
+    note: 'Claude Haiku — texto incluso no plano',
+    textProvider: 'anthropic',
+    textModel: 'claude-haiku-4-5',
+    imageProvider: 'openai',
+    imageModel: 'gpt-image-2',
   },
   {
     id: 'balanced',
     name: 'Equilíbrio',
-    note: 'Z.ai GLM-4.7 — bom custo/benefício',
-    textProvider: 'zai',
-    textModel: 'glm-4.7',
-    imageProvider: 'zai',
-    imageModel: 'glm-image',
+    note: 'Claude Sonnet — texto incluso no plano',
+    textProvider: 'anthropic',
+    textModel: 'claude-sonnet-5',
+    imageProvider: 'openai',
+    imageModel: 'gpt-image-2',
   },
   {
     id: 'quality',
     name: 'Qualidade',
-    note: 'Z.ai GLM-5.2 — máxima qualidade',
-    textProvider: 'zai',
-    textModel: 'glm-5.2',
+    note: 'Claude Opus — texto incluso no plano',
+    textProvider: 'anthropic',
+    textModel: 'claude-opus-5',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
@@ -45,7 +45,10 @@ const TABS = [
   { id: 'keys', label: 'Chaves', icon: KeyRound },
 ];
 
-function ProviderCard({ provider, selected, configured, onClick }) {
+function ProviderCard({ provider, selected, configured, onClick, statusLabel }) {
+  const label = statusLabel
+    || (configured ? 'Conectado' : 'Falta chave');
+  const ok = configured || statusLabel === 'Incluso no plano';
   return (
     <button
       type="button"
@@ -80,16 +83,16 @@ function ProviderCard({ provider, selected, configured, onClick }) {
         gap: 5,
         marginTop: 'auto',
         fontSize: 10,
-        color: configured ? 'var(--success)' : 'var(--text-muted)',
+        color: ok ? 'var(--success)' : 'var(--text-muted)',
         fontFamily: 'var(--font-mono)',
       }}>
         <span style={{
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: configured ? 'var(--success)' : 'var(--hairline)',
+          background: ok ? 'var(--success)' : 'var(--hairline)',
         }} />
-        {configured ? 'Conectado' : 'Falta chave'}
+        {label}
       </span>
     </button>
   );
@@ -164,7 +167,11 @@ export default function KeysModal({
   }, [open, aiSettings]);
 
   const requiredKeys = useMemo(() => {
-    const ids = new Set([draft.textProvider]);
+    const ids = new Set();
+    // Anthropic = texto incluso (chave no servidor). Outros provedores exigem BYOK.
+    if (draft.textProvider && draft.textProvider !== 'anthropic') {
+      ids.add(draft.textProvider);
+    }
     if (draft.useOwnImageKey) {
       ids.add(IMAGE_PROVIDERS[draft.imageProvider]?.keyProvider);
     }
@@ -197,7 +204,9 @@ export default function KeysModal({
 
   const textProvider = TEXT_PROVIDERS[draft.textProvider];
   const imageProvider = IMAGE_PROVIDERS[draft.imageProvider];
-  const ready = [...requiredKeys].every((providerId) => draft.keys[providerId]?.trim());
+  // Sem chaves obrigatórias = texto/imagem inclusos no plano → pronto.
+  const ready = requiredKeys.size === 0
+    || [...requiredKeys].every((providerId) => draft.keys[providerId]?.trim());
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -396,6 +405,7 @@ export default function KeysModal({
                             provider={provider}
                             selected={provider.id === draft.textProvider}
                             configured={Boolean(draft.keys[provider.id]?.trim())}
+                            statusLabel={provider.id === 'anthropic' ? 'Incluso no plano' : undefined}
                             onClick={() => setTextProvider(provider.id)}
                           />
                         ))}
@@ -448,7 +458,7 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Nada a configurar aqui se o teu plano inclui imagens. Só precisas da chave de texto (Z.ai por defeito).
+                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Claude) — sem chave.
                       </p>
                     ) : (
                       <>
@@ -501,10 +511,10 @@ export default function KeysModal({
               >
                 <span>
                   <strong style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>
-                    {ready ? 'Chaves necessárias conectadas' : 'Agora conecte as chaves'}
+                    {ready ? 'Pronto — texto e imagens do plano' : 'Agora conecte as chaves'}
                   </strong>
                   <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: 'var(--text-muted)' }}>
-                    Só pedimos as chaves usadas na configuração
+                    Chaves próprias só se escolheres outro provedor
                   </span>
                 </span>
                 <ChevronRight size={16} />
@@ -518,7 +528,7 @@ export default function KeysModal({
                   Cole apenas as chaves que vai usar
                 </h3>
                 <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-                  Necessárias agora: {[...requiredKeys].map((id) => TEXT_PROVIDERS[id]?.name || IMAGE_PROVIDERS[id]?.name || id).filter(Boolean).join(' + ') || 'nenhuma de imagem (plano)'}.
+                  Necessárias agora: {[...requiredKeys].map((id) => TEXT_PROVIDERS[id]?.name || IMAGE_PROVIDERS[id]?.name || id).filter(Boolean).join(' + ') || 'nenhuma — plano cobre texto e imagem'}.
                 </p>
               </div>
 

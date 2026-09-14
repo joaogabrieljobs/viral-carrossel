@@ -544,7 +544,7 @@ export default function AccountProfile({
             <Settings size={18} color="var(--text-muted)" />
           </div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-            Texto: {textProvider.name}{hasTextAI ? '' : ' · falta chave'}
+            Texto: {textProvider.name}{hasTextAI || textProvider.id === 'anthropic' ? '' : ' · falta chave'}
             {' · '}
             Imagens: {aiSettings?.useOwnImageKey
               ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`

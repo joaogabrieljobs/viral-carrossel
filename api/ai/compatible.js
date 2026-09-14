@@ -49,8 +49,20 @@ export default async function handler(req, res) {
   if (!target || !['chat', 'images'].includes(operation)) {
     return res.status(400).json({ error: { message: 'Provedor ou operação inválida.' } });
   }
-  if (!String(apiKey || '').trim()) {
-    return res.status(400).json({ error: { message: `Chave ${provider} ausente.` } });
+  const envKey = provider === 'zai'
+    ? String(process.env.ZAI_API_KEY || '').trim()
+    : provider === 'kimi'
+      ? String(process.env.KIMI_API_KEY || '').trim()
+      : '';
+  const resolvedKey = String(apiKey || '').trim() || envKey;
+  if (!resolvedKey) {
+    return res.status(400).json({
+      error: {
+        message: operation === 'chat'
+          ? `Chave ${provider} ausente. Use o texto incluso do plano (Claude) ou adicione sua chave em ⚙.`
+          : `Chave ${provider} ausente.`,
+      },
+    });
   }
   if (!payload || typeof payload !== 'object') {
     return res.status(400).json({ error: { message: 'Payload ausente.' } });
@@ -60,7 +72,7 @@ export default async function handler(req, res) {
     const upstream = await fetch(target, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${String(apiKey).trim()}`,
+        Authorization: `Bearer ${resolvedKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),

@@ -77,7 +77,9 @@ export const IMAGE_PROVIDERS = {
 };
 
 export const DEFAULT_AI_SETTINGS = {
-  textProvider: 'zai',
+  // Texto incluso no plano via proxy Anthropic (ANTHROPIC_API_KEY no servidor).
+  // Z.ai/Kimi/OpenAI de texto só com chave própria (avançado).
+  textProvider: 'anthropic',
   textModels: {
     anthropic: 'claude-sonnet-5',
     openai: 'gpt-5.6-terra',
@@ -100,6 +102,9 @@ export const DEFAULT_AI_SETTINGS = {
   persistKeys: false,
 };
 
+/** Provedores de texto que o servidor cobre sem chave do utilizador. */
+export const PLATFORM_TEXT_PROVIDERS = new Set(['anthropic']);
+
 export function normalizeAISettings(value = {}) {
   const next = {
     ...DEFAULT_AI_SETTINGS,
@@ -111,5 +116,11 @@ export function normalizeAISettings(value = {}) {
   };
   if (!TEXT_PROVIDERS[next.textProvider]) next.textProvider = DEFAULT_AI_SETTINGS.textProvider;
   if (!IMAGE_PROVIDERS[next.imageProvider]) next.imageProvider = DEFAULT_AI_SETTINGS.imageProvider;
+
+  // Migração: quem ficou em Z.ai/Kimi/OpenAI sem chave própria volta ao texto incluso.
+  const textKey = String(next.keys[next.textProvider] || '').trim();
+  if (!PLATFORM_TEXT_PROVIDERS.has(next.textProvider) && !textKey) {
+    next.textProvider = DEFAULT_AI_SETTINGS.textProvider;
+  }
   return next;
 }

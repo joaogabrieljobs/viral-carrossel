@@ -177,7 +177,8 @@ const callCompatibleChat = async (
   { json = false, maxTokens = 4096 } = {},
 ) => {
   const apiKey = getProviderKey(provider);
-  if (!apiKey) throw new Error(`Chave ${provider === 'zai' ? 'Z.ai' : 'Kimi'} ausente — configure em ⚙.`);
+  // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
+  const useDirect = IS_LOCAL_DEV && !!apiKey;
   const payload = {
     model: getTextModel(provider),
     max_tokens: maxTokens,
@@ -189,12 +190,11 @@ const callCompatibleChat = async (
   };
   if (json) payload.response_format = { type: 'json_object' };
 
-  const useDirect = IS_LOCAL_DEV;
   const url = useDirect ? COMPATIBLE_DIRECT_URLS[provider] : COMPATIBLE_AI_URL;
   const headers = { 'Content-Type': 'application/json' };
   const body = useDirect
     ? payload
-    : { provider, operation: 'chat', apiKey, payload };
+    : { provider, operation: 'chat', apiKey: apiKey || undefined, payload };
   if (useDirect) headers.Authorization = `Bearer ${apiKey}`;
 
   let res;
@@ -220,10 +220,13 @@ const callCompatibleChat = async (
   return json ? extractJSON(text) : text.trim();
 };
 
-// O provedor selecionado é respeitado: não há fallback oculto que possa gerar
-// cobrança numa segunda conta sem o usuário esperar.
+// Texto incluso = Anthropic no servidor. Outros provedores só com chave própria;
+// sem chave, cai no texto incluso (não bloqueia o assinante).
 const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
-  const provider = _aiRuntimeSettings.textProvider;
+  let provider = _aiRuntimeSettings.textProvider;
+  if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'anthropic';
+  if ((provider === 'zai' || provider === 'kimi') && !getProviderKey(provider)) provider = 'anthropic';
+
   if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens });
   if (provider === 'openai') {
     return callOpenAIChat(userMsg, { json, maxTokens, key: getProviderKey('openai') || openaiKey });
