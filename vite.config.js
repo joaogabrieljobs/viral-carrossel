@@ -17,22 +17,53 @@ export default defineConfig(({ mode }) => {
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
             const pathOnly = req.url?.split('?')[0] || '';
-            if (pathOnly !== '/api/fetch-source') return next();
-            try {
-              const urlObj = new URL(req.url || '', 'http://localhost');
-              const raw = urlObj.searchParams.get('url') || '';
-              assertPublicHttpUrl(raw);
-              const text = await serverFetchUrlPlainText(raw);
-              res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              res.setHeader('Access-Control-Allow-Origin', '*');
-              res.end(JSON.stringify({ ok: true, text }));
-            } catch (e) {
-              const msg = e?.message || 'fetch-source failed';
-              res.statusCode = 400;
-              res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              res.setHeader('Access-Control-Allow-Origin', '*');
-              res.end(JSON.stringify({ ok: false, error: msg }));
+            if (pathOnly === '/api/fetch-source') {
+              try {
+                const urlObj = new URL(req.url || '', 'http://localhost');
+                const raw = urlObj.searchParams.get('url') || '';
+                assertPublicHttpUrl(raw);
+                const text = await serverFetchUrlPlainText(raw);
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end(JSON.stringify({ ok: true, text }));
+              } catch (e) {
+                const msg = e?.message || 'fetch-source failed';
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end(JSON.stringify({ ok: false, error: msg }));
+              }
+              return;
             }
+            if (pathOnly === '/api/ai/sjinn-image') {
+              // Dev: reutiliza o handler Vercel (BILLING_DISABLED ou cookie via vercel dev).
+              try {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const rawBody = Buffer.concat(chunks).toString('utf8');
+                req.body = rawBody ? JSON.parse(rawBody) : {};
+              } catch {
+                req.body = {};
+              }
+              const fakeRes = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k, v) { this.headers[k] = v; },
+                status(code) { this.statusCode = code; return this; },
+                json(payload) {
+                  res.statusCode = this.statusCode;
+                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify(payload));
+                },
+                end(...args) { res.end(...args); },
+              };
+              process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
+              const { default: sjinnHandler } = await import('./api/ai/sjinn-image.js');
+              await sjinnHandler(req, fakeRes);
+              return;
+            }
+            return next();
           });
         },
       },

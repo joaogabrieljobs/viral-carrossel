@@ -12,6 +12,15 @@ import {
   clearAccessCookie,
   billingDisabled,
 } from '../lib/access.js';
+import {
+  PLAN_ORDER,
+  getPlan,
+  getStripePriceIdForTier,
+  resolveTierFromSubscription,
+  imageQuotaForTier,
+  periodBoundsFromSubscription,
+} from './plans.js';
+import { getQuotaUsage } from './image-quota.js';
 
 import { applyCors } from './cors.js';
 
@@ -39,6 +48,14 @@ export async function handleSession(req, res) {
       billingDisabled: true,
       email: null,
       status: 'disabled',
+      tier: 'max',
+      plan: getPlan('max'),
+      imageQuota: {
+        used: 0,
+        limit: imageQuotaForTier('max'),
+        remaining: imageQuotaForTier('max'),
+        tier: 'max',
+      },
     });
   }
 
@@ -57,13 +74,37 @@ export async function handleSession(req, res) {
       });
     }
 
+    const tier = resolveTierFromSubscription(sub);
+    const bounds = periodBoundsFromSubscription(sub);
+    const limit = imageQuotaForTier(tier);
+    let imageQuota = {
+      used: 0,
+      limit,
+      remaining: limit,
+      tier,
+    };
+    try {
+      imageQuota = {
+        ...await getQuotaUsage({
+          customerId: access.customerId,
+          periodStartSec: bounds.periodStartSec,
+          limit,
+        }),
+        tier,
+      };
+    } catch (qe) {
+      console.warn('[auth/session] quota', qe?.message || qe);
+    }
+
     return res.status(200).json({
       active: true,
       email: access.email,
       status: sub.status,
-      currentPeriodEnd: sub.current_period_end
-        ? new Date(sub.current_period_end * 1000).toISOString()
-        : null,
+      currentPeriodEnd: bounds.periodEnd,
+      currentPeriodStart: bounds.periodStart,
+      tier,
+      plan: getPlan(tier),
+      imageQuota,
     });
   } catch (e) {
     console.error('[auth/session]', e?.message || e);
@@ -86,14 +127,18 @@ export async function handleCheckout(req, res) {
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   try {
-    const { email } = readJson(req);
+    const { email, tier: rawTier } = readJson(req);
     const cleanEmail = String(email || '').trim().toLowerCase();
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return res.status(400).json({ error: 'Informe um e-mail válido' });
     }
 
+    const tier = PLAN_ORDER.includes(rawTier) ? rawTier : 'creator';
     const stripe = getStripe();
-    const priceId = getPriceId();
+    const priceId = getStripePriceIdForTier(tier) || getPriceId();
+    if (!priceId) {
+      return res.status(500).json({ error: `Price Stripe não configurado para o plano ${tier}` });
+    }
     const appUrl = getAppUrl(req);
 
     const existing = await stripe.customers.list({ email: cleanEmail, limit: 1 });
@@ -123,12 +168,20 @@ export async function handleCheckout(req, res) {
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
       subscription_data: {
-        metadata: { product: 'viral-carrossel' },
+        metadata: {
+          product: 'viral-carrossel',
+          tier,
+          image_quota: String(imageQuotaForTier(tier)),
+        },
       },
-      metadata: { product: 'viral-carrossel', email: cleanEmail },
+      metadata: {
+        product: 'viral-carrossel',
+        email: cleanEmail,
+        tier,
+      },
     });
 
-    return res.status(200).json({ url: session.url, sessionId: session.id });
+    return res.status(200).json({ url: session.url, sessionId: session.id, tier });
   } catch (e) {
     console.error('[stripe/checkout]', e);
     return res.status(500).json({ error: e.message || 'checkout_error' });

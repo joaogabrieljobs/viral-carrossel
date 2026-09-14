@@ -458,12 +458,53 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
   );
 }
 
+const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
+  const { imgExtraPrompt } = options || {};
+  if (options?.refImage) {
+    console.warn('[SJinn] Referência ignorada no modo plataforma (requer URL pública).');
+  }
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
+  let res;
+  try {
+    res = await fetch('/api/ai/sjinn-image', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt.slice(0, 4000),
+        aspectRatio: '2:3',
+        resolution: '1K',
+      }),
+    });
+  } catch (e) {
+    throw enhanceNetworkError(e, 'Imagem plataforma (SJinn)');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.code = data.code;
+    err.quota = data.quota;
+    throw err;
+  }
+  if (!data.b64_json) throw new Error('Plataforma não devolveu a imagem.');
+  if (typeof window !== 'undefined' && data.quota) {
+    window.dispatchEvent(new CustomEvent('vc:image-quota', { detail: data.quota }));
+  }
+  return `data:${data.mime || 'image/png'};base64,${data.b64_json}`;
+};
+
 /**
  * GPT Image a partir de texto. Opcional: `options.refImage` (data URL ou https) + `options.imgExtraPrompt`.
  * Com referência, usa POST /v1/images/edits; sem referência, /v1/images/generations.
+ * Default: imagens da plataforma (SJinn). BYOK só com useOwnImageKey.
  */
 const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
   const { refImage, imgExtraPrompt } = options || {};
+
+  if (!_aiRuntimeSettings.useOwnImageKey) {
+    return generatePlatformSjinnImage(q, imgParams, options);
+  }
+
   if (_aiRuntimeSettings.imageProvider === 'zai') {
     return generateZaiImage(q, imgParams, imgExtraPrompt);
   }

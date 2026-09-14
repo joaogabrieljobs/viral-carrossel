@@ -89,6 +89,8 @@ export const DEFAULT_AI_SETTINGS = {
     openai: 'gpt-image-2',
     zai: 'cogview-4-250304',
   },
+  /** false = imagens da plataforma (SJinn + quota). true = chave própria (Configurações avançado). */
+  useOwnImageKey: false,
   keys: {
     anthropic: '',
     openai: '',
@@ -105,6 +107,7 @@ export function normalizeAISettings(value = {}) {
     textModels: { ...DEFAULT_AI_SETTINGS.textModels, ...(value.textModels || {}) },
     imageModels: { ...DEFAULT_AI_SETTINGS.imageModels, ...(value.imageModels || {}) },
     keys: { ...DEFAULT_AI_SETTINGS.keys, ...(value.keys || {}) },
+    useOwnImageKey: value.useOwnImageKey === true,
   };
   if (!TEXT_PROVIDERS[next.textProvider]) next.textProvider = DEFAULT_AI_SETTINGS.textProvider;
   if (!IMAGE_PROVIDERS[next.imageProvider]) next.imageProvider = DEFAULT_AI_SETTINGS.imageProvider;

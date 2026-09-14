@@ -52,6 +52,10 @@ export function useAccess({ setShellView, onLeaveEditor }) {
       email: session.email || null,
       billingDisabled: !!session.billingDisabled,
       currentPeriodEnd: session.currentPeriodEnd || null,
+      currentPeriodStart: session.currentPeriodStart || null,
+      tier: session.tier || null,
+      plan: session.plan || null,
+      imageQuota: session.imageQuota || null,
     });
     return session;
   }, []);

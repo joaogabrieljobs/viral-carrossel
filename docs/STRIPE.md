@@ -1,6 +1,8 @@
 # Stripe — assinatura individual Viral.
 
-## Modelo
+> **Atualização de produto (2026-09-14):** o modelo passa a **4 planos** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com **imagens inclusas via SJinn** nos tiers pagos e quota mensal. Texto continua BYOK. Spec completa: [`docs/product/PRD-planos-imagem-sjinn.md`](./product/PRD-planos-imagem-sjinn.md). A secção abaixo descreve o modelo **legado** ainda em produção até o épico ser implementado.
+
+## Modelo (legado — 1 plano)
 
 - **1 plano:** acesso ao studio (Criador · Diretor · Studio)
 - **R$ 97/mês** (criar no Dashboard Stripe em BRL)

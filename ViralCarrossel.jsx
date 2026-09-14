@@ -1179,11 +1179,19 @@ export default function App() {
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const selectedTextProvider = aiSettings.textProvider;
   const selectedImageKeyProvider = aiSettings.imageProvider === 'zai' ? 'zai' : 'openai';
-  // Nome legado (`hasOpenAI`) preservado nos componentes de imagem; agora significa
-  // "há um provedor de imagem configurado", inclusive Z.ai.
-  const hasOpenAI =
+  const useOwnImageKey = !!aiSettings.useOwnImageKey;
+  const hasByokImageKey =
     !!aiSettings.keys[selectedImageKeyProvider] ||
     (selectedImageKeyProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai);
+  const platformImageAllowed =
+    !useOwnImageKey &&
+    (
+      !!access.billingDisabled
+      || (Number(access.imageQuota?.limit) > 0 && Number(access.imageQuota?.remaining) > 0)
+      || (access.active && access.tier && access.tier !== 'essential' && access.imageQuota == null)
+    );
+  // Nome legado (`hasOpenAI`): pode gerar imagem (plataforma ou BYOK avançado).
+  const hasOpenAI = useOwnImageKey ? hasByokImageKey : platformImageAllowed;
   const hasAnthropic = serverStatus.anthropic || !!anthropicKey;
   const hasAnyAI =
     !!aiSettings.keys[selectedTextProvider] ||
@@ -1883,7 +1891,13 @@ export default function App() {
     }
 
     if (!hasOpenAI) {
-      toast('Configure o provedor de imagem em ⚙ (OpenAI ou Z.ai).', 'error');
+      if (!useOwnImageKey && (access.tier === 'essential' || Number(access.imageQuota?.limit) === 0)) {
+        toast('O plano Essencial não inclui imagens. Faça upgrade ou active a chave própria em ⚙ → Avançado.', 'error');
+      } else if (!useOwnImageKey && Number(access.imageQuota?.remaining) === 0) {
+        toast('Quota de imagens esgotada neste mês. Faça upgrade de plano.', 'error');
+      } else {
+        toast('Configure o provedor de imagem em ⚙ (modo avançado com chave própria).', 'error');
+      }
       return;
     }
 
@@ -1909,7 +1923,24 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, hasOpenAI, openaiKey, imgParams, setSlides, toast]);
+  }, [slides, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, setSlides, toast]);
+
+  useEffect(() => {
+    const onQuota = (ev) => {
+      const q = ev?.detail;
+      if (!q || typeof q !== 'object') return;
+      setAccess((prev) => ({
+        ...prev,
+        imageQuota: {
+          ...(prev.imageQuota || {}),
+          ...q,
+        },
+        tier: q.tier || prev.tier,
+      }));
+    };
+    window.addEventListener('vc:image-quota', onQuota);
+    return () => window.removeEventListener('vc:image-quota', onQuota);
+  }, [setAccess]);
 
   const openRefImagePicker = useCallback((slideIdx) => {
     refImageTargetIdxRef.current = slideIdx;
@@ -2805,6 +2836,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
+          planTier={access.plan?.name || access.tier || null}
+          imageQuota={access.imageQuota}
           accountTab={accountTab}
           setAccountTab={setAccountTab}
           openDoc={openDoc}

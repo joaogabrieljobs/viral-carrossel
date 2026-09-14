@@ -37,6 +37,8 @@ function AccountHomeShell({
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
+  planTier = null,
+  imageQuota = null,
   accountTab = 'projects',
   setAccountTab,
 }) {
@@ -451,7 +453,11 @@ function AccountHomeShell({
                   {aiReady ? 'Pronta para gerar' : 'Configure para gerar'}
                 </h3>
                 <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  Escolha quem escreve e quem gera as imagens
+                  Texto com sua chave · imagens do plano
+                  {planTier ? ` (${planTier})` : ''}
+                  {imageQuota && Number(imageQuota.limit) > 0
+                    ? ` · ${imageQuota.used ?? 0}/${imageQuota.limit} imgs`
+                    : ''}
                 </p>
               </div>
               <button
@@ -474,8 +480,19 @@ function AccountHomeShell({
               gap: 8,
             }}>
               {[
-                { label: 'Texto', name: textProvider.name, model: textModelName, ok: hasTextAI },
-                { label: 'Imagens', name: imageProvider.name, model: imageModelName, ok: hasImageAI },
+                { label: 'Texto', name: textProvider.name, model: textModelName, ok: hasTextAI, statusOk: 'Conectado', statusBad: 'Falta chave' },
+                {
+                  label: 'Imagens',
+                  name: aiSettings.useOwnImageKey ? imageProvider.name : 'Plataforma (SJinn)',
+                  model: aiSettings.useOwnImageKey
+                    ? imageModelName
+                    : (imageQuota && Number(imageQuota.limit) > 0
+                      ? `${imageQuota.remaining ?? 0} restantes`
+                      : (Number(imageQuota?.limit) === 0 ? 'Plano sem imagens' : 'GPT Image 2')),
+                  ok: hasImageAI,
+                  statusOk: aiSettings.useOwnImageKey ? 'Chave própria' : 'Inclusas no plano',
+                  statusBad: aiSettings.useOwnImageKey ? 'Falta chave' : 'Sem quota',
+                },
               ].map((row) => (
                 <div
                   key={row.label}
@@ -507,7 +524,7 @@ function AccountHomeShell({
                       width: 6, height: 6, borderRadius: '50%',
                       background: row.ok ? 'var(--success)' : 'var(--hairline)',
                     }} />
-                    {row.ok ? 'Conectado' : 'Falta chave'}
+                    {row.ok ? row.statusOk : row.statusBad}
                   </span>
                 </div>
               ))}

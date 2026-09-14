@@ -23,12 +23,12 @@ export async function fetchAccessSession() {
   }
 }
 
-export async function startCheckout(email) {
+export async function startCheckout(email, { tier = 'creator' } = {}) {
   const r = await fetch('/api/stripe/checkout', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, tier }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Não foi possível iniciar o checkout');

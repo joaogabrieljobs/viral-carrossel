@@ -17,6 +17,11 @@ export default function handler(req, res) {
     openai: Boolean(String(process.env.OPENAI_API_KEY || '').trim()),
     unsplash: Boolean(String(process.env.UNSPLASH_ACCESS_KEY || '').trim()),
     pexels: Boolean(String(process.env.PEXELS_API_KEY || '').trim()),
+    sjinn: Boolean(String(process.env.SJINN_API_KEY || '').trim()),
+    upstash: Boolean(
+      String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
+      && String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim(),
+    ),
     dev: false,
   });
 }

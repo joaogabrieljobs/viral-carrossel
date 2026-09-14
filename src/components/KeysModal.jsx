@@ -163,10 +163,13 @@ export default function KeysModal({
     setTab('setup');
   }, [open, aiSettings]);
 
-  const requiredKeys = useMemo(
-    () => new Set([draft.textProvider, IMAGE_PROVIDERS[draft.imageProvider]?.keyProvider]),
-    [draft.textProvider, draft.imageProvider],
-  );
+  const requiredKeys = useMemo(() => {
+    const ids = new Set([draft.textProvider]);
+    if (draft.useOwnImageKey) {
+      ids.add(IMAGE_PROVIDERS[draft.imageProvider]?.keyProvider);
+    }
+    return ids;
+  }, [draft.textProvider, draft.imageProvider, draft.useOwnImageKey]);
 
   if (!open) return null;
 
@@ -241,7 +244,7 @@ export default function KeysModal({
                 Configurar IA
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                Escolha quem escreve e quem gera as imagens
+                Texto com sua chave · imagens inclusas no plano (salvo modo avançado)
               </p>
             </div>
           </div>
@@ -409,28 +412,70 @@ export default function KeysModal({
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gap: 16 }}>
-                    <div>
-                      <div className="vc-label" style={{ marginBottom: 8 }}>1. Provedor de imagem</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-                        {Object.values(IMAGE_PROVIDERS).map((provider) => (
-                          <ProviderCard
-                            key={provider.id}
-                            provider={provider}
-                            selected={provider.id === draft.imageProvider}
-                            configured={Boolean(draft.keys[provider.keyProvider]?.trim())}
-                            onClick={() => setImageProvider(provider.id)}
+                    <div style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-pearl)',
+                    }}>
+                      <div className="vc-label" style={{ marginBottom: 8 }}>Imagens do plano</div>
+                      <p style={{ margin: '0 0 12px', fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+                        Por defeito as imagens vêm da plataforma (GPT Image 2) e gastam a quota do seu plano.
+                        Só active o modo abaixo se quiser pagar na sua própria conta OpenAI/Z.ai.
+                      </p>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!!draft.useOwnImageKey}
+                          onChange={(e) => setDraft((c) => ({ ...c, useOwnImageKey: e.target.checked }))}
+                          style={{ marginTop: 3 }}
+                        />
+                        <span>
+                          Usar minha chave de imagem (avançado)
+                          <span style={{ display: 'block', marginTop: 4, fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
+                            Consome a tua conta do provedor · não gasta créditos do plano
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+
+                    {!draft.useOwnImageKey ? (
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                        Com Criador/Pro/Max, gera no editor. O Essencial não inclui imagens da plataforma.
+                      </p>
+                    ) : (
+                      <>
+                        <div>
+                          <div className="vc-label" style={{ marginBottom: 8 }}>1. Provedor de imagem</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                            {Object.values(IMAGE_PROVIDERS).map((provider) => (
+                              <ProviderCard
+                                key={provider.id}
+                                provider={provider}
+                                selected={provider.id === draft.imageProvider}
+                                configured={Boolean(draft.keys[provider.keyProvider]?.trim())}
+                                onClick={() => setImageProvider(provider.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="vc-label" style={{ marginBottom: 8 }}>2. Modelo</div>
+                          <ModelSelect
+                            provider={imageProvider}
+                            value={draft.imageModels[draft.imageProvider]}
+                            onChange={setImageModel}
                           />
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="vc-label" style={{ marginBottom: 8 }}>2. Modelo</div>
-                      <ModelSelect
-                        provider={imageProvider}
-                        value={draft.imageModels[draft.imageProvider]}
-                        onChange={setImageModel}
-                      />
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </section>
@@ -473,7 +518,7 @@ export default function KeysModal({
                   Cole apenas as chaves que vai usar
                 </h3>
                 <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-                  Necessárias agora: {[...requiredKeys].map((id) => TEXT_PROVIDERS[id]?.name).filter(Boolean).join(' + ')}.
+                  Necessárias agora: {[...requiredKeys].map((id) => TEXT_PROVIDERS[id]?.name || IMAGE_PROVIDERS[id]?.name || id).filter(Boolean).join(' + ') || 'nenhuma de imagem (plano)'}.
                 </p>
               </div>
 

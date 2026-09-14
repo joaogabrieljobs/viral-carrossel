@@ -31,7 +31,8 @@ export function getAppUrl(req) {
 }
 
 export function getPriceId() {
-  const id = cleanEnv(process.env.STRIPE_PRICE_ID);
+  const id = cleanEnv(process.env.STRIPE_PRICE_ID)
+    || cleanEnv(process.env.STRIPE_PRICE_ID_CREATOR);
   if (!id) throw new Error('STRIPE_PRICE_ID não configurada');
   return id;
 }

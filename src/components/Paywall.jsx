@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { startCheckout } from '../lib/billing.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import BrandLogo from './BrandLogo.jsx';
-
-const PRICE_LABEL = 'R$ 97';
-const PRICE_PERIOD = '/mês';
+import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 
 /**
- * Paywall de assinatura individual (Stripe Checkout).
- * BYOK: a geração usa a chave do utilizador; aqui só se paga o acesso ao studio.
+ * Paywall — 4 planos (Essencial / Criador / Pro / Max).
+ * Texto BYOK; imagens SJinn inclusas nos planos com quota > 0.
  */
 export default function Paywall({
   isMobile,
@@ -19,6 +17,7 @@ export default function Paywall({
   loginHint = '',
 }) {
   const [email, setEmail] = useState(initialEmail || '');
+  const [tier, setTier] = useState('creator');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(loginHint || '');
 
@@ -30,12 +29,14 @@ export default function Paywall({
     if (loginHint) setError(loginHint);
   }, [loginHint]);
 
+  const plan = PLAN_TIERS[tier] || PLAN_TIERS.creator;
+
   const submit = async (e) => {
     e?.preventDefault?.();
     setError('');
     setLoading(true);
     try {
-      const data = await startCheckout(email);
+      const data = await startCheckout(email, { tier });
       if (data.alreadyActive) {
         onAlreadyActive?.();
         return;
@@ -69,7 +70,7 @@ export default function Paywall({
       <div
         style={{
           width: '100%',
-          maxWidth: 440,
+          maxWidth: 520,
           padding: isMobile ? 28 : 36,
           borderRadius: 'var(--radius-xl, 24px)',
           border: '1px solid rgba(255, 45, 141, 0.28)',
@@ -89,7 +90,7 @@ export default function Paywall({
           color: 'var(--accent, #ff2d8d)',
           fontWeight: 600,
         }}>
-          Assinatura individual
+          Escolha o plano
         </p>
         <h1 style={{
           margin: '0 0 12px',
@@ -99,199 +100,140 @@ export default function Paywall({
           fontFamily: 'var(--font-display, Inter, sans-serif)',
           lineHeight: 1.15,
         }}>
-          Acesso ao studio completo
+          Studio completo. Imagens inclusas nos planos pagos.
         </h1>
         <p style={{
-          margin: '0 0 24px',
-          fontSize: 15,
+          margin: '0 0 20px',
+          fontSize: 14,
           lineHeight: 1.5,
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
-          Um plano. Todos os modos (Criador, Diretor, Studio).
-          Sem limite de carrosséis — a geração usa a chave do provedor que você escolher.
+          Texto usa a sua chave de IA. Imagens GPT Image 2 entram na quota do plano (exceto Essencial).
         </p>
 
         <div style={{
-          display: 'flex',
-          alignItems: 'baseline',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
           gap: 8,
-          marginBottom: 24,
+          marginBottom: 20,
         }}>
-          <span style={{
-            fontSize: 40,
-            fontWeight: 600,
-            letterSpacing: '-0.03em',
-            color: 'var(--text-primary, #fff)',
-          }}>{PRICE_LABEL}</span>
-          <span style={{
-            fontSize: 15,
-            color: 'var(--text-muted, #8a8696)',
-          }}>{PRICE_PERIOD}</span>
+          {PLAN_ORDER.map((id) => {
+            const p = PLAN_TIERS[id];
+            const selected = tier === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTier(id)}
+                style={{
+                  textAlign: 'left',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  border: selected ? '1.5px solid var(--accent, #ff2d8d)' : '1px solid rgba(255,255,255,0.12)',
+                  background: selected ? 'rgba(255,45,141,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <strong style={{ display: 'block', fontSize: 13 }}>{p.name}</strong>
+                <span style={{ display: 'block', marginTop: 4, fontSize: 18, fontWeight: 600 }}>{p.priceLabel}<span style={{ fontSize: 12, fontWeight: 500, opacity: 0.7 }}>/mês</span></span>
+                <span style={{ display: 'block', marginTop: 6, fontSize: 11, lineHeight: 1.35, opacity: 0.75 }}>
+                  {p.imageQuota > 0 ? `${p.imageQuota} imagens/mês` : 'Sem imagens inclusas'}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        <ul style={{
-          margin: '0 0 28px',
-          padding: 0,
-          listStyle: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-        }}>
-          {[
-            'Studio completo · modos livres',
-            'Marca, narrativa, legenda e export',
-            'BYOK — você controla o gasto na LLM',
-            'Cancele quando quiser no portal do cliente',
-          ].map((line) => (
-            <li key={line} style={{
-              display: 'flex',
-              gap: 10,
-              alignItems: 'flex-start',
-              fontSize: 14,
-              color: 'var(--text-secondary, #b8b4c2)',
-              lineHeight: 1.4,
-            }}>
-              <ShieldCheck size={16} color="var(--accent, #ff2d8d)" style={{ flexShrink: 0, marginTop: 2 }} />
-              {line}
-            </li>
-          ))}
-        </ul>
-
-        <div style={{ marginBottom: 18 }}>
-          <p style={{
-            margin: '0 0 10px',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--text-muted, #8a8696)',
-          }}>
-            Já assina? Entre com Google
-          </p>
-          <GoogleSignInButton fullWidth label="Entrar com Google" />
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginTop: 16,
-            color: 'var(--text-muted, #8a8696)',
-            fontSize: 11,
-            fontFamily: 'var(--font-mono, monospace)',
-          }}>
-            <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-            ou assine com e-mail
-            <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-          </div>
-        </div>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-secondary, #b8b4c2)' }}>
+          {plan.blurb}
+        </p>
 
         <form onSubmit={submit}>
-          <label style={{
-            display: 'block',
-            fontSize: 12,
-            fontFamily: 'var(--font-mono, monospace)',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted, #8a8696)',
-            marginBottom: 8,
-            fontWeight: 600,
-          }}>
-            E-mail da assinatura
+          <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600 }}>
+            E-mail
           </label>
           <input
             type="email"
             required
-            autoComplete="email"
             value={email}
-            onChange={(ev) => setEmail(ev.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="voce@email.com"
             style={{
               width: '100%',
               height: 48,
-              padding: '0 16px',
-              borderRadius: 12,
-              border: '1px solid var(--hairline, #2a2733)',
-              background: 'var(--bg-secondary, #15131c)',
-              color: 'var(--text-primary, #fff)',
-              fontSize: 16,
+              borderRadius: 9999,
+              border: '1px solid rgba(255,255,255,0.16)',
+              background: 'rgba(0,0,0,0.35)',
+              color: '#fff',
+              padding: '0 18px',
+              fontSize: 15,
               marginBottom: 12,
               boxSizing: 'border-box',
-              outline: 'none',
             }}
           />
           {error && (
-            <p style={{
-              margin: '0 0 12px',
-              fontSize: 13,
-              color: '#ff6b8a',
-              lineHeight: 1.4,
-            }}>{error}</p>
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#ff8fab' }}>{error}</p>
           )}
           <button
             type="submit"
             disabled={loading}
-            className="vc-landing-cta"
+            className="vc-btn"
             style={{
               width: '100%',
-              height: 52,
+              height: 48,
               borderRadius: 9999,
               border: 'none',
-              background: 'var(--accent, #ff2d8d)',
-              color: '#fff',
-              fontSize: 16,
+              background: '#fff',
+              color: '#000',
               fontWeight: 600,
+              fontSize: 15,
               cursor: loading ? 'wait' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 10,
-              fontFamily: 'inherit',
-              opacity: loading ? 0.75 : 1,
+              gap: 8,
             }}
           >
-            {loading ? (
-              <Loader2 size={18} className="vc-spin" style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <Sparkles size={18} />
-            )}
-            Assinar e entrar
-            {!loading && <ArrowRight size={16} />}
+            {loading ? <Loader2 size={18} className="spin" /> : <ArrowRight size={18} />}
+            Continuar · {plan.priceLabel}/mês
           </button>
         </form>
 
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              marginTop: 16,
-              width: '100%',
-              height: 40,
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--text-muted, #8a8696)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Voltar à página inicial
-          </button>
-        )}
-
-        <p style={{
-          margin: '20px 0 0',
-          fontSize: 11,
-          lineHeight: 1.45,
-          color: 'var(--text-muted, #8a8696)',
-          fontFamily: 'var(--font-mono, monospace)',
-          letterSpacing: '0.02em',
-          textAlign: 'center',
-        }}>
-          Pagamento seguro · Assinatura mensal
-        </p>
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <GoogleSignInButton />
+          <p style={{
+            margin: 0,
+            fontSize: 11,
+            lineHeight: 1.45,
+            color: 'var(--text-secondary, #b8b4c2)',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'flex-start',
+          }}>
+            <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            Pagamento seguro via Stripe. Cancele quando quiser no portal do cliente.
+          </p>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary, #b8b4c2)',
+                cursor: 'pointer',
+                fontSize: 13,
+                padding: 0,
+                alignSelf: 'flex-start',
+              }}
+            >
+              ← Voltar
+            </button>
+          )}
+        </div>
       </div>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }
