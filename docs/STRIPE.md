@@ -11,13 +11,15 @@
 
 ## Fluxo
 
-1. Landing → CTA → Paywall (e-mail) **ou** **Entrar** (Google / e-mail)
-2. `POST /api/stripe/checkout` → Stripe Checkout
+1. Landing → CTA → Paywall (e-mail para **nova** assinatura) **ou** **Entrar** (só Google)
+2. `POST /api/stripe/checkout` → Stripe Checkout (se o e-mail já tem sub ativa → `{alreadyActive, requireLogin}` **sem** cookie)
 3. Sucesso → `/?billing=success&session_id=…` → `POST /api/stripe/confirm` → cookie HttpOnly
 4. `GET /api/auth/session` valida assinatura `active` / `trialing`
 5. Botão **Plano** na home → Customer Portal Stripe
 
-### Login Google (assinantes)
+### Login Google (assinantes) — única forma de reentrar
+
+E-mail sozinho **não** autentica (qualquer pessoa com o endereço entrava).
 
 1. Landing → **Entrar** → **Entrar com Google**
 2. `GET /api/auth/google` → OAuth Google → `/api/auth/google/callback`

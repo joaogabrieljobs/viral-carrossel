@@ -36,14 +36,15 @@ describe('POST /api/stripe/checkout (RF-07)', () => {
     );
   });
 
-  it('assinatura já ativa → alreadyActive + cookie de acesso (restauração)', async () => {
+  it('assinatura já ativa → alreadyActive sem cookie (exige Google)', async () => {
     stripeMock.customers.list.mockResolvedValue({ data: [{ id: 'cus_9', email: 'user9@teste.exemplo' }] });
     stripeMock.subscriptions.list.mockResolvedValue({ data: [subAtiva('cus_9')] });
     const res = makeRes();
     await checkoutHandler(post({ email: 'user9@teste.exemplo' }), res);
+    expect(res.statusCode).toBe(200);
     expect(res.body.alreadyActive).toBe(true);
-    expect(res.body.url).toContain('billing=restored');
-    expect(cookieValue(res, COOKIE_NAME)).toBeTruthy();
+    expect(res.body.requireLogin).toBe(true);
+    expect(cookieValue(res, COOKIE_NAME)).toBeFalsy();
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
   });
 

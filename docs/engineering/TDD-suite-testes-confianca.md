@@ -53,7 +53,7 @@ Fonte: `api/lib/billing-handlers.js`, `api/lib/access.js`, `api/stripe/webhook.j
 | Endpoint | Casos |
 |---|---|
 | `GET /api/auth/session` | anônimo→`{active:false,status:'anonymous'}`; cookie válido+sub ativa→`{active:true,status,currentPeriodEnd}`; cookie válido sem sub→`inactive`; cookie adulterado→anonymous |
-| `POST /api/stripe/checkout` | e-mail inválido→400; novo cliente→`{url,sessionId}`; sub já ativa→`{alreadyActive:true}`+Set-Cookie |
+| `POST /api/stripe/checkout` | e-mail inválido→400; novo cliente→`{url,sessionId}`; sub já ativa→`{alreadyActive:true,requireLogin:true}` **sem** cookie (login = Google) |
 | `POST /api/stripe/confirm` | paga→`{active:true}`+Set-Cookie; não paga→402; `mode!=='subscription'`→400; sem sessionId→400 |
 | `POST /api/stripe/webhook` | assinatura válida→200; inválida→400 |
 | `POST /api/stripe/portal` | sem cookie→401; com cookie→`{url}` |

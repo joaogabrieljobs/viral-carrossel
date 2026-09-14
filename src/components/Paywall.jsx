@@ -12,7 +12,6 @@ import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 export default function Paywall({
   isMobile,
   onBack,
-  onAlreadyActive,
   initialEmail = '',
   loginHint = '',
 }) {
@@ -38,7 +37,7 @@ export default function Paywall({
     try {
       const data = await startCheckout(email, { tier });
       if (data.alreadyActive) {
-        onAlreadyActive?.();
+        setError(data.message || 'Este e-mail já tem assinatura. Entre com Google para aceder.');
         return;
       }
       if (data.url) {

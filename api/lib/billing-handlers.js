@@ -150,11 +150,12 @@ export async function handleCheckout(req, res) {
 
     const active = await findActiveSubscription(customer.id);
     if (active) {
-      const token = createAccessToken({ customerId: customer.id, email: cleanEmail });
-      setAccessCookie(res, token);
+      // NÃO emitir cookie só com e-mail — isso permitia entrar sem prova de identidade.
+      // Login de assinante = Google OAuth (ou retorno do Stripe Checkout após pagar).
       return res.status(200).json({
         alreadyActive: true,
-        url: `${appUrl}/?billing=restored`,
+        requireLogin: true,
+        message: 'Este e-mail já tem assinatura ativa. Entre com Google para aceder ao studio.',
       });
     }
 

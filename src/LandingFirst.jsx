@@ -87,12 +87,6 @@ export default function LandingFirst() {
         <LoginModal
           open={loginOpen}
           onClose={() => setLoginOpen(false)}
-          initialEmail=""
-          hint=""
-          onAlreadyActive={() => {
-            setLoginOpen(false);
-            enterStudio();
-          }}
         />
       </Suspense>
     </div>
