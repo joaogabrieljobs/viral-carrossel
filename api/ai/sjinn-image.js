@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   if (!isSjinnConfigured()) {
     return res.status(503).json({
-      error: 'Geração de imagem da plataforma indisponível (SJinn não configurada).',
+      error: 'Geração de imagem indisponível no momento. Tente de novo ou use a sua chave em Configurar IA.',
       code: 'sjinn_unconfigured',
     });
   }
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
     const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution });
     const data = await waitForSjinnTask(taskId);
     const url = data?.output_urls?.[0];
-    if (!url) throw new Error('SJinn não devolveu URL de imagem.');
+    if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
 
     return res.status(200).json({

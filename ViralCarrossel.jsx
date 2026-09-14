@@ -1892,11 +1892,11 @@ export default function App() {
 
     if (!hasOpenAI) {
       if (!useOwnImageKey && (access.tier === 'essential' || Number(access.imageQuota?.limit) === 0)) {
-        toast('O plano Essencial não inclui imagens. Faça upgrade ou active a chave própria em ⚙ → Avançado.', 'error');
+        toast('O plano Essencial não inclui imagens. Faça upgrade ou active a sua chave em Configurar IA.', 'error');
       } else if (!useOwnImageKey && Number(access.imageQuota?.remaining) === 0) {
         toast('Quota de imagens esgotada neste mês. Faça upgrade de plano.', 'error');
       } else {
-        toast('Configure o provedor de imagem em ⚙ (modo avançado com chave própria).', 'error');
+        toast('Configure a chave de imagem em Configurar IA.', 'error');
       }
       return;
     }

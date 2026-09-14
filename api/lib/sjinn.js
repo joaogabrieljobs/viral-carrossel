@@ -65,7 +65,7 @@ export async function waitForSjinnTask(taskId, { pollMs = POLL_MS, maxAttempts =
       throw err;
     }
   }
-  const err = new Error('Timeout à espera da imagem SJinn. Tente de novo.');
+  const err = new Error('A geração de imagem demorou demasiado. Tente de novo.');
   err.code = 'sjinn_timeout';
   throw err;
 }

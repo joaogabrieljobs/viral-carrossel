@@ -77,7 +77,7 @@ export const IMAGE_PROVIDERS = {
 };
 
 export const DEFAULT_AI_SETTINGS = {
-  textProvider: 'openai',
+  textProvider: 'zai',
   textModels: {
     anthropic: 'claude-sonnet-5',
     openai: 'gpt-5.6-terra',
@@ -89,7 +89,7 @@ export const DEFAULT_AI_SETTINGS = {
     openai: 'gpt-image-2',
     zai: 'cogview-4-250304',
   },
-  /** false = imagens da plataforma (SJinn + quota). true = chave própria (Configurações avançado). */
+  /** false = imagens inclusas no plano. true = chave própria (Essencial / avançado). */
   useOwnImageKey: false,
   keys: {
     anthropic: '',

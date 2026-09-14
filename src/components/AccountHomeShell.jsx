@@ -5,7 +5,7 @@ import AccountProfile from './AccountProfile.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
-import { DEFAULT_AI_SETTINGS, IMAGE_PROVIDERS, TEXT_PROVIDERS } from '../config/ai-providers.js';
+import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
 
 // ─── ACCOUNT HOME — visão da conta + lista de projetos (antes do editor) ─────
 function AccountHomeShell({
@@ -118,14 +118,6 @@ function AccountHomeShell({
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   ), [library, search]);
 
-  const textProvider = TEXT_PROVIDERS[aiSettings.textProvider] || TEXT_PROVIDERS.openai;
-  const imageProvider = IMAGE_PROVIDERS[aiSettings.imageProvider] || IMAGE_PROVIDERS.openai;
-  const textModelName = textProvider.models.find((m) => m.id === aiSettings.textModels?.[aiSettings.textProvider])?.name
-    || aiSettings.textModels?.[aiSettings.textProvider]
-    || 'Modelo';
-  const imageModelName = imageProvider.models.find((m) => m.id === aiSettings.imageModels?.[aiSettings.imageProvider])?.name
-    || aiSettings.imageModels?.[aiSettings.imageProvider]
-    || 'Modelo';
   const aiReady = hasTextAI && hasImageAI;
   const projectName = activeEntryName || 'Sem título';
 
@@ -430,102 +422,6 @@ function AccountHomeShell({
                   }}>
                     {value}
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section
-            aria-label="Estado da IA"
-            style={{
-              border: '1px solid var(--border)',
-              background: 'var(--bg-card)',
-              borderRadius: 16,
-              padding: 18,
-              display: 'grid',
-              gap: 14,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-              <div>
-                <div className="vc-eyebrow" style={{ marginBottom: 6 }}>IA</div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {aiReady ? 'Pronta para gerar' : 'Configure para gerar'}
-                </h3>
-                <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  Texto com sua chave · imagens do plano
-                  {planTier ? ` (${planTier})` : ''}
-                  {imageQuota && Number(imageQuota.limit) > 0
-                    ? ` · ${imageQuota.used ?? 0}/${imageQuota.limit} imgs`
-                    : ''}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onOpenSettings()}
-                style={{
-                  height: 36, padding: '0 14px', borderRadius: 9999, flexShrink: 0,
-                  border: aiReady ? '1px solid var(--border)' : 'none',
-                  background: aiReady ? 'var(--bg-pearl)' : 'var(--accent)',
-                  color: aiReady ? 'var(--text-primary)' : '#fff',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                }}
-              >
-                {aiReady ? 'Ajustar' : 'Configurar IA'}
-              </button>
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-              gap: 8,
-            }}>
-              {[
-                { label: 'Texto', name: textProvider.name, model: textModelName, ok: hasTextAI, statusOk: 'Conectado', statusBad: 'Falta chave' },
-                {
-                  label: 'Imagens',
-                  name: aiSettings.useOwnImageKey ? imageProvider.name : 'Plataforma (SJinn)',
-                  model: aiSettings.useOwnImageKey
-                    ? imageModelName
-                    : (imageQuota && Number(imageQuota.limit) > 0
-                      ? `${imageQuota.remaining ?? 0} restantes`
-                      : (Number(imageQuota?.limit) === 0 ? 'Plano sem imagens' : 'GPT Image 2')),
-                  ok: hasImageAI,
-                  statusOk: aiSettings.useOwnImageKey ? 'Chave própria' : 'Inclusas no plano',
-                  statusBad: aiSettings.useOwnImageKey ? 'Falta chave' : 'Sem quota',
-                },
-              ].map((row) => (
-                <div
-                  key={row.label}
-                  style={{
-                    border: '1px solid var(--border)',
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                    background: 'var(--bg-pearl)',
-                    display: 'grid',
-                    gap: 4,
-                  }}
-                >
-                  <span style={{
-                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                    textTransform: 'uppercase', color: 'var(--text-muted)',
-                  }}>
-                    {row.label}
-                  </span>
-                  <strong style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {row.name}
-                  </strong>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{row.model}</span>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
-                    fontSize: 10, fontFamily: 'var(--font-mono)',
-                    color: row.ok ? 'var(--success)' : 'var(--text-muted)',
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: '50%',
-                      background: row.ok ? 'var(--success)' : 'var(--hairline)',
-                    }} />
-                    {row.ok ? row.statusOk : row.statusBad}
-                  </span>
                 </div>
               ))}
             </div>
@@ -840,7 +736,7 @@ function AccountHomeShell({
             color: 'var(--text-muted)',
             textAlign: 'center',
           }}>
-            Atalhos: Templates e Pesquisa no topo · chaves de IA em Configurar IA
+            Atalhos: Templates e Pesquisa no topo · chave de texto em Configurar IA
           </p>
           </section>
           </>

@@ -461,7 +461,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
 const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
   const { imgExtraPrompt } = options || {};
   if (options?.refImage) {
-    console.warn('[SJinn] Referência ignorada no modo plataforma (requer URL pública).');
+    console.warn('[img] Referência ignorada no modo plano (requer URL pública).');
   }
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
   let res;
@@ -477,7 +477,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
       }),
     });
   } catch (e) {
-    throw enhanceNetworkError(e, 'Imagem plataforma (SJinn)');
+    throw enhanceNetworkError(e, 'Imagens do plano');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -496,7 +496,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
 /**
  * GPT Image a partir de texto. Opcional: `options.refImage` (data URL ou https) + `options.imgExtraPrompt`.
  * Com referência, usa POST /v1/images/edits; sem referência, /v1/images/generations.
- * Default: imagens da plataforma (SJinn). BYOK só com useOwnImageKey.
+ * Default: imagens inclusas no plano. BYOK só com useOwnImageKey.
  */
 const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
   const { refImage, imgExtraPrompt } = options || {};

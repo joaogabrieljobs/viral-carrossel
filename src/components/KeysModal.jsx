@@ -14,7 +14,7 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Texto grátis + imagem barata',
+    note: 'Z.ai Flash — texto barato/grátis',
     textProvider: 'zai',
     textModel: 'glm-4.7-flash',
     imageProvider: 'zai',
@@ -23,18 +23,18 @@ const PRESETS = [
   {
     id: 'balanced',
     name: 'Equilíbrio',
-    note: 'Boa qualidade com custo menor',
-    textProvider: 'openai',
-    textModel: 'gpt-5.6-terra',
+    note: 'Z.ai GLM-4.7 — bom custo/benefício',
+    textProvider: 'zai',
+    textModel: 'glm-4.7',
     imageProvider: 'zai',
     imageModel: 'glm-image',
   },
   {
     id: 'quality',
     name: 'Qualidade',
-    note: 'Melhor copy + melhor imagem',
-    textProvider: 'anthropic',
-    textModel: 'claude-sonnet-5',
+    note: 'Z.ai GLM-5.2 — máxima qualidade',
+    textProvider: 'zai',
+    textModel: 'glm-5.2',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
@@ -244,7 +244,7 @@ export default function KeysModal({
                 Configurar IA
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                Texto com sua chave · imagens inclusas no plano (salvo modo avançado)
+                Texto: sua chave (padrão Z.ai). Imagens inclusas no plano — ou a sua, no Essencial.
               </p>
             </div>
           </div>
@@ -420,8 +420,8 @@ export default function KeysModal({
                     }}>
                       <div className="vc-label" style={{ marginBottom: 8 }}>Imagens do plano</div>
                       <p style={{ margin: '0 0 12px', fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
-                        Por defeito as imagens vêm da plataforma (GPT Image 2) e gastam a quota do seu plano.
-                        Só active o modo abaixo se quiser pagar na sua própria conta OpenAI/Z.ai.
+                        Nos planos Criador, Pro e Max as imagens já estão inclusas — gera direto no editor.
+                        No Essencial (R$ 19,90), active abaixo a sua própria chave para gerar imagens.
                       </p>
                       <label style={{
                         display: 'flex',
@@ -438,9 +438,9 @@ export default function KeysModal({
                           style={{ marginTop: 3 }}
                         />
                         <span>
-                          Usar minha chave de imagem (avançado)
+                          Usar minha chave de imagem
                           <span style={{ display: 'block', marginTop: 4, fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
-                            Consome a tua conta do provedor · não gasta créditos do plano
+                            Ideal no plano Essencial · consome a tua conta do provedor, não a quota do plano
                           </span>
                         </span>
                       </label>
@@ -448,7 +448,7 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Com Criador/Pro/Max, gera no editor. O Essencial não inclui imagens da plataforma.
+                        Nada a configurar aqui se o teu plano inclui imagens. Só precisas da chave de texto (Z.ai por defeito).
                       </p>
                     ) : (
                       <>

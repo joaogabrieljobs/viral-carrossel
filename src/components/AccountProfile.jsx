@@ -538,13 +538,17 @@ export default function AccountProfile({
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>IA</div>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-                {aiReady ? 'Pronta para gerar' : 'Configure as chaves'}
+                {aiReady ? 'Pronta para gerar' : 'Configure a chave de texto'}
               </h3>
             </div>
             <Settings size={18} color="var(--text-muted)" />
           </div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-            Texto: {textProvider.name} · Imagens: {imageProvider.name}
+            Texto: {textProvider.name}{hasTextAI ? '' : ' · falta chave'}
+            {' · '}
+            Imagens: {aiSettings?.useOwnImageKey
+              ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`
+              : (hasImageAI ? 'inclusas no plano' : 'não disponíveis neste plano')}
           </p>
           <button
             type="button"
@@ -560,7 +564,7 @@ export default function AccountProfile({
               cursor: 'pointer',
             }}
           >
-            {aiReady ? 'Ajustar IA' : 'Configurar IA'}
+            {aiReady ? 'Ajustar configuração' : 'Configurar IA'}
           </button>
         </div>
       </section>

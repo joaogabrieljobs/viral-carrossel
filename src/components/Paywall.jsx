@@ -7,7 +7,7 @@ import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 
 /**
  * Paywall — 4 planos (Essencial / Criador / Pro / Max).
- * Texto BYOK; imagens SJinn inclusas nos planos com quota > 0.
+ * Texto BYOK (padrão Z.ai); imagens inclusas nos planos com quota > 0.
  */
 export default function Paywall({
   isMobile,
@@ -108,7 +108,7 @@ export default function Paywall({
           lineHeight: 1.5,
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
-          Texto usa a sua chave de IA. Imagens GPT Image 2 entram na quota do plano (exceto Essencial).
+          Texto com a sua chave (recomendamos Z.ai). Imagens já vêm no Criador, Pro e Max — no Essencial usa a sua chave.
         </p>
 
         <div style={{
