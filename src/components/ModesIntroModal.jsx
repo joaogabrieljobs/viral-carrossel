@@ -36,8 +36,22 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
       <div
         className="modal-panel"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 720, padding: 32 }}
+        style={{
+          maxWidth: 720,
+          padding: 0,
+          maxHeight: 'min(92dvh, 920px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: '28px 24px 16px',
+        }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
@@ -69,7 +83,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
         </div>
 
         {/* 3 mode cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 8 }}>
           {MODES.map((m) => {
             const I = m.icon;
             const isCurrent = m.id === currentMode;
@@ -78,6 +92,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                 key={m.id}
                 type="button"
                 onClick={() => onSelect(m.id)}
+
                 style={{
                   textAlign: 'left',
                   padding: '18px 20px',
@@ -175,9 +190,19 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
             );
           })}
         </div>
+        </div>
 
-        {/* Footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        {/* Footer sticky — Fechar sempre à mão no mobile */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexShrink: 0,
+          padding: '12px 24px calc(14px + env(safe-area-inset-bottom, 0px))',
+          borderTop: '1px solid var(--hairline)',
+          background: 'var(--bg-sidebar)',
+        }}>
           <span style={{
             fontSize: 11, color: 'var(--text-muted)',
             letterSpacing: '-0.005em', lineHeight: 1.4,
@@ -188,10 +213,10 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
             type="button"
             onClick={onClose}
             style={{
-              minHeight: 36, padding: '0 18px',
-              borderRadius: 9999, border: '1px solid var(--glass-border-strong)',
-              background: 'transparent', color: 'var(--text-secondary)',
-              fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+              minHeight: 40, padding: '0 18px',
+              borderRadius: 9999, border: '1px solid var(--border)',
+              background: 'var(--bg-card)', color: 'var(--text-primary)',
+              fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
               cursor: 'pointer', letterSpacing: '-0.011em',
             }}
           >

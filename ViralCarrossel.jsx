@@ -1515,7 +1515,7 @@ export default function App() {
           </>
         ),
       })}
-      {!empty && editorIconBtn({
+      {!empty && !isMobile && editorIconBtn({
         onClick: () => setFullscreenOpen(true),
         title: 'Tela cheia (F)',
         children: <Maximize2 size={13} />,
@@ -1540,7 +1540,6 @@ export default function App() {
         title: 'Pesquisar nicho',
         children: <TrendingUp size={14} />,
       })}
-      {isMobile && editorGenerateBtn}
     </div>
   );
 
@@ -2886,6 +2885,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
       }}>
         {isMobile ? (
           <>
+            {/* Linha 1 — navegação: Início · marca · Gerar · Perfil */}
             <div style={{
               display:'flex',
               alignItems:'center',
@@ -2916,12 +2916,10 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 >
                   <Home size={15} />
                 </button>
-                <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
-                  <BrandLogo height={22} style={{ maxWidth: 'min(100%, 168px)' }} />
-                </div>
+                <BrandLogo height={22} style={{ maxWidth: 'min(100%, 140px)' }} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                {editorHeaderActions}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {editorGenerateBtn}
                 <button
                   type="button"
                   onClick={() => goAccount('profile')}
@@ -2937,6 +2935,16 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                   <User size={15} />
                 </button>
               </div>
+            </div>
+            {/* Linha 2 — ferramentas secundárias (modo / biblioteca / IA) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              width: '100%',
+              minHeight: 40,
+            }}>
+              {editorHeaderActions}
             </div>
             <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="mobile" />
           </>
@@ -3160,7 +3168,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
                 display:'flex',
                 alignItems:'center',
                 justifyContent:'center',
-                padding: isMobile ? '20px 16px 28px' : 24,
+                padding: isMobile ? '20px 16px calc(108px + env(safe-area-inset-bottom, 0))' : 24,
                 boxSizing: 'border-box',
               }}>
                 <div style={{
@@ -3286,7 +3294,7 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
               <div
                 style={{
                   display:'flex', flexDirection:'column', alignItems:'center',
-                  padding:'16px 12px calc(80px + env(safe-area-inset-bottom, 0))',
+                  padding:'16px 12px calc(108px + env(safe-area-inset-bottom, 0))',
                   minHeight:'100%', position:'relative',
                 }}
                 onTouchStart={e => {
@@ -3681,90 +3689,90 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             )}
           </div>
 
-          {/* Mobile bottom bar — 6 abas em grid 3×2 (proeminentes) + FAB
-              Exportar circular compacto. Tabs maiores, Exportar não domina. */}
-          {isMobile && !empty && !drawerOpen && (
-            <div
+          {/* Mobile bottom bar — tabs sempre visíveis (também no empty) + Exportar
+              compacto. Chrome claro alinhado ao DS Figma (sem glow magenta). */}
+          {isMobile && !drawerOpen && (
+            <nav
               data-vc-tour="mobile-bar"
+              aria-label="Abas do editor"
               style={{
               position:'fixed', bottom:0, left:0, right:0, zIndex:20,
-              /* Glass dark + ambient pink glow no top */
-              background:'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%), rgba(15, 13, 22, 0.85)',
-              backdropFilter:'blur(32px) saturate(180%)',
-              WebkitBackdropFilter:'blur(32px) saturate(180%)',
-              borderTop:'1px solid var(--glass-border-strong)',
-              padding:'10px 10px calc(10px + env(safe-area-inset-bottom, 0))',
-              display:'flex', gap:10, alignItems:'stretch',
-              boxShadow:'0 -16px 40px rgba(0,0,0,0.42), 0 -32px 80px rgba(255,45,141,0.08)',
+              background:'var(--bg-sidebar)',
+              borderTop:'1px solid var(--hairline)',
+              padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0))',
+              display:'flex', gap:8, alignItems:'stretch',
+              boxShadow:'0 -4px 16px rgba(0,0,0,0.06)',
             }}
             >
               <div style={{
-                flex:1, display:'grid',
-                gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
-                gap:6,
+                flex:1, display:'flex',
+                gap:4,
+                overflowX:'auto',
+                WebkitOverflowScrolling:'touch',
+                scrollbarWidth:'none',
               }}>
               {visibleEditorTabs(appMode).map(({ id, label, icon:Icon }) => {
                 const active = tab === id;
                 return (
                   <button
                     key={id}
+                    type="button"
                     onClick={() => { setTab(id); setDrawerOpen(true); }}
                     style={{
-                      minHeight:54, padding:'4px 6px',
-                      borderRadius:14,
+                      flex:'1 0 auto',
+                      minWidth:56,
+                      minHeight:52,
+                      padding:'6px 8px',
+                      borderRadius:12,
                       border: active
-                        ? '1px solid rgba(255, 45, 141, 0.42)'
-                        : '1px solid var(--glass-border)',
+                        ? '1px solid var(--accent)'
+                        : '1px solid transparent',
                       background: active
-                        ? 'linear-gradient(135deg, rgba(255,45,141,0.18) 0%, rgba(255,45,141,0.08) 100%)'
-                        : 'var(--bg-glass)',
-                      color: active ? '#fff' : 'var(--text-secondary)',
-                      fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
-                      display:'flex', flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6,
+                        ? 'var(--accent-surface)'
+                        : 'transparent',
+                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                      fontSize:10, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
+                      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
                       letterSpacing:'-0.011em',
-                      backdropFilter:'blur(18px)',
-                      WebkitBackdropFilter:'blur(18px)',
-                      /* Active: ambient glow magenta + inset highlight */
-                      boxShadow: active
-                        ? '0 0 24px rgba(255, 45, 141, 0.32), 0 4px 16px rgba(255, 45, 141, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.14)'
-                        : '0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
-                      transition:'all 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
+                      transition:'background 0.15s var(--ease-smooth), border-color 0.15s, color 0.15s',
                     }}
                     onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.96)'; }}
                     onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                     aria-label={`Abrir aba ${label}`}
                     aria-pressed={active}
                   >
-                    <Icon size={15} strokeWidth={active ? 2.25 : 2}/>{label}
+                    <Icon size={16} strokeWidth={active ? 2.35 : 2}/>
+                    <span style={{ lineHeight:1.1, whiteSpace:'nowrap' }}>{label}</span>
                   </button>
                 );
               })}
               </div>
-              {/* Exportar FAB circular — proporcional aos tabs (não mais 40% largura) */}
+              {!empty && (
               <button
+                type="button"
                 onClick={() => exportSlide(activeIdx)}
                 disabled={exporting}
                 style={{
                   alignSelf:'center',
-                  width:60, height:60, borderRadius:'50%',
-                  border:'none', cursor:'pointer',
-                  background:'var(--accent)', color:'#fff',
-                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
+                  width:52, height:52, borderRadius:9999,
+                  border:'none', cursor: exporting ? 'wait' : 'pointer',
+                  background:'var(--accent)', color:'var(--accent-on-dark, #fff)',
+                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1,
                   letterSpacing:'-0.011em',
                   opacity:exporting?0.5:1,
-                  boxShadow:
-                    '0 2px 4px rgba(255, 61, 139, 0.34), 0 8px 22px rgba(255, 61, 139, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-                  transition:'background 0.15s var(--ease-smooth), transform 0.12s var(--ease-smooth), box-shadow 0.22s',
+                  flexShrink:0,
+                  transition:'transform 0.12s var(--ease-smooth), opacity 0.15s',
                 }}
                 onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.94)'; }}
                 onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 aria-label="Exportar card atual"
                 title="Exportar"
               >
-                <Download size={20} strokeWidth={2.5}/>
-                <span style={{ fontSize:9, fontWeight:700, letterSpacing:'0.02em' }}>EXPORTAR</span>
+                <Download size={18} strokeWidth={2.4}/>
+                <span style={{ fontSize:8, fontWeight:700, letterSpacing:'0.04em' }}>PNG</span>
               </button>
-            </div>
+              )}
+            </nav>
           )}
         </main>
       </div>

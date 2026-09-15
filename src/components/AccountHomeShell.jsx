@@ -219,22 +219,19 @@ function AccountHomeShell({
           flexWrap: 'wrap',
         }}>
           {isMobile ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onOpenSettings()}
-                aria-label="Configurar IA"
-                style={{
-                  ...headerBtn,
-                  border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
-                  background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                  color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
-                }}
-              >
-                <Settings size={13} /> IA
-              </button>
-              {navBtn('profile', 'Perfil', User)}
-            </>
+            <button
+              type="button"
+              onClick={() => onOpenSettings()}
+              aria-label="Configurar IA"
+              style={{
+                ...headerBtn,
+                border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
+                background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
+                color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+              }}
+            >
+              <Settings size={13} /> IA
+            </button>
           ) : (
             <>
               <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
@@ -264,12 +261,6 @@ function AccountHomeShell({
             </>
           )}
         </div>
-
-        {isMobile && (
-          <div style={{ gridColumn: '1 / -1' }}>
-            {generateBtn(true)}
-          </div>
-        )}
       </header>
 
       <div style={{
@@ -279,8 +270,10 @@ function AccountHomeShell({
         <div style={{
           boxSizing: 'border-box', width: '100%', maxWidth: accountTab === 'profile' ? 820 : 720,
           marginLeft: 'auto', marginRight: 'auto',
-          padding: isMobile ? '24px 16px 40px' : '40px 24px 72px',
-          display: 'grid', gap: 28,
+          padding: isMobile
+            ? '20px 16px calc(88px + env(safe-area-inset-bottom, 0px))'
+            : '40px 24px 72px',
+          display: 'grid', gap: isMobile ? 22 : 28,
         }}>
           {accountTab === 'profile' && (
             <>
@@ -392,7 +385,7 @@ function AccountHomeShell({
           <section aria-label="Resumo">
             <div style={{
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
               gap: 10,
             }}>
               {[
@@ -743,6 +736,71 @@ function AccountHomeShell({
           )}
         </div>
       </div>
+
+      {isMobile && (
+        <nav
+          aria-label="Conta"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 30,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: 4,
+            padding: '8px 12px calc(8px + env(safe-area-inset-bottom, 0px))',
+            background: 'var(--bg-sidebar)',
+            borderTop: '1px solid var(--hairline)',
+            boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
+          }}
+        >
+          {[
+            { id: 'projects', label: 'Início', Icon: Layers, onClick: () => setAccountTab?.('projects') },
+            { id: 'generate', label: 'Gerar', Icon: Sparkles, onClick: () => onGenerate() },
+            { id: 'profile', label: 'Perfil', Icon: User, onClick: () => setAccountTab?.('profile') },
+          ].map(({ id, label, Icon, onClick }) => {
+            const active = id === 'generate' ? false : accountTab === id;
+            const primary = id === 'generate';
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={onClick}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: primary
+                    ? 'none'
+                    : active
+                      ? '1px solid var(--accent)'
+                      : '1px solid transparent',
+                  background: primary
+                    ? 'var(--accent)'
+                    : active
+                      ? 'var(--accent-surface)'
+                      : 'transparent',
+                  color: primary ? '#fff' : active ? 'var(--text-primary)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-ui)',
+                  letterSpacing: '-0.011em',
+                }}
+              >
+                <Icon size={16} strokeWidth={active || primary ? 2.35 : 2} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }
