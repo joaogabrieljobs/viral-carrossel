@@ -5,7 +5,7 @@
 
 const BASE = 'https://sjinn.ai/api/un-api';
 const POLL_MS = 5_000;
-const MAX_ATTEMPTS = 24; // ~2 min após create
+const MAX_ATTEMPTS = 30; // ~2.5 min (imagens GPT Image 2 costumam 60–90s)
 
 function apiKey() {
   return String(process.env.SJINN_API_KEY || '').trim();
@@ -55,7 +55,8 @@ export async function createGptImage2Task({ prompt, aspectRatio = '2:3', resolut
 
 export async function waitForSjinnTask(taskId, { pollMs = POLL_MS, maxAttempts = MAX_ATTEMPTS } = {}) {
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, pollMs));
+    // Primeiro poll imediato — evita 5s mortos no início.
+    if (i > 0) await new Promise((r) => setTimeout(r, pollMs));
     const { json } = await sjinnFetch('/query_tool_task_status', { task_id: taskId });
     const status = json?.data?.status;
     if (status === 1) return json.data;
@@ -68,6 +69,16 @@ export async function waitForSjinnTask(taskId, { pollMs = POLL_MS, maxAttempts =
   const err = new Error('A geração de imagem demorou demasiado. Tente de novo.');
   err.code = 'sjinn_timeout';
   throw err;
+}
+
+/** Extrai URL de imagem da resposta SJinn (campos variam entre tools). */
+export function extractSjinnOutputUrl(data) {
+  if (!data || typeof data !== 'object') return null;
+  const list = data.output_urls || data.outputUrls || data.urls || [];
+  if (Array.isArray(list) && list[0]) return String(list[0]);
+  if (typeof data.output_url === 'string') return data.output_url;
+  if (typeof data.url === 'string') return data.url;
+  return null;
 }
 
 export async function downloadImageAsBase64(url) {

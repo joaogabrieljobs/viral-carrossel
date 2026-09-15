@@ -25,6 +25,7 @@ import {
   createGptImage2Task,
   waitForSjinnTask,
   downloadImageAsBase64,
+  extractSjinnOutputUrl,
 } from '../lib/sjinn.js';
 
 export const config = {
@@ -105,12 +106,21 @@ export default async function handler(req, res) {
     });
   }
 
-  const consumed = await consumeImageCredit({
-    customerId,
-    periodStartSec,
-    periodEndSec,
-    limit,
-  });
+  let consumed;
+  try {
+    consumed = await consumeImageCredit({
+      customerId,
+      periodStartSec,
+      periodEndSec,
+      limit,
+    });
+  } catch (e) {
+    console.error('[sjinn-image] quota', e?.message || e);
+    return res.status(503).json({
+      error: 'Não foi possível reservar crédito de imagem. Tente de novo.',
+      code: 'quota_store_error',
+    });
+  }
 
   if (!consumed.allowed) {
     return res.status(402).json({
@@ -129,7 +139,7 @@ export default async function handler(req, res) {
   try {
     const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution });
     const data = await waitForSjinnTask(taskId);
-    const url = data?.output_urls?.[0];
+    const url = extractSjinnOutputUrl(data);
     if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
 
