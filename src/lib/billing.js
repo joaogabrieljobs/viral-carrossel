@@ -63,3 +63,27 @@ export async function logoutAccess() {
     credentials: 'include',
   }).catch(() => {});
 }
+
+export async function loginWithPassword(email, password) {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Não foi possível entrar');
+  return data;
+}
+
+export async function registerWithPassword(email, password) {
+  const r = await fetch('/api/auth/register', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Não foi possível criar a conta');
+  return data;
+}

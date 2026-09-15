@@ -24,6 +24,13 @@ export function googleAuthConfigured() {
 }
 
 export function getGoogleRedirectUri(req) {
+  // Preferir o host da request (domínio customizado vs *.vercel.app) —
+  // GOOGLE_REDIRECT_URI fixo quebrava login quando APP_URL ≠ site actual.
+  const proto = req?.headers?.['x-forwarded-proto'] || 'https';
+  const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+  if (host) {
+    return `${String(proto).split(',')[0].trim()}://${String(host).split(',')[0].trim()}/api/auth/google/callback`;
+  }
   const fromEnv = cleanEnv(process.env.GOOGLE_REDIRECT_URI);
   if (fromEnv) return fromEnv;
   return `${getAppUrl(req)}/api/auth/google/callback`;

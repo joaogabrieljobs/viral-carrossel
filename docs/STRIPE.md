@@ -17,11 +17,18 @@
 4. `GET /api/auth/session` valida assinatura `active` / `trialing`
 5. Botão **Plano** na home → Customer Portal Stripe
 
-### Login Google (assinantes) — única forma de reentrar
+### Login e-mail + senha (assinantes)
 
-E-mail sozinho **não** autentica (qualquer pessoa com o endereço entrava).
+1. Landing → **Entrar** → e-mail + senha **ou** Google
+2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt no Upstash (`vc:auth:{email}`)
+3. Se assinatura Stripe ativa → cookie `vc_access`
+4. Conta nova sem plano → `{ needCheckout: true }` → Paywall
 
-1. Landing → **Entrar** → **Entrar com Google**
+Google continua disponível; o redirect OAuth usa o **host da request** (evita mismatch com domínio customizado).
+
+### Login Google (opcional)
+
+1. Landing → **Entrar** → **Continuar com Google**
 2. `GET /api/auth/google` → OAuth Google → `/api/auth/google/callback`
 3. Servidor lê o e-mail Google, procura cliente Stripe com assinatura ativa
 4. Se ativo → cookie `vc_access` → `/?billing=restored&login=google`
