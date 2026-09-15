@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2, X } from 'lucide-react';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
+import { dismissOnboardingLanding } from '../utils/landing-gate.js';
 
 /**
- * Login / criar conta — e-mail+senha (Upstash) + Google opcional.
+ * Login / criar conta — e-mail+senha + Google opcional.
  * Entrar só com e-mail (sem senha) NÃO autentica.
  */
 export default function LoginModal({
@@ -12,6 +13,7 @@ export default function LoginModal({
   onClose,
   initialEmail = '',
   hint = '',
+  onLoggedIn,
 }) {
   const [mode, setMode] = useState('login'); // login | register
   const [email, setEmail] = useState(initialEmail || '');
@@ -44,8 +46,14 @@ export default function LoginModal({
         return;
       }
       if (data.active) {
+        dismissOnboardingLanding();
         onClose?.();
-        window.location.href = '/?billing=restored&login=password';
+        if (typeof onLoggedIn === 'function') {
+          onLoggedIn(data);
+          return;
+        }
+        // Fallback: reload no studio (app=1 salta a landing lazy).
+        window.location.href = '/?app=1&billing=restored&login=password';
         return;
       }
       setError('Resposta inesperada do servidor.');

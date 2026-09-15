@@ -8,6 +8,9 @@ function shouldShowOnboardingLanding() {
   try {
     const q = new URLSearchParams(window.location.search);
     if (q.get('app') === '1' || q.get('studio') === '1') return false;
+    // Retorno de login/checkout: ir direto ao studio (não reabrir a landing).
+    if (q.get('billing') === 'restored' || q.get('billing') === 'success') return false;
+    if (q.get('login') === 'google' || q.get('login') === 'password') return false;
     if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') return true;
     return sessionStorage.getItem(SK.landingDismissed) !== '1';
   } catch {

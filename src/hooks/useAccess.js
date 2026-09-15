@@ -119,8 +119,8 @@ export function useAccess({ setShellView, onLeaveEditor }) {
       if (billing === 'success' && session.active) {
         enterStudio();
       }
-      if ((billing === 'restored' || loginStatus === 'google') && session.active) {
-        trackEvent('login_google_ok');
+      if ((billing === 'restored' || loginStatus === 'google' || loginStatus === 'password') && session.active) {
+        trackEvent(loginStatus === 'password' ? 'login_password_ok' : 'login_google_ok');
         enterStudio();
       }
       if (billing === 'cancel') {

@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { GLOBAL_STYLE } from './styles/global-style.js';
 import { dismissOnboardingLanding } from './utils/landing-gate.js';
+import { fetchAccessSession } from './lib/billing.js';
 import BrandLogo from './components/BrandLogo.jsx';
 
 const OnboardingLanding = lazy(() => import('./components/OnboardingLanding.jsx'));
@@ -56,6 +57,28 @@ export default function LandingFirst() {
     setPhase('studio');
   }, []);
 
+  // Se já autenticado (cookie) ou URL de retorno de login → abrir studio.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        const fromAuth = q.get('billing') === 'restored'
+          || q.get('billing') === 'success'
+          || q.get('login') === 'password'
+          || q.get('login') === 'google'
+          || q.get('app') === '1'
+          || q.get('studio') === '1';
+        const session = await fetchAccessSession();
+        if (cancelled) return;
+        if (session.active && fromAuth) {
+          enterStudio();
+        }
+      } catch { /* landing continua */ }
+    })();
+    return () => { cancelled = true; };
+  }, [enterStudio]);
+
   if (phase === 'studio') {
     return (
       <Suspense fallback={<BootScreen label="A abrir o studio…" />}>
@@ -87,6 +110,10 @@ export default function LandingFirst() {
         <LoginModal
           open={loginOpen}
           onClose={() => setLoginOpen(false)}
+          onLoggedIn={() => {
+            setLoginOpen(false);
+            enterStudio();
+          }}
         />
       </Suspense>
     </div>

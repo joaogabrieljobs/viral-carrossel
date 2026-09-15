@@ -2744,6 +2744,11 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
+            onLoggedIn={async () => {
+              await refreshAccess();
+              setLoginOpen(false);
+              enterStudio();
+            }}
           />
         </Suspense>
       </div>
@@ -2791,6 +2796,11 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
+            onLoggedIn={async () => {
+              await refreshAccess();
+              setLoginOpen(false);
+              enterStudio();
+            }}
           />
         </Suspense>
       </div>
