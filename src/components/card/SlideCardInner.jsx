@@ -140,8 +140,9 @@ const VC_TEXT_ZONE_STYLE = {
  */
 function vcTitleOvershootShift(fontSizePx, leadingPct) {
   const lh = (leadingPct ?? 105) / 100;
-  if (lh >= 1.15) return 0;
-  return Math.round(fontSizePx * 0.17);
+  if (lh >= 1.18) return 0;
+  // Mais folga: display fonts + textBg + export html2canvas.
+  return Math.round(fontSizePx * (lh <= 1.05 ? 0.22 : 0.16));
 }
 
 /**
@@ -383,8 +384,9 @@ const ClassicCanvasInner = React.forwardRef(({
           textAlign: slide.align,
           background: textBgColor,
           backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+          WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           borderRadius: slide.textBg ? f.w * 0.022 : 0,
-          padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
+          padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
         }}
         deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
         minScale={0.45}
@@ -407,7 +409,8 @@ const ClassicCanvasInner = React.forwardRef(({
           fontSize: f.w * 0.084 * (slide.titleSize / 100) * titleScale,
           lineHeight: (slide.titleLeading ?? 105) / 100,
           position: 'relative',
-          top: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100) * titleScale, slide.titleLeading),
+          paddingTop: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100) * titleScale, slide.titleLeading),
+          boxSizing: 'content-box',
           fontWeight: slide.titleWeight ?? 800,
           letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
           margin: 0,
@@ -415,7 +418,6 @@ const ClassicCanvasInner = React.forwardRef(({
           wordBreak: 'normal',
           maxWidth: '100%',
           width: '100%',
-          boxSizing: 'border-box',
           textTransform:
             slide.titleCase === 'upper' ? 'uppercase' :
             slide.titleCase === 'lower' ? 'lowercase' :
@@ -447,8 +449,9 @@ const ClassicCanvasInner = React.forwardRef(({
           overflow: 'hidden',
           background: textBgColor,
           backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+          WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           borderRadius: slide.textBg ? f.w * 0.022 : 0,
-          padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
+          padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: Lzn.jc,
@@ -682,8 +685,9 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     <div style={{
       background: textBgColor,
       backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+      WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
       borderRadius: slide.textBg ? f.w * 0.025 : 0,
-      padding: slide.textBg ? `${f.h * 0.022}px ${f.w * 0.04}px` : 0,
+      padding: slide.textBg ? `${f.h * 0.028}px ${f.w * 0.04}px` : 0,
       display: 'inline-flex',
       flexDirection: 'column',
       alignItems: alignItemsBox,
@@ -698,7 +702,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       fontSize: f.w * 0.084 * (slide.titleSize / 100),
       lineHeight: (slide.titleLeading ?? 105) / 100,
       position: 'relative',
-      top: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100), slide.titleLeading),
+      paddingTop: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100), slide.titleLeading),
+      boxSizing: 'content-box',
       fontWeight: slide.titleWeight ?? 800,
       letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
       margin: 0,
@@ -2161,6 +2166,9 @@ const SlideCardInner = React.forwardRef(({
         // a ser a borda do card. Vale no editor e na exportação — senão o que
         // se vê ao arrastar não é o que sai no PNG.
         const textoDeslocado = hasElementOffset(slide, 'text');
+        // Com glass (textBg) ou arrasto: não clipar ascenders do título.
+        // O card root já tem overflow:hidden para a foto.
+        const textoSemClip = textoDeslocado || !!slide.textBg;
         return (
           <div style={{
             position:'absolute', inset:0,
@@ -2168,7 +2176,7 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', flexDirection:'column',
             justifyContent:L.jc, alignItems:L.ai,
             textAlign:slide.align,
-            overflow: textoDeslocado ? 'visible' : 'hidden',
+            overflow: textoSemClip ? 'visible' : 'hidden',
             // A moldura cobre o card inteiro (inset:0). Deixá-la clicável
             // engolia o clique da zona da foto — só o bloco de texto por dentro
             // é que recebe ponteiro.
@@ -2179,8 +2187,9 @@ const SlideCardInner = React.forwardRef(({
               pointerEvents: movableElements ? 'auto' : 'none',
               background:textBgColor,
               backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
+              WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
               borderRadius: slide.textBg ? f.w*0.025 : 0,
-              padding: slide.textBg ? `${f.h*0.022}px ${f.w*0.04}px` : 0,
+              padding: slide.textBg ? `${f.h*0.028}px ${f.w*0.04}px` : 0,
               display:'inline-flex', flexDirection:'column',
               alignItems:
                 slide.align==='center'  ? 'center'   :
@@ -2229,7 +2238,9 @@ const SlideCardInner = React.forwardRef(({
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
                 position: 'relative',
-                top: vcTitleOvershootShift(f.w*0.084*(slide.titleSize/100), slide.titleLeading),
+                // Preferir padding (html2canvas respeita) em vez de só `top`.
+                paddingTop: vcTitleOvershootShift(f.w*0.084*(slide.titleSize/100), slide.titleLeading),
+                boxSizing: 'content-box',
                 fontWeight:slide.titleWeight ?? 800,
                 // tracking em centi-em: default -3 (-0.03em). User pode ir de -10 a +30 → -0.13em a +0.27em
                 letterSpacing:`${(-3 + (slide.titleTracking ?? 0)) / 100}em`,

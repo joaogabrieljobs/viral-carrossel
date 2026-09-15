@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 import { FORMATS } from '../utils/formats.js';
 import { videoGet } from '../utils/video-store.js';
 import { canvasToPngBlob } from '../utils/image-storage.js';
-import { downloadBlob, vcFixHtml2CanvasImages, downloadCanvasPng } from '../utils/export-helpers.js';
+import { downloadBlob, vcPrepareHtml2CanvasClone, downloadCanvasPng } from '../utils/export-helpers.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { blobFromSlideRef } from '../utils/ai-client.js';
 
@@ -66,7 +66,7 @@ export function useExport({
       windowWidth: w,
       windowHeight: h,
       onclone: (clonedDoc, clonedEl) => {
-        vcFixHtml2CanvasImages(clonedDoc, clonedEl);
+        vcPrepareHtml2CanvasClone(clonedDoc, clonedEl);
       },
     });
   };

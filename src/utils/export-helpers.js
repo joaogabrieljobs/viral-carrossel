@@ -52,6 +52,81 @@ function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
   });
 }
 
+/**
+ * html2canvas corta letras com `backdrop-filter`, `overflow:hidden` apertado e
+ * `position:relative; top` (overshoot). No clone de export: remove blur, abre
+ * overflow nas zonas de texto e troca o shift por padding real.
+ */
+function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
+  if (!clonedSlideRoot?.querySelectorAll) return;
+  const view = clonedDoc.defaultView;
+  if (!view?.getComputedStyle) return;
+
+  const all = Array.from(clonedSlideRoot.querySelectorAll('*'));
+  all.forEach((el) => {
+    const cs = view.getComputedStyle(el);
+    const bf = cs.backdropFilter || cs.webkitBackdropFilter || '';
+    if (bf && bf !== 'none') {
+      el.style.backdropFilter = 'none';
+      el.style.webkitBackdropFilter = 'none';
+    }
+  });
+
+  // Zonas de texto (flex absoluto a cobrir o card): não clipar no PNG.
+  all.forEach((el) => {
+    const cs = view.getComputedStyle(el);
+    if (cs.position !== 'absolute') return;
+    if (cs.display !== 'flex' && cs.display !== 'inline-flex') return;
+    if (cs.flexDirection !== 'column') return;
+    // inset ~0 → zona de texto do slide
+    const top = parseFloat(cs.top);
+    const left = parseFloat(cs.left);
+    if (!Number.isFinite(top) || !Number.isFinite(left)) return;
+    if (Math.abs(top) > 2 || Math.abs(left) > 2) return;
+    el.style.overflow = 'visible';
+  });
+
+  clonedSlideRoot.querySelectorAll('h1').forEach((h1) => {
+    const cs = view.getComputedStyle(h1);
+    const fs = parseFloat(cs.fontSize) || 48;
+    const existing = parseFloat(cs.paddingTop) || 0;
+    const pad = Math.max(existing, Math.round(fs * 0.14), 8);
+    // Anula o `top` de overshoot (html2canvas mede mal) e garante padding de layout.
+    h1.style.top = '0';
+    h1.style.position = 'relative';
+    h1.style.paddingTop = `${pad}px`;
+    h1.style.paddingBottom = `${Math.max(parseFloat(cs.paddingBottom) || 0, Math.round(pad * 0.4))}px`;
+    h1.style.overflow = 'visible';
+    h1.style.lineHeight = cs.lineHeight;
+  });
+
+  // Caixas com fundo de texto: um pouco mais de padding vertical no export.
+  all.forEach((el) => {
+    const cs = view.getComputedStyle(el);
+    if (cs.display !== 'inline-flex' && cs.display !== 'flex') return;
+    const bg = cs.backgroundColor || '';
+    if (!/rgba?\(/i.test(bg)) return;
+    // Só caixas semi-transparentes escuras (placa de texto)
+    const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!m) return;
+    const r = Number(m[1]);
+    const g = Number(m[2]);
+    const b = Number(m[3]);
+    if (r + g + b > 80) return;
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    // Folga extra no PNG: display fonts + line-height apertado.
+    el.style.paddingTop = `${Math.max(pt + 6, 16)}px`;
+    el.style.paddingBottom = `${Math.max(pb + 6, 16)}px`;
+    el.style.overflow = 'visible';
+  });
+}
+
+function vcPrepareHtml2CanvasClone(clonedDoc, clonedSlideRoot) {
+  vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot);
+  vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot);
+}
+
 /** Telemóveis / Safari: após awaits o gesto já não abre âncoras — Web Share API (ficheiro) costuma funcionar. */
 function vcPreferFileShareForDownloads() {
   if (typeof navigator === 'undefined') return false;
@@ -102,6 +177,8 @@ async function downloadBlob(blob, filename) {
 
 export {
   vcFixHtml2CanvasImages,
+  vcFixHtml2CanvasTextClip,
+  vcPrepareHtml2CanvasClone,
   vcPreferFileShareForDownloads,
   downloadBlob,
 };
