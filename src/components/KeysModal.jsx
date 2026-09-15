@@ -14,9 +14,9 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Z.ai Flash — texto incluso no plano',
+    note: 'Z.ai GLM-4.7 — texto incluso no plano',
     textProvider: 'zai',
-    textModel: 'glm-4.7-flash',
+    textModel: 'glm-4.7',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },

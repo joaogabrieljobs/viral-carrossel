@@ -69,7 +69,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch(target, {
+    const attemptFetch = async () => fetch(target, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${resolvedKey}`,
@@ -77,7 +77,21 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(payload),
     });
-    const raw = await upstream.text();
+
+    let upstream = await attemptFetch();
+    let raw = await upstream.text();
+
+    // Retry único em overload transitório da Z.ai (1305 / 429).
+    if (
+      provider === 'zai'
+      && operation === 'chat'
+      && (upstream.status === 429 || /1305|overloaded|try again later/i.test(raw))
+    ) {
+      await new Promise((r) => setTimeout(r, 1200));
+      upstream = await attemptFetch();
+      raw = await upstream.text();
+    }
+
     if (operation === 'images' && upstream.ok) {
       const data = JSON.parse(raw);
       const imageUrl = data?.data?.[0]?.url;

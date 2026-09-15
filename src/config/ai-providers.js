@@ -82,7 +82,8 @@ export const DEFAULT_AI_SETTINGS = {
   textModels: {
     anthropic: 'claude-sonnet-5',
     openai: 'gpt-5.6-terra',
-    zai: 'glm-4.7-flash',
+    // Flash grátis sobrecarrega muito (erro 1305); 4.7 é o default estável.
+    zai: 'glm-4.7',
     kimi: 'kimi-k2.6',
   },
   imageProvider: 'openai',
@@ -117,9 +118,13 @@ export function normalizeAISettings(value = {}) {
   if (!IMAGE_PROVIDERS[next.imageProvider]) next.imageProvider = DEFAULT_AI_SETTINGS.imageProvider;
 
   // Migração: quem ficou em Anthropic/OpenAI/Kimi sem chave própria volta ao Z.ai incluso.
+  // Flash gratuito sobrecarrega (1305) — promove para glm-4.7.
   const textKey = String(next.keys[next.textProvider] || '').trim();
   if (!PLATFORM_TEXT_PROVIDERS.has(next.textProvider) && !textKey) {
     next.textProvider = DEFAULT_AI_SETTINGS.textProvider;
+  }
+  if (next.textProvider === 'zai' && next.textModels.zai === 'glm-4.7-flash') {
+    next.textModels.zai = DEFAULT_AI_SETTINGS.textModels.zai;
   }
   return next;
 }

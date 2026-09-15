@@ -171,6 +171,30 @@ const COMPATIBLE_DIRECT_URLS = {
   kimi: '/api/kimi/v1/chat/completions',
 };
 
+const ZAI_FALLBACK_MODELS = ['glm-4.7', 'glm-4.6', 'glm-4.5', 'glm-4-plus', 'glm-5.2'];
+
+function isZaiOverloadError(status, data, raw) {
+  if (status === 429) return true;
+  const msg = String(data?.error?.message || data?.message || raw || '');
+  const code = String(data?.error?.code || data?.code || '');
+  return code === '1305' || /overloaded|temporar|congest|busy|try again later/i.test(msg);
+}
+
+function translateProviderError(provider, status, data, raw) {
+  const msg = String(data?.error?.message || data?.message || '').trim();
+  const code = String(data?.error?.code || data?.code || '');
+  if (code === '1305' || /overloaded|try again later/i.test(msg)) {
+    return 'Z.ai está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
+  }
+  if (status === 401 || /token expired|incorrect|unauthorized/i.test(msg)) {
+    return 'Chave Z.ai inválida ou expirada. Atualiza ZAI_API_KEY no servidor.';
+  }
+  if (status === 429) {
+    return 'Muitos pedidos à Z.ai. Espera um momento e tenta de novo.';
+  }
+  return msg || `${provider === 'zai' ? 'Z.ai' : 'Kimi'} HTTP ${status}`;
+}
+
 const callCompatibleChat = async (
   provider,
   userMsg,
@@ -179,8 +203,12 @@ const callCompatibleChat = async (
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
   const useDirect = IS_LOCAL_DEV && !!apiKey;
-  const payload = {
-    model: getTextModel(provider),
+  const preferred = getTextModel(provider);
+  const modelCandidates = provider === 'zai'
+    ? [preferred, ...ZAI_FALLBACK_MODELS.filter((m) => m !== preferred)]
+    : [preferred];
+
+  const basePayload = {
     max_tokens: maxTokens,
     messages: [
       { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra.` },
@@ -188,36 +216,59 @@ const callCompatibleChat = async (
     ],
     temperature: 0.8,
   };
-  if (json) payload.response_format = { type: 'json_object' };
+  if (json) basePayload.response_format = { type: 'json_object' };
 
   const url = useDirect ? COMPATIBLE_DIRECT_URLS[provider] : COMPATIBLE_AI_URL;
-  const headers = { 'Content-Type': 'application/json' };
-  const body = useDirect
-    ? payload
-    : { provider, operation: 'chat', apiKey: apiKey || undefined, payload };
-  if (useDirect) headers.Authorization = `Bearer ${apiKey}`;
+  let lastError = null;
 
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      credentials: 'include',
-      headers,
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
+  for (let i = 0; i < modelCandidates.length; i += 1) {
+    const model = modelCandidates[i];
+    const payload = { ...basePayload, model };
+    const headers = { 'Content-Type': 'application/json' };
+    const body = useDirect
+      ? payload
+      : { provider, operation: 'chat', apiKey: apiKey || undefined, payload };
+    if (useDirect) headers.Authorization = `Bearer ${apiKey}`;
+
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
+    }
+
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch {
+      lastError = new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
+      continue;
+    }
+
+    if (!res.ok || data.error) {
+      lastError = new Error(translateProviderError(provider, res.status, data, raw));
+      // Flash/grátis em overload → tenta modelo pago seguinte.
+      if (provider === 'zai' && isZaiOverloadError(res.status, data, raw) && i < modelCandidates.length - 1) {
+        continue;
+      }
+      throw lastError;
+    }
+
+    const text = data.choices?.[0]?.message?.content || '';
+    if (!text.trim()) {
+      lastError = new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'} retornou conteúdo vazio.`);
+      if (i < modelCandidates.length - 1) continue;
+      throw lastError;
+    }
+    return json ? extractJSON(text) : text.trim();
   }
-  const raw = await res.text();
-  let data;
-  try { data = JSON.parse(raw); }
-  catch { throw new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'}: resposta inválida (HTTP ${res.status})`); }
-  if (!res.ok || data.error) {
-    throw new Error(data?.error?.message || `${provider} HTTP ${res.status}`);
-  }
-  const text = data.choices?.[0]?.message?.content || '';
-  if (!text.trim()) throw new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'} retornou conteúdo vazio.`);
-  return json ? extractJSON(text) : text.trim();
+
+  throw lastError || new Error('Z.ai indisponível. Tenta de novo.');
 };
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
