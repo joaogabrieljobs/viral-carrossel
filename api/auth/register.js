@@ -8,7 +8,7 @@ import {
   upsertPassword,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
-import { getStripe, findActiveSubscription } from '../lib/stripe.js';
+import { findActiveSubscription } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 
 function readBody(req) {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   if (!passwordAuthConfigured()) {
-    return res.status(503).json({ error: 'Criar conta indisponível (Upstash não configurado).' });
+    return res.status(503).json({ error: 'Criar conta indisponível.' });
   }
 
   const { email, password } = readBody(req);
@@ -46,26 +46,25 @@ export default async function handler(req, res) {
 
   try {
     const existing = await getAuthRecord(cleanEmail);
-    if (existing) {
+    if (existing?.hash) {
       return res.status(409).json({ error: 'Já existe conta com este e-mail. Entre com a senha.' });
     }
 
-    let customerId = null;
-    let active = false;
-    try {
-      const stripe = getStripe();
-      const customers = await stripe.customers.list({ email: cleanEmail, limit: 5 });
-      const customer = customers.data.find((c) => !c.deleted) || customers.data[0];
-      if (customer) {
-        customerId = customer.id;
-        const sub = await findActiveSubscription(customer.id);
-        active = !!sub;
-      }
-    } catch (e) {
-      console.warn('[auth/register] stripe lookup', e?.message || e);
-    }
+    const saved = await upsertPassword(cleanEmail, password, {
+      customerId: existing?.customerId || null,
+      overwrite: false,
+    });
 
-    await upsertPassword(cleanEmail, password, { customerId, overwrite: false });
+    const customerId = saved.customerId;
+    let active = false;
+    if (customerId) {
+      try {
+        const sub = await findActiveSubscription(customerId);
+        active = !!sub;
+      } catch (e) {
+        console.warn('[auth/register] sub lookup', e?.message || e);
+      }
+    }
 
     if (active && customerId) {
       const token = createAccessToken({ customerId, email: cleanEmail });

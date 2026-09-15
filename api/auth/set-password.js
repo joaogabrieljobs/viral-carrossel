@@ -20,8 +20,6 @@ function readBody(req) {
 /**
  * POST /api/auth/set-password
  * Bootstrap: header x-bootstrap-secret === BOOTSTRAP_SECRET
- * Define/reset senha para e-mail com assinatura ativa (ou força com force:true).
- * Devolve a senha em plain uma vez (não fica logada).
  */
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
@@ -34,7 +32,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Não autorizado' });
   }
   if (!passwordAuthConfigured()) {
-    return res.status(503).json({ error: 'Upstash não configurado' });
+    return res.status(503).json({ error: 'Stripe não configurado' });
   }
 
   const { email, password: givenPassword, force = false } = readBody(req);
@@ -61,7 +59,7 @@ export default async function handler(req, res) {
       ? String(givenPassword)
       : generatePassword(14);
 
-    await upsertPassword(cleanEmail, password, {
+    const saved = await upsertPassword(cleanEmail, password, {
       customerId: customer?.id || null,
       overwrite: true,
     });
@@ -69,7 +67,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       email: cleanEmail,
-      customerId: customer?.id || null,
+      customerId: saved.customerId,
       password,
     });
   } catch (e) {

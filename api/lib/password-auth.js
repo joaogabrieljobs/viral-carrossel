@@ -1,25 +1,15 @@
 /**
- * Contas e-mail + senha (hash scrypt) em Upstash Redis.
- * Chave: vc:auth:{email} → JSON { salt, hash, customerId?, updatedAt }
+ * Contas e-mail + senha (hash scrypt) no metadata do customer Stripe.
+ * Campos: vc_pw_salt, vc_pw_hash (≤500 chars cada — cabem no Stripe metadata).
+ * Não depende de Upstash (quota de imagem continua lá).
  */
 import crypto from 'crypto';
+import { getStripe } from './stripe.js';
 
-const memory = new Map();
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEYLEN = 64;
-
-function hasUpstash() {
-  return !!(
-    process.env.UPSTASH_REDIS_REST_URL?.trim()
-    && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
-  );
-}
-
-function authKey(email) {
-  return `vc:auth:${normalizeEmail(email)}`;
-}
 
 export function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -32,25 +22,6 @@ export function isValidEmail(email) {
 export function isValidPassword(password) {
   const p = String(password || '');
   return p.length >= 8 && p.length <= 128;
-}
-
-async function upstash(command) {
-  const base = process.env.UPSTASH_REDIS_REST_URL.replace(/\/$/, '');
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN.trim();
-  const res = await fetch(`${base}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(command),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Upstash ${res.status}: ${text.slice(0, 200)}`);
-  }
-  const json = await res.json();
-  return json?.result;
 }
 
 function scryptHash(password, salt) {
@@ -76,43 +47,85 @@ export function verifyPassword(password, record) {
   return crypto.timingSafeEqual(a, b);
 }
 
+async function findCustomerByEmail(email) {
+  const stripe = getStripe();
+  const clean = normalizeEmail(email);
+  const list = await stripe.customers.list({ email: clean, limit: 5 });
+  return list.data.find((c) => !c.deleted) || list.data[0] || null;
+}
+
 export async function getAuthRecord(email) {
-  const key = authKey(email);
-  if (hasUpstash()) {
-    const raw = await upstash(['GET', key]);
-    if (!raw) return null;
-    try {
-      return typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch {
-      return null;
-    }
+  const customer = await findCustomerByEmail(email);
+  if (!customer) return null;
+  const salt = customer.metadata?.vc_pw_salt;
+  const hash = customer.metadata?.vc_pw_hash;
+  if (!salt || !hash) {
+    return { customerId: customer.id, email: normalizeEmail(email), salt: null, hash: null };
   }
-  return memory.get(key) || null;
+  return {
+    customerId: customer.id,
+    email: normalizeEmail(email),
+    salt,
+    hash,
+  };
 }
 
 export async function setAuthRecord(email, record) {
-  const key = authKey(email);
-  const payload = {
-    ...record,
-    email: normalizeEmail(email),
+  const stripe = getStripe();
+  const clean = normalizeEmail(email);
+  let customerId = record.customerId;
+  let customer = null;
+
+  if (customerId) {
+    customer = await stripe.customers.retrieve(customerId);
+  } else {
+    customer = await findCustomerByEmail(clean);
+    customerId = customer?.id;
+  }
+
+  if (!customer || customer.deleted) {
+    customer = await stripe.customers.create({
+      email: clean,
+      metadata: {
+        product: 'viral-carrossel',
+        vc_pw_salt: record.salt,
+        vc_pw_hash: record.hash,
+      },
+    });
+    return {
+      email: clean,
+      customerId: customer.id,
+      salt: record.salt,
+      hash: record.hash,
+      updatedAt: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  await stripe.customers.update(customer.id, {
+    metadata: {
+      ...customer.metadata,
+      vc_pw_salt: record.salt,
+      vc_pw_hash: record.hash,
+    },
+  });
+
+  return {
+    email: clean,
+    customerId: customer.id,
+    salt: record.salt,
+    hash: record.hash,
     updatedAt: Math.floor(Date.now() / 1000),
   };
-  if (hasUpstash()) {
-    await upstash(['SET', key, JSON.stringify(payload)]);
-  } else {
-    memory.set(key, payload);
-  }
-  return payload;
 }
 
-/** Cria ou atualiza senha. Não sobrescreve se `overwrite` for false e já existir. */
+/** Cria ou atualiza senha. Não sobrescreve se `overwrite` for false e já existir hash. */
 export async function upsertPassword(email, password, { customerId = null, overwrite = true } = {}) {
   const clean = normalizeEmail(email);
   if (!isValidEmail(clean)) throw new Error('E-mail inválido');
   if (!isValidPassword(password)) throw new Error('Senha deve ter entre 8 e 128 caracteres');
 
   const existing = await getAuthRecord(clean);
-  if (existing && !overwrite) {
+  if (existing?.hash && !overwrite) {
     throw new Error('Conta já existe');
   }
 
@@ -135,5 +148,5 @@ export function generatePassword(length = 14) {
 }
 
 export function passwordAuthConfigured() {
-  return hasUpstash() || process.env.NODE_ENV !== 'production';
+  return Boolean(String(process.env.STRIPE_SECRET_KEY || '').trim());
 }

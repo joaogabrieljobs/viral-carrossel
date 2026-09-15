@@ -5,7 +5,6 @@ import {
   isValidEmail,
   getAuthRecord,
   verifyPassword,
-  setAuthRecord,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
 import { getStripe, findActiveSubscription } from '../lib/stripe.js';
@@ -31,7 +30,7 @@ export default async function handler(req, res) {
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   if (!passwordAuthConfigured()) {
-    return res.status(503).json({ error: 'Login por e-mail indisponível (Upstash não configurado).' });
+    return res.status(503).json({ error: 'Login por e-mail indisponível.' });
   }
 
   const { email, password } = readBody(req);
@@ -42,14 +41,13 @@ export default async function handler(req, res) {
 
   try {
     const record = await getAuthRecord(cleanEmail);
-    if (!record || !verifyPassword(password, record)) {
+    if (!record?.hash || !verifyPassword(password, record)) {
       return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
     }
 
     const stripe = getStripe();
-    const existing = await stripe.customers.list({ email: cleanEmail, limit: 5 });
-    const customer = existing.data.find((c) => !c.deleted) || existing.data[0];
-    if (!customer) {
+    const customer = await stripe.customers.retrieve(record.customerId);
+    if (!customer || customer.deleted) {
       return res.status(402).json({
         error: 'Conta sem assinatura. Assine para entrar no studio.',
         needCheckout: true,
@@ -64,10 +62,6 @@ export default async function handler(req, res) {
         needCheckout: true,
         email: cleanEmail,
       });
-    }
-
-    if (record.customerId !== customer.id) {
-      await setAuthRecord(cleanEmail, { ...record, customerId: customer.id });
     }
 
     const token = createAccessToken({ customerId: customer.id, email: cleanEmail });

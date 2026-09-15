@@ -20,7 +20,7 @@
 ### Login e-mail + senha (assinantes)
 
 1. Landing → **Entrar** → e-mail + senha **ou** Google
-2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt no Upstash (`vc:auth:{email}`)
+2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt no **metadata Stripe** (`vc_pw_salt` / `vc_pw_hash`)
 3. Se assinatura Stripe ativa → cookie `vc_access`
 4. Conta nova sem plano → `{ needCheckout: true }` → Paywall
 
