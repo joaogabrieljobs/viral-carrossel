@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: {
         message: operation === 'chat'
-          ? `Chave ${provider} ausente. Use o texto incluso do plano (Claude) ou adicione sua chave em ⚙.`
+          ? `Chave ${provider} ausente. Texto do plano usa Z.ai no servidor — define ZAI_API_KEY, ou adiciona chave em ⚙.`
           : `Chave ${provider} ausente.`,
       },
     });

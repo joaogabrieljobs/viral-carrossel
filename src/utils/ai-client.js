@@ -220,12 +220,13 @@ const callCompatibleChat = async (
   return json ? extractJSON(text) : text.trim();
 };
 
-// Texto incluso = Anthropic no servidor. Outros provedores só com chave própria;
-// sem chave, cai no texto incluso (não bloqueia o assinante).
+// Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
+// provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
 const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
   let provider = _aiRuntimeSettings.textProvider;
-  if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'anthropic';
-  if ((provider === 'zai' || provider === 'kimi') && !getProviderKey(provider)) provider = 'anthropic';
+  if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
+  if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
+  if (provider === 'kimi' && !getProviderKey('kimi')) provider = 'zai';
 
   if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens });
   if (provider === 'openai') {
@@ -237,11 +238,11 @@ const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = nul
   throw new Error('Provedor de texto inválido. Abra ⚙ e escolha uma opção.');
 };
 
-// Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic.
+// Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic (BYOK). Sem chave Anthropic,
+// a UI deve cair em callAI (Z.ai) sem web ao vivo.
 const callAIwithSearch = async (userMsg, { json = false, maxTokens = 4096 } = {}) => {
-  const status = await getServerStatus();
-  if (!status.anthropic && !getProviderKey('anthropic')) {
-    throw new Error('A pesquisa com web ao vivo precisa de uma chave Anthropic. Adicione-a em ⚙ → Chaves.');
+  if (!getProviderKey('anthropic')) {
+    throw new Error('Pesquisa web ao vivo precisa de chave Anthropic (opcional).');
   }
   return callAnthropic(userMsg, {
     json, maxTokens,

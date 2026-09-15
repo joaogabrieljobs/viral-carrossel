@@ -107,7 +107,7 @@ export default function Paywall({
           lineHeight: 1.5,
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
-          Texto e imagens inclusos no plano (Claude + GPT Image 2). No Essencial, imagens pedem chave própria em Configurações.
+          Texto (Z.ai) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.
         </p>
 
         <div style={{

@@ -14,27 +14,27 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Claude Haiku — texto incluso no plano',
-    textProvider: 'anthropic',
-    textModel: 'claude-haiku-4-5',
+    note: 'Z.ai Flash — texto incluso no plano',
+    textProvider: 'zai',
+    textModel: 'glm-4.7-flash',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
   {
     id: 'balanced',
     name: 'Equilíbrio',
-    note: 'Claude Sonnet — texto incluso no plano',
-    textProvider: 'anthropic',
-    textModel: 'claude-sonnet-5',
+    note: 'Z.ai GLM-4.7 — texto incluso no plano',
+    textProvider: 'zai',
+    textModel: 'glm-4.7',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
   {
     id: 'quality',
     name: 'Qualidade',
-    note: 'Claude Opus — texto incluso no plano',
-    textProvider: 'anthropic',
-    textModel: 'claude-opus-5',
+    note: 'Z.ai GLM-5.2 — texto incluso no plano',
+    textProvider: 'zai',
+    textModel: 'glm-5.2',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
@@ -168,8 +168,8 @@ export default function KeysModal({
 
   const requiredKeys = useMemo(() => {
     const ids = new Set();
-    // Anthropic = texto incluso (chave no servidor). Outros provedores exigem BYOK.
-    if (draft.textProvider && draft.textProvider !== 'anthropic') {
+    // Z.ai = texto incluso (chave no servidor). Outros provedores exigem BYOK.
+    if (draft.textProvider && draft.textProvider !== 'zai') {
       ids.add(draft.textProvider);
     }
     if (draft.useOwnImageKey) {
@@ -405,7 +405,7 @@ export default function KeysModal({
                             provider={provider}
                             selected={provider.id === draft.textProvider}
                             configured={Boolean(draft.keys[provider.id]?.trim())}
-                            statusLabel={provider.id === 'anthropic' ? 'Incluso no plano' : undefined}
+                            statusLabel={provider.id === 'zai' ? 'Incluso no plano' : undefined}
                             onClick={() => setTextProvider(provider.id)}
                           />
                         ))}
@@ -458,7 +458,7 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Claude) — sem chave.
+                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Z.ai) — sem chave.
                       </p>
                     ) : (
                       <>

@@ -63,6 +63,40 @@ export default defineConfig(({ mode }) => {
               await sjinnHandler(req, fakeRes);
               return;
             }
+            if (pathOnly === '/api/ai/compatible') {
+              try {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const rawBody = Buffer.concat(chunks).toString('utf8');
+                req.body = rawBody ? JSON.parse(rawBody) : {};
+              } catch {
+                req.body = {};
+              }
+              if (env.ZAI_API_KEY) process.env.ZAI_API_KEY = env.ZAI_API_KEY;
+              if (env.KIMI_API_KEY) process.env.KIMI_API_KEY = env.KIMI_API_KEY;
+              const fakeRes = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k, v) { this.headers[k] = v; },
+                status(code) { this.statusCode = code; return this; },
+                json(payload) {
+                  res.statusCode = this.statusCode;
+                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify(payload));
+                },
+                send(payload) {
+                  res.statusCode = this.statusCode;
+                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+                  res.end(typeof payload === 'string' ? payload : JSON.stringify(payload));
+                },
+                end(...args) { res.end(...args); },
+              };
+              process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
+              const { default: compatibleHandler } = await import('./api/ai/compatible.js');
+              await compatibleHandler(req, fakeRes);
+              return;
+            }
             return next();
           });
         },
@@ -123,6 +157,16 @@ export default defineConfig(({ mode }) => {
           target: 'https://api.z.ai',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/zai/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              if (!req.headers.authorization && env.ZAI_API_KEY) {
+                proxyReq.setHeader('Authorization', `Bearer ${env.ZAI_API_KEY}`);
+              }
+            });
+            proxy.on('proxyRes', (proxyRes) => {
+              proxyRes.headers['access-control-allow-origin'] = '*';
+            });
+          },
         },
         '/api/kimi': {
           target: 'https://api.moonshot.ai',
@@ -136,8 +180,10 @@ export default defineConfig(({ mode }) => {
             res.end(JSON.stringify({
               anthropic: !!env.ANTHROPIC_API_KEY,
               openai: !!env.OPENAI_API_KEY,
+              zai: !!env.ZAI_API_KEY,
               unsplash: !!env.UNSPLASH_ACCESS_KEY,
               pexels: !!env.PEXELS_API_KEY,
+              sjinn: !!env.SJINN_API_KEY,
               dev: true,
             }));
             return false;

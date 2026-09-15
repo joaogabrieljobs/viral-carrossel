@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'lucide-react';
 import { buildResearchPromptBias } from '../../utils/generation-prompts.js';
-import { getProviderKey, callAI, callAIwithSearch } from '../../utils/ai-client.js';
-import { getAIRuntimeSettings } from '../../utils/ai-client.js';
+import { callAI, callAIwithSearch } from '../../utils/ai-client.js';
 
 const PRESET_NICHES = [
   'Marketing digital','Empreendedorismo','Finanças pessoais','Saúde mental',
@@ -47,10 +46,6 @@ REGRAS:
       setData(r);
       onSetNiche?.(niche);
     } catch (e1) {
-      if (!getProviderKey(getAIRuntimeSettings().textProvider)) {
-        setErr(e1.message || String(e1));
-        return;
-      }
       try {
         const r = await callAI(
           `${buildResearchUserPrompt()}
@@ -63,7 +58,7 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
         setDegraded(true);
         onSetNiche?.(niche);
       } catch (e2) {
-        setErr(e2.message || String(e2));
+        setErr(e2.message || e1.message || String(e2));
       }
     } finally { setBusy(false); }
   };

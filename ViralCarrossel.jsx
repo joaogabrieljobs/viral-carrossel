@@ -1192,14 +1192,14 @@ export default function App() {
     );
   // Nome legado (`hasOpenAI`): pode gerar imagem (plataforma ou BYOK avançado).
   const hasOpenAI = useOwnImageKey ? hasByokImageKey : platformImageAllowed;
-  const hasAnthropic = serverStatus.anthropic || !!anthropicKey || !!access.active || !!access.billingDisabled;
-  // Texto incluso no plano (Anthropic no servidor). BYOK só se o user escolheu outro provedor.
+  const hasAnthropic = !!anthropicKey;
+  // Texto incluso no plano = Z.ai no servidor. Assinante não precisa de chave.
   const hasAnyAI =
     !!access.active
     || !!access.billingDisabled
     || !!aiSettings.keys[selectedTextProvider]
     || (selectedTextProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai)
-    || (selectedTextProvider === 'anthropic' && hasAnthropic);
+    || (selectedTextProvider === 'zai');
   const [niche, setNiche] = useState('');
 
   // Tour guiado — primeira visita (pode repetir pela ajuda)
