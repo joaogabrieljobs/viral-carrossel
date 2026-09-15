@@ -16,7 +16,7 @@ Regressão permanente dos 4 endurecimentos de 2026-08-07 (RF-12..RF-14 + gate do
 - [ ] CA-01 (RF-12): origin fora da allowlist não recebe `Access-Control-Allow-Origin` em endpoint de billing; origin permitido recebe + `Vary: Origin`
 - [ ] CA-02 (RF-13): sem `ACCESS_COOKIE_SECRET`, emissão de token lança erro explícito (sem fallback pra `STRIPE_SECRET_KEY`)
 - [ ] CA-03 (RF-14): `BILLING_DISABLED=true` + `VERCEL_ENV=production` → sessão NÃO libera acesso; em não-prod libera com flag
-- [ ] CA-04: proxy Anthropic — anônimo sem chave própria → 401 (não consome env-key); com sessão → usa env-key; com chave própria → passa sem sessão
+- [ ] CA-04: proxy Anthropic — anônimo sem chave própria → 401 (não consome env-key); com sessão → usa env-key; com chave própria **mas sem sessão → 401** (gate antes da chave; ver `tests/integration/seguranca.test.js`)
 - [ ] CA-05: zero rede real (fetch stubado no proxy)
 
 ## 7. Validação
@@ -31,4 +31,4 @@ npm test && npm run build
 Revert; só teste.
 
 ## 10. Fora de escopo
-Rate limit (não implementado — registrar como pergunta futura), CORS do E2E.
+CORS do E2E. (Rate limit em memória por IP foi implementado depois em `api/lib/rate-limit.js`; testes em `tests/integration/proxies-ia.test.js` cobrem os proxies IA.)

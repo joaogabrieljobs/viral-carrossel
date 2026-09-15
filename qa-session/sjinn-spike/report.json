@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "startedAt": "2026-09-14T12:31:56.676Z",
+  "finishedAt": "2026-09-14T12:33:20.454Z",
+  "wallMs": 81802,
+  "wallSec": 81.8,
+  "tool_type": "gpt-image-2-api",
+  "credits_expected": 100,
+  "credits_observed": 100,
+  "credits": {
+    "httpStatus": 200,
+    "match": {
+      "id": "7c3fbe19-87ad-4e23-85e2-f3489065a32c",
+      "task_type": "tool_gpt-image-2-api",
+      "task_id": "5bf9a9aa-c035-43e3-985b-5d26c9e373a0",
+      "chat_id": null,
+      "cost_credits": 100,
+      "create_time": "2026-09-14T12:31:57.934126+00:00"
+    },
+    "latest": {
+      "id": "7c3fbe19-87ad-4e23-85e2-f3489065a32c",
+      "task_type": "tool_gpt-image-2-api",
+      "task_id": "5bf9a9aa-c035-43e3-985b-5d26c9e373a0",
+      "chat_id": null,
+      "cost_credits": 100,
+      "create_time": "2026-09-14T12:31:57.934126+00:00"
+    }
+  },
+  "aspect_ratio": "2:3",
+  "resolution": "1K",
+  "createMs": 3601,
+  "polls": 14,
+  "pollIntervalMs": 5000,
+  "taskId": "5bf9a9aa-c035-43e3-985b-5d26c9e373a0",
+  "status": 1,
+  "outputUrls": [
+    "https://edit.comfyonline.app/result/96be3749-28c4-466a-ae2d-b288eb117bd4.png"
+  ],
+  "localPath": "/Users/elevessy/Documents/viral-carrossel/viral-carrossel/qa-session/sjinn-spike/gpt-image-2-2x3.png",
+  "downloadMeta": {
+    "bytes": 2189451,
+    "contentType": "application/octet-stream"
+  },
+  "createError": null,
+  "finalError": null,
+  "vercelNote": "Latência >55s — serverless default pode timeout; precisar maxDuration ou job async."
+}

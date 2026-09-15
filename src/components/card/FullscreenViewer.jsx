@@ -62,7 +62,12 @@ function presentationImgAdjustEquivalent(a, b) {
 function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust, creativePreset = 'livre' }) {
   useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
-  const [size, setSize] = useState({ w:0, h:0 });
+  // Medida inicial real: com {w:0,h:0} o primeiro frame usava scale 0.8 e o card
+  // transbordava o ecrã do telemóvel (bug 2026-09-15).
+  const [size, setSize] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 0,
+    h: typeof window !== 'undefined' ? window.innerHeight : 0,
+  }));
   const [photoAdjustOpen, setPhotoAdjustOpen] = useState(false);
   /** Rascunho da tela cheia: apenas slides com entrada explícita; ausente = usar `slide.presentationImgAdjust`. */
   const [imgAdjBySlide, setImgAdjBySlide] = useState({});
@@ -171,7 +176,9 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
     (size.h - padding * 2 - bottomReserve) / f.h,
     1,
   );
-  const realScale = Number.isFinite(scale) && scale > 0 ? scale : 0.8;
+  const realScale = Number.isFinite(scale) && scale > 0
+    ? scale
+    : Math.min(1, Math.max(0.1, ((typeof window !== 'undefined' ? window.innerWidth : 390) - padding * 2) / f.w));
 
   const onTouchStart = e => { touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
   const onTouchEnd = e => {

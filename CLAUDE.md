@@ -1,10 +1,10 @@
 # Viral. Carrossel Studio
 
-Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** (`viral-carrossel.vercel.app`). Netlify aposentado em 2026-08-07 — só redireciona 301. Sem banco — cookie `vc_access` + Stripe são a fonte da verdade.
+Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** (`viral-carrossel.vercel.app`). Netlify aposentado em 2026-08-07 — só redireciona 301. Sem banco de utilizadores — cookie `vc_access` + Stripe são a fonte da verdade de acesso; Upstash Redis só guarda a quota mensal de imagens SJinn (`api/lib/image-quota.js`).
 
 ## Documentos de contexto (spec-driven)
 
-- Auditorias: docs/audit.md (infra/billing) · docs/audit-produto.md (agentes IA, prompts, design, navegação + backlog)
+- Auditorias: docs/audit.md (infra/billing) · docs/audit-produto.md (2026-08-07, histórico) · **docs/audit-ia-2026-09-15.md** (prompts, fluxos IA, proxies, testes — baseline actual)
 - PRD: docs/product/PRD-suite-testes-confianca.md
 - TDD: docs/engineering/TDD-suite-testes-confianca.md
 - Épicos e specs: docs/epics/

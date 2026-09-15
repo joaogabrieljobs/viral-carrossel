@@ -23,8 +23,9 @@ describe('shared plans', () => {
 });
 
 describe('plans resolve', () => {
-  it('price desconhecido cai em creator (legado R$97)', () => {
-    expect(resolveTierFromPriceId('price_unknown')).toBe('creator');
+  it('price desconhecido cai em essential; STRIPE_PRICE_ID legado continua creator', () => {
+    expect(resolveTierFromPriceId('price_unknown')).toBe('essential');
+    expect(resolveTierFromPriceId('price_test_fake')).toBe('creator');
     expect(imageQuotaForTier('creator')).toBe(50);
     expect(getPlan('essential').priceBRL).toBe(19.9);
   });

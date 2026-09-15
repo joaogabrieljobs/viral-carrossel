@@ -28,10 +28,12 @@ export function buildPriceIdToTierMap() {
   return map;
 }
 
+/** Price sem mapeamento cai no tier SEM imagens — antes caía em `creator` (50 imagens) (auditoria A5).
+ *  `STRIPE_PRICE_ID` legado continua a mapear para creator via buildPriceIdToTierMap. */
 export function resolveTierFromPriceId(priceId) {
-  if (!priceId) return 'creator';
+  if (!priceId) return 'essential';
   const map = buildPriceIdToTierMap();
-  return map.get(cleanEnv(priceId)) || 'creator';
+  return map.get(cleanEnv(priceId)) || 'essential';
 }
 
 export function resolveTierFromSubscription(sub) {

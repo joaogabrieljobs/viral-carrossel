@@ -14,6 +14,7 @@ import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowSca
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
+import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
@@ -529,7 +530,7 @@ const ClassicCanvasInner = React.forwardRef(({
                 <span style={{
                   flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                }}>{brand.handle}</span>
+                }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
                 <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>
@@ -947,7 +948,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
                 <span style={{
                   flex: 1, textAlign: 'center', fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF, fontWeight: 600,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{brand.handle}</span>
+                }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
                 <span style={{ fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>
@@ -1115,6 +1116,16 @@ const SlideCardInner = React.forwardRef(({
    * ela cobre o card, e empurrá-la deixaria faixa vazia na borda — o
    * deslocamento dela entra no `background-position` (reenquadra).
    */
+  /** Só o deslocamento gravado, sem handlers: usado com o chrome das zonas ligado
+   *  para o texto não «saltar» ao ligar/desligar «Mostrar zonas» (bug 2026-09-15). */
+  const movOffsetOnly = React.useCallback((chave, estiloBase) => {
+    const off = elementOffsetStyle(slide, chave, f);
+    if (!off) return estiloBase ? { style: estiloBase } : null;
+    const style = { ...(estiloBase || {}), ...off };
+    if (estiloBase?.transform) style.transform = `${estiloBase.transform} ${off.transform}`;
+    return { 'data-vc-movable': chave, style };
+  }, [slide, f]);
+
   const movArrasto = React.useCallback((chave, estiloBase) => {
     const drag = bindDrag(chave);
     if (!drag) return { style: estiloBase };
@@ -1224,6 +1235,10 @@ const SlideCardInner = React.forwardRef(({
 
   let inner;
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
+  // Zonas guardadas renderizam mesmo com a edição desativada — igual ao sanduíche.
+  // Antes, «Desativar composição» derrubava o card para o layout legado e a foto
+  // ajustada «saía do lugar» (bug 2026-09-15). Remover a composição = canvas null.
+  const cvHasZones = !!(slide.canvas && slide.canvas.zones && typeof slide.canvas.zones === 'object');
   const cvVar = slide.canvas?.variant;
   const cultureLayoutInferred = inferCanvasDefaults(slide, creativePreset);
   const cultureVariantForLayout = slide.canvas?.variant ?? cultureLayoutInferred.variant;
@@ -1282,7 +1297,7 @@ const SlideCardInner = React.forwardRef(({
             <span style={{
               flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-            }}>{brand.handle}</span>
+            }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
             <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
@@ -1567,7 +1582,7 @@ const SlideCardInner = React.forwardRef(({
             <span style={{
               flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-            }}>{brand.handle}</span>
+            }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
             <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
@@ -1859,7 +1874,7 @@ const SlideCardInner = React.forwardRef(({
         )}
       </div>
     );
-  } else if (cvEnabled && cvVar === 'classic') {
+  } else if (cvHasZones && cvVar === 'classic') {
     inner = (
       <ClassicCanvasInner
         ref={ref}
@@ -1894,10 +1909,10 @@ const SlideCardInner = React.forwardRef(({
         swapSlideIdx={enableZoneSwapDrag && showCanvasChrome ? slideIdx : null}
         swapZoneKeys={undefined}
         interactionScale={scale}
-        mov={showCanvasChrome ? null : mov}
+        mov={showCanvasChrome ? movOffsetOnly : mov}
       />
     );
-  } else if (normalizePhotoRegion(slide) !== 'full' && !cvEnabled && !(sandwich || cultureStatFlat)) {
+  } else if (normalizePhotoRegion(slide) !== 'full' && !cvHasZones && !(sandwich || cultureStatFlat)) {
     inner = (
       <ClassicLegadoInsetPhotoColumn
         ref={ref}
@@ -1979,14 +1994,14 @@ const SlideCardInner = React.forwardRef(({
           (Sports Editorial etc) em modo full-bleed (não-Cultura). Já existe
           variante no renderer Cultura; aqui é versão simplificada pra classic. */}
       {(() => {
-        const hLeft  = (brand.cultureHeaderLeft  || '').trim();
-        // Centro: se preset setar explicitamente (mesmo ''), respeita.
-        // Senão (undefined/null), fallback pro handle do user.
-        const hCenter = (typeof brand.cultureHeaderCenter === 'string'
-          ? brand.cultureHeaderCenter
-          : (brand.handle || '')).trim();
-        const hRight = (brand.cultureHeaderYear  || '').trim();
-        const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && brand.cultureHeaderLeft);
+        // Colunas sem repetir o @username: o chip já o mostra; e '{handle}' à esquerda
+        // + fallback do centro davam o mesmo nome três vezes (bug 2026-09-15).
+        const { left: hLeft, center: hCenter, right: hRight } = dedupeHeaderColumns({
+          left: brand.cultureHeaderLeft,
+          center: headerCenterText(brand, slide, hideInstaBadge),
+          right: brand.cultureHeaderYear,
+        }, brand, slide, hideInstaBadge);
+        const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && !!(brand.cultureHeaderLeft || '').trim());
         const hasPageBadge = !!brand.showPageBadge;
         if (!hasHeaderBar && !hasPageBadge) return null;
         // Cor branca translúcida quando há foto BG; senão tom da marca.
@@ -2087,7 +2102,7 @@ const SlideCardInner = React.forwardRef(({
                 <span style={{
                   flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                }}>{brand.handle}</span>
+                }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
                 <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>

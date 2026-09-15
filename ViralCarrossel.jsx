@@ -279,6 +279,9 @@ import {
   canvasZonesFontScalePatch,
   sandwichPhotoZoneImgStyle,
   attachGenerationCanvasLayouts,
+  enableCanvasLayoutSlides,
+  disableCanvasLayoutSlides,
+  removeCanvasLayoutSlides,
 } from './src/utils/canvas-zones.js';
 import {
   CARD_VISUAL_STYLE_IDS,
@@ -1751,27 +1754,23 @@ export default function App() {
   }, [setSlides, toast]);
 
   const enableCanvasLayout = useCallback(() => {
-    setSlides((prev) =>
-      prev.map((s) => {
-        const d = inferCanvasDefaults(s, creativePreset);
-        return {
-          ...s,
-          canvas: {
-            enabled: true,
-            variant: d.variant,
-            zones: { ...d.zones },
-          },
-        };
-      }),
-    );
+    // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
+    setSlides((prev) => enableCanvasLayoutSlides(prev, creativePreset));
     setCanvasEditMode(true);
     toast('Composição ativada em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
   }, [creativePreset, setSlides, toast]);
 
   const disableCanvasLayout = useCallback(() => {
-    setSlides((prev) => prev.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false } } : s)));
+    // Só sai do modo de edição: o card continua a renderizar a composição (zonas guardadas).
+    setSlides((prev) => disableCanvasLayoutSlides(prev));
     setCanvasEditMode(false);
-    toast('Composição desativada (as zonas ficam guardadas).', 'info');
+    toast('Edição da composição desativada — o layout ajustado fica no card.', 'info');
+  }, [setSlides, toast]);
+
+  const removeCanvasLayout = useCallback(() => {
+    setSlides((prev) => removeCanvasLayoutSlides(prev));
+    setCanvasEditMode(false);
+    toast('Composição removida — cards voltaram ao layout padrão.', 'info');
   }, [setSlides, toast]);
 
   const swapCanvasZoneContent = useCallback((toIdx, raw) => {
@@ -2011,13 +2010,14 @@ export default function App() {
     cardVisualStyle: cardStyleArg,
     fetchImagesNow = true,
   }) => {
-    // Captura args pra Remix com tom alternativo (B1) — não inclui fetchImagesNow nem chosenMode
-    // pra que o remix herde os defaults atuais.
+    // Captura args pra Remix com tom alternativo (B1). Guarda também fetchImagesNow:
+    // quem gerou "só texto" não pode ver o remix consumir quota de imagens (auditoria M5).
     lastGenerateArgsRef.current = {
       topic, count, niche: n, tone, audience,
       imgParams: axes, mode: chosenNarrativeMode,
       creativePreset: presetArg, slideTextDensity: densityArg,
       cardVisualStyle: cardStyleArg,
+      fetchImagesNow,
     };
     setHasLastGenerate(true);
     trackEvent('carousel_generate_start', {
@@ -2113,7 +2113,9 @@ JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;
 
     setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Escrevendo texto dos slides…' });
-    const result = await callAI(prompt, { json:true, maxTokens:4096, openaiKey });
+    // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
+    const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
+    const result = await callAI(prompt, { json:true, maxTokens: genMaxTokens, openaiKey });
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
@@ -2238,6 +2240,7 @@ ${jsonShapeLine}`;
     imgGenAbortRef.current = abort;
 
     let imgFailCount = 0;
+    let imgQuotaStop = false;
 
     if (fetchImagesNow) {
       if (hasOpenAI) {
@@ -2261,13 +2264,19 @@ ${jsonShapeLine}`;
             console.warn(`Image gen slide ${i+1}:`, e.message);
             if (!abort.cancelled)
               setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImageFailed: true } : sl));
+            // Quota esgotada / plano sem imagens / sessão: os restantes cards falhariam igual — pára aqui (auditoria H6).
+            if (['quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
+              if (!abort.cancelled) toast(e.message, 'error', 7000);
+              imgQuotaStop = true;
+              break;
+            }
           }
           doneImgs++;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
         }
       }
 
-      if (!abort.cancelled && imgFailCount > 0) {
+      if (!abort.cancelled && imgFailCount > 0 && !imgQuotaStop) {
         toast(
           imgFailCount === 1
             ? '1 imagem não carregou após retry — toque na área da foto para tentar de novo.'
@@ -2371,7 +2380,7 @@ ${buildCaptionOutlineInstructions(mode)}
 REGRAS:
 ${capRules}
 - 8-12 linhas de texto. Use quebras de linha para ritmo.
-- Adicionar no final 8-12 hashtags estratégicas ao nicho.
+- Hashtags no final, na quantidade indicada nas REGRAS acima.
 - Respeite a identidade verbal e o material acima. Se houver assinatura recorrente, finalize com ela quando fizer sentido.
 - Apenas a legenda e as hashtags, nada mais.`,
         { openaiKey }
@@ -2428,7 +2437,11 @@ ${capRules}
     const blendedTone = (prev.tone || '').trim()
       ? `${prev.tone} — variação solicitada: ${toneHint}`
       : `Variação solicitada: ${toneHint}`;
-    await handleGenerate({ ...prev, tone: blendedTone });
+    try {
+      await handleGenerate({ ...prev, tone: blendedTone });
+    } catch (e) {
+      toast(e?.message || 'Não foi possível refazer com o novo tom.', 'error', 6000);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
 
@@ -2437,9 +2450,11 @@ ${capRules}
     if (!slides.length) return;
     setRefining(true);
     try {
+      const refineAllHybrid = isPersoHybridDensity(creativePreset, slideTextDensity);
+      const refineAllWantsBody = isTendenciaCulturaPreset(creativePreset) || refineAllHybrid;
       const ctx = slides.map((s, i) =>
         `${i + 1}. Título: "${s.title}" | Subtítulo: "${s.subtitle}"${
-          isTendenciaCulturaPreset(creativePreset) ? ` | bodyAfterImage: ${JSON.stringify(s.bodyAfterImage ?? '')}` : ''
+          refineAllWantsBody ? ` | bodyAfterImage: ${JSON.stringify(s.bodyAfterImage ?? '')}` : ''
         }`,
       ).join('\n');
       const brandBlock = buildBrandBlock(brand);
@@ -2460,12 +2475,12 @@ REGRAS DE VOZ:
 ${voiceBulk}
 ${buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity)}
 - PROIBIDO "Slide N" / "Card N" como título ou abertura de texto — só conteúdo editorial.
-- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
+${refineAllHybrid ? '- Layout Personalizado (1/1 ou 1/2): do 3.º slide em diante o card é sanduíche — reescreva também "bodyAfterImage" (payoff abaixo da foto) mantendo o campo vazio nos slides 1–2.\n' : ''}- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
 ${layoutBulk}
 
-Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
+Retorne APENAS JSON: ${refineAllWantsBody
           ? '{"slides":[{"title":"...","subtitle":"...","bodyAfterImage":"..."}]}'
           : '{"slides":[{"title":"...","subtitle":"..."}]}'}`,
         { json:true, openaiKey }
@@ -2567,7 +2582,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     const abort = { cancelled: false };
     imgGenAbortRef.current = abort;
     (async () => {
-      if (!hasOpenAI || !String(openaiKey || '').trim()) return;
+      // Modo plano (SJinn) não usa chave OpenAI — o gate antigo por `openaiKey` deixava templates sem foto (auditoria H7).
+      if (!hasOpenAI) return;
       let failCount = 0;
       for (let i = 0; i < tpl.slides.length; i++) {
         if (abort.cancelled) break;
@@ -2697,6 +2713,8 @@ Retorne APENAS JSON: ${isTendenciaCulturaPreset(creativePreset)
     canvasEditMode, setCanvasEditMode,
     showPreviewAlignGrid, setShowPreviewAlignGrid,
     anyCanvasEnabled: slides.some((s) => s.canvas?.enabled),
+    anyCanvasSaved: slides.some((s) => !!s.canvas?.zones),
+    removeCanvasLayout,
     patchCanvasZonesAt,
     openPhotoZoneImport,
     handleBatchPhotos,

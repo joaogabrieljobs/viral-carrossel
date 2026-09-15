@@ -1,6 +1,6 @@
 # Stripe — assinatura individual Viral.
 
-> **Atualização de produto (2026-09-14):** o modelo passa a **4 planos** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com **imagens inclusas via SJinn** nos tiers pagos e quota mensal. Texto continua BYOK. Spec completa: [`docs/product/PRD-planos-imagem-sjinn.md`](./product/PRD-planos-imagem-sjinn.md). A secção abaixo descreve o modelo **legado** ainda em produção até o épico ser implementado.
+> **Atualização de produto (2026-09-14):** o modelo passa a **4 planos** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com **imagens inclusas via SJinn** nos tiers pagos e quota mensal. Texto incluso via Z.ai no servidor (`ZAI_API_KEY`, proxy `/api/ai/compatible` com allowlist de modelos); BYOK (Anthropic/OpenAI/Kimi/Z.ai próprio) continua opcional. Spec completa: [`docs/product/PRD-planos-imagem-sjinn.md`](./product/PRD-planos-imagem-sjinn.md). A secção abaixo descreve o modelo **legado** ainda em produção até o épico ser implementado.
 
 ## Modelo (legado — 1 plano)
 
@@ -66,7 +66,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 3. Authorized redirect URIs: `https://viral-carrossel.vercel.app/api/auth/google/callback`
 4. Colar Client ID + Client Secret nas env da Vercel e redeploy
 
-Manter `ANTHROPIC_API_KEY` se quiseres fallback no proxy; o modelo principal continua BYOK no browser.
+`ZAI_API_KEY` é obrigatória (texto incluso no plano). `ANTHROPIC_API_KEY` é opcional — fallback no proxy `/api/anthropic/v1/messages` para assinantes sem chave própria (o cliente actual só chama esse proxy com chave própria).
 
 ## Dev local
 

@@ -454,7 +454,33 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
   });
 }
 
+/**
+ * «Ativar composição»: se o slide já tem zonas guardadas, reutiliza-as (o utilizador
+ * pode ter arrastado a foto antes de desativar). Só infere defaults na primeira vez.
+ */
+function enableCanvasLayoutSlides(slides, creativePreset) {
+  return slides.map((s) => {
+    const hasSaved = !!(s.canvas?.zones && typeof s.canvas.zones === 'object' && s.canvas.variant);
+    if (hasSaved) return { ...s, canvas: { ...s.canvas, enabled: true } };
+    const d = inferCanvasDefaults(s, creativePreset);
+    return { ...s, canvas: { enabled: true, variant: d.variant, zones: { ...d.zones } } };
+  });
+}
+
+/** «Desativar composição»: sai do modo de edição, mantém zonas e render composto. */
+function disableCanvasLayoutSlides(slides) {
+  return slides.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false } } : s));
+}
+
+/** «Remover composição»: volta ao layout padrão (full-bleed / photoRegion). */
+function removeCanvasLayoutSlides(slides) {
+  return slides.map((s) => (s.canvas ? { ...s, canvas: null } : s));
+}
+
 export {
+  enableCanvasLayoutSlides,
+  disableCanvasLayoutSlides,
+  removeCanvasLayoutSlides,
   slideAutoAdjustPatch,
   DEFAULT_CANVAS_ZONES_COVER_FULLBLEED,
   slideHasPendingPhotoIntent,

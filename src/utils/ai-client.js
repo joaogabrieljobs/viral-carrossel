@@ -8,6 +8,13 @@ import { DEFAULT_AI_SETTINGS, normalizeAISettings } from '../config/ai-providers
 import { getServerStatus } from './server-status.js';
 import { extractJSON } from './parsers.js';
 import { buildImgParamsTagsEN } from './generation-prompts.js';
+import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
+
+const TEXT_TIMEOUT_MS = 90_000;
+const textTimeoutSignal = () => {
+  const AS = globalThis.AbortSignal; // via globalThis: scripts/check-undefined.mjs não conhece o global
+  return AS && typeof AS.timeout === 'function' ? AS.timeout(TEXT_TIMEOUT_MS) : undefined;
+};
 
 // ─── AI BACKENDS ──────────────────────────────────────────────────────────────
 // Detecta se está rodando localmente (Vite dev) — nesse caso usa o proxy
@@ -33,6 +40,11 @@ const COMPATIBLE_AI_URL = '/api/ai/compatible';
 /** Converte "Failed to fetch" numa mensagem acionável (CORS, preview sem proxy, rede). */
 function enhanceNetworkError(err, label) {
   const m = (err && err.message) ? err.message : String(err);
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+    const t = new Error(`${label}: a resposta demorou demasiado. Tente de novo.`);
+    t.isNetwork = true;
+    return t;
+  }
   if (!/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
     return err instanceof Error ? err : new Error(m);
   }
@@ -56,7 +68,22 @@ function enhanceNetworkError(err, label) {
     hint =
       'Erro de rede ao chamar a API de IA. Verifique sua conexão e se as chaves no ⚙ estão corretas.';
   }
-  return new Error(`${label}: falha de rede. ${hint}`);
+  const out = new Error(`${label}: falha de rede. ${hint}`);
+  out.isNetwork = true; // lido por generateDALLEWithRetry — a mensagem traduzida não casa com o regex antigo (auditoria M7)
+  return out;
+}
+
+/** 401/402 vindos do gate de sessão do proxy — não são erro do provedor (auditoria H3). */
+function sessionGateError(status, data) {
+  if (status !== 401 && status !== 402) return null;
+  const e = new Error(
+    status === 401
+      ? 'Sessão expirada. Faça login pela assinatura para usar a IA.'
+      : String(data?.error?.message || data?.error || 'Assinatura inativa. Renove o plano para continuar.'),
+  );
+  e.status = status;
+  e.code = status === 401 ? 'session_required' : 'subscription_inactive';
+  return e;
 }
 
 const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês.';
@@ -92,6 +119,7 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
       credentials: 'include',
       headers,
       body: JSON.stringify(body),
+      signal: textTimeoutSignal(),
     });
   } catch (e) {
     throw enhanceNetworkError(e, 'Claude');
@@ -106,6 +134,10 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   try { data = JSON.parse(raw); }
   catch { throw new Error(`Resposta inválida (HTTP ${res.status})`); }
   if (!res.ok || data.error) {
+    if (USE_ANTHROPIC_PROXY && !IS_LOCAL_DEV) {
+      const gate = sessionGateError(res.status, data);
+      if (gate) throw gate;
+    }
     const e = new Error(data?.error?.message || `Anthropic HTTP ${res.status}`);
     e.status = res.status;
     throw e;
@@ -145,6 +177,7 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal: textTimeoutSignal(),
     });
   } catch (e) {
     throw enhanceNetworkError(e, 'OpenAI');
@@ -171,7 +204,7 @@ const COMPATIBLE_DIRECT_URLS = {
   kimi: '/api/kimi/v1/chat/completions',
 };
 
-const ZAI_FALLBACK_MODELS = ['glm-4.7', 'glm-4.6', 'glm-4.5', 'glm-4-plus', 'glm-5.2'];
+// ZAI_FALLBACK_MODELS vem de shared/ai-models.js (mesma lista que o proxy permite).
 
 function isZaiOverloadError(status, data, raw) {
   if (status === 429) return true;
@@ -237,9 +270,20 @@ const callCompatibleChat = async (
         credentials: 'include',
         headers,
         body: JSON.stringify(body),
+        signal: textTimeoutSignal(),
       });
     } catch (error) {
       throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
+    }
+
+    // 429 do rate-limiter do PROXY (traz Retry-After) — não é overload da Z.ai; cascatear
+    // só multiplicava pedidos contra o mesmo limite (auditoria H3).
+    const retryAfter = res.headers?.get?.('retry-after');
+    if (!useDirect && res.status === 429 && retryAfter) {
+      const e = new Error(`Muitos pedidos seguidos. Aguarde ${retryAfter}s e tente de novo.`);
+      e.status = 429;
+      e.code = 'rate_limited';
+      throw e;
     }
 
     const raw = await res.text();
@@ -251,6 +295,10 @@ const callCompatibleChat = async (
     }
 
     if (!res.ok || data.error) {
+      if (!useDirect) {
+        const gate = sessionGateError(res.status, data);
+        if (gate) throw gate;
+      }
       lastError = new Error(translateProviderError(provider, res.status, data, raw));
       // Flash/grátis em overload → tenta modelo pago seguinte.
       if (provider === 'zai' && isZaiOverloadError(res.status, data, raw) && i < modelCandidates.length - 1) {
@@ -358,13 +406,24 @@ async function blobFromSlideRef(refImage) {
 }
 
 /** Prompt completo para GPT Image (geração ou edição com referência). */
-function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference = false } = {}) {
+function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference = false, priorityFirst = false } = {}) {
   const safeTheme = (q || '').slice(0, 280);
   const axisTags = buildImgParamsTagsEN(imgParams);
-  const extra = (imgExtraPrompt || '').trim().slice(0, 2000);
+  const extra = (imgExtraPrompt || '').trim().slice(0, priorityFirst ? 1200 : 2000);
   const refLead = withReference
     ? 'REFERENCE IMAGE IS ATTACHED: Preserve brand/product identity — palette, materials, proportions, packaging style, typography mood. Produce a NEW editorial photograph suitable as a carousel slide background with generous negative space for headline/body text; reinterpret in a fresh scene aligned with the theme — do not output a flat crop of the reference alone.\n\n'
     : '';
+  if (priorityFirst) {
+    // Caminho SJinn corta a 4000 chars: o que importa (tema, marca, regras duras) vai à frente
+    // e o art-direction longo fica no fim, onde um corte custa menos (auditoria H8).
+    let head =
+      `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
+      refLead +
+      (extra ? `BRAND / CLIENT DIRECTION (priority — incorporate faithfully):\n${extra}\n\n` : '') +
+      'HARD RULES: photorealistic real-photograph rendering; generous text-friendly negative space; strictly no text, no captions, no watermarks, no logos inside the image.\n\n' +
+      'ART DIRECTION (follow as far as it fits the theme):\n';
+    return head + GPT_IMAGE_ART_DIRECTION;
+  }
   let body =
     `${GPT_IMAGE_ART_DIRECTION}\n\n` +
     refLead +
@@ -518,7 +577,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
   if (options?.refImage) {
     console.warn('[img] Referência ignorada no modo plano (requer URL pública).');
   }
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, priorityFirst: true });
   let res;
   try {
     res = await fetch('/api/ai/sjinn-image', {
@@ -536,9 +595,17 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    const gate = sessionGateError(res.status, data);
+    if (gate && !data.code) throw Object.assign(gate, { platformImage: true });
     const err = new Error(data.error || `HTTP ${res.status}`);
     err.code = data.code;
     err.quota = data.quota;
+    err.status = res.status;
+    err.platformImage = true; // o servidor já reembolsou/decidiu — não retentar (auditoria C3)
+    // Quota esgotada / plano sem imagem: actualiza o estado da UI também em erro (auditoria H6).
+    if (typeof window !== 'undefined' && data.quota) {
+      window.dispatchEvent(new CustomEvent('vc:image-quota', { detail: { ...data.quota, tier: data.tier || data.quota.tier } }));
+    }
     throw err;
   }
   if (!data.b64_json) throw new Error('Plataforma não devolveu a imagem.');
@@ -649,9 +716,14 @@ const generateDALLEWithRetry = async (q, apiKey, imgParams = null, options = {},
     } catch (e) {
       lastErr = e;
       const msg = String(e?.message || '');
+      // Erros do endpoint do plano (quota, sessão, sjinn_*) já foram decididos no servidor — retentar
+      // duplicava o débito de crédito (auditoria C3/H6). Só rede transitória volta a tentar.
       const isRetriable =
-        e instanceof TypeError ||
-        /HTTP\s*5\d\d|429|rate.?limit|timeout|network|fetch/i.test(msg);
+        e?.isNetwork === true ||
+        (!e?.platformImage && !e?.code && (
+          e instanceof TypeError ||
+          /HTTP\s*5\d\d|429|rate.?limit|timeout|network|fetch/i.test(msg)
+        ));
       if (!isRetriable || attempt === retries) throw e;
       await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
     }
@@ -682,6 +754,7 @@ export {
   callCompatibleChat,
   callAI,
   callAIwithSearch,
+  ZAI_FALLBACK_MODELS,
   GPT_IMAGE_ART_DIRECTION,
   dataUrlToBlob,
   blobFromSlideRef,

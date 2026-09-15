@@ -3,9 +3,15 @@
  * Docs: https://sjinn.ai/docs/api/tool
  */
 
+import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
+
 const BASE = 'https://sjinn.ai/api/un-api';
 const POLL_MS = 5_000;
-const MAX_ATTEMPTS = 30; // ~2.5 min (imagens GPT Image 2 costumam 60–90s)
+const MAX_ATTEMPTS = 30;
+/** Deadline absoluta do polling. Tem de ficar abaixo do `maxDuration` de api/ai/sjinn-image.js (120 s)
+ *  com folga para download + refund — senão a Vercel mata a função com o crédito já debitado (auditoria C3). */
+export const SJINN_DEADLINE_MS = 95_000;
+const SJINN_FETCH_TIMEOUT_MS = 15_000;
 
 function apiKey() {
   return String(process.env.SJINN_API_KEY || '').trim();
@@ -25,6 +31,7 @@ async function sjinnFetch(path, body) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(SJINN_FETCH_TIMEOUT_MS),
   });
   const json = await res.json().catch(() => ({}));
   return { httpStatus: res.status, json };
@@ -53,10 +60,20 @@ export async function createGptImage2Task({ prompt, aspectRatio = '2:3', resolut
   return json.data.task_id;
 }
 
-export async function waitForSjinnTask(taskId, { pollMs = POLL_MS, maxAttempts = MAX_ATTEMPTS } = {}) {
+export async function waitForSjinnTask(
+  taskId,
+  { pollMs = POLL_MS, maxAttempts = MAX_ATTEMPTS, deadlineMs = SJINN_DEADLINE_MS } = {},
+) {
+  const startedAt = Date.now();
+  const timeout = () => {
+    const err = new Error('A geração de imagem demorou demasiado. Tente de novo.');
+    err.code = 'sjinn_timeout';
+    return err;
+  };
   for (let i = 0; i < maxAttempts; i++) {
     // Primeiro poll imediato — evita 5s mortos no início.
     if (i > 0) await new Promise((r) => setTimeout(r, pollMs));
+    if (Date.now() - startedAt > deadlineMs) throw timeout();
     const { json } = await sjinnFetch('/query_tool_task_status', { task_id: taskId });
     const status = json?.data?.status;
     if (status === 1) return json.data;
@@ -82,7 +99,9 @@ export function extractSjinnOutputUrl(data) {
 }
 
 export async function downloadImageAsBase64(url) {
-  const res = await fetch(url, { redirect: 'follow' });
+  // Revalida a URL devolvida pelo upstream (mesmo padrão de api/ai/compatible.js).
+  const safe = assertPublicHttpUrl(url);
+  const res = await fetch(safe, { redirect: 'error', signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`Download da imagem falhou (${res.status})`);
   const mime = (res.headers.get('content-type') || 'image/png').split(';')[0].trim() || 'image/png';
   const bytes = Buffer.from(await res.arrayBuffer());

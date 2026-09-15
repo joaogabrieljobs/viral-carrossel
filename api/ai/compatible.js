@@ -12,6 +12,20 @@ import { applyCors } from '../lib/cors.js';
 import { requireActiveSubscription } from '../lib/require-access.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
+import {
+  isPlatformModelAllowed,
+  PLATFORM_MAX_TOKENS,
+  PLATFORM_MAX_PROMPT_CHARS,
+} from '../../shared/ai-models.js';
+
+/** Tecto da função; o fetch upstream aborta antes (UPSTREAM_TIMEOUT_MS). */
+export const config = { maxDuration: 60 };
+const UPSTREAM_TIMEOUT_MS = 50_000;
+
+function messagesChars(payload) {
+  const msgs = Array.isArray(payload?.messages) ? payload.messages : [];
+  return msgs.reduce((n, m) => n + String(typeof m?.content === 'string' ? m.content : JSON.stringify(m?.content ?? '')).length, 0);
+}
 
 function readBody(req) {
   if (!req.body) return {};
@@ -54,7 +68,14 @@ export default async function handler(req, res) {
     : provider === 'kimi'
       ? String(process.env.KIMI_API_KEY || '').trim()
       : '';
-  const resolvedKey = String(apiKey || '').trim() || envKey;
+  const userKey = String(apiKey || '').trim();
+  // Imagens só com chave do utilizador: a chave da plataforma não tem quota neste endpoint (auditoria C2).
+  if (operation === 'images' && !userKey) {
+    return res.status(400).json({
+      error: { message: 'Geração de imagem por este provedor exige a sua própria chave (Configurar IA → Avançado).' },
+    });
+  }
+  const resolvedKey = userKey || envKey;
   if (!resolvedKey) {
     return res.status(400).json({
       error: {
@@ -67,6 +88,22 @@ export default async function handler(req, res) {
   if (!payload || typeof payload !== 'object') {
     return res.status(400).json({ error: { message: 'Payload ausente.' } });
   }
+  // Chave da plataforma: allowlist de modelo, sem stream/tools, tectos de tokens e prompt (auditoria H4).
+  if (!userKey) {
+    if (!isPlatformModelAllowed(provider, payload.model)) {
+      return res.status(400).json({ error: { message: `Modelo "${String(payload.model || '')}" não disponível no plano. Use a sua chave em ⚙ para outros modelos.` } });
+    }
+    if (payload.stream || payload.tools || payload.functions || payload.tool_choice) {
+      return res.status(400).json({ error: { message: 'stream/tools não são suportados com a chave do plano.' } });
+    }
+    if (messagesChars(payload) > PLATFORM_MAX_PROMPT_CHARS) {
+      return res.status(413).json({ error: { message: 'Prompt demasiado longo. Reduza o material/fontes coladas.' } });
+    }
+    const requested = Number(payload.max_tokens);
+    payload.max_tokens = Number.isFinite(requested) && requested > 0
+      ? Math.min(requested, PLATFORM_MAX_TOKENS)
+      : Math.min(4096, PLATFORM_MAX_TOKENS);
+  }
 
   try {
     const attemptFetch = async () => fetch(target, {
@@ -76,16 +113,22 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     let upstream = await attemptFetch();
     let raw = await upstream.text();
 
-    // Retry único em overload transitório da Z.ai (1305 / 429).
+    // Retry único em overload transitório da Z.ai (1305 / 429) — só em resposta de ERRO;
+    // antes o regex corria sobre o conteúdo gerado e repetia chamadas 200 (auditoria H3).
+    const upstreamErrorCode = () => {
+      try { const j = JSON.parse(raw); return String(j?.error?.code || j?.code || ''); } catch { return ''; }
+    };
     if (
       provider === 'zai'
       && operation === 'chat'
-      && (upstream.status === 429 || /1305|overloaded|try again later/i.test(raw))
+      && !upstream.ok
+      && (upstream.status === 429 || upstreamErrorCode() === '1305')
     ) {
       await new Promise((r) => setTimeout(r, 1200));
       upstream = await attemptFetch();
@@ -114,6 +157,9 @@ export default async function handler(req, res) {
     return res.send(raw);
   } catch (error) {
     console.error(`[ai/compatible] ${provider}/${operation}`, error?.message || error);
-    return res.status(502).json({ error: { message: 'Falha ao conectar ao provedor de IA.' } });
+    const timedOut = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+    return res.status(timedOut ? 504 : 502).json({
+      error: { message: timedOut ? 'O provedor de IA demorou demasiado. Tente de novo.' : 'Falha ao conectar ao provedor de IA.' },
+    });
   }
 }

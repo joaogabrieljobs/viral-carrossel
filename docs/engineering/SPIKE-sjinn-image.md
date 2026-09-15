@@ -28,7 +28,7 @@ Artefacto: `qa-session/sjinn-spike/` (`report.json` + `gpt-image-2-2x3.png`)
 ## Z.ai
 
 **Não falta no `.env` para este spike nem para imagem plataforma.**  
-Z.ai continua **BYOK no browser** (Configurações → avançado). Chave Z.ai no servidor só faria sentido se no futuro a plataforma também oferecer Z.ai como provider pago nosso — **fora do MVP**.
+> Atualizado 2026-09-15: desde o commit 7f22504 o texto do plano usa **Z.ai no servidor** (`ZAI_API_KEY` via `/api/ai/compatible`, com allowlist de modelos e tectos de `max_tokens`). BYOK Z.ai continua possível em Configurações → avançado. A geração de **imagem** Z.ai por esse proxy exige chave própria (sem quota de plataforma).
 
 ## Próximo
 

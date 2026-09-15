@@ -26,6 +26,7 @@ import {
   waitForSjinnTask,
   downloadImageAsBase64,
   extractSjinnOutputUrl,
+  SJINN_DEADLINE_MS,
 } from '../lib/sjinn.js';
 
 export const config = {
@@ -67,7 +68,9 @@ export default async function handler(req, res) {
   const aspectRatio = ['1:1', '16:9', '9:16', '3:2', '2:3', 'auto'].includes(body.aspectRatio)
     ? body.aspectRatio
     : '2:3';
-  const resolution = ['1K', '2K', '4K'].includes(body.resolution) ? body.resolution : '1K';
+  // Modo plano é sempre 1K — custo por resolução não está no preço do plano (auditoria L3).
+  const resolution = '1K';
+  void body.resolution;
 
   let tier = 'creator';
   let periodStartSec = Math.floor(Date.now() / 1000);
@@ -138,7 +141,7 @@ export default async function handler(req, res) {
 
   try {
     const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution });
-    const data = await waitForSjinnTask(taskId);
+    const data = await waitForSjinnTask(taskId, { deadlineMs: SJINN_DEADLINE_MS });
     const url = extractSjinnOutputUrl(data);
     if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
@@ -154,6 +157,7 @@ export default async function handler(req, res) {
         remaining: consumed.remaining,
         tier,
       },
+      ...(consumed.degraded ? { quotaDegraded: true } : {}),
     });
   } catch (e) {
     console.error('[sjinn-image]', e?.message || e);

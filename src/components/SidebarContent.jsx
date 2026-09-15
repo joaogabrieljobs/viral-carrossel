@@ -158,6 +158,8 @@ function SidebarContent({
   canvasEditMode = false, setCanvasEditMode = () => {},
   showPreviewAlignGrid = false, setShowPreviewAlignGrid = () => {},
   anyCanvasEnabled = false,
+  anyCanvasSaved = false,
+  removeCanvasLayout = () => {},
   patchCanvasZonesAt = () => {},
   openPhotoZoneImport = () => {},
   handleBatchPhotos = () => {},
@@ -463,6 +465,22 @@ function SidebarContent({
                     onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.textDecorationColor='var(--hairline)'; }}
                   >
                     Desativar composição
+                  </button>
+                )}
+                {anyCanvasSaved && (
+                  <button
+                    type="button"
+                    onClick={removeCanvasLayout}
+                    aria-label="Remover composição e voltar ao layout padrão"
+                    style={{
+                      alignSelf:'center', minHeight:28, padding:'0 14px',
+                      cursor:'pointer', border:'none', background:'transparent',
+                      color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
+                      letterSpacing:'-0.005em', textDecoration:'underline',
+                      textUnderlineOffset:'3px', textDecorationColor:'var(--hairline)',
+                    }}
+                  >
+                    Remover composição (layout padrão)
                   </button>
                 )}
               </div>
@@ -1811,7 +1829,7 @@ function SidebarContent({
                 <label className="vc-label-sm">@ Username</label>
                 <input
                   value={brand.handle || ''}
-                  onChange={e=>setBrand({...brand,handle:e.target.value})}
+                  onChange={e=>setBrand({...brand,handle:e.target.value.replace(/^\s*@+/, '').replace(/\s+/g, '')})}
                   placeholder="@seuperfil"
                   className="vc-input"
                 />

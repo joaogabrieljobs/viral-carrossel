@@ -6,6 +6,11 @@
 
 const memory = new Map();
 
+/** Com Upstash configurado mas em falha, a memória por instância só cobre uns poucos créditos
+ *  — sem tecto seria quota ilimitada a cada cold start (auditoria H5). */
+export const DEGRADED_FALLBACK_CAP = 3;
+let _warnedNoUpstash = false;
+
 function hasUpstash() {
   // Unitários usam só memória (Upstash de prod/local pode estar offline e estourar timeout).
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
@@ -47,12 +52,18 @@ async function upstash(command) {
 
 /** Tenta Upstash; se Redis estiver offline, usa memória (melhor que bloquear geração). */
 async function withQuotaStore(upstashFn, memoryFn) {
-  if (!hasUpstash()) return memoryFn();
+  if (!hasUpstash()) {
+    if (!_warnedNoUpstash && process.env.VERCEL_ENV === 'production') {
+      _warnedNoUpstash = true;
+      console.error('[image-quota] UPSTASH_REDIS_REST_URL/TOKEN ausentes em produção — quota só em memória por instância.');
+    }
+    return memoryFn({ degraded: process.env.VERCEL_ENV === 'production' });
+  }
   try {
     return await upstashFn();
   } catch (e) {
     console.warn('[image-quota] Upstash falhou, fallback memória:', e?.message || e);
-    return memoryFn();
+    return memoryFn({ degraded: true });
   }
 }
 
@@ -66,17 +77,10 @@ async function memoryGet(key) {
   return memory.get(key) || 0;
 }
 
-async function memoryIncr(key, ttlSec) {
+async function memoryIncr(key) {
+  // Sem TTL: a chave inclui periodStart, roda sozinha a cada período; a instância é efémera.
   const next = (memory.get(key) || 0) + 1;
   memory.set(key, next);
-  // TTL best-effort: schedule delete
-  if (next === 1 && ttlSec > 0) {
-    setTimeout(() => {
-      if (memory.get(key) === next || memory.has(key)) {
-        /* keep until period rolls — key includes periodStart */
-      }
-    }, Math.min(ttlSec, 2147483647) * 1000);
-  }
   return next;
 }
 
@@ -116,6 +120,7 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
   const key = quotaKey(customerId, periodStartSec);
   const ttl = ttlSeconds(periodEndSec);
 
+  let degraded = false;
   const used = Number(await withQuotaStore(
     async () => {
       const next = Number(await upstash(['INCR', key])) || 0;
@@ -126,11 +131,13 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
       }
       return next;
     },
-    async () => {
-      const next = await memoryIncr(key, ttl);
-      if (next > cap) {
+    async ({ degraded: isDegraded } = {}) => {
+      degraded = !!isDegraded;
+      const effectiveCap = isDegraded ? Math.min(cap, DEGRADED_FALLBACK_CAP) : cap;
+      const next = await memoryIncr(key);
+      if (next > effectiveCap) {
         await memoryDecr(key);
-        return next;
+        return cap + 1;
       }
       return next;
     },
@@ -152,6 +159,7 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
     limit: cap,
     remaining: Math.max(0, cap - used),
     reason: null,
+    degraded,
   };
 }
 
