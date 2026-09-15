@@ -77,6 +77,9 @@ function GenerateModal({
   const setAxis = (key, val) => setParams(p => ({ ...p, [key]: val }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // Step 3: utilizador pode desmarcar geração de imagens e ir só com texto.
+  const [wantImages, setWantImages] = useState(!!hasOpenAI);
+  useEffect(() => { if (open) setWantImages(!!hasOpenAI); }, [open, hasOpenAI]);
 
   // Wizard multi-step: 1=Ideia, 2=Formato, 3=Imagens, 4=Revisão.
   // Reset pra step 1 sempre que reabre — usuário pega o fluxo limpo.
@@ -575,21 +578,80 @@ function GenerateModal({
               <div>
                 <label className="vc-label">Imagens dos Cards</label>
                 {hasOpenAI ? (
-                  <div style={{
-                    padding:'10px 12px', borderRadius:8, border:'1.5px solid var(--accent)',
-                    background:'var(--accent-surface-strong)', position:'relative',
-                  }}>
-                    <span style={{
-                      position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
-                      background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
-                      letterSpacing:'-0.011em',
-                    }}>Ativo</span>
-                    <div style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', color:'var(--text-primary)', marginBottom:3, letterSpacing:'-0.011em' }}>
-                      {imageProviderLabel}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                      Geração a partir do tema e das palavras-chave de cada slide
-                    </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setWantImages(true)}
+                      aria-pressed={wantImages}
+                      style={{
+                        padding:'12px 14px', borderRadius:11, cursor:'pointer', textAlign:'left',
+                        border: wantImages ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
+                        background: wantImages ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
+                        position:'relative', fontFamily:'var(--font-ui)',
+                      }}
+                    >
+                      {wantImages && (
+                        <span style={{
+                          position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
+                          background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
+                          letterSpacing:'-0.011em',
+                        }}>Ativo</span>
+                      )}
+                      <div style={{
+                        fontSize:13, fontWeight:600, color:'var(--text-primary)',
+                        marginBottom:3, letterSpacing:'-0.011em',
+                        display:'flex', alignItems:'center', gap:8,
+                      }}>
+                        <span aria-hidden style={{
+                          width:18, height:18, borderRadius:9999, flexShrink:0,
+                          border: wantImages ? 'none' : '1.5px solid var(--border)',
+                          background: wantImages ? 'var(--accent)' : 'transparent',
+                          color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                          fontSize:11, fontWeight:700,
+                        }}>{wantImages ? '✓' : ''}</span>
+                        Gerar com {imageProviderLabel}
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'-0.011em', paddingLeft:26 }}>
+                        Geração a partir do tema e das palavras-chave de cada slide
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setWantImages(false)}
+                      aria-pressed={!wantImages}
+                      style={{
+                        padding:'12px 14px', borderRadius:11, cursor:'pointer', textAlign:'left',
+                        border: !wantImages ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
+                        background: !wantImages ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
+                        position:'relative', fontFamily:'var(--font-ui)',
+                      }}
+                    >
+                      {!wantImages && (
+                        <span style={{
+                          position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
+                          background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
+                          letterSpacing:'-0.011em',
+                        }}>Ativo</span>
+                      )}
+                      <div style={{
+                        fontSize:13, fontWeight:600, color:'var(--text-primary)',
+                        marginBottom:3, letterSpacing:'-0.011em',
+                        display:'flex', alignItems:'center', gap:8,
+                      }}>
+                        <span aria-hidden style={{
+                          width:18, height:18, borderRadius:9999, flexShrink:0,
+                          border: !wantImages ? 'none' : '1.5px solid var(--border)',
+                          background: !wantImages ? 'var(--accent)' : 'transparent',
+                          color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                          fontSize:11, fontWeight:700,
+                        }}>{!wantImages ? '✓' : ''}</span>
+                        Pular imagens
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'-0.011em', paddingLeft:26 }}>
+                        Só texto agora — gera cada imagem depois, card a card
+                      </div>
+                    </button>
                   </div>
                 ) : (
                   <div style={{
@@ -629,8 +691,8 @@ function GenerateModal({
                 )}
               </div>
 
-              {/* Eixos só alteram prompts do GPT Image (geração). */}
-              {hasOpenAI && (
+              {/* Eixos só quando vai gerar imagens agora. */}
+              {hasOpenAI && wantImages && (
                 <ImgParamsPanel value={params} onChange={setAxis} />
               )}
             </>
@@ -685,7 +747,7 @@ function GenerateModal({
 
                   <span style={{ color:'var(--text-muted)' }}>Imagens</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
-                    {hasOpenAI ? imageProviderLabel : 'Só palavras-chave'}
+                    {hasOpenAI && wantImages ? imageProviderLabel : 'Pular — só texto'}
                   </span>
                 </div>
               </div>
@@ -709,14 +771,20 @@ function GenerateModal({
                 </div>
               )}
 
-              {/* Hint pros 2 botões do footer */}
+              {/* Hint alinhado à escolha do passo 3 */}
               <div style={{
                 fontSize:11, color:'var(--text-muted)', lineHeight:1.47, letterSpacing:'-0.011em',
                 padding:'10px 12px', borderRadius:11, border:'1px solid var(--hairline)', background:'var(--bg-card)',
               }}>
-                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos do provedor de imagem.
-                {' '}
-                <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> rápido — você gera as imagens depois, card a card.
+                {hasOpenAI && wantImages ? (
+                  <>
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos do provedor de imagem.
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> rápido — gera as imagens depois, card a card.
+                  </>
+                )}
               </div>
 
               {err && (
@@ -773,50 +841,57 @@ function GenerateModal({
           )}
           {step === 4 && (
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
-              {/* Secundário: só texto + imageQuery. Rápido e barato. */}
+              {/* CTA principal respeita a escolha do passo 3 (gerar ou pular imagens). */}
               <button
                 type="button"
-                onClick={() => run({ withImages: false })}
-                disabled={busy || !resolvedGenerationTopic}
-                title="Gera só texto e palavras-chave da imagem (rápido). Você pode gerar cada imagem depois no botão «Gerar imagem» do card."
-                style={{
-                  height:44, padding:'0 18px', borderRadius:9999,
-                  cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
-                  background: 'var(--bg-pearl)', color: 'var(--text-primary)',
-                  fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
-                  letterSpacing:'-0.014em', border:'1px solid var(--border)',
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  transition:'border-color 0.15s, background 0.15s',
-                  opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
-                }}
-                onMouseEnter={e => { if (!busy && resolvedGenerationTopic) e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-              >
-                <Sparkles size={15} style={{ color: 'var(--text-muted)' }}/>Só texto
-              </button>
-              {/* Primário: texto + imagens GPT Image. Disabled se sem OpenAI. */}
-              <button
-                type="button"
-                onClick={() => run({ withImages: true })}
-                disabled={busy || !resolvedGenerationTopic || !hasOpenAI}
-                title={!hasOpenAI ? 'Configure o provedor de imagem em ⚙' : `Gera texto E imagens (${imageProviderLabel})`}
+                onClick={() => run({ withImages: !!(hasOpenAI && wantImages) })}
+                disabled={busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)}
+                title={
+                  hasOpenAI && wantImages
+                    ? `Gera texto E imagens (${imageProviderLabel})`
+                    : 'Gera só texto e palavras-chave. Pode gerar cada imagem depois no card.'
+                }
                 style={{
                   height:44, padding:'0 18px', borderRadius:9999, border:'none',
-                  cursor: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'not-allowed' : 'pointer',
-                  background: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--bg-pearl)' : 'var(--accent)',
-                  color: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 'var(--text-muted)' : '#fff',
+                  cursor: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'not-allowed' : 'pointer',
+                  background: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'var(--bg-pearl)' : 'var(--accent)',
+                  color: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'var(--text-muted)' : '#fff',
                   fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
                   letterSpacing:'-0.014em',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   transition:'background-color 0.15s var(--ease-smooth)',
-                  opacity: (busy || !resolvedGenerationTopic || !hasOpenAI) ? 0.6 : 1,
+                  opacity: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 0.6 : 1,
                 }}
               >
                 {busy
                   ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
-                  : <><Sparkles size={15}/>Texto + imagem</>
+                  : hasOpenAI && wantImages
+                    ? <><Sparkles size={15}/>Texto + imagem</>
+                    : <><Sparkles size={15}/>Gerar só texto</>
                 }
               </button>
+              {/* Atalho oposto — se escolheu imagens, ainda pode forçar só texto (e vice-versa). */}
+              {hasOpenAI && (
+                <button
+                  type="button"
+                  onClick={() => run({ withImages: !wantImages })}
+                  disabled={busy || !resolvedGenerationTopic}
+                  title={wantImages
+                    ? 'Ignora a escolha acima e gera só texto'
+                    : `Gera texto E imagens (${imageProviderLabel}) mesmo assim`}
+                  style={{
+                    height:44, padding:'0 16px', borderRadius:9999,
+                    cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
+                    background: 'var(--bg-pearl)', color: 'var(--text-primary)',
+                    fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
+                    letterSpacing:'-0.014em', border:'1px solid var(--border)',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
+                  }}
+                >
+                  {wantImages ? 'Só texto' : 'Texto + imagem'}
+                </button>
+              )}
             </div>
           )}
         </div>
