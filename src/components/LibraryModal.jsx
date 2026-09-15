@@ -194,12 +194,14 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                   background: isActive ? 'rgba(255,77,46,0.06)' : 'var(--bg-card)',
                   border:`1.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
                   borderRadius:11, padding:12,
-                  display:'flex', alignItems:'center', gap:12,
+                  display:'flex', flexDirection:'column', gap:10,
                   transition:'all 0.12s',
                 }}
               >
+                <div style={{ display:'flex', alignItems:'flex-start', gap:12, minWidth:0 }}>
                 {/* Mini-thumbnail */}
                 <button
+                  type="button"
                   onClick={() => onOpen(entry.id)}
                   style={{
                     width:56, height:70, borderRadius:6, flexShrink:0, cursor:'pointer',
@@ -221,7 +223,7 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                 </button>
 
                 {/* Conteúdo */}
-                <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:4 }}>
+                <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:6 }}>
                   {editing ? (
                     <input
                       autoFocus
@@ -238,6 +240,7 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                     />
                   ) : (
                     <button
+                      type="button"
                       onClick={() => onOpen(entry.id)}
                       onDoubleClick={() => startEdit(entry)}
                       style={{
@@ -245,6 +248,7 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                         fontSize:13.5, fontWeight:600, color:'var(--text-primary)',
                         fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
                         whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                        maxWidth:'100%',
                       }}
                       title={entry.name + ' (clique duplo para renomear)'}
                     >
@@ -252,77 +256,89 @@ export default function LibraryModal({ open, onClose, library, activeDocId, onOp
                     </button>
                   )}
                   <div style={{
-                    display:'flex', alignItems:'center', gap:8, fontSize:10,
-                    color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
+                    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
+                    fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
                   }}>
                     <span style={{
                       padding:'2px 7px', borderRadius:99,
                       background: status.bg, color: status.color,
                       border: `1px solid ${status.border}`, fontWeight:700,
                     }}>{status.label}</span>
-                    <span>{slides.length} cards</span>
-                    <span style={{ opacity:0.6 }}>· {fmtDate(entry.updatedAt)}</span>
+                    <span>{slides.length} card{slides.length !== 1 ? 's' : ''}</span>
+                    {entry.updatedAt ? (
+                      <span style={{ opacity:0.7 }}>{fmtDate(entry.updatedAt)}</span>
+                    ) : null}
                   </div>
                 </div>
+                </div>
 
-                {/* Ações */}
-                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {/* Toggle de status */}
+                {/* Ações — linha própria (evita overlap no mobile) */}
+                <div style={{
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  gap:8, flexWrap:'wrap',
+                }}>
                   <select
                     value={entry.status}
                     onChange={e => onSetStatus(entry.id, e.target.value)}
                     onClick={e => e.stopPropagation()}
+                    aria-label={`Estado de ${entry.name}`}
                     style={{
-                      fontSize:10, padding:'4px 6px', borderRadius:6,
+                      fontSize:11, padding:'6px 8px', borderRadius:8,
                       background:'var(--bg-elevated)', color:'var(--text-secondary)',
                       border:'1px solid var(--border)', fontFamily:'var(--font-mono)',
-                      cursor:'pointer', appearance:'auto', maxWidth:110,
+                      cursor:'pointer', appearance:'auto', minHeight:32, flex:'1 1 120px', maxWidth:160,
                     }}
                   >
                     {STATUS_DEFS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
-                  <div style={{ display:'flex', gap:4 }}>
+                  <div style={{ display:'flex', gap:6, flexShrink:0, marginLeft:'auto' }}>
                     <button
+                      type="button"
                       onClick={() => startEdit(entry)}
                       aria-label="Renomear" title="Renomear"
-                      style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                     </button>
                     <button
+                      type="button"
                       onClick={() => onDuplicate(entry.id)}
                       aria-label="Duplicar" title="Duplicar"
-                      style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
-                      <Copy size={10}/>
+                      <Copy size={12}/>
                     </button>
                     <button
+                      type="button"
                       onClick={() => onExportDoc(entry.id)}
                       aria-label="Exportar como JSON" title="Exportar como JSON"
-                      style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                     >
-                      <Download size={10}/>
+                      <Download size={12}/>
                     </button>
                     {confirmDeleteId === entry.id ? (
                       <>
                         <button
+                          type="button"
                           onClick={() => { onDelete(entry.id); setConfirmDeleteId(null); }}
                           title="Confirmar exclusão"
-                          style={{ height:26, padding:'0 8px', borderRadius:5, border:'1px solid rgba(248,113,113,0.5)', background:'rgba(248,113,113,0.15)', color:'#f87171', cursor:'pointer', fontSize:10, fontWeight:700, fontFamily:'var(--font-ui)' }}
+                          style={{ height:36, padding:'0 10px', borderRadius:8, border:'1px solid rgba(248,113,113,0.5)', background:'rgba(248,113,113,0.15)', color:'#f87171', cursor:'pointer', fontSize:11, fontWeight:700, fontFamily:'var(--font-ui)' }}
                         >OK</button>
                         <button
+                          type="button"
                           onClick={() => setConfirmDeleteId(null)}
                           aria-label="Cancelar" title="Cancelar"
-                          style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                        ><X size={10}/></button>
+                          style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        ><X size={12}/></button>
                       </>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => setConfirmDeleteId(entry.id)}
                         aria-label="Apagar" title="Apagar"
-                        style={{ width:26, height:26, borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                       >
-                        <Trash2 size={10}/>
+                        <Trash2 size={12}/>
                       </button>
                     )}
                   </div>

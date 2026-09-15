@@ -504,11 +504,12 @@ function AccountHomeShell({
                   borderRadius: 14,
                   padding: 14,
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
+                  flexDirection: 'column',
+                  gap: 10,
                   transition: 'border-color 0.15s var(--ease-smooth)',
                 }}
               >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
                 <button
                   type="button"
                   onClick={() => openDoc(entry.id)}
@@ -618,12 +619,13 @@ function AccountHomeShell({
                     {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
                 </div>
+                </div>
                 <div style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
-                  alignItems: 'stretch',
-                  flexShrink: 0,
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                 }}>
                   <select
                     aria-label={`Estado para ${entry.name}`}
@@ -631,24 +633,26 @@ function AccountHomeShell({
                     onChange={e => setDocStatus(entry.id, e.target.value)}
                     style={{
                       fontSize: 11,
-                      padding: '4px 6px',
+                      padding: '6px 8px',
                       borderRadius: 8,
                       background: 'var(--bg-card)',
                       color: 'var(--text-secondary)',
                       border: '1px solid var(--border)',
                       cursor: 'pointer',
-                      minWidth: 100,
+                      minHeight: 32,
+                      flex: '1 1 120px',
+                      maxWidth: 160,
                       fontFamily: 'var(--font-ui)',
                     }}
                   >
                     {STATUS_DEFS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
                     <button type="button" onClick={() => duplicateDoc(entry.id)} title="Duplicar"
                       aria-label={`Duplicar ${entry.name}`}
                       style={{
-                        width: 32,
-                        height: 32,
+                        width: 36,
+                        height: 36,
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         cursor: 'pointer',
@@ -662,8 +666,8 @@ function AccountHomeShell({
                     <button type="button" onClick={() => exportDoc(entry.id)} title="Exportar JSON"
                       aria-label={`Exportar ${entry.name}`}
                       style={{
-                        width: 32,
-                        height: 32,
+                        width: 36,
+                        height: 36,
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         cursor: 'pointer',
@@ -679,7 +683,7 @@ function AccountHomeShell({
                         <button type="button" onClick={() => { deleteDoc(entry.id); setConfirmDeleteId(null); }}
                           style={{
                             padding: '0 10px',
-                            height: 32,
+                            height: 36,
                             borderRadius: 8,
                             border: '1px solid rgba(255,59,48,0.35)',
                             cursor: 'pointer',
@@ -692,8 +696,8 @@ function AccountHomeShell({
                           Confirmar eliminação
                         </button>
                         <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar eliminação" style={{
-                          width: 32,
-                          height: 32,
+                          width: 36,
+                          height: 36,
                           borderRadius: 8,
                           border: '1px solid var(--border)',
                           cursor: 'pointer',
@@ -708,7 +712,7 @@ function AccountHomeShell({
                       <button type="button" onClick={() => setConfirmDeleteId(entry.id)}
                         aria-label={`Apagar ${entry.name}`}
                         style={{
-                          width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+                          width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)',
                           cursor: 'pointer',
                           background: 'var(--bg-base)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff3b30',
