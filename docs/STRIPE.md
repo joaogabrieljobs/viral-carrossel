@@ -66,7 +66,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 3. Authorized redirect URIs: `https://viral-carrossel.vercel.app/api/auth/google/callback`
 4. Colar Client ID + Client Secret nas env da Vercel e redeploy
 
-`ZAI_API_KEY` é obrigatória (texto incluso no plano). `ANTHROPIC_API_KEY` é opcional — fallback no proxy `/api/anthropic/v1/messages` para assinantes sem chave própria (o cliente actual só chama esse proxy com chave própria).
+`ZAI_API_KEY` é obrigatória (texto incluso no plano). `ANTHROPIC_API_KEY` **não está configurada em produção por decisão de custo** (removida em 2026-09-15): com ela, qualquer assinante — incluindo o Essencial de R$ 19,90 — podia gastar Opus e `web_search` na conta da plataforma via `/api/anthropic/v1/messages`. Claude e a pesquisa web ao vivo são BYOK: o utilizador põe a própria chave em Configurar IA e ela viaja no header `x-anthropic-key`. `VITE_ANTHROPIC_PROXY=true` continua necessária para o BYOK passar pelo proxy e evitar CORS.
 
 ## Dev local
 
