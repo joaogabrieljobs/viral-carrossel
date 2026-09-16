@@ -13,11 +13,28 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
+import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
 import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
+
+/**
+ * Texto com os trechos de "Marcar destaque" pintados na cor de acento.
+ * Só os layouts culture usavam `destaqueSpans`; os restantes desenhavam o texto
+ * simples e o destaque aplicado pela barra lateral nunca aparecia no card.
+ * Sem trechos marcados devolve o texto original, sem tocar em nada.
+ */
+function textoComDestaque(text, spans, accentColor, accentWeight) {
+  const t = String(text ?? '');
+  if (!t) return t;
+  const pieces = cultureAccentRenderablePieces(t, spans);
+  if (!pieces.some((p) => p.type === 'accent')) return t;
+  return pieces.map((p, i) => (p.type === 'accent'
+    ? <span key={i} data-vc-destaque style={{ color: accentColor || 'inherit', fontWeight: accentWeight }}>{p.v}</span>
+    : <React.Fragment key={i}>{p.v}</React.Fragment>));
+}
 
 /**
  * Nos slides Cultura/Tendência, a superfície «dark» alternada usava sempre #272729, ignorando
@@ -448,7 +465,7 @@ const ClassicCanvasInner = React.forwardRef(({
             fontWeight={slide.titleWeight ?? 800}
             letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
           />
-        ) : slide.title}</h1>
+        ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
         </div>
         )}
       </OverflowScaler>
@@ -517,7 +534,7 @@ const ClassicCanvasInner = React.forwardRef(({
               boxSizing: 'border-box',
               letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
               textShadow: shadow,
-            }}>{slide.subtitle}</p>
+            }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
           )
         )}
         </div>
@@ -742,7 +759,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         fontWeight={slide.titleWeight ?? 800}
         letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
       />
-    ) : slide.title}</h1>
+    ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
   );
 
   // `brand.subtitleVisible === false` é assinatura de preset (ex.: Sports
@@ -778,7 +795,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         fontWeight: 400, margin: 0,
         letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
         textShadow: shadow,
-      }}>{slide.subtitle}</p>
+      }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
     )
   ) : null;
 
@@ -2450,7 +2467,7 @@ const SlideCardInner = React.forwardRef(({
                   fontWeight={slide.titleWeight ?? 800}
                   letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
                 />
-              ) : slide.title}</h1>
+              ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
               {/* Subtítulo — preset controla via brand.subtitleVisible/Weight/Case
                   (presets editoriais como Sports/NMLSS escondem subtítulo pra
                   não competir com eyebrow+título). */}
@@ -2487,7 +2504,7 @@ const SlideCardInner = React.forwardRef(({
                   textTransform: brand.subtitleCase === 'upper' ? 'uppercase'
                     : brand.subtitleCase === 'lower' ? 'lowercase' : 'none',
                   fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
-                })}>{slide.subtitle}</p>
+                })}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
               ))}
               {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
                   do título. Suporta strikethroughText pra preço antigo riscado:

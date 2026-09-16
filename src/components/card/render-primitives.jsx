@@ -94,7 +94,7 @@ function CultureInlineRich({
           // - fontWeight 800 garante destaque acima de base 400/500/600 padrão
           // - se a cor accent estiver muito próxima do base (washout em fundos com baixo contraste),
           //   o weight extra ainda permite o usuário ver o destaque
-          <span key={i} style={{
+          <span key={i} data-vc-destaque style={{
             color: accentColor,
             fontWeight: 800,
           }}>{p.v}</span>
