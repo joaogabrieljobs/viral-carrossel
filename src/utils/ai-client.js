@@ -107,7 +107,8 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   };
   if (tools) body.tools = tools;
   const headers = { 'Content-Type': 'application/json' };
-  // BYOK: chave do usuário via header; sem ela, o proxy usa ANTHROPIC_API_KEY do host.
+  // Claude é BYOK: sem chave do utilizador o proxy responde 400 (o fallback para a
+  // chave do host foi removido em 2026-09-15). `callAI` já encaminha para Z.ai nesse caso.
   const anthropicKey = getProviderKey('anthropic');
   if (anthropicKey) {
     headers['x-anthropic-key'] = anthropicKey;

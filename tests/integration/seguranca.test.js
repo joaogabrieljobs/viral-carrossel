@@ -100,14 +100,32 @@ describe('Gate do proxy Anthropic (assinatura obrigatória)', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('assinante com sessão usa a chave do host', async () => {
+  // Revisto em 2026-09-15 (auditoria M17): o fallback para a chave do host foi
+  // removido. Antes, um assinante do plano mais barato podia gastar Opus e
+  // web_search na conta da plataforma. Claude passa a ser exclusivamente BYOK.
+  it('assinante com sessão mas SEM chave própria → 400 e não toca na chave do host', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-chave-do-host';
-    const spy = stubUpstream();
+    stubUpstream();
     const cookie = cookieAtivo();
     const res = makeRes();
     await anthropicProxy(makeReq({ method: 'POST', body: {}, cookie }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body?.error?.code).toBe('anthropic_key_required');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('chave do host NUNCA é enviada ao upstream, mesmo com a env setada', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-chave-do-host';
+    const spy = stubUpstream();
+    const cookie = cookieAtivo('cus_host', 'host@teste.exemplo');
+    const res = makeRes();
+    await anthropicProxy(
+      makeReq({ method: 'POST', body: {}, cookie, headers: { 'x-anthropic-key': 'sk-ant-do-usuario' } }),
+      res,
+    );
     expect(res.statusCode).toBe(200);
-    expect(spy.mock.calls[0][1].headers['x-api-key']).toBe('sk-ant-chave-do-host');
+    expect(spy.mock.calls[0][1].headers['x-api-key']).toBe('sk-ant-do-usuario');
+    expect(JSON.stringify(spy.mock.calls[0][1])).not.toContain('sk-ant-chave-do-host');
   });
 
   it('BYOK sem sessão é rejeitado → 401', async () => {

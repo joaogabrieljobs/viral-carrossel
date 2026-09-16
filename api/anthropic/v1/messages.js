@@ -1,6 +1,11 @@
 /**
- * Proxy Anthropic — exige assinatura ativa (ou BILLING_DISABLED em non-prod).
- * BYOK via x-anthropic-key; sem key própria, usa ANTHROPIC_API_KEY do host.
+ * Proxy Anthropic — exige assinatura ativa (ou BILLING_DISABLED em non-prod)
+ * E chave do próprio utilizador no header `x-anthropic-key`.
+ *
+ * NÃO existe fallback para `ANTHROPIC_API_KEY` do host (removido em 2026-09-15):
+ * com ele, qualquer assinante — incluindo o Essencial de R$ 19,90 — podia gastar
+ * Opus e `web_search` na conta da plataforma, sem quota nem tecto por plano.
+ * O único caminho que usa chave de env é o proxy de dev do Vite (`vite.config.js`).
  */
 
 import { applyCors } from '../../lib/cors.js';
@@ -29,17 +34,16 @@ export default async function handler(req, res) {
   const access = await requireActiveSubscription(req, res, { errorShape: 'nested' });
   if (!access) return;
 
-  const userKey = String(
+  const key = String(
     req.headers['x-anthropic-key'] || req.headers['X-Anthropic-Key'] || '',
   ).trim();
-  const envKey = String(process.env.ANTHROPIC_API_KEY || '').trim();
-  const key = userKey || envKey;
 
   if (!key) {
-    return res.status(503).json({
+    return res.status(400).json({
       error: {
         message:
-          'Chave Anthropic não configurada. Adicione sua chave no ícone de chaves (⚙) no header do app, ou defina ANTHROPIC_API_KEY nas Environment Variables da Vercel.',
+          'Claude exige a sua própria chave Anthropic. Adicione-a em Configurar IA (⚙) — o texto incluso no plano usa Z.ai.',
+        code: 'anthropic_key_required',
       },
     });
   }
