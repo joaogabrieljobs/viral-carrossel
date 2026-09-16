@@ -1,4 +1,17 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+
+function sameRect(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return Math.abs(a.top - b.top) < 0.5 && Math.abs(a.left - b.left) < 0.5
+    && Math.abs(a.width - b.width) < 0.5 && Math.abs(a.height - b.height) < 0.5;
+}
+
+function sameBubble(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return Math.abs(a.left - b.left) < 0.5 && Math.abs(a.top - b.top) < 0.5 && a.maxW === b.maxW;
+}
 
 export function getOnboardingSteps(isMobile, empty) {
   let panelSel = '';
@@ -68,6 +81,27 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
   const [hole, setHole] = useState(null);
   const [bubble, setBubble] = useState({ left: 24, top: 80, maxW: 360 });
 
+  /**
+   * As callbacks chegam como arrow functions inline do monólito, logo mudam de
+   * identidade a cada render. Com elas nas deps do layout effect, cada `setHole`
+   * /`setBubble` (objetos novos) provocava novo render → nova identidade → o
+   * effect corria outra vez → loop infinito e React #185 ("Maximum update depth
+   * exceeded"), que derrubava a app inteira para o error boundary.
+   * Guardamos as callbacks em refs (não entram nas deps) e só escrevemos estado
+   * quando a medida muda de facto.
+   */
+  const cbRef = useRef({ onEnterEditor, onPrepareRefsTourStep, setTab, setDrawerOpen });
+  useEffect(() => {
+    cbRef.current = { onEnterEditor, onPrepareRefsTourStep, setTab, setDrawerOpen };
+  }, [onEnterEditor, onPrepareRefsTourStep, setTab, setDrawerOpen]);
+
+  const setHoleIfChanged = useCallback((next) => {
+    setHole((prev) => (sameRect(prev, next) ? prev : next));
+  }, []);
+  const setBubbleIfChanged = useCallback((next) => {
+    setBubble((prev) => (sameBubble(prev, next) ? prev : next));
+  }, []);
+
   useEffect(() => {
     if (open) setIdx(0);
   }, [open]);
@@ -75,45 +109,42 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
   useLayoutEffect(() => {
     if (!open) return undefined;
     const stepIds = steps[idx]?.id;
+    const cb = cbRef.current;
     if (stepIds === 'refs') {
-      if (typeof onEnterEditor === 'function') onEnterEditor();
-      if (typeof onPrepareRefsTourStep === 'function') onPrepareRefsTourStep();
+      if (typeof cb.onEnterEditor === 'function') cb.onEnterEditor();
+      if (typeof cb.onPrepareRefsTourStep === 'function') cb.onPrepareRefsTourStep();
     } else if (stepIds === 'thumbs' || stepIds === 'panel') {
-      if (typeof onEnterEditor === 'function') onEnterEditor();
-      if (stepIds === 'panel' && isMobile && !empty) setDrawerOpen(true);
+      if (typeof cb.onEnterEditor === 'function') cb.onEnterEditor();
+      if (stepIds === 'panel' && isMobile && !empty) cb.setDrawerOpen?.(true);
     }
     const measure = () => {
       const s = steps[idx];
-      if (!s?.selector) {
-        setHole(null);
+      const centrado = (fator) => {
         const maxW = Math.min(380, window.innerWidth - 32);
-        setBubble({
+        setHoleIfChanged(null);
+        setBubbleIfChanged({
           left: (window.innerWidth - maxW) / 2,
-          top: Math.max(24, window.innerHeight * 0.2),
+          top: Math.max(24, window.innerHeight * fator),
           maxW,
         });
-        return;
-      }
+      };
+      if (!s?.selector) return centrado(0.2);
       const el = document.querySelector(s.selector);
-      if (!el) {
-        setHole(null);
-        const maxW = Math.min(380, window.innerWidth - 32);
-        setBubble({
-          left: (window.innerWidth - maxW) / 2,
-          top: Math.max(24, window.innerHeight * 0.22),
-          maxW,
-        });
-        return;
-      }
+      // Elemento ausente, invisível (display:none, sem caixa) ou tapado por um
+      // modal: sem isto o realce virava um retângulo rosa sobre espaço vazio.
+      const r = el?.getBoundingClientRect();
+      const visivel = !!r && r.width > 8 && r.height > 8
+        && r.bottom > 0 && r.right > 0
+        && r.top < window.innerHeight && r.left < window.innerWidth;
+      if (!visivel) return centrado(0.22);
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      const r = el.getBoundingClientRect();
-      setHole({ top: r.top, left: r.left, width: r.width, height: r.height });
+      setHoleIfChanged({ top: r.top, left: r.left, width: r.width, height: r.height });
       const maxW = Math.min(340, window.innerWidth - 32);
       let left = Math.max(16, Math.min(window.innerWidth - maxW - 16, r.left + r.width / 2 - maxW / 2));
       let top = r.bottom + 14;
       const estCard = 210;
       if (top + estCard > window.innerHeight - 16) top = Math.max(16, r.top - estCard - 12);
-      setBubble({ left, top, maxW });
+      setBubbleIfChanged({ left, top, maxW });
     };
 
     const delay =
@@ -131,7 +162,8 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
       window.removeEventListener('resize', onWin);
       window.removeEventListener('scroll', onWin, true);
     };
-  }, [open, idx, steps, setTab, setDrawerOpen, isMobile, onEnterEditor, empty, onPrepareRefsTourStep]);
+    // Sem as callbacks inline nas deps — vivem em `cbRef` (ver comentário acima).
+  }, [open, idx, steps, isMobile, empty, setHoleIfChanged, setBubbleIfChanged]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -169,6 +201,7 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
       {/* Escurece o fundo; “buraco” no spotlight quando há alvo */}
       {hole ? (
         <div
+          data-vc-tour-hole=""
           style={{
             position: 'fixed',
             left: hole.left - 5,
@@ -196,6 +229,7 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
 
       {/* Card */}
       <div
+        data-vc-tour-card=""
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',

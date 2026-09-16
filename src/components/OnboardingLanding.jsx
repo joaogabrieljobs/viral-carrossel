@@ -461,6 +461,17 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           background: var(--accent-hover) !important;
           box-shadow: 0 8px 32px rgba(255, 45, 141, 0.35);
         }
+        /* Botões do topo sobre fotografia: contorno próprio + anel de foco visível.
+           Sem isto ficavam texto branco sem moldura, invisíveis em zonas claras da foto. */
+        .vc-landing-navbtn:hover {
+          border-color: var(--accent) !important;
+          background: rgba(255, 45, 141, 0.18) !important;
+        }
+        .vc-landing-navbtn:focus-visible,
+        .vc-landing-cta:focus-visible {
+          outline: 2px solid var(--accent) !important;
+          outline-offset: 2px;
+        }
         .vc-landing-cap-chip:hover {
           border-color: var(--glass-border-strong);
           background: var(--bg-glass-strong);
@@ -500,12 +511,16 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             <button
               type="button"
               onClick={onLogin}
+              className="vc-landing-navbtn"
               style={{
                 height: 36,
-                padding: '0 14px',
+                padding: '0 16px',
                 borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.32)',
+                background: 'rgba(12, 10, 18, 0.55)',
+                backdropFilter: 'blur(14px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.28)',
                 color: 'var(--text-primary)',
                 fontSize: 13,
                 fontWeight: 600,
@@ -516,6 +531,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               Entrar
             </button>
           )}
+          {!isMobile && (
           <button
             type="button"
             className="vc-landing-cta"
@@ -534,8 +550,9 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               height: 36,
               padding: '0 18px',
               borderRadius: 'var(--radius-pill)',
-              border: '1px solid var(--glass-border-strong)',
-              background: 'var(--bg-glass)',
+              border: '1.5px solid var(--accent)',
+              background: 'rgba(255, 45, 141, 0.16)',
+              boxShadow: '0 0 0 3px rgba(255, 45, 141, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
               color: 'var(--text-primary)',
               fontSize: 13,
               fontWeight: 600,
@@ -545,6 +562,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           >
             Conhecer o studio
           </button>
+          )}
         </div>
       </div>
 
@@ -636,12 +654,16 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               <button
                 type="button"
                 onClick={onLogin}
+                className="vc-landing-navbtn"
                 style={{
                   height: 40,
-                  padding: '0 16px',
+                  padding: '0 18px',
                   borderRadius: 'var(--radius-pill)',
-                  border: '1px solid transparent',
-                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.32)',
+                  background: 'rgba(12, 10, 18, 0.55)',
+                  backdropFilter: 'blur(14px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.28)',
                   color: 'var(--text-primary)',
                   fontSize: 13,
                   fontWeight: 600,
@@ -652,6 +674,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 Entrar
               </button>
             )}
+            {!isMobile && (
             <button
               type="button"
               className="vc-landing-cta"
@@ -670,10 +693,11 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
                 height: 40,
                 padding: '0 20px',
                 borderRadius: 'var(--radius-pill)',
-                border: '1px solid var(--glass-border-strong)',
-                background: 'var(--bg-glass)',
+                border: '1.5px solid var(--accent)',
+                background: 'rgba(255, 45, 141, 0.16)',
                 backdropFilter: 'blur(18px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+                boxShadow: '0 0 0 3px rgba(255, 45, 141, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
                 color: 'var(--text-primary)',
                 fontSize: 13,
                 fontWeight: 600,
@@ -683,6 +707,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             >
               Conhecer o studio
             </button>
+            )}
           </div>
         </nav>
 

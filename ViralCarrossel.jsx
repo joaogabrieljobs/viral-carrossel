@@ -1099,6 +1099,13 @@ export default function App() {
     } catch { /* */ }
     return undefined;
   }, [landingOpen]);
+  // Identidade estável: como props inline, entravam nas deps do layout effect do
+  // tour e realimentavam o ciclo render → effect → setState → render (React #185).
+  const tourEnterEditor = useCallback(() => setShellView('project'), [setShellView]);
+  const tourPrepareRefsStep = useCallback(() => {
+    setCreativePreset('livre');
+    setSetupOpen(true);
+  }, [setCreativePreset]);
   const closeModesIntro = useCallback(() => {
     setModesIntroOpen(false);
     try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
@@ -1205,17 +1212,20 @@ export default function App() {
     || (selectedTextProvider === 'zai');
   const [niche, setNiche] = useState('');
 
-  // Tour guiado — primeira visita (pode repetir pela ajuda)
+  // Tour guiado — primeira visita (pode repetir pela ajuda). Espera o modal de
+  // boas-vindas fechar: empilhado, o realce do tour caía atrás do modal e lia-se
+  // como um retângulo rosa vazio (auditoria §4 «tour + modes-intro empilhados»).
   useEffect(() => {
-    if (typeof window === 'undefined' || landingOpen) return undefined;
+    if (typeof window === 'undefined' || landingOpen || modesIntroOpen) return undefined;
     try {
+      if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
       if (!localStorage.getItem(SK.onboarding)) {
         const t = window.setTimeout(() => setTourOpen(true), 850);
         return () => window.clearTimeout(t);
       }
     } catch { /* ignore */ }
     return undefined;
-  }, [landingOpen]);
+  }, [landingOpen, modesIntroOpen]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -3986,11 +3996,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
         empty={empty}
         setTab={setTab}
         setDrawerOpen={setDrawerOpen}
-        onEnterEditor={() => setShellView('project')}
-        onPrepareRefsTourStep={() => {
-          setCreativePreset('livre');
-          setSetupOpen(true);
-        }}
+        onEnterEditor={tourEnterEditor}
+        onPrepareRefsTourStep={tourPrepareRefsStep}
       />
       <HelpModal
         open={helpOpen}
