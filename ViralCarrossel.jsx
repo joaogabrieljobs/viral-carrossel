@@ -3094,7 +3094,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             Mantemos UMA árvore oculta com cada slide em escala real (1080×1350).
             html2canvas captura SEMPRE estes elementos — nunca os preview escalados,
             que distorcem o resultado por causa do `transform: scale()` aplicado. */}
-        <div style={{ position:'fixed', left:'-99999px', top:0, pointerEvents:'none', opacity:0, zIndex:-1 }} aria-hidden>
+        <div data-vc-export-tree style={{ position:'fixed', left:'-99999px', top:0, pointerEvents:'none', opacity:0, zIndex:-1 }} aria-hidden>
           {slides.map((s,i)=>(
             <SlideCard
               key={`exp-${s.id}`}
@@ -3102,6 +3102,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               slide={s} fmt={fmt} brand={brand} num={i+1} total={slides.length} scale={1}
               creativePreset={creativePreset}
               showCanvasChrome={false}
+              forExport
             />
           ))}
         </div>

@@ -12,6 +12,7 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.presentationImgFilter !== next.presentationImgFilter) return false;
   if (prev.creativePreset !== next.creativePreset) return false;
   if (prev.showCanvasChrome !== next.showCanvasChrome) return false;
+  if (prev.forExport !== next.forExport) return false;
   if (prev.enableZoneSwapDrag !== next.enableZoneSwapDrag) return false;
   if (prev.slideIndex !== next.slideIndex) return false;
   if (prev.onCanvasZonePatch !== next.onCanvasZonePatch) return false;

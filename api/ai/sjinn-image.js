@@ -30,7 +30,8 @@ import {
 } from '../lib/sjinn.js';
 
 export const config = {
-  maxDuration: 120,
+  // Plano Pro permite 300 s. Geração típica ~82 s, com cauda bem acima disso.
+  maxDuration: 300,
 };
 
 function readBody(req) {

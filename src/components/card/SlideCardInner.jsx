@@ -75,7 +75,13 @@ function normalizePhotoRegion(slide) {
   return PHOTO_REGION_IDS.has(r) ? r : 'full';
 }
 
-/** Cobre a zona foto: toque direto no `<input>` (WebKit/iOS). Opacidade > 0 — alguns motores ignoram camada totalmente invisível. */
+/**
+ * Cobre a zona foto para o toque cair direto no `<input>` (WebKit/iOS).
+ * A opacidade tem de ser > 0 (alguns motores ignoram camada invisível), mas a 0.03
+ * o controlo nativo aparecia no card: o texto "Nenhum arquivo escolhido" e a linha
+ * do botão ficavam por cima do título. Agora fica quase zero, com texto
+ * transparente e o botão nativo escondido pela classe `vc-photo-hit`.
+ */
 const VC_PHOTO_ZONE_HIT_LAYER_STYLE = {
   position: 'absolute',
   inset: 0,
@@ -84,9 +90,10 @@ const VC_PHOTO_ZONE_HIT_LAYER_STYLE = {
   margin: 0,
   padding: 0,
   border: 'none',
-  opacity: 0.03,
+  opacity: 0.002,
+  color: 'transparent',
   cursor: 'pointer',
-  fontSize: 28,
+  fontSize: 0,
   zIndex: 4,
   display: 'block',
   boxSizing: 'border-box',
@@ -221,6 +228,7 @@ function canvasCultureSandwichBottomPaddingXPx(f, slide) {
 
 /** Layout canvas (variant classic): zonas foto + título + subtítulo em %. */
 const ClassicCanvasInner = React.forwardRef(({
+  forExport = false,
   f,
   slide,
   brand,
@@ -336,7 +344,7 @@ const ClassicCanvasInner = React.forwardRef(({
             </span>
           </div>
         )}
-        {(showCanvasChrome || pendingPhotoZone) && !slide.bgImage && (
+        {(showCanvasChrome || pendingPhotoZone) && !slide.bgImage && !forExport && (
           <div style={{
             position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
             color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
@@ -365,6 +373,7 @@ const ClassicCanvasInner = React.forwardRef(({
             accept="image/*"
             onChange={onPhotoZoneFileChange}
             onTouchStart={(e) => e.stopPropagation()}
+            className="vc-photo-hit"
             style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
             aria-label="Importar imagem na zona da foto"
           />
@@ -629,6 +638,7 @@ const ClassicCanvasInner = React.forwardRef(({
 
 /** Clássico: foto em faixa horizontal com margens (sem canvas / sem sanduíche cultura no card). */
 const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
+  forExport = false,
   f,
   slide,
   brand,
@@ -816,7 +826,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             }}/>
           ) : null}
         </>
-      ) : slideHasPendingPhotoIntent(slide) ? (
+      ) : slideHasPendingPhotoIntent(slide) && !forExport ? (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--text-muted)', fontSize: f.w * 0.024, fontWeight: 600, textAlign: 'center', padding: f.w * 0.04,
@@ -1044,6 +1054,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
 });
 
 const SlideCardInner = React.forwardRef(({
+  /** Árvore offscreen do export (html2canvas): nada de texto de interface no PNG. */
+  forExport = false,
   slide, fmt, brand, num, total, scale = 1, presentationImgFilter, creativePreset = 'livre',
   slideIndex: slideIndexProp,
   showCanvasChrome = false,
@@ -1443,7 +1455,7 @@ const SlideCardInner = React.forwardRef(({
                 <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
               </>
             )}
-            {sandwich && !slide.videoId && !slide.bgImage && (
+            {sandwich && !slide.videoId && !slide.bgImage && !forExport && (
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
                 color:cr.inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
@@ -1457,6 +1469,7 @@ const SlideCardInner = React.forwardRef(({
                 accept="image/*"
                 onChange={onPhotoZoneFileInputChange}
                 onTouchStart={(e) => e.stopPropagation()}
+                className="vc-photo-hit"
                 style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
                 aria-label="Importar imagem na zona da foto"
               />
@@ -1695,13 +1708,14 @@ const SlideCardInner = React.forwardRef(({
                   : undefined
               }
             >
-              {slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto'}
+              {forExport ? '' : (slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto')}
               {flatPhotoNativeHit ? (
                 <input
                   type="file"
                   accept="image/*"
                   onChange={onPhotoZoneFileInputChange}
                   onTouchStart={(e) => e.stopPropagation()}
+                  className="vc-photo-hit"
                   style={{
                     ...VC_PHOTO_ZONE_HIT_LAYER_STYLE,
                     borderRadius: f.w * 0.017,
@@ -1903,6 +1917,7 @@ const SlideCardInner = React.forwardRef(({
         imgErr={imgErr}
         imgLoading={imgLoading}
         showCanvasChrome={showCanvasChrome}
+        forExport={forExport}
         onCanvasPatch={onCanvasPatch}
         onPhotoZoneClick={onPhotoZoneClick}
         onPhotoZoneFileChange={onPhotoZoneNativeFile ? onPhotoZoneFileInputChange : undefined}
@@ -1917,6 +1932,7 @@ const SlideCardInner = React.forwardRef(({
       <ClassicLegadoInsetPhotoColumn
         ref={ref}
         f={f}
+        forExport={forExport}
         slide={slide}
         brand={brand}
         bg={bg}

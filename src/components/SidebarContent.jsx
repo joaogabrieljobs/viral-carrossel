@@ -1000,7 +1000,26 @@ function SidebarContent({
                     action: () => onOpenImageCrop?.(),
                     disabled: !slide.bgImage,
                   },
-                ].map(({ icon: Icon, label, action, disabled })=>(
+                  {
+                    icon: Trash2,
+                    label: 'Excluir',
+                    // Limpa a foto e o enquadramento: sem isto, a próxima imagem
+                    // herdava zoom e posição da anterior. As palavras-chave ficam,
+                    // para poder gerar outra no mesmo tema. Cmd+Z desfaz.
+                    action: () => updateSlide({
+                      bgImage: null,
+                      bgImageFailed: false,
+                      bgImageSource: null,
+                      bgX: 50,
+                      bgY: 50,
+                      bgZoom: 100,
+                      bgFit: 'cover',
+                      bgMirror: false,
+                    }),
+                    disabled: !slide.bgImage,
+                    danger: true,
+                  },
+                ].map(({ icon: Icon, label, action, disabled, danger })=>(
                   <button
                     key={label}
                     type="button"
@@ -1019,8 +1038,8 @@ function SidebarContent({
                     }}
                     onMouseEnter={(e)=>{
                       if (disabled) return;
-                      e.currentTarget.style.color='var(--text-primary)';
-                      e.currentTarget.style.borderColor='var(--accent)';
+                      e.currentTarget.style.color = danger ? '#ff5470' : 'var(--text-primary)';
+                      e.currentTarget.style.borderColor = danger ? '#ff5470' : 'var(--accent)';
                     }}
                     onMouseLeave={(e)=>{
                       if (disabled) return;

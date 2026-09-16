@@ -6,9 +6,11 @@
 
 const memory = new Map();
 
-/** Com Upstash configurado mas em falha, a memória por instância só cobre uns poucos créditos
- *  — sem tecto seria quota ilimitada a cada cold start (auditoria H5). */
-export const DEGRADED_FALLBACK_CAP = 3;
+/** Com Upstash em falha a contagem vive na memória da instância: sem tecto seria
+ *  quota ilimitada a cada cold start (auditoria H5), com tecto baixo demais um
+ *  assinante fica bloqueado a meio de um carrossel. 25 por instância é o meio
+ *  termo até o Redis voltar — o `console.error` abaixo é o sinal para o arranjar. */
+export const DEGRADED_FALLBACK_CAP = 25;
 let _warnedNoUpstash = false;
 
 function hasUpstash() {

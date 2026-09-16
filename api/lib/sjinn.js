@@ -8,9 +8,11 @@ import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
 const BASE = 'https://sjinn.ai/api/un-api';
 const POLL_MS = 5_000;
 const MAX_ATTEMPTS = 30;
-/** Deadline absoluta do polling. Tem de ficar abaixo do `maxDuration` de api/ai/sjinn-image.js (120 s)
- *  com folga para download + refund — senão a Vercel mata a função com o crédito já debitado (auditoria C3). */
-export const SJINN_DEADLINE_MS = 95_000;
+/** Deadline absoluta do polling, abaixo do `maxDuration` de api/ai/sjinn-image.js
+ *  com folga para download + refund. O spike mediu ~82 s por imagem GPT Image 2
+ *  (qa-session/sjinn-spike/report.json), logo 95 s deixava 2 de 3 imagens a morrer
+ *  por timeout do nosso lado — não do SJinn. */
+export const SJINN_DEADLINE_MS = 240_000;
 const SJINN_FETCH_TIMEOUT_MS = 15_000;
 
 function apiKey() {

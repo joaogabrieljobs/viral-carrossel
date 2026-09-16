@@ -195,6 +195,7 @@ function CanvasZonesOverlay({ f, zones, keys, onPatch, swapSlideIdx = null, swap
         return (
           <div
             key={k}
+            data-vc-zone={k}
             style={{
               ...box,
               zIndex: 45,

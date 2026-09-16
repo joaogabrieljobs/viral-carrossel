@@ -599,6 +599,12 @@ export const GLOBAL_STYLE = `
   .vc-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Inputs glass — surface translúcida sobre dark + focus halo magenta */
+  /* Camada de toque da zona da foto: o input tem de existir e ser clicável, mas o
+     controlo nativo (botão + "Nenhum arquivo escolhido") não pode aparecer no card. */
+  .vc-photo-hit { color: transparent !important; font-size: 0 !important; }
+  .vc-photo-hit::-webkit-file-upload-button { display: none !important; }
+  .vc-photo-hit::file-selector-button { display: none !important; }
+
   .vc-input {
     width: 100%;
     background: rgba(255, 255, 255, 0.06);
