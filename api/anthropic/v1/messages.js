@@ -14,6 +14,11 @@ import { consumeRateLimit, rateLimitResponse } from '../../lib/rate-limit.js';
 
 const TARGET = 'https://api.anthropic.com/v1/messages';
 
+/** Mesmo orçamento do proxy compatible: gerar um carrossel passa do default da
+ *  plataforma (segundos), e sem `maxDuration` a função era morta a meio. */
+export const config = { maxDuration: 300 };
+const UPSTREAM_TIMEOUT_MS = 240_000;
+
 export default async function handler(req, res) {
   applyCors(req, res, {
     credentials: true,
@@ -65,6 +70,7 @@ export default async function handler(req, res) {
         'anthropic-version': anthropicVersion,
       },
       body,
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     const text = await upstream.text();
@@ -72,8 +78,14 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', ct);
     return res.status(upstream.status).send(text);
   } catch (e) {
-    return res.status(502).json({
-      error: { message: e?.message || 'Erro no proxy Anthropic' },
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+    return res.status(timedOut ? 504 : 502).json({
+      error: {
+        message: timedOut
+          ? 'A IA demorou demasiado a responder. Tente de novo, com menos cards ou menos material colado em Fontes.'
+          : (e?.message || 'Erro no proxy Anthropic'),
+        code: timedOut ? 'upstream_timeout' : 'upstream_error',
+      },
     });
   }
 }

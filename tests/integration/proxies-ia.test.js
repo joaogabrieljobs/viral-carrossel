@@ -159,3 +159,31 @@ describe('A5 — price desconhecido não ganha imagens', () => {
     expect(resolveTierFromPriceId('price_test_fake')).toBe('creator'); // STRIPE_PRICE_ID legado
   });
 });
+
+describe('Orçamento de tempo do proxy (timeout de geração longa)', () => {
+  it('maxDuration cabe no plano e deixa folga sobre o orçamento das tentativas', async () => {
+    const mod = await import('../../api/ai/compatible.js');
+    expect(mod.config.maxDuration).toBeLessThanOrEqual(300);
+    expect(mod.config.maxDuration * 1000).toBeGreaterThan(240_000);
+  });
+
+  it('cada tentativa aborta com o tempo que resta, não com um valor fixo', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ choices: [{ message: { content: 'ok' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await callCompatible({ provider: 'zai', operation: 'chat', payload: { model: 'glm-4.7', messages: [{ role: 'user', content: 'x' }] } });
+    expect(res.statusCode).toBe(200);
+    const { signal } = fetchMock.mock.calls[0][1];
+    expect(signal).toBeTruthy();
+    expect(signal.aborted).toBe(false);
+  });
+
+  it('timeout do upstream devolve 504 com código e dica acionável', async () => {
+    const err = new Error('The operation was aborted due to timeout');
+    err.name = 'TimeoutError';
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(err));
+    const res = await callCompatible({ provider: 'zai', operation: 'chat', payload: { model: 'glm-4.7', messages: [] } });
+    expect(res.statusCode).toBe(504);
+    expect(res.body.error.code).toBe('upstream_timeout');
+    expect(res.body.error.message).toMatch(/menos cards|menos material/i);
+  });
+});

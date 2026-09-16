@@ -18,9 +18,16 @@ import {
   PLATFORM_MAX_PROMPT_CHARS,
 } from '../../shared/ai-models.js';
 
-/** Tecto da função; o fetch upstream aborta antes (UPSTREAM_TIMEOUT_MS). */
-export const config = { maxDuration: 60 };
-const UPSTREAM_TIMEOUT_MS = 50_000;
+/**
+ * Tecto da função (plano Pro permite até 300 s). Um carrossel de 8-10 cards com
+ * material colado pede ~7k tokens de saída, o que em glm-4.7 passa facilmente de
+ * um minuto — com `maxDuration: 60` + abort a 50 s o pedido morria a meio.
+ * O orçamento abaixo é partilhado pelas duas tentativas: cada fetch aborta com o
+ * tempo que resta, e o retry só corre se ainda houver margem útil.
+ */
+export const config = { maxDuration: 300 };
+const TOTAL_BUDGET_MS = 240_000;
+const MIN_RETRY_BUDGET_MS = 30_000;
 
 function messagesChars(payload) {
   const msgs = Array.isArray(payload?.messages) ? payload.messages : [];
@@ -105,6 +112,9 @@ export default async function handler(req, res) {
       : Math.min(4096, PLATFORM_MAX_TOKENS);
   }
 
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const budgetLeft = () => deadline - Date.now();
+
   try {
     const attemptFetch = async () => fetch(target, {
       method: 'POST',
@@ -113,7 +123,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.max(5_000, budgetLeft())),
     });
 
     let upstream = await attemptFetch();
@@ -129,6 +139,7 @@ export default async function handler(req, res) {
       && operation === 'chat'
       && !upstream.ok
       && (upstream.status === 429 || upstreamErrorCode() === '1305')
+      && budgetLeft() > MIN_RETRY_BUDGET_MS
     ) {
       await new Promise((r) => setTimeout(r, 1200));
       upstream = await attemptFetch();
@@ -159,7 +170,12 @@ export default async function handler(req, res) {
     console.error(`[ai/compatible] ${provider}/${operation}`, error?.message || error);
     const timedOut = error?.name === 'TimeoutError' || error?.name === 'AbortError';
     return res.status(timedOut ? 504 : 502).json({
-      error: { message: timedOut ? 'O provedor de IA demorou demasiado. Tente de novo.' : 'Falha ao conectar ao provedor de IA.' },
+      error: {
+        message: timedOut
+          ? 'A IA demorou demasiado a responder. Tente de novo, com menos cards ou menos material colado em Fontes.'
+          : 'Falha ao conectar ao provedor de IA.',
+        code: timedOut ? 'upstream_timeout' : 'upstream_error',
+      },
     });
   }
 }

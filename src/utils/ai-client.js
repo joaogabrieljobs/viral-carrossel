@@ -10,7 +10,10 @@ import { extractJSON } from './parsers.js';
 import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 
-const TEXT_TIMEOUT_MS = 90_000;
+// Acima do orçamento do proxy (240 s em api/ai/compatible.js): se o cliente
+// abortasse primeiro, o utilizador perdia uma geração que o servidor ainda ia
+// entregar. Só existe para não deixar o botão preso para sempre.
+const TEXT_TIMEOUT_MS = 260_000;
 const textTimeoutSignal = () => {
   const AS = globalThis.AbortSignal; // via globalThis: scripts/check-undefined.mjs não conhece o global
   return AS && typeof AS.timeout === 'function' ? AS.timeout(TEXT_TIMEOUT_MS) : undefined;
