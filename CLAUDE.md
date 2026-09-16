@@ -1,6 +1,6 @@
 # Viral. Carrossel Studio
 
-Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** (`viral-carrossel.vercel.app`). Netlify aposentado em 2026-08-07 — só redireciona 301. Sem banco de utilizadores — cookie `vc_access` + Stripe são a fonte da verdade de acesso; Upstash Redis só guarda a quota mensal de imagens SJinn (`api/lib/image-quota.js`).
+Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** (`viral-carrossel.vercel.app`). Netlify aposentado em 2026-08-07 — só redireciona 301. Sem banco de utilizadores — cookie `vc_access` + Stripe são a fonte da verdade de acesso e também da quota mensal de imagens (contador em `customer.metadata`, ver `api/lib/quota-stripe-store.js`); Upstash Redis é opcional e, quando configurado, assume a contagem por ser atómico. Imagens dos cards vivem em IndexedDB no browser (`src/utils/image-store.js`), não no localStorage.
 
 ## Documentos de contexto (spec-driven)
 

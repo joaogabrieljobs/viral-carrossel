@@ -1,15 +1,20 @@
 /**
- * Quota mensal de imagens SJinn por customerId + período Stripe.
- * Produção: Upstash Redis REST (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN).
- * Dev/testes: Map em memória (não partilha entre instâncias).
+ * Quota mensal de imagens SJinn por customerId + período de facturação.
+ *
+ * Três caminhos, por ordem de preferência:
+ *   1. Upstash Redis REST — incremento atómico, é o melhor quando existe.
+ *   2. Metadados do cliente Stripe — sem serviço extra, sobrevive a cold starts.
+ *      É o que segura a quota desde que a base Upstash deste projeto foi apagada.
+ *   3. Map em memória — só testes e dev com BILLING_DISABLED.
+ *
+ * O caminho 2 existe porque o 3 não é quota nenhuma: reiniciava a cada instância,
+ * logo um assinante gerava sem limite e a plataforma pagava (auditoria H5).
  */
+import { stripeQuotaGet, stripeQuotaConsume, stripeQuotaRefund } from './quota-stripe-store.js';
 
 const memory = new Map();
 
-/** Com Upstash em falha a contagem vive na memória da instância: sem tecto seria
- *  quota ilimitada a cada cold start (auditoria H5), com tecto baixo demais um
- *  assinante fica bloqueado a meio de um carrossel. 25 por instância é o meio
- *  termo até o Redis voltar — o `console.error` abaixo é o sinal para o arranjar. */
+/** Tecto por instância no último recurso (sem Upstash e sem Stripe utilizável). */
 export const DEGRADED_FALLBACK_CAP = 25;
 let _warnedNoUpstash = false;
 
@@ -52,21 +57,40 @@ async function upstash(command) {
   }
 }
 
-/** Tenta Upstash; se Redis estiver offline, usa memória (melhor que bloquear geração). */
-async function withQuotaStore(upstashFn, memoryFn) {
-  if (!hasUpstash()) {
-    if (!_warnedNoUpstash && process.env.VERCEL_ENV === 'production') {
-      _warnedNoUpstash = true;
-      console.error('[image-quota] UPSTASH_REDIS_REST_URL/TOKEN ausentes em produção — quota só em memória por instância.');
+/** Só há Stripe utilizável com um customerId real (dev com BILLING_DISABLED não tem). */
+function podeUsarStripe(customerId) {
+  // Nos testes o Stripe está mockado; o caminho só é exercitado quando o próprio
+  // teste o pede (VC_QUOTA_ALLOW_STRIPE), para os outros ficarem determinísticos.
+  const emTeste = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  if (emTeste && process.env.VC_QUOTA_ALLOW_STRIPE !== '1') return false;
+  const id = String(customerId || '');
+  return id.startsWith('cus_') && !!String(process.env.STRIPE_SECRET_KEY || '').trim();
+}
+
+/**
+ * Executa no primeiro armazenamento disponível: Upstash, senão Stripe, senão
+ * memória. `memoryFn` recebe `degraded: true` quando a contagem deixou de ser
+ * partilhada entre instâncias — é o sinal para aplicar o tecto de último recurso.
+ */
+async function withQuotaStore(upstashFn, memoryFn, stripeFn, customerId) {
+  if (hasUpstash()) {
+    try {
+      return await upstashFn();
+    } catch (e) {
+      console.warn('[image-quota] Upstash falhou:', e?.message || e);
     }
-    return memoryFn({ degraded: process.env.VERCEL_ENV === 'production' });
+  } else if (!_warnedNoUpstash && process.env.VERCEL_ENV === 'production') {
+    _warnedNoUpstash = true;
+    console.warn('[image-quota] sem Upstash — a contagem vai pelos metadados do cliente Stripe.');
   }
-  try {
-    return await upstashFn();
-  } catch (e) {
-    console.warn('[image-quota] Upstash falhou, fallback memória:', e?.message || e);
-    return memoryFn({ degraded: true });
+  if (stripeFn && podeUsarStripe(customerId)) {
+    try {
+      return await stripeFn();
+    } catch (e) {
+      console.error('[image-quota] contador no Stripe falhou:', e?.message || e);
+    }
   }
+  return memoryFn({ degraded: true });
 }
 
 function ttlSeconds(periodEndSec) {
@@ -101,6 +125,8 @@ export async function getQuotaUsage({ customerId, periodStartSec, limit }) {
   const used = Number(await withQuotaStore(
     async () => upstash(['GET', key]),
     async () => memoryGet(key),
+    async () => stripeQuotaGet({ customerId, periodStartSec }),
+    customerId,
   )) || 0;
   const cap = Math.max(0, Number(limit) || 0);
   return {
@@ -143,6 +169,8 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
       }
       return next;
     },
+    async () => stripeQuotaConsume({ customerId, periodStartSec, cap }),
+    customerId,
   )) || 0;
 
   if (used > cap) {
@@ -175,6 +203,8 @@ export async function refundImageCredit({ customerId, periodStartSec }) {
       return Math.max(0, n);
     },
     async () => memoryDecr(key),
+    async () => stripeQuotaRefund({ customerId, periodStartSec }),
+    customerId,
   );
 }
 
