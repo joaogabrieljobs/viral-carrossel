@@ -1258,6 +1258,17 @@ const SlideCardInner = React.forwardRef(({
    * layout sanduíche, o utilizador preenchia estes campos em Marca e nada
    * aparecia no card. Agora é um nó partilhado, montado em todos os ramos.
    */
+  /**
+   * Escalas por item da assinatura (barra editorial, contador, barra do rodapé,
+   * selo). São percentagens com default 100 — o utilizador ajusta em Marca porque
+   * o tamanho certo depende da fonte da marca e do comprimento do texto dele.
+   */
+  const escalaDe = (valor) => Math.min(2, Math.max(0.5, (Number(valor) || 100) / 100));
+  const escHeader = escalaDe(brand.cultureHeaderScale);
+  const escBadge = escalaDe(brand.pageBadgeScale);
+  const escFooterBar = escalaDe(brand.footerBarScale);
+  const escPill = escalaDe(brand.footerPillScale);
+
   const brandHeaderChrome = (
     <>
         {/* Header bar 3-col + badge "N/M" — usado por presets visuais editoriais
@@ -1290,18 +1301,18 @@ const SlideCardInner = React.forwardRef(({
                   pointerEvents: movableElements ? 'auto' : 'none',
                 })}>
                   <span style={{
-                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hLeft}</span>
                   <span style={{
                     flex:1, textAlign:'center',
-                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hCenter}</span>
                   <span style={{
-                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
                   }}>{hRight}</span>
@@ -1311,8 +1322,8 @@ const SlideCardInner = React.forwardRef(({
                 <div {...mov('pageBadge', {
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                   background: badgeBg, color: badgeColor,
-                  padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:9999,
-                  fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
+                  padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
+                  fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:bodyFF,
                   letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
                   pointerEvents: movableElements ? 'auto' : 'none',
@@ -1341,10 +1352,10 @@ const SlideCardInner = React.forwardRef(({
             const [label, value] = String(data).split('|');
             return (
               <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
-                <span style={{ fontSize: f.w*0.020, fontFamily: bodyFF, color: labelColor,
+                <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: bodyFF, color: labelColor,
                   letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
                 {value && (
-                  <span style={{ fontSize: f.w*0.022, fontFamily: bodyFF, color: valueColor,
+                  <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: bodyFF, color: valueColor,
                     fontWeight: 700 }}>{value}</span>
                 )}
               </div>
@@ -1369,7 +1380,7 @@ const SlideCardInner = React.forwardRef(({
           // Default true se undefined; só esconde quando explicitamente false.
           const showArrow = brand.footerPillArrow !== false;
           // Padding-right encolhe quando não tem seta (visual mais compacto).
-          const padRight = showArrow ? f.w*0.014 : f.w*0.028;
+          const padRight = (showArrow ? f.w*0.014 : f.w*0.028) * escPill;
           return (
             <div {...mov('pill', {
               position:'absolute', bottom: f.h*0.058,
@@ -1378,10 +1389,10 @@ const SlideCardInner = React.forwardRef(({
             })}>
               <div style={{
                 background: pillBg, color: pillFg,
-                padding: `${f.h*0.012}px ${padRight}px ${f.h*0.012}px ${f.w*0.028}px`,
+                padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
                 borderRadius: 9999,
                 display:'inline-flex', alignItems:'center', gap: f.w*0.018,
-                fontSize: f.w*0.026, fontWeight:700, fontFamily: bodyFF,
+                fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: bodyFF,
                 letterSpacing:'-0.011em', whiteSpace:'nowrap',
                 textTransform: 'uppercase',
                 boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
@@ -1389,10 +1400,10 @@ const SlideCardInner = React.forwardRef(({
                 {brand.footerPillText}
                 {showArrow && (
                   <span style={{
-                    width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
+                    width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',
                     background: pillFg, color: pillBg,
                     display:'inline-flex', alignItems:'center', justifyContent:'center',
-                    fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
+                    fontSize: f.w*0.030*escPill, fontWeight:700, lineHeight:1,
                     flexShrink:0,
                   }}>→</span>
                 )}

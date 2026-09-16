@@ -179,6 +179,47 @@ function SidebarContent({
 }) {
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
+  /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
+  const BarraTamanho = ({ campo, rotulo, padrao = 100 }) => {
+    const valor = Number(brand[campo] ?? padrao);
+    return (
+      <div style={{ display:'grid', gap:4, marginTop:8 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+          <label htmlFor={`vc-tam-${campo}`} className="vc-label-sm">{rotulo}</label>
+          <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono, var(--font-ui))' }}>
+            {Math.round(valor)}%
+          </span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <input
+            id={`vc-tam-${campo}`}
+            type="range"
+            min={50}
+            max={200}
+            step={5}
+            value={valor}
+            onChange={(e) => setBrand({ ...brand, [campo]: Number(e.target.value) })}
+            style={{ flex:1 }}
+            aria-label={`${rotulo} em percentagem`}
+          />
+          <button
+            type="button"
+            onClick={() => setBrand({ ...brand, [campo]: padrao })}
+            disabled={Math.round(valor) === padrao}
+            title="Voltar ao tamanho padrão"
+            style={{
+              height:24, padding:'0 8px', borderRadius:9999, cursor: Math.round(valor) === padrao ? 'default' : 'pointer',
+              border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-muted)',
+              fontSize:10, fontFamily:'var(--font-ui)', opacity: Math.round(valor) === padrao ? 0.5 : 1,
+            }}
+          >
+            padrão
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const applyDalleQuery = async (q) => {
     if (!hasOpenAI) { toast?.('Para gerar imagens, confirme o seu plano ou a sua chave em Configurar IA.', 'error'); return; }
     updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
@@ -2128,6 +2169,7 @@ function SidebarContent({
                     style={{ fontSize:12 }}
                   />
                 </div>
+                <BarraTamanho campo="cultureHeaderScale" rotulo="Tamanho da barra" />
               </S>
             )}
 
@@ -2178,6 +2220,7 @@ function SidebarContent({
                       />
                       Mostrar seta circular
                     </label>
+                    <BarraTamanho campo="footerPillScale" rotulo="Tamanho do selo" />
                   </>
                 ) : null}
               </S>
@@ -2204,6 +2247,7 @@ function SidebarContent({
                     />
                   </div>
                 ))}
+                <BarraTamanho campo="footerBarScale" rotulo="Tamanho do rodapé" />
               </S>
             )}
 
@@ -2223,6 +2267,9 @@ function SidebarContent({
                     {rotulo}
                   </label>
                 ))}
+                              {brand.showPageBadge && (
+                  <BarraTamanho campo="pageBadgeScale" rotulo="Tamanho do contador N/M" />
+                )}
               </S>
             )}
 

@@ -169,6 +169,9 @@ const DEFAULT_BRAND = {
   logoPosition: 'tr',     // canto: 'tl' | 'tr' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
   /** Barra editorial fina no topo dos cards (modo Tendência/Cultura) — opcional. */
+  /** Tamanho de cada item da assinatura, em % (100 = tamanho de origem do padrão).
+   *  Ajustável em Marca porque o certo depende da fonte e do comprimento do texto. */
+  cultureHeaderScale: 100, pageBadgeScale: 100, footerBarScale: 100, footerPillScale: 100,
   cultureHeaderLeft: '',
   /** Ex.: 2026 — mostrado como “2026 //” à direita da barra. */
   cultureHeaderYear: '',
