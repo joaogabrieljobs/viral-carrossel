@@ -3,16 +3,36 @@ import { SK } from './storage.js';
 import { uid } from './doc-schema.js';
 
 /** Landing de introdução: entrada padrão do site até o utilizador clicar Entrar. */
+/**
+ * Decisão pura (testável): a landing entra ou não?
+ *
+ * `main.jsx` usa isto para escolher o bundle: landing-only (`LandingFirst`) ou o
+ * studio completo. Qualquer URL de RETORNO de um fluxo externo tem de carregar o
+ * studio, porque é lá que vive o tratamento desses params (`useAccess`): limpar a
+ * query e abrir paywall/login. Antes só `billing=restored|success` e
+ * `login=google|password` saltavam a landing, então quem cancelava o checkout e
+ * voltava em `?billing=cancel` caía na landing — sem paywall e com o param preso
+ * na URL, porque `useAccess` nunca chegava a montar.
+ *
+ * @param {string} search  query string (com ou sem '?')
+ * @param {boolean} dismissed  landing já dispensada nesta aba
+ */
+function landingGateDecision(search, dismissed) {
+  const q = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+  if (q.get('app') === '1' || q.get('studio') === '1') return false;
+  // Retorno de checkout (success/cancel/restored) ou de login (qualquer estado,
+  // incluindo no_subscription e denied): o studio trata e mostra o que falta.
+  if (q.has('billing') || q.has('login')) return false;
+  if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') return true;
+  return !dismissed;
+}
+
 function shouldShowOnboardingLanding() {
   if (typeof window === 'undefined') return false;
   try {
-    const q = new URLSearchParams(window.location.search);
-    if (q.get('app') === '1' || q.get('studio') === '1') return false;
-    // Retorno de login/checkout: ir direto ao studio (não reabrir a landing).
-    if (q.get('billing') === 'restored' || q.get('billing') === 'success') return false;
-    if (q.get('login') === 'google' || q.get('login') === 'password') return false;
-    if (q.get('landing') === '1' || q.get('intro') === '1' || q.get('welcome') === '1') return true;
-    return sessionStorage.getItem(SK.landingDismissed) !== '1';
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem(SK.landingDismissed) === '1'; } catch { dismissed = false; }
+    return landingGateDecision(window.location.search, dismissed);
   } catch {
     return true;
   }
@@ -45,6 +65,7 @@ const mkLibEntry = (doc, name = 'Sem título') => {
 };
 
 export {
+  landingGateDecision,
   shouldShowOnboardingLanding,
   dismissOnboardingLanding,
   mkLibEntry,

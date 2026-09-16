@@ -13,8 +13,12 @@ test.describe('Landing (RF-01)', () => {
     await mockApi(page);
     await page.goto('/?landing=1');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Carrossel que prende');
-    await expect(page.getByRole('button', { name: /entrar no studio/i }).first()).toBeVisible();
+    // Headline conforme docs/LANDING-COPY.md §hero — 'prendem até o fim' é a
+    // parte em cor de destaque, logo o pedaço mais estável para ancorar.
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('prendem até o fim');
+    // CTA principal e secundário conforme docs/LANDING-COPY.md §hero.
+    await expect(page.getByRole('button', { name: /criar meu primeiro carrossel/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /ver como funciona/i }).first()).toBeVisible();
 
     expect(errosConsole, `Erros de console na landing:\n${errosConsole.join('\n')}`).toEqual([]);
   });
