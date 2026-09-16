@@ -1415,11 +1415,11 @@ const SlideCardInner = React.forwardRef(({
   );
 
   let inner;
+  // Só com a composição LIGADA é que o card usa zonas de altura fixa. Desligada,
+  // o texto corre livre no card inteiro: era o que faltava para aumentar o
+  // subtítulo sem ele sair da área visível.
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
-  // Zonas guardadas renderizam mesmo com a edição desativada — igual ao sanduíche.
-  // Antes, «Desativar composição» derrubava o card para o layout legado e a foto
-  // ajustada «saía do lugar» (bug 2026-09-15). Remover a composição = canvas null.
-  const cvHasZones = !!(slide.canvas && slide.canvas.zones && typeof slide.canvas.zones === 'object');
+  const cvHasZones = cvEnabled;
   const cvVar = slide.canvas?.variant;
   const cultureLayoutInferred = inferCanvasDefaults(slide, creativePreset);
   const cultureVariantForLayout = slide.canvas?.variant ?? cultureLayoutInferred.variant;
@@ -1427,7 +1427,10 @@ const SlideCardInner = React.forwardRef(({
     slide.canvas?.zones && typeof slide.canvas.zones === 'object'
       ? slide.canvas.zones
       : cultureLayoutInferred.zones;
+  // Idem para os layouts sanduíche: sem composição ligada usa-se a variante
+  // fluida (mais abaixo), que cresce com o texto em vez de o cortar.
   const useCultureCanvasZones =
+    cvEnabled &&
     (sandwich || cultureStatFlat) &&
     (cultureVariantForLayout === 'sandwich' || cultureVariantForLayout === 'stat');
 
@@ -2137,6 +2140,12 @@ const SlideCardInner = React.forwardRef(({
       />
     );
   } else {
+    const fullBleedNativeHit = !!(
+      !slide.bgImage
+      && slideHasPendingPhotoIntent(slide)
+      && onPhotoZoneClick
+      && onPhotoZoneNativeFile
+    );
     inner = (
     <div
       ref={ref}
@@ -2163,6 +2172,36 @@ const SlideCardInner = React.forwardRef(({
                 }),
             ...(effectivePresentationFilter ? { filter: effectivePresentationFilter } : {}),
           }}/>
+        </div>
+      )}
+      {/* Sem foto ainda: a área inteira convida ao toque. Com a composição
+          desligada (o normal) este ramo passou a ser o dos cards de template e
+          de geração, e sem isto o convite "toque para inserir" não existia. */}
+      {!slide.bgImage && !slide.videoId && slideHasPendingPhotoIntent(slide) && !forExport && (
+        <div
+          role={onPhotoZoneClick && !fullBleedNativeHit ? 'button' : undefined}
+          tabIndex={onPhotoZoneClick && !fullBleedNativeHit ? 0 : undefined}
+          onClick={onPhotoZoneClick && !fullBleedNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
+          style={{
+            position:'absolute', inset:0, zIndex:3,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            padding: f.w*0.06, textAlign:'center',
+            color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF,
+            cursor: onPhotoZoneClick ? 'pointer' : undefined,
+          }}
+        >
+          {slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto'}
+          {fullBleedNativeHit ? (
+            <input
+              type="file"
+              accept="image/*"
+              onChange={onPhotoZoneFileInputChange}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="vc-photo-hit"
+              style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
+              aria-label="Importar imagem na zona da foto"
+            />
+          ) : null}
         </div>
       )}
       {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (

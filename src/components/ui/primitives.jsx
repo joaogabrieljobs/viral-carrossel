@@ -21,6 +21,7 @@ const Slider = ({ label, value, min, max, onChange }) => {
         type="range" min={min} max={max} value={value}
         onChange={(e) => apply(e.target.value)}
         onInput={(e) => apply(e.target.value)}
+        aria-label={typeof label === 'string' ? label : undefined}
         style={{ '--pct': `${pct}%`, touchAction: 'pan-x', minHeight: 32 }}
       />
     </div>

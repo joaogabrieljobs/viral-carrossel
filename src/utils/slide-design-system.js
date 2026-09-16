@@ -271,8 +271,13 @@ export function applyCompositionToSlide(slide, compositionId, zonesByKey = {}) {
   };
   if (scale.bodyAfterSize != null) next.bodyAfterSize = scale.bodyAfterSize;
   if (zones && comp.canvasVariant) {
+    // Zonas ficam guardadas como ponto de partida, mas a composição entra
+    // DESLIGADA: templates e geração não podem prender o texto numa moldura de
+    // altura fixa sem o utilizador pedir. Com ela desligada o texto usa o card
+    // inteiro e crescer o subtítulo não o faz desaparecer; ligar é um clique em
+    // Layout → Ativar composição.
     next.canvas = {
-      enabled: true,
+      enabled: false,
       variant: comp.canvasVariant,
       zones: { ...zones },
     };
