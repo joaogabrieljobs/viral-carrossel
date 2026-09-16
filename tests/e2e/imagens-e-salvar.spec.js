@@ -35,6 +35,7 @@ test.describe('Imagens do plano', () => {
 
 test.describe('Salvar projeto', () => {
   test('botão Salvar confirma a gravação e persiste depois do reload', async ({ page }) => {
+    test.setTimeout(60_000); // boot + reload com CPU dividida entre workers
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
     const continuar = page.getByRole('button', { name: /continuar no editor/i });

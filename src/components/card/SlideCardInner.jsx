@@ -2174,19 +2174,24 @@ const SlideCardInner = React.forwardRef(({
           }}/>
         </div>
       )}
-      {/* Sem foto ainda: a área inteira convida ao toque. Com a composição
-          desligada (o normal) este ramo passou a ser o dos cards de template e
-          de geração, e sem isto o convite "toque para inserir" não existia. */}
+      {/* Sem foto ainda: convite ao toque numa MOLDURA delimitada, acima do bloco
+          de texto. Ocupar o card inteiro roubava o ponteiro — clicar em qualquer
+          sítio abria o seletor de ficheiros e não se conseguia arrastar o texto. */}
       {!slide.bgImage && !slide.videoId && slideHasPendingPhotoIntent(slide) && !forExport && (
         <div
           role={onPhotoZoneClick && !fullBleedNativeHit ? 'button' : undefined}
           tabIndex={onPhotoZoneClick && !fullBleedNativeHit ? 0 : undefined}
           onClick={onPhotoZoneClick && !fullBleedNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
           style={{
-            position:'absolute', inset:0, zIndex:3,
+            position:'absolute', zIndex:3,
+            left: f.w*0.2, width: f.w*0.6,
+            top: f.h*0.1, height: f.h*0.24,
             display:'flex', alignItems:'center', justifyContent:'center',
-            padding: f.w*0.06, textAlign:'center',
-            color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF,
+            padding: f.w*0.03, textAlign:'center',
+            border:`${Math.max(1, f.w*0.002)}px dashed rgba(255,255,255,0.28)`,
+            borderRadius: f.w*0.02,
+            background:'rgba(255,255,255,0.04)',
+            color:'rgba(255,255,255,0.5)', fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
             cursor: onPhotoZoneClick ? 'pointer' : undefined,
           }}
         >

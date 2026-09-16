@@ -99,3 +99,41 @@ test.describe('Texto não desaparece ao crescer', () => {
     expect(m.fracaoDoCard, 'com composição ligada o texto fica numa moldura').toBeLessThan(0.9);
   });
 });
+
+test.describe('Convite para inserir foto não rouba o card', () => {
+  test('a zona de toque é delimitada e não cobre os textos', async ({ page }) => {
+    test.setTimeout(120_000);
+    await prepararCardComSubtituloLongo(page);
+
+    const m = await page.evaluate(() => {
+      const tree = document.querySelector('[data-vc-export-tree]');
+      const card = [...document.querySelectorAll('div')]
+        .filter((e) => e.style.width === '1080px' && e.style.height === '1350px')
+        .filter((e) => !tree || !tree.contains(e))
+        .find((e) => e.getBoundingClientRect().left > 0);
+      if (!card) return null;
+      const cr = card.getBoundingClientRect();
+      const hit = card.querySelector('input[type="file"].vc-photo-hit');
+      if (!hit) return { semZona: true };
+      const hr = hit.getBoundingClientRect();
+      const frac = (hr.width * hr.height) / (cr.width * cr.height);
+      const textos = ['title', 'subtitle', 'text'].map((chave) => {
+        const el = card.querySelector(`[data-vc-movable="${chave}"]`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        const sobrepoe = !(r.right < hr.left || r.left > hr.right || r.bottom < hr.top || r.top > hr.bottom);
+        return { chave, sobrepoe };
+      }).filter(Boolean);
+      return { fracaoDoCard: +frac.toFixed(3), textos };
+    });
+
+    expect(m, 'card não encontrado').not.toBeNull();
+    if (m.semZona) return; // card sem intenção de foto: nada a medir
+    // Cobrir o card inteiro tirava o clique e o arrasto dos textos.
+    expect(m.fracaoDoCard, `zona de foto ocupa ${m.fracaoDoCard} do card`).toBeLessThan(0.3);
+    expect(m.textos.length, 'nenhum texto arrastável medido').toBeGreaterThan(0);
+    for (const t of m.textos) {
+      expect(t.sobrepoe, `zona de foto sobrepõe o ${t.chave}`).toBe(false);
+    }
+  });
+});
