@@ -1500,6 +1500,10 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
+  /* Desktop estreito: header de 1 linha não cabe (grupo direito = 730px). */
+  const headerTight = !isMobile && vw < 1200;
+  /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
+  const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const previewScale = useMemo(() => {
     if (isMobile) {
@@ -1609,6 +1613,49 @@ export default function App() {
       <Sparkles size={14} />
       {isMobile ? 'Gerar' : 'Gerar com IA'}
     </button>
+  );
+
+  /* Histórico (desfazer/refazer) + formato de exportação. No desktop largo
+     vive à direita; abaixo de 1200px desce para a 2ª linha do header. */
+  const historyFormatGroup = (
+    <>
+        <div style={{
+          display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
+          borderRadius: 9999, padding: 3, gap: 0, border: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          <button
+            type="button"
+            onClick={history.undo}
+            disabled={!history.canUndo}
+            title="Desfazer (⌘Z)"
+            aria-label="Desfazer"
+            style={{
+              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
+              color: 'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: history.canUndo ? 1 : 0.35,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
+          </button>
+          <button
+            type="button"
+            onClick={history.redo}
+            disabled={!history.canRedo}
+            title="Refazer (⌘⇧Z)"
+            aria-label="Refazer"
+            style={{
+              width: 32, height: 30, borderRadius: 9999, border: 'none', background: 'transparent',
+              color: 'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: history.canRedo ? 1 : 0.35,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
+          </button>
+        </div>
+        <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
+    </>
   );
 
   const editorHeaderActions = (
@@ -3038,11 +3085,21 @@ Retorne APENAS JSON: ${refineAllWantsBody
           maxHeight: drawerOpen ? 0 : 240,
         } : {
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+          /* Direita = auto (largura de conteúdo). Com 1fr o grupo de
+             ferramentas transbordava para a esquerda e sobrepunha o CTA
+             "Gerar com IA" (28px a 1440px, 87px a 1100px). */
+          gridTemplateColumns: 'minmax(0, 1fr) auto auto',
           alignItems: 'center',
-          padding: 'env(safe-area-inset-top, 0) 14px 0',
-          height: `calc(56px + env(safe-area-inset-top, 0))`,
-          gap: 12,
+          ...(headerTight ? {
+            /* 2 linhas: histórico + formato descem, em vez de sobrepor o CTA. */
+            padding: 'env(safe-area-inset-top, 0) 14px 8px',
+            rowGap: 8,
+            columnGap: 12,
+          } : {
+            padding: 'env(safe-area-inset-top, 0) 14px 0',
+            height: `calc(56px + env(safe-area-inset-top, 0))`,
+            gap: 12,
+          }),
         }),
       }}>
         {isMobile ? (
@@ -3113,7 +3170,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         ) : (
           <>
         {/* Esquerda — marca + Projetos */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
           <BrandLogo height={26} style={{ maxWidth: 220 }} />
           <div style={{ minWidth: 0 }}>
             {activeEntry && (
@@ -3134,7 +3191,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   style={{
                     fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    maxWidth: headerVeryTight ? 110 : 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textAlign: 'left',
                   }}
                   title="Clique para renomear"
@@ -3160,7 +3217,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             )}
           </div>
-          {editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
+          {!headerVeryTight && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -3170,45 +3227,17 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
         {/* Direita — ferramentas + Perfil (extremo direito) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', background: 'var(--bg-card)',
-            borderRadius: 9999, padding: 3, gap: 0, border: '1px solid var(--border)', flexShrink: 0,
-          }}>
-            <button
-              type="button"
-              onClick={history.undo}
-              disabled={!history.canUndo}
-              title="Desfazer (⌘Z)"
-              aria-label="Desfazer"
-              style={{
-                width: 28, height: 26, borderRadius: 9999, border: 'none', background: 'transparent',
-                color: 'var(--text-muted)', cursor: history.canUndo ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: history.canUndo ? 1 : 0.35,
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7L3 9"/></svg>
-            </button>
-            <button
-              type="button"
-              onClick={history.redo}
-              disabled={!history.canRedo}
-              title="Refazer (⌘⇧Z)"
-              aria-label="Refazer"
-              style={{
-                width: 28, height: 26, borderRadius: 9999, border: 'none', background: 'transparent',
-                color: 'var(--text-muted)', cursor: history.canRedo ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: history.canRedo ? 1 : 0.35,
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7l3 3"/></svg>
-            </button>
-          </div>
-          <EditorFormatSelector fmt={fmt} setFmt={setFmt} layout="desktop" />
+          {!headerTight && historyFormatGroup}
           {editorHeaderActions}
           {editorAccountNav}
         </div>
+
+        {/* Linha 2 (desktop estreito) — histórico + formato */}
+        {headerTight && (
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {historyFormatGroup}
+          </div>
+        )}
           </>
         )}
       </header>

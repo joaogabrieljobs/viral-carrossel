@@ -73,8 +73,8 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
                     // 3 botões dividirem largura igualmente; no desktop
                     // fica padding natural (auto-width pill clássico).
                     flex: layout === 'mobile' ? '1 1 0' : 'initial',
-                    minHeight: layout === 'mobile' ? 32 : undefined,
-                    padding: layout === 'mobile' ? '6px 10px' : '5px 14px',
+                    minHeight: 32,
+                    padding: layout === 'mobile' ? '6px 10px' : '6px 14px',
                     borderRadius: 9999,
                     fontSize: layout === 'mobile' ? 12 : 13,
                     fontWeight: isActive ? 600 : 400,

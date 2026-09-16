@@ -1726,7 +1726,7 @@ function SidebarContent({
                         {brandRoster.find(b => b.id === activeBrandId)?.name || 'Perfil personalizado'}
                       </div>
                       <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em' }}>
-                        {brandRoster.length} {brandRoster.length === 1 ? 'perfil' : 'perfis'} salvos
+                        {brandRoster.length} {brandRoster.length === 1 ? 'perfil salvo' : 'perfis salvos'}
                       </div>
                     </div>
                   </div>

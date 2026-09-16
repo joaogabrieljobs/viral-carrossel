@@ -846,11 +846,19 @@ export const GLOBAL_STYLE = `
     letter-spacing: -0.011em;
   }
 
+  /* Canto inferior direito: no topo-centro os toasts tapavam a tira de
+     miniaturas e o topo do card 01 (ver docs/ux-audit-editor-2026-09-16.md). */
   .toast-stack {
-    position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
-    z-index: 60; display: flex; flex-direction: column; gap: 8px;
-    width: min(420px, calc(100vw - 24px));
+    position: fixed; bottom: 76px; right: 16px; left: auto; top: auto;
+    z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+    width: min(420px, calc(100vw - 32px));
     pointer-events: none;
+  }
+  @media (max-width: 767px) {
+    .toast-stack {
+      left: 12px; right: 12px; width: auto; align-items: stretch;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    }
   }
   .toast-item {
     display: flex; align-items: flex-start; gap: 10px;
