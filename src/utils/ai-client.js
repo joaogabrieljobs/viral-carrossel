@@ -221,15 +221,15 @@ function translateProviderError(provider, status, data, raw) {
   const msg = String(data?.error?.message || data?.message || '').trim();
   const code = String(data?.error?.code || data?.code || '');
   if (code === '1305' || /overloaded|try again later/i.test(msg)) {
-    return 'Z.ai está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
+    return 'A Viral AI está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
   }
   if (status === 401 || /token expired|incorrect|unauthorized/i.test(msg)) {
     return 'A IA incluída no plano está indisponível neste momento. Tente de novo em instantes — se persistir, fale com o suporte.';
   }
   if (status === 429) {
-    return 'Muitos pedidos à Z.ai. Espera um momento e tenta de novo.';
+    return 'Muitos pedidos à Viral AI. Espera um momento e tenta de novo.';
   }
-  return msg || `${provider === 'zai' ? 'Z.ai' : 'Kimi'} HTTP ${status}`;
+  return msg || `${provider === 'zai' ? 'Viral AI' : 'Kimi'} HTTP ${status}`;
 }
 
 const callCompatibleChat = async (
@@ -277,7 +277,7 @@ const callCompatibleChat = async (
         signal: textTimeoutSignal(),
       });
     } catch (error) {
-      throw enhanceNetworkError(error, provider === 'zai' ? 'Z.ai' : 'Kimi');
+      throw enhanceNetworkError(error, provider === 'zai' ? 'Viral AI' : 'Kimi');
     }
 
     // 429 do rate-limiter do PROXY (traz Retry-After) — não é overload da Z.ai; cascatear
@@ -294,7 +294,7 @@ const callCompatibleChat = async (
     let data;
     try { data = JSON.parse(raw); }
     catch {
-      lastError = new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
+      lastError = new Error(`${provider === 'zai' ? 'Viral AI' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
       continue;
     }
 
@@ -313,14 +313,14 @@ const callCompatibleChat = async (
 
     const text = data.choices?.[0]?.message?.content || '';
     if (!text.trim()) {
-      lastError = new Error(`${provider === 'zai' ? 'Z.ai' : 'Kimi'} retornou conteúdo vazio.`);
+      lastError = new Error(`${provider === 'zai' ? 'Viral AI' : 'Kimi'} retornou conteúdo vazio.`);
       if (i < modelCandidates.length - 1) continue;
       throw lastError;
     }
     return json ? extractJSON(text) : text.trim();
   }
 
-  throw lastError || new Error('Z.ai indisponível. Tenta de novo.');
+  throw lastError || new Error('Viral AI indisponível. Tenta de novo.');
 };
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
@@ -442,7 +442,7 @@ function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference =
 
 async function generateZaiImage(q, imgParams, imgExtraPrompt) {
   const apiKey = getProviderKey('zai');
-  if (!apiKey) throw new Error('Falta a chave da Z.ai. Adicione-a em Configurar IA.');
+  if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
   const payload = {
@@ -470,18 +470,18 @@ async function generateZaiImage(q, imgParams, imgExtraPrompt) {
       body: JSON.stringify(body),
     });
   } catch (error) {
-    throw enhanceNetworkError(error, 'Z.ai Image');
+    throw enhanceNetworkError(error, 'Provedor de imagem');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error || data.code) {
-    throw new Error(data?.error?.message || data?.message || `Z.ai Image HTTP ${res.status}`);
+    throw new Error(data?.error?.message || data?.message || `Provedor de imagem HTTP ${res.status}`);
   }
   const image = data.data?.[0];
   if (image?.b64_json) {
     return `data:${image.mime || 'image/png'};base64,${image.b64_json}`;
   }
   if (image?.url) return image.url;
-  throw new Error('Z.ai não retornou a imagem.');
+  throw new Error('O provedor não retornou a imagem.');
 }
 
 // Lista de modelos OpenAI tentados em ordem (do mais novo/melhor pro mais antigo).

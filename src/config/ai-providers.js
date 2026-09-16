@@ -27,16 +27,14 @@ export const TEXT_PROVIDERS = {
   },
   zai: {
     id: 'zai',
-    name: 'Z.ai',
-    short: 'GLM',
-    keyLabel: 'Chave Z.ai',
-    placeholder: 'Cole sua chave Z.ai',
-    keyUrl: 'https://z.ai/manage-apikey/apikey-list',
+    // Nome de produto: o fornecedor por trás do texto incluso não aparece na UI.
+    name: 'Viral AI',
+    short: 'IA do Viral',
+    platform: true,
     models: [
-      { id: 'glm-4.7-flash', name: 'GLM-4.7 Flash', note: 'Grátis', tier: 'free' },
-      { id: 'glm-4.7-flashx', name: 'GLM-4.7 FlashX', note: 'Muito barato', tier: 'economy' },
-      { id: 'glm-4.7', name: 'GLM-4.7', note: 'Melhor equilíbrio', tier: 'balanced' },
-      { id: 'glm-5.2', name: 'GLM-5.2', note: 'Máxima qualidade', tier: 'quality' },
+      { id: 'glm-4.7-flashx', name: 'Viral AI Rápido', note: 'Mais econômico', tier: 'economy' },
+      { id: 'glm-4.7', name: 'Viral AI', note: 'Melhor equilíbrio', tier: 'balanced' },
+      { id: 'glm-5.2', name: 'Viral AI Pro', note: 'Máxima qualidade', tier: 'quality' },
     ],
   },
   kimi: {
@@ -66,9 +64,11 @@ export const IMAGE_PROVIDERS = {
   },
   zai: {
     id: 'zai',
-    name: 'Z.ai',
+    name: 'CogView',
     short: 'GLM Image',
     keyProvider: 'zai',
+    // Exige chave própria do fornecedor do texto incluso — escondido da UI.
+    hidden: true,
     models: [
       { id: 'cogview-4-250304', name: 'CogView-4', note: 'US$ 0,01/imagem', tier: 'economy' },
       { id: 'glm-image', name: 'GLM-Image', note: 'US$ 0,015/imagem', tier: 'balanced' },
@@ -125,6 +125,10 @@ export function normalizeAISettings(value = {}) {
   }
   if (next.textProvider === 'zai' && next.textModels.zai === 'glm-4.7-flash') {
     next.textModels.zai = DEFAULT_AI_SETTINGS.textModels.zai;
+  }
+  // Provedor de imagem escondido da UI: quem o tinha volta ao OpenAI.
+  if (IMAGE_PROVIDERS[next.imageProvider]?.hidden) {
+    next.imageProvider = DEFAULT_AI_SETTINGS.imageProvider;
   }
   return next;
 }

@@ -659,7 +659,7 @@ function GenerateModal({
                     border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
                     fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
                   }}>
-                    Sem provedor de imagem, o carrossel sai com texto e palavras-chave. Depois use Upload/URL em cada card, ou configure OpenAI/Z.ai em ⚙.
+                    Sem provedor de imagem, o carrossel sai com texto e palavras-chave. Depois use Upload/URL em cada card, ou configure uma chave OpenAI em ⚙.
                   </div>
                 )}
                 {!hasOpenAI && (
@@ -670,7 +670,7 @@ function GenerateModal({
                     display:'flex', flexDirection:'column', gap:8,
                   }}>
                     <div>
-                      Em ⚙ → Configuração escolha <b>OpenAI</b> (GPT Image) ou <b>Z.ai</b> (CogView/GLM-Image) e cole a chave.
+                      Em ⚙ → Configuração escolha <b>OpenAI</b> (GPT Image) e cole a chave.
                     </div>
                     {onOpenKeys && (
                       <button

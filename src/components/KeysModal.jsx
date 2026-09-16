@@ -14,16 +14,16 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Z.ai GLM-4.7 — texto incluso no plano',
+    note: 'Viral AI Rápido — texto incluso no plano',
     textProvider: 'zai',
-    textModel: 'glm-4.7',
+    textModel: 'glm-4.7-flashx',
     imageProvider: 'openai',
     imageModel: 'gpt-image-2',
   },
   {
     id: 'balanced',
     name: 'Equilíbrio',
-    note: 'Z.ai GLM-4.7 — texto incluso no plano',
+    note: 'Viral AI — texto incluso no plano',
     textProvider: 'zai',
     textModel: 'glm-4.7',
     imageProvider: 'openai',
@@ -32,7 +32,7 @@ const PRESETS = [
   {
     id: 'quality',
     name: 'Qualidade',
-    note: 'Z.ai GLM-5.2 — texto incluso no plano',
+    note: 'Viral AI Pro — texto incluso no plano',
     textProvider: 'zai',
     textModel: 'glm-5.2',
     imageProvider: 'openai',
@@ -129,7 +129,7 @@ function ModelSelect({ provider, value, onChange }) {
             <span>
               <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>{model.name}</span>
               <span style={{ display: 'block', marginTop: 2, fontSize: 10, color: 'var(--text-muted)' }}>
-                {model.id}
+                {provider.platform ? 'Incluso no plano' : model.id}
               </span>
             </span>
             <span style={{
@@ -168,7 +168,7 @@ export default function KeysModal({
 
   const requiredKeys = useMemo(() => {
     const ids = new Set();
-    // Z.ai = texto incluso (chave no servidor). Outros provedores exigem BYOK.
+    // Viral AI (zai) = texto incluso (chave no servidor). Outros provedores exigem BYOK.
     if (draft.textProvider && draft.textProvider !== 'zai') {
       ids.add(draft.textProvider);
     }
@@ -253,7 +253,7 @@ export default function KeysModal({
                 Configurar IA
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                Texto: sua chave (padrão Z.ai). Imagens inclusas no plano — ou a sua, no Essencial.
+                Texto e imagens inclusos no plano com a Viral AI. Chave própria é opcional.
               </p>
             </div>
           </div>
@@ -458,14 +458,14 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Z.ai) — sem chave.
+                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Viral AI) — sem chave.
                       </p>
                     ) : (
                       <>
                         <div>
                           <div className="vc-label" style={{ marginBottom: 8 }}>1. Provedor de imagem</div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-                            {Object.values(IMAGE_PROVIDERS).map((provider) => (
+                            {Object.values(IMAGE_PROVIDERS).filter((p) => !p.hidden).map((provider) => (
                               <ProviderCard
                                 key={provider.id}
                                 provider={provider}
@@ -533,7 +533,7 @@ export default function KeysModal({
               </div>
 
               <div style={{ display: 'grid', gap: 12 }}>
-                {Object.values(TEXT_PROVIDERS).map((provider) => {
+                {Object.values(TEXT_PROVIDERS).filter((p) => !p.platform).map((provider) => {
                   const required = requiredKeys.has(provider.id);
                   return (
                     <div

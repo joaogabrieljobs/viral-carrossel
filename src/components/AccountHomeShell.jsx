@@ -139,6 +139,29 @@ function AccountHomeShell({
     gap: 6,
   };
 
+  // Perfil e Imagens abrem por cima do trabalho: fechar volta ao editor quando há
+  // projeto aberto, senão à lista de projetos.
+  const fecharConta = () => {
+    if (activeDocId && onContinueEditor) onContinueEditor();
+    else setAccountTab?.('projects');
+  };
+  const fecharBtn = (
+    <button
+      type="button"
+      onClick={fecharConta}
+      aria-label="Fechar"
+      title="Fechar"
+      style={{
+        width: 40, height: 40, borderRadius: 9999,
+        border: '1px solid var(--border)', background: 'var(--bg-card)',
+        color: 'var(--text-secondary)', cursor: 'pointer',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <X size={18} />
+    </button>
+  );
+
   return (
     <div
       data-vc-tour="account-home"
@@ -280,6 +303,11 @@ function AccountHomeShell({
           display: 'grid', gap: isMobile ? 22 : 28,
         }}>
           {accountTab === 'images' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? -14 : -20 }}>
+              {fecharBtn}
+            </div>
+          )}
+          {accountTab === 'images' && (
             <ImagesLibraryPanel
               library={library}
               imageQuota={imageQuota}
@@ -291,7 +319,8 @@ function AccountHomeShell({
 
           {accountTab === 'profile' && (
             <>
-              <header>
+              <header style={{ position: 'relative', paddingRight: 48 }}>
+                <div style={{ position: 'absolute', top: 0, right: 0 }}>{fecharBtn}</div>
                 <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
                 <h2 style={{
                   margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,

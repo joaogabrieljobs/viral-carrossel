@@ -462,7 +462,7 @@ function SidebarContent({
           <>
             {(tab==='layout'||tab==='slide') && (<S
               title="Composição"
-              hint="Zonas redimensionáveis dentro do card. Ative primeiro abaixo; depois mostre as molduras para clicar direto na área da foto. Pino de swap troca texto/foto entre cards."
+              hint="Divide o card em áreas que você redimensiona: uma para o texto, outra para a foto. Opcional — sem composição o texto usa o card inteiro."
             >
               {/* Polish: CTA primário com fontWeight 600 + ícone (era 400 e
                   parecia botão fantasma). Quando ativo, vira selo de sucesso
@@ -477,9 +477,10 @@ function SidebarContent({
                   style={{
                     width:'100%', minHeight:44, padding:'0 18px', borderRadius:9999,
                     cursor: anyCanvasEnabled ? 'default' : 'pointer',
-                    border:`1px solid ${anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--accent)'}`,
-                    background: anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--accent)',
-                    color:'#fff',
+                    // Secundário: composição é opção avançada, o rosa fica para "Gerar com IA".
+                    border:`1px solid ${anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--border)'}`,
+                    background: anyCanvasEnabled ? 'var(--success, #16a34a)' : 'var(--bg-card)',
+                    color: anyCanvasEnabled ? '#fff' : 'var(--text-primary)',
                     fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
                     display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                     transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
@@ -530,7 +531,11 @@ function SidebarContent({
               </div>
               {/* Toggle só faz sentido depois de ativar — fica desabilitado e
                   com hint visual claro do porquê quando canvas está off. */}
-              <div style={{ opacity: anyCanvasEnabled ? 1 : 0.55, transition:'opacity 0.15s' }}>
+              <div
+                aria-disabled={!anyCanvasEnabled || undefined}
+                title={anyCanvasEnabled ? undefined : 'Ative a composição primeiro'}
+                style={{ opacity: anyCanvasEnabled ? 1 : 0.45, cursor: anyCanvasEnabled ? undefined : 'not-allowed', transition:'opacity 0.15s' }}
+              >
                 <Toggle
                   label="Mostrar zonas no card"
                   value={canvasEditMode}
@@ -544,7 +549,7 @@ function SidebarContent({
                 />
                 {!anyCanvasEnabled && (
                   <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, letterSpacing:'-0.005em' }}>
-                    Disponível depois de ativar o canvas.
+                    Disponível depois de ativar a composição.
                   </div>
                 )}
               </div>
@@ -1116,7 +1121,7 @@ function SidebarContent({
                       background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11,
                       padding:'8px 10px',
                     }}>
-                      Com <strong style={{ fontWeight:600 }}>canvas</strong> ativo, o modo e o foco aplicam-se à{' '}
+                      Com <strong style={{ fontWeight:600 }}>composição</strong> ativo, o modo e o foco aplicam-se à{' '}
                       <strong style={{ fontWeight:600 }}>foto dentro da zona de imagem</strong> — arraste a moldura no preview para mudar o quadro.
                     </div>
                   )}
@@ -1409,7 +1414,7 @@ function SidebarContent({
 
             {(tab==='layout'||tab==='slide') && (<S
               title="Ajuste automático"
-              hint="Cover e tipografia; com canvas reorganiza foto e todas as zonas de texto em conjunto (largura útil ~6%, espaçamentos entre foto/título/subtítulo ou topo/foto/rodapé) para caber dentro da margem do cartão e evitar cortes."
+              hint="Cover e tipografia; com composição ativa reorganiza foto e todas as zonas de texto em conjunto (largura útil ~6%, espaçamentos entre foto/título/subtítulo ou topo/foto/rodapé) para caber dentro da margem do cartão e evitar cortes."
             >
               <button
                 type="button"

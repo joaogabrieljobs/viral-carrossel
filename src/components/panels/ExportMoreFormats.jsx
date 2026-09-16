@@ -30,6 +30,9 @@ function ExportMoreFormats({
     };
   }, [open]);
   const photoCount = slides.filter(s => !!s.bgImage).length;
+  // Sem nada para exportar o botão fica secundário: o rosa é reservado a
+  // "Gerar com IA", o passo que falta.
+  const temConteudo = slides.some(s => (s.title || '').trim() || (s.body || '').trim() || s.bgImage);
   const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
   const menuItemStyle = {
     display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
@@ -47,8 +50,10 @@ function ExportMoreFormats({
         aria-expanded={open}
         aria-label="Opções de download"
         style={{
-          minHeight:36, padding:'0 16px', borderRadius:9999, border:'none',
-          background:'var(--text-primary)', color:'#fff',
+          minHeight:36, padding:'0 16px', borderRadius:9999,
+          ...(temConteudo
+            ? { border:'none', background:'var(--text-primary)', color:'#fff' }
+            : { border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-secondary)' }),
           fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
           letterSpacing:'-0.011em', cursor:'pointer',
           display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6,

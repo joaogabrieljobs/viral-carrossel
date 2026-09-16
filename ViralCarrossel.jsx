@@ -1064,7 +1064,7 @@ export default function App() {
    */
   const boardScrollRef = useRef(null);
   const boardCardRefs = useRef([]);
-  const [tab, setTab] = useState('brand');
+  const [tab, setTab] = useState('home');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [canvasEditMode, setCanvasEditMode] = useState(false);
   const [showPreviewAlignGrid, setShowPreviewAlignGrid] = useState(() => {
@@ -2787,7 +2787,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
         }
       }
       if (!abort.cancelled && failCount > 0)
-        toast(`${failCount} imagem(ns) do template não carregou.`, 'warning', 5000);
+        toast(failCount === 1
+          ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
+          : `${failCount} imagens do template não carregaram. Toque no card para tentar de novo.`, 'warning', 5000);
     })();
   }, [history, toast, setSlides, hasOpenAI, openaiKey, imgParams]);
 
@@ -3725,6 +3727,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 </div>
 
                 <PerSlideImageRefBlock
+                  collapsible
+                  key={`img-ref-m-${slide.id}`}
                   slide={slide}
                   width={Math.min(vw - 48, f.w * previewScale)}
                   onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
@@ -3874,6 +3878,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       </div>
                     </div>
                     <PerSlideImageRefBlock
+                      collapsible
+                      key={`img-ref-${s.id}`}
                       slide={s}
                       width={desktopThumbWidth}
                       onChangeExtra={(v) => updateSlideAt(i, { imgExtraPrompt: v })}
@@ -4070,9 +4076,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         hasOpenAI={hasOpenAI}
         hasAnthropic={hasAnthropic}
         imageProviderLabel={
-          aiSettings.imageProvider === 'zai'
-            ? (aiSettings.imageModels?.zai === 'glm-image' ? 'GLM-Image · Z.ai' : 'CogView-4 · Z.ai')
-            : (aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2')
+          aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2'
         }
         onOpenKeys={() => setKeysOpen(true)}
         onGoToMaterial={() => {

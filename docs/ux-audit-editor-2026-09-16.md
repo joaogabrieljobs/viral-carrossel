@@ -6,6 +6,8 @@ Método: varredura Playwright do editor em produção-build (`vite preview`) com
 
 Estado dos achados: **corrigido neste ciclo** = já no código; os restantes são recomendação.
 
+**Atualização 2026-09-16 (2º ciclo):** aplicados também UX-003 (Gerar imagem por card e Ativar composição passam a secundários; Exportar fica secundário enquanto não há conteúdo), UX-004 (editor abre em Home), UX-005 (direção da imagem colapsada por card, abre sozinha se já tiver referência/prompt) e UX-006 (copy da composição + termo único), mais UX-013 (toggle desativado explícito) e a copy do aviso de imagens do template (UX-012 parcial). Cobertura: `tests/e2e/editor-ux-2026-09-16.spec.js`.
+
 ## Resumo Executivo
 
 O editor está funcional e visualmente coerente, mas o topo estava literalmente quebrado: o grupo de ferramentas da direita mede 730px e transbordava sobre o CTA principal, cobrindo "Gerar com IA" em todas as larguras testadas — e os avisos (toasts) nasciam no topo-centro, tapando a tira de miniaturas e o topo do card 01. O maior risco de conversão restante é hierarquia: há 5 ou mais botões rosa primários no mesmo ecrã (Gerar com IA, Exportar, Gerar imagem ×3, Ativar composição), o que dilui a ação que gera valor. O maior quick win é a aba inicial da barra lateral — o editor abre em **Marca** (configuração), não em Home/Narrativa, onde está o trabalho.
