@@ -229,6 +229,9 @@ function canvasCultureSandwichBottomPaddingXPx(f, slide) {
 /** Layout canvas (variant classic): zonas foto + título + subtítulo em %. */
 const ClassicCanvasInner = React.forwardRef(({
   forExport = false,
+  /** Assinatura da marca (barra/contador/rodapé/selo) montada pelo componente pai. */
+  brandHeaderChrome = null,
+  brandFooterChrome = null,
   f,
   slide,
   brand,
@@ -618,6 +621,10 @@ const ClassicCanvasInner = React.forwardRef(({
         if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
         return <div style={style} aria-hidden/>;
       })()}
+
+      {/* Assinatura da marca por cima do layout composto (zIndex próprio). */}
+      {brandHeaderChrome}
+      {brandFooterChrome}
 
       {showCanvasChrome && onCanvasPatch && (
         <CanvasZonesOverlay
@@ -1245,6 +1252,157 @@ const SlideCardInner = React.forwardRef(({
     }
   }
 
+  /**
+   * Assinatura da marca (barra editorial no topo, contador N/M, barra do rodapé
+   * e selo pill). Vivia só no ramo legado full-bleed: com composição ativa ou
+   * layout sanduíche, o utilizador preenchia estes campos em Marca e nada
+   * aparecia no card. Agora é um nó partilhado, montado em todos os ramos.
+   */
+  const brandHeaderChrome = (
+    <>
+        {/* Header bar 3-col + badge "N/M" — usado por presets visuais editoriais
+            (Sports Editorial etc) em modo full-bleed (não-Cultura). Já existe
+            variante no renderer Cultura; aqui é versão simplificada pra classic. */}
+        {(() => {
+          // Colunas sem repetir o @username: o chip já o mostra; e '{handle}' à esquerda
+          // + fallback do centro davam o mesmo nome três vezes (bug 2026-09-15).
+          const { left: hLeft, center: hCenter, right: hRight } = dedupeHeaderColumns({
+            left: brand.cultureHeaderLeft,
+            center: headerCenterText(brand, slide, hideInstaBadge),
+            right: brand.cultureHeaderYear,
+          }, brand, slide, hideInstaBadge);
+          const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && !!(brand.cultureHeaderLeft || '').trim());
+          const hasPageBadge = !!brand.showPageBadge;
+          if (!hasHeaderBar && !hasPageBadge) return null;
+          // Cor branca translúcida quando há foto BG; senão tom da marca.
+          const headerColor = slide.bgImage ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
+          const badgeBg = slide.bgImage ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
+          const badgeColor = slide.bgImage ? '#fff' : (displayBodyInk || '#222');
+          return (
+            <>
+              {hasHeaderBar && (
+                <div {...mov('headerBar', {
+                  position:'absolute', top:f.h*0.028, left:f.w*0.05,
+                  right: hasPageBadge ? f.w*0.16 : f.w*0.05,
+                  zIndex:25,
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                  gap:f.w*0.02,
+                  pointerEvents: movableElements ? 'auto' : 'none',
+                })}>
+                  <span style={{
+                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                    maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                  }}>{hLeft}</span>
+                  <span style={{
+                    flex:1, textAlign:'center',
+                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                  }}>{hCenter}</span>
+                  <span style={{
+                    fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
+                    fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
+                    maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
+                  }}>{hRight}</span>
+                </div>
+              )}
+              {hasPageBadge && (
+                <div {...mov('pageBadge', {
+                  position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
+                  background: badgeBg, color: badgeColor,
+                  padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:9999,
+                  fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
+                  letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
+                  backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
+                  pointerEvents: movableElements ? 'auto' : 'none',
+                })}>{num}/{total}</div>
+              )}
+            </>
+          );
+        })()}
+    </>
+  );
+  const brandFooterChrome = (
+    <>
+        {/* Footer bar 3 colunas (Authority Black REF 11): Topic / Brought by / Save.
+            Texto pequeno MAIÚSCULAS distribuído no rodapé, similar ao header
+            mas em baixo. Cada coluna tem label cinza + valor branco em 2 linhas. */}
+        {(() => {
+          const fLeft = brand.footerBarLeft;
+          const fCenter = brand.footerBarCenter;
+          const fRight = brand.footerBarRight;
+          const hasFooter = !!(fLeft || fCenter || fRight);
+          if (!hasFooter) return null;
+          const labelColor = slide.bgImage ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
+          const valueColor = slide.bgImage ? '#ffffff' : (displayTitleInk || '#000');
+          const Col = ({ data }) => {
+            if (!data) return <div style={{ flex:1 }}/>;
+            const [label, value] = String(data).split('|');
+            return (
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
+                <span style={{ fontSize: f.w*0.020, fontFamily: bodyFF, color: labelColor,
+                  letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
+                {value && (
+                  <span style={{ fontSize: f.w*0.022, fontFamily: bodyFF, color: valueColor,
+                    fontWeight: 700 }}>{value}</span>
+                )}
+              </div>
+            );
+          };
+          return (
+            <div {...mov('footerBar', {
+              position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
+              zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+              gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
+            })}>
+              <Col data={fLeft}/>
+              <Col data={fCenter}/>
+              <Col data={fRight}/>
+            </div>
+          );
+        })()}
+        {brand.footerPillText && (() => {
+          const pillBg = brand.footerPillBg || brand.accent || '#0a0a0a';
+          const pillFg = brand.footerPillFg || (pillBg === brand.accent ? '#0a0a0a' : '#ffffff');
+          // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
+          // Default true se undefined; só esconde quando explicitamente false.
+          const showArrow = brand.footerPillArrow !== false;
+          // Padding-right encolhe quando não tem seta (visual mais compacto).
+          const padRight = showArrow ? f.w*0.014 : f.w*0.028;
+          return (
+            <div {...mov('pill', {
+              position:'absolute', bottom: f.h*0.058,
+              left:'50%', transform:'translateX(-50%)',
+              zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
+            })}>
+              <div style={{
+                background: pillBg, color: pillFg,
+                padding: `${f.h*0.012}px ${padRight}px ${f.h*0.012}px ${f.w*0.028}px`,
+                borderRadius: 9999,
+                display:'inline-flex', alignItems:'center', gap: f.w*0.018,
+                fontSize: f.w*0.026, fontWeight:700, fontFamily: bodyFF,
+                letterSpacing:'-0.011em', whiteSpace:'nowrap',
+                textTransform: 'uppercase',
+                boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
+              }}>
+                {brand.footerPillText}
+                {showArrow && (
+                  <span style={{
+                    width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
+                    background: pillFg, color: pillBg,
+                    display:'inline-flex', alignItems:'center', justifyContent:'center',
+                    fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
+                    flexShrink:0,
+                  }}>→</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+    </>
+  );
+
   let inner;
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
   // Zonas guardadas renderizam mesmo com a edição desativada — igual ao sanduíche.
@@ -1524,6 +1682,7 @@ const SlideCardInner = React.forwardRef(({
           />
         )}
 
+        {brandFooterChrome}
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
@@ -1828,6 +1987,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
           </>)}
         </OverflowScaler>
+        {brandFooterChrome}
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
@@ -1918,6 +2078,8 @@ const SlideCardInner = React.forwardRef(({
         imgLoading={imgLoading}
         showCanvasChrome={showCanvasChrome}
         forExport={forExport}
+        brandHeaderChrome={cultureRichText ? null : brandHeaderChrome}
+        brandFooterChrome={brandFooterChrome}
         onCanvasPatch={onCanvasPatch}
         onPhotoZoneClick={onPhotoZoneClick}
         onPhotoZoneFileChange={onPhotoZoneNativeFile ? onPhotoZoneFileInputChange : undefined}
@@ -2006,67 +2168,7 @@ const SlideCardInner = React.forwardRef(({
       )}
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
 
-      {/* Header bar 3-col + badge "N/M" — usado por presets visuais editoriais
-          (Sports Editorial etc) em modo full-bleed (não-Cultura). Já existe
-          variante no renderer Cultura; aqui é versão simplificada pra classic. */}
-      {(() => {
-        // Colunas sem repetir o @username: o chip já o mostra; e '{handle}' à esquerda
-        // + fallback do centro davam o mesmo nome três vezes (bug 2026-09-15).
-        const { left: hLeft, center: hCenter, right: hRight } = dedupeHeaderColumns({
-          left: brand.cultureHeaderLeft,
-          center: headerCenterText(brand, slide, hideInstaBadge),
-          right: brand.cultureHeaderYear,
-        }, brand, slide, hideInstaBadge);
-        const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && !!(brand.cultureHeaderLeft || '').trim());
-        const hasPageBadge = !!brand.showPageBadge;
-        if (!hasHeaderBar && !hasPageBadge) return null;
-        // Cor branca translúcida quando há foto BG; senão tom da marca.
-        const headerColor = slide.bgImage ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
-        const badgeBg = slide.bgImage ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.12)';
-        const badgeColor = slide.bgImage ? '#fff' : (displayBodyInk || '#222');
-        return (
-          <>
-            {hasHeaderBar && (
-              <div {...mov('headerBar', {
-                position:'absolute', top:f.h*0.028, left:f.w*0.05,
-                right: hasPageBadge ? f.w*0.16 : f.w*0.05,
-                zIndex:25,
-                display:'flex', justifyContent:'space-between', alignItems:'center',
-                gap:f.w*0.02,
-                pointerEvents: movableElements ? 'auto' : 'none',
-              })}>
-                <span style={{
-                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
-                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
-                  maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                }}>{hLeft}</span>
-                <span style={{
-                  flex:1, textAlign:'center',
-                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
-                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
-                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                }}>{hCenter}</span>
-                <span style={{
-                  fontSize:f.w*0.020, color:headerColor, fontFamily:bodyFF,
-                  fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
-                  maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
-                }}>{hRight}</span>
-              </div>
-            )}
-            {hasPageBadge && (
-              <div {...mov('pageBadge', {
-                position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
-                background: badgeBg, color: badgeColor,
-                padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:9999,
-                fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
-                letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
-                backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
-                pointerEvents: movableElements ? 'auto' : 'none',
-              })}>{num}/{total}</div>
-            )}
-          </>
-        );
-      })()}
+      {brandHeaderChrome}
 
       {/* Loading até a URL da imagem terminar de baixar */}
       {imgLoading && (
@@ -2365,85 +2467,11 @@ const SlideCardInner = React.forwardRef(({
         );
       })()}
 
-      {/* Footer bar 3 colunas (Authority Black REF 11): Topic / Brought by / Save.
-          Texto pequeno MAIÚSCULAS distribuído no rodapé, similar ao header
-          mas em baixo. Cada coluna tem label cinza + valor branco em 2 linhas. */}
-      {(() => {
-        const fLeft = brand.footerBarLeft;
-        const fCenter = brand.footerBarCenter;
-        const fRight = brand.footerBarRight;
-        const hasFooter = !!(fLeft || fCenter || fRight);
-        if (!hasFooter) return null;
-        const labelColor = slide.bgImage ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
-        const valueColor = slide.bgImage ? '#ffffff' : (displayTitleInk || '#000');
-        const Col = ({ data }) => {
-          if (!data) return <div style={{ flex:1 }}/>;
-          const [label, value] = String(data).split('|');
-          return (
-            <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
-              <span style={{ fontSize: f.w*0.020, fontFamily: bodyFF, color: labelColor,
-                letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
-              {value && (
-                <span style={{ fontSize: f.w*0.022, fontFamily: bodyFF, color: valueColor,
-                  fontWeight: 700 }}>{value}</span>
-              )}
-            </div>
-          );
-        };
-        return (
-          <div {...mov('footerBar', {
-            position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
-            zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-            gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
-          })}>
-            <Col data={fLeft}/>
-            <Col data={fCenter}/>
-            <Col data={fRight}/>
-          </div>
-        );
-      })()}
 
       {/* Footer pill com seta — usado em presets como Case Study Neon
           (CTA verde-neon) e Reflexivo Cream (handle pill). Texto + seta
           circular contrastante. Cor de fundo = brand.accent. */}
-      {brand.footerPillText && (() => {
-        const pillBg = brand.footerPillBg || brand.accent || '#0a0a0a';
-        const pillFg = brand.footerPillFg || (pillBg === brand.accent ? '#0a0a0a' : '#ffffff');
-        // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
-        // Default true se undefined; só esconde quando explicitamente false.
-        const showArrow = brand.footerPillArrow !== false;
-        // Padding-right encolhe quando não tem seta (visual mais compacto).
-        const padRight = showArrow ? f.w*0.014 : f.w*0.028;
-        return (
-          <div {...mov('pill', {
-            position:'absolute', bottom: f.h*0.058,
-            left:'50%', transform:'translateX(-50%)',
-            zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
-          })}>
-            <div style={{
-              background: pillBg, color: pillFg,
-              padding: `${f.h*0.012}px ${padRight}px ${f.h*0.012}px ${f.w*0.028}px`,
-              borderRadius: 9999,
-              display:'inline-flex', alignItems:'center', gap: f.w*0.018,
-              fontSize: f.w*0.026, fontWeight:700, fontFamily: bodyFF,
-              letterSpacing:'-0.011em', whiteSpace:'nowrap',
-              textTransform: 'uppercase',
-              boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
-            }}>
-              {brand.footerPillText}
-              {showArrow && (
-                <span style={{
-                  width: f.w*0.05, height: f.w*0.05, borderRadius:'50%',
-                  background: pillFg, color: pillBg,
-                  display:'inline-flex', alignItems:'center', justifyContent:'center',
-                  fontSize: f.w*0.030, fontWeight:700, lineHeight:1,
-                  flexShrink:0,
-                }}>→</span>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {brandFooterChrome}
 
       {/* Logo da marca — renderiza em qualquer canto, baseado no brand.logoPosition */}
       {brand.logo && (() => {

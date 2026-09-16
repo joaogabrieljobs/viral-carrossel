@@ -2254,6 +2254,12 @@ ${jsonShapeLine}`;
       fmt,
     );
     setSlides(newSlides); setActiveIdx(0); setShellView('project');
+    // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
+    // trazem `subtitleVisible: false` (look só-título) e escondiam o texto recém
+    // gerado sem o utilizador perceber que havia uma caixa desmarcada em Marca.
+    if (newSlides.some((sl) => String(sl.subtitle || '').trim())) {
+      setBrand((b) => (b?.subtitleVisible === false ? { ...b, subtitleVisible: true } : b));
+    }
     const quickTplSynced = isQuickTemplatePreset(cp) ? TEMPLATES.find((x) => x.id === quickTemplateIdFromPreset(cp)) : null;
     if (quickTplSynced) {
       const pal = PALETTES[quickTplSynced.palette] || PALETTES[0];
