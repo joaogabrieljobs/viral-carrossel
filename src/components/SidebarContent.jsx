@@ -179,7 +179,7 @@ function SidebarContent({
   const [dalleLoading, setDalleLoading] = React.useState(false);
 
   const applyDalleQuery = async (q) => {
-    if (!hasOpenAI) { toast?.('Configure o provedor de imagem em ⚙ (OpenAI ou Z.ai).', 'error'); return; }
+    if (!hasOpenAI) { toast?.('Para gerar imagens, confirme o seu plano ou a sua chave em Configurar IA.', 'error'); return; }
     updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
     setDalleLoading(true);
     try {
@@ -913,7 +913,7 @@ function SidebarContent({
               }}>
                 {hasOpenAI
                   ? 'Fundo: GPT Image 2. Buscar altera as palavras-chave; ⟳ gera outra imagem com o mesmo tema.'
-                  : 'Para gerar fundos por IA, configure a chave OpenAI (⚙). Até lá: Upload ou URL.'}
+                  : 'Para gerar fundos com IA, confirme o plano ou a chave em Configurar IA. Até lá, use Upload ou URL.'}
               </div>
 
               {(() => {

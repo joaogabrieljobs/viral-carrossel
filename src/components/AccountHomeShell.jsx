@@ -1,7 +1,8 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useMemo } from 'react';
-import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, ChevronRight, Settings, Layers, User } from 'lucide-react';
+import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, ChevronRight, Settings, Layers, User, Image as ImageIcon } from 'lucide-react';
 import AccountProfile from './AccountProfile.jsx';
+import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
@@ -39,6 +40,7 @@ function AccountHomeShell({
   currentPeriodEnd,
   planTier = null,
   imageQuota = null,
+  useOwnImageKey = false,
   accountTab = 'projects',
   setAccountTab,
 }) {
@@ -200,6 +202,7 @@ function AccountHomeShell({
             </div>
           </button>
           {!isMobile && navBtn('projects', 'Projetos', Layers)}
+          {!isMobile && navBtn('images', 'Imagens', ImageIcon)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -256,6 +259,7 @@ function AccountHomeShell({
                 </button>
               </nav>
               <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {isMobile && navBtn('images', 'Imagens', ImageIcon)}
                 {navBtn('profile', 'Perfil', User)}
               </nav>
             </>
@@ -275,6 +279,16 @@ function AccountHomeShell({
             : '40px 24px 72px',
           display: 'grid', gap: isMobile ? 22 : 28,
         }}>
+          {accountTab === 'images' && (
+            <ImagesLibraryPanel
+              library={library}
+              imageQuota={imageQuota}
+              planTier={planTier}
+              isMobile={isMobile}
+              useOwnImageKey={useOwnImageKey}
+            />
+          )}
+
           {accountTab === 'profile' && (
             <>
               <header>

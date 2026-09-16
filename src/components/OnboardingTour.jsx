@@ -17,39 +17,41 @@ export function getOnboardingSteps(isMobile, empty) {
   let panelSel = '';
   if (!isMobile) panelSel = '[data-vc-tour="sidebar-tabs"]';
   else if (!empty) panelSel = '[data-vc-tour="mobile-bar"]';
+  // Nomes reais das abas (EDITOR_TABS em SidebarContent): Home, Narrativa, Visual,
+  // Imagem, Texto, Layout, Marca. Texto e Layout só aparecem nos modos Diretor e Studio.
   const panelBody = !isMobile
-    ? 'Abas Marca, Conteúdo (base para a IA), Cards (texto e imagem em cada card) e IA (refinos e legenda).'
+    ? 'Narrativa muda o texto dos cards. Visual troca cores e fontes. Imagem cuida da foto de cada card. Marca guarda o seu @ e a identidade. Nos modos Diretor e Studio aparecem também Texto e Layout, com ajustes finos.'
     : empty
-      ? 'Depois do primeiro carrossel gerado, uma barra inferior traz Marca, Conteúdo, Cards e IA.'
-      : 'Toque nos ícones na barra inferior para abrir o painel de edição.';
+      ? 'Depois do primeiro carrossel, a barra de baixo dá acesso a Narrativa, Visual, Imagem e Marca.'
+      : 'Toque nos ícones da barra de baixo para abrir cada painel de edição.';
 
   return [
     {
       id: 'welcome',
       title: 'Bem-vindo ao Viral Carrossel',
       body:
-        'Em poucos passos você vê o Início (conta local e projetos), onde gerar com IA e como conectar as APIs. Use Avançar ou Pular.',
+        'Um tour rápido: onde pedir o carrossel à IA, onde editar cada card e onde ficam os seus projetos. Pode pular agora e rever depois no ícone de ajuda.',
       selector: null,
     },
     {
       id: 'generate',
       title: 'Gerar com IA',
       body:
-        'Defina tema, modo narrativo, direção de imagem e contexto de marca. Um fluxo cria gancho, slides intermediários e legenda.',
+        'Diga o tema e escolha o estilo. A IA escreve o gancho, os cards do meio, o fecho e a legenda — no tom da sua marca.',
       selector: '[data-vc-tour="generate"]',
     },
     {
       id: 'library',
-      title: 'Biblioteca',
+      title: 'Seus projetos',
       body:
-        'Vários projetos ficam só no seu navegador. Use o Início para visão geral, ou a biblioteca para filtrar e importar.',
+        'Cada carrossel fica guardado neste navegador. Em Projetos você abre, duplica, renomeia e exporta — e pode importar um arquivo guardado antes.',
       selector: '[data-vc-tour="library"]',
     },
     {
       id: 'thumbs',
       title: 'Miniaturas',
       body:
-        'Clique para escolher o card ativo. Arraste para reordenar a narrativa.',
+        'Cada miniatura é um card. Toque para editar; arraste para mudar a ordem da história.',
       selector: '[data-vc-tour="thumbnails"]',
     },
     {
@@ -60,16 +62,16 @@ export function getOnboardingSteps(isMobile, empty) {
     },
     {
       id: 'settings',
-      title: 'Chaves de API',
+      title: 'Configurar IA',
       body:
-        'Conecte Anthropic e/ou OpenAI (texto e imagens HD). Em desenvolvimento local, o servidor pode ler .env.local.',
+        'Não precisa configurar nada para começar: o texto já vem incluso no seu plano, e as imagens também nos planos Criador, Pro e Max. Se preferir usar a sua própria conta da OpenAI ou do Claude, é aqui que cola a chave.',
       selector: '[data-vc-tour="settings"]',
     },
     {
       id: 'refs',
-      title: 'Perfis de referência',
+      title: 'Vozes de referência',
       body:
-        'No modal Configurar carrossel, logo abaixo dos modos narrativos (pacote Personalizado), escolha uma voz curada para inspirar tom e ritmo — sem copiar conteúdo de terceiros. A legenda sugere boas combinações com cada modo.',
+        'Ao configurar o carrossel, no pacote Personalizado, escolha uma voz de referência para inspirar o ritmo do texto. Serve de inspiração de tom — nada é copiado de ninguém.',
       selector: '[data-vc-tour="ref-profiles"]',
     },
   ];

@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: {
         message:
-          'Claude exige a sua própria chave Anthropic. Adicione-a em Configurar IA (⚙) — o texto incluso no plano usa Z.ai.',
+          'O Claude precisa da sua própria chave. Adicione-a em Configurar IA — ou use o texto já incluído no seu plano.',
         code: 'anthropic_key_required',
       },
     });

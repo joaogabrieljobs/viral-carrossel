@@ -57,19 +57,19 @@ function enhanceNetworkError(err, label) {
   let hint;
   if (!hosted) {
     // Dev local: provavelmente o proxy /api não está respondendo
-    hint = 'Verifique se `npm run dev` está rodando e se há internet. Em local dev, o proxy /api precisa do servidor Vite ativo.';
+    // Só alcançável em localhost — mensagem para quem desenvolve.
+    hint = 'Ambiente local: confirme que o servidor de desenvolvimento está a correr e que há internet.';
   } else if (isClaude) {
     hint =
-      'Claude passa pelo proxy seguro /api/anthropic. ' +
-      'Confira a chave Anthropic em ⚙ → Chaves ou escolha outro provedor de texto em Configuração.';
+      'Não foi possível falar com o Claude. Confirme a sua chave em Configurar IA, ou escolha outro modelo de texto.';
   } else if (isOpenAI) {
     hint =
       'Sua chave OpenAI pode estar inválida, expirada ou sem saldo. ' +
       'Verifique em platform.openai.com/api-keys e platform.openai.com/account/billing. ' +
-      'Se nunca configurou, adicione a chave no ícone ⚙ no header.';
+      'Se ainda não configurou, adicione a chave em Configurar IA.';
   } else {
     hint =
-      'Erro de rede ao chamar a API de IA. Verifique sua conexão e se as chaves no ⚙ estão corretas.';
+      'Não foi possível falar com a IA. Verifique a sua ligação à internet e tente de novo.';
   }
   const out = new Error(`${label}: falha de rede. ${hint}`);
   out.isNetwork = true; // lido por generateDALLEWithRetry — a mensagem traduzida não casa com o regex antigo (auditoria M7)
@@ -131,7 +131,7 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   const raw = await res.text();
   if (res.status === 404 && IS_LOCAL_DEV && String(ANTHROPIC_URL).startsWith('/api')) {
     throw new Error(
-      'Endpoint /api não existe neste servidor (ex.: `npm run preview` não inclui proxy). Use `npm run dev` para IA com Claude/OpenAI.',
+      'Ambiente local sem as rotas de IA: use o servidor de desenvolvimento em vez do preview.',
     );
   }
   let data;
@@ -159,7 +159,7 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
   key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
-  if (!IS_LOCAL_DEV && !key) throw new Error('Chave OpenAI ausente — configure em ⚙ no header.');
+  if (!IS_LOCAL_DEV && !key) throw new Error('Falta a chave da OpenAI. Adicione-a em Configurar IA.');
   const body = {
     model: getTextModel('openai'),
     max_completion_tokens: maxTokens,
@@ -189,7 +189,7 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
   const raw = await res.text();
   if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_CHAT_URL).startsWith('/api')) {
     throw new Error(
-      'Endpoint /api não existe neste servidor (ex.: `npm run preview`). Use `npm run dev` para IA com proxy.',
+      'Ambiente local sem as rotas de IA: use o servidor de desenvolvimento em vez do preview.',
     );
   }
   let data;
@@ -224,7 +224,7 @@ function translateProviderError(provider, status, data, raw) {
     return 'Z.ai está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
   }
   if (status === 401 || /token expired|incorrect|unauthorized/i.test(msg)) {
-    return 'Chave Z.ai inválida ou expirada. Atualiza ZAI_API_KEY no servidor.';
+    return 'A IA incluída no plano está indisponível neste momento. Tente de novo em instantes — se persistir, fale com o suporte.';
   }
   if (status === 429) {
     return 'Muitos pedidos à Z.ai. Espera um momento e tenta de novo.';
@@ -338,7 +338,7 @@ const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = nul
   if (provider === 'zai' || provider === 'kimi') {
     return callCompatibleChat(provider, userMsg, { json, maxTokens });
   }
-  throw new Error('Provedor de texto inválido. Abra ⚙ e escolha uma opção.');
+  throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 };
 
 // Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic (BYOK). Sem chave Anthropic,
@@ -442,7 +442,7 @@ function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference =
 
 async function generateZaiImage(q, imgParams, imgExtraPrompt) {
   const apiKey = getProviderKey('zai');
-  if (!apiKey) throw new Error('Chave Z.ai ausente — configure em ⚙ → Chaves.');
+  if (!apiKey) throw new Error('Falta a chave da Z.ai. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
   const payload = {
@@ -544,7 +544,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
       }
       if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_IMAGE_EDITS_URL).startsWith('/api')) {
         throw new Error(
-          'Endpoint /api não existe (`npm run preview` não tem proxy). Use `npm run dev` para GPT Image.',
+          'Ambiente local sem as rotas de imagem: use o servidor de desenvolvimento em vez do preview.',
         );
       }
       if (!res.ok) {
@@ -678,7 +678,7 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
       }
       if (res.status === 404 && IS_LOCAL_DEV && String(OPENAI_IMAGE_URL).startsWith('/api')) {
         throw new Error(
-          'Endpoint /api não existe (`npm run preview` não tem proxy). Use `npm run dev` para GPT Image.',
+          'Ambiente local sem as rotas de imagem: use o servidor de desenvolvimento em vez do preview.',
         );
       }
       if (!res.ok) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   Sparkles, Search, Download, Trash2, Copy,
-  Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2,
+  Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2, Save,
   Bookmark, Shuffle, Lock, Move, FlipHorizontal2, RotateCcw,
   Video, Film,
   TrendingUp, RefreshCw, X, Upload, Link as LinkIcon,
@@ -814,10 +814,20 @@ export default function App() {
 
   const libraryPersistRef = useRef(library);
   libraryPersistRef.current = library;
+  /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
+  const flushPersistRef = useRef(null);
 
-  /** Evita perder fotos (base64) ao puxar-para-atualizar no telemóvel antes do debounce. */
+  /**
+   * Evita perder fotos (base64) e as últimas edições ao puxar-para-atualizar no
+   * telemóvel: a cadeia normal é doc → (400ms) → biblioteca → (100ms) →
+   * localStorage, logo um flush que só copiasse a biblioteca perdia o que foi
+   * escrito nos últimos 400 ms. `flushPersistNow` junta o doc em edição.
+   */
   useEffect(() => {
-    const flushLibrary = () => lsSet(SK.library, libraryPersistRef.current);
+    const flushLibrary = () => {
+      if (flushPersistRef.current) { flushPersistRef.current(); return; }
+      lsSet(SK.library, libraryPersistRef.current);
+    };
     const onHidden = () => {
       if (document.visibilityState === 'hidden') flushLibrary();
     };
@@ -999,6 +1009,30 @@ export default function App() {
     setActiveBrandId(newBrand.id);
     return newBrand;
   }, [doc.brand, brandRoster.length, upsertBrand]);
+
+  /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
+  const flushPersistNow = useCallback(() => {
+    const agora = Date.now();
+    const lib = (libraryPersistRef.current || []).map((e) => (
+      e.id === activeDocId ? { ...e, doc, updatedAt: agora } : e
+    ));
+    libraryPersistRef.current = lib;
+    lsSet(SK.library, lib);
+    if (activeDocId) lsSet(SK.activeDocId, activeDocId);
+    lsSet(SK.brands, brandRoster);
+    lsSet(SK.activeBrandId, activeBrandId);
+    setLastSavedAt(agora);
+    return lib;
+  }, [doc, activeDocId, brandRoster, activeBrandId]);
+  flushPersistRef.current = flushPersistNow;
+
+  /** Botão «Salvar»: o autosave já corre sozinho, mas o utilizador precisa de um
+   *  gesto explícito e de confirmação visível antes de fechar o navegador. */
+  const salvarProjeto = useCallback(() => {
+    const lib = flushPersistNow();
+    setLibrary(lib);
+    toast('Projeto salvo neste navegador.', 'success', 2200);
+  }, [flushPersistNow, setLibrary, toast]);
 
   // Autosave: salva o doc atual na entrada da biblioteca (debounced)
   useEffect(() => {
@@ -2645,6 +2679,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
+      // Cmd/Ctrl+S: grava já. Vale mesmo com modal aberto — nunca é destrutivo.
+      if (mod && (k === 's' || k === 'S')) {
+        e.preventDefault();
+        salvarProjeto();
+        return;
+      }
+
       if (shellView === 'home') {
         if (mod && k === '/') {
           e.preventDefault();
@@ -2850,6 +2891,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           hasTextAI={hasAnyAI}
           hasImageAI={hasOpenAI}
           isMobile={isMobile}
+          useOwnImageKey={useOwnImageKey}
           onGenerate={() => setSetupOpen(true)}
           onOpenLibrary={() => setLibraryOpen(true)}
           onOpenTemplates={() => setTemplatesOpen(true)}
@@ -3008,6 +3050,21 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   {activeEntry.name || 'Sem título'}
                 </button>
                 <SavedIndicator savedAt={lastSavedAt} />
+                <button
+                  type="button"
+                  onClick={salvarProjeto}
+                  title="Salvar projeto agora (⌘S)"
+                  aria-label="Salvar projeto agora"
+                  style={{
+                    height: 24, padding: '0 10px', borderRadius: 9999,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    color: 'var(--text-primary)', fontSize: 11, fontWeight: 600,
+                    fontFamily: 'var(--font-ui)', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Save size={11} aria-hidden/> Salvar
+                </button>
               </div>
             )}
           </div>

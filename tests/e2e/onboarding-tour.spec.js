@@ -51,3 +51,21 @@ test.describe('Tour de onboarding', () => {
     ).toEqual([]);
   });
 });
+
+test.describe('Copy do tour', () => {
+  test('nenhum passo fala de .env, chave de API ou ambiente local', async ({ page }) => {
+    await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
+    await page.goto('/?app=1');
+    await page.getByRole('button', { name: /fechar/i }).first().click();
+    const card = page.locator('[data-vc-tour-card]');
+    await expect(card).toBeVisible({ timeout: 10_000 });
+
+    const proibido = /\.env|env\.local|desenvolvimento local|chaves de api|endpoint|localhost/i;
+    for (let passo = 1; passo <= TOTAL_PASSOS; passo += 1) {
+      const texto = await card.innerText();
+      expect(texto, `passo ${passo} com linguagem de dev: ${texto}`).not.toMatch(proibido);
+      await page.getByRole('button', { name: /avançar|concluir|terminar/i }).first().click();
+      await page.waitForTimeout(400);
+    }
+  });
+});
