@@ -42,7 +42,10 @@ const mkSlide = (n = 1, brand = null) => {
   title: 'Seu título aqui',
   subtitle: 'Subtítulo descritivo que reforça o gancho principal do carrossel.',
   layout: 'mc', align: 'center',
-  bgImage: null, imageQuery: '',
+  /** Imagem de fundo: `bgImageId` é o que fica gravado (bytes em IndexedDB, ver
+   *  src/utils/image-store.js); `bgImage` é o object URL de runtime, regenerado a
+   *  cada load. Antes a data URL vivia aqui e enchia a quota do localStorage. */
+  bgImage: null, bgImageId: null, imageQuery: '',
   /** Vídeo de fundo (mutually exclusive c/ bgImage). Guardado em IndexedDB pelo id;
    *  o blob URL é regenerado a cada load da app via useVideoLoader. */
   videoId: null,

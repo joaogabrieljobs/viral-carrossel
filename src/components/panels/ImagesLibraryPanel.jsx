@@ -1,21 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, ImageOff, Loader2, Package } from 'lucide-react';
 import { downloadBlob } from '../../utils/export-helpers.js';
+import { imageGet } from '../../utils/image-store.js';
 
-/** data URL → Blob, para descarregar com nome próprio. */
-function dataUrlToBlob(dataUrl) {
-  const m = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/s);
-  if (!m) return null;
-  const bin = atob(m[2]);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
-  return new Blob([arr], { type: m[1] || 'image/png' });
-}
-
-function extDe(dataUrl) {
-  const m = String(dataUrl || '').match(/^data:image\/([a-z0-9+]+)/i);
-  const raw = (m?.[1] || 'png').toLowerCase();
-  return raw === 'jpeg' ? 'jpg' : raw;
+function extDeMime(mime) {
+  const raw = String(mime || 'image/png').split('/')[1]?.toLowerCase() || 'png';
+  return raw === 'jpeg' ? 'jpg' : raw.replace(/[^a-z0-9]/g, '');
 }
 
 function slug(txt) {
@@ -39,29 +29,55 @@ export default function ImagesLibraryPanel({
 }) {
   const [baixandoTudo, setBaixandoTudo] = useState(false);
 
-  const imagens = useMemo(() => {
-    const vistas = new Set();
+  // As referências vêm do documento; os bytes vêm do IndexedDB (image-store).
+  const refs = useMemo(() => {
+    const vistos = new Set();
     const out = [];
     for (const entry of library) {
       const slides = Array.isArray(entry?.doc?.slides) ? entry.doc.slides : [];
       slides.forEach((s, i) => {
-        const url = s?.bgImage;
-        if (!url || typeof url !== 'string' || !url.startsWith('data:image')) return;
-        if (s.bgImageSource !== 'ai') return;
-        if (vistas.has(url)) return;
-        vistas.add(url);
+        const id = s?.bgImageId;
+        if (!id || s.bgImageSource !== 'ai' || vistos.has(id)) return;
+        vistos.add(id);
         out.push({
-          url,
+          id,
           docId: entry.id,
           docName: entry.name || 'Sem título',
           cardNum: i + 1,
           atualizado: entry.updatedAt || entry.createdAt || 0,
-          nome: `${slug(entry.name)}-card-${String(i + 1).padStart(2, '0')}.${extDe(url)}`,
         });
       });
     }
     return out.sort((a, b) => b.atualizado - a.atualizado);
   }, [library]);
+
+  const [imagens, setImagens] = useState([]);
+  useEffect(() => {
+    let cancelado = false;
+    const criadas = [];
+    (async () => {
+      const out = [];
+      for (const r of refs) {
+        try {
+          const entry = await imageGet(r.id);
+          if (!entry?.blob) continue;
+          const url = URL.createObjectURL(entry.blob);
+          criadas.push(url);
+          out.push({
+            ...r,
+            url,
+            blob: entry.blob,
+            nome: `${slug(r.docName)}-card-${String(r.cardNum).padStart(2, '0')}.${extDeMime(entry.mime || entry.blob.type)}`,
+          });
+        } catch { /* imagem em falta: ignora */ }
+      }
+      if (!cancelado) setImagens(out);
+    })();
+    return () => {
+      cancelado = true;
+      criadas.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [refs]);
 
   const limite = Number(imageQuota?.limit);
   const usadas = Number(imageQuota?.used);
@@ -70,8 +86,7 @@ export default function ImagesLibraryPanel({
   const pct = temQuota ? Math.min(100, Math.round((usadas / limite) * 100)) : 0;
 
   const baixarUma = async (img) => {
-    const blob = dataUrlToBlob(img.url);
-    if (blob) await downloadBlob(blob, img.nome);
+    if (img.blob) await downloadBlob(img.blob, img.nome);
   };
 
   const baixarTudo = async () => {
@@ -81,8 +96,7 @@ export default function ImagesLibraryPanel({
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       imagens.forEach((img) => {
-        const blob = dataUrlToBlob(img.url);
-        if (blob) zip.file(img.nome, blob);
+        if (img.blob) zip.file(img.nome, img.blob);
       });
       const out = await zip.generateAsync({ type: 'blob' });
       await downloadBlob(out, 'imagens-viral-carrossel.zip');
@@ -195,7 +209,7 @@ export default function ImagesLibraryPanel({
             gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(150px, 1fr))',
           }}>
             {imagens.map((img) => (
-              <li key={`${img.docId}-${img.cardNum}`} style={{
+              <li key={img.id} style={{
                 border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden',
                 background: 'var(--bg-card)', display: 'grid',
               }}>

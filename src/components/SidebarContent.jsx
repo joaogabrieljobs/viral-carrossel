@@ -25,6 +25,7 @@ import { slideAutoAdjustPatch, slideHasPendingPhotoIntent } from '../utils/canva
 import { normalizeDestaqueSpansForLen, remapDestaqueSpansOnEdit } from '../utils/text-spans.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { generateDALLE } from '../utils/ai-client.js';
+import { guardarImagemDoSlide } from '../utils/image-store.js';
 
 function guessFontFileFormat(file) {
   const n = (file?.name || '').toLowerCase();
@@ -187,7 +188,9 @@ function SidebarContent({
         refImage: slide.refImage,
         imgExtraPrompt: slide.imgExtraPrompt,
       });
-      updateSlide({ bgImage: url, bgImageSource: 'ai' });
+      // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
+      const patch = await guardarImagemDoSlide(url);
+      updateSlide({ ...patch, bgImageSource: 'ai' });
     } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
     finally { setDalleLoading(false); }
   };
@@ -217,7 +220,7 @@ function SidebarContent({
       placeholder: 'https://...',
       cta: 'Usar imagem',
     });
-    if (u) updateSlide({ bgImage: u });
+    if (u) updateSlide(await guardarImagemDoSlide(u));
   };
 
   const btnStyle = (active) => ({
@@ -898,7 +901,7 @@ function SidebarContent({
                         opacity:dalleLoading?0.45:1,
                       }}><RefreshCw size={10}/></button>
                     )}
-                    <button onClick={()=>updateSlide({bgImage:null})} aria-label="Remover imagem" title="Remover imagem" style={{
+                    <button onClick={()=>updateSlide({bgImage:null, bgImageId:null})} aria-label="Remover imagem" title="Remover imagem" style={{
                       background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.1)',
                       color:'#fff', padding:'4px 5px', borderRadius:5, cursor:'pointer', display:'flex',
                     }}><Trash2 size={10}/></button>
@@ -1008,6 +1011,7 @@ function SidebarContent({
                     // para poder gerar outra no mesmo tema. Cmd+Z desfaz.
                     action: () => updateSlide({
                       bgImage: null,
+                      bgImageId: null,
                       bgImageFailed: false,
                       bgImageSource: null,
                       bgX: 50,

@@ -18,6 +18,15 @@ import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
 import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
+import {
+  guardarImagemDoSlide,
+  imageGet,
+  imageDelete,
+  imageCleanupOrphans,
+  imageStorageUsage,
+  semImagensDeRuntime,
+  idsDeImagemEmUso,
+} from './src/utils/image-store.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
@@ -826,7 +835,7 @@ export default function App() {
   useEffect(() => {
     const flushLibrary = () => {
       if (flushPersistRef.current) { flushPersistRef.current(); return; }
-      lsSet(SK.library, libraryPersistRef.current);
+      lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
     };
     const onHidden = () => {
       if (document.visibilityState === 'hidden') flushLibrary();
@@ -845,7 +854,7 @@ export default function App() {
   const firstSaveRef = useRef(true);
   useEffect(() => {
     const t = setTimeout(() => {
-      lsSet(SK.library, library);
+      lsSet(SK.library, semImagensDeRuntime(library));
       if (firstSaveRef.current) { firstSaveRef.current = false; return; }
       setLastSavedAt(Date.now());
     }, 100);
@@ -1017,7 +1026,7 @@ export default function App() {
       e.id === activeDocId ? { ...e, doc, updatedAt: agora } : e
     ));
     libraryPersistRef.current = lib;
-    lsSet(SK.library, lib);
+    lsSet(SK.library, semImagensDeRuntime(lib));
     if (activeDocId) lsSet(SK.activeDocId, activeDocId);
     lsSet(SK.brands, brandRoster);
     lsSet(SK.activeBrandId, activeBrandId);
@@ -1145,6 +1154,74 @@ export default function App() {
     try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
   }, []);
   useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
+  // ── IMAGENS — bytes em IndexedDB, object URL em runtime ─────────────────────
+  // O documento guarda `bgImageId`; `bgImage` é recriado a cada load. Também
+  // migramos aqui as data URLs de projetos antigos: ficavam no localStorage e
+  // eram apagadas quando a quota enchia.
+  // Mapa id → object URL. NÃO é um marcador de "já feito": no boot o
+  // `history.reset` troca o documento depois de o patch entrar, logo a hidratação
+  // tem de poder repetir-se. Com o mapa, repetir é de graça (sem ler o disco).
+  const imagemUrlsRef = useRef(new Map());
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const alvo = (slidesLiveRef.current || []).map((sl, i) => ({ sl, i }));
+      const paraMigrar = alvo.filter(({ sl }) => typeof sl.bgImage === 'string' && sl.bgImage.startsWith('data:') && !sl.bgImageId);
+      const paraHidratar = alvo.filter(({ sl }) => sl.bgImageId && !sl.bgImage);
+      if (!paraMigrar.length && !paraHidratar.length) return;
+
+      const patches = [];
+      for (const { sl, i } of paraMigrar) {
+        try {
+          const patch = await guardarImagemDoSlide(sl.bgImage);
+          if (patch.bgImageId) {
+            imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
+            patches.push({ i, patch });
+          }
+        } catch (e) { console.warn('[imagem] migração falhou:', e?.message || e); }
+      }
+      for (const { sl, i } of paraHidratar) {
+        const cache = imagemUrlsRef.current.get(sl.bgImageId);
+        if (cache) { patches.push({ i, patch: { bgImage: cache } }); continue; }
+        try {
+          const entry = await imageGet(sl.bgImageId);
+          if (entry?.blob) {
+            const url = URL.createObjectURL(entry.blob);
+            imagemUrlsRef.current.set(sl.bgImageId, url);
+            patches.push({ i, patch: { bgImage: url } });
+          }
+        } catch (e) { console.warn('[imagem] leitura falhou:', e?.message || e); }
+      }
+      if (cancelado || !patches.length) return;
+      // `setSilent`: hidratar não é edição do utilizador, não entra no undo.
+      history.setSilent((d) => {
+        const slidesAtuais = d.slides || [];
+        let mudou = false;
+        const proximos = slidesAtuais.map((sl, i) => {
+          const p = patches.find((x) => x.i === i);
+          if (!p || sl.bgImage) return sl;
+          mudou = true;
+          return { ...sl, ...p.patch };
+        });
+        return mudou ? { ...d, slides: proximos } : d;
+      });
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDocId, slides]);
+
+  // Limpeza das imagens que nenhum projeto referencia — uma vez por sessão.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const removidas = await imageCleanupOrphans(idsDeImagemEmUso(libraryPersistRef.current));
+        if (removidas > 0) console.log(`[imagem] limpeza: ${removidas} imagem(ns) órfã(s) removida(s)`);
+      } catch { /* IndexedDB indisponível */ }
+    }, 6000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── VÍDEOS — IndexedDB store + Map reativo de id → blob URL ──────────────────
   // videoId no slide referencia o blob no IndexedDB. Aqui criamos object URLs sob
   // demanda e revogamos no unmount. Cleanup de orphans roda quando slides mudam.
@@ -1648,7 +1725,9 @@ export default function App() {
         toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
         return;
       }
-      updateSlideAt(sIdx, { bgImage: url, bgImageSource: 'imported' });
+      void guardarImagemDoSlide(url).then((patch) => {
+        updateSlideAt(sIdx, { ...patch, bgImageSource: 'imported' });
+      });
     });
   }, [updateSlideAt, toast]);
 
@@ -1769,7 +1848,10 @@ export default function App() {
       );
 
     void (async () => {
-      const urls = await Promise.all(files.map(readOne));
+      const lidas = await Promise.all(files.map(readOne));
+      // Cada foto vai para o IndexedDB antes de entrar no documento: o patch traz
+      // `bgImageId` (persistido) e `bgImage` (object URL de runtime).
+      const urls = await Promise.all(lidas.map((u) => (u ? guardarImagemDoSlide(u) : null)));
       const slideCount = slidesLiveRef.current.length;
       const n = Math.min(urls.length, slideCount);
 
@@ -1778,7 +1860,7 @@ export default function App() {
         return prev.map((sl, j) => {
           if (j >= cap) return sl;
           const data = urls[j];
-          return data ? { ...sl, bgImage: data, bgImageSource: 'imported' } : sl;
+          return data ? { ...sl, ...data, bgImageSource: 'imported' } : sl;
         });
       });
 
@@ -1834,8 +1916,8 @@ export default function App() {
       if (!a || !b) return prev;
       const next = [...prev];
       if (zone === 'photo') {
-        next[fromIdx] = { ...a, bgImage: b.bgImage };
-        next[toIdx] = { ...b, bgImage: a.bgImage };
+        next[fromIdx] = { ...a, bgImage: b.bgImage, bgImageId: b.bgImageId ?? null };
+        next[toIdx] = { ...b, bgImage: a.bgImage, bgImageId: a.bgImageId ?? null };
       } else if (zone === 'title') {
         next[fromIdx] = { ...a, title: b.title };
         next[toIdx] = { ...b, title: a.title };
@@ -1953,9 +2035,11 @@ export default function App() {
         refImage: snap.refImage,
         imgExtraPrompt: snap.imgExtraPrompt,
       });
+      // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
+      const patchImg = await guardarImagemDoSlide(url);
       setSlides(prev => {
         const j = prev.findIndex(sl => sl.id === slideId);
-        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, bgImage: url, imgMode: 'dalle', overlay: 70, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, ...patchImg, imgMode: 'dalle', overlay: 70, bgImageFailed: false, bgImageSource: 'ai' } : sl));
       });
       toast(`Slide ${idx + 1}: imagem gerada`, 'success');
     } catch (e) {
@@ -2307,8 +2391,9 @@ ${jsonShapeLine}`;
               refImage: newSlides[i]?.refImage,
               imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
             });
+            const patchImg = await guardarImagemDoSlide(url);
             if (!abort.cancelled)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImage: url, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
           } catch(e) {
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
@@ -2470,7 +2555,7 @@ ${capRules}
         toast('Não foi possível processar a imagem.', 'error', 4500);
         return;
       }
-      updateSlide({ bgImage: url, bgImageSource: 'imported' });
+      void guardarImagemDoSlide(url).then((patch) => updateSlide({ ...patch, bgImageSource: 'imported' }));
     });
     e.target.value = '';
   };
@@ -2644,8 +2729,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
             refImage: newSlides[i]?.refImage,
             imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
           });
+          const patchImg = await guardarImagemDoSlide(url);
           if (!abort.cancelled)
-            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImage: url, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
         } catch (e) {
           failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
@@ -4041,7 +4127,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={imageCropOpen && !!slide.bgImage}
         imageSrc={slide.bgImage || ''}
         onClose={() => setImageCropOpen(false)}
-        onApply={(dataUrl) => updateSlide({ bgImage: dataUrl })}
+        onApply={(dataUrl) => { void guardarImagemDoSlide(dataUrl).then((patch) => updateSlide(patch)); }}
       />
       <PhotoPositionModal
         open={photoPositionOpen}

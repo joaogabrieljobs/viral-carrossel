@@ -11,6 +11,7 @@ const SESSAO_COM_QUOTA = {
 
 test.describe('Imagens do plano', () => {
   test('aba Imagens mostra consumo e estado vazio da galeria', async ({ page }) => {
+    test.setTimeout(60_000); // boot do studio sob CPU dividida entre workers
     await mockApi(page, { session: SESSAO_COM_QUOTA });
     await page.goto('/?app=1');
 

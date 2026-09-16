@@ -10,6 +10,7 @@ import { hydrateBrandTextColors } from '../utils/brand-helpers.js';
 import { migrateDoc } from '../utils/schema-migration.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { downloadBlob } from '../utils/export-helpers.js';
+import { imagemComoDataUrl, guardarImagemDoSlide } from '../utils/image-store.js';
 import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
 import { SK } from '../utils/storage.js';
@@ -82,24 +83,46 @@ export function useLibrary({
 
   // ── EXPORT / IMPORT de projetos ─────────────────────────────────────────────
   // Exporta UMA entrada da biblioteca como arquivo .json
+  /**
+   * O backup tem de ser autossuficiente: as imagens vivem no IndexedDB deste
+   * navegador, logo exportar só o `bgImageId` daria um ficheiro que abre sem fotos
+   * noutra máquina. Aqui voltam a ser embutidas em data URL.
+   */
+  const comImagensEmbutidas = useCallback(async (entries) => Promise.all(
+    (entries || []).map(async (entry) => {
+      const slides = entry?.doc?.slides;
+      if (!Array.isArray(slides)) return entry;
+      const novos = await Promise.all(slides.map(async (sl) => {
+        if (!sl?.bgImageId) return sl;
+        try {
+          const dataUrl = await imagemComoDataUrl(sl.bgImageId);
+          return dataUrl ? { ...sl, bgImage: dataUrl } : sl;
+        } catch { return sl; }
+      }));
+      return { ...entry, doc: { ...entry.doc, slides: novos } };
+    }),
+  ), []);
+
   const exportDoc = useCallback(async (docId) => {
     const entry = library.find(e => e.id === docId);
     if (!entry) return;
-    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [entry] }, null, 2)], { type: 'application/json' });
+    const [comImagens] = await comImagensEmbutidas([entry]);
+    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [comImagens] }, null, 2)], { type: 'application/json' });
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
     await downloadBlob(blob, fname);
     toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
     trackEvent('export_json_single', { size_kb: String(Math.round(blob.size / 1024)) });
-  }, [library, toast]);
+  }, [library, toast, comImagensEmbutidas]);
 
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
-    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: library }, null, 2)], { type: 'application/json' });
+    const docs = await comImagensEmbutidas(library);
+    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs }, null, 2)], { type: 'application/json' });
     const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
     toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
     trackEvent('export_json_full', { project_count: String(library.length), size_kb: String(Math.round(blob.size / 1024)) });
-  }, [library, toast]);
+  }, [library, toast, comImagensEmbutidas]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
   const importDocRef = useRef(null);
@@ -108,7 +131,7 @@ export function useLibrary({
     if (!file) return;
     e.target.value = '';
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const parsed = JSON.parse(ev.target.result);
         const docs = parsed.docs || (Array.isArray(parsed) ? parsed : null);
@@ -120,6 +143,20 @@ export function useLibrary({
           name: e.name || 'Importado',
           importedAt: Date.now(),
         }));
+        // As imagens vêm embutidas em data URL no backup. Passam para o
+        // IndexedDB agora, senão voltariam a pesar no localStorage e seriam
+        // apagadas quando a quota enchesse.
+        for (const entry of newEntries) {
+          const slides = entry?.doc?.slides;
+          if (!Array.isArray(slides)) continue;
+          entry.doc = {
+            ...entry.doc,
+            slides: await Promise.all(slides.map(async (sl) => {
+              if (typeof sl?.bgImage !== 'string' || !sl.bgImage.startsWith('data:')) return sl;
+              try { return { ...sl, ...(await guardarImagemDoSlide(sl.bgImage)) }; } catch { return sl; }
+            })),
+          };
+        }
         setLibrary(prev => [...newEntries, ...prev]);
         // Ativa o primeiro importado
         setActiveDocId(newEntries[0].id);
