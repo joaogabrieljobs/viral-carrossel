@@ -1,5 +1,7 @@
 # Controles de geração e ativos por projeto
 
+Publicado em 28/09/2026 no domínio oficial, commit `d2043b6`. [CI aprovado](https://github.com/joaogabrieljobs/viral-carrossel/actions/runs/36514985503): 343 testes de código e 66 de navegador. [Guia de uso](../product/guia-projetos-geracao.md) e [copy da landing](../LANDING-COPY.md) atualizados em 29/09/2026.
+
 ## Comportamento
 
 - **Prompt para gerar**: escolha explícita entre Só texto (padrão) e Texto e imagens; a segunda opção depende do acesso a imagens. O seletor horizontal oferece os oito modos narrativos e Nenhum. A escolha do modo é salva em `doc.quickNarrativeMode`. Nenhum segue pedido/brief sem aplicar método editorial, estratégia do histórico ou fórmula de legenda. A geração rápida usa pacote livre, para um pacote antigo não anular a escolha atual.

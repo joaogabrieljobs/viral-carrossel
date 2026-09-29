@@ -5,6 +5,9 @@ import {
   BookOpen, Layers, Image, FileText, Check, X,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
+import ProjectWorkflowShowcase from './landing/ProjectWorkflowShowcase.jsx';
+import LandingPlans from './landing/LandingPlans.jsx';
+import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
 
 /** Assets em public/landing/ — samples otimizados WebP (slides editoriais) */
@@ -42,32 +45,32 @@ const STEPS = [
   {
     n: '01',
     title: 'Traga uma ideia',
-    body: 'Digite um tema, cole um texto ou use uma referência. Você pode começar com algo pronto ou apenas com aquela ideia que ainda está meio solta.',
+    body: 'Escreva o pedido e guarde brief, estilo, referências e logo no projeto. Esse contexto orienta as próximas gerações.',
     image: IMG.steps[0],
   },
   {
     n: '02',
     title: 'Escolha a direção',
-    body: 'Defina o tipo de narrativa e a identidade visual. O Viral. organiza o argumento e cria o carrossel inteiro.',
+    body: 'Escolha só texto ou texto e imagens. Selecione um modo narrativo ou Nenhum, para seguir o seu pedido sem uma estrutura predefinida.',
     image: IMG.steps[1],
   },
   {
     n: '03',
     title: 'Refine e publique',
-    body: 'Ajuste frases e imagens com a sua cara, depois exporte em PNG ou PDF nas dimensões certas — sem remontar o projeto em outro lugar.',
+    body: 'Varie o tom, aplique a logo nos cards escolhidos e ajuste o visual. Exporte em PNG ou PDF quando estiver pronto.',
     image: IMG.steps[2],
   },
 ];
 
 const CAPABILITIES = [
-  { icon: Layout, label: '16 sistemas editoriais', hint: 'Marketing · Criadores · Mentoria · Consultoria · Tecnologia · E-commerce e mais' },
-  { icon: BookOpen, label: 'Narrativas completas', hint: 'Gancho · contexto · tensão · virada · aplicação · CTA' },
-  { icon: Palette, label: 'Identidade de marca', hint: 'Paleta · tipografia · assinatura · fontes próprias' },
-  { icon: TrendingUp, label: 'Pesquisa de nicho', hint: 'Tendências e referências da web para alimentar a pauta' },
-  { icon: Wand2, label: 'Variações de gancho', hint: 'Compare diferentes teses antes de escolher a capa' },
-  { icon: Image, label: 'Imagens no fluxo', hint: 'Pesquise, envie ou gere imagens sem sair do projeto' },
-  { icon: Download, label: 'Exportação pronta', hint: 'PNG individual ou PDF completo nas proporções do feed' },
-  { icon: Instagram, label: 'Feito para continuar no celular', hint: 'Crie, revise e exporte sem depender do computador' },
+  { icon: BookOpen, label: 'Contexto por projeto', hint: 'Brief · estilo visual · até quatro referências · aviso Contexto ON' },
+  { icon: Layers, label: 'Só texto ou texto e imagens', hint: 'Escolha antes de gerar e antes de refazer o tom' },
+  { icon: Layout, label: 'Oito modos narrativos + Nenhum', hint: 'Uma estrutura para sua ideia, ou liberdade para seguir o pedido' },
+  { icon: Wand2, label: 'Oito tons para refazer', hint: 'Variação de voz com o visual preservado no remix de texto' },
+  { icon: Palette, label: 'Logo salva no projeto', hint: 'PNG transparente · aplicar no card selecionado · tamanho e posição' },
+  { icon: Image, label: 'Referências no fluxo', hint: 'Moodboard para orientar geradores de imagem compatíveis' },
+  { icon: Download, label: 'Exportação pronta', hint: 'PNG individual ou em lote · PDF completo' },
+  { icon: Instagram, label: 'Criação no celular', hint: 'Edite, cancele a geração e exporte também no mobile' },
 ];
 
 const MODES = [
@@ -75,7 +78,7 @@ const MODES = [
     id: 'criador',
     label: 'Criador',
     tag: 'Comece aqui',
-    desc: 'Escreva o tema e receba uma primeira versão completa: narrativa, slides, legenda e visual.',
+    desc: 'Traga o pedido e o contexto. Escolha o que gerar e receba uma primeira versão para editar.',
   },
   {
     id: 'diretor',
@@ -167,54 +170,52 @@ const GENERATION_LAYERS = [
 const FAQ = [
   {
     q: 'Quanto custa o Viral.?',
-    a: 'O plano individual custa R$ 97 por mês ou R$ 790 por ano. Os dois liberam o studio completo. A geração de texto e imagem usa a chave de IA conectada por você.',
+    a: `${PLAN_ORDER.map(id => `${PLAN_TIERS[id].name}: ${PLAN_TIERS[id].priceLabel}/mês`).join(' · ')}. Todos incluem o editor completo e geração de texto com IA. As imagens inclusas variam por plano.`,
   },
   {
-    q: 'Por que preciso conectar uma chave de IA?',
-    a: 'Porque preferimos dar transparência e controle a você. Em vez de esconder o consumo dentro de pacotes de créditos, o Viral. deixa você escolher o provedor, acompanhar os gastos e trocar de modelo quando quiser.',
+    q: 'Preciso conectar uma chave de IA?',
+    a: 'Não para usar o texto incluso. Os planos Criador, Pro e Max também incluem um saldo de imagens. Você pode conectar uma chave própria em Configurações; nesse caso, o provedor cobra o uso diretamente na sua conta.',
   },
   {
-    q: 'Isso significa que existe um custo além da assinatura?',
-    a: 'Sim. O acesso ao studio é a assinatura. As gerações são cobradas pelo provedor de IA escolhido, diretamente na sua conta. O valor varia conforme o modelo e a quantidade de conteúdo gerado.',
+    q: 'Posso gerar só o texto ou mudar o tom sem refazer as imagens?',
+    a: 'Sim. Escolha Só texto no prompt ou no remix. Ao refazer o tom só do texto, as imagens, fontes, cores e composição existentes são preservadas. Para novas imagens, selecione Texto e imagens; essa opção usa saldo do plano ou a chave própria configurada.',
+  },
+  {
+    q: 'Como o contexto da marca entra na criação?',
+    a: 'Cada projeto guarda seu brief, estilo e até quatro referências de imagem. O pedido atual define o que criar; o brief orienta o conteúdo e o estilo orienta a arte. O aviso Contexto ON identifica o contexto ativo. As referências são enviadas aos geradores de imagem compatíveis.',
+  },
+  {
+    q: 'Preciso importar minha logo toda vez?',
+    a: 'Não. Salve uma logo PNG transparente de até 2 MB no projeto. Depois, selecione um card e use Aplicar logo do projeto neste card. Você pode ajustar tamanho e posição sem importar o arquivo novamente.',
+  },
+  {
+    q: 'Posso interromper uma geração?',
+    a: 'Sim. Cancelar geração funciona mesmo depois de trocar de aba e mantém o que já ficou pronto. Uma imagem já enviada ao provedor ainda pode consumir crédito; cancelar não garante estorno.',
+  },
+  {
+    q: 'Os projetos ficam salvos na nuvem?',
+    a: 'Os projetos e suas imagens ficam salvos neste navegador. Use o backup JSON da biblioteca para guardar uma cópia ou transferir para outro navegador. Entrar na mesma conta em outro aparelho não sincroniza os projetos automaticamente.',
   },
   {
     q: 'Existe limite de carrosséis?',
-    a: 'O Viral. não impõe um teto mensal de projetos. O limite prático depende apenas do saldo ou orçamento configurado na sua chave de IA.',
+    a: 'Não há um teto mensal de projetos no editor. As imagens geradas pela plataforma seguem o saldo do plano, e as requisições de IA têm limites de uso. Você pode importar suas próprias imagens e continuar editando.',
   },
   {
     q: 'Preciso ser designer ou copywriter?',
-    a: 'Não. O modo Criador entrega uma primeira versão completa. Se quiser mais controle, você pode avançar para os modos Diretor e Studio sem precisar dominar uma ferramenta profissional de design.',
-  },
-  {
-    q: 'ChatGPT ou Claude não fazem isso sozinhos?',
-    a: 'Eles ajudam a gerar texto. O Viral. transforma esse texto em um projeto editorial: organiza o arco, distribui a ideia entre os cards, aplica sua identidade visual, prepara a legenda e exporta tudo nas dimensões corretas.',
-  },
-  {
-    q: 'Ainda vou precisar do Canva?',
-    a: 'Não para o fluxo principal. Você pode criar, editar e exportar dentro do Viral. Se quiser um tratamento muito específico fora do produto, o arquivo exportado continua sendo seu.',
-  },
-  {
-    q: 'Posso usar minha própria identidade visual?',
-    a: 'Sim. Você pode configurar cores, tipografia, assinatura e outros elementos da marca para manter consistência entre os projetos.',
+    a: 'Não. Comece no modo Criador e refine o resultado. Os modos Diretor e Studio dão acesso a mais controles. Os oito modos narrativos são outra escolha: definem a estrutura do conteúdo, com a opção Nenhum para seguir o pedido sem fórmula predefinida.',
   },
   {
     q: 'Funciona no celular?',
-    a: 'Sim. O fluxo de criação, revisão, preview e exportação foi pensado para funcionar também no celular.',
+    a: 'Sim. Você pode criar, revisar e exportar no celular. O cancelamento continua acessível e o prompt é preservado ao mudar a orientação da tela.',
   },
   {
-    q: 'Como cancelo?',
+    q: 'Esqueci minha senha. Como recupero o acesso?',
+    a: 'Clique em Entrar e depois em Esqueci minha senha. Solicite o link usando o e-mail da conta. O link de redefinição vale por 30 minutos e só pode ser usado uma vez.',
+  },
+  {
+    q: 'Como cancelo a assinatura?',
     a: 'O cancelamento é feito pelo portal do cliente, sem fidelidade. Seu acesso permanece ativo até o fim do período já pago.',
   },
-];
-
-const PLAN_FEATURES = [
-  'Acesso aos modos Criador, Diretor e Studio',
-  'Narrativa, slides, visual, legenda e exportação',
-  '16 sistemas editoriais para diferentes nichos',
-  'Perfis de marca, fontes e paletas próprias',
-  'Compatível com diferentes provedores de IA',
-  'Sem limite de carrosséis imposto pelo studio',
-  'Cancelamento pelo portal do cliente',
 ];
 
 /** Faixa horizontal de previews 4:5 (carrosséis reais) */
@@ -747,9 +748,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             lineHeight: 1.12,
             fontFamily: 'var(--font-display)',
           }}>
-            Crie carrosséis que{' '}
-            <span style={{ color: 'var(--accent)' }}>prendem até o fim,</span>
-            {' '}viralizam e constroem autoridade.
+            Carrosséis com a sua voz.{' '}
+            <span style={{ color: 'var(--accent)' }}>E a cara da sua marca.</span>
           </h1>
           <p style={{
             margin: 0,
@@ -759,8 +759,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-secondary)',
             maxWidth: isMobile ? '34ch' : '38ch',
           }}>
-            Conheça nosso studio que une design, copy e tendências —
-            gerados por agentes ultra avançados.
+            Reúna brief, referências e logo em um projeto. Gere só texto ou texto e imagens, refine o tom e exporte tudo no mesmo studio.
           </p>
           <div style={{
             display: 'flex',
@@ -834,7 +833,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             color: 'var(--text-muted)',
             maxWidth: '40ch',
           }}>
-            Design, copy e tendências no mesmo fluxo — do tema ao arquivo pronto.
+            Seu contexto orienta. Você escolhe a versão final.
           </p>
         </div>
       </header>
@@ -931,6 +930,8 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
           </div>
         </div>
       </RevealSection>
+
+      <ProjectWorkflowShowcase onEnter={onEnter} isMobile={isMobile} />
 
       {/* ── PROBLEMA EDITORIAL ── */}
       <RevealSection
@@ -1705,225 +1706,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
         </div>
       </RevealSection>
 
-      {/* ── PLANOS ── */}
-      <RevealSection
-        variant="rise"
-        id="planos"
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: isMobile ? '20px 16px 40px' : '28px clamp(24px, 5vw, 48px) 64px',
-        }}
-      >
-        <p style={{
-          margin: '0 0 8px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-          fontWeight: 600,
-        }}>Um plano. O studio inteiro.</p>
-        <h2 style={{
-          margin: '0 0 12px',
-          fontSize: isMobile ? 26 : 36,
-          fontWeight: 600,
-          letterSpacing: '-0.024em',
-          fontFamily: 'var(--font-display)',
-          lineHeight: 1.12,
-        }}>
-          Você paga pelo studio.
-          <br />
-          A sua produção continua nas suas mãos.
-        </h2>
-        <p style={{
-          margin: '0 0 32px',
-          fontSize: 17,
-          lineHeight: 1.47,
-          color: 'var(--text-secondary)',
-          maxWidth: '52ch',
-        }}>
-          Conecte a sua própria chave de IA e escolha o provedor que prefere.
-          Assim, você acompanha o consumo diretamente e não fica preso a pacotes de posts ou créditos escondidos.
-        </p>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.15fr 0.85fr',
-          gap: 16,
-          alignItems: 'stretch',
-        }}>
-          <div style={{
-            padding: isMobile ? 24 : 32,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid rgba(255, 45, 141, 0.4)',
-            background: 'linear-gradient(160deg, rgba(255,45,141,0.12) 0%, rgba(14,12,20,0.5) 55%)',
-            boxShadow: 'var(--shadow-pink)',
-          }}>
-            <div style={{
-              display: 'inline-flex',
-              padding: '4px 10px',
-              borderRadius: 999,
-              background: 'var(--accent-surface)',
-              color: 'var(--accent)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              fontWeight: 700,
-              marginBottom: 16,
-            }}>
-              Plano individual
-            </div>
-            <h3 style={{
-              margin: '0 0 8px',
-              fontSize: 22,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-            }}>Viral. Studio</h3>
-            <div style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 8,
-              marginBottom: 8,
-            }}>
-              <span style={{
-                fontSize: isMobile ? 40 : 48,
-                fontWeight: 600,
-                letterSpacing: '-0.03em',
-              }}>R$ 97</span>
-              <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>/mês</span>
-            </div>
-            <p style={{
-              margin: '0 0 24px',
-              fontSize: 14,
-              color: 'var(--text-secondary)',
-            }}>
-              ou <strong style={{ color: 'var(--text-primary)' }}>R$ 790/ano</strong>
-              {' '}— equivalente a cerca de R$ 66/mês
-            </p>
-            <ul style={{
-              margin: '0 0 28px',
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}>
-              {PLAN_FEATURES.map((line) => (
-                <li key={line} style={{
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'flex-start',
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  color: 'var(--text-secondary)',
-                }}>
-                  <Check size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 2 }} />
-                  {line}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              className="vc-landing-cta"
-              onClick={onEnter}
-              style={{
-                width: '100%',
-                height: 52,
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                fontFamily: 'var(--font-ui)',
-                boxShadow: 'var(--shadow-pink)',
-              }}
-            >
-              <Sparkles size={18} />
-              Entrar no Viral. Studio
-              <ArrowRight size={16} />
-            </button>
-            {onLogin && (
-              <button
-                type="button"
-                onClick={onLogin}
-                style={{
-                  marginTop: 12,
-                  width: '100%',
-                  height: 44,
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--glass-border-strong)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                Já assina? Entrar
-              </button>
-            )}
-            <p style={{
-              margin: '14px 0 0',
-              fontSize: 12,
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.03em',
-            }}>
-              Use sua própria chave de IA · Cancele quando quiser
-            </p>
-          </div>
-
-          <div style={{
-            padding: isMobile ? 22 : 28,
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid var(--hairline)',
-            background: 'var(--bg-secondary)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: 16,
-          }}>
-            <p style={{
-              margin: 0,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              fontWeight: 600,
-            }}>Por que conectar sua chave?</p>
-            <p style={{
-              margin: 0,
-              fontSize: 16,
-              lineHeight: 1.5,
-              color: 'var(--text-secondary)',
-            }}>
-              Em vez de esconder o consumo em pacotes de créditos, o Viral. deixa você
-              escolher o provedor, acompanhar os gastos e trocar de modelo quando quiser.
-            </p>
-            <p style={{
-              margin: 0,
-              fontSize: 14,
-              lineHeight: 1.45,
-              color: 'var(--text-muted)',
-            }}>
-              Você paga pelo studio. A geração fica na sua conta de IA — com transparência e controle.
-            </p>
-          </div>
-        </div>
-      </RevealSection>
+      <LandingPlans onEnter={onEnter} onLogin={onLogin} isMobile={isMobile} />
 
       {/* ── FAQ ── */}
       <RevealSection
@@ -2087,7 +1870,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            Studio completo · R$ 97/mês · Sua chave de IA · Sem limite imposto pelo produto
+            Studio completo a partir de {PLAN_TIERS.essential.priceLabel}/mês · Texto com IA incluso
           </p>
           </div>
         </div>

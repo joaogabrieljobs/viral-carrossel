@@ -1,9 +1,9 @@
 # PRD — Planos com imagem inclusa (SJinn) + Essencial sem imagem
 
-**Status:** Decisões fechadas (pronto para épico/tasks)
+**Status:** Implementado; comunicação pública alinhada em 29/09/2026. Os itens abaixo preservam as decisões e o planejamento original.
 **Autor:** João Gabriel (via sessão de produto)
 **Data:** 2026-09-14
-**Substitui (parcial):** modelo “1 plano R$ 97 + BYOK total” em `docs/STRIPE.md` e `docs/audit.md` DEC-B — no que toca a **imagem**. Texto continua BYOK.
+**Substitui:** modelo “1 plano R$ 97 + BYOK total” em `docs/STRIPE.md` e `docs/audit.md` DEC-B. Texto incluso na plataforma; chave própria opcional, conforme D-01 e RF-08.
 
 ## 1. Problema
 

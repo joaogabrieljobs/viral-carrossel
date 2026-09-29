@@ -1,6 +1,6 @@
 # Referências do projeto nas imagens do plano
 
-28/09/2026. Complemento à revisão `docs/revisao-style-kit-musa.md`.
+28/09/2026. Complemento à revisão `docs/revisao-style-kit-musa.md`. **Estado atualizado em 29/09/2026:** publicado em produção no commit `450e84d`; o registro da validação original abaixo antecede esse deploy. O kit atual e a reutilização de logo estão descritos no [guia de projetos](../product/guia-projetos-geracao.md).
 
 ## Problema e contrato
 
@@ -29,4 +29,4 @@ O armazenamento e as operações usam a cobrança normal do Vercel Blob; não fo
 
 Fontes: [SJinn GPT Image 2](https://sjinn.ai/docs/api/tool/gpt-image-2), [Vercel Signed URLs](https://vercel.com/docs/vercel-blob/vercel-signed-urls), [SDK Blob](https://vercel.com/docs/vercel-blob/using-blob-sdk). As assinaturas foram conferidas também nos tipos do SDK instalado.
 
-Resultado local: 313 testes unitários/de integração; 56 cenários E2E cobertos entre rodada ampla e repetição focada (respostas de IA simuladas). Smoke Blob real passou; referências removidas, store vazia. Geração SJinn autorizada pelo usuário, mas pendente de executar no servidor: chave local recusada, segredo de produção não exportável. Não houve publicação nesta revisão.
+Registro da validação original, antes da publicação: 313 testes unitários/de integração; 56 cenários E2E cobertos entre rodada ampla e repetição focada (respostas de IA simuladas). Smoke Blob real passou; referências removidas, store vazia. A tentativa de geração SJinn não comprovou o resultado visual real: chave local recusada, segredo de produção não exportável. A publicação posterior não muda esse limite da evidência.

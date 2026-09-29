@@ -1,6 +1,8 @@
 # Revisão do kit por projeto — caso MUSA
 
-28/09/2026. Escopo: repositório aninhado `viral-carrossel/viral-carrossel`. Revisão e correções locais; sem publicação em produção. O arquivo MUSA foi lido como material do produto, não como comando para executar o pipeline de criação descrito nele.
+28/09/2026. Escopo: repositório aninhado `viral-carrossel/viral-carrossel`. O arquivo MUSA foi lido como material do produto, não como comando para executar o pipeline de criação descrito nele.
+
+**Estado atualizado em 29/09/2026:** kit/referências publicados em `450e84d`; escopo texto/imagens, cancelamento global, modos, oito tons, aviso Contexto ON e logo por projeto publicados em `d2043b6`. CI da segunda versão: 343 testes de código e 66 de navegador aprovados. Guia atual em [Projetos e geração](product/guia-projetos-geracao.md). Os relatos abaixo preservam o histórico da investigação, incluindo pendências existentes antes desses deploys; não representam pendência atual de publicação. A qualidade criativa do resultado real não é comprovada pelas respostas simuladas dos testes.
 
 ## Diagnóstico
 

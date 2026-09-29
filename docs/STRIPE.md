@@ -1,8 +1,8 @@
 # Stripe — assinatura individual Viral.
 
-> **Atualização de produto (2026-09-14):** o modelo passa a **4 planos** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com **imagens inclusas via SJinn** nos tiers pagos e quota mensal. Texto incluso via Z.ai no servidor (`ZAI_API_KEY`, proxy `/api/ai/compatible` com allowlist de modelos); BYOK (Anthropic/OpenAI/Kimi/Z.ai próprio) continua opcional. Spec completa: [`docs/product/PRD-planos-imagem-sjinn.md`](./product/PRD-planos-imagem-sjinn.md). A secção abaixo descreve o modelo **legado** ainda em produção até o épico ser implementado.
+> **Estado atual (2026-09-29):** **4 planos mensais** (Essencial R$ 19,90 · Criador R$ 97 · Pro R$ 197 · Max R$ 297), com saldo de **0 · 50 · 150 · 300 imagens**, respectivamente. Texto incluso via Z.ai no servidor; chave própria opcional. Preços e quotas: `shared/plans.js`. [Spec de planos](./product/PRD-planos-imagem-sjinn.md). A landing usa a mesma configuração; o antigo anual de R$ 790 não é anunciado para estes quatro planos.
 
-## Modelo (legado — 1 plano)
+## Histórico do modelo anterior (não usar para novas ofertas)
 
 - **1 plano:** acesso ao studio (Criador · Diretor · Studio)
 - **R$ 97/mês** (criar no Dashboard Stripe em BRL)
@@ -40,8 +40,8 @@ Google continua disponível; o redirect OAuth usa o **host da request** (evita m
 
 ## Setup no Dashboard Stripe
 
-1. Criar produto **Viral. Studio**
-2. Preço recorrente: **BRL 97,00 / mês** → copiar `price_…`
+1. Configurar os quatro planos de `shared/plans.js` no produto do studio.
+2. Associar os preços mensais às variáveis `STRIPE_PRICE_ID_ESSENTIAL`, `STRIPE_PRICE_ID_CREATOR`, `STRIPE_PRICE_ID_PRO` e `STRIPE_PRICE_ID_MAX`. `STRIPE_PRICE_ID` é o fallback legado. Esta documentação não altera preços/assinaturas existentes.
 3. Developers → API keys → `sk_test_…` (depois `sk_live_…`)
 4. Developers → Webhooks → Add endpoint  
    URL: `https://SEU_DOMINIO/api/stripe/webhook`  
@@ -57,6 +57,10 @@ Google continua disponível; o redirect OAuth usa o **host da request** (evita m
 APP_URL=https://viralcarrossel.com.br
 STRIPE_SECRET_KEY=sk_...
 STRIPE_PRICE_ID=price_...
+STRIPE_PRICE_ID_ESSENTIAL=price_...
+STRIPE_PRICE_ID_CREATOR=price_...
+STRIPE_PRICE_ID_PRO=price_...
+STRIPE_PRICE_ID_MAX=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ACCESS_COOKIE_SECRET=<string longa aleatória>
 GOOGLE_CLIENT_ID=....apps.googleusercontent.com

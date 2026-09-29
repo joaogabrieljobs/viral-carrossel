@@ -1,6 +1,6 @@
 # Recuperação de senha
 
-Implementação em 28/09/2026. Domínio `viralcarrossel.com.br` verificado no Resend e as duas variáveis de envio adicionadas à produção na Vercel. Publicação e envio real em validação.
+Implementação e publicação em 28/09/2026, commit `450e84d`. Domínio `viralcarrossel.com.br` verificado no Resend e variáveis de envio configuradas na Vercel. O envio real autorizado foi aceito pelo serviço de e-mail. Isso não confirma chegada à caixa postal; a senha do usuário não foi alterada no teste.
 
 ## Experiência
 
@@ -16,7 +16,7 @@ Implementação em 28/09/2026. Domínio `viralcarrossel.com.br` verificado no Re
 3. Manter `APP_URL=https://viralcarrossel.com.br`, `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`, já utilizados pelo app.
 4. Publicar e solicitar um link para uma conta de teste controlada. Confirmar recebimento (inclusive spam), redefinição, login novo, rejeição da senha antiga e do link usado. Não alterar senha de cliente durante smoke tests.
 
-Sem as duas configurações de e-mail, o endpoint responde indisponibilidade explícita; a UI não diz que enviou. A configuração local foi validada com credenciais sintéticas e Resend simulado; nenhum e-mail real foi enviado nesta revisão.
+Sem as duas configurações de e-mail, o endpoint responde indisponibilidade explícita; a UI não diz que enviou. Os testes automatizados usam credenciais sintéticas e Resend simulado. O smoke de envio em produção foi feito separadamente, com autorização, sem consumir o link para alterar a senha.
 
 ## Contratos e segurança
 

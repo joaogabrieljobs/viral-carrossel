@@ -2,6 +2,8 @@
 
 Data: 22/09/2026. Implementação da próxima etapa aprovada após a revisão dos prompts de texto.
 
+Atualização de 29/09/2026: publicado junto ao pacote `450e84d`. O prompt rápido agora também oferece **Nenhum** como modo narrativo; nesse caso, a geração omite a seleção de estrutura editorial e a preferência histórica, seguindo pedido e brief. Validação estrutural e revisão editorial continuam ativas. [Guia atual](guia-projetos-geracao.md).
+
 ## Comportamento
 
 Na etapa Ideia, o usuário escolhe o objetivo: automático, compartilhamentos, salvamentos, autoridade, conversas, interesse comercial ou interpretação cultural. A escolha acompanha geração, remix, refinamento, legenda e variações de gancho; fica salva no documento. Projetos antigos assumem automático.

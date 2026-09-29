@@ -54,6 +54,10 @@ export default function LandingFirst() {
 
   const enterStudio = useCallback(() => {
     dismissOnboardingLanding();
+    // O preview forçado não pode reabrir a landing ao montar o editor.
+    const url = new URL(window.location.href);
+    for (const key of ['landing', 'intro', 'welcome']) url.searchParams.delete(key);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
     setPhase('studio');
   }, []);
 
