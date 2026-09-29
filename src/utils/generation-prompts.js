@@ -145,6 +145,11 @@ Máximo drama na forma, honestidade no conteúdo: pode exagerar RITMO e TENSÃO 
 - Último slide: payoff real (o que ficou provado neste carrossel) + pergunta inflamável NOS FATOS OU save — sem arme-se sem fechar o arco.
 Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo.`,
   },
+  {
+    id: 'none', Icon: ScrollText, label: 'Nenhum',
+    desc: 'Segue o pedido e o brief, sem fórmula narrativa predefinida.',
+    method: 'SEM MODO NARRATIVO: siga a entrega e a organização pedidas pelo usuário e pelo brief. Não imponha tese editorial, tutorial, história ou fórmula de retenção. Garanta clareza, coerência e ausência de repetição.',
+  },
 ];
 const GEN_MODE_BY_ID = Object.fromEntries(GEN_MODES.map(m => [m.id, m]));
 
@@ -693,6 +698,7 @@ function buildGenerationIntroLine(presetId) {
 }
 
 function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial') {
+  if (narrativeMode === 'none') return `LINGUAGEM: siga a voz do brief e o tom solicitado: ${tone || 'natural e concreto'}. Não force um registro editorial ou uma fórmula narrativa.`;
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
   const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
   const journalMode = narrativeMode === 'jornalistico';
@@ -793,6 +799,7 @@ ${sandwichVol}${
     }
 `;
   }
+  if (narrativeModeId === 'none') return `LIMITES DE TEXTO: títulos curtos e subtítulos até ${midHi} caracteres; abertura até ${scaledCeiling(80, textDensityId)} e encerramento até ${scaledCeiling(140, textDensityId)}. Ajuste o volume ao pedido sem preencher pisos artificialmente. A sequência segue o brief e a entrega, sem funções narrativas obrigatórias.`;
   const hookMag = isTendenciaCulturaPreset(creativePresetId)
     ? '   - Gancho nomeia fenômeno ou tensão vivida pelo público — não título genérico de relatório (“X: uma reflexão”).'
     : '   - Hook que para o scroll: linha de cena ou tensão, não conceito abstrato de marca.';
@@ -1001,6 +1008,7 @@ function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { p
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
 function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
+  if (narrativeModeId === 'none') return 'LEGENDA: complemente o conteúdo com uma informação útil e um próximo passo pertinente ao pedido. Siga a voz do brief, sem impor uma fórmula narrativa.';
   if (isTendenciaCulturaPreset(presetId)) {
     return `ESTRUTURA DA LEGENDA CULTURA:
 1. Primeiro parágrafo: expanda a percepção nomeada no carrossel, sem copiar a capa.
@@ -1061,6 +1069,7 @@ function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
 
 /** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */
 function buildHookModeVariationRules(narrativeModeId, creativePresetId) {
+  if (narrativeModeId === 'none') return '- Varie a abertura respeitando o pedido, a voz do brief e os fatos atuais, sem impor uma fórmula narrativa.';
   const tendenciaCulture = isTendenciaCulturaPreset(creativePresetId);
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
     return `- Priorize entrada em CENA ou identificação emocional imediata (in medias res / "é exatamente isso") — não só fórmulas "X não é Y".
@@ -1109,6 +1118,7 @@ function buildHookModeVariationRules(narrativeModeId, creativePresetId) {
 }
 
 function buildRefineModeVoiceRules(presetId, narrativeMode = 'editorial') {
+  if (narrativeMode === 'none') return '- Preserve a voz do brief e a entrega original, sem acrescentar um modo narrativo.';
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
   const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
   const journalMode = narrativeMode === 'jornalistico';

@@ -28,8 +28,8 @@ import {
 import { AI_SYSTEM_PT } from '../../src/utils/ai-client.js';
 
 describe('módulo generation-prompts (extração do monólito)', () => {
-  it('8 modos narrativos com método não-vazio', () => {
-    expect(GEN_MODES).toHaveLength(8);
+  it('8 modos narrativos e opção Nenhum com orientação explícita', () => {
+    expect(GEN_MODES).toHaveLength(9);
     for (const m of GEN_MODES) {
       expect(GEN_MODE_BY_ID[m.id]).toBe(m);
       expect(m.method.length).toBeGreaterThan(100);
@@ -73,7 +73,7 @@ describe('contratos editoriais de texto', () => {
       for (const { id: density } of SLIDE_TEXT_DENSITY_OPTIONS) {
         const b = scaledCharBand(...midSubtitleBandFor(mode), density);
         const layout = buildGenerationSlideLayoutRules(mode, 'quick_erro_comum', density);
-        expect(layout).toContain(`${b.lo} E ${b.hi}`);
+        expect(layout).toContain(mode === 'none' ? `até ${b.hi} caracteres` : `${b.lo} E ${b.hi}`);
         expect(layout).not.toContain('SUBSTITUI');
         const refine = buildRefineSingleSlideRules(mode, density, { presetId: 'quick_erro_comum', slideIndex: 2, slideCount: 7 });
         expect(refine).toContain(`${b.lo} e ${b.hi}`);

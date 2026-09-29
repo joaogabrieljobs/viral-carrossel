@@ -167,7 +167,7 @@ function GenerateModal({
       // Aplica padrão visual ao brand ANTES da geração — IA usa as cores
       // novas pra recomendar paleta consistente nos slides.
       if (visualPreset && onVisualPresetChange) onVisualPresetChange(visualPreset);
-      await onGenerate({
+      const result = await onGenerate({
         topic: resolvedGenerationTopic,
         count,
         niche: modoPersonalizado ? niche : '',
@@ -182,7 +182,7 @@ function GenerateModal({
         cardVisualStyle: cardStyle,
         fetchImagesNow: !!withImages,
       });
-      onClose();
+      if (!result?.cancelled) onClose();
     } catch(e) { setErr(e.message); }
     finally { setBusy(false); }
   };

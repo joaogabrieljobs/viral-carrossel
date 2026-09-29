@@ -1,3 +1,4 @@
+import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-control.js';
 import { isPersoHybridDensity, isTendenciaCulturaPreset } from './generation-prompts.js';
 import { normalizeInstagramCaption } from './editorial-strategy.js';
 
@@ -68,12 +69,14 @@ export function applyEditorialReview(draft, review, config) {
 /** No máximo duas chamadas: geração + revisão. Falha da revisão não perde o rascunho. */
 export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview }, callAI) {
   const draft = validateCarouselDraft(await callAI(prompt, { ...aiOptions, json: true }), config);
+  throwIfGenerationCancelled(aiOptions?.signal);
   onReview?.();
   try {
     const review = await callAI(buildEditorialReviewPrompt(prompt, draft), { ...aiOptions, json: true });
     const result = applyEditorialReview(draft, review, config);
     return { result, reviewStatus: JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised' };
-  } catch {
+  } catch (error) {
+    if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
     return { result: draft, reviewStatus: 'unavailable' };
   }
 }

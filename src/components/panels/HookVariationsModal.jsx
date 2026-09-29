@@ -1,3 +1,4 @@
+import { isGenerationCancelled } from '../../utils/generation-control.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw, X, Zap, ChevronRight, Instagram } from 'lucide-react';
@@ -52,7 +53,7 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
         { json: true, openaiKey }
       );
       setHooks(r.hooks || []);
-    } catch(e) { setErr(e.message); }
+    } catch(e) { if (!isGenerationCancelled(e)) setErr(e.message); }
     finally { setBusy(false); }
   }, [
     slides,

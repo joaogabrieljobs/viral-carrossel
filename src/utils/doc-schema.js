@@ -209,6 +209,7 @@ const DEFAULT_DOC = {
   // Modo narrativo padrão. Persistido entre sessões pra que o usuário
   // não precise reescolher toda vez. Um dos GEN_MODES.id.
   mode: 'editorial',
+  quickNarrativeMode: 'none',
   // Pacote criativo da IA — default personalizado (id interno `livre`) ou Tendência/Cultura.
   creativePreset: 'livre',
   contentObjective: 'auto',
@@ -276,6 +277,7 @@ function ensureDocShape(d) {
   }
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';
   if (!out.mode) out.mode = 'editorial';
+  if (!GEN_MODES.some(m => m.id === out.quickNarrativeMode)) out.quickNarrativeMode = 'none';
   if (out.creativePreset == null) out.creativePreset = 'livre';
   if (out.creativePreset === 'estudio_editorial') out.creativePreset = 'tendencia_cultura';
   if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';

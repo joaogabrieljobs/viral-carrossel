@@ -1,3 +1,4 @@
+import { isGenerationCancelled } from '../../utils/generation-control.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState } from 'react';
 import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'lucide-react';
@@ -29,6 +30,7 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
       setData(normalizeResearchResult(r, true));
       onSetNiche?.(niche);
     } catch (e1) {
+      if (isGenerationCancelled(e1)) return;
       setDegraded(true);
       try {
         const r = await callAI(
@@ -39,6 +41,7 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
         setDegraded(true);
         onSetNiche?.(niche);
       } catch (e2) {
+        if (isGenerationCancelled(e2)) return;
         setErr(e2.message || e1.message || String(e2));
       }
     } finally { setBusy(false); }

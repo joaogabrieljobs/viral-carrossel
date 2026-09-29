@@ -33,7 +33,7 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
   const literal = src.match(/const prompt = (`[\s\S]*?`);\n\n    setGenProgress/)[1];
   const material = { context: 'Tom próximo, sem gíria forçada' };
   const context = {
-    ...prompts, buildGenerationTaskBlock, announcement: false, projectContextBlock: '', styleKitTextHint: '', projectDesignInstructions: '', buildEditorialStrategyBlock, objective: 'auto',
+    ...prompts, buildGenerationTaskBlock, announcement: false, projectContextBlock: '', styleKitTextHint: '', projectDesignInstructions: '', remixBlock: '', buildEditorialStrategyBlock, objective: 'auto',
     performanceGuidance,
     cp, effectiveMode: 'editorial', count, topic: 'Reuniões sem pauta',
     introLine: prompts.buildGenerationIntroLine(cp),

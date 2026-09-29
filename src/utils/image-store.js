@@ -185,8 +185,9 @@ export async function imagemComoDataUrl(id) {
 /** Ids referenciados por uma biblioteca de projetos. */
 export function idsDeImagemEmUso(library) {
   return [...new Set((library || []).flatMap((e) => [
-    ...(e?.doc?.slides || []).map(s => s?.bgImageId),
+    ...(e?.doc?.slides || []).flatMap(s => [s?.bgImageId, s?.logoImageId]),
     ...(e?.doc?.styleKit?.refImages || []).map(r => r?.imageId),
+    e?.doc?.styleKit?.logo?.imageId,
   ]).filter(Boolean))];
 }
 
@@ -206,10 +207,13 @@ export function semImagensDeRuntime(library) {
       const bg = typeof s.bgImage === 'string' ? s.bgImage : '';
       const ehRuntime = bg.startsWith('blob:');
       const jaGuardada = !!s.bgImageId && (bg.startsWith('blob:') || bg.startsWith('data:'));
-      if (!ehRuntime && !jaGuardada) return s;
+      const logoRuntime = !!s.logoImageId || String(s.logoImage || '').startsWith('blob:');
+      if (!ehRuntime && !jaGuardada && !logoRuntime) return s;
       mudou = true;
-      const { bgImage, ...resto } = s;
-      return resto;
+      const next = { ...s };
+      if (ehRuntime || jaGuardada) delete next.bgImage;
+      if (logoRuntime) delete next.logoImage;
+      return next;
     });
     if (!mudou) return entry;
     return { ...entry, doc: { ...entry.doc, slides: novos } };

@@ -1,3 +1,4 @@
+import { brandWithSlideLogo } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Layout, Video, User } from 'lucide-react';
@@ -1097,7 +1098,7 @@ const SlideCardInner = React.forwardRef(({
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
   // handle mesmo que o usuário configure depois de aplicar o padrão visual.
-  const brandRaw = brand;
+  const brandRaw = React.useMemo(() => brandWithSlideLogo(brand, slide), [brand, slide.logoImageId, slide.logoImage, slide.logoHidden, slide.logoPosition, slide.logoSize, slide.logoOpacity]);
   brand = React.useMemo(() => {
     const campos = ['cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
       'footerPillText', 'footerBarLeft', 'footerBarCenter', 'footerBarRight'];

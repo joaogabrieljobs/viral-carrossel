@@ -1,4 +1,6 @@
-import React from 'react';
+import { GEN_MODES } from '../../utils/generation-prompts.js';
+import React, { useState } from 'react';
+import { GenerationScopePicker } from '../GenerationScopePicker.jsx';
 import { BookOpen, ChevronDown, FileText, Loader2, Sparkles, Type } from 'lucide-react';
 import { ProjectStyleKitPanel } from './ProjectStyleKitPanel.jsx';
 import { styleKitHasContent } from '../../utils/style-kit.js';
@@ -123,12 +125,17 @@ function NarrativaStudioPanels({
   setQuickPrompt,
   onQuickGenerate,
   genBusy = false,
+  hasImages = false,
+  narrativeMode = 'none',
+  onNarrativeModeChange = () => {},
   activeIdx = 0,
   slidesCount = 1,
   cardChildren = null,
   materialChildren = null,
   materialSummary = '',
 }) {
+  const [scope, setScope] = useState('text');
+  const effectiveScope = hasImages ? scope : 'text';
   const kit = styleKit || {};
   const hasKit = styleKitHasContent(kit);
   const promptTrim = (quickPrompt || '').trim();
@@ -207,10 +214,21 @@ function NarrativaStudioPanels({
               minHeight: 110, resize: 'vertical', lineHeight: 1.5, fontSize: 14,
             }}
           />
+          <fieldset disabled={genBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            <legend style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Modo narrativo</legend>
+            <div role="group" aria-label="Modo narrativo" style={{ display: 'flex', overflowX: 'auto', gap: 6, paddingBottom: 8 }}>
+              {[GEN_MODES.find(item => item.id === 'none'), ...GEN_MODES.filter(item => item.id !== 'none')].map(item => (
+                <button key={item.id} type="button" aria-pressed={narrativeMode === item.id} title={item.desc} onClick={() => onNarrativeModeChange(item.id)}
+                  style={{ flexShrink: 0, minHeight: 40, padding: '8px 12px', borderRadius: 9999, border: `1px solid ${narrativeMode === item.id ? 'var(--accent)' : 'var(--border)'}`, background: narrativeMode === item.id ? 'var(--accent-surface)' : 'var(--bg-card)', color: 'var(--text-primary)', cursor: genBusy ? 'not-allowed' : 'pointer' }}>{item.label}</button>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: 0 }}>{GEN_MODES.find(item => item.id === narrativeMode)?.desc}</p>
+          </fieldset>
+          <GenerationScopePicker value={effectiveScope} onChange={setScope} disabled={genBusy} hasImages={hasImages} />
           <button
             type="button"
             disabled={genBusy || !promptTrim}
-            onClick={() => onQuickGenerate?.(promptTrim)}
+            onClick={() => onQuickGenerate?.(promptTrim, { withImages: effectiveScope === 'text_images', narrativeMode })}
             style={{
               width: '100%', height: 44, borderRadius: 9999, border: 'none',
               cursor: genBusy || !promptTrim ? 'not-allowed' : 'pointer',

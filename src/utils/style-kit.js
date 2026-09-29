@@ -31,6 +31,9 @@ function normalizeStyleKit(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const refs = Array.isArray(src.refImages) ? src.refImages : [];
   return {
+    ...(asString(src.name).trim() ? { name: asString(src.name).trim().slice(0, 60) } : {}),
+    ...(src.logo && (asString(src.logo.imageId) || asString(src.logo.dataUrl).startsWith('data:image/png;base64,'))
+      ? { logo: { name: asString(src.logo.name).slice(0, 80) || 'Logo do projeto', ...(src.logo.imageId ? { imageId: src.logo.imageId } : { dataUrl: src.logo.dataUrl }) } } : {}),
     stylePrompt: asString(src.stylePrompt).slice(0, STYLE_PROMPT_MAX),
     contextMd: asString(src.contextMd).slice(0, CONTEXT_MD_MAX),
     refImages: refs
@@ -47,6 +50,13 @@ function normalizeStyleKit(raw) {
 function styleKitHasContent(kit) {
   const k = normalizeStyleKit(kit);
   return Boolean(k.stylePrompt.trim() || k.contextMd.trim() || k.refImages.length);
+}
+
+export function projectContextLabel(kit, projectName = '') {
+  const normalized = normalizeStyleKit(kit);
+  if (normalized.name) return normalized.name;
+  const heading = normalized.contextMd.match(/^#\s+(.+)$/m)?.[1]?.replace(/[*_`]/g, '').trim();
+  return (heading || projectName.trim() || 'Este projeto').slice(0, 60);
 }
 
 /** Brief tipo CLAUDE.md → bloco de texto para prompts de copy. */

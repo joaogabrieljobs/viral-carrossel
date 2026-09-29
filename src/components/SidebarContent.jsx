@@ -1,3 +1,6 @@
+import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
+import { isGenerationCancelled, startAIJob, runAIJob, throwIfGenerationCancelled } from '../utils/generation-control.js';
+import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal } from 'lucide-react';
@@ -151,6 +154,9 @@ function SidebarContent({
   material = { content:'', sources:'', context:'' }, setMaterial = () => {},
   styleKit = { stylePrompt: '', contextMd: '', refImages: [] }, setStyleKit = () => {},
   onQuickGenerate = null,
+  quickPrompt = '', setQuickPrompt = () => {},
+  quickNarrativeMode = 'none',
+  onQuickNarrativeModeChange = () => {},
   genBusy = false,
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
   setImgParams = () => {},
@@ -192,10 +198,8 @@ function SidebarContent({
   const [dalleLoading, setDalleLoading] = React.useState(false);
   /** Accordion da aba Narrativa: context | prompt | card | null */
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
-  const [quickPrompt, setQuickPrompt] = React.useState('');
-  // Prompt rápido é por sessão/projeto — limpa ao trocar de carrossel.
+  // O rascunho do prompt vive no editor; este painel pode desmontar no mobile.
   React.useLayoutEffect(() => {
-    setQuickPrompt('');
     setNarrativaPanel('prompt');
   }, [activeEntry?.id]);
 
@@ -245,17 +249,20 @@ function SidebarContent({
     const target = imageTargetRef.current;
     updateSlide({ imageQuery: q, imgMode: 'dalle' });
     setDalleLoading(true);
+    const job = startAIJob();
     try {
       const url = await generateDALLE(q, openaiKey, imgParams, {
-        refImages: await resolveImageReferences(styleKit, slide.refImage),
+        signal: job.signal,
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, slide.imgExtraPrompt),
       });
       // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
       const patch = await guardarImagemDoSlide(url);
+      throwIfGenerationCancelled(job.signal);
       if (imageTargetRef.current.projectId !== target.projectId || imageTargetRef.current.slideId !== target.slideId) return;
       updateSlide({ ...patch, overlay: 70, bgImageSource: 'ai' });
-    } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
-    finally { setDalleLoading(false); }
+    } catch(e) { if (!isGenerationCancelled(e)) toast?.('GPT Image 2: '+e.message, 'error'); }
+    finally { job.finish(); setDalleLoading(false); }
   };
 
   const replaceImg = async () => {
@@ -490,11 +497,14 @@ function SidebarContent({
             onNewProject={onNewProject}
             quickPrompt={quickPrompt}
             setQuickPrompt={setQuickPrompt}
-            onQuickGenerate={async (text) => {
-              await onQuickGenerate?.(text);
-              setNarrativaPanel('card');
+            onQuickGenerate={async (text, options) => {
+              const result = await onQuickGenerate?.(text, options);
+              if (result && !result.cancelled) setNarrativaPanel('card');
             }}
             genBusy={genBusy}
+            hasImages={hasOpenAI}
+            narrativeMode={quickNarrativeMode}
+            onNarrativeModeChange={onQuickNarrativeModeChange}
             activeIdx={activeIdx}
             slidesCount={slides.length}
             materialSummary={(() => {
@@ -2909,6 +2919,12 @@ function SidebarContent({
 
         {/* HOME / Storyboard — visão geral do projeto. Sequência de cards,
             estatísticas, fluxo narrativo. "Mesa criativa" cinematográfica. */}
+        {(tab === 'brand' || (tab === 'narrativa' && narrativaPanel === 'card')) && (
+          <S title={`Logo — card ${activeIdx + 1}`}>
+            <SlideLogoPanel key={`${activeEntry?.id}-${slide.id}`} slide={slide} updateSlide={updateSlide} toast={toast} styleKit={styleKit} setStyleKit={setStyleKit} brand={brand} />
+          </S>
+        )}
+
         {tab==='home' && (
           <>
             {/* Saudação + status */}
@@ -3117,52 +3133,8 @@ function SidebarContent({
             </S>
 
             {hasLastGenerate ? (
-              <S title="Refazer com tom alternativo" hint="Usa o mesmo tema/material da última geração mas com inflexão de tom diferente. O carrossel atual fica em Cmd+Z (undo) pra você comparar.">
-                {/* Polish: cards verticais com label grande + micro-descrição em cinza.
-                    Hover puxa borda accent + lift sutil. Disabled durante refining. */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                  {[
-                    { id:'analitico',  label:'Analítico',  blurb:'Editorial, calmo, conceitual.', hint:'mais analítico-editorial, conceitual e calmo, com profundidade de raciocínio' },
-                    { id:'provocador', label:'Provocador', blurb:'Contraintuitivo, vira a tese.',  hint:'mais provocador e contraintuitivo, virando a tese óbvia do avesso sem deixar de sustentar' },
-                    { id:'leve',       label:'Leve',       blurb:'Direto, humor sutil, curto.',   hint:'mais leve, conversacional e direto, com humor sutil e frases curtas' },
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => remixWithTone(opt.hint, opt.label)}
-                      disabled={refining}
-                      aria-label={opt.hint} title={opt.hint}
-                      style={{
-                        display:'flex', flexDirection:'column', alignItems:'flex-start', gap:4,
-                        padding:'10px 10px 11px', borderRadius:10, cursor: refining ? 'not-allowed' : 'pointer',
-                        background:'var(--bg-card)', border:'1px solid var(--border)',
-                        color:'var(--text-secondary)',
-                        fontFamily:'var(--font-ui)',
-                        opacity: refining ? 0.5 : 1,
-                        transition:'border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth), background-color 0.15s var(--ease-smooth)',
-                        textAlign:'left',
-                      }}
-                      onMouseEnter={e => {
-                        if (refining) return;
-                        e.currentTarget.style.borderColor = 'var(--accent)';
-                        e.currentTarget.style.background = 'var(--accent-surface)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = 'var(--border)';
-                        e.currentTarget.style.background = 'var(--bg-card)';
-                      }}
-                      onMouseDown={e => { if (!refining) e.currentTarget.style.transform = 'scale(0.97)'; }}
-                      onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                    >
-                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
-                        {opt.label}
-                      </span>
-                      <span style={{ fontSize:10, lineHeight:1.35, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                        {opt.blurb}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              <S title="Refazer com tom alternativo" hint="Escolha o tom e o que refazer. O brief, as referências e a identidade visual do projeto continuam valendo. Você pode desfazer para comparar.">
+                <RemixPanel key={activeEntry?.id} onRemix={remixWithTone} busy={refining || genBusy} hasImages={hasOpenAI} />
               </S>
             ) : null}
 

@@ -1,3 +1,7 @@
+import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
+import { startAIJob, runAIJob, cancelAllAIGeneration, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
+import { buildRemixBlock, mergeRemixedSlides } from './src/utils/carousel-remix.js';
+import { GenerationStatus } from './src/components/GenerationStatus.jsx';
 import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
 import { generateReviewedCarousel } from './src/utils/editorial-review.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
@@ -1192,6 +1196,35 @@ export default function App() {
   // tem de poder repetir-se. Com o mapa, repetir é de graça (sem ler o disco).
   const imagemUrlsRef = useRef(new Map());
   useEffect(() => {
+    let cancelled = false;
+    const targets = slides.filter(sl => sl.logoImageId && !sl.logoImage);
+    if (!targets.length) return;
+    Promise.all(targets.map(async sl => {
+      let url = imagemUrlsRef.current.get(sl.logoImageId);
+      if (!url) {
+        const entry = await imageGet(sl.logoImageId);
+        if (!entry?.blob) return null;
+        url = URL.createObjectURL(entry.blob);
+        imagemUrlsRef.current.set(sl.logoImageId, url);
+      }
+      return { id: sl.id, imageId: sl.logoImageId, url };
+    })).then(patches => {
+      if (cancelled || !patches.some(Boolean)) return;
+      history.setSilent(d => {
+        let changed = false;
+        const next = d.slides.map(sl => {
+          const patch = patches.find(p => p?.id === sl.id && p.imageId === sl.logoImageId);
+          if (!patch || sl.logoImage) return sl;
+          changed = true;
+          return { ...sl, logoImage: patch.url };
+        });
+        return changed ? { ...d, slides: next } : d;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [slides, activeEntry?.id, history.setSilent]);
+
+  useEffect(() => {
     let cancelado = false;
     (async () => {
       const alvo = (slidesLiveRef.current || []).map((sl, i) => ({ sl, i }));
@@ -1243,7 +1276,7 @@ export default function App() {
   useEffect(() => {
     const projectId = activeEntry?.id;
     const source = doc.styleKit;
-    if (!(source?.refImages || []).some(r => r.dataUrl && !r.imageId)) return;
+    if (!(source?.refImages || []).some(r => r.dataUrl && !r.imageId) && !source?.logo?.dataUrl) return;
     let cancelled = false;
     migrateProjectReferences(source).then(migrated => {
       if (cancelled || activeProjectRef.current !== projectId) return;
@@ -1335,10 +1368,34 @@ export default function App() {
   }, [showPreviewAlignGrid]);
   // Ref para cancelar loops de geração de imagem órfãos (race-condition guard)
   const imgGenAbortRef = useRef(null);
+  const generationRef = useRef(null);
   const slideImgGenIdsRef = useRef(new Set());
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
   const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
+  // O drawer mobile e a sidebar desktop desmontam ao mudar a largura da tela.
+  // Mantém o pedido no editor para não perdê-lo ao girar o celular/cancelar.
+  const [quickPrompt, setQuickPrompt] = useState('');
+  const cancelGeneration = useCallback(() => {
+    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    cancelAllAIGeneration();
+    generationRef.current = null;
+    setGenProgress(null);
+    toast('Geração cancelada. O que já foi concluído foi mantido.', 'info');
+  }, [toast]);
+  useEffect(() => {
+    setQuickPrompt('');
+    lastGenerateArgsRef.current = null;
+    setHasLastGenerate(false);
+    return () => {
+      generationRef.current?.cancel();
+      generationRef.current = null;
+      if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+      cancelAllAIGeneration();
+      setGenProgress(null);
+    };
+  }, [activeEntry?.id]);
+
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const selectedTextProvider = aiSettings.textProvider;
   const selectedImageKeyProvider = aiSettings.imageProvider === 'zai' ? 'zai' : 'openai';
@@ -2119,21 +2176,25 @@ export default function App() {
 
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
+    const job = startAIJob();
     try {
       const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
-        refImages: await resolveImageReferences(styleKit, snap.refImage),
+        signal: job.signal,
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, snap.imgExtraPrompt),
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
       const patchImg = await guardarImagemDoSlide(url);
+      throwIfGenerationCancelled(job.signal);
       setSlides(prev => {
         const j = prev.findIndex(sl => sl.id === slideId);
         return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, ...patchImg, imgMode: 'dalle', overlay: 70, bgImageFailed: false, bgImageSource: 'ai' } : sl));
       });
       toast(`Slide ${idx + 1}: imagem gerada`, 'success');
     } catch (e) {
-      toast(`GPT Image: ${e.message}`, 'error');
+      if (!isGenerationCancelled(e)) toast(`GPT Image: ${e.message}`, 'error');
     } finally {
+      job.finish();
       slideImgGenIdsRef.current.delete(slideId);
       setSlideImgGenBusy(prev => {
         const next = { ...prev };
@@ -2228,18 +2289,18 @@ export default function App() {
     cardVisualStyle: cardStyleArg,
     fetchImagesNow = true,
     announcement = false,
+    remix = false,
   }) => {
+    if (generationRef.current && !generationRef.current.signal.aborted) return { cancelled: true };
     const generationProjectId = activeProjectRef.current;
-    // Captura args pra Remix com tom alternativo (B1). Guarda também fetchImagesNow:
-    // quem gerou "só texto" não pode ver o remix consumir quota de imagens (auditoria M5).
-    lastGenerateArgsRef.current = {
-      topic, count, niche: n, tone, audience,
-      imgParams: axes, mode: chosenNarrativeMode,
-      creativePreset: presetArg, contentObjective: normalizeContentObjective(objectiveArg ?? contentObjective), slideTextDensity: densityArg,
-      cardVisualStyle: cardStyleArg,
-      fetchImagesNow, announcement,
+    const job = startAIJob();
+    generationRef.current = job;
+    const checkActive = () => {
+      if (activeProjectRef.current !== generationProjectId || generationRef.current !== job) job.cancel();
+      throwIfGenerationCancelled(job.signal);
     };
-    setHasLastGenerate(true);
+    const sourceSlides = slides;
+    setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Preparando contexto do projeto…' });
     trackEvent('carousel_generate_start', {
       preset: presetArg ?? creativePreset ?? 'livre',
       mode: chosenNarrativeMode || mode || 'editorial',
@@ -2265,7 +2326,8 @@ export default function App() {
     const brandBlock = buildBrandBlock(brand);
     const projectContextBlock = buildProjectContextBlock(styleKit);
     const styleKitTextHint = buildStyleKitTextHint(styleKit);
-    const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
+    const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
+    checkActive();
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
@@ -2276,7 +2338,8 @@ export default function App() {
     const quickPackBlock = quickTid ? buildQuickTemplatePackBlock(quickTid, count) : '';
 
     const persoHybridActive = isPersoHybridDensity(cp, td);
-    const projectDesignInstructions = buildProjectDesignInstructions(styleKit);
+    const projectDesignInstructions = remix ? '' : buildProjectDesignInstructions(styleKit);
+    const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
     const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null);
 
     const idiomaRegra = `
@@ -2300,7 +2363,7 @@ REGRA DE IDIOMA (obrigatória):
               `Tom de voz solicitado: ${tone}`,
             ].filter(Boolean).join('\n');
     const modoNarrativoBloco =
-      announcement ? 'Arco publicitário: apresente o produto e a possibilidade concreta que ele oferece, desenvolva benefícios sustentados pelo brief e encerre com um próximo passo. Cada card deve ser uma peça pronta para o público.' : isTendenciaCulturaPreset(cp)
+      effectiveMode === 'none' ? modeDef.method : announcement && !chosenNarrativeMode ? 'Arco publicitário: apresente o produto e a possibilidade concreta que ele oferece, desenvolva benefícios sustentados pelo brief e encerre com um próximo passo. Cada card deve ser uma peça pronta para o público.' : isTendenciaCulturaPreset(cp)
         ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
         : modeDef.method;
 
@@ -2317,8 +2380,8 @@ ${hasPromptMaterial ? '' : `${materialBlock}${materialPriorityBlock}`}${imgParam
 ${buildGenerationTaskBlock(topic, announcement)}
 ${idiomaRegra}
 
-${buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId)}
-${performanceGuidance.prompt}
+${effectiveMode === 'none' ? '' : buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId)}
+${effectiveMode === 'none' ? '' : performanceGuidance.prompt}
 
 ${modoNarrativoBloco}
 ${tendenciaPackBlock}
@@ -2330,6 +2393,7 @@ ${langLayer}
 
 ${imageLayer}
 ${projectDesignInstructions}
+${remixBlock}
 
 ${buildCaptionOutlineInstructions(effectiveMode, cp)}
 ${buildCaptionVoiceRules(cp, effectiveMode)}
@@ -2343,10 +2407,10 @@ ${jsonShapeLine}`;
     const { result, reviewStatus } = await generateReviewedCarousel({
       prompt,
       config: { count: Number(count), presetId: cp, densityId: td },
-      aiOptions: { maxTokens: genMaxTokens, openaiKey },
-      onReview: () => setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Revisando clareza e coerência…' }),
+      aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
+      onReview: () => { checkActive(); setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Revisando clareza e coerência…' }); },
     }, callAI);
-    if (activeProjectRef.current !== generationProjectId) return;
+    checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
@@ -2355,7 +2419,7 @@ ${jsonShapeLine}`;
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
-    const newSlides = applyFinalizeCanvasMarginsToSlides(
+    const newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : applyFinalizeCanvasMarginsToSlides(
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       let q = ((s.imageQuery ?? s.image_query) || '').trim();
@@ -2444,6 +2508,15 @@ ${jsonShapeLine}`;
       ),
       fmt,
     );
+    checkActive();
+    if (!remix) {
+      lastGenerateArgsRef.current = {
+        topic, count, niche: n, tone, audience, announcement,
+        imgParams: effectiveAxes, mode: effectiveMode, creativePreset: cp,
+        contentObjective: objective, slideTextDensity: td, cardVisualStyle: cvStyle,
+      };
+      setHasLastGenerate(true);
+    }
     history.set(d => ({
       ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp, slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
       editorialContext: { topic, niche: n || '', generatedAt: new Date().toISOString(), suggestedStructureId: performanceGuidance.preferredStructureId },
@@ -2452,11 +2525,11 @@ ${jsonShapeLine}`;
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
     // trazem `subtitleVisible: false` (look só-título) e escondiam o texto recém
     // gerado sem o utilizador perceber que havia uma caixa desmarcada em Marca.
-    if (newSlides.some((sl) => String(sl.subtitle || '').trim())) {
+    if (!remix && newSlides.some((sl) => String(sl.subtitle || '').trim())) {
       setBrand((b) => (b?.subtitleVisible === false ? { ...b, subtitleVisible: true } : b));
     }
     const quickTplSynced = isQuickTemplatePreset(cp) ? TEMPLATES.find((x) => x.id === quickTemplateIdFromPreset(cp)) : null;
-    if (quickTplSynced) {
+    if (quickTplSynced && !remix) {
       const pal = PALETTES[quickTplSynced.palette] || PALETTES[0];
       setBrand((b) => ({
         ...b,
@@ -2498,14 +2571,19 @@ ${jsonShapeLine}`;
           if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagem do card ${i+1} (${doneImgs+1}/${totalImgs})…` });
           try {
+            checkActive();
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
+              signal: job.signal,
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
             });
+            checkActive();
             const patchImg = await guardarImagemDoSlide(url);
+            checkActive();
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
               setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
           } catch(e) {
+            if (isGenerationCancelled(e) || job.signal.aborted) throw e;
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
@@ -2531,36 +2609,41 @@ ${jsonShapeLine}`;
           6000,
         );
       }
-    } else if (result.slides.some(s => (s.imageQuery || '').trim())) {
+    } else if (!remix && result.slides.some(s => (s.imageQuery || '').trim())) {
       toast(
         'Imagens não foram geradas agora — já existem zonas de foto nos cards (toque na área para importar ou use «Gerar imagem»).',
         'info',
         5500,
       );
     }
+      checkActive();
       trackEvent('carousel_generate_success', {
         slide_count: String(newSlides.length),
         image_failures: String(imgFailCount),
       });
+      return { cancelled: false };
     } catch (err) {
+      if (isGenerationCancelled(err) || job.signal.aborted) return { cancelled: true };
       trackEvent('carousel_generate_error', {
         msg: String(err?.message || '').slice(0, 80),
       });
       throw err;
     } finally {
-      setGenProgress(null);
+      job.finish();
+      if (generationRef.current === job) { generationRef.current = null; setGenProgress(null); }
     }
   };
 
   const refineSlide = async (instruction) => {
     const projectId = activeProjectRef.current;
     setRefining(true); setError('');
+    const job = startAIJob();
     try {
       const ctx = buildCarouselTextContext(slides);
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const nSl = slides.length;
       const isCultureSandwichSlide =
@@ -2593,8 +2676,9 @@ ${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset
 - Respeite a identidade verbal e o material acima.
 
 Retorne exatamente: ${singleJson}`,
-        { json:true, openaiKey }
+        { json:true, openaiKey, signal: job.signal }
       );
+      throwIfGenerationCancelled(job.signal);
       const patch = {
         title: stripLeadingSlideCardLabel(String(r.title ?? slide.title ?? '').trim()),
         subtitle: stripLeadingSlideCardLabel(String(r.subtitle ?? slide.subtitle ?? '').trim()),
@@ -2603,19 +2687,20 @@ Retorne exatamente: ${singleJson}`,
         patch.bodyAfterImage = stripLeadingSlideCardLabel(String(r.bodyAfterImage).trim());
       }
       if (activeProjectRef.current === projectId) updateSlide(patch);
-    } catch(e) { setError(e.message); }
-    finally { setRefining(false); }
+    } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
+    finally { job.finish(); setRefining(false); }
   };
 
   const generateCaption = async () => {
     const projectId = activeProjectRef.current;
     setGenCaption(true); setError('');
+    const job = startAIJob();
     try {
       const ctx = buildCarouselTextContext(slides);
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const capRules = buildCaptionVoiceRules(creativePreset, mode);
-      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
       const r = await callAI(
         `Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.
 
@@ -2632,13 +2717,14 @@ ${capRules}
 - Hashtags no final, na quantidade indicada nas REGRAS acima.
 - Respeite a identidade verbal e use o material para conferir os fatos do carrossel.
 - Apenas a legenda e as hashtags, nada mais.`,
-        { openaiKey }
+        { openaiKey, signal: job.signal }
       );
+      throwIfGenerationCancelled(job.signal);
       const finalCaption = normalizeInstagramCaption(r);
 
       if (activeProjectRef.current === projectId) setCaption(finalCaption);
-    } catch(e) { setError(e.message); }
-    finally { setGenCaption(false); }
+    } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
+    finally { job.finish(); setGenCaption(false); }
   };
 
   // Garante que: (a) fontes web carregaram (b) imagens dos slides estão carregadas
@@ -2671,7 +2757,7 @@ ${capRules}
 
   // B1: Remix com tom alternativo — re-roda handleGenerate com os mesmos args mas
   // adicionando um hint de tom. Usuário pode comparar com Cmd+Z (undo) depois.
-  const remixWithTone = async (toneHint, hintLabel) => {
+  const remixWithTone = async (toneHint, hintLabel, { withImages = false } = {}) => {
     const prev = lastGenerateArgsRef.current;
     if (!prev) {
       toast('Gere um carrossel primeiro — depois use o remix para variar o tom.', 'info');
@@ -2682,14 +2768,18 @@ ${capRules}
       ? `${prev.tone} — variação solicitada: ${toneHint}`
       : `Variação solicitada: ${toneHint}`;
     try {
-      await handleGenerate({ ...prev, tone: blendedTone });
+      return await handleGenerate({
+        ...prev, tone: blendedTone, count: slides.length, remix: true,
+        mode, creativePreset, slideTextDensity, contentObjective, cardVisualStyle, imgParams,
+        fetchImagesNow: withImages && hasOpenAI,
+      });
     } catch (e) {
       toast(e?.message || 'Não foi possível refazer com o novo tom.', 'error', 6000);
     }
   };
 
   /** Geração rápida a partir do prompt da aba Narrativa (usa styleKit + material). */
-  const handleQuickGenerateFromNarrativa = async (promptText) => {
+  const handleQuickGenerateFromNarrativa = async (promptText, { withImages = false, narrativeMode = 'none' } = {}) => {
     const topic = String(promptText || '').trim();
     if (!topic) {
       toast('Escreve o que queres gerar no prompt.', 'error');
@@ -2697,7 +2787,7 @@ ${capRules}
     }
     try {
       const { count, announcement } = resolveQuickGenerationRequest(topic, slides.length >= 3 && slides.length <= 12 ? slides.length : 6);
-      await handleGenerate({
+      return await handleGenerate({
         topic,
         count,
         niche: styleKit.contextMd.trim() ? '' : (niche || ''),
@@ -2705,16 +2795,17 @@ ${capRules}
         audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
         imgMode: 'dalle',
         imgParams,
-        mode: announcement ? 'editorial' : mode,
+        mode: GEN_MODE_BY_ID[narrativeMode] ? narrativeMode : 'none',
         announcement,
-        creativePreset: announcement ? 'livre' : creativePreset,
+        creativePreset: 'livre',
         contentObjective: announcement ? 'leads' : contentObjective,
         slideTextDensity: announcement ? '1_5' : slideTextDensity,
         cardVisualStyle,
-        fetchImagesNow: !!hasOpenAI,
+        fetchImagesNow: withImages && hasOpenAI,
       });
     } catch (e) {
-      toast(e?.message || 'Não foi possível gerar a partir do prompt.', 'error', 6000);
+      if (!isGenerationCancelled(e)) toast(e?.message || 'Não foi possível gerar a partir do prompt.', 'error', 6000);
+      return { cancelled: true };
     }
   };
 
@@ -2723,6 +2814,7 @@ ${capRules}
     const projectId = activeProjectRef.current;
     if (!slides.length) return;
     setRefining(true);
+    const job = startAIJob();
     try {
       const refineAllHybrid = isPersoHybridDensity(creativePreset, slideTextDensity);
       const refineAllWantsBody = isTendenciaCulturaPreset(creativePreset) || refineAllHybrid;
@@ -2734,7 +2826,7 @@ ${capRules}
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length);
       const r = await callAI(
@@ -2759,8 +2851,9 @@ ${layoutBulk}
 Retorne APENAS JSON: ${refineAllWantsBody
           ? '{"slides":[{"title":"...","subtitle":"...","bodyAfterImage":"..."}]}'
           : '{"slides":[{"title":"...","subtitle":"..."}]}'}`,
-        { json:true, openaiKey }
+        { json:true, openaiKey, signal: job.signal }
       );
+      throwIfGenerationCancelled(job.signal);
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
       if (activeProjectRef.current !== projectId) return;
       setSlides(prev => prev.map((s, i) => {
@@ -2780,8 +2873,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
         };
       }));
       toast('Todos os slides refinados', 'success');
-    } catch(e) { setError(e.message); }
-    finally { setRefining(false); }
+    } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
+    finally { job.finish(); setRefining(false); }
   }, [slides, setSlides, setError, toast, openaiKey, brand, material, styleKit, creativePreset, mode, slideTextDensity, contentObjective]);
 
   // Aplica um template pronto (preenche slides + brand + composições)
@@ -2857,11 +2950,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
     trackEvent('template_applied', { template: tpl.id || tpl.name, slides: tpl.slides.length });
     // Guard contra race-condition (mesmo padrão do handleGenerate)
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    const templateJob = startAIJob();
     const abort = { cancelled: false };
+    templateJob.signal.addEventListener('abort', () => { abort.cancelled = true; }, { once: true });
     imgGenAbortRef.current = abort;
     (async () => {
       // Modo plano (SJinn) não usa chave OpenAI — o gate antigo por `openaiKey` deixava templates sem foto (auditoria H7).
-      if (!hasOpenAI) return;
+      if (!hasOpenAI) { templateJob.finish(); return; }
       let failCount = 0;
       for (let i = 0; i < tpl.slides.length; i++) {
         if (abort.cancelled || activeProjectRef.current !== projectId) break;
@@ -2869,6 +2964,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         if (!q) continue;
         try {
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
+            signal: templateJob.signal,
             refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
             imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
           });
@@ -2876,12 +2972,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
           if (!abort.cancelled && activeProjectRef.current === projectId)
             setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
         } catch (e) {
+          if (isGenerationCancelled(e)) break;
           failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
           if (!abort.cancelled && activeProjectRef.current === projectId)
             setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImageFailed: true } : sl));
         }
       }
+      templateJob.finish();
       if (!abort.cancelled && failCount > 0)
         toast(failCount === 1
           ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
@@ -2990,6 +3088,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
     material, setMaterial,
     styleKit, setStyleKit,
     onQuickGenerate: handleQuickGenerateFromNarrativa,
+    quickPrompt, setQuickPrompt,
+    quickNarrativeMode: doc.quickNarrativeMode || 'none',
+    onQuickNarrativeModeChange: value => history.set(d => ({ ...d, quickNarrativeMode: value })),
     genBusy: !!genProgress,
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
@@ -3345,6 +3446,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
           </>
         )}
       </header>
+
+      <ProjectContextBanner styleKit={styleKit} projectName={activeEntry?.name} />
 
       {/* ── BODY ── */}
       <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
@@ -4114,51 +4217,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         onClose={closeModesIntro}
       />
 
-      {/* Barra de progresso fixa no rodapé durante geração de carrossel */}
-      {genProgress && (() => {
-        const pct = genProgress.total > 0
-          ? Math.min(100, Math.max(0, (genProgress.current / genProgress.total) * 100))
-          : (genProgress.phase === 'text' ? 30 : 0);
-        return (
-          <div style={{
-            position:'fixed', left:0, right:0, bottom:0, zIndex:9999,
-            pointerEvents:'none',
-          }}>
-            <div style={{
-              maxWidth: 560, margin:'0 auto 16px', padding:'12px 16px',
-              background:'rgba(20,20,22,0.95)', color:'#fff',
-              backdropFilter:'blur(18px)', WebkitBackdropFilter:'blur(18px)',
-              borderRadius: 14, border:'1px solid rgba(255,255,255,0.1)',
-              boxShadow:'0 12px 40px rgba(0,0,0,0.32)',
-              fontFamily:'var(--font-ui)',
-              pointerEvents:'auto',
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite', color:'var(--accent)', flexShrink:0 }}/>
-                <span style={{ fontSize:13, fontWeight:600, letterSpacing:'-0.011em', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                  {genProgress.label || 'Gerando…'}
-                </span>
-                {genProgress.total > 0 && (
-                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
-                    {genProgress.current}/{genProgress.total}
-                  </span>
-                )}
-              </div>
-              <div style={{
-                height: 4, background:'rgba(255,255,255,0.12)', borderRadius:9999, overflow:'hidden',
-              }}>
-                <div style={{
-                  height:'100%',
-                  width: `${pct}%`,
-                  background: 'linear-gradient(90deg, var(--accent), #ffb3d1)',
-                  borderRadius: 9999,
-                  transition: 'width 0.35s ease-out',
-                }}/>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <GenerationStatus progress={genProgress} onCancel={cancelGeneration} />
 
       {/* Modals */}
       <KeysModal
@@ -4387,4 +4446,3 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
 // ─── LIBRARY MODAL ────────────────────────────────────────────────────────────
 // Lista os carrosséis salvos com mini-thumbnail, nome editável, status e ações.
-

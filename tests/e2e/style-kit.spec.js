@@ -35,6 +35,7 @@ test('plano: prompt rápido gera três imagens com as referências e o estilo do
   await expect(page.getByRole('button', { name: 'Remover mood-b.png', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /PROMPT PARA GERAR/i }).first().click();
   await page.getByLabel('Prompt para gerar', { exact: true }).fill('CRIE 3 CARDS ANUNCIANDO LANÇAMENTO DO MUSA');
+  await page.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await page.getByRole('button', { name: /Gerar com contexto e referências/i }).click();
   await expect.poll(() => imageRequests.length).toBe(3);
   for (const body of imageRequests) {
@@ -102,11 +103,14 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   expect(generated.slides.every(s => s.titleWeight === 400 && s.photoRegion === 'full')).toBe(true);
   await contextPanel(page);
   // Troca imediatamente depois de digitar: não pode perder o último caractere no debounce.
+  await page.getByLabel('Nome do contexto', { exact: true }).fill('MUSA');
   await page.getByLabel('Brief do projeto').fill(brief + '\nÚltima edição antes da troca.');
+  await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
   await page.getByRole('button', { name: /^Novo projeto$/i }).first().click();
   await narrativa(page);
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue('');
+  await expect(page.getByRole('status', { name: 'Contexto ativo' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Remover mood-b.png', exact: true })).toHaveCount(0);
   await expect.poll(async () => (await persisted(page)).find(e => e.id === id)?.doc.styleKit.contextMd).toContain('Última edição antes da troca.');
   // Volta por meio da biblioteca real; pagehide também persiste o projeto ativo.
@@ -130,6 +134,7 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   for await (const chunk of await download.createReadStream()) chunks.push(chunk);
   const backup = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   const backedUp = backup.docs.find(e => e.id === id).doc.styleKit;
+  expect(backedUp.name).toBe('MUSA');
   expect(backedUp.refImages.every(r => r.dataUrl?.startsWith('data:image/') && !r.imageId)).toBe(true);
   await page.locator('input[accept=".json,application/json"]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
   await expect.poll(async () => (await persisted(page)).length).toBe(4);

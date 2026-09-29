@@ -12,6 +12,7 @@ import {
 
 import { imageGet } from '../../utils/image-store.js';
 import { storeProjectReference } from '../../utils/style-kit-storage.js';
+import { storeSlideLogo } from '../../utils/slide-logo.js';
 
 function ReferenceThumbnail({ reference }) {
   const [src, setSrc] = useState(reference.dataUrl || '');
@@ -46,6 +47,7 @@ function ProjectStyleKitPanel({
   useEffect(() => { alive.current = true; return () => { alive.current = false; uploadVersion.current++; }; }, []);
   const contextFileRef = useRef(null);
   const refImagesInputRef = useRef(null);
+  const logoInputRef = useRef(null);
   const kit = styleKit || { stylePrompt: '', contextMd: '', refImages: [] };
   const refs = Array.isArray(kit.refImages) ? kit.refImages : [];
   const hasContent = styleKitHasContent(kit);
@@ -89,6 +91,29 @@ function ProjectStyleKitPanel({
 
   return (
     <>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+        Nome do contexto
+        <input className="vc-input" value={kit.name || ''} maxLength={60} placeholder="Ex.: MUSA" onChange={e => patch({ name: e.target.value })} />
+      </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <strong style={{ fontSize: 12 }}>Logo do projeto</strong>
+        <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>Salve um PNG transparente e aplique depois nos cards escolhidos, em Editar card.</p>
+        {kit.logo && <span style={{ fontSize: 12 }}>{kit.logo.name || 'Logo salva no projeto'}</span>}
+        <button type="button" className="vc-btn" disabled={uploading} onClick={() => logoInputRef.current?.click()}>{kit.logo ? 'Trocar logo do projeto' : 'Importar logo PNG para o projeto'}</button>
+        <input ref={logoInputRef} type="file" accept="image/png" aria-label="Arquivo PNG da logo do projeto" style={{ display: 'none' }} onChange={async e => {
+          const file = e.target.files?.[0]; e.target.value = ''; if (!file) return;
+          const version = uploadVersion.current;
+          setUploading(true);
+          try {
+            const stored = await storeSlideLogo(file);
+            URL.revokeObjectURL(stored.logoImage);
+            if (!alive.current || version !== uploadVersion.current) return;
+            patch({ logo: { imageId: stored.logoImageId, name: file.name } });
+            toast('Logo salva no projeto. Aplique nos cards que você escolher.', 'success');
+          } catch (error) { if (alive.current) toast(error.message, 'error'); }
+          finally { if (alive.current) setUploading(false); }
+        }} />
+      </div>
       <input
         ref={contextFileRef}
         type="file"

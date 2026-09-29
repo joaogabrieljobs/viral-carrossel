@@ -1,3 +1,4 @@
+import { runAIJob, throwIfGenerationCancelled, isGenerationCancelled, abortableDelay } from './generation-control.js';
 /**
  * TRANSPORTE DE IA — extraído do monólito (decomposição B2).
  * Texto: callAI / callAIwithSearch (Anthropic, OpenAI, Z.ai, Kimi).
@@ -15,10 +16,23 @@ import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 // abortasse primeiro, o utilizador perdia uma geração que o servidor ainda ia
 // entregar. Só existe para não deixar o botão preso para sempre.
 const TEXT_TIMEOUT_MS = 260_000;
-const textTimeoutSignal = () => {
-  const AS = globalThis.AbortSignal; // via globalThis: scripts/check-undefined.mjs não conhece o global
-  return AS && typeof AS.timeout === 'function' ? AS.timeout(TEXT_TIMEOUT_MS) : undefined;
-};
+async function fetchText(url, options) {
+  const controller = new AbortController();
+  const parent = options.signal;
+  let timer;
+  const cancel = () => { clearTimeout(timer); controller.abort(parent.reason); };
+  parent?.addEventListener('abort', cancel, { once: true });
+  if (parent?.aborted) cancel();
+  timer = setTimeout(() => controller.abort(Object.assign(new Error('Tempo de resposta excedido.'), { name: 'TimeoutError' })), TEXT_TIMEOUT_MS);
+  try {
+    throwIfGenerationCancelled(parent);
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    // Mantém cancelamento e timeout ativos até terminar de ler o corpo.
+    const raw = await response.text();
+    return { ok: response.ok, status: response.status, headers: response.headers, text: async () => raw };
+  }
+  finally { clearTimeout(timer); parent?.removeEventListener('abort', cancel); }
+}
 
 // ─── AI BACKENDS ──────────────────────────────────────────────────────────────
 // Detecta se está rodando localmente (Vite dev) — nesse caso usa o proxy
@@ -43,6 +57,7 @@ const COMPATIBLE_AI_URL = '/api/ai/compatible';
 
 /** Converte "Failed to fetch" numa mensagem acionável (CORS, preview sem proxy, rede). */
 function enhanceNetworkError(err, label) {
+  if (isGenerationCancelled(err)) return err;
   const m = (err && err.message) ? err.message : String(err);
   if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
     const t = new Error(`${label}: a resposta demorou demasiado. Tente de novo.`);
@@ -102,7 +117,7 @@ const getTextModel = (provider) =>
   _aiRuntimeSettings.textModels?.[provider] || DEFAULT_AI_SETTINGS.textModels[provider];
 const getProviderKey = (provider) => String(_aiRuntimeSettings.keys?.[provider] || '').trim();
 
-const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null } = {}) => {
+const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null, signal } = {}) => {
   const body = {
     model: getTextModel('anthropic'),
     max_tokens: maxTokens,
@@ -119,12 +134,12 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
   }
   let res;
   try {
-    res = await fetch(ANTHROPIC_URL, {
+    res = await fetchText(ANTHROPIC_URL, {
       method: 'POST',
       credentials: 'include',
       headers,
       body: JSON.stringify(body),
-      signal: textTimeoutSignal(),
+      signal,
     });
   } catch (e) {
     throw enhanceNetworkError(e, 'Claude');
@@ -156,7 +171,7 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
 };
 
 // Backend OpenAI — Chat Completions com a família GPT-5.6.
-const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) => {
+const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key, signal }) => {
   key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
@@ -178,11 +193,11 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key }) 
   }
   let res;
   try {
-    res = await fetch(OPENAI_CHAT_URL, {
+    res = await fetchText(OPENAI_CHAT_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: textTimeoutSignal(),
+      signal,
     });
   } catch (e) {
     throw enhanceNetworkError(e, 'OpenAI');
@@ -236,7 +251,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, maxTokens = 4096 } = {},
+  { json = false, maxTokens = 4096, signal } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -260,6 +275,7 @@ const callCompatibleChat = async (
   let lastError = null;
 
   for (let i = 0; i < modelCandidates.length; i += 1) {
+    throwIfGenerationCancelled(signal);
     const model = modelCandidates[i];
     const payload = { ...basePayload, model };
     const headers = { 'Content-Type': 'application/json' };
@@ -270,12 +286,12 @@ const callCompatibleChat = async (
 
     let res;
     try {
-      res = await fetch(url, {
+      res = await fetchText(url, {
         method: 'POST',
         credentials: 'include',
         headers,
         body: JSON.stringify(body),
-        signal: textTimeoutSignal(),
+        signal,
       });
     } catch (error) {
       throw enhanceNetworkError(error, provider === 'zai' ? 'Viral AI' : 'Kimi');
@@ -326,33 +342,33 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = async (userMsg, { json = false, maxTokens = 4096, openaiKey = null } = {}) => {
+const callAI = (userMsg, { json = false, maxTokens = 4096, openaiKey = null, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
   if (provider === 'kimi' && !getProviderKey('kimi')) provider = 'zai';
 
-  if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens });
+  if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens, signal });
   if (provider === 'openai') {
-    return callOpenAIChat(userMsg, { json, maxTokens, key: getProviderKey('openai') || openaiKey });
+    return callOpenAIChat(userMsg, { json, maxTokens, signal, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, maxTokens });
+    return callCompatibleChat(provider, userMsg, { json, maxTokens, signal });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
-};
+}, parentSignal);
 
 // Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic (BYOK). Sem chave Anthropic,
 // a UI deve cair em callAI (Z.ai) sem web ao vivo.
-const callAIwithSearch = async (userMsg, { json = false, maxTokens = 4096 } = {}) => {
+const callAIwithSearch = (userMsg, { json = false, maxTokens = 4096, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   if (!getProviderKey('anthropic')) {
     throw new Error('Pesquisa web ao vivo precisa de chave Anthropic (opcional).');
   }
   return callAnthropic(userMsg, {
-    json, maxTokens,
+    json, maxTokens, signal,
     tools: [{ type: 'web_search_20250305', name: 'web_search' }],
   });
-};
+}, parentSignal);
 
 // ─── GPT IMAGE 2 (OpenAI) ─────────────────────────────────────────────────────
 // Migração de DALL·E 3 → gpt-image-2 (modelo flagship lançado em abril/2026):
@@ -402,10 +418,10 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([arr], { type: mime || 'image/png' });
 }
 
-async function blobFromSlideRef(refImage) {
+async function blobFromSlideRef(refImage, signal) {
   if (!refImage || typeof refImage !== 'string') throw new Error('Referência ausente.');
   if (refImage.startsWith('data:')) return dataUrlToBlob(refImage);
-  const res = await fetch(refImage);
+  const res = await fetch(refImage, { signal });
   if (!res.ok) throw new Error('Não foi possível carregar a URL da imagem de referência.');
   return res.blob();
 }
@@ -438,7 +454,7 @@ function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference =
   return body;
 }
 
-async function generateZaiImage(q, imgParams, imgExtraPrompt) {
+async function generateZaiImage(q, imgParams, imgExtraPrompt, signal) {
   const apiKey = getProviderKey('zai');
   if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
@@ -462,6 +478,7 @@ async function generateZaiImage(q, imgParams, imgExtraPrompt) {
   let res;
   try {
     res = await fetch(url, {
+      signal,
       method: 'POST',
       credentials: 'include',
       headers,
@@ -506,7 +523,7 @@ function getOpenAIImageOrder() {
 }
 
 /** Geração com uma ou mais imagens de referência (API edits — multipart). */
-async function generateDALLEEdits(refBlob, prompt, apiKey) {
+async function generateDALLEEdits(refBlob, prompt, apiKey, signal) {
   const referenceBlobs = Array.isArray(refBlob) ? refBlob : [refBlob];
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
   const headers = {};
@@ -520,6 +537,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
 
   let lastErr = null;
   for (const model of order) {
+    throwIfGenerationCancelled(signal);
     const fd = new FormData();
     fd.append('model', model.name);
     fd.append('prompt', prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000));
@@ -536,7 +554,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
     try {
       let res;
       try {
-        res = await fetch(OPENAI_IMAGE_EDITS_URL, { method: 'POST', headers, body: fd });
+        res = await fetch(OPENAI_IMAGE_EDITS_URL, { method: 'POST', headers, body: fd, signal });
       } catch (e) {
         throw enhanceNetworkError(e, 'GPT Image (referência)');
       }
@@ -575,12 +593,14 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
 }
 
 const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
-  const { imgExtraPrompt } = options || {};
+  const { imgExtraPrompt, signal } = options || {};
   const refs = await prepareImageReferencesForUpload(options.refImages || (options.refImage ? [options.refImage] : []));
+  throwIfGenerationCancelled(signal);
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: refs.length > 0, priorityFirst: true });
   let res;
   try {
     res = await fetch('/api/ai/sjinn-image', {
+      signal,
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -621,7 +641,8 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
  * Com referência, usa POST /v1/images/edits; sem referência, /v1/images/generations.
  * Default: imagens inclusas no plano. BYOK só com useOwnImageKey.
  */
-const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
+const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(async (signal) => {
+  options = { ...options, signal };
   const { refImage, imgExtraPrompt } = options || {};
   const refs = options.refImages || (refImage ? [refImage] : []);
 
@@ -631,15 +652,16 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
 
   if (_aiRuntimeSettings.imageProvider === 'zai') {
     if (refs.length) throw Object.assign(new Error('Este gerador não aceita referências. Selecione OpenAI com chave própria para usar o moodboard.'), { code: 'reference_unsupported' });
-    return generateZaiImage(q, imgParams, imgExtraPrompt);
+    return generateZaiImage(q, imgParams, imgExtraPrompt, signal);
   }
   apiKey = getProviderKey('openai') || apiKey;
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
 
   if (refs.length) {
-    const blobs = await Promise.all(refs.slice(0, 4).map(blobFromSlideRef));
+    const blobs = await Promise.all(refs.slice(0, 4).map(ref => blobFromSlideRef(ref, signal)));
     const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: true });
-    return generateDALLEEdits(blobs, promptRef, apiKey);
+    throwIfGenerationCancelled(signal);
+    return generateDALLEEdits(blobs, promptRef, apiKey, signal);
   }
 
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
@@ -654,6 +676,7 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
 
   let lastErr = null;
   for (const model of order) {
+    throwIfGenerationCancelled(signal);
     const body = {
       model: model.name,
       prompt: prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000),
@@ -667,7 +690,7 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
     try {
       let res;
       try {
-        res = await fetch(OPENAI_IMAGE_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+        res = await fetch(OPENAI_IMAGE_URL, { method: 'POST', headers, body: JSON.stringify(body), signal });
       } catch (e) {
         throw enhanceNetworkError(e, 'GPT Image');
       }
@@ -703,16 +726,18 @@ const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
       `Último erro: ${lastErr?.message || 'desconhecido'}. ` +
       `Verifique sua organização em https://platform.openai.com/settings/organization/general`,
   );
-};
+}, options.signal);
 
 /** Wrapper que tenta `generateDALLE` até N+1 vezes com backoff curto. Útil para rate-limits transitórios.
  *  Erros 4xx persistentes (auth, conteúdo, modelo indisponível) NÃO retentam — só rede / 5xx / 429. */
-const generateDALLEWithRetry = async (q, apiKey, imgParams = null, options = {}, { retries = 1, backoffMs = 1200 } = {}) => {
+const generateDALLEWithRetry = (q, apiKey, imgParams = null, options = {}, { retries = 1, backoffMs = 1200 } = {}) => runAIJob(async (signal) => {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    throwIfGenerationCancelled(signal);
     try {
-      return await generateDALLE(q, apiKey, imgParams, options);
+      return await generateDALLE(q, apiKey, imgParams, { ...options, signal });
     } catch (e) {
+      if (isGenerationCancelled(e)) throw e;
       lastErr = e;
       const msg = String(e?.message || '');
       // Erros do endpoint do plano (quota, sessão, sjinn_*) já foram decididos no servidor — retentar
@@ -724,11 +749,11 @@ const generateDALLEWithRetry = async (q, apiKey, imgParams = null, options = {},
           /HTTP\s*5\d\d|429|rate.?limit|timeout|network|fetch/i.test(msg)
         ));
       if (!isRetriable || attempt === retries) throw e;
-      await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
+      await abortableDelay(backoffMs * (attempt + 1), signal);
     }
   }
   throw lastErr;
-};
+}, options.signal);
 
 export function getAIRuntimeSettings() {
   return _aiRuntimeSettings;

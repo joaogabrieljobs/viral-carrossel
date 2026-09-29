@@ -1,6 +1,7 @@
 import { normalizeStyleKit, MAX_REF_IMAGES } from './style-kit.js';
 import { imageGet, imagePut, newImageId, blobParaDataUrl, dataUrlParaBlob, imagemComoDataUrl } from './image-store.js';
 import { vcImageFileToStorageDataUrl } from './image-storage.js';
+import { storeSlideLogo } from './slide-logo.js';
 
 export async function storeProjectReference(file) {
   const dataUrl = await vcImageFileToStorageDataUrl(file);
@@ -13,6 +14,11 @@ export async function storeProjectReference(file) {
 
 export async function migrateProjectReferences(kit) {
   const k = normalizeStyleKit(kit);
+  if (k.logo?.dataUrl) {
+    const stored = await storeSlideLogo(dataUrlParaBlob(k.logo.dataUrl));
+    URL.revokeObjectURL(stored.logoImage);
+    k.logo = { imageId: stored.logoImageId, name: k.logo.name };
+  }
   const refImages = await Promise.all(k.refImages.map(async r => {
     if (r.imageId || !r.dataUrl) return r;
     const blob = dataUrlParaBlob(r.dataUrl);
@@ -27,6 +33,11 @@ export async function migrateProjectReferences(kit) {
 
 export async function exportProjectReferences(kit) {
   const k = normalizeStyleKit(kit);
+  if (k.logo?.imageId) {
+    const dataUrl = await imagemComoDataUrl(k.logo.imageId);
+    if (!dataUrl) throw new Error('A logo do projeto não está disponível para o backup. Reimporte o PNG.');
+    k.logo = { dataUrl, name: k.logo.name };
+  }
   return { ...k, refImages: await Promise.all(k.refImages.map(async r => {
     if (!r.imageId) return r;
     const dataUrl = await imagemComoDataUrl(r.imageId);
