@@ -87,9 +87,11 @@ test('link expirado oferece nova recuperação, inclusive no celular', async ({ 
 test('indisponibilidade do serviço é mostrada, sem falsa mensagem de envio', async ({ page }) => {
   const dialog = await openLogin(page, { '/api/auth/forgot-password': route => route.fulfill({ status: 503, json: { error: 'A recuperação por e-mail está temporariamente indisponível.' } }) });
   await dialog.getByRole('button', { name: 'Esqueci minha senha' }).click();
-  await page.getByLabel('E-mail').fill('pessoa@teste.exemplo');
-  await page.getByRole('button', { name: 'Enviar link de recuperação' }).click();
-  await expect(page.getByRole('alert')).toContainText('indisponível');
-  await expect(page.getByRole('status')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Enviar link de recuperação' })).toBeEnabled();
+  const recovery = page.getByRole('dialog', { name: 'Esqueci minha senha' });
+  await recovery.getByLabel('E-mail').fill('pessoa@teste.exemplo');
+  await recovery.getByRole('button', { name: 'Enviar link de recuperação' }).click();
+  await expect(recovery.getByRole('alert')).toContainText('indisponível');
+  // O status ilustrativo da landing não é uma confirmação de envio de e-mail.
+  await expect(recovery.getByRole('status')).toHaveCount(0);
+  await expect(recovery.getByRole('button', { name: 'Enviar link de recuperação' })).toBeEnabled();
 });
