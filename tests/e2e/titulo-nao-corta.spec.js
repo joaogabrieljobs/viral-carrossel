@@ -60,8 +60,9 @@ test.describe('Título nunca sai da zona que o recorta', () => {
 
     const escreveTitulo = async (txt) => {
       await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });
-      await page.waitForTimeout(300);
-      const ta = page.locator('textarea').first();
+      const editor = page.getByRole('button', { name: /EDITAR CARD/i }).first();
+      if (await editor.getAttribute('aria-expanded') !== 'true') await editor.click();
+      const ta = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
       await ta.fill(txt);
       await page.waitForTimeout(1200);
     };

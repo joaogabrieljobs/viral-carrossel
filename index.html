@@ -8,9 +8,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ff247e" />
     <title>viral carrossel STUDIO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      if (window.location.pathname !== '/redefinir-senha') {
+        var tailwind = document.createElement('script');
+        tailwind.src = 'https://cdn.tailwindcss.com';
+        document.head.appendChild(tailwind);
+      }
+    </script>
     <!-- Analytics: Plausible (privacy-first, sem cookies, sem PII, sem consent banner) -->
-    <script defer data-domain="viral-carrossel.vercel.app" src="https://plausible.io/js/script.tagged-events.js"></script>
+    <script>
+      // A página de recuperação não carrega analytics com o token na URL.
+      if (window.location.pathname !== '/redefinir-senha') {
+        var analytics = document.createElement('script');
+        analytics.defer = true;
+        analytics.dataset.domain = 'viralcarrossel.com.br';
+        analytics.src = 'https://plausible.io/js/script.tagged-events.js';
+        document.head.appendChild(analytics);
+      }
+    </script>
     <script>window.plausible = window.plausible || function(){(window.plausible.q=window.plausible.q||[]).push(arguments)}</script>
     <style>
       html, body, #root { height: 100%; margin: 0; padding: 0; background: #0e0c14; color: #f3f0eb; }

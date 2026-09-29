@@ -5,7 +5,6 @@ export function allowedOrigins() {
   return new Set(
     [
       (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, ''),
-      'https://viral-carrossel.vercel.app',
       'https://viralcarrossel.com.br',
       'https://www.viralcarrossel.com.br',
       'http://localhost:5173',

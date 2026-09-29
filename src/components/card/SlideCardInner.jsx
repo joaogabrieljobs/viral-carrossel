@@ -6,6 +6,7 @@ import AutoFitText from '../AutoFitText.jsx';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { resolveSlideBrandBg } from '../../utils/brand-helpers.js';
+import { needsLightPhotoText } from '../../utils/style-kit-design.js';
 import { FORMATS } from '../../utils/formats.js';
 import { AUTOFIT_MIN_SCALE, DARK_CREAM, getComposition } from '../../utils/slide-design-system.js';
 import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentationAdjustIsNeutral } from './FullscreenViewer.jsx';
@@ -1267,6 +1268,11 @@ const SlideCardInner = React.forwardRef(({
         displayBodyInk = 'rgba(245,245,247,0.92)';
       }
     }
+  }
+
+  if (needsLightPhotoText(slide)) {
+    displayTitleInk = '#ffffff';
+    displayBodyInk = '#f5f5f7';
   }
 
   /**

@@ -11,13 +11,17 @@
 
 ## Fluxo
 
-1. Landing → CTA → Paywall (e-mail para **nova** assinatura) **ou** **Entrar** (só Google)
+1. Landing → CTA → Paywall (e-mail para **nova** assinatura) **ou** **Entrar** (e-mail + senha ou Google)
 2. `POST /api/stripe/checkout` → Stripe Checkout (se o e-mail já tem sub ativa → `{alreadyActive, requireLogin}` **sem** cookie)
 3. Sucesso → `/?billing=success&session_id=…` → `POST /api/stripe/confirm` → cookie HttpOnly
 4. `GET /api/auth/session` valida assinatura `active` / `trialing`
 5. Botão **Plano** na home → Customer Portal Stripe
 
 ### Login e-mail + senha (assinantes)
+
+O login inclui **Mostrar/Ocultar senha** e **Esqueci minha senha**. A recuperação
+usa Resend e um link de uso único com validade de 30 minutos. Configuração,
+contratos e testes: [Recuperação de senha](engineering/recuperacao-senha.md).
 
 1. Landing → **Entrar** → e-mail + senha **ou** Google
 2. `POST /api/auth/login` (ou `/api/auth/register`) — senha em hash scrypt no **metadata Stripe** (`vc_pw_salt` / `vc_pw_hash`)
@@ -50,7 +54,7 @@ Google continua disponível; o redirect OAuth usa o **host da request** (evita m
 ## Variáveis na Vercel
 
 ```
-APP_URL=https://viral-carrossel.vercel.app
+APP_URL=https://viralcarrossel.com.br
 STRIPE_SECRET_KEY=sk_...
 STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -62,8 +66,8 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 ### Setup Google OAuth
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create credentials → OAuth client ID → **Web application**
-2. Authorized JavaScript origins: `https://viral-carrossel.vercel.app` (e domínio custom se houver)
-3. Authorized redirect URIs: `https://viral-carrossel.vercel.app/api/auth/google/callback`
+2. Authorized JavaScript origins: `https://viralcarrossel.com.br` e `https://www.viralcarrossel.com.br`
+3. Authorized redirect URIs: `https://viralcarrossel.com.br/api/auth/google/callback` (e www se usares)
 4. Colar Client ID + Client Secret nas env da Vercel e redeploy
 
 `ZAI_API_KEY` é obrigatória (texto incluso no plano). `ANTHROPIC_API_KEY` **não está configurada em produção por decisão de custo** (removida em 2026-09-15): com ela, qualquer assinante — incluindo o Essencial de R$ 19,90 — podia gastar Opus e `web_search` na conta da plataforma via `/api/anthropic/v1/messages`. Claude e a pesquisa web ao vivo são BYOK: o utilizador põe a própria chave em Configurar IA e ela viaja no header `x-anthropic-key`. `VITE_ANTHROPIC_PROXY=true` continua necessária para o BYOK passar pelo proxy e evitar CORS.

@@ -8,7 +8,7 @@ import {
 import {
   createAccessToken,
   setAccessCookie,
-  readAccessCookie,
+  readCurrentAccessCookie,
   clearAccessCookie,
   billingDisabled,
 } from '../lib/access.js';
@@ -60,7 +60,7 @@ export async function handleSession(req, res) {
   }
 
   try {
-    const access = readAccessCookie(req);
+    const access = await readCurrentAccessCookie(req);
     if (!access?.customerId) {
       return res.status(200).json({ active: false, email: null, status: 'anonymous' });
     }
@@ -254,7 +254,7 @@ export async function handlePortal(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const access = readAccessCookie(req);
+    const access = await readCurrentAccessCookie(req);
     if (!access?.customerId) {
       return res.status(401).json({ error: 'Faça login pela assinatura primeiro' });
     }

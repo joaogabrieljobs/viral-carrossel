@@ -60,14 +60,16 @@ export async function imagePut(id, blob, meta = {}) {
   if (!id || !blob) throw new Error('imagePut: id e blob obrigatórios.');
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = tx(db, 'readwrite').put({
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const req = transaction.objectStore(STORE_NAME).put({
       id,
       blob,
       mime: meta.mime || blob.type || 'image/png',
       size: blob.size,
       savedAt: Date.now(),
     });
-    req.onsuccess = () => resolve(id);
+    transaction.oncomplete = () => resolve(id);
+    transaction.onabort = () => reject(transaction.error || new Error('Gravação da imagem interrompida.'));
     req.onerror = () => reject(req.error || new Error('Falha ao gravar a imagem.'));
   });
 }
@@ -105,7 +107,9 @@ export async function imageListIds() {
 export async function imageCleanupOrphans(keepIds) {
   const keep = new Set((keepIds || []).filter(Boolean));
   const all = await imageListIds();
-  const orfas = all.filter((id) => !keep.has(id));
+  // Uploads em andamento ainda podem não ter chegado ao autosave.
+  const candidates = await Promise.all(all.filter(id => !keep.has(id)).map(imageGet));
+  const orfas = candidates.filter(entry => entry && entry.savedAt < Date.now() - 60_000).map(entry => entry.id);
   await Promise.all(orfas.map((id) => imageDelete(id)));
   return orfas.length;
 }
@@ -180,7 +184,10 @@ export async function imagemComoDataUrl(id) {
 
 /** Ids referenciados por uma biblioteca de projetos. */
 export function idsDeImagemEmUso(library) {
-  return [...new Set((library || []).flatMap((e) => (e?.doc?.slides || []).map((s) => s?.bgImageId).filter(Boolean)))];
+  return [...new Set((library || []).flatMap((e) => [
+    ...(e?.doc?.slides || []).map(s => s?.bgImageId),
+    ...(e?.doc?.styleKit?.refImages || []).map(r => r?.imageId),
+  ]).filter(Boolean))];
 }
 
 /**

@@ -3,11 +3,26 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "crons": [{ "path": "/api/cron/cleanup-image-references", "schedule": "0 4 * * *" }],
   "build": {
     "env": {
       "VITE_ANTHROPIC_PROXY": "true"
     }
   },
+  "redirects": [
+    {
+      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "has": [{ "type": "host", "value": "viral-carrossel.vercel.app" }],
+      "destination": "https://viralcarrossel.com.br/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "has": [{ "type": "host", "value": "viral-carrossel-elevessy-s-projects.vercel.app" }],
+      "destination": "https://viralcarrossel.com.br/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
@@ -21,7 +36,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://plausible.io; connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.z.ai https://api.moonshot.ai https://api.stripe.com https://checkout.stripe.com https://billing.stripe.com https://plausible.io https://commons.wikimedia.org https://*.vercel.app; worker-src 'self' blob:"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://plausible.io; connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.z.ai https://api.moonshot.ai https://api.stripe.com https://checkout.stripe.com https://billing.stripe.com https://plausible.io https://commons.wikimedia.org; worker-src 'self' blob:"
         }
       ]
     },
@@ -41,6 +56,14 @@
       "source": "/assets/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/redefinir-senha",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
       ]
     }
   ]

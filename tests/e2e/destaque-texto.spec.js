@@ -11,6 +11,7 @@ test('destaque marcado no subtítulo aparece no card', async ({ page }) => {
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.waitForTimeout(800);
   await page.getByRole('tab', { name: /narrativa/i }).first().click({ force: true });
+  await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
 
   const alvo = page.getByText('Subtítulo', { exact: true }).first().locator('xpath=following::textarea[1]');
   await alvo.fill('O que funcionava ontem já não move ponteiro.');

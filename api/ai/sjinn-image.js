@@ -2,7 +2,7 @@
  * POST /api/ai/sjinn-image
  * Gera 1 imagem GPT Image 2 via SJinn (chave só no servidor) e consome quota do plano.
  *
- * Body: { prompt: string, aspectRatio?: '2:3'|'1:1'|..., resolution?: '1K'|'2K'|'4K' }
+ * Body: { prompt: string, aspectRatio?: '2:3'|'1:1'|..., imageList?: (HTTPS | data URL)[] }
  * Resposta: { b64_json, mime, quota: { used, limit, remaining, tier } }
  */
 import { applyCors } from '../lib/cors.js';
@@ -20,6 +20,7 @@ import {
   getQuotaUsage,
 } from '../lib/image-quota.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { parseImageReferences, assertReferenceStorageConfigured, stageImageReferences } from '../lib/image-references.js';
 import {
   isSjinnConfigured,
   createGptImage2Task,
@@ -43,6 +44,7 @@ function readBody(req) {
 }
 
 export default async function handler(req, res) {
+  const startedAt = Date.now();
   applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -64,6 +66,14 @@ export default async function handler(req, res) {
   const prompt = String(body.prompt || '').trim();
   if (prompt.length < 8) {
     return res.status(400).json({ error: 'Prompt de imagem demasiado curto.' });
+  }
+
+  let references;
+  try {
+    references = parseImageReferences(body.imageList ?? []);
+    assertReferenceStorageConfigured(references);
+  } catch (e) {
+    return res.status(e.code === 'reference_storage_unconfigured' ? 503 : 400).json({ error: `${e.message} Nenhum crédito foi usado.`, code: e.code });
   }
 
   const aspectRatio = ['1:1', '16:9', '9:16', '3:2', '2:3', 'auto'].includes(body.aspectRatio)
@@ -140,9 +150,14 @@ export default async function handler(req, res) {
     });
   }
 
+  let cleanupReferences;
   try {
-    const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution });
-    const data = await waitForSjinnTask(taskId, { deadlineMs: SJINN_DEADLINE_MS });
+    const staged = await stageImageReferences(references);
+    cleanupReferences = staged.cleanup;
+    const imageList = staged.imageList;
+    const taskId = await createGptImage2Task({ prompt, aspectRatio, resolution, imageList });
+    // Upload e autenticação usam o mesmo orçamento; sobram download, reembolso e limpeza.
+    const data = await waitForSjinnTask(taskId, { deadlineMs: Math.max(1, SJINN_DEADLINE_MS - (Date.now() - startedAt)) });
     const url = extractSjinnOutputUrl(data);
     if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
@@ -176,5 +191,7 @@ export default async function handler(req, res) {
         ? { used: usage.used, limit: usage.limit, remaining: usage.remaining, tier }
         : undefined,
     });
+  } finally {
+    await cleanupReferences?.();
   }
 }

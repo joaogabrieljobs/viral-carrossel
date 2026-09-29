@@ -1,7 +1,9 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw, X, Zap, ChevronRight, Instagram } from 'lucide-react';
-import { buildBrandBlock, buildNarrativeModeReminder, buildHookVariationRules } from '../../utils/generation-prompts.js';
+import { buildBrandBlock, buildNarrativeModeReminder, buildHookVariationRules, buildCarouselTextContext } from '../../utils/generation-prompts.js';
+import { buildContentObjectiveReminder } from '../../utils/editorial-strategy.js';
+import { buildProjectContextBlock } from '../../utils/style-kit.js';
 import { callAI } from '../../utils/ai-client.js';
 import { resolveMaterialPromptParts } from '../../utils/generation-prompts.js';
 
@@ -10,10 +12,13 @@ function HookVariationsModal({
   onClose,
   onPick,
   slide,
+  slides = null,
+  contentObjective = 'auto',
   niche,
   openaiKey,
   brand,
   material,
+  styleKit = null,
   narrativeMode = 'editorial',
   creativePreset = 'livre',
 }) {
@@ -25,12 +30,16 @@ function HookVariationsModal({
     setBusy(true); setErr(''); setHooks([]);
     try {
       const brandBlock = buildBrandBlock(brand);
+      const projectContextBlock = buildProjectContextBlock(styleKit);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material);
       const r = await callAI(
         `Atue como copywriter sênior. Gere 5 variações de gancho (slide 1 de carrossel Instagram) com base no contexto abaixo.
 
 ${buildNarrativeModeReminder(narrativeMode)}
-${brandBlock}${materialBlock}${materialPriorityBlock}
+${buildContentObjectiveReminder(contentObjective)}
+Carrossel completo (confira a promessa e a entrega no segundo slide):
+${buildCarouselTextContext(slides || [])}
+${brandBlock}${projectContextBlock}${materialBlock}${materialPriorityBlock}
 Tema atual: "${slide?.title || ''}"
 Contexto: "${slide?.subtitle || ''}"
 ${niche ? `Nicho: ${niche}` : ''}
@@ -46,6 +55,8 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
     } catch(e) { setErr(e.message); }
     finally { setBusy(false); }
   }, [
+    slides,
+    contentObjective,
     slide?.title,
     slide?.subtitle,
     niche,
@@ -54,6 +65,7 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
     creativePreset,
     brand,
     material,
+    styleKit,
   ]);
 
   useEffect(() => { if (open) run(); }, [open, run]);

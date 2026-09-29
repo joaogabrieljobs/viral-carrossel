@@ -9,7 +9,7 @@
 import { vi } from 'vitest';
 
 export const stripeMock = {
-  customers: { list: vi.fn(), create: vi.fn() },
+  customers: { list: vi.fn(), create: vi.fn(), retrieve: vi.fn(), update: vi.fn() },
   subscriptions: { list: vi.fn() },
   checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
   billingPortal: { sessions: { create: vi.fn() } },
@@ -24,6 +24,8 @@ export const subAtiva = (customerId) => ({
 });
 
 export function resetStripeMock() {
+  stripeMock.customers.retrieve.mockReset().mockImplementation(async id => ({ id, metadata: {} }));
+  stripeMock.customers.update.mockReset().mockImplementation(async (id, data) => ({ id, ...data }));
   stripeMock.customers.list.mockReset().mockResolvedValue({ data: [] });
   stripeMock.customers.create.mockReset().mockImplementation(async ({ email }) => ({
     id: `cus_novo_${email.split('@')[0]}`,

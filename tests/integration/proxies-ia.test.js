@@ -13,7 +13,7 @@ import { resolveTierFromPriceId } from '../../api/lib/plans.js';
 import { PLATFORM_MAX_TOKENS } from '../../shared/ai-models.js';
 import { resetMemoryQuotas } from '../../api/lib/image-quota.js';
 
-const APP = 'https://viral-carrossel.vercel.app';
+const APP = 'https://viralcarrossel.com.br';
 const cookieFor = (customerId) =>
   `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email: 'x@teste.exemplo' }))}`;
 
@@ -145,10 +145,11 @@ describe('C3 — SJinn não ultrapassa o maxDuration da função', () => {
       .mockResolvedValueOnce(okJson({}, { 'content-type': 'image/png' }));
     vi.stubGlobal('fetch', fetchMock);
     const res = makeRes();
-    await sjinnHandler(makeReq({ method: 'POST', headers: { origin: APP }, cookie: cookieFor('cus_img'), body: { prompt: 'uma foto editorial', resolution: '4K' } }), res);
+    await sjinnHandler(makeReq({ method: 'POST', headers: { origin: APP }, cookie: cookieFor('cus_img'), body: { prompt: 'uma foto editorial', resolution: '4K', imageList: ['https://cdn.exemplo/ref1.png', 'https://cdn.exemplo/ref2.png'] } }), res);
     expect(res.statusCode).toBe(200);
     const createBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(createBody.input.resolution).toBe('1K');
+    expect(createBody.input.image_list).toEqual(['https://cdn.exemplo/ref1.png', 'https://cdn.exemplo/ref2.png']);
     expect(res.body.quota.used).toBe(1);
   });
 });
@@ -186,4 +187,16 @@ describe('Orçamento de tempo do proxy (timeout de geração longa)', () => {
     expect(res.body.error.code).toBe('upstream_timeout');
     expect(res.body.error.message).toMatch(/menos cards|menos material/i);
   });
+});
+
+
+it('referência sem bytes de imagem é recusada antes de consumir crédito ou chamar SJinn', async () => {
+  process.env.SJINN_API_KEY = 'sjinn-fake-key-123';
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { tier: 'creator' } }] });
+  const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+  const res = makeRes();
+  await sjinnHandler(makeReq({ method: 'POST', headers: { origin: APP }, cookie: cookieFor('cus_ref'), body: { prompt: 'imagem com referência', imageList: ['data:image/png;base64,YQ=='] } }), res);
+  expect(res.statusCode).toBe(400);
+  expect(res.body.code).toBe('reference_invalid');
+  expect(fetchMock).not.toHaveBeenCalled();
 });

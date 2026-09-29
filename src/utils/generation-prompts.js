@@ -9,6 +9,7 @@ import {
   GraduationCap, ScrollText, Megaphone,
 } from 'lucide-react';
 import { TEMPLATES, PALETTES } from './design-data.js';
+import { INSTAGRAM_HASHTAG_LIMIT, INSTAGRAM_CAPTION_LIMIT } from './editorial-strategy.js';
 import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
@@ -20,10 +21,10 @@ const GEN_MODES = [
     label: 'Editorial',
     desc: 'Tese forte, camadas de mercado e leitura que desmonta o óbvio',
     method: `MÉTODO EDITORIAL — leitura estratégica (escala ao número total de slides):
-Objetivo: soar como análise de quem enxerga categoria, não como post motivacional.
-- Slide 1 · HOOK/Tese: uma frase-tese contraintuitiva que para o scroll. Formatos úteis: "X não está fazendo Y, está fazendo Z.", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X deixou de ser sobre Y. Agora é sobre Z."
+Objetivo: defender uma leitura específica do tema com observação, mecanismo e consequência concreta.
+- Slide 1 · HOOK/Tese: uma observação específica que desperta curiosidade e que o miolo sustenta. Pode ser direta, uma cena ou um contraste; não force tese contraintuitiva nem a fórmula "Não é sobre X. É sobre Y.".
 - Slides do meio (2 até penúltimo): cada um = UMA camada nova — sem repetir o mesmo tipo de argumento. Ordens possíveis (combine conforme N): contexto de mercado → onde a leitura óbvia quebra → mecanismo ou estrutura por trás → impacto na categoria ou no consumidor → erro recorrente → contraste com o que "todo mundo faz". Vocabulário útil quando couber: categoria, distribuição, posicionamento, percepção, comportamento, recorrência, narrativa (da categoria), repertório, diferenciação, sinal, confiança.
-- Último slide · Fecho: elegante, reflexivo (não obrigatoriamente "ganhe dinheiro"). Ex.: "Quem entende isso constrói marca. Quem ignora disputa preço." / "Salve antes da próxima campanha."
+- Último slide · Fecho: conclua a tese com uma consequência específica do tema. Depois, uma pergunta real OU um convite para salvar com utilidade clara; evite máximas sobre quem vence ou fica para trás.
 EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos em vários slides.`,
   },
   {
@@ -39,7 +40,7 @@ Disseque o tema: variáveis, padrões, hipóteses testáveis. Zero "seja autênt
   (B) PADRÃO OCULTO — princípio que conecta casos visíveis; nomeie o que se repete.
   (C) DEMONSTRAÇÃO — um caso onde o padrão aparece em ação.
   (D) IMPLICAÇÃO — o que muda na decisão ou na leitura quando você enxerga isso.
-- Último slide · CTA: reflexivo, sem urgência falsa. Ex.: "Quem enxerga padrão vence quem corre atrás de truque."
+- Último slide · Fecho: mostre qual decisão muda ao reconhecer o mecanismo; uma pergunta específica pode encerrar, sem hierarquia entre quem entendeu e quem não entendeu.
 Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento, recorrência, fricção, antecipação, hipótese, variável, sistema. EVITE: hack, segredo, fórmula mágica.`,
   },
   {
@@ -65,15 +66,15 @@ Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EV
     label: 'Viral Trends',
     desc: 'Parada de scroll, loop de tensão, prova e frase para guardar ou mandar',
     method: `MÉTODO VIRAL TRENDS — retenção e clareza algorítmica (escala ao N de slides):
-Cada slide tem função para segurar o dedo e completar o arco. 90% morre no slide 1 — o hook decide tudo.
+Cada slide deve entregar informação e criar motivo para continuar; feche no miolo a pergunta aberta na capa.
 - Slide 1 · PARADA DE SCROLL (≤0,5s): UMA técnica abaixo. PROIBIDO abrir com "Hoje vou te ensinar", "Você sabia que", "5 dicas infalíveis".
   • INTERRUPÇÃO — contraria a expectativa do nicho.
-  • PROMESSA NUMÉRICA específica — "3 decisões que mudam [X] em [prazo]."
+  • PROMESSA NUMÉRICA específica — quantidade real de ideias entregues; prazo ou resultado só se sustentado pelo material.
   • REVELAÇÃO ATRASADA — resultado primeiro, causa depois.
   • IDENTIFICAÇÃO brutal — "isso sou eu."
   • PERGUNTA que tira sono — a dúvida às 2h.
 - Slides do meio — distribua funções (repetir ou expandir se N for grande):
-  BUILD-UP (abre loop; atrasa resposta),
+  BUILD-UP (abre pergunta e entrega uma pista útil, sem enrolação),
   DESENVOLVIMENTO (prova parcial, autoridade rápida sem paper acadêmico),
   SHARE-TRIGGER (uma frase quotável memorável),
   PAYOFF (fecha o loop — o "ahá").
@@ -109,9 +110,9 @@ Sem palestra motivacional. O leitor deve sair sabendo o que fazer na ordem certa
   • TÍTULO: "Passo N · [verbo + objeto]" (nome curto e ativo).
   • SUBTÍTULO: (1) imperativo do que fazer; (2) como fazer com precisão; (3) erro comum OU mini-exemplo.
   Linguagem imperativa: "Identifique…", "Anote…", "Compare…" — evite "é importante que você…".
-- Penúltimo slide (se K≥2): o ERRO que faz a maioria falhar mesmo seguindo o roteiro — específico ao tema.
+- Penúltimo slide: entregue o último passo; inclua nele um erro específico a evitar, sem substituir o passo prometido.
 - Último slide: save com utilidade + pergunta sobre qual passo testar primeiro.
-Se houver mais slides que passos necessários: acrescente slide de checklist rápido ou variação do passo mais crítico — não encha com teoria.`,
+Se houver checklist ou variação, conte apenas os passos reais na promessa da capa; não invente passos para preencher espaço.`,
   },
   {
     id: 'jornalistico',
@@ -178,9 +179,10 @@ function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
   return `
 LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
 
-- Slide 1 e Slide 2: CAPA tipo tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
+- Slide 1 e Slide 2: subtítulo até ${scaledCeiling(80, textDensityId)} caracteres; formato de tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
 
-- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Quando incluir foto no card ("imageQuery" preenchido), preencha **subtitle** com **${subLo}–${subHi}** caracteres (prosa de várias frases, não headline solta) e **bodyAfterImage** com **${bodyLo}–${bodyHi}** caracteres. Destaque lexical: UM trecho entre **asteriscos duplos**.
+- A segunda tela já desenvolve o argumento; não repita a abertura. O último slide conclui o arco, mesmo usando dois blocos.
+- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Com ou sem foto, preencha **subtitle** com **${subLo}–${subHi}** caracteres (prosa de várias frases, não headline solta) e **bodyAfterImage** com **${bodyLo}–${bodyHi}** caracteres. As faixas incluem espaços e são alvos: não acrescente redundância ou fatos para atingir o piso. Preserve o ritmo do modo com frases curtas dentro de cada bloco. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
 - Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
 - Slide só texto SEM foto neste formato: imageQuery ""; use "subtitle" + "bodyAfterImage" em dupla coluna tipográfica (sem sanduíche de foto).
 `;
@@ -424,7 +426,7 @@ const buildMaterialBlock = (material, urlSnippets = []) => {
     }
   }
 
-  if (c) parts.push(`MATÉRIA-PRIMA (use como base de fatos antes de inventar — extraia teses, não copie literal):\n"""\n${c.slice(0, 8000)}\n"""`);
+  if (c) parts.push(`MATÉRIA-PRIMA (base factual — extraia teses, não copie literalmente nem invente fatos):\n"""\n${c.slice(0, 8000)}\n"""`);
   if (s) {
     const fetchedFull = Array.isArray(urlSnippets)
       ? urlSnippets.filter((u) => u.text && String(u.text).trim().length >= 120)
@@ -433,11 +435,11 @@ const buildMaterialBlock = (material, urlSnippets = []) => {
       fetchedFull.length > 0
         ? 'FONTES & REFERÊNCIAS (URL listada — o texto legível já foi transcrito para o bloco «TEXTO OBTIDO DAS FONTES» acima):'
         : /https?:\/\//i.test(s) || /\bwww\.[^\s]+\b/i.test(s)
-          ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) sem extração bem-sucedida — use vocabulário do endereço e matéria-prima; não finja ler a página inteira):'
+          ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) sem extração bem-sucedida — o endereço não comprova fatos; use apenas o texto disponível, sem fingir leitura):'
           : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
     parts.push(`${srcLabel}\n${s.slice(0, 2000)}`);
   }
-  if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (sobrepõem regras default — siga literalmente):\n${x.slice(0, 1500)}`);
+  if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (orientam recorte e estilo; preserve idioma, veracidade e schema solicitado):\n${x.slice(0, 1500)}`);
   if (ref?.promptBlock) {
     parts.push(
       `VOZ DE REFERÊNCIA — curadoria interna (inspire-se no ritmo, cadência e tom abaixo; não cite nomes de perfis nem reproduza posts reais):\n${ref.promptBlock}`,
@@ -449,24 +451,20 @@ const buildMaterialBlock = (material, urlSnippets = []) => {
   return '\n' + parts.join('\n\n') + '\n';
 };
 
-/** Quando há Material, o tema livre do modal não pode sobrepor o que o usuário colou. */
+/** Material sustenta fatos; tema delimita o recorte. Instrução de voz não troca o assunto. */
 function buildMaterialPriorityBlock(material, urlSnippets = []) {
   const { c, s, x } = normalizedMaterialPieces(material);
   const fetchedOk = Array.isArray(urlSnippets) && urlSnippets.some((p) => p && String(p.text || '').trim().length >= 80);
   if (!c && !s && !x && !fetchedOk) return '';
 
-  let urlClause = `- URLs sem texto transcrito: você não navega na web. Se só houver link sem extração bem-sucedida, infira o tema só do vocabulário visível no URL + instruções + matéria-prima.\n`;
-
-  if (fetchedOk) {
-    urlClause = `- TEXTO EXTRAÍDO: o bloco «TEXTO OBTIDO DAS FONTES» contém conteúdo real obtido das páginas. O carrossel DEVE alinhar factos e ângulos a esse texto (parafraseando). NÃO ignore em favor do tema livre nem de clichês virais nem de “marcas/arquétipos” genéricos se o material fala de outro assunto.\n`;
-  }
-
   return `
-PRIORIDADE ABSOLUTA — MATERIAL DO USUÁRIO:
-- O carrossel DEVE refletir o bloco MATÉRIA-PRIMA, FONTES e INSTRUÇÕES acima — e, quando existir, o TEXTO OBTIDO DAS FONTES. O campo “sobre o que é o conteúdo” e o nicho são SECUNDÁRIOS: servem para tom ou desambiguação, NÃO para trocar o assunto.
-- PROIBIDO fabricar narrativa genérica de “rotina de trabalho” (madrugada, arquivo não carrega, tela azul, escritório vazio, café, deadline) se NADA disso estiver no material — isso descola o post do que o usuário forneceu.
-${urlClause}- Cada slide deve extrair uma linha de raciocínio do MATERIAL (não de clichês de carrossel viral).
+PRIORIDADE DO MATERIAL E DO TEMA:
+- O tema solicitado define o assunto e o recorte; use MATÉRIA-PRIMA e TEXTO OBTIDO DAS FONTES como base factual relevante a esse recorte. Não troque o tema pelo assunto inteiro de uma fonte ampla.
+- Instruções de estilo, assinatura e voz de referência não são evidência e não substituem o tema. Mudança de assunto só quando explicitamente pedida nas instruções do usuário.
+- Se o material não sustentar uma afirmação, omita-a ou apresente-a como hipótese; não force conexão nem fabrique dados, cenas reais ou citações.
+- ${fetchedOk ? 'TEXTO EXTRAÍDO disponível: sintetize os trechos pertinentes com palavras próprias.' : 'URLs sem texto transcrito: você não navega na web; o endereço não comprova o conteúdo da página. Trabalhe com o tema e o texto disponível, sem atribuir fatos ao link.'}
 `;
+
 }
 
 /** Pacotes criativos da geração — id `livre` = Personalizado. Entre T/C e Personalizado: arquétipos «Templates prontos» (Erro Comum, Tendência de Mercado, …). */
@@ -515,7 +513,7 @@ function scaledCharBand(lo, hi, densityId) {
 
 /**
  * Faixas de caracteres para miolo sanduíche T/C & híbrido personalizado (subtitle acima da foto + bodyAfterImage abaixo).
- * 1/1 segue referências editoriais densas (~50–90 palavras por zona quando o tema der), não resumo telegráfico.
+ * As faixas calculadas abaixo são o único alvo de volume por zona, incluindo espaços.
  */
 function tendenciaStyleSandwichCharBands(textDensityId = '1_1') {
   const densityId = textDensityId || '1_1';
@@ -600,7 +598,6 @@ function isTendenciaCulturaPreset(presetId) {
 /** Sobreposição estratégica do pacote Tendência/Cultura (adapta ao N de slides). */
 function buildTendenciaCulturaPackBlock(slideCount, textDensityId = '1_1') {
   const n = Math.min(12, Math.max(3, slideCount | 0));
-  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
   return `
 PACOTE ATIVO — TENDÊNCIA/CULTURA (prioridade quando colidir com clichês genéricos de “dicas virais”):
 Este formato NÃO é post de dicas soltas nem explicação de conceito novo. É nomear e ORGANIZAR o que o leitor já percebia no comportamento, na cultura, na polêmica ou na mudança de mercado.
@@ -613,30 +610,30 @@ Tipos úteis (escolha o que casa com o material): A) Tendência interpretada B) 
 
 Arco editorial de referência (distribua as FUNÇÕES abaixo pelos ${n} slides — se N < 9, una etapas adjacentes; se N > 9, expanda com mais evidência ou contraste mantendo o propósito de cada função):
 
-S1 CAPA · hook que soe como “finalmente alguém falou isso” — teses tipo: fenômeno inesperado + consequência; obsessão comportamental + geração; grupo/categoria em mudança surpreendente; dado de mercado em tensão com narrativa óbvia; “por que X prova Y”.
+S1 CAPA · hook que soe como “finalmente alguém falou isso” — teses tipo: fenômeno inesperado + consequência; obsessão comportamental + geração; grupo/categoria em mudança surpreendente; dado de mercado em tensão com narrativa óbvia; “o que X revela sobre Y”.
 S2 CONTEXTO · dado ou situação histórica; abre espaço factual.
 S3 MECANISMO · síntese densa — princípio central do fenômeno (prosa forte, primeira frase = gancho do slide).
 S4 DISSONÂNCIA · conflito que o mecanismo cria; consequência vivida.
 S5 LIMITE · teto do comportamento atual; por que as pessoas travam ou param.
-S6 (se N≥6) STAT/PARADOXO · UM slide pode ser só insight em tipografia mental: afirmação grande + linha menor com dado ou contrassenso (sem clichê motivacional).
-S7 (se N≥7) MECANISMO DUPLO · contraste A vs B nos dois sentidos do fenômeno.
-S8 (se N≥8) REFRAME · ângulo que muda como se lê o comportamento (pode citar pesquisa só se plausible ao material — não invente fonte).
-S9 FECHO · meta-pergunta que organiza o que o leitor já sentia + CTA orgânico (comentário, save, síntese).
+S6 (se N≥7; nunca ocupar o fecho) STAT/PARADOXO · UM slide pode ser só insight em tipografia mental: afirmação grande + linha menor com dado ou contrassenso (sem clichê motivacional).
+S7 (se N≥8) MECANISMO DUPLO · contraste A vs B nos dois sentidos do fenômeno.
+S8 (se N≥9) REFRAME · ângulo que muda como se lê o comportamento (cite pesquisa apenas se ela estiver no material disponível; previsão deve ser identificada como hipótese).
+ÚLTIMO SLIDE (posição ${n}) · FECHO · meta-pergunta que organiza o que o leitor já sentia + CTA orgânico (comentário, save, síntese).
 
 Reforço contínuo: “você já percebia isso; aqui está o porquê.” Três gatilhos ao longo do fio: identificação, alívio (não sou só eu), autoridade sobria.
 
 LAYOUT VISUAL ↔ CAMPOS DO JSON (leitura do app — siga estritamente):
 - Slide 1 (CAPA com foto full-bleed): use "title" + "subtitle" + "imageQuery". O campo "bodyAfterImage" DEVE ser "" (string vazia). Nunca sanduíche na capa.
-- Slide final (fecho) COM foto: também full-bleed — "bodyAfterImage" vazio; apenas "title", "subtitle", "imageQuery" (e cultureTone se precisar).
-- Slides intermediários e fecho COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "subtitle" ACIMA da foto com **${subLo}–${subHi} caracteres** (parágrafo(s) corrido(s); primeira frase fecha o gancho) e "bodyAfterImage" ABAIXO da imagem com **${bodyLo}–${bodyHi} caracteres** — duas zonas distintas de prosa editorial, **não** uma headline + frase única nem bullets telegráficos salvo densidade 1/4–1/5. Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
-- Slide só texto (“stat”) SEM foto: deixe "imageQuery" vazio; use "subtitle" (e opcionalmente "title") no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
+- Slide final (fecho): também full-bleed — "bodyAfterImage" vazio; apenas "title", "subtitle", "imageQuery" (e cultureTone se precisar).
+- Apenas slides intermediários COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "subtitle" ACIMA da foto na faixa definida nas REGRAS DE TAMANHO (primeira frase abre o argumento) e "bodyAfterImage" ABAIXO da imagem na faixa definida nas REGRAS DE TAMANHO — continuação do mesmo argumento, com consequência ou exemplo sem repetir o bloco superior, **não** uma headline + frase única nem bullets telegráficos salvo densidade 1/4–1/5. Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
+- Slide só texto (“stat”) SEM foto e sem destaque lexical: deixe "imageQuery" vazio; use "subtitle" no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
 - "cultureTone" (opcional): omita ou use "" para alternância automática claro/escuro; só use "light", "dark" ou "accent" quando o contraste exigir.
 
-CRITICAL (texto nos slides JSON):
-- Sem título de seção tipo “Slide 3 — Mecânismo”: use título+subtítulo como no app; primeira frase do subtítulo faz o trabalho do gancho.
-- PROIBIDO usar “Slide N”, “Card N” ou número ordinal de card como "title" — só copy editorial; o app numera os cards na UI.
-${textDensityId === '1_1' || !textDensityId ? '- Com densidade 1/1, o miolo sanduíche deve calibrar como referências editoriais densas (capacidade de **~50–85 palavras por zona de texto** quando o material suportar); **proibido** entregar miolo resumido tipo “capa de LinkedIn”.\n' : ''}
-- PROIBIDO abrir miolo como manual (“5 passos”, “dica número”) quando o tema for cultura/tendência — salvo modo narrativo Passo-a-passo pedido pelo usuário em outra camada.
+TEXTO CULTURA:
+- No miolo, use title = "" e faça a primeira frase de subtitle funcionar como gancho. Os dois blocos continuam um único argumento editorial; não crie títulos de seção separados.
+- O fecho sempre ocupa o último slide, mesmo quando etapas intermediárias forem unidas. Termine a leitura antes de fazer uma pergunta ou convite.
+- Se o tema for apenas um conceito, busque um ângulo de comportamento sustentado pelo material; não declare uma tendência sem evidência.
+
 `;
 }
 
@@ -659,10 +656,9 @@ Regras:
 - Adapte títulos, subtítulos e imageQuery ao TEMA do utilizador; NÃO copie texto literal dos exemplos — preserve só a FUNÇÃO de cada posição no arco.
 - Cada imageQuery: inglês, 8–15 palavras, alinhada ao argumento do slide (pode inspirar-se na família visual dos exemplos).
 
-CRITICAL — ABA «CONTEÚDO» (MATÉRIA-PRIMA / FONTES / TEXTO EXTRAÍDO / INSTRUÇÕES):
-- Se o prompt trouxer esses blocos, o assunto factual do carrossel é **o material colado**, não uma história genérica (escritório, cliente, terça-feira, deadline, etc.) inventada para encaixar no arquétipo.
-- O arquétipo «${t.name}» define só a **estrutura** do arco (gancho, prova, virada…): os exemplos abaixo com «título de referência» são **ilustrativos** — reescreva tudo ao tema real do utilizador.
-- A linha «sobre: "…"» do formulário é **secundária** quando existe material; use-a só se bater com o material ou para tom/desambiguação — nunca para trocar o assunto.
+MATERIAL E EXEMPLOS:
+- Aplique a PRIORIDADE DO MATERIAL E DO TEMA. O arquétipo define funções no arco, não o assunto nem fatos.
+- Os títulos abaixo são exemplos ilustrativos: não copie slogans, generalizações ou promessas de resultado/serviço (ex.: analisar comentários) sem respaldo no pedido.
 
 Distribuição para ${n} slides (o template original tem ${t.slides.length} passos — estique ou una passos adjacentes se N for diferente):
 ${refs}
@@ -674,9 +670,9 @@ function buildTendenciaCulturaRefineSlideHint(creativePresetId, textDensityId = 
   const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
   const dense =
     textDensityId === '1_1' || !textDensityId
-      ? ' Com 1/1, se estiver curto, expanda até prosa completa por zona (método editorial), sem factos novos fora do material.'
+      ? ' As faixas são alvos: só expanda se o pedido exigir e houver conteúdo pertinente, sem fatos novos fora do material.'
       : '';
-  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards. Alvo miolo sanduíche: subtitle ~${subLo}–${subHi} car.; bodyAfterImage ~${bodyLo}–${bodyHi} car.${dense}`;
+  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards. No miolo, mantenha title vazio e o gancho na primeira frase de subtitle. Alvo miolo sanduíche: subtitle ~${subLo}–${subHi} car.; bodyAfterImage ~${bodyLo}–${bodyHi} car.${dense}`;
 }
 
 function coerceCultureTone(v) {
@@ -772,18 +768,20 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 }
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
-function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1') {
-  const [midLo, midHi] = midSubtitleBandFor(narrativeModeId);
+function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9) {
+  if (isPersoHybridDensity(creativePresetId, textDensityId)) {
+    return buildPersoHybridLayoutBlock(slideCount, textDensityId);
+  }
+  const base = midSubtitleBandFor(narrativeModeId);
+  const { lo: midLo, hi: midHi } = scaledCharBand(...base, textDensityId);
   if (isTendenciaCulturaPreset(creativePresetId)) {
     const bands = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
     const sandwichVol = `
 ▶ VOLUME NO MIOLO SANDUÍCHE (texto · foto · texto) — prevalece sobre faixas genéricas de “subtítulo único”:
-- **subtitle** (acima da foto) e **bodyAfterImage** (abaixo) são blocos separados; cada um = parágrafo(s) corrido(s) com múltiplas frases — não substituir por headline + uma linha nem bullets soltos.
-- Faixas-alvo neste projeto: subtitle ~${bands.subLo}–${bands.subHi} caracteres; bodyAfterImage ~${bands.bodyLo}–${bands.bodyHi} caracteres.${
-      textDensityId === '1_1' || !textDensityId
-        ? ' Densidade 1/1 = padrão do método: calibre editorial denso (~50–85 palavras por zona quando o tema der), como referências tipo miolo sanduíche longo.'
-        : ''
-    }
+- **subtitle** (acima da foto) e **bodyAfterImage** (abaixo) são blocos separados; desenvolvem uma ideia sem se repetir. Em 1/4–1/5, aceite frases únicas ou bullets curtos com substância.
+- Faixas-alvo neste projeto: subtitle ~${bands.subLo}–${bands.subHi} caracteres; bodyAfterImage ~${bands.bodyLo}–${bands.bodyHi} caracteres (incluindo espaços). São alvos: não invente fatos nem repita ideias para alcançar o piso.
+- Capa: subtitle até ${scaledCeiling(80, textDensityId)} caracteres; fecho: até ${scaledCeiling(140, textDensityId)}. bodyAfterImage vazio em ambos.
+
 `;
     return `
 REGRAS DE TAMANHO (pacote TENDÊNCIA/CULTURA):
@@ -807,7 +805,7 @@ O MÉTODO deste modo (seção acima) é a lei. Estas instruções substituem o f
 - PROIBIDO repetir o molde “headline de marca + subtítulo raciocínio binário” em vários slides (ex.: título “Peptídeos: uma revolução na estética” + subtítulo “não é A, é B”; ou “Inovação e ciência” + “quem incorpora ciência constrói credibilidade…”).
 - PROIBIDO títulos formulaicos “[Tema]: uma reflexão”, “[Tema]: uma revolução”, “[Dois conceitos] e [conceito]: …” como capa de deck.
 - Slide 1 (hook): entrada em cena (in medias res ou imagem forte). Título = momento ou fragmento narrativo. Subtítulo = continua a cena ou a tensão — não posicionamento institucional.
-- Slides intermediários: cada um AVANÇA a história (tempo, gesto, virada, consequência). Subtítulo em prosa narrativa: tipicamente 120–280 caracteres; É PERMITIDO bem menos quando for batida seca, fala ou linha única.
+- Slides intermediários: cada um AVANÇA a história (tempo, gesto, virada, consequência). Subtítulo em prosa narrativa: tipicamente ENTRE ${midLo} E ${midHi} caracteres; É PERMITIDO bem menos quando for batida seca, fala ou linha única.
 - Último slide: desfecho, pergunta ao leitor ou convite honesto — não obrigatoriamente “lição de estratégia”.
 
 🪝 SLIDE 1 — HOOK NARRATIVO:
@@ -818,7 +816,7 @@ ${hookMag}
    - Subtítulo: microcena ou sequência de causas; ritmo de narrador, não de slide de pitch.
 
 🔚 SLIDE FINAL — fechamento narrativo ou convite à conversa.
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
   }
 
@@ -836,7 +834,7 @@ O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras 
 📖 MEIO — tensão → prova → payoff (distribuído conforme N).
 
 🔚 FINAL — pergunta ou save com motivo concreto (sem CTA preguiçoso).
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
   }
 
@@ -845,7 +843,7 @@ ${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
 REGRAS DE ESTRUTURA POR SLIDE (modo "passo-a-passo" — manual, não narrativa nem pitch):
 O MÉTODO acima manda: um passo por slide com "Passo N · …".
 
-- Slides intermediários: subtítulo tipicamente ENTRE ${midLo} E ${midHi} caracteres — imperativo + como fazer + erro ou exemplo; pode ultrapassar levemente se a instrução exigir checklist curto.
+- Slides intermediários: subtítulo tipicamente ENTRE ${midLo} E ${midHi} caracteres — imperativo + como fazer + erro ou exemplo; comprima o exemplo se precisar de checklist curto.
 - Título DEVE refletir sequência de passos (Passo 1, 2…) até o penúltimo ou até o bloco de “erro comum”, conforme o método.
 - PROIBIDO diluir em storytelling ou em tese de marca; mantenha linguagem de procedimento.
 
@@ -854,7 +852,7 @@ O MÉTODO acima manda: um passo por slide com "Passo N · …".
 📖 MEIO — instruções numeradas.
 
 🔚 FINAL — save + pergunta sobre qual passo testar.
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
   }
 
@@ -871,7 +869,7 @@ O método sensacionalista acima manda cortes rápidos e micro-ganchos.
 📖 MEIO — viradas e fechos de mini-loop (distribuído conforme N); um slide pode carregar frase quotável chocante-mas-verdadeira.
 
 🔚 FINAL — revelação ou síntese real + provocação factual / save útil — sem clichê de "segue pra parte 2".
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
   }
 
@@ -889,7 +887,7 @@ O método jornalístico prevalece. Slides devem ler como sequência de fio ou ca
    - Subtítulo: 2-4 frases curtas OU um parágrafo denso factual: tipicamente ENTRE ${midLo} E ${midHi} caracteres; informação primeiro, ornamentação zero.
 
 🔚 FINAL — editorial curto ou o que falta saber próximo — sem CTA influencer vazio.
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
   }
 
@@ -902,7 +900,7 @@ REGRAS DE TAMANHO POR POSIÇÃO (CRÍTICO — siga estritamente, NÃO trate todo
 
 🪝 SLIDE 1 (HOOK) — texto MÍNIMO, máximo impacto:
    - Título: 5-9 palavras. Frase-tese curta e cortante. Usa o espaço visual.
-   - Subtítulo: UMA frase curta apenas, máx 80 caracteres. Pode ser inclusive vazio se a tese se sustenta sozinha.
+   - Subtítulo: UMA frase curta apenas, máx ${scaledCeiling(80, textDensityId)} caracteres. Pode ser inclusive vazio se a tese se sustenta sozinha.
 ${hookVisualHint}
 
 📖 SLIDES INTERMEDIÁRIOS (2 ao penúltimo) — texto DENSO e com CONTEÚDO:
@@ -912,12 +910,19 @@ ${hookVisualHint}
 
 🔚 SLIDE FINAL (CTA) — concisão elegante:
    - Título: 5-9 palavras. Conclusão ou convite.
-   - Subtítulo: 1-2 frases curtas, máx 140 caracteres. Fechamento limpo, sem repetir o título.
-${buildSlideTextDensityOverrides(textDensityId, narrativeModeId)}
+   - Subtítulo: 1-2 frases curtas, máx ${scaledCeiling(140, textDensityId)} caracteres. Fechamento limpo, sem repetir o título.
+- Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
 }
 
-function buildGenerationImageLayer(presetId, topic, n, audience) {
+function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false) {
+  if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
+• INGLÊS, 8–15 palavras: sujeito + ação + ambiente + linguagem visual/luz extraída do brief.
+• Relacione a cena à mensagem específica do card. Varie cenas mantendo a identidade do projeto.
+• Siga a estética explicitada no brief/estilo (fotografia, 3D, animação, colagem etc.). Não imponha realismo, silêncio visual ou tons dessaturados por padrão.
+• Reserve área legível para as camadas editáveis de título/subtítulo; nunca desenhe texto, logo ou marca-d'água dentro da imagem.
+• As referências são moodboard, não autorização para copiar rosto, personagem ou logo. Arquivos apenas citados no Markdown não estão anexados.`;
+
   const nicheStr = n ? ` (nicho: ${n})` : '';
   const audStr = audience ? ` (público: ${audience})` : '';
   if (isTendenciaCulturaPreset(presetId)) {
@@ -954,30 +959,54 @@ function buildNarrativeModeReminder(modeId) {
 }
 
 /** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo + densidade de texto. */
-function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1') {
-  const denHint = buildSlideTextDensityRefineHint(textDensityId);
-  const refNoEnum = '- PROIBIDO "Slide N" / "Card N" como título — o app já numera o card.\n';
+function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { presetId = 'livre', slideIndex, slideCount } = {}) {
+  const positioned = Number.isInteger(slideIndex) && slideCount > 0;
+  const culture = isTendenciaCulturaPreset(presetId);
+  const hybrid = isPersoHybridDensity(presetId, textDensityId);
+  const sandwich = positioned && ((culture && slideIndex > 0 && slideIndex < slideCount - 1) || (hybrid && slideIndex >= 2));
+  let denHint = buildSlideTextDensityRefineHint(textDensityId);
+  if (sandwich) {
+    const b = tendenciaStyleSandwichCharBands(textDensityId);
+    denHint = `- Alvos deste slide: subtitle ${b.subLo}–${b.subHi} caracteres; bodyAfterImage ${b.bodyLo}–${b.bodyHi}. Desenvolva a mesma ideia em dois blocos sem repetição, sem forçar o piso.\n`;
+    if (culture) denHint += '- No miolo Cultura, title = ""; primeira frase de subtitle é o gancho.\n';
+  } else if (positioned) {
+    const fullBleed = slideIndex === 0 || slideIndex === slideCount - 1 || (hybrid && slideIndex === 1);
+    if (fullBleed) {
+      const ceiling = scaledCeiling(slideIndex === slideCount - 1 && !hybrid ? 140 : 80, textDensityId);
+      denHint = `- Subtitle até ${ceiling} caracteres; bodyAfterImage vazio. Preserve a função desta posição no arco.\n`;
+    } else {
+      const b = scaledCharBand(...midSubtitleBandFor(narrativeModeId), textDensityId);
+      denHint = `- Subtitle entre ${b.lo} e ${b.hi} caracteres, sem preencher o piso artificialmente.\n`;
+    }
+  }
+  if (culture) return denHint + '- Preserve leitura cultural, gancho na primeira frase e consequência concreta; sem título de seção.';
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
-    return `${denHint}${refNoEnum}- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
+    return `${denHint}- Refine mantendo registro narrativo (cena, tensão, consequência ou empatia) — não converta em headline de deck + subtítulo "tese/antítese" corporativo.
 - Título pode ser fragmento de cena ou virada; subtítulo em prosa coerente com o modo, sem forçar três frases analíticas se uma batida basta.`;
   }
   if (narrativeModeId === 'viral') {
-    return `${denHint}${refNoEnum}- Mantenha ou reforce ritmo viral: título curto; subtítulo telegráfico (sem parágrafo denso de análise).`;
+    return `${denHint}- Mantenha ou reforce ritmo viral: título curto; frases curtas, sem diluir a tensão; respeite os campos e alvos de volume desta posição.`;
   }
   if (narrativeModeId === 'sensacionalista') {
-    return `${denHint}${refNoEnum}- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
+    return `${denHint}- Refine preservando tensão sensacionalista: cortes rápidos, viradas — SEM inventar fatos nem promessa falsa para clickbait.`;
   }
   if (narrativeModeId === 'jornalistico') {
-    return `${denHint}${refNoEnum}- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
+    return `${denHint}- Refine preservando hierarquia jornalística (selo/manchete/lead onde couber ao slide) e prosa factual; não converta em pitch de marca.`;
   }
   if (narrativeModeId === 'how_to') {
-    return `${denHint}${refNoEnum}- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
+    return `${denHint}- Se o slide for instrucional, mantenha "Passo N · …" e imperativos; o refinamento não deve virar história ou tese de marca.`;
   }
-  return `${denHint}${refNoEnum}- Título: 4–14 palavras conforme impacto. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
+  return `${denHint}- Título: mantenha curto e específico, sem mudar a promessa. Subtítulo: aprofunde a ideia deste slide; no miolo editorial/profundo pode ser mais denso que no hook.`;
 }
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
-function buildCaptionOutlineInstructions(narrativeModeId) {
+function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
+  if (isTendenciaCulturaPreset(presetId)) {
+    return `ESTRUTURA DA LEGENDA CULTURA:
+1. Primeiro parágrafo: expanda a percepção nomeada no carrossel, sem copiar a capa.
+2. Segundo parágrafo: pergunta de identificação OU convite útil ligado à conclusão.
+3. Hashtags específicas ao nicho no final.`;
+  }
   switch (narrativeModeId) {
     case 'storytelling':
     case 'pain':
@@ -997,7 +1026,7 @@ function buildCaptionOutlineInstructions(narrativeModeId) {
       return `ESTRUTURA DA LEGENDA (modo passo-a-passo):
 1. Reformular a promessa do que o carrossel ensina.
 2. Resumir os passos em uma linha fluida (sem listar todos os títulos).
-3. Sugerir qual passo testar primeiro + save útil.
+3. Sugerir qual passo testar primeiro OU salvamento com motivo útil.
 4. Hashtags.`;
     case 'deep':
       return `ESTRUTURA DA LEGENDA (modo profundo):
@@ -1031,7 +1060,7 @@ function buildCaptionOutlineInstructions(narrativeModeId) {
 }
 
 /** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */
-function buildHookVariationRules(narrativeModeId, creativePresetId) {
+function buildHookModeVariationRules(narrativeModeId, creativePresetId) {
   const tendenciaCulture = isTendenciaCulturaPreset(creativePresetId);
   if (narrativeModeId === 'storytelling' || narrativeModeId === 'pain') {
     return `- Priorize entrada em CENA ou identificação emocional imediata (in medias res / "é exatamente isso") — não só fórmulas "X não é Y".
@@ -1063,9 +1092,9 @@ function buildHookVariationRules(narrativeModeId, creativePresetId) {
 - Subtítulo: linha que aumenta o custo cognitivo de ignorar OU contraste visceral inicial.
 - 5 hooks em cadências bem diferentes — tablóide moderno honesto — sem "você vai se arrepender" vazio nem ALL CAPS exagerado em todas.`;
   }
-  const editorialFormats = `- Use formatos contraintuitivos: "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z."`;
+  const editorialFormats = `- Varie a construção: observação concreta, contraste sustentado, pergunta específica, consequência e cena curta. Não gere cinco paráfrases nem force "Não é sobre X. É sobre Y.".`;
   const tendenciaPatterns = `
-- Patterns extra (Tendência/Cultura — soe como "finalmente alguém falou isso"): "[Substantivo] muda [algo inesperado]: como [fenômeno] provou [tese]", "A nova obsessão é [comportamento]: como uma geração [consequência]", "[Grupo] está [verbo surpreendente] — e o que isso revela sobre [tensão]", "o que cresceu enquanto [contexto contrário] mudava", "por que [fenômeno] é prova de [tese provocadora]".`;
+- Patterns extra (Tendência/Cultura — soe como "finalmente alguém falou isso"): "[Substantivo] muda [algo inesperado]: o que [fenômeno] revela sobre [tese]", "A nova obsessão é [comportamento]: como uma geração [consequência]", "[Grupo] está [verbo surpreendente] — e o que isso revela sobre [tensão]", "o que cresceu enquanto [contexto contrário] mudava", "por que [fenômeno] sugere [tese provocadora]".`;
   if (tendenciaCulture) {
     return `${editorialFormats}${tendenciaPatterns}
 - Âncoras no fenômeno JÁ EM CURSO (comportamento, cultura, polêmica, mercado) — não promessa de "aulinha".
@@ -1079,7 +1108,7 @@ function buildHookVariationRules(narrativeModeId, creativePresetId) {
 - 5 variações DIFERENTES entre si (formatos diferentes).`;
 }
 
-function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
+function buildRefineModeVoiceRules(presetId, narrativeMode = 'editorial') {
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
   const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
   const journalMode = narrativeMode === 'jornalistico';
@@ -1129,9 +1158,9 @@ function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
 function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
   let presetLine;
   if (isTendenciaCulturaPreset(presetId)) {
-    presetLine = `- Tom: jornalístico-analítico (expande o insight como algo que o leitor já sentia); sem emojis em excesso (máx 2-3). Bloco 2: pergunta que ativa identificação + CTA orgânico. Hashtags: 5-8 específicas ao nicho.`;
+    presetLine = `- Tom: jornalístico-analítico (expande o insight como algo que o leitor já sentia); sem emojis. Segundo parágrafo: pergunta que ativa identificação OU CTA orgânico. Hashtags: até ${INSTAGRAM_HASHTAG_LIMIT} específicas ao assunto; use menos se não houver outras pertinentes.`;
   } else {
-    presetLine = `- Tom: alinhado à marca e ao material; natural — sem forçar frieza analítica se o modo narrativo pedir calor humano. Emojis com moderação. Hashtags: 8-12 estratégicas ao nicho, no final.`;
+    presetLine = `- Tom: alinhado à marca e ao material; natural — sem forçar frieza analítica se o modo narrativo pedir calor humano. Emojis com moderação. Hashtags: até ${INSTAGRAM_HASHTAG_LIMIT} específicas ao assunto, no final; não complete quantidade com tags genéricas.`;
   }
   const modeLine =
     narrativeMode === 'storytelling' || narrativeMode === 'pain'
@@ -1147,15 +1176,49 @@ function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
               : narrativeMode === 'jornalistico'
                 ? `- Legenda em tom de fio: manchete + lead factual antes de hashtags.`
                 : '';
-  return [presetLine, modeLine].filter(Boolean).join('\n');
+  return [
+    `- Legenda até ${INSTAGRAM_CAPTION_LIMIT} caracteres, incluindo espaços, quebras e hashtags. Use parágrafos curtos; não existe número obrigatório de linhas.`,
+    '- Baseie a legenda no carrossel completo, incluindo bodyAfterImage. Complemente a leitura sem transcrever os slides nem adicionar fatos ou promessas ausentes.',
+    '- Use uma única ação final (pergunta OU convite); assinatura da marca só quando couber, antes das hashtags e sem duplicar o CTA.',
+    presetLine, isTendenciaCulturaPreset(presetId) ? '' : modeLine,
+  ].filter(Boolean).join('\n');
+}
+
+/** Contexto completo para edição/legenda, sem perder o payoff abaixo da foto. */
+function buildCarouselTextContext(slides) {
+  return JSON.stringify(slides.map((s, i) => ({
+    position: i + 1, title: s.title || '', subtitle: s.subtitle || '', bodyAfterImage: s.bodyAfterImage || '',
+  })));
+}
+
+function buildRefineVoiceRules(presetId, narrativeMode = 'editorial') {
+  return `- Edite apenas o necessário para cumprir a instrução. Preserve assunto, fatos, voz, função de cada slide e progressão do arco; não redistribua argumentos nem crie nova promessa sem pedido explícito.
+- Preserve os destaques **existentes** quando ainda fizerem sentido. Ao refinar um slide, altere somente esse slide; os demais são contexto. Ao refinar todos, preserve quantidade e ordem.
+${buildRefineModeVoiceRules(presetId, narrativeMode)}`;
+}
+
+function buildHookVariationRules(narrativeModeId, creativePresetId) {
+  return `- Preserve o assunto e a promessa da capa atual; varie o ângulo sem ampliar resultados, números ou prazos. Não anuncie provas ou passos que o contexto não confirma.
+- Devolva exatamente 5 objetos com title e subtitle como strings no schema pedido; sem campos extras.
+${buildHookModeVariationRules(isTendenciaCulturaPreset(creativePresetId) ? 'editorial' : narrativeModeId, creativePresetId)}`;
+}
+
+function buildGenerationJsonContract(presetId, densityId, count, projectDesignSchema = null) {
+  const slide = { title: '', subtitle: '', imageQuery: '' };
+  if (isTendenciaCulturaPreset(presetId) || isPersoHybridDensity(presetId, densityId)) slide.bodyAfterImage = '';
+  return `Retorne um único objeto JSON com exatamente ${count} itens em slides, na ordem do arco, e caption como string.
+Use apenas os campos do modelo; todos os campos de texto são strings, nunca null, arrays ou objetos. As strings vazias do modelo indicam tipos, não conteúdo pronto.
+${'bodyAfterImage' in slide ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.' : ''}
+Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaques **assim** são permitidos dentro das strings quando o layout pedir.
+${JSON.stringify({ slides: [slide], caption: '', ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}) })}`;
 }
 
 /** Viés para pesquisa de nicho — alinha ideias e ganchos ao modo/pacote do documento. */
-function buildResearchPromptBias(narrativeModeId, creativePresetId) {
+function buildResearchPromptBias(narrativeModeId, creativePresetId, hasWeb = true) {
   const m = GEN_MODE_BY_ID[narrativeModeId] || GEN_MODE_BY_ID.editorial;
   const p = CREATIVE_PRESET_BY_ID[creativePresetId] || CREATIVE_PRESET_BY_ID.livre;
   return `
-Preferências do usuário (viés suave — continue a pesquisar fatos REAIS na web):
+Preferências do usuário (viés suave — ${hasWeb ? 'pesquise fatos reais com fontes na web' : 'sugira hipóteses editoriais sem afirmar atualidade'}):
 - Modo narrativo alvo: "${m.label}" — ${m.desc}
 - Pacote criativo de referência: "${p.label}" — ${p.desc}
 Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (ex.: storytelling → arco em cena; passo-a-passo → passos numerados; viral → tensão e payoff; profundo → padrão/mecanismo; pacote Tendência/Cultura → fenômeno de comportamento ou cultura já em curso que o público sente no feed, não “lista de dicas”). Em "viral_hooks", combine formatos estratégicos com variações compatíveis com o modo.
@@ -1163,6 +1226,8 @@ Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (
 }
 
 export {
+  buildCarouselTextContext,
+  buildGenerationJsonContract,
   resolveMaterialPromptParts,
   clearMaterialUrlCache,
   quickTemplateIdFromPreset,

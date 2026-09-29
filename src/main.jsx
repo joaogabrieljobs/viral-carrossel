@@ -74,7 +74,9 @@ function BootScreen() {
 // Landing first paint sem o monólito do studio; quem já passou pela intro
 // vai direto ao ViralCarrossel.
 const App = lazy(() => (
-  shouldShowOnboardingLanding()
+  window.location.pathname === '/redefinir-senha'
+    ? import('./PasswordRecoveryPage.jsx')
+    : shouldShowOnboardingLanding()
     ? import('./LandingFirst.jsx')
     : import('../ViralCarrossel.jsx')
 ));

@@ -8,6 +8,8 @@ import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
 import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
+import { CONTENT_OBJECTIVES, normalizeContentObjective } from '../../utils/editorial-strategy.js';
+import { buildPerformanceGuidance } from '../../utils/publication-results.js';
 import { CARD_VISUAL_STYLE_IDS } from '../../utils/doc-schema.js';
 
 function normalizeCardVisualStyle(v) {
@@ -42,6 +44,9 @@ function GenerateModal({
   mode: defaultMode = 'editorial',
   onModeChange,
   creativePreset: defaultCreativePreset = 'livre',
+  contentObjective: defaultContentObjective = 'auto',
+  resultsLibrary = [],
+  performanceSettings = {},
   onCreativePresetChange,
   slideTextDensity: defaultSlideTextDensity = '1_1',
   onSlideTextDensityChange,
@@ -59,6 +64,12 @@ function GenerateModal({
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
   const [packCreative, setPackCreative] = useState(defaultCreativePreset || 'livre');
+  const [contentObjective, setContentObjective] = useState(() => normalizeContentObjective(defaultContentObjective));
+  const performanceGuidance = buildPerformanceGuidance(resultsLibrary, {
+    ...performanceSettings, objective: contentObjective, niche, presetId: packCreative,
+    mode: packCreative === 'tendencia_cultura' ? 'editorial' : (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(packCreative)] || mode),
+  });
+  useEffect(() => { if (open) setContentObjective(normalizeContentObjective(defaultContentObjective)); }, [open, defaultContentObjective]);
   const [textDensity, setTextDensity] = useState(defaultSlideTextDensity || '1_1');
   useEffect(() => { if (open) setMode(defaultMode); }, [open, defaultMode]);
   useEffect(() => { if (open) setPackCreative(defaultCreativePreset || 'livre'); }, [open, defaultCreativePreset]);
@@ -166,6 +177,7 @@ function GenerateModal({
         imgParams: params,
         mode: narrativeForGenerate,
         creativePreset: packCreative,
+        contentObjective,
         slideTextDensity: textDensity,
         cardVisualStyle: cardStyle,
         fetchImagesNow: !!withImages,
@@ -345,6 +357,21 @@ function GenerateModal({
                     );
                   })}
                 </div>
+              </div>
+
+              <div>
+                <label className="vc-label" htmlFor="generation-objective">O que você quer com este conteúdo?</label>
+                <select id="generation-objective" className="vc-input" value={contentObjective} onChange={e => setContentObjective(e.target.value)}>
+                  {CONTENT_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <p style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>
+                  {CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.desc}
+                </p>
+                {performanceSettings.account && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  {performanceSettings.enabled === false ? 'Histórico desativado para este projeto.'
+                    : performanceGuidance.preferredStructureId ? 'Seu histórico será considerado na escolha da estrutura. O tema e o pacote continuam prioritários.'
+                      : 'Histórico: ainda sem comparação suficiente para este briefing. A geração segue pelo conteúdo.'}
+                </p>}
               </div>
 
               {/* Topic */}
@@ -736,6 +763,10 @@ function GenerateModal({
                     </>
                   )}
 
+                  <span style={{ color:'var(--text-muted)' }}>Objetivo</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.label}</span>
+                  <span style={{ color:'var(--text-muted)' }}>Revisão do texto</span>
+                  <span style={{ color:'var(--text-primary)' }}>Incluída — confere clareza, repetição e coerência antes de abrir o editor.</span>
                   <span style={{ color:'var(--text-muted)' }}>Cards</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{count}</span>
 

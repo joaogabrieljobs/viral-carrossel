@@ -37,6 +37,9 @@ export default defineConfig(({ mode }) => {
             }
             if (pathOnly === '/api/ai/sjinn-image') {
               // Dev: reutiliza o handler Vercel (BILLING_DISABLED ou cookie via vercel dev).
+              for (const key of ['SJINN_API_KEY', 'BLOB_READ_WRITE_TOKEN', 'BLOB_STORE_ID', 'VERCEL_OIDC_TOKEN']) {
+                if (env[key]) process.env[key] = env[key];
+              }
               try {
                 const chunks = [];
                 for await (const chunk of req) chunks.push(chunk);

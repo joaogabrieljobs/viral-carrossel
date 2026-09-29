@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getStripe } from './stripe.js';
 
 const COOKIE_NAME = 'vc_access';
 const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 dias
@@ -45,6 +46,7 @@ export function createAccessToken(data) {
     customerId: data.customerId,
     email: data.email,
     iat: Math.floor(Date.now() / 1000),
+    iatMs: Date.now(),
   };
   const body = b64urlJson(payload);
   return `${body}.${sign(body)}`;
@@ -86,6 +88,20 @@ export function parseCookies(req) {
 export function readAccessCookie(req) {
   const cookies = parseCookies(req);
   return verifyAccessToken(cookies[COOKIE_NAME]);
+}
+
+/** Rejeita também sessões anteriores a uma recuperação de senha. */
+export async function readCurrentAccessCookie(req) {
+  const access = readAccessCookie(req);
+  if (!access) return null;
+  let customer;
+  try { customer = await getStripe().customers.retrieve(access.customerId); }
+  catch (error) { if (error.code === 'resource_missing') return null; throw error; }
+  if (!customer || customer.deleted) return null;
+  const revokedBefore = Number(customer.metadata?.vc_session_revoked_before || 0);
+  const issuedAt = Number(access.iatMs || access.iat * 1000 || 0);
+  if (revokedBefore && issuedAt <= revokedBefore) return null;
+  return access;
 }
 
 function appendSetCookie(res, value) {

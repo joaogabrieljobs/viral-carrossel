@@ -9,11 +9,11 @@
 # index.html mínimo, e a regra de redirect cobre tudo antes dele.
 [build]
   publish = "netlify-redirect"
-  command = "mkdir -p netlify-redirect && printf '<!doctype html><meta http-equiv=\"refresh\" content=\"0; url=https://viral-carrossel.vercel.app/\">' > netlify-redirect/index.html"
+  command = "mkdir -p netlify-redirect && printf '<!doctype html><meta http-equiv=\"refresh\" content=\"0; url=https://viralcarrossel.com.br/\">' > netlify-redirect/index.html"
 
-# Redireciona TUDO — inclusive /api/* — para a produção real.
+# Redireciona TUDO — inclusive /api/* — para o domínio oficial.
 [[redirects]]
   from = "/*"
-  to = "https://viral-carrossel.vercel.app/:splat"
+  to = "https://viralcarrossel.com.br/:splat"
   status = 301
   force = true

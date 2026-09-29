@@ -1,3 +1,7 @@
+import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
+import { generateReviewedCarousel } from './src/utils/editorial-review.js';
+import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
+import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   Sparkles, Search, Download, Trash2, Copy,
@@ -63,7 +67,6 @@ import {
   GEN_MODES,
   GEN_MODE_BY_ID,
   isPersoHybridDensity,
-  buildPersoHybridLayoutBlock,
   buildBrandBlock,
   buildImgParamsBlockPT,
   buildImgParamsTagsEN,
@@ -94,6 +97,8 @@ import {
   buildQuickTemplatePackBlock,
   buildTendenciaCulturaRefineSlideHint,
   coerceCultureTone,
+  buildCarouselTextContext,
+  buildGenerationJsonContract,
   buildGenerationIntroLine,
   buildGenerationLanguageLayer,
   buildGenerationSlideLayoutRules,
@@ -110,6 +115,16 @@ import {
   QUICK_TEMPLATE_CREATIVE_PRESET_ENTRIES,
   resolveMaterialPromptParts,
 } from './src/utils/generation-prompts.js';
+import {
+  normalizeStyleKit,
+  buildProjectContextBlock,
+  buildStyleKitTextHint,
+  composeImgExtraPrompt,
+  resolveQuickGenerationRequest,
+  buildGenerationTaskBlock,
+} from './src/utils/style-kit.js';
+import { buildProjectDesignInstructions, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
+import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
@@ -873,11 +888,13 @@ export default function App() {
 
   // Doc ativo da biblioteca + ponteiro pro index dele (pra updates eficientes)
   const activeEntry = library.find(e => e.id === activeDocId) || library[0];
+  const activeProjectRef = useRef(activeEntry?.id);
+  activeProjectRef.current = activeEntry?.id;
   const initialDoc  = ensureDocShape(activeEntry?.doc || DEFAULT_DOC);
 
   const history = useHistory(initialDoc);
-  // Quando trocar de doc ativo, recarrega o histórico com o novo doc
-  useEffect(() => {
+  // Carrega antes de pintar: não expõe o brief do projeto anterior por um frame.
+  useLayoutEffect(() => {
     if (activeEntry?.doc) history.reset(ensureDocShape(activeEntry.doc));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDocId]);
@@ -892,8 +909,11 @@ export default function App() {
   const caption = typeof doc.caption === 'string' ? doc.caption : '';
   const material  = doc.material  || { content:'', sources:'', context:'' };
   const imgParams = doc.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 };
+  const styleKit = useMemo(() => normalizeStyleKit(doc.styleKit), [doc.styleKit]);
   const mode      = doc.mode      || 'editorial';
   const creativePreset = doc.creativePreset ?? 'livre';
+  const contentObjective = normalizeContentObjective(doc.contentObjective);
+  const performanceSettings = { account: brand.handle || '', windowDays: 7, enabled: true, ...activeEntry?.performanceSettings };
   const slideTextDensityRaw = doc.slideTextDensity ?? '1_1';
   const slideTextDensity = SLIDE_TEXT_DENSITY_BY_ID[slideTextDensityRaw] ? slideTextDensityRaw : '1_1';
   const cardVisualStyle = normalizeCardVisualStyle(doc.cardVisualStyle);
@@ -928,6 +948,14 @@ export default function App() {
     imgParams: typeof next==='function'
       ? next(d.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 })
       : next,
+  })), [history]);
+  const setStyleKit = useCallback(next => history.set(d => ({
+    ...d,
+    styleKit: normalizeStyleKit(
+      typeof next === 'function'
+        ? next(normalizeStyleKit(d.styleKit))
+        : next,
+    ),
   })), [history]);
   const setMode      = useCallback(next => history.set(d => ({
     ...d,
@@ -1087,6 +1115,7 @@ export default function App() {
   const [thumbQaMode, setThumbQaMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [hookVarsOpen, setHookVarsOpen] = useState(false);
@@ -1209,6 +1238,19 @@ export default function App() {
     return () => { cancelado = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDocId, slides]);
+
+  // Migra moodboards antigos sem substituir edições feitas enquanto o disco grava.
+  useEffect(() => {
+    const projectId = activeEntry?.id;
+    const source = doc.styleKit;
+    if (!(source?.refImages || []).some(r => r.dataUrl && !r.imageId)) return;
+    let cancelled = false;
+    migrateProjectReferences(source).then(migrated => {
+      if (cancelled || activeProjectRef.current !== projectId) return;
+      history.setSilent(current => current.styleKit === source ? { ...current, styleKit: migrated } : current);
+    }).catch(() => toast('As referências antigas ainda não puderam ser migradas. Exporte um backup antes de limpar o navegador.', 'warning'));
+    return () => { cancelled = true; };
+  }, [activeEntry?.id, doc.styleKit]);
 
   // Limpeza das imagens que nenhum projeto referencia — uma vez por sessão.
   useEffect(() => {
@@ -2079,8 +2121,8 @@ export default function App() {
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     try {
       const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
-        refImage: snap.refImage,
-        imgExtraPrompt: snap.imgExtraPrompt,
+        refImages: await resolveImageReferences(styleKit, snap.refImage),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, snap.imgExtraPrompt),
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
       const patchImg = await guardarImagemDoSlide(url);
@@ -2099,7 +2141,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, setSlides, toast]);
+  }, [slides, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, styleKit, setSlides, toast]);
 
   useEffect(() => {
     const onQuota = (ev) => {
@@ -2181,18 +2223,21 @@ export default function App() {
     imgParams: axes,
     mode: chosenNarrativeMode,
     creativePreset: presetArg,
+    contentObjective: objectiveArg,
     slideTextDensity: densityArg,
     cardVisualStyle: cardStyleArg,
     fetchImagesNow = true,
+    announcement = false,
   }) => {
+    const generationProjectId = activeProjectRef.current;
     // Captura args pra Remix com tom alternativo (B1). Guarda também fetchImagesNow:
     // quem gerou "só texto" não pode ver o remix consumir quota de imagens (auditoria M5).
     lastGenerateArgsRef.current = {
       topic, count, niche: n, tone, audience,
       imgParams: axes, mode: chosenNarrativeMode,
-      creativePreset: presetArg, slideTextDensity: densityArg,
+      creativePreset: presetArg, contentObjective: normalizeContentObjective(objectiveArg ?? contentObjective), slideTextDensity: densityArg,
       cardVisualStyle: cardStyleArg,
-      fetchImagesNow,
+      fetchImagesNow, announcement,
     };
     setHasLastGenerate(true);
     trackEvent('carousel_generate_start', {
@@ -2204,42 +2249,40 @@ export default function App() {
     try {
     const effectiveAxes = axes || imgParams;
     const cp = presetArg ?? creativePreset ?? 'livre';
+    const objective = normalizeContentObjective(objectiveArg ?? contentObjective);
     const effectiveMode = isTendenciaCulturaPreset(cp)
       ? 'editorial'
       : isQuickTemplatePreset(cp)
         ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(cp)] || 'editorial')
         : (chosenNarrativeMode || mode || 'editorial');
     const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
+    const performanceGuidance = buildPerformanceGuidance(library, {
+      ...performanceSettings, objective, niche: n || '', mode: effectiveMode, presetId: cp,
+    });
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
     const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
     const brandBlock = buildBrandBlock(brand);
+    const projectContextBlock = buildProjectContextBlock(styleKit);
+    const styleKitTextHint = buildStyleKitTextHint(styleKit);
     const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
     const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
-    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience);
-    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td);
+    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()));
+    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
     const quickTid = quickTemplateIdFromPreset(cp);
     const quickPackBlock = quickTid ? buildQuickTemplatePackBlock(quickTid, count) : '';
 
     const persoHybridActive = isPersoHybridDensity(cp, td);
-    const persoHybridBlock = persoHybridActive ? buildPersoHybridLayoutBlock(count, td) : '';
-
-    const jsonShapeLine = isTendenciaCulturaPreset(cp)
-      ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (regras: capa + último slide vazio; miolo COM foto = obrigatório)","cultureTone":"opcional: light | dark | accent ou omita"}],"caption":"legenda…"}'
-      : persoHybridActive
-        ? '{"slides":[{"title":"…","subtitle":"…","imageQuery":"… (inglês, 8–15 palavras)","bodyAfterImage":"… (slides 1–2 vazio; desde o 3º = sanduíche se houver foto)","cultureTone":"opcional"}],"caption":"legenda…"}'
-        : '{"slides":[{"title":"…","subtitle":"…","imageQuery":"…"}],"caption":"legenda…"}';
+    const projectDesignInstructions = buildProjectDesignInstructions(styleKit);
+    const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null);
 
     const idiomaRegra = `
 REGRA DE IDIOMA (obrigatória):
 - Redija em português brasileiro: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
 - Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
-
-PROIBIDO RÓTULO DE ENUMERAÇÃO DO CARROSSEL NOS CAMPOS DE TEXTO:
-- Não escreva "Slide 1", "Slide 01", "Slide 2 —", "Card 3", "SLIDE 6:" nem equivalentes em "title", "subtitle" ou "bodyAfterImage". O utilizador já vê o número do card na interface — o copy deve ser só conteúdo editorial (gancho, tese, prosa).
 `;
 
     const contextoModoPerso =
@@ -2257,7 +2300,7 @@ PROIBIDO RÓTULO DE ENUMERAÇÃO DO CARROSSEL NOS CAMPOS DE TEXTO:
               `Tom de voz solicitado: ${tone}`,
             ].filter(Boolean).join('\n');
     const modoNarrativoBloco =
-      isTendenciaCulturaPreset(cp)
+      announcement ? 'Arco publicitário: apresente o produto e a possibilidade concreta que ele oferece, desenvolva benefícios sustentados pelo brief e encerre com um próximo passo. Cada card deve ser uma peça pronta para o público.' : isTendenciaCulturaPreset(cp)
         ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
         : modeDef.method;
 
@@ -2268,21 +2311,28 @@ PROIBIDO RÓTULO DE ENUMERAÇÃO DO CARROSSEL NOS CAMPOS DE TEXTO:
 
     const prompt = `${introLine}
 ${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
-${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}
+${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}${projectContextBlock}${styleKitTextHint}
 ${hasPromptMaterial ? '' : `${materialBlock}${materialPriorityBlock}`}${imgParamsBlock}
 
+${buildGenerationTaskBlock(topic, announcement)}
 ${idiomaRegra}
+
+${buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId)}
+${performanceGuidance.prompt}
 
 ${modoNarrativoBloco}
 ${tendenciaPackBlock}
 ${quickPackBlock ? `${quickPackBlock}\n` : ''}
 
 ${slideLayoutRules}
-${persoHybridBlock ? `${persoHybridBlock}\n` : ''}
 
 ${langLayer}
 
 ${imageLayer}
+${projectDesignInstructions}
+
+${buildCaptionOutlineInstructions(effectiveMode, cp)}
+${buildCaptionVoiceRules(cp, effectiveMode)}
 
 JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;
@@ -2290,10 +2340,18 @@ ${jsonShapeLine}`;
     setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Escrevendo texto dos slides…' });
     // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
     const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
-    const result = await callAI(prompt, { json:true, maxTokens: genMaxTokens, openaiKey });
+    const { result, reviewStatus } = await generateReviewedCarousel({
+      prompt,
+      config: { count: Number(count), presetId: cp, densityId: td },
+      aiOptions: { maxTokens: genMaxTokens, openaiKey },
+      onReview: () => setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Revisando clareza e coerência…' }),
+    }, callAI);
+    if (activeProjectRef.current !== generationProjectId) return;
+    if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
+    const generationBrand = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
@@ -2315,7 +2373,7 @@ ${jsonShapeLine}`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
       }
       const base = {
-        ...mkSlide(i + 1, brand),
+        ...mkSlide(i + 1, generationBrand),
         title,
         subtitle,
         imageQuery: q,
@@ -2324,7 +2382,9 @@ ${jsonShapeLine}`;
         layout: i === 0 ? 'mc' : 'bl',
         align: i === 0 ? 'center' : 'left',
         useCultureLayout: false,
-        photoRegion: cvStyle,
+        photoRegion: projectDesignInstructions && result.projectDesign?.layout === 'fullbleed' ? 'full' : cvStyle,
+        ...(projectDesignInstructions && result.projectDesign?.layout === 'fullbleed' && q
+          ? { composition: i === nSlides - 1 ? 'cta_close' : 'hook_fullbleed' } : {}),
       };
 
       if (isTendenciaCulturaPreset(cp)) {
@@ -2384,7 +2444,11 @@ ${jsonShapeLine}`;
       ),
       fmt,
     );
-    setSlides(newSlides); setActiveIdx(0); setShellView('project');
+    history.set(d => ({
+      ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp, slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      editorialContext: { topic, niche: n || '', generatedAt: new Date().toISOString(), suggestedStructureId: performanceGuidance.preferredStructureId },
+    }));
+    setActiveIdx(0); setShellView('project');
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
     // trazem `subtitleVisible: false` (look só-título) e escondiam o texto recém
     // gerado sem o utilizador perceber que havia uma caixa desmarcada em Marca.
@@ -2431,23 +2495,23 @@ ${jsonShapeLine}`;
         let doneImgs = 0;
         setGenProgress({ phase: 'images', current: 0, total: totalImgs, label: `Gerando imagens (0/${totalImgs})…` });
         for (const { i, q } of slidesWithImage) {
-          if (abort.cancelled) break;
+          if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagem do card ${i+1} (${doneImgs+1}/${totalImgs})…` });
           try {
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
-              refImage: newSlides[i]?.refImage,
-              imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
+              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
+              imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
             });
             const patchImg = await guardarImagemDoSlide(url);
-            if (!abort.cancelled)
+            if (!abort.cancelled && activeProjectRef.current === generationProjectId)
               setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
           } catch(e) {
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
-            if (!abort.cancelled)
+            if (!abort.cancelled && activeProjectRef.current === generationProjectId)
               setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImageFailed: true } : sl));
             // Quota esgotada / plano sem imagens / sessão: os restantes cards falhariam igual — pára aqui (auditoria H6).
-            if (['quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
+            if (['reference_unsupported', 'reference_invalid', 'reference_storage_unconfigured', 'reference_upload_failed', 'quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
               if (!abort.cancelled) toast(e.message, 'error', 7000);
               imgQuotaStop = true;
               break;
@@ -2489,13 +2553,15 @@ ${jsonShapeLine}`;
   };
 
   const refineSlide = async (instruction) => {
+    const projectId = activeProjectRef.current;
     setRefining(true); setError('');
     try {
-      const ctx = slides.map((s,i)=>`${i+1}. ${s.title}`).join('\n');
+      const ctx = buildCarouselTextContext(slides);
       const brandBlock = buildBrandBlock(brand);
+      const projectContextBlock = buildProjectContextBlock(styleKit);
+      const styleKitTextHint = buildStyleKitTextHint(styleKit);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
-      const cultureRef = buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity);
       const nSl = slides.length;
       const isCultureSandwichSlide =
         isTendenciaCulturaPreset(creativePreset) && activeIdx > 0 && activeIdx < nSl - 1;
@@ -2509,9 +2575,10 @@ ${jsonShapeLine}`;
         `Atue como editor de carrossel para Instagram. Responda APENAS com JSON.
 
 ${buildNarrativeModeReminder(mode)}
+${buildContentObjectiveReminder(contentObjective)}
 
 Contexto do carrossel:\n${ctx}
-${brandBlock}${materialBlock}${materialPriorityBlock}
+${brandBlock}${projectContextBlock}${styleKitTextHint}${materialBlock}${materialPriorityBlock}
 Slide ${activeIdx+1} (atual):
 Título: "${slide.title}"
 Subtítulo: "${slide.subtitle}"
@@ -2520,10 +2587,8 @@ Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
-${cultureRef}
-- PROIBIDO devolver "Slide N", "Card N" ou "01." como título; só copy editorial (o app mostra o índice do card).
 ${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
-${buildRefineSingleSlideRules(mode, slideTextDensity)}
+${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset, slideIndex: activeIdx, slideCount: nSl })}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
 
@@ -2537,44 +2602,41 @@ Retorne exatamente: ${singleJson}`,
       if (typeof r.bodyAfterImage === 'string' && refineNeedsBodyAfter) {
         patch.bodyAfterImage = stripLeadingSlideCardLabel(String(r.bodyAfterImage).trim());
       }
-      updateSlide(patch);
+      if (activeProjectRef.current === projectId) updateSlide(patch);
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
   };
 
   const generateCaption = async () => {
+    const projectId = activeProjectRef.current;
     setGenCaption(true); setError('');
     try {
-      const ctx = slides.map((s,i)=>`Slide ${i+1}: ${s.title} — ${s.subtitle}`).join('\n');
+      const ctx = buildCarouselTextContext(slides);
       const brandBlock = buildBrandBlock(brand);
+      const projectContextBlock = buildProjectContextBlock(styleKit);
       const capRules = buildCaptionVoiceRules(creativePreset, mode);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const r = await callAI(
         `Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.
 
 ${buildNarrativeModeReminder(mode)}
+${buildContentObjectiveReminder(contentObjective)}
 
 Carrossel:
 ${ctx}
-${brandBlock}${materialBlock}${materialPriorityBlock}
-${buildCaptionOutlineInstructions(mode)}
+${brandBlock}${projectContextBlock}${materialBlock}${materialPriorityBlock}
+${buildCaptionOutlineInstructions(mode, creativePreset)}
 
 REGRAS:
 ${capRules}
-- 8-12 linhas de texto. Use quebras de linha para ritmo.
 - Hashtags no final, na quantidade indicada nas REGRAS acima.
-- Respeite a identidade verbal e o material acima. Se houver assinatura recorrente, finalize com ela quando fizer sentido.
+- Respeite a identidade verbal e use o material para conferir os fatos do carrossel.
 - Apenas a legenda e as hashtags, nada mais.`,
         { openaiKey }
       );
-      const INSTAGRAM_CAPTION_LIMIT = 2200;
-      let finalCaption = r.trim();
-      if (finalCaption.length > INSTAGRAM_CAPTION_LIMIT) {
-        const over = finalCaption.length - INSTAGRAM_CAPTION_LIMIT;
-        finalCaption = finalCaption.slice(0, INSTAGRAM_CAPTION_LIMIT - 1).trimEnd() + '…';
-        toast(`Legenda excedia o limite do Instagram em ${over} caracteres — cortei o final.`, 'warning', 5000);
-      }
-      setCaption(finalCaption);
+      const finalCaption = normalizeInstagramCaption(r);
+
+      if (activeProjectRef.current === projectId) setCaption(finalCaption);
     } catch(e) { setError(e.message); }
     finally { setGenCaption(false); }
   };
@@ -2609,7 +2671,7 @@ ${capRules}
 
   // B1: Remix com tom alternativo — re-roda handleGenerate com os mesmos args mas
   // adicionando um hint de tom. Usuário pode comparar com Cmd+Z (undo) depois.
-  const remixWithTone = useCallback(async (toneHint, hintLabel) => {
+  const remixWithTone = async (toneHint, hintLabel) => {
     const prev = lastGenerateArgsRef.current;
     if (!prev) {
       toast('Gere um carrossel primeiro — depois use o remix para variar o tom.', 'info');
@@ -2624,11 +2686,41 @@ ${capRules}
     } catch (e) {
       toast(e?.message || 'Não foi possível refazer com o novo tom.', 'error', 6000);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]);
+  };
+
+  /** Geração rápida a partir do prompt da aba Narrativa (usa styleKit + material). */
+  const handleQuickGenerateFromNarrativa = async (promptText) => {
+    const topic = String(promptText || '').trim();
+    if (!topic) {
+      toast('Escreve o que queres gerar no prompt.', 'error');
+      return;
+    }
+    try {
+      const { count, announcement } = resolveQuickGenerationRequest(topic, slides.length >= 3 && slides.length <= 12 ? slides.length : 6);
+      await handleGenerate({
+        topic,
+        count,
+        niche: styleKit.contextMd.trim() ? '' : (niche || ''),
+        tone: styleKit.contextMd.trim() ? 'Use a voz do brief do projeto; na ausência, PT-BR direto e concreto' : ((brand.defaultTone || '').trim() || 'direto e concreto'),
+        audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
+        imgMode: 'dalle',
+        imgParams,
+        mode: announcement ? 'editorial' : mode,
+        announcement,
+        creativePreset: announcement ? 'livre' : creativePreset,
+        contentObjective: announcement ? 'leads' : contentObjective,
+        slideTextDensity: announcement ? '1_5' : slideTextDensity,
+        cardVisualStyle,
+        fetchImagesNow: !!hasOpenAI,
+      });
+    } catch (e) {
+      toast(e?.message || 'Não foi possível gerar a partir do prompt.', 'error', 6000);
+    }
+  };
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
   const refineAll = useCallback(async (instruction) => {
+    const projectId = activeProjectRef.current;
     if (!slides.length) return;
     setRefining(true);
     try {
@@ -2640,23 +2732,25 @@ ${capRules}
         }`,
       ).join('\n');
       const brandBlock = buildBrandBlock(brand);
+      const projectContextBlock = buildProjectContextBlock(styleKit);
+      const styleKitTextHint = buildStyleKitTextHint(styleKit);
       const { materialBlock, materialPriorityBlock } = await resolveMaterialPromptParts(material, toast);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
-      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity);
+      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length);
       const r = await callAI(
         `Atue como editor de carrossel para Instagram. Reescreva TODOS os slides do carrossel abaixo aplicando a instrução do usuário, mantendo coerência narrativa entre eles.
 
 ${buildNarrativeModeReminder(mode)}
+${buildContentObjectiveReminder(contentObjective)}
 
 Carrossel atual:
 ${ctx}
-${brandBlock}${materialBlock}${materialPriorityBlock}
+${brandBlock}${projectContextBlock}${styleKitTextHint}${materialBlock}${materialPriorityBlock}
 Instrução: ${instruction}
 
 REGRAS DE VOZ:
 ${voiceBulk}
 ${buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity)}
-- PROIBIDO "Slide N" / "Card N" como título ou abertura de texto — só conteúdo editorial.
 ${refineAllHybrid ? '- Layout Personalizado (1/1 ou 1/2): do 3.º slide em diante o card é sanduíche — reescreva também "bodyAfterImage" (payoff abaixo da foto) mantendo o campo vazio nos slides 1–2.\n' : ''}- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
@@ -2668,6 +2762,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         { json:true, openaiKey }
       );
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
+      if (activeProjectRef.current !== projectId) return;
       setSlides(prev => prev.map((s, i) => {
         const total = prev.length;
         const isCultureSandwich =
@@ -2687,10 +2782,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
       toast('Todos os slides refinados', 'success');
     } catch(e) { setError(e.message); }
     finally { setRefining(false); }
-  }, [slides, setSlides, setError, toast, openaiKey, brand, material, creativePreset, mode, slideTextDensity]);
+  }, [slides, setSlides, setError, toast, openaiKey, brand, material, styleKit, creativePreset, mode, slideTextDensity, contentObjective]);
 
   // Aplica um template pronto (preenche slides + brand + composições)
   const applyTemplate = useCallback((tpl) => {
+    const projectId = activeProjectRef.current;
     const palette = PALETTES[tpl.palette] || PALETTES[0];
     // Fontes vêm SÓ do pairing — os índices titleFont/bodyFont dos templates
     // eram ignorados aqui mas exibidos no preview do modal, então o card do
@@ -2768,21 +2864,21 @@ Retorne APENAS JSON: ${refineAllWantsBody
       if (!hasOpenAI) return;
       let failCount = 0;
       for (let i = 0; i < tpl.slides.length; i++) {
-        if (abort.cancelled) break;
+        if (abort.cancelled || activeProjectRef.current !== projectId) break;
         const q = tpl.slides[i]?.q;
         if (!q) continue;
         try {
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
-            refImage: newSlides[i]?.refImage,
-            imgExtraPrompt: newSlides[i]?.imgExtraPrompt,
+            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
+            imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
           });
           const patchImg = await guardarImagemDoSlide(url);
-          if (!abort.cancelled)
+          if (!abort.cancelled && activeProjectRef.current === projectId)
             setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
         } catch (e) {
           failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
-          if (!abort.cancelled)
+          if (!abort.cancelled && activeProjectRef.current === projectId)
             setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImageFailed: true } : sl));
         }
       }
@@ -2791,7 +2887,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
           : `${failCount} imagens do template não carregaram. Toque no card para tentar de novo.`, 'warning', 5000);
     })();
-  }, [history, toast, setSlides, hasOpenAI, openaiKey, imgParams]);
+  }, [history, toast, setSlides, hasOpenAI, openaiKey, imgParams, styleKit]);
 
   // Reordena slides (drag-and-drop)
   const reorderSlides = useCallback((from, to) => {
@@ -2816,7 +2912,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
       // Qualquer overlay bloqueia os atalhos. Landing/paywall/login e a intro de
       // modos faltavam: com eles abertos, setas/Delete/F agiam no documento por baixo.
-      const anyModalOpen = setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
+      const anyModalOpen = resultsOpen || setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
@@ -2827,6 +2923,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         return;
       }
 
+      if (resultsOpen) return;
       if (shellView === 'home') {
         if (mod && k === '/') {
           e.preventDefault();
@@ -2877,12 +2974,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides.length, history, setupOpen, researchOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
     // hookLibrary em si só é lido pelo GenerateModal — não entra aqui.
     setHookLibrary, niche,
+    onOpenResults: () => setResultsOpen(true),
     slide, slides, activeIdx, brand, setBrand, updateSlide,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
@@ -2890,9 +2988,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
     openaiKey, hasOpenAI, setKeysOpen,
     setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
     material, setMaterial,
+    styleKit, setStyleKit,
+    onQuickGenerate: handleQuickGenerateFromNarrativa,
+    genBusy: !!genProgress,
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
     setLibraryOpen, libraryCount: library.length,
+    onNewProject: () => newDoc(null, 'Novo carrossel'),
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,
     openRefImagePicker,
@@ -4106,6 +4208,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
         mode={mode}
         onModeChange={setMode}
         creativePreset={creativePreset}
+        contentObjective={contentObjective}
+        resultsLibrary={library}
+        performanceSettings={performanceSettings}
         onCreativePresetChange={setCreativePreset}
         slideTextDensity={slideTextDensity}
         onSlideTextDensityChange={setSlideTextDensity}
@@ -4117,11 +4222,35 @@ Retorne APENAS JSON: ${refineAllWantsBody
         setMaterial={setMaterial}
         hookLibrary={hookLibrary}
       />
+      {resultsOpen && <PublicationResultsModal
+        key={activeEntry.id}
+        doc={doc}
+        library={library}
+        projectId={activeEntry.id}
+        settings={performanceSettings}
+        onSettingsChange={patch => setLibrary(prev => prev.map(entry => entry.id === activeEntry.id
+          ? { ...entry, performanceSettings: { ...performanceSettings, ...patch } } : entry))}
+        onSave={(projectId, record) => {
+          const next = savePublicationResult(library, projectId, record);
+          setLibrary(next.map(entry => entry.id === activeEntry.id && !performanceSettings.account
+            ? { ...entry, performanceSettings: { ...performanceSettings, account: record.account } } : entry));
+        }}
+        onRemove={id => setLibrary(prev => removePublicationResult(prev, id))}
+        onClose={() => setResultsOpen(false)}
+      />}
       <ResearchPanel
         open={researchOpen}
         onClose={()=>setResearchOpen(false)}
         onSetNiche={setNiche}
-        onUseIdea={text=>{setResearchOpen(false);setPrefilledTopic(text);setSetupOpen(true);}}
+        onUseIdea={(text, researchMaterial) => {
+          if (researchMaterial) setMaterial(m => ({
+            ...m,
+            content: [m.content, researchMaterial.content].filter(Boolean).join('\n\n'),
+            sources: [m.sources, researchMaterial.sources].filter(Boolean).join('\n'),
+          }));
+          setResearchOpen(false); setPrefilledTopic(text); setSetupOpen(true);
+        }}
+        contentObjective={contentObjective}
         narrativeMode={mode}
         creativePreset={creativePreset}
         openaiKey={openaiKey}
@@ -4135,9 +4264,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={hookVarsOpen}
         onClose={()=>setHookVarsOpen(false)}
         slide={slide}
+        slides={slides}
+        contentObjective={contentObjective}
         niche={niche}
         brand={brand}
         material={material}
+        styleKit={styleKit}
         openaiKey={openaiKey}
         narrativeMode={mode}
         creativePreset={creativePreset}
@@ -4255,7 +4387,4 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
 // ─── LIBRARY MODAL ────────────────────────────────────────────────────────────
 // Lista os carrosséis salvos com mini-thumbnail, nome editável, status e ações.
-
-
-
 

@@ -13,6 +13,8 @@ import { normalizeMaterialField, materialHasUserInput } from '../utils/generatio
 import { effectiveBodyFontFamily, LAYOUTS, normalizePhotoRegion, normalizeSlideImgMode, slideStoredPresentationCssFilter, vcHandleAvatarImgStyle } from './card/SlideCardInner.jsx';
 import { DEFAULT_PRESENTATION_IMG_ADJUST, presentationAdjustIsNeutral, presentationImgAdjustEquivalent } from './card/FullscreenViewer.jsx';
 import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
+import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
+import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
 import { ExportMoreFormats } from './panels/ExportMoreFormats.jsx';
 import { RefineBtn } from './ui/editor-chrome.jsx';
 import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch } from '../utils/card-elements.js';
@@ -26,6 +28,9 @@ import { normalizeDestaqueSpansForLen, remapDestaqueSpansOnEdit } from '../utils
 import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { generateDALLE } from '../utils/ai-client.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
+import { styleKitHasContent } from '../utils/style-kit.js';
+import { composeImgExtraPrompt } from '../utils/style-kit.js';
+import { resolveImageReferences } from '../utils/style-kit-storage.js';
 
 function guessFontFileFormat(file) {
   const n = (file?.name || '').toLowerCase();
@@ -144,10 +149,14 @@ function SidebarContent({
   openaiKey, hasOpenAI=false, setKeysOpen,
   setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
   material = { content:'', sources:'', context:'' }, setMaterial = () => {},
+  styleKit = { stylePrompt: '', contextMd: '', refImages: [] }, setStyleKit = () => {},
+  onQuickGenerate = null,
+  genBusy = false,
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
   setLibraryOpen = () => {}, libraryCount = 0,
+  onNewProject = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
@@ -176,8 +185,19 @@ function SidebarContent({
   appMode = 'criador',
   setActiveIdx = () => {},
   activeEntry = null,
+  onOpenResults = () => {},
 }) {
+  const imageTargetRef = useRef(null);
+  imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
   const [dalleLoading, setDalleLoading] = React.useState(false);
+  /** Accordion da aba Narrativa: context | prompt | card | null */
+  const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
+  const [quickPrompt, setQuickPrompt] = React.useState('');
+  // Prompt rápido é por sessão/projeto — limpa ao trocar de carrossel.
+  React.useLayoutEffect(() => {
+    setQuickPrompt('');
+    setNarrativaPanel('prompt');
+  }, [activeEntry?.id]);
 
   /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
   const BarraTamanho = ({ campo, rotulo, padrao = 100 }) => {
@@ -222,16 +242,18 @@ function SidebarContent({
 
   const applyDalleQuery = async (q) => {
     if (!hasOpenAI) { toast?.('Para gerar imagens, confirme o seu plano ou a sua chave em Configurar IA.', 'error'); return; }
-    updateSlide({ imageQuery: q, imgMode: 'dalle', bgImage: null, overlay: 70 });
+    const target = imageTargetRef.current;
+    updateSlide({ imageQuery: q, imgMode: 'dalle' });
     setDalleLoading(true);
     try {
       const url = await generateDALLE(q, openaiKey, imgParams, {
-        refImage: slide.refImage,
-        imgExtraPrompt: slide.imgExtraPrompt,
+        refImages: await resolveImageReferences(styleKit, slide.refImage),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, slide.imgExtraPrompt),
       });
       // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
       const patch = await guardarImagemDoSlide(url);
-      updateSlide({ ...patch, bgImageSource: 'ai' });
+      if (imageTargetRef.current.projectId !== target.projectId || imageTargetRef.current.slideId !== target.slideId) return;
+      updateSlide({ ...patch, overlay: 70, bgImageSource: 'ai' });
     } catch(e) { toast?.('GPT Image 2: '+e.message, 'error'); }
     finally { setDalleLoading(false); }
   };
@@ -454,6 +476,48 @@ function SidebarContent({
 
       {/* Scrollable body */}
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:20, paddingBottom:24 }}>
+
+        {tab === 'narrativa' && (
+          <NarrativaStudioPanels
+            key={activeEntry?.id}
+            panel={narrativaPanel}
+            setPanel={setNarrativaPanel}
+            styleKit={styleKit}
+            setStyleKit={setStyleKit}
+            toast={toast}
+            projectName={activeEntry?.name}
+            onOpenProjects={() => setLibraryOpen(true)}
+            onNewProject={onNewProject}
+            quickPrompt={quickPrompt}
+            setQuickPrompt={setQuickPrompt}
+            onQuickGenerate={async (text) => {
+              await onQuickGenerate?.(text);
+              setNarrativaPanel('card');
+            }}
+            genBusy={genBusy}
+            activeIdx={activeIdx}
+            slidesCount={slides.length}
+            materialSummary={(() => {
+              const { c, s, x } = (() => {
+                try {
+                  return {
+                    c: normalizeMaterialField(material.content),
+                    s: normalizeMaterialField(material.sources),
+                    x: normalizeMaterialField(material.context),
+                  };
+                } catch {
+                  return { c: '', s: '', x: '' };
+                }
+              })();
+              const bits = [
+                c ? `base ${c.length.toLocaleString('pt-BR')}` : null,
+                s ? 'fontes' : null,
+                x ? 'contexto' : null,
+              ].filter(Boolean);
+              return bits.length ? bits.join(' · ') : 'Vazio — cola texto, fontes ou regras';
+            })()}
+          />
+        )}
 
         {/* FASE 1 Narrative OS: split Cards em Imagem + Layout + (Tipografia
             em Visual + Texto card em Narrativa). Outer condition cobre os 4
@@ -689,7 +753,7 @@ function SidebarContent({
               </S>
             ) : null}
 
-            {(tab==='narrativa'||tab==='slide') && (<S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
+            {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (<S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
               <div>
                 <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                   <span>Título</span>
@@ -832,16 +896,17 @@ function SidebarContent({
                 style={{
                   width:'100%', minHeight:36, borderRadius:9999, cursor: refining ? 'not-allowed' : 'pointer',
                   border:'1px solid var(--accent)', background:'var(--bg-pearl)', color:'var(--accent)',
-                  fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
+                  fontSize:12,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   opacity: refining ? 0.5 : 1,
                   transition:'transform 0.1s var(--ease-smooth)',
+                  ...BTN_CAPS,
                 }}
               >
                 <Highlighter size={15} aria-hidden />
                 Marcar Destaque
               </button>
-              <RefineBtn onRefine={refineSlide} busy={refining}/>
+              <RefineBtn onRefine={refineSlide} busy={refining} label="Refinar com IA"/>
               <button
                 onClick={()=>setHookVarsOpen(true)}
                 disabled={refining}
@@ -849,8 +914,9 @@ function SidebarContent({
                 style={{
                   width:'100%', height:36, borderRadius:8, cursor:'pointer',
                   background:'var(--bg-card)', border:'1px solid var(--border)',
-                  color:'var(--text-secondary)', fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)',
+                  color:'var(--text-secondary)', fontSize:11,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.12s',
+                  ...BTN_CAPS,
                 }}
                 onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
                 onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
@@ -859,7 +925,7 @@ function SidebarContent({
               </button>
             </S>)}
 
-            {(tab==='narrativa'||tab==='slide') && (
+            {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (
               <S
                 title="Textos de assinatura deste card"
                 hint="Vêm preenchidos pelos padrões visuais (Bold Promo, Case Study…). São por card — deixe vazio para esconder."
@@ -1681,13 +1747,12 @@ function SidebarContent({
         {tab==='visual' && (
           <>
             <div style={{
-              padding:'4px 0 8px',
-              fontSize:13, color:'var(--text-secondary)',
-              fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', lineHeight:1.5,
+              padding: '4px 0 4px',
+              fontSize: 13, color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em', lineHeight: 1.5,
             }}>
-              <strong style={{ color:'var(--text-primary)' }}>Escolha um padrão visual.</strong>
-              {' '}Paleta, fontes e tipografia mudam de uma vez.
-              Cada estilo tem uma assinatura própria (header bar, pill, ornaments…).
+              <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Escolha um padrão visual.</strong>
+              {' '}Paleta, fontes e tipografia mudam de uma vez — cada estilo tem assinatura própria.
             </div>
             <VisualStylePicker
               value={visualPreset}
@@ -2747,9 +2812,8 @@ function SidebarContent({
           </>
         )}
 
-        {/* Conteúdo base agora vive dentro de Narrativa (FASE 1 merge) —
-            matéria-prima da IA pertence ao domínio narrativo. */}
-        {tab==='narrativa' && (
+        {/* Conteúdo base — painel ADD CONTEÚDO */}
+        {tab==='narrativa' && narrativaPanel==='material' && (
           <>
             <S
               title="Conteúdo base"
@@ -2814,11 +2878,11 @@ function SidebarContent({
                 style={{
                   width:'100%', height:44, borderRadius:9999, cursor:'pointer',
                   background:'var(--accent)', border:'none',
-                  color:'#fff', fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
-                  letterSpacing:'-0.011em',
+                  color:'#fff', fontSize:12,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   whiteSpace:'nowrap',
                   transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                  ...BTN_CAPS,
                 }}
               >
                 <Sparkles size={14}/>Gerar com este material
@@ -2830,11 +2894,11 @@ function SidebarContent({
                   alignSelf:'center', minHeight:32, padding:'4px 12px',
                   cursor: !materialHasUserInput(material) ? 'not-allowed' : 'pointer',
                   border:'none', background:'transparent',
-                  color:'var(--text-muted)', fontSize:11, fontFamily:'var(--font-ui)',
-                  letterSpacing:'-0.005em',
+                  color:'var(--text-muted)', fontSize:11,
                   display:'inline-flex', alignItems:'center', gap:5,
                   opacity: !materialHasUserInput(material) ? 0.4 : 1,
                   transition:'color 0.12s',
+                  ...BTN_CAPS,
                 }}
               >
                 <Trash2 size={11}/>Limpar tudo
@@ -2878,8 +2942,23 @@ function SidebarContent({
                 {slides.length} card{slides.length === 1 ? '' : 's'} ·
                 {' '}{slides.filter(s => s.bgImage).length} com imagem ·
                 {' '}{slides.filter(s => (s.title || '').trim()).length} com título
+                {styleKitHasContent(styleKit) ? ' · contexto definido' : ''}
               </div>
             </div>
+
+            <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenResults} style={{ width: '100%' }}>
+              Resultados das publicações
+            </button>
+
+            <ProjectStyleKitPanel
+              key={activeEntry?.id}
+              styleKit={styleKit}
+              setStyleKit={setStyleKit}
+              toast={toast}
+              projectName={activeEntry?.name}
+              onOpenProjects={() => setLibraryOpen(true)}
+              onNewProject={onNewProject}
+            />
 
             {/* Fluxo narrativo — mini-thumbs vertical */}
             <S title="Fluxo da narrativa" hint="Sequência dos cards e progressão. Clique pra editar.">
@@ -2976,18 +3055,17 @@ function SidebarContent({
           </>
         )}
 
-        {/* Narrativa (FASE 1): IA + Conteúdo gradual. Por enquanto só os
-            controles que estavam na aba IA (gerar/refinar/legenda/tom). */}
-        {tab==='narrativa' && (
+        {/* Narrativa: gerar/refinar/legenda — no painel EDITAR CARD. */}
+        {tab==='narrativa' && narrativaPanel==='card' && (
           <>
             <S title="Gerar conteúdo">
               <button onClick={()=>setSetupOpen(true)} style={{
                 width:'100%', height:44, borderRadius:9999, border:'none', cursor:'pointer',
                 background:'var(--accent)',
-                color:'#fff', fontSize:14, fontWeight:400, fontFamily:'var(--font-ui)',
-                letterSpacing:'-0.016em',
+                color:'#fff', fontSize:12,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                 transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                ...BTN_CAPS,
               }}
               onMouseEnter={e=>e.currentTarget.style.background='var(--accent-hover)'}
               onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
@@ -3000,8 +3078,9 @@ function SidebarContent({
                 <button onClick={()=>setTemplatesOpen?.(true)} style={{
                   height:38, borderRadius:8, cursor:'pointer',
                   background:'var(--bg-card)', border:'1px solid var(--border)',
-                  color:'var(--text-secondary)', fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)',
+                  color:'var(--text-secondary)', fontSize:11,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.12s',
+                  ...BTN_CAPS,
                 }}
                 onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
                 onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
@@ -3012,8 +3091,9 @@ function SidebarContent({
                 <button onClick={()=>setResearchOpen(true)} style={{
                   height:38, borderRadius:8, cursor:'pointer',
                   background:'var(--bg-card)', border:'1px solid var(--border)',
-                  color:'var(--text-secondary)', fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)',
+                  color:'var(--text-secondary)', fontSize:11,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.12s',
+                  ...BTN_CAPS,
                 }}
                 onMouseEnter={e=>{e.currentTarget.style.color='var(--text-primary)';e.currentTarget.style.borderColor='var(--accent)';}}
                 onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}

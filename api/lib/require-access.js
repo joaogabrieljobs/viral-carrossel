@@ -2,7 +2,7 @@
  * Gate de assinatura para endpoints caros (proxies IA, fetch-source).
  * Cookie HMAC válido + assinatura Stripe ativa (exceto BILLING_DISABLED em non-prod).
  */
-import { readAccessCookie, billingDisabled } from './access.js';
+import { readCurrentAccessCookie, billingDisabled } from './access.js';
 import { findActiveSubscription } from './stripe.js';
 
 /**
@@ -26,7 +26,12 @@ export async function requireActiveSubscription(req, res, opts = {}) {
     return { billingDisabled: true };
   }
 
-  const access = readAccessCookie(req);
+  let access;
+  try { access = await readCurrentAccessCookie(req); }
+  catch {
+    fail(503, 'Não foi possível verificar sua sessão. Tente novamente.');
+    return null;
+  }
   if (!access?.customerId) {
     fail(
       401,

@@ -82,18 +82,18 @@ const lsSet = (key, value) => {
       err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
     );
     if (isQuota) {
-      // Tenta salvar uma versão compacta: remove bgImage (base64) de todos os slides
+      // Compacta apenas imagens que já têm cópia persistida; nunca apaga a única cópia.
       try {
         const slim = JSON.parse(JSON.stringify(value));
         if (key === 'vc_library' && Array.isArray(slim)) {
           slim.forEach(entry => {
-            (entry.doc?.slides || []).forEach(s => { delete s.bgImage; });
+            (entry.doc?.slides || []).forEach(s => { if (s.bgImageId) delete s.bgImage; });
           });
           localStorage.setItem(key, JSON.stringify(slim));
           if (!VC_QUOTA_SLIM_ALREADY_NOTIFIED) {
             VC_QUOTA_SLIM_ALREADY_NOTIFIED = true;
             window.dispatchEvent(new CustomEvent('vc:quota-warning', {
-              detail: 'Limite de armazenamento quase atingido. Imagens de fundo foram omitidas do cache. Exporte seus projetos como JSON para não perder dados.',
+              detail: 'Limite de armazenamento quase atingido. Cópias de imagens já salvas foram removidas do cache. Exporte seus projetos como JSON para não perder dados.',
             }));
           }
           return true;

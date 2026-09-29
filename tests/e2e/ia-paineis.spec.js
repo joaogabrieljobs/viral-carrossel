@@ -91,6 +91,7 @@ test.describe('Painéis de IA', () => {
 
     // o botão vive na aba Narrativa da sidebar
     await page.getByRole('tab', { name: /narrativa/i }).first().click({ force: true });
+    await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
     await page.getByRole('button', { name: /gerar variações de gancho/i }).click({ force: true });
     // o modal dispara a geração sozinho ao abrir (não há botão de submit)
     await expect(page.getByText(/sobre recuperação/i)).toBeVisible({ timeout: 15_000 });

@@ -1,7 +1,7 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState } from 'react';
 import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'lucide-react';
-import { buildResearchPromptBias } from '../../utils/generation-prompts.js';
+import { buildResearchUserPrompt, normalizeResearchResult, researchIdeaMaterial } from '../../utils/research-prompts.js';
 import { callAI, callAIwithSearch } from '../../utils/ai-client.js';
 
 const PRESET_NICHES = [
@@ -10,7 +10,7 @@ const PRESET_NICHES = [
   'Carreira','Investimentos','Relacionamentos','Medicina estética','Direito',
 ];
 
-function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre', openaiKey = '' }) {
+function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre', contentObjective = 'auto', openaiKey = '' }) {
   const [niche, setNiche] = useState('');
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState(null);
@@ -19,42 +19,23 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
 
   if (!open) return null;
 
-  const buildResearchUserPrompt = () =>
-    `Atue como estrategista sênior de conteúdo, branding e cultura de mercado. Pesquise tendências REAIS e atuais na web.
-
-Nicho: "${niche}"
-${buildResearchPromptBias(narrativeMode, creativePreset)}
-ENTREGUE SOMENTE este JSON exato (sem texto extra, sem markdown):
-{
-  "trending_topics": [{"topic":"...","why":"por que isso está movimentando o mercado agora"}],
-  "viral_hooks": ["..."],
-  "carousel_ideas": [{"title":"...","angle":"..."}],
-  "warning": null
-}
-
-REGRAS:
-- viral_hooks: use estes formatos estratégicos — "X não está fazendo Y, está fazendo Z", "Não é sobre X. É sobre Y.", "Todo mundo viu X. Pouca gente entendeu Y.", "O mercado de X está deixando de ser sobre Y. Agora é sobre Z.", "O erro de X é achar que Y. Na prática, o jogo está em Z.", "Quando todo mundo começa a fazer X, o valor migra para Y.", "O próximo diferencial competitivo em X será Y." — Tom assertivo, sofisticado, sem clichês, sem motivacional.
-- carousel_ideas: siga os 7 tipos de post estratégico: decodificação de marca, de comportamento, de categoria, de campanha, de erro comum, de tendência, de mercado futuro. O campo "angle" deve revelar a tese contraintuitiva.
-- trending_topics: fatos REAIS com data recente.
-- Mínimo: 5 trending_topics, 7 viral_hooks, 5 carousel_ideas. Português BR.`;
+  const researchPrompt = hasWeb => buildResearchUserPrompt({ niche, narrativeMode, creativePreset, contentObjective, hasWeb });
 
   const run = async () => {
     if (!niche.trim()) { setErr('Informe o nicho'); return; }
     setBusy(true); setErr(''); setData(null); setDegraded(false);
     try {
-      const r = await callAIwithSearch(buildResearchUserPrompt(), { json: true });
-      setData(r);
+      const r = await callAIwithSearch(researchPrompt(true), { json: true });
+      setData(normalizeResearchResult(r, true));
       onSetNiche?.(niche);
     } catch (e1) {
+      setDegraded(true);
       try {
         const r = await callAI(
-          `${buildResearchUserPrompt()}
-
-CONTEXTO TÉCNICO — SEM WEB AO VIVO:
-Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de 2025” verificáveis. Em trending_topics, use ângulos plausíveis do nicho e deixe "why" como leitura estratégica (não como notícia datada). Preencha "warning" com uma frase curta: resultado sem pesquisa web em tempo real.`,
+          researchPrompt(false),
           { json: true, openaiKey },
         );
-        setData(r);
+        setData(normalizeResearchResult(r, false));
         setDegraded(true);
         onSetNiche?.(niche);
       } catch (e2) {
@@ -82,7 +63,7 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
             </div>
             <div>
               <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Pesquisa de nicho</div>
-              <div className="vc-eyebrow">Pesquisa com IA + web ao vivo</div>
+              <div className="vc-eyebrow">Ideias e referências para seu conteúdo</div>
             </div>
           </div>
           <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
@@ -130,7 +111,7 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
               fontSize:12, color:'var(--text-secondary)', background:'var(--bg-pearl)', border:'1px solid var(--hairline)',
               borderRadius:11, padding:'10px 14px', letterSpacing:'-0.011em', lineHeight:1.45, fontFamily:'var(--font-ui)',
             }}>
-              Sem pesquisa web ao vivo nesta sessão — resultado via OpenAI (chave em ⚙). Trate tendências como leitura estratégica, não como notícias datadas.
+              Sem pesquisa web ao vivo nesta sessão. As sugestões são hipóteses editoriais para validar, não notícias atuais.
             </div>
           )}
 
@@ -139,7 +120,7 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
               <div style={{ position:'relative', width:40, height:40 }}>
                 <div style={{ width:40, height:40, borderRadius:'50%', border:'2px solid var(--border)', borderTopColor:'var(--accent-amber)', animation:'spin 1s linear infinite' }}/>
               </div>
-              <p style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'var(--font-ui)' }}>Pesquisando tendências na web…</p>
+              <p style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'var(--font-ui)' }}>{degraded ? 'Explorando ideias para o tema…' : 'Pesquisando fatos e referências…'}</p>
             </div>
           )}
 
@@ -158,9 +139,10 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     {data.carousel_ideas.map((idea,i)=>(
-                      <button key={i} className="idea-card" onClick={()=>onUseIdea(idea.title+(idea.angle?'. '+idea.angle:''))}>
+                      <button key={i} className="idea-card" onClick={()=>onUseIdea(idea.title+(idea.angle?'. '+idea.angle:''), researchIdeaMaterial(idea, data.trending_topics))}>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)', lineHeight:1.29, marginBottom:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.014em' }}>{idea.title}</div>
                         <div style={{ fontSize:11, color:'var(--text-secondary)', lineHeight:1.4, fontFamily:'var(--font-ui)' }}>{idea.angle}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6 }}>{idea.sourceIndexes.length ? 'Com referências da pesquisa' : 'Hipótese para validar'}</div>
                         <div style={{ marginTop:10, fontSize:13, color:'var(--accent)', fontWeight:600, letterSpacing:'-0.011em' }}>Usar  →</div>
                       </button>
                     ))}
@@ -191,13 +173,22 @@ Você não tem acesso à internet. Não invente datas, manchetes ou “estudo de
               {data.trending_topics?.length > 0 && (
                 <div>
                   <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                    <TrendingUp size={12} style={{color:'var(--accent-amber)'}}/>Trending agora
+                    <TrendingUp size={12} style={{color:'var(--accent-amber)'}}/>{degraded ? 'Assuntos para explorar' : 'Assuntos e fontes'}
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                     {data.trending_topics.map((t,i)=>(
                       <div key={i} style={{ background:'var(--bg-card)', borderRadius:8, padding:'10px 12px' }}>
                         <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)' }}>{t.topic}</div>
                         <div style={{ fontSize:11, color:'var(--text-secondary)', marginTop:3, lineHeight:1.4, fontFamily:'var(--font-ui)' }}>{t.why}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6 }}>
+                          {t.sources.length ? 'Fontes indicadas pela pesquisa:' : 'Hipótese — sem fonte datada.'}
+                          {t.eventDate && <span> Evento: {t.eventDate}.</span>}
+                          {t.sources.map(source => (
+                            <div key={source.url}>
+                              <a href={source.url} target="_blank" rel="noopener noreferrer">{source.name}</a> · {source.publishedAt}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>

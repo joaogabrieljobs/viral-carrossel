@@ -1,46 +1,55 @@
 /**
- * VisualStylePicker — grid 3×4 com 12 padrões visuais pra carrossel.
- *
- * Cada card mostra mini-preview SVG do padrão + nome + descrição curta.
- * Selecionado fica com borda accent + check no canto.
- *
- * Props:
- *   - value: id do preset ativo (string) ou null pra "nenhum/padrão"
- *   - onChange: (id) => void
- *   - presets: array de presets (VISUAL_PRESETS de visual-presets.js)
- *   - title: string opcional (default: 'Escolha o Padrão Visual do seu Carrossel')
+ * VisualStylePicker — grelha de padrões visuais do carrossel.
+ * Preview maior (proporção 4:5), tipografia legível, seleção limpa.
  */
 
 import React from 'react';
 import { Check } from 'lucide-react';
 import { renderPresetPreview } from '../styles/visual-presets.jsx';
 
+function paletteSwatches(preset) {
+  const b = preset?.brand || {};
+  return [b.bg, b.titleColor, b.accent].filter(Boolean).slice(0, 3);
+}
+
 export default function VisualStylePicker({
   value,
   onChange,
   presets,
-  title = 'Escolha o Padrão Visual do seu Carrossel',
+  title = 'Escolha o padrão visual',
   /** id do padrão que combina com o conteúdo atual (ponte template/IA → visual). */
   suggestedId = null,
 }) {
+  const selected = presets.find((p) => p.id === value) || null;
+
   return (
-    <div role="group" aria-label={title}>
-      {title && (
-        <label className="vc-label" style={{ marginBottom: 10 }}>
+    <div role="group" aria-label={title || 'Padrões visuais'}>
+      {title ? (
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          marginBottom: 12,
+        }}>
           {title}
-        </label>
-      )}
-      {/* Grid responsivo: 3 cols no desktop, 2 no mobile estreito */}
+        </div>
+      ) : null}
+
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
-          gap: 10,
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: 12,
         }}
       >
         {presets.map((p) => {
           const isActive = value === p.id;
           const isSuggested = !isActive && suggestedId === p.id;
+          const swatches = paletteSwatches(p);
+
           return (
             <button
               key={p.id}
@@ -52,95 +61,168 @@ export default function VisualStylePicker({
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                gap: 6,
-                padding: 8,
-                borderRadius: 11,
+                alignItems: 'stretch',
+                gap: 0,
+                padding: 0,
+                borderRadius: 12,
                 cursor: 'pointer',
-                background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
-                border: `1.5px solid ${isActive ? 'var(--accent)' : isSuggested ? 'var(--text-muted)' : 'var(--hairline)'}`,
-                transition: 'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
-                textAlign: 'center',
+                overflow: 'hidden',
+                background: 'var(--bg-base)',
+                border: `1px solid ${isActive ? 'var(--text-primary)' : isSuggested ? 'var(--text-muted)' : 'var(--hairline)'}`,
+                boxShadow: isActive ? 'inset 0 0 0 1px var(--text-primary)' : 'none',
+                transition: 'border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth), box-shadow 0.15s',
+                textAlign: 'left',
                 fontFamily: 'var(--font-ui)',
               }}
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.borderColor = 'var(--text-muted)';
               }}
               onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.borderColor = 'var(--hairline)';
+                e.currentTarget.style.transform = 'scale(1)';
+                if (!isActive) {
+                  e.currentTarget.style.borderColor = isSuggested
+                    ? 'var(--text-muted)'
+                    : 'var(--hairline)';
+                }
               }}
-              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.98)'; }}
               onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
             >
-              {/* Check no canto quando selecionado */}
+              {isSuggested && (
+                <span style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: 8,
+                  zIndex: 2,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '3px 7px',
+                  borderRadius: 9999,
+                  background: 'var(--text-primary)',
+                  color: 'var(--accent-on-dark, #fff)',
+                }}>
+                  Combina
+                </span>
+              )}
+
               {isActive && (
                 <span
                   aria-hidden
                   style={{
-                    position: 'absolute', top: 4, right: 4,
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: 'var(--accent)', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    zIndex: 2,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 9999,
+                    background: 'var(--text-primary)',
+                    color: 'var(--accent-on-dark, #fff)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Check size={11} strokeWidth={3} />
+                  <Check size={12} strokeWidth={2.75} />
                 </span>
               )}
-              {/* Chip discreto: este padrão veste o arco/pacote criativo atual.
-                  Some quando o padrão está selecionado (o check já comunica). */}
-              {isSuggested && (
-                <span style={{
-                  position: 'absolute', top: -7, left: '50%', transform: 'translateX(-50%)',
-                  fontSize: 8.5, fontWeight: 700, letterSpacing: '0.04em',
-                  padding: '2px 7px', borderRadius: 999, whiteSpace: 'nowrap',
-                  background: 'var(--accent)', color: '#fff',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-                }}>COMBINA</span>
-              )}
-              {/* Mini-preview SVG — gerado a partir dos campos do preset
-                  (header bar, badge, star, eyebrow, título, subtítulo, pill,
-                  footer bar, strikethrough) com fidelidade ao card real. */}
-              <div style={{ width: 60, height: 75, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.1)', borderRadius: 6 }}>
-                {renderPresetPreview(p)}
+
+              <div style={{
+                width: '100%',
+                aspectRatio: '4 / 5',
+                background: 'var(--bg-parchment)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 10,
+                boxSizing: 'border-box',
+              }}>
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: 92,
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                }}>
+                  {renderPresetPreview(p, { width: '100%', height: '100%' })}
+                </div>
               </div>
-              {/* Nome do preset */}
-              <div
-                style={{
-                  fontSize: 10,
+
+              <div style={{
+                padding: '10px 10px 12px',
+                borderTop: '1px solid var(--hairline)',
+                background: isActive ? 'var(--accent-surface)' : 'var(--bg-base)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}>
+                <div style={{
+                  fontSize: 12,
                   fontWeight: 600,
-                  color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  letterSpacing: '-0.005em',
-                  lineHeight: 1.2,
-                  minHeight: 24,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center',
-                }}
-              >
-                {p.label}
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.011em',
+                  lineHeight: 1.25,
+                }}>
+                  {p.label}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {swatches.map((c, i) => (
+                    <span
+                      key={`${p.id}-sw-${i}`}
+                      aria-hidden
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 9999,
+                        background: c,
+                        border: '1px solid rgba(0,0,0,0.12)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             </button>
           );
         })}
       </div>
-      {/* Descrição do selecionado */}
-      {value && (
+
+      {selected ? (
         <div
           aria-live="polite"
           style={{
-            marginTop: 10,
-            fontSize: 11,
-            color: 'var(--text-muted)',
-            fontFamily: 'var(--font-ui)',
-            lineHeight: 1.5,
-            letterSpacing: '-0.005em',
+            marginTop: 14,
+            padding: '12px 14px',
+            borderRadius: 12,
+            border: '1px solid var(--hairline)',
+            background: 'var(--bg-parchment)',
           }}
         >
-          {presets.find((p) => p.id === value)?.desc}
+          <div style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.011em',
+            marginBottom: 4,
+            fontFamily: 'var(--font-ui)',
+          }}>
+            {selected.label}
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-ui)',
+            lineHeight: 1.45,
+            letterSpacing: '-0.005em',
+          }}>
+            {selected.desc}
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { hydrateBrandTextColors } from './brand-helpers.js';
 import { FORMATS } from './formats.js';
 import { clampTitleWeight } from './slide-design-system.js';
 import { GEN_MODES, CREATIVE_PRESETS, SLIDE_TEXT_DENSITY_BY_ID } from './generation-prompts.js';
+import { normalizeContentObjective } from './editorial-strategy.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
+import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
 
 /** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
 const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
@@ -197,11 +199,19 @@ const DEFAULT_DOC = {
     irreverence: 50,  // 0=sério/sóbrio · 100=irreverente/cheeky
     objectivity: 50,  // 0=atmosférico/abstrato · 100=documentário/factual
   },
+  /**
+   * Pacote de estilo + brief do projeto:
+   * - stylePrompt: bíblia visual (composição, tipografia, luz, mood)
+   * - contextMd: ficheiro tipo CLAUDE.md com conhecimento do assunto
+   * - refImages: moodboard (data URLs) para gerações de imagem
+   */
+  styleKit: { ...DEFAULT_STYLE_KIT },
   // Modo narrativo padrão. Persistido entre sessões pra que o usuário
   // não precise reescolher toda vez. Um dos GEN_MODES.id.
   mode: 'editorial',
   // Pacote criativo da IA — default personalizado (id interno `livre`) ou Tendência/Cultura.
   creativePreset: 'livre',
+  contentObjective: 'auto',
   /** Volume de texto alvo nos cards ao gerar/refinar — 1/1 … 1/5 (fracionado). */
   slideTextDensity: '1_1',
   /** Região da foto por defeito nos slides gerados / novos (`photoRegion`). */
@@ -250,6 +260,7 @@ function ensureDocShape(d) {
     brand: hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(migrated.brand && typeof migrated.brand === 'object' ? migrated.brand : {}) }),
     material: { ...DEFAULT_DOC.material, ...(migrated.material && typeof migrated.material === 'object' ? migrated.material : {}) },
     imgParams: { ...DEFAULT_DOC.imgParams, ...(migrated.imgParams && typeof migrated.imgParams === 'object' ? migrated.imgParams : {}) },
+    styleKit: normalizeStyleKit(migrated.styleKit),
   };
   out.material.sources = scrubStaleMaterialSources(
     typeof out.material.sources === 'string' ? out.material.sources : ''
@@ -268,6 +279,7 @@ function ensureDocShape(d) {
   if (out.creativePreset == null) out.creativePreset = 'livre';
   if (out.creativePreset === 'estudio_editorial') out.creativePreset = 'tendencia_cultura';
   if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';
+  out.contentObjective = normalizeContentObjective(out.contentObjective);
   if (out.slideTextDensity == null) out.slideTextDensity = '1_1';
   if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';
   if (out.cardVisualStyle == null) out.cardVisualStyle = 'full';

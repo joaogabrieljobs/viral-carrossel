@@ -11,7 +11,7 @@ import logoutHandler from '../../api/auth/logout.js';
 import googleStartHandler from '../../api/auth/google.js';
 import googleCallbackHandler from '../../api/auth/google/callback.js';
 
-const APP = 'https://viral-carrossel.vercel.app';
+const APP = 'https://viralcarrossel.com.br';
 const cookieFor = (customerId, email) =>
   `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email }))}`;
 

@@ -20,7 +20,7 @@ const eventBody = (type = 'checkout.session.completed') =>
   });
 
 const request = (body, headers = {}) =>
-  new Request('https://viral-carrossel.vercel.app/api/stripe/webhook', {
+  new Request('https://viralcarrossel.com.br/api/stripe/webhook', {
     method: 'POST',
     body,
     headers,
@@ -58,7 +58,7 @@ describe('POST /api/stripe/webhook (RF-09)', () => {
 
   it('GET → 405', async () => {
     const res = await webhookHandler(
-      new Request('https://viral-carrossel.vercel.app/api/stripe/webhook', { method: 'GET' }),
+      new Request('https://viralcarrossel.com.br/api/stripe/webhook', { method: 'GET' }),
     );
     expect(res.status).toBe(405);
   });

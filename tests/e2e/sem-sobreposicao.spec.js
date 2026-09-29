@@ -65,8 +65,9 @@ test.describe('Nenhum elemento do card se sobrepõe a outro', () => {
 
     const escreve = async (txt) => {
       await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });
-      await page.waitForTimeout(300);
-      await page.locator('textarea').first().fill(txt);
+      const editor = page.getByRole('button', { name: /EDITAR CARD/i }).first();
+      if (await editor.getAttribute('aria-expanded') !== 'true') await editor.click();
+      await page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]').fill(txt);
       await page.waitForTimeout(1000);
     };
     await escreve('Depois.');

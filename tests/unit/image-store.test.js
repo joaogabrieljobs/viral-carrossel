@@ -52,3 +52,7 @@ describe('utilitários', () => {
     expect(a).not.toBe(b);
   });
 });
+
+it('protege moodboards de todos os projetos da limpeza de órfãs', () => {
+  expect(idsDeImagemEmUso([{ doc: { slides: [{ bgImageId: 'a' }], styleKit: { refImages: [{ imageId: 'b' }, { imageId: 'a' }] } } }]).sort()).toEqual(['a', 'b']);
+});

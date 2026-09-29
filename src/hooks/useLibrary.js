@@ -11,6 +11,7 @@ import { migrateDoc } from '../utils/schema-migration.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { downloadBlob } from '../utils/export-helpers.js';
 import { imagemComoDataUrl, guardarImagemDoSlide } from '../utils/image-store.js';
+import { exportProjectReferences, migrateProjectReferences } from '../utils/style-kit-storage.js';
 import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
 import { SK } from '../utils/storage.js';
@@ -22,6 +23,16 @@ export function useLibrary({
   history, slides, brand, brandRoster, activeBrandId,
   setLibraryOpen, toast, setError,
 }) {
+  // Snapshot imediato: trocar/exportar não depende do debounce de autosave.
+  const live = useRef(null);
+  live.current = { id: activeDocId || library[0]?.id, doc: history.state };
+  const snapshotEntries = useCallback((entries, snapshot = live.current) => entries.map(entry =>
+    entry.id === snapshot.id ? { ...entry, doc: snapshot.doc, updatedAt: Date.now() } : entry
+  ), []);
+  const flushCurrent = useCallback(() => {
+    const snapshot = live.current;
+    setLibrary(entries => snapshotEntries(entries, snapshot));
+  }, [setLibrary, snapshotEntries]);
   // ── BIBLIOTECA: handlers ────────────────────────────────────────────────────
   const renameDoc = useCallback((docId, newName) => {
     setLibrary(prev => prev.map(e => e.id === docId ? { ...e, name: newName, updatedAt: Date.now() } : e));
@@ -35,6 +46,7 @@ export function useLibrary({
   }, [shellView]);
 
   const openDoc = useCallback((docId) => {
+    flushCurrent();
     setActiveDocId(docId);
     setLibraryOpen(false);
     setShellView('project');
@@ -44,26 +56,34 @@ export function useLibrary({
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
     const hydratedBrand = hydrateBrandTextColors({ ...activeBrand });
     const seeded = seedDoc || {};
+    // Projeto novo = contexto próprio vazio (não herda styleKit de outro projeto).
+    // Se seedDoc trouxer styleKit (ex.: template), respeita; senão começa limpo.
     const baseDoc = {
       ...DEFAULT_DOC,
       ...seeded,
       brand: hydratedBrand,
+      styleKit: seeded.styleKit
+        ? seeded.styleKit
+        : { stylePrompt: '', contextMd: '', refImages: [] },
       slides: Array.isArray(seeded.slides) && seeded.slides.length
         ? seeded.slides
         : [mkSlide(1, hydratedBrand)],
     };
     const entry = mkLibEntry(baseDoc, name);
-    setLibrary(prev => [entry, ...prev]);
+    const snapshot = live.current;
+    setLibrary(prev => [entry, ...snapshotEntries(prev, snapshot)]);
     setActiveDocId(entry.id);
     setLibraryOpen(false);
     setShellView('project');
   }, [brandRoster, activeBrandId]);
   const duplicateDoc = useCallback((docId) => {
+    const snapshot = live.current;
     setLibrary(prev => {
-      const src = prev.find(e => e.id === docId);
+      const currentEntries = snapshotEntries(prev, snapshot);
+      const src = currentEntries.find(e => e.id === docId);
       if (!src) return prev;
       const copy = mkLibEntry(JSON.parse(JSON.stringify(src.doc)), `${src.name} (cópia)`);
-      return [copy, ...prev];
+      return [copy, ...currentEntries];
     });
   }, []);
   const deleteDoc = useCallback((docId) => {
@@ -99,14 +119,16 @@ export function useLibrary({
           return dataUrl ? { ...sl, bgImage: dataUrl } : sl;
         } catch { return sl; }
       }));
-      return { ...entry, doc: { ...entry.doc, slides: novos } };
+      return { ...entry, doc: { ...entry.doc, slides: novos, styleKit: await exportProjectReferences(entry.doc.styleKit) } };
     }),
   ), []);
 
   const exportDoc = useCallback(async (docId) => {
-    const entry = library.find(e => e.id === docId);
+    const entry = snapshotEntries(library).find(e => e.id === docId);
     if (!entry) return;
-    const [comImagens] = await comImagensEmbutidas([entry]);
+    let comImagens;
+    try { [comImagens] = await comImagensEmbutidas([entry]); }
+    catch (err) { toast(err.message, 'error'); return; }
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [comImagens] }, null, 2)], { type: 'application/json' });
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
     await downloadBlob(blob, fname);
@@ -116,7 +138,9 @@ export function useLibrary({
 
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
-    const docs = await comImagensEmbutidas(library);
+    let docs;
+    try { docs = await comImagensEmbutidas(snapshotEntries(library)); }
+    catch (err) { toast(err.message, 'error'); return; }
     const blob = new Blob([JSON.stringify({ vcVersion: 1, docs }, null, 2)], { type: 'application/json' });
     const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
@@ -147,6 +171,7 @@ export function useLibrary({
         // IndexedDB agora, senão voltariam a pesar no localStorage e seriam
         // apagadas quando a quota enchesse.
         for (const entry of newEntries) {
+          if (entry.doc) entry.doc.styleKit = await migrateProjectReferences(entry.doc.styleKit);
           const slides = entry?.doc?.slides;
           if (!Array.isArray(slides)) continue;
           entry.doc = {

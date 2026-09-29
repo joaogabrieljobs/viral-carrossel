@@ -17,6 +17,8 @@
     "check:a11y": "node scripts/check-a11y.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.0",
+    "@vercel/functions": "^3.9.9",
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

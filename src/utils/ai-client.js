@@ -9,6 +9,7 @@ import { getServerStatus } from './server-status.js';
 import { extractJSON } from './parsers.js';
 import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
+import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 
 // Acima do orçamento do proxy (240 s em api/ai/compatible.js): se o cliente
 // abortasse primeiro, o utilizador perdia uma geração que o servidor ainda ia
@@ -89,7 +90,7 @@ function sessionGateError(status, data) {
   return e;
 }
 
-const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês.';
+const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês. Escreva com naturalidade brasileira, verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
 
 // Configuração selecionada no modal. Mantida em módulo para as funções de geração,
 // que vivem fora do componente React, lerem a preferência atual sem prop drilling.
@@ -413,29 +414,26 @@ async function blobFromSlideRef(refImage) {
 function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference = false, priorityFirst = false } = {}) {
   const safeTheme = (q || '').slice(0, 280);
   const axisTags = buildImgParamsTagsEN(imgParams);
-  const extra = (imgExtraPrompt || '').trim().slice(0, priorityFirst ? 1200 : 2000);
-  const refLead = withReference
-    ? 'REFERENCE IMAGE IS ATTACHED: Preserve brand/product identity — palette, materials, proportions, packaging style, typography mood. Produce a NEW editorial photograph suitable as a carousel slide background with generous negative space for headline/body text; reinterpret in a fresh scene aligned with the theme — do not output a flat crop of the reference alone.\n\n'
-    : '';
+  const extra = (imgExtraPrompt || '').trim().slice(0, 3000);
+  if (extra || withReference) {
+    return `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
+      (withReference ? 'REFERENCE IMAGES ARE ATTACHED: use them as a moodboard for composition, light and visual language. Do not copy faces, characters, lettering or logos unless explicitly requested.\n' : '') +
+      (extra ? `BRAND / CLIENT DIRECTION (takes precedence over generic defaults):\n${extra}\n\n` : 'Match the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.\n\n') +
+      'Create the visual language requested above, including illustration, 3D, collage or photography when specified. Keep natural subject colors unless directed otherwise. Reserve readable space for editable type. HARD RULES: no text, no captions, no watermarks, no logos inside the image.';
+  }
   if (priorityFirst) {
     // Caminho SJinn corta a 4000 chars: o que importa (tema, marca, regras duras) vai à frente
     // e o art-direction longo fica no fim, onde um corte custa menos (auditoria H8).
     let head =
       `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
-      refLead +
-      (extra ? `BRAND / CLIENT DIRECTION (priority — incorporate faithfully):\n${extra}\n\n` : '') +
       'HARD RULES: photorealistic real-photograph rendering; generous text-friendly negative space; strictly no text, no captions, no watermarks, no logos inside the image.\n\n' +
       'ART DIRECTION (follow as far as it fits the theme):\n';
     return head + GPT_IMAGE_ART_DIRECTION;
   }
   let body =
     `${GPT_IMAGE_ART_DIRECTION}\n\n` +
-    refLead +
     `THEME OF THIS CARD: ${safeTheme}` +
     `${axisTags}`;
-  if (extra) {
-    body += `\n\nBRAND / CLIENT DIRECTION (priority — incorporate faithfully):\n${extra}`;
-  }
   body += `\n\nNow create the image following all the directions above. Use photorealistic real-photograph rendering.`;
   return body;
 }
@@ -509,6 +507,7 @@ function getOpenAIImageOrder() {
 
 /** Geração com uma ou mais imagens de referência (API edits — multipart). */
 async function generateDALLEEdits(refBlob, prompt, apiKey) {
+  const referenceBlobs = Array.isArray(refBlob) ? refBlob : [refBlob];
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
   const headers = {};
   if (IS_LOCAL_DEV) {
@@ -517,7 +516,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const order = getOpenAIImageOrder();
+  const order = getOpenAIImageOrder().filter(model => model.name !== 'dall-e-3');
 
   let lastErr = null;
   for (const model of order) {
@@ -529,11 +528,10 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
     fd.append('quality', model.quality);
     if (model.style) fd.append('style', model.style);
     if (model.responseFormat) fd.append('response_format', 'b64_json');
-    const ext =
-      (refBlob.type && refBlob.type.includes('jpeg')) || (refBlob.type && refBlob.type.includes('jpg'))
-        ? 'jpg'
-        : 'png';
-    fd.append('image[]', refBlob, `reference.${ext}`);
+    referenceBlobs.slice(0, 4).forEach((blob, index) => {
+      const ext = /jpe?g/.test(blob.type) ? 'jpg' : 'png';
+      fd.append('image[]', blob, `reference-${index + 1}.${ext}`);
+    });
 
     try {
       let res;
@@ -578,10 +576,8 @@ async function generateDALLEEdits(refBlob, prompt, apiKey) {
 
 const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
   const { imgExtraPrompt } = options || {};
-  if (options?.refImage) {
-    console.warn('[img] Referência ignorada no modo plano (requer URL pública).');
-  }
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, priorityFirst: true });
+  const refs = await prepareImageReferencesForUpload(options.refImages || (options.refImage ? [options.refImage] : []));
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: refs.length > 0, priorityFirst: true });
   let res;
   try {
     res = await fetch('/api/ai/sjinn-image', {
@@ -592,6 +588,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
         prompt: prompt.slice(0, 4000),
         aspectRatio: '2:3',
         resolution: '1K',
+        imageList: refs,
       }),
     });
   } catch (e) {
@@ -626,25 +623,23 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
  */
 const generateDALLE = async (q, apiKey, imgParams = null, options = {}) => {
   const { refImage, imgExtraPrompt } = options || {};
+  const refs = options.refImages || (refImage ? [refImage] : []);
 
   if (!_aiRuntimeSettings.useOwnImageKey) {
     return generatePlatformSjinnImage(q, imgParams, options);
   }
 
   if (_aiRuntimeSettings.imageProvider === 'zai') {
+    if (refs.length) throw Object.assign(new Error('Este gerador não aceita referências. Selecione OpenAI com chave própria para usar o moodboard.'), { code: 'reference_unsupported' });
     return generateZaiImage(q, imgParams, imgExtraPrompt);
   }
   apiKey = getProviderKey('openai') || apiKey;
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
 
-  if (refImage) {
-    try {
-      const blob = await blobFromSlideRef(refImage);
-      const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: true });
-      return await generateDALLEEdits(blob, promptRef, apiKey);
-    } catch (e) {
-      console.warn('[GPT Image] Referência indisponível, gerando só com texto:', e.message);
-    }
+  if (refs.length) {
+    const blobs = await Promise.all(refs.slice(0, 4).map(blobFromSlideRef));
+    const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: true });
+    return generateDALLEEdits(blobs, promptRef, apiKey);
   }
 
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });

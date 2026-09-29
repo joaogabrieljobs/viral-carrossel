@@ -10,7 +10,7 @@ import { createAccessToken, billingDisabled, COOKIE_NAME } from '../../api/lib/a
 import sessionHandler from '../../api/auth/session.js';
 import anthropicProxy from '../../api/anthropic/v1/messages.js';
 
-const APP = 'https://viral-carrossel.vercel.app';
+const APP = 'https://viralcarrossel.com.br';
 
 beforeEach(resetStripeMock);
 
@@ -44,6 +44,13 @@ describe('RF-12 — CORS allowlist nos endpoints de billing', () => {
     const res = makeRes();
     await sessionHandler(makeReq({ headers: { origin } }), res);
     expect(res.headers['access-control-allow-origin']).toBe(origin);
+  });
+
+  it('host legado *.vercel.app NÃO entra na allowlist', async () => {
+    const origin = 'https://viral-carrossel.vercel.app';
+    const res = makeRes();
+    await sessionHandler(makeReq({ headers: { origin } }), res);
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 });
 

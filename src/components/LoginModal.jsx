@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, EyeOff, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
+import PasswordField from './PasswordField.jsx';
+import { requestPasswordReset } from '../lib/password-recovery.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
 import { dismissOnboardingLanding } from '../utils/landing-gate.js';
@@ -15,10 +17,10 @@ export default function LoginModal({
   hint = '',
   onLoggedIn,
 }) {
-  const [mode, setMode] = useState('login'); // login | register
+  const [mode, setMode] = useState('login'); // login | register | forgot
   const [email, setEmail] = useState(initialEmail || '');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hint || '');
 
@@ -27,16 +29,26 @@ export default function LoginModal({
     setError(hint || '');
     setEmail(initialEmail || '');
     setPassword('');
+    setNotice('');
     setMode('login');
   }, [open, hint, initialEmail]);
 
   if (!open) return null;
+
+  const changeMode = next => {
+    setMode(next); setError(''); setNotice(''); setPassword('');
+  };
 
   const submit = async (event) => {
     event?.preventDefault?.();
     setError('');
     setLoading(true);
     try {
+      if (mode === 'forgot') {
+        const data = await requestPasswordReset(email);
+        setNotice(data.message);
+        return;
+      }
       const data = mode === 'register'
         ? await registerWithPassword(email, password)
         : await loginWithPassword(email, password);
@@ -93,7 +105,7 @@ export default function LoginModal({
         }}>
           <div>
             <p className="vc-eyebrow" style={{ margin: '0 0 6px' }}>
-              {mode === 'register' ? 'Nova conta' : 'Já tem conta'}
+              {mode === 'forgot' ? 'Recuperar acesso' : mode === 'register' ? 'Nova conta' : 'Já tem conta'}
             </p>
             <h2 id="login-title" style={{
               margin: 0,
@@ -102,7 +114,7 @@ export default function LoginModal({
               letterSpacing: '-0.022em',
               lineHeight: 1.2,
             }}>
-              {mode === 'register' ? 'Criar conta' : 'Entrar no studio'}
+              {mode === 'forgot' ? 'Esqueci minha senha' : mode === 'register' ? 'Criar conta' : 'Entrar no studio'}
             </h2>
             <p style={{
               margin: '8px 0 0',
@@ -110,7 +122,7 @@ export default function LoginModal({
               lineHeight: 1.45,
               color: 'var(--text-muted)',
             }}>
-              {mode === 'register'
+              {mode === 'forgot' ? 'Informe o e-mail da sua conta para receber o link de recuperação.' : mode === 'register'
                 ? 'Cria com e-mail e senha. Se já assinou com este e-mail, entra directo.'
                 : 'Usa o e-mail da assinatura + senha, ou Google.'}
             </p>
@@ -121,7 +133,7 @@ export default function LoginModal({
         </header>
 
         <div style={{ padding: 20, display: 'grid', gap: 14 }}>
-          <div style={{
+          {mode !== 'forgot' && <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 6,
@@ -136,7 +148,8 @@ export default function LoginModal({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => { setMode(tab.id); setError(''); }}
+                disabled={loading}
+                onClick={() => changeMode(tab.id)}
                 style={{
                   height: 36,
                   borderRadius: 10,
@@ -152,18 +165,21 @@ export default function LoginModal({
                 {tab.label}
               </button>
             ))}
-          </div>
+          </div>}
 
           {error && (
-            <p style={{ margin: 0, fontSize: 12, color: '#ff6b8a', lineHeight: 1.4 }}>{error}</p>
+            <p role="alert" style={{ margin: 0, fontSize: 12, color: '#ff6b8a', lineHeight: 1.4 }}>{error}</p>
           )}
+          {notice && <p role="status" style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: '#a4e8c0' }}>{notice}</p>}
 
-          <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+          {!notice && <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <span className="vc-label">E-mail</span>
               <input
                 type="email"
                 required
+                disabled={loading}
+                maxLength={254}
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -173,41 +189,12 @@ export default function LoginModal({
               />
             </label>
 
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span className="vc-label">Senha</span>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={8}
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'Mínimo 8 caracteres' : 'A tua senha'}
-                  className="vc-input"
-                  style={{ height: 44, borderRadius: 9999, padding: '0 44px 0 16px', width: '100%' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  style={{
-                    position: 'absolute',
-                    right: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)',
-                    padding: 6,
-                    display: 'inline-flex',
-                  }}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </label>
+            {mode !== 'forgot' && <PasswordField key={mode} value={password} onChange={e => setPassword(e.target.value)}
+              disabled={loading} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />}
+            {mode === 'login' && <button type="button" disabled={loading} onClick={() => changeMode('forgot')}
+              style={{ justifySelf: 'end', background: 'transparent', border: 0, padding: '6px 0', color: '#ff87bb', textDecoration: 'underline', fontSize: 13, cursor: 'pointer' }}>
+              Esqueci minha senha
+            </button>}
 
             <button
               type="submit"
@@ -229,11 +216,14 @@ export default function LoginModal({
               }}
             >
               {loading && <Loader2 size={16} className="spin" />}
-              {mode === 'register' ? 'Criar conta' : 'Entrar'}
+              {mode === 'forgot' ? 'Enviar link de recuperação' : mode === 'register' ? 'Criar conta' : 'Entrar'}
             </button>
-          </form>
+          </form>}
 
-          <div style={{
+          {mode === 'forgot' && <button type="button" disabled={loading} onClick={() => changeMode('login')}
+            className="vc-btn" style={{ minHeight: 44 }}>Voltar para entrar</button>}
+
+          {mode !== 'forgot' && <><div style={{
             display: 'grid',
             gridTemplateColumns: '1fr auto 1fr',
             alignItems: 'center',
@@ -256,6 +246,7 @@ export default function LoginModal({
             Novo e ainda sem plano? Cria a conta e depois escolhe o plano em{' '}
             <strong style={{ color: 'var(--text-secondary)' }}>Começar agora</strong>.
           </p>
+          </>}
         </div>
       </div>
     </div>

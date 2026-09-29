@@ -54,7 +54,8 @@ async function prepararCardComSubtituloLongo(page) {
 
   await page.getByRole('button', { name: /^Slide 2 de / }).click({ force: true });
   await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });
-  await page.locator('textarea').nth(1).fill(SUBTITULO_LONGO);
+  await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
+  await page.getByText('Subtítulo', { exact: true }).first().locator('xpath=following::textarea[1]').fill(SUBTITULO_LONGO);
   await page.waitForTimeout(900);
 }
 

@@ -37,49 +37,59 @@ import { clampTitleWeight } from '../utils/slide-design-system.js';
 //   0 Inter Tight · 1 Inter · 2 DM Sans · ...
 
 /** Cartão base do preview — bg color + clip. Children desenham por cima. */
-function PreviewCard({ bg, children, gradient = null }) {
+function PreviewCard({ bg, children, style, gradId = 'vcPreviewWash' }) {
+  const instanceId = React.useId().replace(/:/g, '');
+  const washId = `${gradId}-${instanceId}-dark`;
+  const washLightId = `${gradId}-${instanceId}-light`;
   return (
-    <svg viewBox="0 0 60 75" width="60" height="75" style={{ display:'block', borderRadius:6, overflow:'hidden' }}>
-      <rect width="60" height="75" fill={gradient || bg} />
-      {children}
+    <svg
+      viewBox="0 0 80 100"
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', borderRadius: 8, overflow: 'hidden', ...style }}
+    >
+      <defs>
+        <linearGradient id={washId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(0,0,0,0.05)" />
+          <stop offset="55%" stopColor="rgba(0,0,0,0.15)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+        </linearGradient>
+        <linearGradient id={washLightId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.12)" />
+        </linearGradient>
+      </defs>
+      <rect width="80" height="100" fill={bg} />
+      {typeof children === 'function' ? children({ washId, washLightId }) : children}
     </svg>
   );
 }
 
 /**
  * Gerador único de preview a partir dos campos do preset.
- * Reproduz fielmente o que o renderer real desenha: foto simulada + header
- * 3-col + badge + star + eyebrow + título + subtítulo (se visível) + footer
- * pill OU footer bar 3-col. Posicionamento respeita slideDefaults.layout/align.
- *
- * Resultado: cada um dos 12 cards mostra sua assinatura visual real,
- * não uma abstração genérica.
+ * Mini-card 4:5 com assinatura visual (header, badge, título, pill…).
  */
-export function renderPresetPreview(preset) {
+export function renderPresetPreview(preset, svgStyle = {}) {
   const b = preset.brand || {};
   const d = preset.slideDefaults || {};
+  const gradId = `vcPrev-${preset.id || 'x'}`;
 
-  // Layout: tl/tc/tr (top) · ml/mc/mr (mid) · bl/bc/br (bottom)
   const layout = d.layout || 'mc';
-  const vPos = layout.charAt(0); // t/m/b
-  const hPos = layout.charAt(1); // l/c/r
+  const vPos = layout.charAt(0);
   const align = d.align || 'left';
 
-  // Foto BG simulada — usa brand.bg como cor dominante (não mais cinza
-  // genérico). Sobre o bg, aplica um wash escuro pra simular overlay de
-  // foto. Resultado: presets com bg colorido (Pink, brown) mantêm sua
-  // identidade cromática; presets com bg neutro (preto) ficam visíveis.
   const noPhoto = preset.id === 'minimal_clean';
-
-  // Cores derivadas
   const titleC = b.titleColor || '#fff';
   const subC = b.subtitleColor || titleC;
   const accent = b.accent || titleC;
-  // Determina se bg é "claro" pra ajustar contraste dos elementos sutis
   const isLightBg = (b.bg || '').match(/^#([fF][a-fA-F0-9]|[eE][a-fA-F0-9])/);
-  const mutedC = noPhoto ? '#a0a0a0' : isLightBg ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.65)';
+  const mutedC = noPhoto
+    ? 'rgba(0,0,0,0.28)'
+    : isLightBg
+      ? 'rgba(0,0,0,0.40)'
+      : 'rgba(255,255,255,0.55)';
 
-  // Flags
   const hasHeader = !!(b.cultureHeaderLeft || b.cultureHeaderYear || b.cultureHeaderCenter);
   const hasBadge = !!b.showPageBadge;
   const hasStar = !!b.showStarOrnament;
@@ -89,158 +99,155 @@ export function renderPresetPreview(preset) {
   const hasFooterPill = !!b.footerPillText;
   const hasFooterBar = !!(b.footerBarLeft || b.footerBarCenter || b.footerBarRight);
 
-  // Posição base da pilha eyebrow/star/título (respeita layout vertical)
-  const stackBaseY = vPos === 't' ? 12 : vPos === 'm' ? 30 : 46;
-
-  // Helper de alinhamento horizontal (start/center/end)
+  const stackBaseY = vPos === 't' ? 16 : vPos === 'm' ? 38 : 58;
   const xAlign = align === 'center' ? 'center' : align === 'right' ? 'end' : 'start';
-  const xLineCenter = 30;
-  const xLineX = (w) => xAlign === 'center' ? 30 - w/2 : xAlign === 'end' ? 56 - w : 4;
-
-  // Posição base do pill / bar do footer
-  const footerY = 67;
+  const xLineX = (w) => (xAlign === 'center' ? 40 - w / 2 : xAlign === 'end' ? 74 - w : 6);
+  const footerY = 88;
 
   let y = stackBaseY;
 
   return (
-    <PreviewCard bg={b.bg || '#222'}>
-      {/* Foto simulada — wash escuro SOBRE brand.bg (não mais cinza
-          genérico). Mantém a cor da marca dominante. */}
+    <PreviewCard bg={b.bg || '#222'} style={svgStyle} gradId={gradId}>
+      {({ washId, washLightId }) => (
+        <>
       {!noPhoto && (
         <>
-          {/* Sugestão de elemento fotográfico (silhueta sutil) no topo */}
-          <ellipse cx="30" cy="22" rx="14" ry="13" fill="rgba(0,0,0,0.22)"/>
-          {/* Overlay escuro embaixo pra contrastar texto */}
-          <rect x="0" y="38" width="60" height="37" fill={isLightBg ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.40)'}/>
+          <ellipse cx="40" cy="28" rx="22" ry="20" fill="rgba(255,255,255,0.06)" />
+          <ellipse cx="40" cy="28" rx="14" ry="13" fill="rgba(0,0,0,0.18)" />
+          <rect
+            x="0"
+            y="0"
+            width="80"
+            height="100"
+            fill={isLightBg ? `url(#${washLightId})` : `url(#${washId})`}
+          />
         </>
       )}
 
-      {/* Header 3-col fino no topo — visualmente mais presente */}
       {hasHeader && (
-        <g>
-          {b.cultureHeaderLeft && <rect x="3" y="3" width="14" height="2" fill={mutedC} rx="0.5"/>}
-          {(b.cultureHeaderCenter || '').trim() && <rect x="23" y="3" width="14" height="2" fill={mutedC} rx="0.5"/>}
-          {b.cultureHeaderYear && <rect x={hasBadge ? 41 : 44} y="3" width={hasBadge ? 8 : 13} height="2" fill={mutedC} rx="0.5"/>}
-        </g>
-      )}
-
-      {/* Badge "N/M" pill canto sup direito — maior pra ser óbvio */}
-      {hasBadge && (
-        <g>
-          <rect x="49" y="2" width="9" height="5" rx="2.5" fill="rgba(0,0,0,0.65)"/>
-          <text x="53.5" y="5.8" fontSize="3" fill="#fff" fontWeight="700" textAnchor="middle">1/N</text>
-        </g>
-      )}
-
-      {/* Star ornament 8-pontas centralizado acima do eyebrow */}
-      {hasStar && (() => {
-        const sx = xLineCenter;
-        const sy = y + 2;
-        y += 7;
-        return (
-          <g fill={accent} transform={`translate(${sx} ${sy})`}>
-            <polygon points="0,-3.5 0.8,-0.5 3.5,0 0.8,0.5 0,3.5 -0.8,0.5 -3.5,0 -0.8,-0.5"/>
-            <g transform="rotate(45)">
-              <polygon points="0,-3 0.7,-0.4 3,0 0.7,0.4 0,3 -0.7,0.4 -3,0 -0.7,-0.4"/>
-            </g>
-          </g>
-        );
-      })()}
-
-      {/* Eyebrow MAIÚSCULAS pequeno */}
-      {hasEyebrow && (() => {
-        const w = 32;
-        const x = hasStar || align === 'center' ? 30 - w/2 : xLineX(w);
-        const row = <rect key="eb" x={x} y={y} width={w} height={1.6} fill={subC} rx="0.4"/>;
-        y += 4;
-        return row;
-      })()}
-
-      {/* Título — 2-3 linhas com cor titleColor */}
-      {(() => {
-        const lines = [
-          { w: align === 'center' ? 44 : 50, h: 4 },
-          { w: align === 'center' ? 38 : 44, h: 4 },
-          { w: align === 'center' ? 30 : 36, h: 4 },
-        ];
-        const out = lines.map((ln, i) => {
-          const x = xLineX(ln.w);
-          const rect = <rect key={`t${i}`} x={x} y={y} width={ln.w} height={ln.h} fill={titleC} rx="0.6"/>;
-          y += ln.h + 1.2;
-          return rect;
-        });
-        return out;
-      })()}
-
-      {/* Subtítulo (se visível) — peso mais leve, cor sutil */}
-      {subVisible && (() => {
-        y += 1.5;
-        const w = align === 'center' ? 28 : 32;
-        const x = xLineX(w);
-        const r1 = <rect key="s1" x={x} y={y} width={w} height={1.8} fill={subC} opacity="0.7" rx="0.4"/>;
-        y += 2.8;
-        const r2 = <rect key="s2" x={x} y={y} width={w-6} height={1.8} fill={subC} opacity="0.7" rx="0.4"/>;
-        y += 2.8;
-        return [r1, r2];
-      })()}
-
-      {/* Strikethrough (Bold Promo Pink) — risco vermelho ÓBVIO acima
-          de texto branco. Visual de promo com preço cortado. */}
-      {hasStrike && (() => {
-        y += 3;
-        const xStrike = xLineX(40);
-        return (
-          <g key="strike">
-            {/* "DE R$99" riscado */}
-            <rect x={xStrike} y={y} width="12" height="3" fill={titleC} opacity="0.9" rx="0.5"/>
-            <line x1={xStrike - 0.5} y1={y + 1.5} x2={xStrike + 12.5} y2={y + 1.5}
-              stroke={accent} strokeWidth="1.4"/>
-            {/* "POR R$0,00" intacto */}
-            <rect x={xStrike + 14} y={y} width="24" height="3" fill={titleC} rx="0.5"/>
-          </g>
-        );
-      })()}
-
-      {/* Footer pill centralizado bottom */}
-      {hasFooterPill && (
-        <g>
-          <rect
-            x={b.footerPillArrow === false ? 18 : 14}
-            y={footerY}
-            width={b.footerPillArrow === false ? 24 : 32}
-            height="5"
-            rx="2.5"
-            fill={b.footerPillBg || accent}
-          />
-          <rect
-            x={b.footerPillArrow === false ? 22 : 18}
-            y={footerY + 1.4}
-            width={b.footerPillArrow === false ? 16 : 18}
-            height="2"
-            fill={b.footerPillFg || (b.footerPillBg ? '#fff' : '#0a0a0a')}
-            rx="0.4"
-          />
-          {b.footerPillArrow !== false && (
-            <circle
-              cx={42}
-              cy={footerY + 2.5}
-              r="1.8"
-              fill={b.footerPillFg || '#0a0a0a'}
-            />
+        <g opacity="0.85">
+          {b.cultureHeaderLeft && <rect x="6" y="5" width="16" height="1.8" fill={mutedC} rx="0.6" />}
+          {(b.cultureHeaderCenter || '').trim() && (
+            <rect x="32" y="5" width="16" height="1.8" fill={mutedC} rx="0.6" />
+          )}
+          {b.cultureHeaderYear && (
+            <rect x={hasBadge ? 54 : 58} y="5" width={hasBadge ? 10 : 16} height="1.8" fill={mutedC} rx="0.6" />
           )}
         </g>
       )}
 
-      {/* Footer bar 3-col (Authority Black) */}
+      {hasBadge && (
+        <g>
+          <rect x="64" y="4" width="12" height="6.5" rx="3.25" fill="rgba(0,0,0,0.55)" />
+          <text x="70" y="8.6" fontSize="3.2" fill="#fff" fontWeight="700" textAnchor="middle" fontFamily="system-ui,sans-serif">
+            1/7
+          </text>
+        </g>
+      )}
+
+      {hasStar && (() => {
+        const sx = 40;
+        const sy = y + 2;
+        y += 9;
+        return (
+          <g fill={accent} transform={`translate(${sx} ${sy})`}>
+            <polygon points="0,-4 0.9,-0.6 4,0 0.9,0.6 0,4 -0.9,0.6 -4,0 -0.9,-0.6" />
+            <g transform="rotate(45)">
+              <polygon points="0,-3.4 0.8,-0.5 3.4,0 0.8,0.5 0,3.4 -0.8,0.5 -3.4,0 -0.8,-0.5" />
+            </g>
+          </g>
+        );
+      })()}
+
+      {hasEyebrow && (() => {
+        const w = 36;
+        const x = hasStar || align === 'center' ? 40 - w / 2 : xLineX(w);
+        const row = <rect key="eb" x={x} y={y} width={w} height={1.8} fill={subC} opacity="0.85" rx="0.5" />;
+        y += 5;
+        return row;
+      })()}
+
+      {(() => {
+        const lines = [
+          { w: align === 'center' ? 56 : 64, h: 5.2 },
+          { w: align === 'center' ? 48 : 56, h: 5.2 },
+          { w: align === 'center' ? 38 : 46, h: 5.2 },
+        ];
+        return lines.map((ln, i) => {
+          const x = xLineX(ln.w);
+          const rect = (
+            <rect key={`t${i}`} x={x} y={y} width={ln.w} height={ln.h} fill={titleC} rx="1" />
+          );
+          y += ln.h + 1.6;
+          return rect;
+        });
+      })()}
+
+      {subVisible && (() => {
+        y += 2;
+        const w = align === 'center' ? 36 : 42;
+        const x = xLineX(w);
+        const r1 = <rect key="s1" x={x} y={y} width={w} height={2} fill={subC} opacity="0.65" rx="0.5" />;
+        y += 3.2;
+        const r2 = <rect key="s2" x={x} y={y} width={w - 8} height={2} fill={subC} opacity="0.55" rx="0.5" />;
+        return [r1, r2];
+      })()}
+
+      {hasStrike && (() => {
+        y += 4;
+        const xStrike = xLineX(52);
+        return (
+          <g key="strike">
+            <rect x={xStrike} y={y} width="14" height="3.5" fill={titleC} opacity="0.9" rx="0.6" />
+            <line
+              x1={xStrike - 0.5}
+              y1={y + 1.75}
+              x2={xStrike + 14.5}
+              y2={y + 1.75}
+              stroke={accent}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+            <rect x={xStrike + 17} y={y} width="30" height="3.5" fill={titleC} rx="0.6" />
+          </g>
+        );
+      })()}
+
+      {hasFooterPill && (
+        <g>
+          <rect
+            x={b.footerPillArrow === false ? 22 : 16}
+            y={footerY}
+            width={b.footerPillArrow === false ? 36 : 48}
+            height="6.5"
+            rx="3.25"
+            fill={b.footerPillBg || accent}
+          />
+          <rect
+            x={b.footerPillArrow === false ? 28 : 22}
+            y={footerY + 2}
+            width={b.footerPillArrow === false ? 24 : 28}
+            height="2.4"
+            fill={b.footerPillFg || (b.footerPillBg ? '#fff' : '#0a0a0a')}
+            rx="0.5"
+          />
+          {b.footerPillArrow !== false && (
+            <circle cx={58} cy={footerY + 3.25} r="2.2" fill={b.footerPillFg || '#0a0a0a'} />
+          )}
+        </g>
+      )}
+
       {hasFooterBar && (
         <g>
-          {[8, 24, 40].map((x, i) => (
+          {[8, 30, 52].map((x, i) => (
             <g key={`fb${i}`}>
-              <rect x={x} y={footerY} width="12" height="1.4" fill={mutedC} rx="0.3"/>
-              <rect x={x} y={footerY + 2.4} width="11" height="1.4" fill={titleC} rx="0.3"/>
+              <rect x={x} y={footerY} width="16" height="1.6" fill={mutedC} rx="0.4" />
+              <rect x={x} y={footerY + 2.8} width="14" height="1.6" fill={titleC} opacity="0.85" rx="0.4" />
             </g>
           ))}
         </g>
+      )}
+        </>
       )}
     </PreviewCard>
   );

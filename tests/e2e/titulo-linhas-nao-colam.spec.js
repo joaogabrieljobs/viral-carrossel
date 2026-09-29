@@ -62,7 +62,8 @@ test.describe('Linhas do título não se colam', () => {
     await page.waitForTimeout(600);
 
     await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });
-    await page.locator('textarea').first().fill(TITULO);
+    await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
+    await page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]').fill(TITULO);
     await page.waitForTimeout(900);
 
     const falhas = [];
