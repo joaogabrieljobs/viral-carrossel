@@ -740,17 +740,25 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           }}>
             Viral. · Studio editorial com IA
           </p>
-          <h1 ref={heroTitleRef} style={{
-            margin: 0,
-            maxWidth: isMobile ? '16ch' : '22ch',
-            fontSize: isMobile ? 'clamp(1.65rem, 6.8vw, 1.95rem)' : 'clamp(2.35rem, 3.4vw, 3.2rem)',
-            fontWeight: 600,
-            letterSpacing: '-0.03em',
-            lineHeight: 1.12,
-            fontFamily: 'var(--font-display)',
-          }}>
-            Carrosséis com a sua voz.{' '}
-            <span style={{ color: 'var(--accent)' }}>E a cara da sua marca.</span>
+          <h1
+            ref={heroTitleRef}
+            aria-label="Carrosséis com a sua voz. E a cara da sua marca."
+            style={{
+              margin: 0,
+              maxWidth: isMobile ? '17ch' : 'none',
+              fontSize: isMobile ? 'clamp(1.65rem, 6.8vw, 1.95rem)' : 'clamp(2.35rem, 3.4vw, 3.2rem)',
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.12,
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            <span style={{ display: 'block', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+              Carrosséis com a sua voz.
+            </span>
+            <span style={{ display: 'block', color: 'var(--accent)', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+              E a cara da sua marca.
+            </span>
           </h1>
           <p style={{
             margin: 0,
