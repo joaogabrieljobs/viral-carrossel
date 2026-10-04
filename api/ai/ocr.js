@@ -7,6 +7,7 @@ import { consumeOcrCredit, refundOcrCredit } from '../lib/ocr-quota.js';
 const OCR_URL = 'https://api.z.ai/api/paas/v4/layout_parsing';
 const OCR_TEXT_MAX = 18_000;
 export const config = { maxDuration: 90 };
+let providerUnavailableUntil = 0;
 
 function readBody(req) {
   if (!req.body) return {};
@@ -38,6 +39,9 @@ export default async function handler(req, res) {
     }
     const key = String(process.env.ZAI_API_KEY || '').trim();
     if (!key) return res.status(503).json({ error: 'A leitura de imagens está temporariamente indisponível.' });
+    if (Date.now() < providerUnavailableUntil) {
+      return res.status(503).json({ error: 'A leitura online está indisponível. O app tentará ler no seu aparelho.' });
+    }
     const quota = await consumeOcrCredit({ customerId: access.customerId || 'dev' });
     if (!quota.allowed) {
       return res.status(quota.reason === 'exhausted' ? 429 : 503).json({
@@ -67,12 +71,20 @@ export default async function handler(req, res) {
     try { payload = JSON.parse(raw); } catch { /* tratado como falha do provedor */ }
     if (!upstream.ok || !payload || payload?.code) {
       console.error('[carousel-ocr] upstream_error', upstream.status, payload?.code || 'invalid_json');
+      if (upstream.status === 401 || upstream.status === 403) {
+        providerUnavailableUntil = Date.now() + 5 * 60_000;
+      }
       await refundOcrCredit({ customerId: access.customerId || 'dev' });
       quotaConsumed = false;
-      return res.status(upstream.status === 429 ? 429 : 502).json({
+      const responseStatus = upstream.status === 429
+        ? 429
+        : (upstream.status === 401 || upstream.status === 403 ? 503 : 502);
+      return res.status(responseStatus).json({
         error: upstream.status === 429
           ? 'Muitas imagens ao mesmo tempo. Aguarde um instante e tente de novo.'
-          : 'Não foi possível ler esta imagem. Tente outro arquivo.',
+          : (upstream.status === 401 || upstream.status === 403)
+            ? 'A leitura online está indisponível. O app tentará ler no seu aparelho.'
+            : 'Não foi possível ler esta imagem. Tente outro arquivo.',
       });
     }
     const text = String(payload?.md_results || '').trim().slice(0, OCR_TEXT_MAX);

@@ -124,7 +124,10 @@ export function BrandTonePanel({
     const operation = beginOperation();
     try {
       const result = await extractCarouselImageEvidence(selected, {
-        onProgress: ({ current, total, name }) => setImageProgress(`Lendo ${current} de ${total}: ${name}`),
+        onProgress: ({ current, total, name, stage, progress }) => {
+          const percent = stage === 'local' && progress > 0 ? ` · ${Math.round(progress * 100)}%` : '';
+          setImageProgress(`${stage === 'local' ? 'Lendo no aparelho' : 'Lendo'} ${current} de ${total}: ${name}${percent}`);
+        },
         signal: operation.job.signal,
       });
       if (!operationIsCurrent(operation)) return;
@@ -132,7 +135,12 @@ export function BrandTonePanel({
       setImageEvidence(next);
       setBrand?.((current) => ({ ...(current || {}), voiceImageTexts: next }));
       if (result.evidence.length) {
-        toast?.(`${result.evidence.length} imagem${result.evidence.length === 1 ? '' : 'ns'} lida${result.evidence.length === 1 ? '' : 's'}. O texto entrou na análise do DNA.`, 'success', 4200);
+        toast?.(
+          `${result.evidence.length} imagem${result.evidence.length === 1 ? '' : 'ns'} lida${result.evidence.length === 1 ? '' : 's'}`
+          + `${result.localCount ? ' no seu aparelho' : ''}. O texto entrou na análise do DNA.`,
+          'success',
+          5200,
+        );
       }
       if (result.failures.length) {
         const firstReason = result.failures[0]?.error || 'Não foi possível ler o arquivo.';
@@ -362,7 +370,7 @@ export function BrandTonePanel({
                   : <><FileImage size={14} /> Ler texto de prints/PNGs dos carrosséis</>}
               </button>
               <div style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Até 10 imagens PNG/JPG. Elas são enviadas à Z.AI apenas para leitura; os arquivos não ficam no projeto. Só o texto extraído é salvo para reanálise.
+                Até 10 imagens PNG/JPG. Se a leitura online falhar, o texto é extraído no seu aparelho. Os arquivos não ficam no projeto; só o texto extraído é salvo para reanálise.
               </div>
               {imageEvidence.length ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }} aria-label={`${imageEvidence.length} imagens lidas`}>

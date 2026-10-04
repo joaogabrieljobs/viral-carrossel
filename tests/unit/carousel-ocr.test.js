@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CAROUSEL_OCR_MAX_IMAGES,
   CAROUSEL_OCR_MAX_STORED_TEXT,
@@ -6,7 +6,10 @@ import {
   normalizeCarouselImageEvidence,
   normalizeCarouselFileDataUrl,
   validateCarouselOcrFiles,
+  extractCarouselImageEvidence,
 } from '../../src/utils/carousel-ocr.js';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('evidências OCR de carrosséis', () => {
   it('limita quantidade e texto salvo para não estourar o projeto local', () => {
@@ -35,5 +38,36 @@ describe('evidências OCR de carrosséis', () => {
       'data:;base64,BBBB',
       { name: 'card.jpeg', type: '' },
     )).toBe('data:image/jpeg;base64,BBBB');
+  });
+
+  it('usa OCR no aparelho quando a leitura online está indisponível e reaproveita a sessão', async () => {
+    class FileReaderMock {
+      readAsDataURL() {
+        this.result = 'data:image/png;base64,AAAA';
+        this.onload?.();
+      }
+    }
+    vi.stubGlobal('FileReader', FileReaderMock);
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: 'Leitura online indisponível' }),
+    }));
+    const recognize = vi.fn(async () => 'TEXTO DA CAPA\nUma frase legível do carrossel.');
+    const terminate = vi.fn(async () => {});
+    const browserOcrFactory = vi.fn(async () => ({ recognize, terminate, setProgress: vi.fn() }));
+    const files = [
+      { name: 'card-1.png', type: 'image/png', size: 100 },
+      { name: 'card-2.png', type: 'image/png', size: 100 },
+    ];
+
+    const result = await extractCarouselImageEvidence(files, { fetchImpl, browserOcrFactory });
+
+    expect(result.evidence).toHaveLength(2);
+    expect(result.localCount).toBe(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(browserOcrFactory).toHaveBeenCalledTimes(1);
+    expect(recognize).toHaveBeenCalledTimes(2);
+    expect(terminate).toHaveBeenCalledTimes(1);
   });
 });

@@ -32,6 +32,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, text });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    let hostname = 'invalid';
+    try { hostname = new URL(String(req.body?.url || req.query?.url || '')).hostname; } catch { /* sem URL válida */ }
+    console.warn('[fetch-source] leitura bloqueada', hostname, msg.slice(0, 160));
     return res.status(400).json({ ok: false, error: msg });
   }
 }

@@ -14,7 +14,7 @@ export const SOCIAL_TONE_MAX_SOURCE_CHARS = 7_000;
 export const SOCIAL_TONE_MAX_TOTAL_SOURCE_CHARS = 24_000;
 
 const TRACKING_PARAMS = new Set([
-  'fbclid', 'gclid', 'igshid', 'mc_cid', 'mc_eid',
+  'fbclid', 'gclid', 'igshid', 'stkn', 'mc_cid', 'mc_eid',
 ]);
 const SENSITIVE_PARAM = /(access[_-]?token|auth|api[_-]?key|secret|signature|session|password|passcode|oauth|code)/i;
 
@@ -57,6 +57,13 @@ export function normalizeSocialUrls(raw) {
     if (!['http:', 'https:'].includes(url.protocol)) continue;
     if (url.username || url.password) continue;
     url.hash = '';
+    const network = socialNetworkForUrl(url.toString());
+    if (network === 'instagram') {
+      // Links compartilhados pelo app carregam tokens transitórios que podem
+      // ativar bloqueios. O caminho público identifica perfil/post sozinho.
+      url.search = '';
+      if (!url.pathname.endsWith('/')) url.pathname += '/';
+    }
     for (const key of [...url.searchParams.keys()]) {
       if (key.startsWith('utm_') || TRACKING_PARAMS.has(key) || SENSITIVE_PARAM.test(key)) url.searchParams.delete(key);
     }

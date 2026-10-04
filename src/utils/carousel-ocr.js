@@ -1,4 +1,5 @@
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
+import { createBrowserOcrSession, shouldUseBrowserOcrFallback } from './browser-ocr.js';
 
 export const CAROUSEL_OCR_MAX_IMAGES = 10;
 export const CAROUSEL_OCR_MAX_TEXT_PER_IMAGE = 6_000;
@@ -78,24 +79,70 @@ export async function readCarouselImageText(dataUrl, { fetchImpl = fetch, signal
   return String(payload.text || '').trim().slice(0, 18_000);
 }
 
-export async function extractCarouselImageEvidence(files, { fetchImpl, signal, onProgress } = {}) {
+export async function extractCarouselImageEvidence(files, {
+  fetchImpl,
+  signal,
+  onProgress,
+  browserOcrFactory = createBrowserOcrSession,
+} = {}) {
   const valid = validateCarouselOcrFiles(files);
   const evidence = [];
   const failures = [];
-  for (let index = 0; index < valid.length; index += 1) {
-    const file = valid[index];
-    onProgress?.({ current: index + 1, total: valid.length, name: file.name });
-    try {
-      const dataUrl = await readAsDataUrl(file);
-      const text = await readCarouselImageText(dataUrl, { fetchImpl, signal });
-      evidence.push({
-        name: String(file.name || `Imagem ${index + 1}`).slice(0, 100),
-        text: text.slice(0, CAROUSEL_OCR_MAX_TEXT_PER_IMAGE),
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') throw error;
-      failures.push({ name: file.name || `Imagem ${index + 1}`, error: error?.message || 'Falha na leitura.' });
+  let browserOcr = null;
+  let preferBrowserOcr = false;
+  let localCount = 0;
+  try {
+    for (let index = 0; index < valid.length; index += 1) {
+      const file = valid[index];
+      onProgress?.({ current: index + 1, total: valid.length, name: file.name, stage: preferBrowserOcr ? 'local' : 'server' });
+      try {
+        const dataUrl = await readAsDataUrl(file);
+        let text = '';
+        let serverError = null;
+        if (!preferBrowserOcr) {
+          try {
+            text = await readCarouselImageText(dataUrl, { fetchImpl, signal });
+          } catch (error) {
+            if (error?.name === 'AbortError') throw error;
+            serverError = error;
+          }
+        }
+        if (!text) {
+          if (serverError && !shouldUseBrowserOcrFallback(serverError)) throw serverError;
+          if (!browserOcr) {
+            browserOcr = await browserOcrFactory({
+              signal,
+              onProgress: (message) => onProgress?.({
+                current: index + 1,
+                total: valid.length,
+                name: file.name,
+                stage: 'local',
+                progress: Number(message?.progress || 0),
+              }),
+            });
+          }
+          browserOcr.setProgress?.((message) => onProgress?.({
+            current: index + 1,
+            total: valid.length,
+            name: file.name,
+            stage: 'local',
+            progress: Number(message?.progress || 0),
+          }));
+          text = await browserOcr.recognize(dataUrl);
+          preferBrowserOcr = true;
+          localCount += 1;
+        }
+        evidence.push({
+          name: String(file.name || `Imagem ${index + 1}`).slice(0, 100),
+          text: text.slice(0, CAROUSEL_OCR_MAX_TEXT_PER_IMAGE),
+        });
+      } catch (error) {
+        if (error?.name === 'AbortError') throw error;
+        failures.push({ name: file.name || `Imagem ${index + 1}`, error: error?.message || 'Falha na leitura.' });
+      }
     }
+  } finally {
+    await browserOcr?.terminate?.();
   }
-  return { evidence: normalizeCarouselImageEvidence(evidence), failures };
+  return { evidence: normalizeCarouselImageEvidence(evidence), failures, localCount };
 }

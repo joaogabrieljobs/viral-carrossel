@@ -78,6 +78,8 @@ describe('social-tone', () => {
     expect(normalizeSocialUrls('https://user:pass@example.com/post')).toEqual([]);
     expect(normalizeSocialUrls('https://example.com/post?access_token=segredo&utm_source=x&id=42'))
       .toEqual(['https://example.com/post?id=42']);
-    expect(normalizeSocialUrls('instagram.com/minhamarca')).toEqual(['https://instagram.com/minhamarca']);
+    expect(normalizeSocialUrls('instagram.com/minhamarca')).toEqual(['https://instagram.com/minhamarca/']);
+    expect(normalizeSocialUrls('https://www.instagram.com/minhamarca?stkn=segredo'))
+      .toEqual(['https://www.instagram.com/minhamarca/']);
   });
 });

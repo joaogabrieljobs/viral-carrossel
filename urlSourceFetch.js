@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 
 const MAX_REDIRECTS = 5;
 export const MAX_SOURCE_RESPONSE_BYTES = 1024 * 1024;
+const INSTAGRAM_MAX_SOURCE_RESPONSE_BYTES = 2 * MAX_SOURCE_RESPONSE_BYTES;
 
 const responseDisposers = new WeakMap();
 
@@ -356,7 +357,8 @@ export async function fetchPublicHttp(urlString, init = {}, deps = {}) {
         dispatcher,
         headers: {
           'User-Agent':
-            'ViralCarrossel/1.0 (+https://github.com) texto para resumo editorial',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7',
           Accept: 'text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8,application/json;q=0.7',
           ...(init.headers || {}),
         },
@@ -465,7 +467,11 @@ export async function serverFetchUrlPlainText(urlString, deps = {}) {
     }
 
     const ct = assertTextualContentType(res);
-    const buf = await readResponseBufferLimited(res);
+    const host = new URL(urlString).hostname.toLowerCase().replace(/^www\./, '');
+    const maxBytes = host === 'instagram.com'
+      ? INSTAGRAM_MAX_SOURCE_RESPONSE_BYTES
+      : MAX_SOURCE_RESPONSE_BYTES;
+    const buf = await readResponseBufferLimited(res, maxBytes);
 
     let rawText = '';
     if (/\bcharset=utf-16/i.test(ct)) {
