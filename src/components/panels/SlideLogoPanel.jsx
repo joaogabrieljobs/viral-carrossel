@@ -5,7 +5,7 @@ import {
   resolveLogoControls,
   clearSlideLogoLayout,
   resolveLogoDataUrl,
-  brandLogoInsertPatch,
+  applyLogoAssetToSlides,
   stampLogoVisibleOnSlides,
   hideLogoOnSlides,
   LOGO_SIZE_MIN,
@@ -39,6 +39,7 @@ export function SlideLogoPanel({
   setSlides,
   cardIndex = 0,
   selectedSlideIds = null,
+  cardOnly = false,
 }) {
   const brandFile = useRef(null);
   const cardFile = useRef(null);
@@ -50,12 +51,12 @@ export function SlideLogoPanel({
   const hidden = !!slide.logoHidden;
   const hasCustom = !!(slide.logoImageId && !hidden);
   const cardN = cardIndex + 1;
-  const hasLogoSource = !!(brand?.logo || styleKit?.logo?.imageId);
+  const hasLogoSource = !!(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId);
   const logoOnGenerate = styleKit?.logoOnGenerate !== false;
 
   const setBrandLogo = (partial) => {
     if (!setBrand) return;
-    setBrand({ ...brand, ...partial });
+    setBrand((current) => ({ ...current, ...partial }));
     // Card ativo deixa de travar o padrão antigo
     updateSlide(clearSlideLogoLayout());
   };
@@ -64,9 +65,9 @@ export function SlideLogoPanel({
     updateSlide({ ...partial, logoHidden: false });
   };
 
-  /** Promove logo do projeto/marca → marca e deixa todos (ou seleção) com ela visível. */
+  /** Aplica a logo em cards sem promover a logo específica do projeto ao perfil global. */
   const insertLogoOnAllCards = async (onlySelected = false) => {
-    if (!setBrand || !setSlides) {
+    if (!setSlides) {
       toast?.('Não foi possível aplicar a logo em todos os cards.', 'error');
       return;
     }
@@ -83,9 +84,28 @@ export function SlideLogoPanel({
         toast?.('Carrega uma logo da marca ou do projeto primeiro.', 'error');
         return;
       }
-      setBrand({ ...brand, ...brandLogoInsertPatch(dataUrl, brand) });
-      setSlides((list) => stampLogoVisibleOnSlides(list, ids));
-      setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
+      const projectLogoId = styleKit?.logo?.imageId || null;
+      let logoImageId = projectLogoId || brand?.logoImageId || null;
+      let logoImage = dataUrl;
+      // Backups legados podem trazer apenas data URL. Para uma camada por card,
+      // os bytes precisam primeiro de um ID durável no IndexedDB.
+      if ((ids || projectLogoId) && !logoImageId) {
+        const stored = await storeSlideLogo(await origemParaBlob(dataUrl));
+        logoImageId = stored.logoImageId;
+        logoImage = stored.logoImage;
+      }
+      if (ids || projectLogoId) {
+        setSlides((list) => applyLogoAssetToSlides(list, {
+          ids,
+          logoImageId,
+          logoImage,
+          hideUnselected: false,
+        }));
+      } else {
+        // A fonte já é a marca global; basta controlar a visibilidade.
+        setSlides((list) => stampLogoVisibleOnSlides(list, ids));
+      }
+      if (!onlySelected) setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
       toast?.(
         ids
           ? `Logo aplicada em ${ids.length} card${ids.length === 1 ? '' : 's'} selecionado${ids.length === 1 ? '' : 's'}. Desfazer: Cmd+Z.`
@@ -117,29 +137,30 @@ export function SlideLogoPanel({
     );
   };
 
-  const onBrandUpload = (e) => {
+  const onBrandUpload = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !setBrand) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast?.('Imagem muito grande. Máximo 2MB.', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setBrand({
-        ...brand,
-        logo: reader.result,
-        logoSize: brand.logoSize ?? LOGO_SIZE_DEFAULT,
-        logoOpacity: brand.logoOpacity ?? 90,
-        logoPosition: brand.logoPosition || 'tr',
-      });
+    setBusy(true);
+    try {
+      const stored = await storeSlideLogo(file);
+      if (!alive.current) { URL.revokeObjectURL(stored.logoImage); return; }
+      setBrand((current) => ({
+        ...current,
+        logo: stored.logoImage,
+        logoImageId: stored.logoImageId,
+        logoSize: current.logoSize ?? LOGO_SIZE_DEFAULT,
+        logoOpacity: current.logoOpacity ?? 90,
+        logoPosition: current.logoPosition || 'tr',
+      }));
       setSlides?.((list) => stampLogoVisibleOnSlides(list));
-      setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
       updateSlide({ ...clearSlideLogoLayout(), logoHidden: false });
       toast?.('Logo da marca aplicada em todos os cards.', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      if (alive.current) toast?.(error.message || 'Não foi possível salvar a logo.', 'error');
+    } finally {
+      if (alive.current) setBusy(false);
+    }
   };
 
   const onCardUpload = async (e) => {
@@ -150,7 +171,6 @@ export function SlideLogoPanel({
     try {
       const patch = await storeSlideLogo(file);
       if (!alive.current) { URL.revokeObjectURL(patch.logoImage); return; }
-      setStyleKit?.(prev => ({ ...prev, logo: { imageId: patch.logoImageId, name: file.name } }));
       updateSlide({
         ...patch,
         logoPosition: slide.logoPosition || brand?.logoPosition || 'tr',
@@ -178,12 +198,13 @@ export function SlideLogoPanel({
       toast?.(`Logo do projeto só no card ${cardN}.`, 'success');
       return;
     }
-    if (!brand?.logo) return;
+    if (!brand?.logo && !brand?.logoImageId) return;
     setBusy(true);
     try {
-      const patch = await storeSlideLogo(await origemParaBlob(brand.logo));
+      const source = await resolveLogoDataUrl(brand, {});
+      if (!source) throw new Error('A logo da marca não está disponível. Reimporte o PNG.');
+      const patch = await storeSlideLogo(await origemParaBlob(source));
       if (!alive.current) { URL.revokeObjectURL(patch.logoImage); return; }
-      setStyleKit?.(prev => ({ ...prev, logo: { imageId: patch.logoImageId, name: 'Logo da marca' } }));
       updateSlide({
         ...patch,
         logoPosition: brand.logoPosition || 'tr',
@@ -201,7 +222,7 @@ export function SlideLogoPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ── Padrão da marca ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {!cardOnly ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{
           fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
           letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
@@ -227,7 +248,9 @@ export function SlideLogoPanel({
             {setBrand ? (
               <button
                 type="button"
-                onClick={() => setBrand({ ...brand, logo: null })}
+                onClick={() => {
+                  setBrand((current) => ({ ...current, logo: null, logoImageId: null }));
+                }}
                 aria-label="Remover logo da marca"
                 title="Remove de todos os cards (exceto overrides)"
                 style={{
@@ -255,6 +278,8 @@ export function SlideLogoPanel({
           type="file"
           accept="image/png,image/jpeg,image/svg+xml,image/webp"
           aria-label="Arquivo da logo da marca"
+          aria-hidden="true"
+          tabIndex={-1}
           style={{ display: 'none' }}
           onChange={onBrandUpload}
         />
@@ -298,7 +323,7 @@ export function SlideLogoPanel({
           </>
         ) : null}
 
-        {hasLogoSource && setBrand && setSlides ? (
+        {hasLogoSource && setSlides ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               type="button"
@@ -371,7 +396,7 @@ export function SlideLogoPanel({
             </label>
           </div>
         ) : null}
-      </div>
+      </div> : null}
 
       {/* ── Este card ── */}
       <div style={{
@@ -385,7 +410,7 @@ export function SlideLogoPanel({
           Só no card {cardN}
         </div>
 
-        {(brand?.logo || styleKit?.logo?.imageId || hasCustom) ? (
+        {(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId || hasCustom) ? (
           <button
             type="button"
             className="vc-btn"
@@ -414,28 +439,23 @@ export function SlideLogoPanel({
           </p>
         )}
 
-        {!hidden && (brand?.logo || hasCustom) ? (
+        {!hidden && (brand?.logo || brand?.logoImageId || hasCustom) ? (
           <>
-            <div>
-              <label className="vc-label-sm">Posição neste card</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-                {POS.map((p) => {
-                  const on = ctrl.logoPosition === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`vc-seg-item${on ? ' active' : ''}`}
-                      aria-pressed={on}
-                      onClick={() => setCardLayout({ logoPosition: p.id })}
-                      style={{ minHeight: 40, fontSize: 14 }}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="vc-label-sm">Posição neste card</span>
+              <select
+                className="vc-input"
+                aria-label="Posição da logo neste card"
+                value={ctrl.logoPosition}
+                onChange={(event) => setCardLayout({ logoPosition: event.target.value })}
+                style={{ minHeight: 40 }}
+              >
+                <option value="tl">Superior esquerda ↖</option>
+                <option value="tr">Superior direita ↗</option>
+                <option value="bl">Inferior esquerda ↙</option>
+                <option value="br">Inferior direita ↘</option>
+              </select>
+            </label>
             <Slider
               label={`Tamanho no card ${cardN}`}
               value={ctrl.logoSize}
@@ -455,10 +475,11 @@ export function SlideLogoPanel({
 
         {!hidden ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(styleKit?.logo?.imageId || brand?.logo) && !hasCustom ? (
+            {(styleKit?.logo?.imageId || brand?.logo || brand?.logoImageId) && !hasCustom ? (
               <button
                 type="button"
                 className="vc-btn vc-btn-ghost"
+                aria-label="Aplicar logo do projeto neste card"
                 disabled={busy}
                 onClick={applyProjectOrBrandToCard}
                 style={{ width: '100%', minHeight: 40 }}
@@ -469,6 +490,7 @@ export function SlideLogoPanel({
             <button
               type="button"
               className="vc-btn vc-btn-ghost"
+              aria-label="Importar logo PNG neste card"
               disabled={busy}
               onClick={() => cardFile.current?.click()}
               style={{ width: '100%', minHeight: 40 }}
@@ -480,6 +502,8 @@ export function SlideLogoPanel({
               type="file"
               accept="image/png"
               aria-label="Arquivo PNG da logo deste card"
+              aria-hidden="true"
+              tabIndex={-1}
               style={{ display: 'none' }}
               onChange={onCardUpload}
             />
@@ -488,7 +512,7 @@ export function SlideLogoPanel({
                 {slide.logoImage ? (
                   <img
                     src={slide.logoImage}
-                    alt={`Logo do card ${cardN}`}
+                    alt="Logo deste card"
                     style={{
                       width: 64, height: 64, objectFit: 'contain', alignSelf: 'center',
                       background: 'repeating-conic-gradient(#aaa 0% 25%, #ddd 0% 50%) 0 / 16px 16px',

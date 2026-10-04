@@ -1,5 +1,5 @@
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
-import { startAIJob, runAIJob, cancelAllAIGeneration, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
+import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
 import { buildRemixBlock, mergeRemixedSlides } from './src/utils/carousel-remix.js';
 import { GenerationStatus } from './src/components/GenerationStatus.jsx';
 import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
@@ -33,7 +33,9 @@ import {
   imageCleanupOrphans,
   imageStorageUsage,
   semImagensDeRuntime,
+  semLogosDeRuntimeDasMarcas,
   idsDeImagemEmUso,
+  dataUrlParaBlob,
 } from './src/utils/image-store.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
@@ -398,7 +400,11 @@ import {
   brandToneFromAnalysis,
   brandToneIsReady,
 } from './src/utils/brand-tone.js';
-import { resolveLogoDataUrl, brandLogoInsertPatch, stampLogoVisibleOnSlides } from './src/utils/slide-logo.js';
+import {
+  resolveLogoDataUrl,
+  applyGenerationLogoPolicy,
+  storeSlideLogo,
+} from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 
 const OnboardingLanding = lazy(() => import('./src/components/OnboardingLanding.jsx'));
@@ -852,6 +858,8 @@ export default function App() {
 
   const libraryPersistRef = useRef(library);
   libraryPersistRef.current = library;
+  const brandRosterPersistRef = useRef(brandRoster);
+  brandRosterPersistRef.current = brandRoster;
   const libraryFoldersPersistRef = useRef(libraryFolders);
   libraryFoldersPersistRef.current = libraryFolders;
   /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
@@ -868,6 +876,7 @@ export default function App() {
       if (flushPersistRef.current) { flushPersistRef.current(); return; }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
       lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
+      lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current));
     };
     const onHidden = () => {
       if (document.visibilityState === 'hidden') flushLibrary();
@@ -894,7 +903,7 @@ export default function App() {
   }, [library]);
   useEffect(() => { lsSet(SK.libraryFolders, libraryFolders); }, [libraryFolders]);
   useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
-  useEffect(() => { lsSet(SK.brands, brandRoster); }, [brandRoster]);
+  useEffect(() => { lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster)); }, [brandRoster]);
   useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
 
   // Guard de primeira visita: localStorage vazio → activeDocId nasce null porque a
@@ -909,6 +918,22 @@ export default function App() {
   const activeProjectRef = useRef(activeEntry?.id);
   activeProjectRef.current = activeEntry?.id;
   const initialDoc  = ensureDocShape(activeEntry?.doc || DEFAULT_DOC);
+
+  // O perfil ativo acompanha a marca gravada no projeto antes de o histórico
+  // carregar o novo doc. Evita que a identidade do projeto A seja sincronizada
+  // por engano no perfil que estava ativo ao abrir o projeto B.
+  useLayoutEffect(() => {
+    const projectBrandId = activeEntry?.doc?.brand?.id;
+    if (
+      projectBrandId
+      && projectBrandId !== activeBrandId
+      && brandRoster.some((item) => item.id === projectBrandId)
+    ) setActiveBrandId(projectBrandId);
+    // A identidade deve ser sincronizada somente ao trocar de projeto. Incluir
+    // activeBrandId aqui restaura por engano o ID antigo da biblioteca durante
+    // os milissegundos entre aplicar uma marca e o autosave do documento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDocId]);
 
   const history = useHistory(initialDoc);
   // Carrega antes de pintar: não expõe o brief do projeto anterior por um frame.
@@ -1030,7 +1055,8 @@ export default function App() {
     shellView, setShellView, importDocRef,
   } = useLibrary({
     library, setLibrary, libraryFolders, setLibraryFolders, activeDocId, setActiveDocId,
-    history, slides, brand, brandRoster, activeBrandId, setLibraryOpen, toast, setError,
+    history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
+    setLibraryOpen, toast, setError,
   });
 
   // ── PERFIS DE MARCA: handlers ───────────────────────────────────────────────
@@ -1057,15 +1083,28 @@ export default function App() {
       if (!next.length) return [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
       return next;
     });
+    const fallbackBrand = hydrateBrandTextColors({ ...DEFAULT_BRAND });
+    setLibrary((current) => current.map((entry) => (
+      entry?.doc?.brand?.id === brandId
+        ? { ...entry, doc: { ...entry.doc, brand: { ...fallbackBrand } } }
+        : entry
+    )));
+    if (doc.brand?.id === brandId) {
+      history.set((current) => ({ ...current, brand: { ...fallbackBrand } }));
+    }
     if (brandId === activeBrandId) setActiveBrandId('default');
-  }, [activeBrandId, brandRoster]);
+  }, [activeBrandId, brandRoster, doc.brand?.id, history, setLibrary]);
   // Salva o brand do doc atual como um perfil novo na "estante"
   const saveCurrentBrandAsProfile = useCallback((name) => {
     const newBrand = { ...doc.brand, id: uid(), name: name || `Perfil ${brandRoster.length + 1}` };
     upsertBrand(newBrand);
+    // O perfil selecionado e o perfil gravado no projeto precisam mudar na
+    // mesma ação. Caso contrário, o sincronizador por projeto restaura o ID
+    // antigo no render seguinte.
+    history.set((current) => ({ ...current, brand: hydrateBrandTextColors(newBrand) }));
     setActiveBrandId(newBrand.id);
     return newBrand;
-  }, [doc.brand, brandRoster.length, upsertBrand]);
+  }, [doc.brand, brandRoster.length, history, upsertBrand]);
 
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
   const flushPersistNow = useCallback(() => {
@@ -1077,7 +1116,7 @@ export default function App() {
     lsSet(SK.library, semImagensDeRuntime(lib));
     lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
     if (activeDocId) lsSet(SK.activeDocId, activeDocId);
-    lsSet(SK.brands, brandRoster);
+    lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster));
     lsSet(SK.activeBrandId, activeBrandId);
     setLastSavedAt(agora);
     return lib;
@@ -1178,9 +1217,73 @@ export default function App() {
   const setAppMode = useCallback((next) => {
     if (!['criador', 'diretor', 'studio'].includes(next)) return;
     setAppModeState(next);
+    // Nunca deixe ativa uma aba que o modo recém-selecionado esconde.
+    setTab((current) => (
+      visibleEditorTabs(next).some(({ id }) => id === current) ? current : 'home'
+    ));
     lsSet(SK.appMode, next);
     trackEvent('app_mode_change', { mode: next });
   }, []);
+  const creatorIdentitySnapshot = useMemo(() => ({
+    name: brand.name,
+    handle: brand.handle,
+    bio: brand.bio,
+    positioning: brand.positioning,
+    defaultTone: brand.defaultTone,
+    defaultAudience: brand.defaultAudience,
+    signature: brand.signature,
+    brandTone: brand.brandTone,
+    useBrandVoice: brand.useBrandVoice !== false,
+    voiceSourceUrls: brand.voiceSourceUrls,
+    voiceSampleText: brand.voiceSampleText,
+    voiceImageTexts: brand.voiceImageTexts,
+    logo: brand.logo,
+    logoImageId: brand.logoImageId,
+    logoPosition: brand.logoPosition,
+    logoSize: brand.logoSize,
+    logoOpacity: brand.logoOpacity,
+  }), [
+    brand.name, brand.handle, brand.bio, brand.positioning, brand.defaultTone,
+    brand.defaultAudience, brand.signature, brand.brandTone, brand.useBrandVoice,
+    brand.voiceSourceUrls, brand.voiceSampleText, brand.voiceImageTexts, brand.logo, brand.logoImageId, brand.logoPosition,
+    brand.logoSize, brand.logoOpacity,
+  ]);
+  const creatorIdentitySyncRef = useRef({ projectId: null, serialized: '' });
+  const skipCreatorIdentitySyncRef = useRef(false);
+  useEffect(() => {
+    const projectId = activeEntry?.id || null;
+    const serialized = JSON.stringify(creatorIdentitySnapshot);
+    if (creatorIdentitySyncRef.current.projectId !== projectId) {
+      creatorIdentitySyncRef.current = { projectId, serialized };
+      return;
+    }
+    if (skipCreatorIdentitySyncRef.current) {
+      skipCreatorIdentitySyncRef.current = false;
+      creatorIdentitySyncRef.current = { projectId, serialized };
+      return;
+    }
+    if (creatorIdentitySyncRef.current.serialized === serialized) return;
+    creatorIdentitySyncRef.current = { projectId, serialized };
+    if (appMode !== 'criador' || !activeBrandId || (brand.id && brand.id !== activeBrandId)) return;
+    setBrandRoster((currentRoster) => {
+      const index = currentRoster.findIndex((item) => item.id === activeBrandId);
+      if (index < 0) return currentRoster;
+      const current = currentRoster[index];
+      const changed = Object.entries(creatorIdentitySnapshot).some(([key, value]) => (
+        key === 'brandTone' || key === 'voiceSourceUrls' || key === 'voiceImageTexts'
+          ? JSON.stringify(current[key] ?? null) !== JSON.stringify(value ?? null)
+          : current[key] !== value
+      ));
+      if (!changed) return currentRoster;
+      const nextRoster = [...currentRoster];
+      nextRoster[index] = hydrateBrandTextColors({
+        ...current,
+        ...creatorIdentitySnapshot,
+        id: current.id,
+      });
+      return nextRoster;
+    });
+  }, [appMode, activeBrandId, activeEntry?.id, creatorIdentitySnapshot]);
   // Modal de boas-vindas dos 3 modos — primeira visita só.
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
   useEffect(() => {
@@ -1213,6 +1316,123 @@ export default function App() {
   // `history.reset` troca o documento depois de o patch entrar, logo a hidratação
   // tem de poder repetir-se. Com o mapa, repetir é de graça (sem ler o disco).
   const imagemUrlsRef = useRef(new Map());
+  const legacyBrandLogoJobsRef = useRef(new Set());
+  useEffect(() => {
+    const targets = (brandRoster || []).filter((profile) => (
+      !profile?.logoImageId
+      && typeof profile?.logo === 'string'
+      && profile.logo.startsWith('data:image/png;base64,')
+    ));
+    for (const profile of targets) {
+      const portableLogo = profile.logo;
+      const jobKey = `${profile.id || 'sem-id'}:${portableLogo.length}:${portableLogo.slice(-24)}`;
+      if (legacyBrandLogoJobsRef.current.has(jobKey)) continue;
+      legacyBrandLogoJobsRef.current.add(jobKey);
+      (async () => {
+        const blob = dataUrlParaBlob(portableLogo);
+        if (!blob) return;
+        const stored = await storeSlideLogo(blob);
+        imagemUrlsRef.current.set(stored.logoImageId, stored.logoImage);
+        setBrandRoster((current) => current.map((item) => (
+          item?.id === profile.id && item.logo === portableLogo && !item.logoImageId
+            ? { ...item, logo: stored.logoImage, logoImageId: stored.logoImageId }
+            : item
+        )));
+        history.setSilent((current) => {
+          if (
+            current.brand?.id !== profile.id
+            || current.brand?.logo !== portableLogo
+            || current.brand?.logoImageId
+          ) return current;
+          skipCreatorIdentitySyncRef.current = true;
+          return {
+            ...current,
+            brand: {
+              ...current.brand,
+              logo: stored.logoImage,
+              logoImageId: stored.logoImageId,
+            },
+          };
+        });
+      })().catch(() => {}).finally(() => {
+        legacyBrandLogoJobsRef.current.delete(jobKey);
+      });
+    }
+  }, [brandRoster, history.setSilent]);
+
+  useEffect(() => {
+    const projectId = activeEntry?.id;
+    const portableLogo = typeof brand.logo === 'string' ? brand.logo : '';
+    const rosterWillMigrate = (brandRoster || []).some((profile) => (
+      profile?.id === brand.id
+      && !profile.logoImageId
+      && profile.logo === portableLogo
+    ));
+    if (
+      rosterWillMigrate
+      || brand.logoImageId
+      || !portableLogo.startsWith('data:image/png;base64,')
+    ) return undefined;
+    let cancelled = false;
+    (async () => {
+      const blob = dataUrlParaBlob(portableLogo);
+      if (!blob) return;
+      const stored = await storeSlideLogo(blob);
+      if (cancelled || activeProjectRef.current !== projectId) {
+        URL.revokeObjectURL(stored.logoImage);
+        return;
+      }
+      history.setSilent((current) => {
+        if (current.brand?.logo !== portableLogo || current.brand?.logoImageId) {
+          URL.revokeObjectURL(stored.logoImage);
+          return current;
+        }
+        skipCreatorIdentitySyncRef.current = true;
+        imagemUrlsRef.current.set(stored.logoImageId, stored.logoImage);
+        return {
+          ...current,
+          brand: {
+            ...current.brand,
+            logo: stored.logoImage,
+            logoImageId: stored.logoImageId,
+          },
+        };
+      });
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeEntry?.id, brand.id, brand.logo, brand.logoImageId, brandRoster, history.setSilent]);
+
+  useEffect(() => {
+    const projectId = activeEntry?.id;
+    // A logo do kit é uma biblioteca por projeto e só vira padrão global
+    // quando a marca aponta para ela. Isto mantém “aplicar neste card” isolado.
+    // O fallback migra apenas o formato antigo, que guardava ID no kit e a
+    // mesma imagem em base64 na marca.
+    const logoImageId = brand.logoImageId;
+    if (!logoImageId || (brand.logo && String(brand.logo).startsWith('blob:'))) return undefined;
+    let cancelled = false;
+    (async () => {
+      let url = imagemUrlsRef.current.get(logoImageId);
+      if (!url) {
+        const entry = await imageGet(logoImageId);
+        if (!entry?.blob) return;
+        url = URL.createObjectURL(entry.blob);
+        imagemUrlsRef.current.set(logoImageId, url);
+      }
+      if (cancelled || activeProjectRef.current !== projectId) return;
+      history.setSilent((current) => {
+        const currentId = current.brand?.logoImageId;
+        if (currentId !== logoImageId || current.brand?.logo === url) return current;
+        skipCreatorIdentitySyncRef.current = true;
+        return {
+          ...current,
+          brand: { ...current.brand, logo: url, logoImageId },
+        };
+      });
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeEntry?.id, brand.logo, brand.logoImageId, history.setSilent]);
+
   useEffect(() => {
     let cancelled = false;
     const targets = slides.filter(sl => sl.logoImageId && !sl.logoImage);
@@ -1307,7 +1527,10 @@ export default function App() {
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
-        const removidas = await imageCleanupOrphans(idsDeImagemEmUso(libraryPersistRef.current));
+        const removidas = await imageCleanupOrphans(idsDeImagemEmUso(
+          libraryPersistRef.current,
+          brandRosterPersistRef.current,
+        ));
         if (removidas > 0) console.log(`[imagem] limpeza: ${removidas} imagem(ns) órfã(s) removida(s)`);
       } catch { /* IndexedDB indisponível */ }
     }, 6000);
@@ -1377,6 +1600,9 @@ export default function App() {
     Object.values(videoUrlsRef.current).forEach(url => {
       try { URL.revokeObjectURL(url); } catch { /* */ }
     });
+    imagemUrlsRef.current.forEach((url) => {
+      try { URL.revokeObjectURL(url); } catch { /* */ }
+    });
   }, []);
   // Últimos args passados a handleGenerate — permite remix com tom alternativo sem reabrir modal (B1)
   const lastGenerateArgsRef = useRef(null);
@@ -1396,13 +1622,22 @@ export default function App() {
   const [quickPrompt, setQuickPrompt] = useState('');
   const cancelGeneration = useCallback(() => {
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    generationRef.current?.cancel();
     cancelAllAIGeneration();
     generationRef.current = null;
     setGenProgress(null);
-    toast('Geração cancelada. O que já foi concluído foi mantido.', 'info');
+    setSlideImgGenBusy({});
+    setAnalyzingBrandTone(false);
+    setRefining(false);
+    setGenCaption(false);
+    toast('Operação cancelada. O que já foi concluído foi mantido.', 'info');
   }, [toast]);
   useEffect(() => {
-    setQuickPrompt('');
+    setQuickPrompt(
+      typeof activeEntry?.doc?.quickPromptDraft === 'string'
+        ? activeEntry.doc.quickPromptDraft
+        : '',
+    );
     lastGenerateArgsRef.current = null;
     setHasLastGenerate(false);
     return () => {
@@ -1413,6 +1648,19 @@ export default function App() {
       setGenProgress(null);
     };
   }, [activeEntry?.id]);
+  useEffect(() => {
+    const projectId = activeEntry?.id;
+    if (!projectId) return undefined;
+    const timer = window.setTimeout(() => {
+      if (activeProjectRef.current !== projectId) return;
+      history.setSilent((current) => (
+        current.quickPromptDraft === quickPrompt
+          ? current
+          : { ...current, quickPromptDraft: quickPrompt }
+      ));
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [activeEntry?.id, history.setSilent, quickPrompt]);
 
   const [serverStatus, setServerStatus] = useState({ anthropic:false, openai:false, dev:false });
   const selectedTextProvider = aiSettings.textProvider;
@@ -1439,6 +1687,11 @@ export default function App() {
     || (selectedTextProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai)
     || (selectedTextProvider === 'zai');
   const [niche, setNiche] = useState('');
+  useEffect(() => {
+    // Nicho pertence ao briefing do projeto aberto. Limpar também é essencial:
+    // sem isso, um projeto vazio herdava silenciosamente o nicho anterior.
+    setNiche(String(activeEntry?.doc?.editorialContext?.niche || ''));
+  }, [activeEntry?.id]);
 
   // Tour guiado — só após a 1.ª geração (ou conteúdo real), para não tapar
   // a Home / Criar rápido. Pode repetir pela ajuda.
@@ -2044,7 +2297,7 @@ export default function App() {
       if (extraFiles || leftoverSlides) {
         toast(
           extraFiles
-            ? `Foram aplicadas ${n} fotos (até ao slide ${n}). Mais ${urls.length - n} ficheiros extra ignorados.`
+            ? `Foram aplicadas ${n} fotos (até o card ${n}). Mais ${urls.length - n} arquivos extras foram ignorados.`
             : `Foram aplicadas ${n} fotos aos primeiros slides; ${slideCount - n} cards ficaram sem ficheiro novo.`,
           'info',
         );
@@ -2177,7 +2430,7 @@ export default function App() {
     toast('Ajustes da foto gravados no projeto.', 'success');
   }, [setSlides, toast]);
 
-  const generateSlideImageAt = useCallback(async (idx) => {
+  const generateSlideImageAt = useCallback(async (idx, parentSignal = null) => {
     const snap = slides[idx];
     if (!snap) return;
     const slideId = snap.id;
@@ -2205,7 +2458,7 @@ export default function App() {
 
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
-    const job = startAIJob();
+    const job = startAIJob(parentSignal);
     try {
       const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
         signal: job.signal,
@@ -2321,6 +2574,10 @@ export default function App() {
     remix = false,
   }) => {
     if (generationRef.current && !generationRef.current.signal.aborted) return { cancelled: true };
+    if (getAIGenerationCount() > 0) {
+      toast('Há outra operação de IA em andamento. Conclua ou cancele antes de gerar o carrossel.', 'info', 4800);
+      return { cancelled: true };
+    }
     const generationProjectId = activeProjectRef.current;
     const job = startAIJob();
     generationRef.current = job;
@@ -2448,12 +2705,15 @@ ${jsonShapeLine}`;
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
-    const generationBrandBase = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
-    let generationBrand = generationBrandBase;
-    if (styleKit?.logoOnGenerate !== false) {
+    const generationBrand = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
+    let projectLogoAsset = null;
+    if (styleKit?.logoOnGenerate !== false && styleKit?.logo) {
       try {
-        const logoUrl = await resolveLogoDataUrl(generationBrandBase, styleKit);
-        if (logoUrl) generationBrand = { ...generationBrandBase, ...brandLogoInsertPatch(logoUrl, generationBrandBase) };
+        const logoUrl = await resolveLogoDataUrl(generationBrand, styleKit);
+        if (logoUrl) projectLogoAsset = {
+          logoImageId: styleKit.logo.imageId || null,
+          logoImage: logoUrl,
+        };
       } catch { /* logo opcional — geração segue sem bloquear */ }
     }
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
@@ -2548,8 +2808,12 @@ ${jsonShapeLine}`;
       ),
       fmt,
     );
-    if (styleKit?.logoOnGenerate !== false && generationBrand?.logo) {
-      newSlides = stampLogoVisibleOnSlides(newSlides);
+    if (!remix) {
+      newSlides = applyGenerationLogoPolicy(newSlides, {
+        enabled: styleKit?.logoOnGenerate !== false,
+        projectLogoAsset,
+        hasBrandLogo: !!(generationBrand?.logo || generationBrand?.logoImageId),
+      });
     }
     checkActive();
     if (!remix) {
@@ -2835,7 +3099,7 @@ ${capRules}
   const handleQuickGenerateFromNarrativa = async (promptText, { withImages = false, narrativeMode = 'none' } = {}) => {
     const topic = String(promptText || '').trim();
     if (!topic) {
-      toast('Escreve o que queres gerar no prompt.', 'error');
+      toast('Escreva o que você quer gerar no prompt.', 'error');
       return;
     }
     try {
@@ -2869,20 +3133,21 @@ ${capRules}
 
   const [analyzingBrandTone, setAnalyzingBrandTone] = useState(false);
   /** Analisa e devolve o rascunho — o painel confirma antes de gravar (spec Fatia 2 / alinhamento). */
-  const analyzeBrandTone = useCallback(async () => {
+  const analyzeBrandTone = useCallback(async (options = {}) => {
     if (analyzingBrandTone) return null;
-    if (!hasOpenAI) {
+    if (!hasAnyAI) {
       setKeysOpen(true);
-      toast('Configure a chave de IA para analisar o tom.', 'info');
+      toast('Ative a IA de texto para analisar o tom.', 'info');
       return null;
     }
-    const job = startAIJob('brand-tone');
+    const job = startAIJob(options.signal);
     setAnalyzingBrandTone(true);
     try {
       const prompt = buildBrandToneAnalysisPrompt({
         brand,
         styleKit,
         projectName: activeEntry?.name || styleKit?.name || '',
+        socialEvidence: options.socialEvidence,
       });
       const raw = await runAIJob(
         () => callAI(prompt, { json: true, openaiKey, signal: job.signal, maxTokens: 2048 }),
@@ -2894,13 +3159,13 @@ ${capRules}
       if (!tone?.method) throw new Error('A IA não devolveu um perfil de tom utilizável.');
       return tone;
     } catch (e) {
-      if (!isGenerationCancelled(e)) toast(e?.message || 'Não foi possível analisar o tom.', 'error', 6000);
-      return null;
+      if (isGenerationCancelled(e)) return null;
+      throw e;
     } finally {
       job.finish?.();
       setAnalyzingBrandTone(false);
     }
-  }, [analyzingBrandTone, hasOpenAI, brand, styleKit, activeEntry?.name, openaiKey, toast, setKeysOpen]);
+  }, [analyzingBrandTone, hasAnyAI, brand, styleKit, activeEntry?.name, openaiKey, toast, setKeysOpen]);
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
   const refineAll = useCallback(async (instruction) => {
@@ -3114,6 +3379,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
         return;
       }
 
+      // Só o salvamento explícito atravessa overlays. Todo o restante pertence
+      // ao diálogo aberto; nunca editar/exportar o documento escondido atrás.
+      if (anyModalOpen) return;
+
       if (resultsOpen) return;
       if (shellView === 'home') {
         if (mod && k === '/') {
@@ -3177,7 +3446,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
     exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
-    openaiKey, hasOpenAI, setKeysOpen,
+    openaiKey, hasOpenAI, hasTextAI: hasAnyAI, setKeysOpen,
     setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
     material, setMaterial,
     styleKit, setStyleKit,
@@ -3237,9 +3506,22 @@ Retorne APENAS JSON: ${refineAllWantsBody
         return;
       }
       trackEvent('criar_rapido_images', { count: String(idxs.length) });
-      for (const i of idxs) {
-        // eslint-disable-next-line no-await-in-loop
-        await generateSlideImageAt(i);
+      // Mantém um job pai vivo durante o lote. Sem ele, cancelar abortava apenas
+      // a imagem atual e o loop começava o card seguinte como uma nova geração.
+      const batchJob = startAIJob();
+      try {
+        for (const i of idxs) {
+          throwIfGenerationCancelled(batchJob.signal);
+          // eslint-disable-next-line no-await-in-loop
+          await generateSlideImageAt(i, batchJob.signal);
+          throwIfGenerationCancelled(batchJob.signal);
+        }
+      } catch (error) {
+        if (!isGenerationCancelled(error)) {
+          toast(error?.message || 'Não foi possível concluir as imagens.', 'error');
+        }
+      } finally {
+        batchJob.finish();
       }
     },
     imagesBatchBusy: Object.values(slideImgGenBusy || {}).some(Boolean),
@@ -4375,7 +4657,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
         onClose={closeModesIntro}
       />
 
-      <GenerationStatus progress={genProgress} onCancel={cancelGeneration} />
+      <GenerationStatus
+        progress={analyzingBrandTone
+          ? { phase: 'tone', label: 'Analisando publicações e tom da marca…' }
+          : genProgress}
+        onCancel={cancelGeneration}
+      />
 
       {/* Modals */}
       <KeysModal
@@ -4388,12 +4675,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={setupOpen}
         onClose={()=>{setSetupOpen(false);setPrefilledTopic('');}}
         onGenerate={handleGenerate}
+        onCancelGeneration={cancelGeneration}
         defaultNiche={niche}
         defaultTopic={prefilledTopic}
         defaultTone={brand.defaultTone || ''}
         defaultAudience={brand.defaultAudience || ''}
         hasOpenAI={hasOpenAI}
         hasAnthropic={hasAnthropic}
+        defaultWithImages={appMode !== 'criador'}
         imageProviderLabel={
           aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2'
         }
@@ -4475,6 +4764,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <SeriesPanel
         open={seriesOpen}
         onClose={() => setSeriesOpen(false)}
+        projectId={activeEntry?.id}
         brand={brand}
         styleKit={styleKit}
         folderId={activeEntry?.folderId || ''}

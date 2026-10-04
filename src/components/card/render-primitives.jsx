@@ -117,14 +117,20 @@ function CultureRichParagraphs({
   letterSpacing,
   paraGap,
   destaqueSpans = null,
+  paragraphProps = null,
 }) {
   const full = text ?? '';
   const windows = listCultureParagraphWindows(full);
   const globSpans = unifyAccentIntervalsUtf16(full, destaqueSpans);
   if (!windows.length) return null;
-  return windows.map((w, idx) => (
+  return windows.map((w, idx) => {
+    const extra = typeof paragraphProps === 'function'
+      ? (paragraphProps(idx) || {})
+      : (paragraphProps || {});
+    return (
     <p
       key={idx}
+      {...extra}
       style={{
         margin: 0,
         marginBottom: idx < windows.length - 1 ? paraGap : 0,
@@ -132,6 +138,7 @@ function CultureRichParagraphs({
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
+        ...(extra.style || {}),
       }}
     >
       <CultureInlineRich
@@ -146,7 +153,8 @@ function CultureRichParagraphs({
         letterSpacing={letterSpacing}
       />
     </p>
-  ));
+    );
+  });
 }
 
 // ─── OVERFLOW SCALER ──────────────────────────────────────────────────────────

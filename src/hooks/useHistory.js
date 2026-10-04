@@ -42,7 +42,6 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
   const [state, setStateInternal] = React.useState(initialState);
   const past = React.useRef([]);
   const future = React.useRef([]);
-  const skipNext = React.useRef(false);
   const lastPushAt = React.useRef(0);
   // Guards contra StrictMode double-invoke: React 18 roda o updater 2× em dev
   // pra detectar side-effects. Sem isso, push duplica entradas e undo/redo pulam steps.
@@ -57,7 +56,6 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
     setStateInternal((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       if (next === prev) return prev;
-      if (skipNext.current) { skipNext.current = false; return next; }
       // Guard StrictMode: se já empurramos exatamente este prev no último ciclo, é re-invoke
       if (lastPushedPrev.current === prev) return next;
       lastPushedPrev.current = prev;
@@ -78,7 +76,6 @@ function useHistory(initialState, { limit = 100, coalesceMs = 600 } = {}) {
 
   // setState que NÃO grava no histórico (uso interno)
   const setSilent = React.useCallback((updater) => {
-    skipNext.current = true;
     setStateInternal(updater);
   }, []);
 

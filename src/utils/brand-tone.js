@@ -4,6 +4,8 @@
  * Preferência `brand.useBrandVoice` (default true) activa a voz na geração.
  */
 
+import { buildSocialToneEvidenceBlock } from './social-tone.js';
+
 const FIELD_MAX = 1200;
 const TRAIT_MAX = 8;
 const PHRASE_MAX = 6;
@@ -20,27 +22,37 @@ function asStringList(v, maxItems, itemMax = 80) {
     .slice(0, maxItems);
 }
 
+function isLegacyGeneratedMethod(method) {
+  return /voz e narrativa próprias|não use fórmulas de outros modos|arco narrativo preferido|slide 1 · hook/i.test(method);
+}
+
 /** Normaliza o objeto persistido em `brand.brandTone`. */
 export function normalizeBrandTone(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const summary = asString(raw.summary, 280);
   const method = asString(raw.method, 4000);
   if (!summary && !method) return null;
-  return {
-    summary: summary || 'Tom da marca',
+  const normalizedFields = {
+    summary,
     traits: asStringList(raw.traits, TRAIT_MAX),
     do: asString(raw.do, FIELD_MAX),
     dont: asString(raw.dont, FIELD_MAX),
-    narrativeArc: asString(raw.narrativeArc, FIELD_MAX),
+    ctaStyle: asString(raw.ctaStyle, FIELD_MAX),
     samplePhrases: asStringList(raw.samplePhrases, PHRASE_MAX, 120),
-    method: method || buildBrandToneMethod({
-      summary,
-      traits: asStringList(raw.traits, TRAIT_MAX),
-      do: asString(raw.do, FIELD_MAX),
-      dont: asString(raw.dont, FIELD_MAX),
-      narrativeArc: asString(raw.narrativeArc, FIELD_MAX),
-      samplePhrases: asStringList(raw.samplePhrases, PHRASE_MAX, 120),
-    }),
+  };
+  return {
+    summary: summary || 'Tom da marca',
+    traits: normalizedFields.traits,
+    do: normalizedFields.do,
+    dont: normalizedFields.dont,
+    ctaStyle: normalizedFields.ctaStyle,
+    // Campo legado mantido para round-trip de projetos antigos. Não entra no
+    // método: o arco pertence ao modo narrativo escolhido pelo usuário.
+    narrativeArc: asString(raw.narrativeArc, FIELD_MAX),
+    samplePhrases: normalizedFields.samplePhrases,
+    method: !method || isLegacyGeneratedMethod(method)
+      ? buildBrandToneMethod(normalizedFields)
+      : method,
     analyzedAt: typeof raw.analyzedAt === 'string' ? raw.analyzedAt : null,
   };
 }
@@ -55,30 +67,37 @@ export function buildBrandToneMethod(tone = {}) {
   const traits = asStringList(tone.traits, TRAIT_MAX);
   const doList = asString(tone.do, FIELD_MAX);
   const dont = asString(tone.dont, FIELD_MAX);
-  const arc = asString(tone.narrativeArc, FIELD_MAX);
+  const ctaStyle = asString(tone.ctaStyle, FIELD_MAX);
   const samples = asStringList(tone.samplePhrases, PHRASE_MAX, 120);
 
-  return `MÉTODO TOM DA MARCA — voz e narrativa próprias (escala ao N de slides):
-Objetivo: escrever o carrossel INTEIRO nesta voz, como se a marca falasse — não use fórmulas de outros modos (editorial, viral, storytelling genérico) salvo quando encaixem nesta voz.
+  return `MÉTODO TOM DA MARCA — camada de voz transversal:
+Objetivo: escrever o carrossel inteiro como se a marca falasse. Este método governa vocabulário, ritmo, postura, exemplos e CTA. O modo narrativo selecionado governa o arco e a função de cada slide; preserve-o.
 Perfil: ${summary}
 ${traits.length ? `Traços de voz: ${traits.join('; ')}.` : ''}
 ${doList ? `FAÇA:\n${doList}` : ''}
 ${dont ? `EVITE:\n${dont}` : ''}
-${arc ? `Arco narrativo preferido:\n${arc}` : 'Arco: hook na voz da marca → miolo com camadas coerentes com o perfil → fecho com CTA/pergunta no mesmo tom.'}
 ${samples.length ? `Referência de fraseado (imite o espírito, não copie):\n${samples.map((s) => `• "${s}"`).join('\n')}` : ''}
-- Slide 1 · HOOK na voz da marca (não force tese contraintuitiva se o tom for sóbrio; não force urgência se o tom for calmo).
-- Slides do meio: uma ideia nova por card, léxico e ritmo alinhados ao perfil.
-- Último slide: fecho coerente com a assinatura da marca (pergunta ou save com utilidade).
+${ctaStyle ? `Estilo de CTA:\n${ctaStyle}` : 'CTA: mantenha a postura da marca e cumpra a função de fecho definida pelo modo narrativo.'}
 REGRA: se o brief do projeto contradisser um traço, priorize o brief factual; mantenha o tom.`;
 }
 
 /** Prompt JSON para a IA analisar brief + identidade e devolver o perfil. */
-export function buildBrandToneAnalysisPrompt({ brand = {}, styleKit = {}, projectName = '' } = {}) {
+export function buildBrandToneAnalysisPrompt({
+  brand = {},
+  styleKit = {},
+  projectName = '',
+  socialEvidence = null,
+} = {}) {
   const brief = asString(styleKit?.contextMd, 14000);
   const style = asString(styleKit?.stylePrompt, 2000);
   const nome = asString(projectName || styleKit?.name || brand?.handle || 'a marca', 80);
+  const socialBlock = buildSocialToneEvidenceBlock(socialEvidence);
 
-  return `Você é estrategista de voz de marca. Analise o material abaixo e devolva o TOM DE VOZ + NARRATIVA da marca "${nome}" para carrosséis Instagram.
+  return `Você é estrategista de voz de marca. Analise o material abaixo e devolva o TOM DE VOZ da marca "${nome}" para carrosséis Instagram.
+
+O perfil deve orientar vocabulário, ritmo, postura, exemplos e CTA. Não defina sequência de slides nem arco narrativo: isso será controlado separadamente pelo modo narrativo escolhido pelo usuário.
+
+${socialBlock}
 
 IDENTIDADE VERBAL:
 • Bio: ${asString(brand.bio, 600) || '(vazio)'}
@@ -97,9 +116,9 @@ Responda APENAS com JSON válido (sem markdown):
 {
   "summary": "1 frase curta do tom (ex.: direto, editorial, sem motivacional)",
   "traits": ["3 a 6 adjetivos/traços curtos"],
-  "do": "bullet points do que a voz FAZ (ritmo, vocabulário, ângulo)",
+  "do": "bullet points do que a voz FAZ (vocabulário, ritmo, postura e exemplos)",
   "dont": "bullet points do que a voz EVITA",
-  "narrativeArc": "como esta marca estrutura um carrossel (hook → miolo → fecho) na própria voz",
+  "ctaStyle": "como a marca convida a agir sem mudar de voz",
   "samplePhrases": ["2 a 4 frases curtas no tom da marca, originais"]
 }`;
 }
@@ -112,6 +131,8 @@ export function brandToneFromAnalysis(raw) {
     traits: asStringList(src.traits, TRAIT_MAX),
     do: asString(src.do, FIELD_MAX),
     dont: asString(src.dont, FIELD_MAX),
+    ctaStyle: asString(src.ctaStyle, FIELD_MAX),
+    // Compatibilidade de leitura; não será injetado como regra de arco.
     narrativeArc: asString(src.narrativeArc, FIELD_MAX),
     samplePhrases: asStringList(src.samplePhrases, PHRASE_MAX, 120),
     analyzedAt: new Date().toISOString(),

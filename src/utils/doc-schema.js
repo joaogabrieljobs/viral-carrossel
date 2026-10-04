@@ -9,6 +9,7 @@ import { GEN_MODES, CREATIVE_PRESETS, SLIDE_TEXT_DENSITY_BY_ID, normalizeNarrati
 import { normalizeContentObjective } from './editorial-strategy.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
+import { unlockGroupedElementsPatch } from './card-elements.js';
 
 /** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
 const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
@@ -81,6 +82,8 @@ const mkSlide = (n = 1, brand = null) => {
    * Ver src/utils/card-elements.js.
    */
   elementOffsets: {},
+  /** Cultura/sanduíche: título, subtítulo, foto e texto final movem-se separados. */
+  elementsUnlocked: true,
   // text-on-image controls
   textShadow: false,  // drop shadow — desligado por defeito (toggle «Sombra no texto»)
   textBg: false,      // pill/box background behind text block
@@ -147,8 +150,9 @@ const DEFAULT_BRAND = {
   /** Quando true e há brandTone, injeta voz da marca em toda geração. */
   useBrandVoice: true,
   links: '',
-  // Logo (data URL) — aplicado automaticamente nos slides quando setado
+  // Logo em runtime; os bytes persistidos vivem no IndexedDB via logoImageId.
   logo: null,
+  logoImageId: null,
   /** Foto do perfil no badge @ (data URL) — substitui o ícone decorativo circular */
   handleAvatar: null,
   /** Enquadramento da foto dentro do círculo do badge (0–100 = object-position %). */
@@ -284,7 +288,17 @@ function ensureDocShape(d) {
     out.slides = out.slides.map((sl) => {
       if (!sl || typeof sl !== 'object') return mkSlide(1, out.brand);
       const bp = sl.bgPattern;
-      return { ...sl, bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none' };
+      const normalized = {
+        ...sl,
+        bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none',
+      };
+      // Projetos anteriores à edição individual não tinham este campo. Migra
+      // os offsets antes de ativar os alvos separados para a composição não
+      // saltar (no Cultura antigo, `subtitle` deslocava a zona inferior).
+      if (!Object.prototype.hasOwnProperty.call(sl, 'elementsUnlocked')) {
+        return { ...normalized, ...unlockGroupedElementsPatch(normalized) };
+      }
+      return { ...normalized, elementsUnlocked: sl.elementsUnlocked !== false };
     });
   }
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';

@@ -63,6 +63,10 @@ export const GLOBAL_STYLE = `
     --text-muted: rgba(243, 240, 235, 0.55);
     --text-on-dark: #ffffff;
     --text-on-dark-muted: rgba(255, 255, 255, 0.72);
+    /* Texto escuro sobre magenta passa WCAG AA também no hover #ff4fa1. */
+    --text-on-accent: #160810;
+    /* Limite visível dos campos contra #1c1925: 3.45:1 (WCAG 1.4.11). */
+    --control-border: #736d7a;
 
     /* Accent system (legacy aliases pra compat) */
     --accent: var(--accent-primary);
@@ -82,6 +86,7 @@ export const GLOBAL_STYLE = `
     --success-border: rgba(30, 166, 74, 0.28);
     --success-text: #5fd47e;
     --danger: #ff3b30;
+    --danger-text: #ff8d86;
     --warning: #ff9500;
 
     /* Typography — stack de sistema primeiro (WWDC: optical sizing + legibilidade) */
@@ -450,6 +455,7 @@ export const GLOBAL_STYLE = `
   button[style*="background: var(--accent)"]:not(:disabled),
   button[style*="background:'var(--accent)'"]:not(:disabled) {
     background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
+    color: var(--text-on-accent) !important;
     border: 1px solid rgba(255, 255, 255, 0.10) !important;
     box-shadow:
       0 8px 24px rgba(255, 45, 141, 0.24),
@@ -500,7 +506,7 @@ export const GLOBAL_STYLE = `
   button[style*="background:var(--text-primary)"]:not(.vc-btn-primary):not(:disabled),
   button[style*="background: var(--text-primary)"]:not(.vc-btn-primary):not(:disabled) {
     background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
-    color: #ffffff !important;
+    color: var(--text-on-accent) !important;
     border-color: transparent !important;
     box-shadow:
       0 8px 24px rgba(255, 45, 141, 0.24),
@@ -580,7 +586,7 @@ export const GLOBAL_STYLE = `
     /* Default = ghost legível — evita botão “sem linha” quando só tem .vc-btn */
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-primary);
-    border: 1px solid var(--glass-border-strong);
+    border: 1px solid var(--control-border);
     outline: none; position: relative; overflow: hidden;
     letter-spacing: -0.014em;
     font-feature-settings: 'cv11', 'ss01';
@@ -600,7 +606,7 @@ export const GLOBAL_STYLE = `
 
   /* Primary pill — gradient 135deg magenta + sombra colored + glow no hover */
   .vc-btn-primary {
-    color: #fff;
+    color: var(--text-on-accent);
     padding: 0 22px; height: 40px; font-size: 14px; font-weight: 600;
     background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -645,10 +651,10 @@ export const GLOBAL_STYLE = `
   }
   .vc-btn-ghost:active:not(:disabled) { transform: scale(0.97); }
 
-  /* Botão de ícone — touch target 36px, hover com glass branca sutil */
+  /* Botão de ícone — alvo de toque 44px, hover com glass branca sutil */
   .vc-icon-btn {
     background: none; border: none; cursor: pointer; color: var(--text-muted);
-    min-width: 36px; min-height: 36px; padding: 8px; border-radius: 10px;
+    min-width: 44px; min-height: 44px; padding: 10px; border-radius: 10px;
     display: inline-flex; align-items: center; justify-content: center;
     transition: background 0.18s var(--ease-smooth), color 0.18s var(--ease-smooth), transform 0.12s var(--ease-smooth);
     flex-shrink: 0;
@@ -672,7 +678,7 @@ export const GLOBAL_STYLE = `
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--glass-border-strong);
+    border: 1px solid var(--control-border);
     border-radius: 9999px; padding: 11px 18px; font-size: 14px;
     color: var(--text-primary); font-family: var(--font-ui);
     letter-spacing: -0.014em;
@@ -930,6 +936,45 @@ export const GLOBAL_STYLE = `
   }
   .modal-panel-wide { max-width: 640px; }
   @media (max-width: 639px) {
+    .vc-library-header {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) 44px;
+      gap: 10px 8px !important;
+      padding: 12px 14px !important;
+      align-items: center !important;
+    }
+    .vc-library-header > .vc-icon-btn {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .vc-library-view-tabs {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .vc-library-view-tabs > button {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 44px !important;
+      padding-inline: 6px !important;
+      justify-content: center;
+    }
+    .vc-library-toolbar { padding: 12px 14px 0 !important; }
+    .vc-library-actions {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .vc-library-actions > button {
+      min-width: 0;
+      min-height: 44px;
+      justify-content: center;
+    }
+    .vc-library-actions > .vc-library-new { grid-column: 1 / -1; }
+  }
+  @media (max-width: 639px) {
     .modal-panel::before {
       content: ''; display: block; width: 36px; height: 4px;
       background: var(--hairline); border-radius: 99px;
@@ -970,20 +1015,32 @@ export const GLOBAL_STYLE = `
     pointer-events: auto;
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border: 1px solid var(--divider-soft);
+    border: 1px solid transparent;
     line-height: 1.4;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
   }
-  .toast-item.toast-error  { background: rgba(255, 59, 48, 0.92);   color: #ffffff; border-color: transparent; }
-  .toast-item.toast-success{ background: rgba(30, 166, 74, 0.92); color: #ffffff; border-color: transparent; }
-  .toast-item.toast-info   { background: rgba(245, 245, 247, 0.92); color: var(--text-primary); }
+  .toast-item.toast-error  { background: #b42318; color: #ffffff; border-color: #ef8a82; }
+  .toast-item.toast-success{ background: #0c6b3a; color: #ffffff; border-color: #68c58f; }
+  .toast-item.toast-info   { background: #f5f5f7; color: #17131e; border-color: #a8a5ad; }
+  .toast-item.toast-warning{ background: #8a4b00; color: #ffffff; border-color: #e4a54d; }
   .toast-item button {
-    background: none; border: none; cursor: pointer; color: inherit;
-    opacity: 0.7; padding: 10px; flex-shrink: 0;
-    min-width: 36px; min-height: 36px;
+    background: rgba(255,255,255,0.14); border: 1px solid currentColor; cursor: pointer; color: inherit;
+    opacity: 1; padding: 10px; flex-shrink: 0;
+    min-width: 44px; min-height: 44px;
     display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 6px;
+    border-radius: 8px;
   }
-  .toast-item button:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+  .toast-item.toast-info button { background: rgba(23,19,30,0.08); }
+  .toast-item button:hover { background: rgba(255,255,255,0.24); }
+  .toast-item.toast-info button:hover { background: rgba(23,19,30,0.16); }
+
+  .vc-sr-only {
+    position: absolute !important;
+    width: 1px !important; height: 1px !important;
+    padding: 0 !important; margin: -1px !important;
+    overflow: hidden !important; clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important; border: 0 !important;
+  }
 
   .kbd {
     display: inline-flex; align-items: center; justify-content: center;
@@ -1036,7 +1093,7 @@ export const GLOBAL_STYLE = `
     text-transform: none;
   }
 
-  /* Focus-visible: anel --accent-focus nos controlos interativos */
+  /* Focus-visible: anel --accent-focus nos controles interativos */
   button:focus-visible,
   [role="button"]:focus-visible,
   a:focus-visible {

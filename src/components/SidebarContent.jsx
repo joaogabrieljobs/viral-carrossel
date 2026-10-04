@@ -29,7 +29,7 @@ import { OrganizeForPublish } from './panels/OrganizeForPublish.jsx';
 import { ObjectiveTemplateChips } from './panels/ObjectiveTemplateChips.jsx';
 import { ExportMoreFormats } from './panels/ExportMoreFormats.jsx';
 import { RefineBtn } from './ui/editor-chrome.jsx';
-import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch } from '../utils/card-elements.js';
+import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch, unlockGroupedElementsPatch } from '../utils/card-elements.js';
 import { suggestVisualPresetForCreative } from '../utils/slide-design-system.js';
 import { FontPairingPicker, FontPicker } from './ui/font-pickers.jsx';
 import { LayoutMiniIcon, ImageFocalMiniIcon, PhotoRegionMiniIcon } from './ui/mini-icons.jsx';
@@ -151,6 +151,32 @@ const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
 const visibleEditorTabs = (appMode) =>
   EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
 
+function UnlockGroupedElementsNotice({ onUnlock }) {
+  return (
+    <div style={{
+      display:'flex', flexDirection:'column', gap:8, padding:10,
+      border:'1px solid var(--glass-border-strong)', borderRadius:10,
+      background:'var(--bg-card)',
+    }}>
+      <p style={{ fontSize:11, color:'var(--text-secondary)', margin:0, lineHeight:1.5, fontFamily:'var(--font-ui)' }}>
+        Este card ainda usa o movimento agrupado antigo. Separe para arrastar título, subtítulo, foto e texto final individualmente.
+      </p>
+      <button
+        type="button"
+        onClick={onUnlock}
+        style={{
+          width:'100%', minHeight:40, borderRadius:9999, cursor:'pointer',
+          border:'1px solid var(--accent)', background:'var(--accent)', color:'var(--text-on-accent)',
+          fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+        }}
+      >
+        <Move size={14} aria-hidden /> Separar elementos deste card
+      </button>
+    </div>
+  );
+}
+
 function SidebarContent({
   setHookLibrary,
   niche,
@@ -159,7 +185,7 @@ function SidebarContent({
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
   exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
-  openaiKey, hasOpenAI=false, setKeysOpen,
+  openaiKey, hasOpenAI=false, hasTextAI=false, setKeysOpen,
   setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
   material = { content:'', sources:'', context:'' }, setMaterial = () => {},
   styleKit = { stylePrompt: '', contextMd: '', refImages: [] }, setStyleKit = () => {},
@@ -225,6 +251,17 @@ function SidebarContent({
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
+  const groupedCultureElements = !!(
+    (creativePreset === 'tendencia_cultura' || slide?.useCultureLayout)
+    && String(slide?.bodyAfterImage || '').trim()
+    && (slide?.bgImage || slideHasPendingPhotoIntent(slide) || String(slide?.subtitle || '').trim())
+    && slide?.elementsUnlocked === false
+  );
+  const unlockActiveCardElements = React.useCallback(() => {
+    updateSlide(unlockGroupedElementsPatch(slide));
+    setCanvasEditMode(false);
+    toast?.('Elementos separados neste card. Agora cada parte pode ser movida individualmente.', 'success', 5200);
+  }, [setCanvasEditMode, slide, toast, updateSlide]);
   // O rascunho do prompt vive no editor; este painel pode desmontar no mobile.
   React.useLayoutEffect(() => {
     setNarrativaPanel('prompt');
@@ -623,6 +660,7 @@ function SidebarContent({
             setStyleKit={setStyleKit}
             toast={toast}
             projectName={activeEntry?.name}
+            projectId={activeDocId || activeEntry?.id}
             quickPrompt={quickPrompt}
             setQuickPrompt={setQuickPrompt}
             onQuickGenerate={async (text, options) => {
@@ -637,7 +675,7 @@ function SidebarContent({
             setBrand={setBrand}
             onAnalyzeBrandTone={analyzeBrandTone}
             analyzingBrandTone={analyzingBrandTone}
-            hasOpenAI={hasOpenAI}
+            hasOpenAI={hasTextAI}
             onNeedKeys={() => setKeysOpen?.(true)}
             material={material}
             activeIdx={activeIdx}
@@ -899,6 +937,9 @@ function SidebarContent({
             ) : null}
 
             {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (<S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
+              {groupedCultureElements ? (
+                <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} />
+              ) : null}
               <div>
                 <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                   <span>Título</span>
@@ -1107,6 +1148,28 @@ function SidebarContent({
                     />
                   </div>
                 </div>
+              </S>
+            )}
+
+            {tab==='narrativa' && narrativaPanel==='card' && (
+              <S
+                title={`Logo — card ${activeIdx + 1}`}
+                hint="Use a logo já salva no projeto, ou importe um PNG apenas para este card."
+              >
+                <SlideLogoPanel
+                  key={`card-logo-${activeEntry?.id}-${slide.id}`}
+                  slide={slide}
+                  updateSlide={updateSlide}
+                  toast={toast}
+                  styleKit={styleKit}
+                  setStyleKit={setStyleKit}
+                  brand={brand}
+                  setBrand={setBrand}
+                  setSlides={setSlides}
+                  cardIndex={activeIdx}
+                  selectedSlideIds={selectedSlideIds}
+                  cardOnly
+                />
               </S>
             )}
 
@@ -1814,6 +1877,9 @@ function SidebarContent({
                   title="Posição livre"
                   hint="Clique no meio de qualquer elemento do card e arraste. Vale para texto, foto, barra editorial, selo e ornamentos."
                 >
+                  {groupedCultureElements ? (
+                    <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} />
+                  ) : null}
                   {movidos.length ? (
                     <>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -1848,12 +1914,12 @@ function SidebarContent({
                         Repor tudo
                       </button>
                     </>
-                  ) : (
+                  ) : !groupedCultureElements ? (
                     <p style={{ fontSize:11, color:'var(--text-muted)', margin:0, lineHeight:1.5, fontFamily:'var(--font-ui)' }}>
                       Nada foi movido neste card. Arraste um elemento na pré-visualização
                       e ele aparece aqui para repor.
                     </p>
-                  )}
+                  ) : null}
                 </S>
               );
             })()}
@@ -3146,6 +3212,9 @@ function SidebarContent({
                   }}
                   genBusy={genBusy}
                   hasOpenAI={hasOpenAI}
+                  hasTextAI={hasTextAI}
+                  narrativeMode={quickNarrativeMode}
+                  onNarrativeModeChange={onQuickNarrativeModeChange}
                   onNeedKeys={() => setKeysOpen?.(true)}
                   onAnalyzeBrandTone={analyzeBrandTone}
                   analyzingBrandTone={analyzingBrandTone}
@@ -3180,11 +3249,12 @@ function SidebarContent({
                     setStyleKit={setStyleKit}
                     toast={toast}
                     projectName={activeEntry?.name}
+                    projectId={activeDocId || activeEntry?.id}
                     brand={brand}
                     setBrand={setBrand}
                     onAnalyzeBrandTone={analyzeBrandTone}
                     analyzingBrandTone={analyzingBrandTone}
-                    hasOpenAI={hasOpenAI}
+                    hasOpenAI={hasTextAI}
                     onNeedKeys={() => setKeysOpen?.(true)}
                     material={material}
                   />

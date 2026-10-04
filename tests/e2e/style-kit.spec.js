@@ -106,7 +106,9 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   await page.getByLabel('Nome do contexto', { exact: true }).fill('MUSA');
   await page.getByLabel('Brief do projeto').fill(brief + '\nÚltima edição antes da troca.');
   await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
-  await page.getByRole('button', { name: /^Novo projeto$/i }).first().click();
+  // Troca de projeto vive na Home no fluxo com divulgação progressiva.
+  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('button', { name: /Criar novo projeto/i }).first().click();
   await narrativa(page);
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue('');

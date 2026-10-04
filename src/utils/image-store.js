@@ -183,12 +183,35 @@ export async function imagemComoDataUrl(id) {
 }
 
 /** Ids referenciados por uma biblioteca de projetos. */
-export function idsDeImagemEmUso(library) {
-  return [...new Set((library || []).flatMap((e) => [
+export function idsDeImagemEmUso(library, brands = []) {
+  return [...new Set([
+    ...(library || []).flatMap((e) => [
     ...(e?.doc?.slides || []).flatMap(s => [s?.bgImageId, s?.logoImageId]),
     ...(e?.doc?.styleKit?.refImages || []).map(r => r?.imageId),
     e?.doc?.styleKit?.logo?.imageId,
-  ]).filter(Boolean))];
+    e?.doc?.brand?.logoImageId,
+    ]),
+    ...(brands || []).map((brand) => brand?.logoImageId),
+  ].filter(Boolean))];
+}
+
+function semLogoDeRuntime(brand) {
+  if (!brand || typeof brand !== 'object') return brand;
+  const logo = typeof brand.logo === 'string' ? brand.logo : '';
+  const imageId = brand.logoImageId || null;
+  const runtime = logo.startsWith('blob:');
+  const duplicated = !!imageId && logo.startsWith('data:image/');
+  if (!runtime && !duplicated) return brand;
+  const next = { ...brand };
+  delete next.logo;
+  if (imageId) next.logoImageId = imageId;
+  return next;
+}
+
+/** Remove object/data URLs de perfis quando os bytes já vivem no IndexedDB. */
+export function semLogosDeRuntimeDasMarcas(brands) {
+  if (!Array.isArray(brands)) return brands;
+  return brands.map((brand) => semLogoDeRuntime(brand));
 }
 
 /**
@@ -199,8 +222,9 @@ export function idsDeImagemEmUso(library) {
 export function semImagensDeRuntime(library) {
   if (!Array.isArray(library)) return library;
   return library.map((entry) => {
-    const slides = entry?.doc?.slides;
-    if (!Array.isArray(slides)) return entry;
+    const doc = entry?.doc;
+    if (!doc || typeof doc !== 'object') return entry;
+    const slides = Array.isArray(doc.slides) ? doc.slides : [];
     let mudou = false;
     const novos = slides.map((s) => {
       if (!s || typeof s !== 'object') return s;
@@ -215,7 +239,9 @@ export function semImagensDeRuntime(library) {
       if (logoRuntime) delete next.logoImage;
       return next;
     });
+    const brand = semLogoDeRuntime(doc.brand);
+    if (brand !== doc.brand) mudou = true;
     if (!mudou) return entry;
-    return { ...entry, doc: { ...entry.doc, slides: novos } };
+    return { ...entry, doc: { ...doc, slides: novos, brand } };
   });
 }

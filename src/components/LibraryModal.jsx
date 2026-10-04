@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   CalendarDays,
@@ -35,7 +35,7 @@ const controlStyle = {
   borderRadius: 8,
   background: 'var(--bg-elevated)',
   color: 'var(--text-secondary)',
-  border: '1px solid var(--border)',
+  border: '1px solid var(--control-border)',
   fontFamily: 'var(--font-ui)',
   fontSize: 11,
 };
@@ -44,7 +44,7 @@ const actionButtonStyle = {
   width: 44,
   height: 44,
   borderRadius: 8,
-  border: '1px solid var(--border)',
+  border: '1px solid var(--control-border)',
   background: 'var(--bg-elevated)',
   color: 'var(--text-muted)',
   cursor: 'pointer',
@@ -96,6 +96,73 @@ const fieldLabelTextStyle = {
 };
 
 const dayNames = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
+const projectViews = [
+  { id: 'library', label: 'Biblioteca', icon: BookOpen },
+  { id: 'queue', label: 'Fila', icon: ListOrdered },
+  { id: 'calendar', label: 'Calendário', icon: CalendarDays },
+];
+
+function useModalKeyboard(open, onClose) {
+  const dialogRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  const focusEditorAfterCloseRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    focusEditorAfterCloseRef.current = false;
+    const focusTimer = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      // Abrir um projeto troca o conteúdo atrás do modal. Nesse caso o alvo
+      // lógico é a aba ativa do editor; nos demais fechamentos voltamos ao
+      // botão que abriu a Biblioteca, se ele ainda existir.
+      window.requestAnimationFrame(() => {
+        const editorTarget = document.querySelector(
+          '[aria-label="Áreas de edição do projeto"] [role="tab"][aria-selected="true"], '
+          + '[aria-label="Abas do editor"] button',
+        );
+        const returnTarget = returnFocusRef.current;
+        if (focusEditorAfterCloseRef.current && editorTarget instanceof HTMLElement) {
+          editorTarget.focus();
+        } else if (returnTarget instanceof HTMLElement && returnTarget.isConnected) {
+          returnTarget.focus();
+        } else if (editorTarget instanceof HTMLElement) {
+          editorTarget.focus();
+        }
+      });
+    };
+  }, [open]);
+
+  const onDialogKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose?.();
+      return;
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return;
+    const controls = [...dialogRef.current.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0);
+    if (!controls.length) {
+      event.preventDefault();
+      dialogRef.current.focus();
+      return;
+    }
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return { dialogRef, onDialogKeyDown, focusEditorAfterCloseRef };
+}
 
 const monthLabel = (key) => {
   const match = /^(\d{4})-(\d{2})$/.exec(key);
@@ -103,6 +170,13 @@ const monthLabel = (key) => {
   const label = new Date(Number(match[1]), Number(match[2]) - 1, 1)
     .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+const calendarDateLabel = (key) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || '');
+  if (!match) return key || 'Sem data';
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    .toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
 function FolderOrganizer({
@@ -118,6 +192,20 @@ function FolderOrganizer({
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editingFolderName, setEditingFolderName] = useState('');
   const [confirmDeleteFolderId, setConfirmDeleteFolderId] = useState(null);
+  const newFolderInputRef = useRef(null);
+  const folderDeleteConfirmRef = useRef(null);
+  const folderDeleteButtonsRef = useRef(new Map());
+
+  useEffect(() => {
+    if (!confirmDeleteFolderId) return undefined;
+    const focusTimer = window.requestAnimationFrame(() => folderDeleteConfirmRef.current?.focus());
+    return () => window.cancelAnimationFrame(focusTimer);
+  }, [confirmDeleteFolderId]);
+
+  const cancelFolderDelete = (folderId) => {
+    setConfirmDeleteFolderId(null);
+    window.requestAnimationFrame(() => folderDeleteButtonsRef.current.get(folderId)?.focus());
+  };
 
   const submitNewFolder = (event) => {
     event.preventDefault();
@@ -156,6 +244,7 @@ function FolderOrganizer({
         </div>
         <form onSubmit={submitNewFolder} style={{ display: 'flex', gap: 6, flex: '1 1 250px', maxWidth: 340 }}>
           <input
+            ref={newFolderInputRef}
             type="text"
             value={newFolderName}
             onChange={(event) => setNewFolderName(event.target.value)}
@@ -216,7 +305,10 @@ function FolderOrganizer({
                   onBlur={commitRename}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') commitRename();
-                    if (event.key === 'Escape') setEditingFolderId(null);
+                    if (event.key === 'Escape') {
+                      event.stopPropagation();
+                      setEditingFolderId(null);
+                    }
                   }}
                   aria-label={`Novo nome da pasta ${folder.name}`}
                   className="vc-input"
@@ -230,6 +322,15 @@ function FolderOrganizer({
           return (
             <div
               key={folder.id}
+              role={confirming ? 'group' : undefined}
+              aria-label={confirming ? `Confirmar exclusão da pasta ${folder.name}` : undefined}
+              onKeyDown={confirming ? (event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  cancelFolderDelete(folder.id);
+                }
+              } : undefined}
               style={{
                 display: 'inline-flex', alignItems: 'center', borderRadius: 99,
                 border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
@@ -251,11 +352,13 @@ function FolderOrganizer({
               {confirming ? (
                 <>
                   <button
+                    ref={folderDeleteConfirmRef}
                     type="button"
                     onClick={() => {
                       onDeleteFolder?.(folder.id);
                       if (active) onFolderFilter('all');
                       setConfirmDeleteFolderId(null);
+                      window.requestAnimationFrame(() => newFolderInputRef.current?.focus());
                     }}
                     title="Confirmar exclusão. Os projetos ficarão sem pasta."
                     aria-label={`Confirmar exclusão da pasta ${folder.name}`}
@@ -267,7 +370,7 @@ function FolderOrganizer({
                   >OK</button>
                   <button
                     type="button"
-                    onClick={() => setConfirmDeleteFolderId(null)}
+                    onClick={() => cancelFolderDelete(folder.id)}
                     title="Cancelar exclusão"
                     aria-label="Cancelar exclusão da pasta"
                     style={folderIconStyle}
@@ -283,6 +386,10 @@ function FolderOrganizer({
                     style={folderIconStyle}
                   ><Pencil size={10}/></button>
                   <button
+                    ref={(node) => {
+                      if (node) folderDeleteButtonsRef.current.set(folder.id, node);
+                      else folderDeleteButtonsRef.current.delete(folder.id);
+                    }}
                     type="button"
                     onClick={() => {
                       setConfirmDeleteFolderId(folder.id);
@@ -334,7 +441,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
           <ChevronLeft size={15}/>
         </button>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>
+          <div aria-live="polite" aria-atomic="true" style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>
             {monthLabel(currentMonth)}
           </div>
           <button
@@ -376,7 +483,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
                       <div style={{
                         width: 23, height: 23, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         borderRadius: 99, background: isToday ? 'var(--accent)' : 'transparent',
-                        color: isToday ? '#fff' : 'var(--text-muted)', fontSize: 10.5, fontWeight: 700,
+                        color: isToday ? 'var(--text-on-accent)' : 'var(--text-muted)', fontSize: 10.5, fontWeight: 700,
                         fontFamily: 'var(--font-mono)', marginBottom: 4,
                       }}>
                         {Number(date.slice(-2))}
@@ -391,6 +498,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
                               key={entry.id}
                               onClick={() => onOpen(entry.id)}
                               title={`${entry.name}${folderName ? ` · ${folderName}` : ''}`}
+                              aria-label={`${entry.name}. Data: ${calendarDateLabel(date)}. Status: ${status.label}. Pasta: ${folderName || 'Sem pasta'}.`}
                               style={{
                                 width: '100%', minWidth: 0, padding: '6px 7px', borderRadius: 6,
                                 background: status.bg, border: `1px solid ${status.border}`,
@@ -528,7 +636,7 @@ function LibraryQueue({ library, folders, onOpen, onSetStatus }) {
         <ListOrdered size={15} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
         <span>
           <strong style={{ color: 'var(--text-primary)' }}>Fila editorial local.</strong>{' '}
-          Organiza o que publicar a seguir. A publicação continua a ser feita por si no Instagram.
+          Organize o que publicar a seguir. A publicação continua sendo feita por você no Instagram.
         </span>
       </div>
 
@@ -544,7 +652,7 @@ function LibraryQueue({ library, folders, onOpen, onSetStatus }) {
       />
       <QueueSection
         title="Próximos 7 dias"
-        hint={`De ${queue.today} até ${queue.horizon} (planeamento local).`}
+        hint={`De ${queue.today} até ${queue.horizon} (planejamento local).`}
         entries={queue.next7}
         emptyLabel="Nada agendado nesta janela."
         folders={folders}
@@ -593,6 +701,7 @@ export default function LibraryModal({
   appMode = 'criador',
 }) {
   useScrollLock(open);
+  const { dialogRef, onDialogKeyDown, focusEditorAfterCloseRef } = useModalKeyboard(open, onClose);
   const [view, setView] = useState('library');
   const [filter, setFilter] = useState('all');
   const [folderFilter, setFolderFilter] = useState('all');
@@ -602,6 +711,9 @@ export default function LibraryModal({
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState(monthKey());
   const [organizeIds, setOrganizeIds] = useState(() => new Set());
+  const projectDeleteConfirmRef = useRef(null);
+  const projectDeleteButtonsRef = useRef(new Map());
+  const newProjectButtonRef = useRef(null);
   const compactCards = appMode === 'criador';
   const showLibraryFilters = view === 'library';
 
@@ -630,6 +742,56 @@ export default function LibraryModal({
   }), [library]);
   const statusFilters = [{ id: 'all', label: 'Todos' }, ...STATUS_DEFS];
 
+  const changeView = (nextView) => {
+    // Busca e filtros pertencem à Biblioteca. Ao sair dela, limpamos os
+    // filtros para o Calendário e a Fila nunca parecerem vazios por um estado
+    // que ficou invisível.
+    if (nextView !== 'library') {
+      setFilter('all');
+      setFolderFilter('all');
+      setSearch('');
+    }
+    setView(nextView);
+  };
+
+  const openProject = (projectId) => {
+    focusEditorAfterCloseRef.current = true;
+    onOpen?.(projectId);
+  };
+
+  useEffect(() => {
+    if (!confirmDeleteId) return undefined;
+    const focusTimer = window.requestAnimationFrame(() => projectDeleteConfirmRef.current?.focus());
+    return () => window.cancelAnimationFrame(focusTimer);
+  }, [confirmDeleteId]);
+
+  useEffect(() => {
+    if (open) return;
+    setConfirmDeleteId(null);
+    setEditingId(null);
+  }, [open]);
+
+  const cancelProjectDelete = (projectId) => {
+    setConfirmDeleteId(null);
+    window.requestAnimationFrame(() => projectDeleteButtonsRef.current.get(projectId)?.focus());
+  };
+
+  const onViewKeyDown = (event, currentId) => {
+    const currentIndex = projectViews.findIndex((item) => item.id === currentId);
+    let nextIndex = null;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % projectViews.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + projectViews.length) % projectViews.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = projectViews.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextId = projectViews[nextIndex].id;
+    changeView(nextId);
+    window.requestAnimationFrame(() => {
+      dialogRef.current?.querySelector(`[data-project-view="${nextId}"]`)?.focus();
+    });
+  };
+
   const startEdit = (entry) => {
     setEditingId(entry.id);
     setEditingName(entry.name);
@@ -644,14 +806,17 @@ export default function LibraryModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal-panel modal-panel-wide"
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
         style={{ maxWidth: view === 'calendar' ? 1040 : 860 }}
         role="dialog"
         aria-modal="true"
         aria-label="Biblioteca de carrosséis"
+        tabIndex={-1}
       >
-        <div style={{
+        <div className="vc-library-header" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
           padding: '14px 20px', borderBottom: '1px solid var(--border)',
           position: 'sticky', top: 0, background: 'var(--bg-sidebar)', zIndex: 2,
@@ -672,12 +837,8 @@ export default function LibraryModal({
             </div>
           </div>
 
-          <div role="tablist" aria-label="Visualização dos projetos" style={{ display: 'flex', padding: 3, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-            {[
-              { id: 'library', label: 'Biblioteca', icon: BookOpen },
-              { id: 'queue', label: 'Fila', icon: ListOrdered },
-              { id: 'calendar', label: 'Calendário', icon: CalendarDays },
-            ].map((tab) => {
+          <div className="vc-library-view-tabs" role="tablist" aria-label="Visualização dos projetos" style={{ display: 'flex', padding: 3, borderRadius: 9, border: '1px solid var(--control-border)', background: 'var(--bg-card)' }}>
+            {projectViews.map((tab) => {
               const Icon = tab.icon;
               const active = view === tab.id;
               return (
@@ -685,8 +846,13 @@ export default function LibraryModal({
                   type="button"
                   role="tab"
                   aria-selected={active}
+                  aria-controls={`project-view-${tab.id}`}
+                  id={`project-view-tab-${tab.id}`}
+                  tabIndex={active ? 0 : -1}
+                  data-project-view={tab.id}
                   key={tab.id}
-                  onClick={() => setView(tab.id)}
+                  onClick={() => changeView(tab.id)}
+                  onKeyDown={(event) => onViewKeyDown(event, tab.id)}
                   style={{
                     minHeight: 32, padding: '0 11px', borderRadius: 7, border: 0, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -700,17 +866,19 @@ export default function LibraryModal({
             })}
           </div>
 
-          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn"><X size={16}/></button>
+          <button type="button" onClick={onClose} aria-label="Fechar biblioteca" className="vc-icon-btn"><X size={16}/></button>
         </div>
 
-        <div style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className="vc-library-toolbar" style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="vc-library-actions" style={{ display: 'flex', gap: 8 }}>
             <button
+              ref={newProjectButtonRef}
               type="button"
+              className="vc-btn vc-btn-primary vc-library-new"
               onClick={() => onNew()}
               style={{
                 height: 40, flex: 1, borderRadius: 9, border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg, var(--accent), #e03220)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--text-on-accent)',
                 fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: '0 4px 14px rgba(255,77,46,0.25)',
@@ -758,7 +926,7 @@ export default function LibraryModal({
                     fontFamily: 'var(--font-ui)', fontWeight: 600, transition: 'all 0.12s',
                     background: filter === statusFilter.id ? 'var(--accent)' : 'var(--bg-card)',
                     border: `1px solid ${filter === statusFilter.id ? 'var(--accent)' : 'var(--border)'}`,
-                    color: filter === statusFilter.id ? '#fff' : 'var(--text-secondary)',
+                    color: filter === statusFilter.id ? 'var(--text-on-accent)' : 'var(--text-secondary)',
                   }}
                 >
                   {statusFilter.label} <span style={{ opacity: 0.65, marginLeft: 3 }}>({counts[statusFilter.id] || 0})</span>
@@ -770,19 +938,26 @@ export default function LibraryModal({
           ) : null}
         </div>
 
+        <div
+          id={`project-view-${view}`}
+          role="tabpanel"
+          aria-labelledby={`project-view-tab-${view}`}
+          tabIndex={0}
+          style={{ minHeight: 0 }}
+        >
         {view === 'calendar' ? (
           <LibraryCalendar
-            library={visibleItems}
+            library={library}
             folders={folders}
             currentMonth={calendarMonth}
             onMonthChange={setCalendarMonth}
-            onOpen={onOpen}
+            onOpen={openProject}
           />
         ) : view === 'queue' ? (
           <LibraryQueue
             library={library}
             folders={folders}
-            onOpen={onOpen}
+            onOpen={openProject}
             onSetStatus={onSetStatus}
           />
         ) : (
@@ -810,7 +985,7 @@ export default function LibraryModal({
                       onClick={() => { onClose(); onNew?.(); }}
                       style={{
                         marginTop: 6, padding: '10px 18px', borderRadius: 9999, cursor: 'pointer',
-                        background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13,
+                        background: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none', fontSize: 13,
                         fontWeight: 600, fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
                         display: 'inline-flex', alignItems: 'center', gap: 8,
                       }}
@@ -847,7 +1022,7 @@ export default function LibraryModal({
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
                     <button
                       type="button"
-                      onClick={() => onOpen(entry.id)}
+                      onClick={() => openProject(entry.id)}
                       style={{
                         width: 56, height: 70, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
                         background: bg, backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
@@ -872,7 +1047,10 @@ export default function LibraryModal({
                           onBlur={commitEdit}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') commitEdit();
-                            if (event.key === 'Escape') setEditingId(null);
+                            if (event.key === 'Escape') {
+                              event.stopPropagation();
+                              setEditingId(null);
+                            }
                           }}
                           className="vc-input"
                           style={{ padding: '6px 8px', fontSize: 13, fontWeight: 600 }}
@@ -880,14 +1058,13 @@ export default function LibraryModal({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => onOpen(entry.id)}
-                          onDoubleClick={() => startEdit(entry)}
+                          onClick={() => openProject(entry.id)}
                           style={{
                             background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left',
                             fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
                             letterSpacing: '-0.011em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
                           }}
-                          title={`${entry.name} (clique duplo para renomear)`}
+                          title={`Abrir ${entry.name}`}
                         >{entry.name}</button>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
@@ -973,7 +1150,18 @@ export default function LibraryModal({
                   </div>
                   ) : null}
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                  <div
+                    role={confirmDeleteId === entry.id ? 'group' : undefined}
+                    aria-label={confirmDeleteId === entry.id ? `Confirmar exclusão de ${entry.name}` : undefined}
+                    onKeyDown={confirmDeleteId === entry.id ? (event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelProjectDelete(entry.id);
+                      }
+                    } : undefined}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}
+                  >
                     <button type="button" onClick={() => startEdit(entry)} aria-label={`Renomear ${entry.name}`} title="Renomear" style={actionButtonStyle}><Pencil size={12}/></button>
                     <button type="button" onClick={() => onDuplicate(entry.id)} aria-label={`Duplicar ${entry.name}`} title="Duplicar" style={actionButtonStyle}><Copy size={12}/></button>
                     {onNewFromContext ? (
@@ -991,15 +1179,31 @@ export default function LibraryModal({
                     {confirmDeleteId === entry.id ? (
                       <>
                         <button
+                          ref={projectDeleteConfirmRef}
                           type="button"
-                          onClick={() => { onDelete(entry.id); setConfirmDeleteId(null); }}
+                          onClick={() => {
+                            onDelete(entry.id);
+                            setConfirmDeleteId(null);
+                            window.requestAnimationFrame(() => newProjectButtonRef.current?.focus());
+                          }}
                           title="Confirmar exclusão"
+                          aria-label={`Confirmar exclusão de ${entry.name}`}
                           style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.5)', background: 'rgba(248,113,113,0.15)', color: '#f87171', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-ui)' }}
                         >Apagar</button>
-                        <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar exclusão" title="Cancelar" style={actionButtonStyle}><X size={12}/></button>
+                        <button type="button" onClick={() => cancelProjectDelete(entry.id)} aria-label={`Cancelar exclusão de ${entry.name}`} title="Cancelar" style={actionButtonStyle}><X size={12}/></button>
                       </>
                     ) : (
-                      <button type="button" onClick={() => setConfirmDeleteId(entry.id)} aria-label={`Apagar ${entry.name}`} title="Apagar" style={{ ...actionButtonStyle, color: '#f87171' }}><Trash2 size={12}/></button>
+                      <button
+                        ref={(node) => {
+                          if (node) projectDeleteButtonsRef.current.set(entry.id, node);
+                          else projectDeleteButtonsRef.current.delete(entry.id);
+                        }}
+                        type="button"
+                        onClick={() => setConfirmDeleteId(entry.id)}
+                        aria-label={`Apagar ${entry.name}`}
+                        title="Apagar"
+                        style={{ ...actionButtonStyle, color: '#f87171' }}
+                      ><Trash2 size={12}/></button>
                     )}
                   </div>
                 </article>
@@ -1007,6 +1211,7 @@ export default function LibraryModal({
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

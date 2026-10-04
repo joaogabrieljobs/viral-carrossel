@@ -153,6 +153,15 @@ const VC_TEXT_ZONE_STYLE = {
 };
 
 /**
+ * Zonas automáticas continuam a recortar e a reduzir texto enquanto agrupadas.
+ * Depois de separar os elementos, o limite visual passa a ser a borda do card:
+ * título/subtítulo podem atravessar a antiga zona sem desaparecer atrás dela.
+ */
+export function overflowDosElementosSeparados(elementsUnlocked, hasMovedChild) {
+  return elementsUnlocked && hasMovedChild ? 'visible' : 'hidden';
+}
+
+/**
  * Deslocamento visual para o "overshoot" das fontes display.
  *
  * Archivo Black, Anton e Big Shoulders desenham glyphs mais altos que a caixa de
@@ -1161,7 +1170,7 @@ const SlideCardInner = React.forwardRef(({
     if (!off) return estiloBase ? { style: estiloBase } : null;
     const style = { ...(estiloBase || {}), ...off };
     if (estiloBase?.transform) style.transform = `${estiloBase.transform} ${off.transform}`;
-    return { 'data-vc-movable': chave, style };
+    return { style };
   }, [slide, f]);
 
   const movArrasto = React.useCallback((chave, estiloBase) => {
@@ -1169,6 +1178,14 @@ const SlideCardInner = React.forwardRef(({
     if (!drag) return { style: estiloBase };
     return { ...drag, 'data-vc-movable': chave, style: { ...estiloBase, ...drag.style } };
   }, [bindDrag]);
+  const elementsUnlocked = slide.elementsUnlocked === true;
+  /** Cultura/sanduíche nasce como composição automática. Depois de desbloquear,
+   *  cada parte recebe o próprio arrasto sem mudar a geometria do layout. */
+  const movSeparate = React.useCallback((chave, estiloBase) => (
+    elementsUnlocked
+      ? mov(chave, estiloBase)
+      : (estiloBase ? { style: estiloBase } : null)
+  ), [elementsUnlocked, mov]);
   const onPhotoZoneClick = React.useCallback(() => {
     photoReqRef.current?.(slideIdx);
   }, [slideIdx]);
@@ -1512,22 +1529,25 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         {showCultureIdx && (
-          <div style={{
+          <div {...mov('pageBadge', {
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
             fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
-          }}>{num}/{total}</div>
+          })}>{num}/{total}</div>
         )}
 
         <OverflowScaler
-          containerProps={mov('text')}
+          containerProps={elementsUnlocked ? movOffsetOnly('text') : mov('text')}
           containerStyle={{
             ...pctBox(topR, f),
             ...VC_TEXT_ZONE_STYLE,
             zIndex: 4,
-            overflow: 'hidden',
+            overflow: overflowDosElementosSeparados(
+              elementsUnlocked,
+              hasElementOffset(slide, 'title') || hasElementOffset(slide, 'subtitle'),
+            ),
             padding: `${padYCv}px ${padXCvTop}px`,
             display: 'flex',
             flexDirection: 'column',
@@ -1535,7 +1555,7 @@ const SlideCardInner = React.forwardRef(({
             alignItems: Lzn.ai,
             textAlign: slide.align === 'justify' ? 'left' : slide.align,
           }}
-          deps={[slide.title, slide.subtitle, slide.titleSize, slide.subSize, topR.w, topR.h, f.w, f.h]}
+          deps={[slide.title, slide.subtitle, slide.titleSize, slide.subSize, topR.w, topR.h, f.w, f.h, elementsUnlocked]}
           minScale={AUTOFIT_MIN_SCALE}
         >
           {(topScale) => (
@@ -1552,7 +1572,7 @@ const SlideCardInner = React.forwardRef(({
             }}
           >
           {(slide.title || '').trim() ? (
-            <h2 style={{
+            <h2 {...movSeparate('title', {
               margin: 0,
               fontFamily: titleFF,
               overflowWrap: 'break-word',
@@ -1563,7 +1583,7 @@ const SlideCardInner = React.forwardRef(({
               textTransform:
                 slide.titleCase === 'upper' ? 'uppercase' :
                 slide.titleCase === 'lower' ? 'lowercase' : 'none',
-            }}>
+            })}>
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
@@ -1588,6 +1608,7 @@ const SlideCardInner = React.forwardRef(({
             fontWeight={600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
             paraGap={f.h * 0.012 * topScale}
+            paragraphProps={elementsUnlocked ? mov('subtitle') : null}
           />
           </div>
           )}
@@ -1674,7 +1695,7 @@ const SlideCardInner = React.forwardRef(({
         )}
 
         <OverflowScaler
-          containerProps={mov('subtitle')}
+          containerProps={elementsUnlocked ? mov('bodyAfterImage') : mov('subtitle')}
           containerStyle={{
             ...pctBox(botR, f),
             ...VC_TEXT_ZONE_STYLE,
@@ -1738,7 +1759,7 @@ const SlideCardInner = React.forwardRef(({
           if (pos === 'tr') Object.assign(st, { top: topOffset, right: margin });
           if (pos === 'bl') Object.assign(st, { bottom: margin, left: margin });
           if (pos === 'br') Object.assign(st, { bottom: margin, right: margin });
-          return <div style={st} aria-hidden/>;
+          return <div {...mov('logo', st)} aria-hidden={movableElements ? undefined : true}/>;
         })()}
       </div>
     );
@@ -1799,13 +1820,13 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         {showCultureIdx && (
-          <div style={{
+          <div {...mov('pageBadge', {
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
             fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
-          }}>{num}/{total}</div>
+          })}>{num}/{total}</div>
         )}
         {sandwich && imgLoading && (
           <div style={{
@@ -1820,7 +1841,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         <OverflowScaler
-          containerProps={mov('text')}
+          containerProps={elementsUnlocked ? movOffsetOnly('text') : mov('text')}
           containerStyle={{
             position:'absolute',
             top: f.h * (hasBar ? 0.09 : 0.065),
@@ -1831,24 +1852,28 @@ const SlideCardInner = React.forwardRef(({
             flexDirection:'column',
             gap: f.h * 0.024,
             // Sempre flex-start: space-between empurrava o primeiro item PRA CIMA quando havia
-            // overflow (causa do bug "texto cortado no topo"). Com flex-start, overflow vai pra
-            // baixo onde overflow:hidden corta sem comprometer leitura do começo.
+            // overflow. Agrupado, o scaler reduz e a zona recorta o excesso; separado, filhos
+            // deslocados podem atravessar a antiga zona e só a borda do card os limita.
             justifyContent: 'flex-start',
             ...VC_TEXT_ZONE_STYLE,
-            overflow: 'hidden',
+            overflow: overflowDosElementosSeparados(
+              elementsUnlocked,
+              ['title', 'subtitle', 'bodyAfterImage', 'photo']
+                .some((key) => hasElementOffset(slide, key)),
+            ),
             minWidth: 0,
             minHeight: 0,
           }}
           deps={[
             slide.title, slide.subtitle, bodyAfterCulture,
             f.w, f.h, slide.titleSize, slide.subSize, slide.bodyAfterSize,
-            sandwich, !!slide.bgImage,
+            sandwich, !!slide.bgImage, elementsUnlocked,
           ]}
           minScale={0.78}
         >
           {(scale) => (<>
           {(slide.title || '').trim() ? (
-            <h2 style={{
+            <h2 {...movSeparate('title', {
               margin: 0,
               fontFamily: titleFF,
               overflowWrap: 'break-word',
@@ -1857,7 +1882,7 @@ const SlideCardInner = React.forwardRef(({
               maxWidth: '100%',
               minWidth: 0,
               boxSizing: 'border-box',
-            }}>
+            })}>
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
@@ -1882,11 +1907,12 @@ const SlideCardInner = React.forwardRef(({
             fontWeight={600}
             letterSpacing="-0.018em"
             paraGap={f.h*0.012}
+            paragraphProps={elementsUnlocked ? mov('subtitle') : null}
           />
           {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
             <div
               data-vc-photo-zone="1"
-              style={{
+              {...movSeparate('photo', {
                 ...flatPhotoPlaceholderStyle,
                 position: 'relative',
                 cursor: onPhotoZoneClick ? 'pointer' : undefined,
@@ -1894,7 +1920,7 @@ const SlideCardInner = React.forwardRef(({
                   borderColor: cr.accentInk,
                   color: cr.accentInk,
                 } : null),
-              }}
+              })}
               role={onPhotoZoneClick && !flatPhotoNativeHit ? 'button' : undefined}
               onClick={
                 onPhotoZoneClick && !flatPhotoNativeHit
@@ -1923,14 +1949,14 @@ const SlideCardInner = React.forwardRef(({
             </div>
           )}
           {sandwich && slide.videoId && getVideoUrl(slide.videoId) && (
-            <div data-vc-photo-zone="1" style={{
+            <div data-vc-photo-zone="1" {...movSeparate('photo', {
               width:'100%', flex: '0 1 auto',
               height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
               minHeight: f.h * 0.22, maxHeight: f.h * 0.32,
               borderRadius: f.w * 0.017, overflow:'hidden', flexShrink:1, position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
               boxShadow: 'var(--shadow-product)',
-            }}>
+            })}>
               <video
                 src={getVideoUrl(slide.videoId)}
                 autoPlay loop muted playsInline
@@ -1957,7 +1983,7 @@ const SlideCardInner = React.forwardRef(({
             </div>
           )}
           {sandwich && !slide.videoId && imgReady && !imgErr && slide.bgImage && (
-            <div data-vc-photo-zone="1" style={{
+            <div data-vc-photo-zone="1" {...movSeparate('photo', {
               width:'100%',
               flex: '0 1 auto',
               height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
@@ -1969,7 +1995,7 @@ const SlideCardInner = React.forwardRef(({
               position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
               boxShadow: 'var(--shadow-product)',
-            }}>
+            })}>
               <img
                 src={slide.bgImage}
                 alt=""
@@ -2009,7 +2035,7 @@ const SlideCardInner = React.forwardRef(({
           )}
           {/* Body sem AutoFitText: deixa OverflowScaler medir a altura real e escalar
               uniformemente. Wrapper com width 100% pro CultureRichParagraphs ocupar a largura. */}
-          <div style={{ width: '100%' }}>
+          <div {...movSeparate('bodyAfterImage', { width: '100%' })}>
             <CultureRichParagraphs
               text={bodyAfterCulture}
               destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
@@ -2043,10 +2069,10 @@ const SlideCardInner = React.forwardRef(({
           if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
           if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
           if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
-          return <div style={style} aria-hidden/>;
+          return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
         })()}
         {brand.showHandle && slide.showHandle && !hideInstaBadge && (brand.handle || '').trim() && (
-          <div style={{
+          <div {...mov('handleBadge', {
             ...vcHandleBadgeBoxPositionStyle(brand),
             display:'flex', alignItems:'center', gap:f.w*0.012,
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
@@ -2054,7 +2080,7 @@ const SlideCardInner = React.forwardRef(({
             padding:`${f.h*0.01}px ${f.w*0.022}px`,
             borderRadius:999,
             border: cr.solidBgIsLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.12)',
-          }}>
+          })}>
             <div style={{
               width:f.w*0.034, height:f.w*0.034, borderRadius:'50%',
               background:'conic-gradient(from 45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',
@@ -2377,7 +2403,8 @@ const SlideCardInner = React.forwardRef(({
         // Com o bloco deslocado, a moldura não pode recortar: quem limita passa
         // a ser a borda do card. Vale no editor e na exportação — senão o que
         // se vê ao arrastar não é o que sai no PNG.
-        const textoDeslocado = hasElementOffset(slide, 'text');
+        const textoDeslocado = ['text', 'title', 'subtitle']
+          .some((key) => hasElementOffset(slide, key));
         // Com glass (textBg) ou arrasto: não clipar ascenders do título.
         // O card root já tem overflow:hidden para a foto.
         const textoSemClip = textoDeslocado || !!slide.textBg;
@@ -2572,7 +2599,7 @@ const SlideCardInner = React.forwardRef(({
         if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
         if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
         if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
-        return <div {...mov('logo', style)} aria-hidden/>;
+        return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
       })()}
     </div>
   );

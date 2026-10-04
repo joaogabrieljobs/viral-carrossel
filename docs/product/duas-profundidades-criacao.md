@@ -2,7 +2,7 @@
 
 Atualizado em 04/10/2026. Spec de produto canónica para a entrada “Criar rápido” / “Controle profissional”. Complementa `guia-projetos-geracao.md` (fluxo operacional atual) e não substitui contratos de billing em `shared/plans.js`.
 
-**Estado de implementação:** alinhamento tom/logo/rótulos + Fatia 1 + Fatia 2 + Fatia 3 (checklist profissional, logo em massa com undo, multi-select, templates por objetivo, gerar série ideias→rascunhos, novo com este contexto). Fatia 0 (validação com utilizadores) segue no roadmap.
+**Estado de implementação:** alinhamento tom/logo/rótulos + Fatia 1 + Fatia 2 + Fatia 3 (checklist profissional, logo em massa com undo, multi-select, templates por objetivo, gerar série ideias→rascunhos, novo com este contexto) + DNA verbal por links, legendas e OCR + edição individual dos elementos + pastas/calendário leve + backup completo v3 de perfis. Fatia 0 (validação com usuários) segue no roadmap.
 
 ## Tese do produto
 
@@ -43,9 +43,14 @@ O produto apresenta primeiro apenas as decisões necessárias para chegar ao pr�
 
 Nenhum recurso fica preso para sempre a um perfil. Os controles avançados permanecem acessíveis por “Mais controle” ou pela troca do modo de interface.
 
-## Fundamento compartilhado: identidade do projeto
+## Fundamento compartilhado: identidade da marca e contexto do projeto
 
-A identidade do projeto é composta por camadas distintas:
+A plataforma separa o que deve ser reaproveitado do que pertence a um único trabalho:
+
+- **Identidade da marca (reutilizável):** bio, posicionamento, público, tom/DNA verbal e assinatura. É salva no perfil de marca ativo e reaparece em novos projetos.
+- **Contexto do projeto (isolado):** brief, regras, estilo visual, referências e logo específica daquele cliente/campanha. Pode ser duplicado por “Novo com este contexto”.
+
+O conjunto usado pela geração é composto por camadas distintas:
 
 - **Contexto:** o que a marca faz, para quem, fatos, restrições e objetivos.
 - **Tom de voz:** como a marca fala.
@@ -78,6 +83,14 @@ Em vez de “Complete 2 passos”, a interface deve dizer o benefício concreto:
 
 O nome “Contexto ON” pode continuar como indicador compacto após a configuração.
 
+Depois de a identidade ser salva, o Criar rápido não pede a apresentação da marca a cada visita. Mostra um resumo fechado — por exemplo, “MUSA · identidade salva” — e a ação **Editar identidade**. O formulário completo volta a abrir apenas quando a identidade está incompleta ou quando o usuário escolhe editar.
+
+### Backup e restauração da identidade
+
+O backup completo da biblioteca usa `vcVersion: 3` e leva projetos, pastas, perfis de marca, perfil ativo e logos em formato portátil. Ao importar, o produto restaura a marca ativa, remapeia IDs em conflito e converte backups v1/v2 em perfis separados por projeto, evitando fundir identidades antigas que compartilhavam o ID padrão.
+
+O backup de um projeto isolado continua limitado àquele projeto. Ele não substitui o backup completo quando a intenção é migrar todos os perfis reutilizáveis para outro navegador.
+
 # Caminho 1 — Criar rápido
 
 ## Objetivo
@@ -104,6 +117,8 @@ A Home apresenta uma sequência curta e retomável:
    - A análise apresenta um resumo editável antes de salvar.
    - Exemplo: “Direto, confiante e didático. Frases curtas. Sem promessas exageradas.”
    - O usuário pode reanalisar ou editar manualmente.
+   - Opcionalmente, o usuário cola links de perfil/posts públicos e de 3 a 10 legendas reais para extrair o DNA verbal.
+   - A ação analisa somente o tom. Ela não gera cards e não aparece como “geração de carrossel” no progresso global.
 
 4. **Diga o que quer publicar**
    - Prompt principal grande.
@@ -131,6 +146,29 @@ O checklist deixa de ser exibido como obrigação depois do primeiro resultado. 
 - **Revisão:** mantém checagem editorial antes de aplicar o resultado.
 
 O sistema não deve usar “Tom da marca” como substituto do modo narrativo. O tom acompanha todos os modos.
+
+## DNA verbal por publicações
+
+O fluxo aceita três classes de evidência:
+
+1. **Links públicos:** perfil, post, artigo, vídeo ou página pública. O servidor tenta extrair título, descrição social e texto visível com limite de tamanho, autenticação e validação de URL.
+2. **Legendas coladas:** fonte mais confiável quando a rede exige login ou monta o feed apenas no navegador.
+3. **Imagens de carrosséis publicados:** até 10 PNGs/JPGs passam por OCR; o texto reconhecido entra como evidência verbal junto às legendas.
+
+Regras do produto:
+
+- publicações da própria marca têm prioridade sobre adjetivos genéricos do brief;
+- a análise procura padrões recorrentes de vocabulário, ritmo, postura, exemplos e CTA;
+- frases são usadas como evidência, sem serem copiadas para novos cards;
+- o DNA verbal não define capa, sequência ou arco; isso continua pertencendo ao modo narrativo;
+- se nenhum link liberar texto, a interface explica o bloqueio e pede legendas reais;
+- links e exemplos ficam no perfil/projeto local para permitir reanálise; conteúdo não entra na telemetria.
+- os arquivos usados no OCR não são gravados no projeto; apenas o texto extraído fica salvo para reanálise;
+- links, legendas e textos extraídos podem ser removidos por completo; o estado vazio também é persistido;
+- leitura, OCR e análise de tom obedecem ao cancelamento global e descartam respostas tardias;
+- a leitura das imagens infere voz a partir do texto dos cards. Ela não trata composição visual como tom de voz.
+
+O Instagram não oferece leitura irrestrita de qualquer perfil por URL. A conexão oficial do feed completo exige login/autorização de uma conta profissional e configuração do aplicativo na Meta. Enquanto essa conexão não estiver habilitada, o produto trabalha com páginas públicas que liberem descrição e com legendas fornecidas pelo usuário, sem afirmar que leu posts que a rede bloqueou.
 
 ## Linguagem do caminho rápido
 
@@ -182,8 +220,11 @@ Estados de progresso devem comunicar resultado:
 - “Adicione uma logo para deixar os próximos carrosséis prontos mais rápido.”
 - “Tudo pronto para gerar.”
 - “Criando o texto do seu carrossel.”
+- “Analisando publicações e contexto da marca.”
 - “Gerando imagem 2 de 5.”
 - “Cancelar geração” permanece disponível globalmente.
+
+O cancelamento global cobre texto, imagens, refinos, legenda, ganchos, série, leitura de fontes, OCR e análise de tom. Ele interrompe o lote inteiro, descarta respostas tardias e preserva etapas já concluídas. Uma requisição já entregue ao provedor pode ter sido contabilizada antes do cancelamento; a interface não promete estorno automático desse consumo.
 
 # Caminho 2 — Controle profissional
 
@@ -262,9 +303,15 @@ A ação em massa deve existir também depois da geração:
 
 Sempre com undo.
 
+Os três níveis são isolados: logo do perfil global, logo do projeto e override do card não se promovem nem se sobrescrevem silenciosamente. A logo do projeto entra como camada nos novos cards, `logoOnGenerate=false` a oculta nas novas gerações, e remix preserva as logos já aplicadas. “Somente selecionados” deixa os demais cards intactos; remover a logo do projeto não apaga a logo do perfil da marca.
+
+## Edição individual do card
+
+Nos layouts editoriais e no preset Cultura, os componentes do card são alvos independentes: título, subtítulo, imagem, texto abaixo da imagem, contador, assinatura e logo. Arrastar um deles não move o conjunto. O mesmo ajuste funciona por mouse, toque e setas do teclado; `Shift` acelera o deslocamento. Projetos antigos são migrados preservando os offsets do layout agrupado para não alterar a composição salva. Cards antigos explicitamente salvos como agrupados oferecem a ação **Separar elementos**.
+
 ## Gerar série
 
-“Gerar série” merece backlog próprio e não deve ser apenas um prompt maior.
+A primeira versão de “Gerar série” já segue um fluxo próprio e não é apenas um prompt maior. A geração completa em fila continua como evolução posterior.
 
 Entrada:
 
@@ -279,7 +326,7 @@ Saída inicial:
 
 - lista de ideias e ângulos para aprovação;
 - um projeto por tema somente depois da seleção;
-- geração em fila com cancelamento global;
+- criação dos rascunhos selecionados; a geração completa em fila permanece como evolução posterior;
 - indicação de possível consumo de imagens antes da confirmação.
 
 Primeira versão recomendada:
@@ -287,6 +334,10 @@ Primeira versão recomendada:
 > Gerar cinco ideias → selecionar ideias → criar rascunhos de projetos.
 
 Isso reduz custo e evita gerar cinco carrosséis ruins de uma vez.
+
+## Organização para publicação
+
+O organizador local permite atribuir pasta, status e data de publicação, filtrar projetos e navegar por uma visão mensal. Rascunhos de uma série podem herdar a pasta escolhida. Essa camada prepara e acompanha o trabalho; ela não publica nem agenda conteúdo na Meta.
 
 # Navegação entre os caminhos
 
@@ -314,7 +365,7 @@ O segundo link abre o mesmo produto com Diretor ativo e checklist profissional e
 - Agendamento pela Meta
 - Sincronização completa em nuvem
 - Agente autônomo que cria e publica
-- Calendário editorial completo
+- Planejamento editorial estratégico ou calendário com publicação automática
 - Geração em massa sem etapa de aprovação
 - Nova arquitetura ou backend separado por perfil
 
@@ -379,6 +430,9 @@ Entregas:
 Critérios de aceite:
 
 - segundo carrossel reutiliza contexto, tom e preferência de logo;
+- uma identidade salva reaparece em um projeto novo sem pedir a bio novamente;
+- “Analisar meu tom” nunca inicia geração de cards;
+- quando links sociais são bloqueados, a tela pede legendas e não inventa uma análise do feed;
 - mudar o modo narrativo não apaga o tom;
 - atualizar o tom pede confirmação antes de alterar gerações futuras;
 - pacote exportado contém os cards esperados e oferece a legenda separadamente.

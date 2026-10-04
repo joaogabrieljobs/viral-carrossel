@@ -30,7 +30,15 @@ describe('context-status (Fatia 2)', () => {
   it('detecta carrossel com conteúdo', () => {
     expect(projectHasCarouselContent([])).toBe(false);
     expect(projectHasCarouselContent([{ title: 'Seu título aqui' }])).toBe(false);
+    expect(projectHasCarouselContent([{
+      title: 'Seu título aqui',
+      subtitle: 'Subtítulo descritivo que reforça o gancho principal do carrossel.',
+    }])).toBe(false);
     expect(projectHasCarouselContent([{ title: 'Hook' }])).toBe(true);
     expect(projectHasCarouselContent([{ title: 'Seu título aqui', subtitle: 'Sub real' }])).toBe(true);
+  });
+
+  it('reconhece logo persistida no IndexedDB sem depender da URL de runtime', () => {
+    expect(resolveContextStatus({ brand: { logoImageId: 'logo-1' } }).hasLogo).toBe(true);
   });
 });

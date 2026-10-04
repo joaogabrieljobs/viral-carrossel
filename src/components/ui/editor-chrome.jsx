@@ -273,8 +273,12 @@ const DRAWER_DEFAULT_SNAP = 1;
 
 function MobileDrawer({ open, onClose, children }) {
   const panelRef  = useRef(null);
+  const closeRef  = useRef(null);
+  const returnFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
   const startRef  = useRef({ y:0, t:0, snap: DRAWER_DEFAULT_SNAP });
   const dragging  = useRef(false);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   // Snap atual — reset pra default ao reabrir o drawer.
   const [snapIdx, setSnapIdx] = useState(DRAWER_DEFAULT_SNAP);
   useEffect(() => { if (open) setSnapIdx(DRAWER_DEFAULT_SNAP); }, [open]);
@@ -293,9 +297,43 @@ function MobileDrawer({ open, onClose, children }) {
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
+    returnFocusRef.current = document.activeElement;
     document.body.style.overflow = 'hidden';
     applyDrag(0);
-    return () => { document.body.style.overflow = prev; };
+    const focusTimer = window.requestAnimationFrame(() => closeRef.current?.focus());
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current?.();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const controls = [...panelRef.current.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => element.getClientRects().length > 0);
+      if (!controls.length) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.body.style.overflow = prev;
+      returnFocusRef.current?.focus?.();
+    };
   }, [open, applyDrag]);
 
   const onTouchStart = (e) => {
@@ -340,22 +378,29 @@ function MobileDrawer({ open, onClose, children }) {
     // Drag pequeno = volta pro snap original (applyDrag(0) já cuida).
   };
 
+  // Fechado, o drawer sai da árvore. Assim os seus campos não entram na
+  // navegação por Tab enquanto permanecem visualmente fora da tela.
+  if (!open) return null;
+
   return (
     <>
       {/* Backdrop dim leve sem blur — cards visíveis acima */}
-      {open && (
-        <div
-          onClick={onClose}
-          style={{
-            position:'fixed', inset:0, background:'rgba(0,0,0,0.18)',
-            zIndex:30, animation:'fadeIn 0.18s',
-          }}
-        />
-      )}
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.18)',
+          zIndex:30, animation:'fadeIn 0.18s',
+        }}
+      />
       {/* Painel resizable — altura controlada por snapIdx, drag escolhe entre
           os 3 snaps (pequeno/médio/grande) ou fecha no limite inferior. */}
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editor do card"
+        tabIndex={-1}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -400,12 +445,14 @@ function MobileDrawer({ open, onClose, children }) {
             ))}
           </div>
           <button
+            ref={closeRef}
+            type="button"
             onClick={onClose}
             style={{
               position:'absolute', right:10, top:8,
               background:'none', border:'none', color:'var(--text-muted)',
               cursor:'pointer', padding:8, borderRadius:6,
-              minWidth:36, minHeight:36,
+              minWidth:44, minHeight:44,
               display:'flex', alignItems:'center', justifyContent:'center',
             }}
             aria-label="Fechar editor"

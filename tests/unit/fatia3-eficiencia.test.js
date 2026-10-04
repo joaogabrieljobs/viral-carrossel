@@ -5,11 +5,14 @@ import {
   applyObjectiveTemplate,
   resolveObjectiveTemplate,
 } from '../../src/utils/objective-templates.js';
+import { resolveQuickNarrativeMode } from '../../src/components/panels/CriarRapidoHome.jsx';
 import {
   buildSeriesIdeasPrompt,
   normalizeSeriesIdeas,
   buildSeriesDraftSeed,
+  cloneSeriesBrand,
 } from '../../src/utils/series-drafts.js';
+import { buildSeededLibraryDoc } from '../../src/hooks/useLibrary.js';
 import {
   stampLogoVisibleOnSlides,
   hideLogoOnSlides,
@@ -22,6 +25,12 @@ describe('objective-templates (Fatia 3)', () => {
     expect(OBJECTIVE_TEMPLATES.map((t) => t.id)).toEqual([
       'lancar', 'educar', 'prova_social', 'bastidor',
     ]);
+  });
+
+  it('Criar rápido aplica o modo do objetivo e preserva o modo salvo sem objetivo', () => {
+    expect(resolveQuickNarrativeMode('educar', 'none')).toBe('how_to');
+    expect(resolveQuickNarrativeMode('bastidor', 'none')).toBe('storytelling');
+    expect(resolveQuickNarrativeMode(null, 'viral')).toBe('viral');
   });
 
   it('aplica template sem apagar pedido existente', () => {
@@ -62,9 +71,25 @@ describe('series-drafts (Fatia 3)', () => {
     expect(ideas[0].title).toBe('Hook A');
   });
 
-  it('cria seed de rascunho com styleKit herdado e slides omitidos', () => {
+  it('cria seed com contexto, marca e pedido persistidos no próprio rascunho', () => {
+    const logo = 'data:image/png;base64,LOGO_DA_MARCA';
+    const brand = {
+      id: 'musa',
+      name: 'MUSA',
+      logo,
+      titleColor: '#ff5500',
+      textTitleSize: 143,
+      useBrandVoice: true,
+      brandTone: {
+        summary: 'Editorial e direto',
+        traits: ['preciso', 'provocador'],
+        samplePhrases: ['O improviso cobra caro.'],
+        method: 'MÉTODO TOM DA MARCA — perfil MUSA persistido.',
+      },
+    };
     const seed = buildSeriesDraftSeed({
       idea: { title: 'Tema X', angle: 'prova' },
+      brand,
       styleKit: {
         contextMd: '# Brief',
         stylePrompt: 'editorial',
@@ -81,8 +106,66 @@ describe('series-drafts (Fatia 3)', () => {
     expect(seed.publicationDate).toBe('2026-10-08');
     expect(seed.seedDoc.styleKit.contextMd).toBe('# Brief');
     expect(seed.seedDoc.styleKit.logo.imageId).toBe('logo1');
+    expect(seed.seedDoc.brand).toMatchObject({ id: 'musa', logo, titleColor: '#ff5500' });
+    expect(seed.seedDoc.brand).not.toBe(brand);
+    expect(seed.seedDoc.brand.brandTone).not.toBe(brand.brandTone);
+    expect(seed.seedDoc.brand.brandTone.traits).not.toBe(brand.brandTone.traits);
     expect(seed.seedDoc.slides).toBeUndefined();
     expect(seed.quickPrompt).toMatch(/Tema X/);
+    expect(seed.seedDoc.quickPromptDraft).toBe(seed.quickPrompt);
+  });
+
+  it('não duplica strings pesadas ao copiar a marca da série', () => {
+    const logo = `data:image/png;base64,${'A'.repeat(2000)}`;
+    const fontData = `data:font/woff2;base64,${'B'.repeat(2000)}`;
+    const source = { logo, customTitleFont: { dataUrl: fontData }, brandTone: null };
+    const cloned = cloneSeriesBrand(source);
+    expect(cloned).not.toBe(source);
+    expect(cloned.logo).toBe(logo);
+    expect(cloned.customTitleFont.dataUrl).toBe(fontData);
+  });
+
+  it('não replica evidências brutas de tom em cada rascunho da série', () => {
+    const cloned = cloneSeriesBrand({
+      id: 'musa',
+      brandTone: { summary: 'Direto', traits: ['claro'] },
+      voiceImageTexts: [{ name: 'card.png', text: 'x'.repeat(6000) }],
+      voiceSampleText: 'legendas antigas',
+      voiceSourceUrls: ['https://instagram.com/musa'],
+    });
+    expect(cloned.id).toBe('musa');
+    expect(cloned.brandTone.summary).toBe('Direto');
+    expect(cloned.voiceImageTexts).toBeUndefined();
+    expect(cloned.voiceSampleText).toBeUndefined();
+    expect(cloned.voiceSourceUrls).toBeUndefined();
+  });
+
+  it('hidrata o primeiro card com a marca do seed, não com o perfil global', () => {
+    const fallback = {
+      id: 'global', titleColor: '#0000ff', textTitleSize: 70,
+    };
+    const seedBrand = {
+      id: 'projeto',
+      logo: 'data:image/png;base64,PROJETO',
+      titleColor: '#ff3300',
+      textTitleSize: 146,
+      brandTone: {
+        summary: 'Voz do projeto',
+        method: 'MÉTODO TOM DA MARCA — voz específica deste projeto.',
+      },
+    };
+    const doc = buildSeededLibraryDoc({
+      brand: seedBrand,
+      quickPromptDraft: 'Tema aprovado do rascunho',
+    }, fallback);
+
+    expect(doc.brand.id).toBe('projeto');
+    expect(doc.brand.logo).toBe(seedBrand.logo);
+    expect(doc.brand.brandTone.summary).toBe('Voz do projeto');
+    expect(doc.quickPromptDraft).toBe('Tema aprovado do rascunho');
+    expect(doc.slides).toHaveLength(1);
+    expect(doc.slides[0].titleSize).toBe(146);
+    expect(doc.brand.titleColor).toBe('#ff3300');
   });
   it('mkLibEntry agenda quando há data editorial', () => {
     const withDate = mkLibEntry({ slides: [] }, 'Campanha', {

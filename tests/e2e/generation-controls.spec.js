@@ -29,6 +29,95 @@ async function prompt(page) {
 }
 const generate = page => page.getByRole('button', { name: /Gerar com contexto e referências/i }).click();
 
+test('analisar meu tom usa somente IA de texto e não inicia carrossel', async ({ page }) => {
+  const textOnlySession = {
+    ...SESSAO_ATIVA,
+    tier: 'essential',
+    imageQuota: { limit: 0, remaining: 0, used: 0 },
+  };
+  let releaseAnalysis;
+  let analysisStarted = false;
+  const prompts = [];
+  const pending = new Promise((resolve) => { releaseAnalysis = resolve; });
+  await mockApi(page, {
+    session: textOnlySession,
+    extra: {
+      '/api/ai/compatible': async (route) => {
+        const promptText = route.request().postDataJSON().payload.messages.find((message) => message.role === 'user').content;
+        prompts.push(promptText);
+        analysisStarted = true;
+        await pending;
+        return route.fulfill({ json: completion({
+          summary: 'Direto, humano e preciso',
+          traits: ['direto', 'humano', 'preciso'],
+          do: 'Nomeie o mecanismo com exemplos concretos.',
+          dont: 'Evite tom de guru e frases vazias.',
+          ctaStyle: 'Convide para um próximo passo simples.',
+          samplePhrases: ['Clareza antes de volume.', 'A ideia precisa caber na vida real.'],
+        }) });
+      },
+    },
+  });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  const before = await doc(page);
+  const analyzeButton = page.getByRole('button', { name: 'Analisar meu tom', exact: true });
+  await expect(analyzeButton).toBeVisible();
+  await analyzeButton.click();
+  await expect.poll(() => analysisStarted).toBe(true);
+  await expect(page.getByRole('button', { name: /Analisando/i })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Análise de tom em andamento' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancelar análise' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
+  expect((await doc(page)).slides).toEqual(before.slides);
+  releaseAnalysis();
+  await expect(page.getByText('Confirme o tom antes de guardar', { exact: true })).toBeVisible();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain('estrategista de voz de marca');
+  expect(prompts[0]).not.toContain('Crie um carrossel de');
+  expect((await doc(page)).slides).toEqual(before.slides);
+  await page.getByRole('button', { name: 'Guardar tom da marca', exact: true }).click();
+  await expect.poll(async () => page.evaluate(() => {
+    const brands = JSON.parse(localStorage.getItem('vc_brands') || '[]');
+    const activeId = JSON.parse(localStorage.getItem('vc_active_brand_id') || '"default"');
+    return brands.find((item) => item.id === activeId)?.brandTone?.summary || '';
+  })).toBe('Direto, humano e preciso');
+});
+
+test('objetivo do Criar rápido aplica e persiste o modo narrativo sugerido', async ({ page }) => {
+  const prompts = [];
+  await mockApi(page, {
+    session,
+    extra: {
+      '/api/ai/compatible': (route) => {
+        const promptText = route.request().postDataJSON().payload.messages.find((message) => message.role === 'user').content;
+        prompts.push(promptText);
+        return route.fulfill({
+          json: completion(promptText.startsWith('REVISÃO EDITORIAL')
+            ? { edits: [] }
+            : {
+                slides: Array.from({ length: 6 }, (_, index) => ({
+                  title: `Educativo ${index + 1}`,
+                  subtitle: `Passo concreto ${index + 1}.`,
+                  bodyAfterImage: index < 2 ? '' : `Aplicação prática do passo ${index + 1}, com um exemplo simples para testar hoje.`,
+                  imageQuery: `editorial educational scene step ${index + 1}`,
+                })),
+                caption: 'Um passo por vez, com aplicação prática.',
+              }),
+        });
+      },
+    },
+  });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await page.getByRole('button', { name: 'Educar', exact: true }).click();
+  await expect(page.getByLabel('Pedido para gerar carrossel', { exact: true })).toHaveValue(/carrossel educativo/i);
+  await expect.poll(async () => (await doc(page))?.quickNarrativeMode).toBe('how_to');
+  await page.getByRole('button', { name: 'Gerar carrossel', exact: true }).click();
+  await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Educativo 1');
+  expect(prompts[0]).toContain('MÉTODO PASSO-A-PASSO');
+});
+
 // Somente APIs mockadas: nenhum crédito real e nenhuma conta de produção.
 test('remix exige escolha, mantém visual e usa contexto/referências atuais nas imagens', async ({ page }) => {
   test.setTimeout(90_000);
@@ -107,15 +196,15 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
     '/api/ai/sjinn-image': route => { images.push(1); return route.fulfill({ json: { b64_json: PNG } }); },
   });
   await prompt(page);
-  const modes = page.getByRole('group', { name: 'Modo narrativo', exact: true });
-  await expect(modes.getByRole('button', { name: 'Nenhum', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const modes = page.getByLabel('Modo narrativo', { exact: true });
+  await expect(modes).toHaveValue('none');
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides.length).toBe(3);
   expect(prompts[0]).toContain('SEM MODO NARRATIVO');
   expect(prompts[0]).not.toContain('MÉTODO EDITORIAL');
   expect(images).toHaveLength(0);
   await prompt(page);
-  await modes.getByRole('button', { name: 'Storytelling', exact: true }).click();
+  await modes.selectOption('storytelling');
   await generate(page);
   await expect.poll(() => prompts.length).toBe(4);
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
@@ -124,7 +213,7 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
   await page.reload();
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /PROMPT PARA GERAR/i);
-  await expect(modes.getByRole('button', { name: 'Storytelling', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(modes).toHaveValue('storytelling');
 });
 
 test('cancelar é global, descarta texto atrasado e libera uma nova geração', async ({ page }) => {
@@ -145,7 +234,7 @@ test('cancelar é global, descarta texto atrasado e libera uma nova geração', 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Cancelar geração', exact: true })).toBeVisible();
   await page.screenshot({ path: '/tmp/viral-cancel-mobile.png' });
-  await page.getByRole('button', { name: 'Cancelar geração', exact: true }).click();
+  await page.getByRole('button', { name: /Cancelar (?:geração|operação)/i }).click();
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
   release();
@@ -183,6 +272,38 @@ test('cancelar imagens para a fila e mantém imagens já concluídas', async ({ 
   await expect.poll(async () => (await doc(page))?.slides.filter(s => s.bgImageId).length).toBe(1);
   expect(imageCalls).toBe(2);
   expect((await doc(page)).slides.some(s => s.bgImageFailed)).toBe(false);
+});
+
+test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ page }) => {
+  let imageCalls = 0;
+  let releaseFirstImage;
+  const firstImagePending = new Promise(resolve => { releaseFirstImage = resolve; });
+  await openEditor(page, {
+    '/api/ai/compatible': route => {
+      const p = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+      return route.fulfill({ json: completion(p.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : draft()) });
+    },
+    '/api/ai/sjinn-image': async route => {
+      imageCalls++;
+      if (imageCalls === 1) await firstImagePending;
+      await route.fulfill({ json: { b64_json: PNG, mime: 'image/png' } }).catch(() => {});
+    },
+  });
+  await prompt(page);
+  await generate(page);
+  await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
+
+  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('button', { name: 'Gerar imagens', exact: true }).click();
+  await expect.poll(() => imageCalls).toBe(1);
+  await page.getByRole('button', { name: /Cancelar (?:geração|operação)/i }).click();
+  releaseFirstImage();
+  await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
+  // Dá ao loop cancelado duas oportunidades de iniciar outro request. O teste
+  // falha na regressão em que o card 2 nascia como um job novo após o cancelamento.
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(imageCalls).toBe(1);
+  expect((await doc(page)).slides.filter(s => s.bgImageId)).toHaveLength(0);
 });
 
 test('logo PNG transparente pertence só ao card escolhido e volta no reload/backup', async ({ page }) => {

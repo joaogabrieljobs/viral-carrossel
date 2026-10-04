@@ -12,7 +12,7 @@ export function resolveContextStatus({ brand = {}, styleKit = {} } = {}) {
   const bio = String(brand?.bio || '').trim();
   const hasDesc = brief.length >= 40 || bio.length >= 20;
   const hasTone = brandToneIsReady(brand);
-  const hasLogo = !!(brand?.logo || styleKit?.logo?.imageId);
+  const hasLogo = !!(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId);
   const hasStylePrompt = !!String(styleKit?.stylePrompt || '').trim();
   const refCount = Array.isArray(styleKit?.refImages) ? styleKit.refImages.length : 0;
   const hasRefs = refCount > 0;
@@ -64,9 +64,17 @@ export function buildIdentityChecklist({ brand = {}, styleKit = {}, material = {
 }
 
 const PLACEHOLDER_TITLES = new Set(['seu título aqui', 'seu titulo aqui']);
+const PLACEHOLDER_SUBTITLES = new Set([
+  'subtítulo descritivo que reforça o gancho principal do carrossel.',
+  'subtitulo descritivo que reforca o gancho principal do carrossel.',
+]);
 
 function isPlaceholderTitle(title) {
   return PLACEHOLDER_TITLES.has(String(title || '').trim().toLowerCase());
+}
+
+function isPlaceholderSubtitle(subtitle) {
+  return PLACEHOLDER_SUBTITLES.has(String(subtitle || '').trim().toLowerCase());
 }
 
 /** True quando há conteúdo real (não o placeholder «Seu título aqui»). */
@@ -75,7 +83,8 @@ export function projectHasCarouselContent(slides = []) {
     const title = String(s?.title || '').trim();
     const subtitle = String(s?.subtitle || '').trim();
     const hasRealTitle = title && !isPlaceholderTitle(title);
-    return !!(hasRealTitle || subtitle || s?.bgImage || s?.logoImageId);
+    const hasRealSubtitle = subtitle && !isPlaceholderSubtitle(subtitle);
+    return !!(hasRealTitle || hasRealSubtitle || s?.bgImage || s?.logoImageId);
   });
 }
 

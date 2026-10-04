@@ -7,6 +7,7 @@ import {
   elementOffsetStyle,
   offsetAfterDrag,
   resetElementOffsetsPatch,
+  unlockGroupedElementsPatch,
   clampPct0a100,
 } from '../../src/utils/card-elements.js';
 
@@ -68,6 +69,46 @@ describe('offsets de elementos do card', () => {
     const chaves = MOVABLE_ELEMENTS.map((e) => e.key);
     expect(new Set(chaves).size).toBe(chaves.length);
     for (const e of MOVABLE_ELEMENTS) expect(e.label.length).toBeGreaterThan(2);
+  });
+
+  it('desbloqueia sanduíche fluido mantendo o deslocamento-base do contentor', () => {
+    const slide = { elementOffsets: { text: { x: 8, y: -4 }, logo: { x: 2, y: 1 } } };
+    expect(unlockGroupedElementsPatch(slide)).toEqual({
+      elementsUnlocked: true,
+      elementOffsets: {
+        text: { x: 8, y: -4 },
+        logo: { x: 2, y: 1 },
+      },
+    });
+  });
+
+  it('separa topo e rodapé do canvas e não soma offsets numa segunda aplicação', () => {
+    const slide = {
+      canvas: { enabled: true, variant: 'sandwich' },
+      elementOffsets: {
+        text: { x: 5, y: 3 },
+        subtitle: { x: -2, y: 7 },
+        bodyAfterImage: { x: 1, y: 1 },
+      },
+    };
+    const patch = unlockGroupedElementsPatch(slide);
+    expect(patch).toEqual({
+      elementsUnlocked: true,
+      elementOffsets: {
+        text: { x: 5, y: 3 },
+        bodyAfterImage: { x: -1, y: 8 },
+      },
+    });
+    expect(unlockGroupedElementsPatch({ ...slide, ...patch })).toEqual(patch);
+  });
+
+  it('preserva offsets individuais já existentes ao separar o grupo', () => {
+    const slide = {
+      elementOffsets: { text: { x: 50, y: -50 }, title: { x: 30, y: -30 } },
+    };
+    const patch = unlockGroupedElementsPatch(slide);
+    expect(patch.elementOffsets.text).toEqual({ x: 50, y: -50 });
+    expect(patch.elementOffsets.title).toEqual({ x: 30, y: -30 });
   });
 });
 

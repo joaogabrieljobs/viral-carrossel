@@ -20,7 +20,13 @@ export default defineConfig(({ mode }) => {
             if (pathOnly === '/api/fetch-source') {
               try {
                 const urlObj = new URL(req.url || '', 'http://localhost');
-                const raw = urlObj.searchParams.get('url') || '';
+                let raw = urlObj.searchParams.get('url') || '';
+                if (req.method === 'POST') {
+                  const chunks = [];
+                  for await (const chunk of req) chunks.push(chunk);
+                  const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+                  raw = payload.url || '';
+                }
                 assertPublicHttpUrl(raw);
                 const text = await serverFetchUrlPlainText(raw);
                 res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -33,6 +39,34 @@ export default defineConfig(({ mode }) => {
                 res.setHeader('Access-Control-Allow-Origin', '*');
                 res.end(JSON.stringify({ ok: false, error: msg }));
               }
+              return;
+            }
+            if (pathOnly === '/api/ai/ocr') {
+              try {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const rawBody = Buffer.concat(chunks).toString('utf8');
+                req.body = rawBody ? JSON.parse(rawBody) : {};
+              } catch {
+                req.body = {};
+              }
+              if (env.ZAI_API_KEY) process.env.ZAI_API_KEY = env.ZAI_API_KEY;
+              const fakeRes = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k, v) { this.headers[k] = v; },
+                status(code) { this.statusCode = code; return this; },
+                json(payload) {
+                  res.statusCode = this.statusCode;
+                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify(payload));
+                },
+                end(...args) { res.end(...args); },
+              };
+              process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
+              const { default: ocrHandler } = await import('./api/ai/ocr.js');
+              await ocrHandler(req, fakeRes);
               return;
             }
             if (pathOnly === '/api/ai/sjinn-image') {

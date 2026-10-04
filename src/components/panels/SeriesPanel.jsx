@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Loader2, X, Check } from 'lucide-react';
 import { callAI } from '../../utils/ai-client.js';
-import { isGenerationCancelled } from '../../utils/generation-control.js';
+import {
+  getAIGenerationCount,
+  isGenerationCancelled,
+  startAIJob,
+} from '../../utils/generation-control.js';
 import { OBJECTIVE_TEMPLATES } from '../../utils/objective-templates.js';
 import {
   buildSeriesIdeasPrompt,
@@ -17,6 +21,7 @@ import { trackEvent } from '../../utils/telemetry.js';
 export function SeriesPanel({
   open,
   onClose,
+  projectId = null,
   brand = {},
   styleKit = null,
   folderId: initialFolderId = '',
@@ -32,16 +37,81 @@ export function SeriesPanel({
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [ideas, setIdeas] = useState([]);
+  const [ideasObjectiveId, setIdeasObjectiveId] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [err, setErr] = useState('');
   const [folderId, setFolderId] = useState(initialFolderId || '');
   const [publicationDate, setPublicationDate] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
+  const dialogRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  const ideasJobRef = useRef(null);
+
+  const cancelIdeas = () => {
+    ideasJobRef.current?.cancel?.();
+    ideasJobRef.current = null;
+    setBusy(false);
+  };
+
+  const closePanel = () => {
+    cancelIdeas();
+    onClose?.();
+  };
 
   // Sync pasta do projeto aberto quando o modal abre
   useEffect(() => {
     if (open) setFolderId(initialFolderId || '');
   }, [open, initialFolderId]);
+
+  useEffect(() => {
+    setObjectiveId('educar');
+    setIdeaCount(5);
+    setVariety('media');
+    setIdeas([]);
+    setIdeasObjectiveId(null);
+    setSelected(new Set());
+    setErr('');
+    setPublicationDate('');
+    setNewFolderName('');
+    cancelIdeas();
+  }, [projectId]);
+
+  useEffect(() => () => ideasJobRef.current?.cancel?.(), []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    const focusTimer = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      returnFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  const onDialogKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
+      return;
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return;
+    const controls = [...dialogRef.current.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (!first) {
+      event.preventDefault();
+      dialogRef.current.focus();
+    } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   if (!open) return null;
 
@@ -55,6 +125,13 @@ export function SeriesPanel({
   };
 
   const runIdeas = async () => {
+    if (getAIGenerationCount() > 0) {
+      toast?.('Conclua ou cancele a geração atual antes de iniciar a série.', 'info');
+      return;
+    }
+    const request = { objectiveId, ideaCount, variety };
+    const job = startAIJob();
+    ideasJobRef.current = job;
     setBusy(true);
     setErr('');
     setIdeas([]);
@@ -63,22 +140,39 @@ export function SeriesPanel({
       const prompt = buildSeriesIdeasPrompt({
         brandBio: brand?.bio || '',
         contextMd: styleKit?.contextMd || '',
-        objectiveId,
-        ideaCount,
-        variety,
+        objectiveId: request.objectiveId,
+        ideaCount: request.ideaCount,
+        variety: request.variety,
       });
-      const raw = await callAI(prompt, { json: true, openaiKey, maxTokens: 2048 });
-      const list = normalizeSeriesIdeas(raw, { max: ideaCount });
+      const raw = await callAI(prompt, {
+        json: true,
+        openaiKey,
+        maxTokens: 2048,
+        signal: job.signal,
+      });
+      if (job.signal.aborted) return;
+      const list = normalizeSeriesIdeas(raw, { max: request.ideaCount });
       if (!list.length) throw new Error('A IA não devolveu ideias utilizáveis. Tente de novo.');
       setIdeas(list);
+      setIdeasObjectiveId(request.objectiveId);
       setSelected(new Set(list.map((i) => i.id)));
-      trackEvent('series_ideas', { count: String(list.length), objective: objectiveId });
+      trackEvent('series_ideas', { count: String(list.length), objective: request.objectiveId });
     } catch (e) {
       if (isGenerationCancelled(e)) return;
       setErr(e.message || 'Falha ao gerar ideias.');
     } finally {
+      job.finish?.();
+      if (ideasJobRef.current === job) ideasJobRef.current = null;
       setBusy(false);
     }
+  };
+
+  const invalidateIdeas = (message) => {
+    if (!ideas.length) return;
+    setIdeas([]);
+    setSelected(new Set());
+    setIdeasObjectiveId(null);
+    setErr(message);
   };
 
   const createDrafts = async () => {
@@ -91,15 +185,16 @@ export function SeriesPanel({
     try {
       const drafts = picked.map((idea) => buildSeriesDraftSeed({
         idea,
+        brand,
         styleKit,
-        objectiveId,
+        objectiveId: ideasObjectiveId || objectiveId,
         folderId,
         publicationDate,
       }));
       await onCreateDrafts?.(drafts);
       trackEvent('series_drafts', {
         count: String(drafts.length),
-        objective: objectiveId,
+        objective: ideasObjectiveId || objectiveId,
         with_folder: folderId ? '1' : '0',
         with_date: publicationDate ? '1' : '0',
       });
@@ -112,7 +207,7 @@ export function SeriesPanel({
         'success',
         5500,
       );
-      onClose?.();
+      closePanel();
     } catch (e) {
       toast?.(e.message || 'Não foi possível criar os rascunhos.', 'error');
     } finally {
@@ -121,13 +216,17 @@ export function SeriesPanel({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={closePanel}>
       <div
+        ref={dialogRef}
         className="modal-panel modal-panel-wide"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
         role="dialog"
         aria-modal="true"
         aria-label="Gerar série"
+        aria-busy={busy || creating}
+        tabIndex={-1}
       >
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -137,7 +236,7 @@ export function SeriesPanel({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
-              background: 'var(--accent)', color: '#fff',
+              background: 'var(--accent)', color: 'var(--text-on-accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Layers size={14} />
@@ -149,7 +248,7 @@ export function SeriesPanel({
               <div className="vc-eyebrow">Ideias → seleção → rascunhos</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+          <button type="button" onClick={closePanel} className="vc-icon-btn" aria-label="Fechar">
             <X size={16} />
           </button>
         </div>
@@ -165,10 +264,17 @@ export function SeriesPanel({
                 key={t.id}
                 type="button"
                 className="vc-btn"
-                onClick={() => setObjectiveId(t.id)}
+                disabled={busy || creating}
+                onClick={() => {
+                  if (t.id !== objectiveId && ideas.length) {
+                    invalidateIdeas('Objetivo alterado. Gere novas ideias para manter a série coerente.');
+                  }
+                  setObjectiveId(t.id);
+                }}
+                aria-pressed={objectiveId === t.id}
                 style={{
                   minHeight: 36, padding: '0 12px', borderRadius: 9999,
-                  border: `1px solid ${objectiveId === t.id ? 'var(--accent)' : 'var(--hairline)'}`,
+                  border: `1px solid ${objectiveId === t.id ? 'var(--accent)' : 'var(--control-border)'}`,
                   background: objectiveId === t.id ? 'var(--accent-surface)' : 'var(--bg-card)',
                   fontWeight: objectiveId === t.id ? 600 : 480, fontSize: 12,
                 }}
@@ -183,7 +289,12 @@ export function SeriesPanel({
               <span style={{ color: 'var(--text-muted)' }}>Quantidade</span>
               <select
                 value={ideaCount}
-                onChange={(e) => setIdeaCount(Number(e.target.value))}
+                disabled={busy || creating}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (next !== ideaCount) invalidateIdeas('Quantidade alterada. Gere novas ideias para atualizar a série.');
+                  setIdeaCount(next);
+                }}
                 className="vc-input"
                 style={{ minHeight: 40, minWidth: 100 }}
               >
@@ -194,7 +305,12 @@ export function SeriesPanel({
               <span style={{ color: 'var(--text-muted)' }}>Variedade</span>
               <select
                 value={variety}
-                onChange={(e) => setVariety(e.target.value)}
+                disabled={busy || creating}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next !== variety) invalidateIdeas('Variedade alterada. Gere novas ideias para atualizar a série.');
+                  setVariety(next);
+                }}
                 className="vc-input"
                 style={{ minHeight: 40, minWidth: 120 }}
               >
@@ -208,7 +324,7 @@ export function SeriesPanel({
           <div style={{
             display: 'flex', flexDirection: 'column', gap: 8,
             padding: '10px 12px', borderRadius: 12,
-            border: '1px solid var(--hairline)', background: 'var(--bg-card)',
+            border: '1px solid var(--control-border)', background: 'var(--bg-card)',
           }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
               Destino dos rascunhos
@@ -264,7 +380,7 @@ export function SeriesPanel({
                   }}
                   style={{
                     minHeight: 40, padding: '0 12px', borderRadius: 10,
-                    border: '1px solid var(--hairline)', fontSize: 12, fontWeight: 600,
+                    border: '1px solid var(--control-border)', fontSize: 12, fontWeight: 600,
                   }}
                 >
                   Criar
@@ -282,26 +398,51 @@ export function SeriesPanel({
               />
             </label>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-              A data é planeamento local — não publica no Instagram. Sem data, os rascunhos ficam em Rascunho.
+              A data é planejamento local — não publica no Instagram. Sem data, os rascunhos ficam em Rascunho.
             </p>
           </div>
 
-          <button
-            type="button"
-            className="vc-btn"
-            disabled={busy}
-            onClick={runIdeas}
-            style={{
-              minHeight: 48, borderRadius: 9999, border: 'none',
-              background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 13,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            {busy ? <><Loader2 size={14} className="spin" /> A gerar ideias…</> : 'Gerar ideias'}
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              className="vc-btn"
+              onClick={cancelIdeas}
+              style={{
+                minHeight: 48, borderRadius: 9999, border: '1px solid var(--accent)',
+                background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 600, fontSize: 13,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <Loader2 size={14} className="spin" /> Cancelar geração de ideias
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="vc-btn"
+              disabled={creating}
+              onClick={runIdeas}
+              style={{
+                minHeight: 48, borderRadius: 9999, border: 'none',
+                background: 'var(--accent)', color: 'var(--text-on-accent)', fontWeight: 600, fontSize: 13,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              Gerar ideias
+            </button>
+          )}
+
+          <span id="series-status" className="vc-sr-only" role="status" aria-live="polite">
+            {busy
+              ? 'Gerando ideias para a série.'
+              : creating
+                ? 'Criando os rascunhos selecionados.'
+                : ideas.length
+                  ? `${ideas.length} ideias geradas. ${selected.size} selecionadas.`
+                  : ''}
+          </span>
 
           {err ? (
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--danger, #c0392b)' }}>{err}</p>
+            <p role="alert" aria-live="assertive" style={{ margin: 0, fontSize: 13, color: 'var(--danger-text)' }}>{err}</p>
           ) : null}
 
           {ideas.length > 0 ? (
@@ -317,18 +458,19 @@ export function SeriesPanel({
                     type="button"
                     className="vc-btn"
                     onClick={() => toggle(idea.id)}
+                    aria-pressed={on}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 10,
                       padding: 12, borderRadius: 12, textAlign: 'left',
-                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                      border: `1px solid ${on ? 'var(--accent)' : 'var(--control-border)'}`,
                       background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
                     }}
                   >
-                    <span style={{
+                    <span aria-hidden="true" style={{
                       width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 2,
-                      border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                      border: `1px solid ${on ? 'var(--accent)' : 'var(--control-border)'}`,
                       background: on ? 'var(--accent)' : 'transparent',
-                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--text-on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       {on ? <Check size={12} /> : null}
                     </span>
@@ -352,12 +494,12 @@ export function SeriesPanel({
                 onClick={createDrafts}
                 style={{
                   minHeight: 48, borderRadius: 9999, border: 'none', marginTop: 4,
-                  background: 'var(--text-primary)', color: '#fff', fontWeight: 600, fontSize: 13,
+                  background: 'var(--accent)', color: 'var(--text-on-accent)', fontWeight: 600, fontSize: 13,
                   opacity: creating || selected.size === 0 ? 0.5 : 1,
                 }}
               >
                 {creating
-                  ? 'A criar rascunhos…'
+                  ? 'Criando rascunhos…'
                   : `Criar ${selected.size} rascunho${selected.size === 1 ? '' : 's'}`}
               </button>
             </div>

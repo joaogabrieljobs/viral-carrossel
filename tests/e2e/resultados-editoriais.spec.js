@@ -21,6 +21,7 @@ async function seed(page, publications = []) {
     }]));
     localStorage.setItem('vc_active_doc_id', JSON.stringify('project'));
     localStorage.setItem('vc_shell_view', JSON.stringify('project'));
+    localStorage.setItem('vc_app_mode', JSON.stringify('diretor'));
   }, { doc: baseDoc, publications });
 }
 

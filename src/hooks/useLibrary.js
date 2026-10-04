@@ -1,4 +1,9 @@
-import { exportSlideLogo, importSlideLogo } from '../utils/slide-logo.js';
+import {
+  exportBrandLogo,
+  exportSlideLogo,
+  importBrandLogo,
+  importSlideLogo,
+} from '../utils/slide-logo.js';
 /**
  * Biblioteca de projetos (multi-doc): abrir, criar, duplicar, apagar, renomear,
  * exportar/importar JSON. Extraído do App (~125 linhas de handlers).
@@ -8,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { mkLibEntry } from '../utils/landing-gate.js';
 import { DEFAULT_DOC, DEFAULT_BRAND, ensureDocShape, mkSlide } from '../utils/doc-schema.js';
 import { hydrateBrandTextColors } from '../utils/brand-helpers.js';
+import { normalizeBrandTone } from '../utils/brand-tone.js';
 import { migrateDoc } from '../utils/schema-migration.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { downloadBlob } from '../utils/export-helpers.js';
@@ -27,13 +33,46 @@ import {
   setEntryPublicationDate,
 } from '../utils/library-organizer.js';
 
+/**
+ * Monta um documento novo sem perder a identidade que veio no seed.
+ * Mantida pura e exportada para cobrir a herança de séries por teste unitário.
+ */
+export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BRAND) {
+  const seeded = seedDoc && typeof seedDoc === 'object' ? seedDoc : {};
+  const sourceBrand = seeded.brand && typeof seeded.brand === 'object'
+    ? seeded.brand
+    : fallbackBrand;
+  const hydratedBrand = hydrateBrandTextColors({
+    ...DEFAULT_BRAND,
+    ...(sourceBrand || DEFAULT_BRAND),
+  });
+  hydratedBrand.brandTone = normalizeBrandTone(hydratedBrand.brandTone);
+  hydratedBrand.useBrandVoice = hydratedBrand.useBrandVoice !== false;
+  return {
+    ...DEFAULT_DOC,
+    ...seeded,
+    brand: hydratedBrand,
+    styleKit: seeded.styleKit
+      ? seeded.styleKit
+      : { stylePrompt: '', contextMd: '', refImages: [] },
+    slides: Array.isArray(seeded.slides) && seeded.slides.length
+      ? seeded.slides
+      : [mkSlide(1, hydratedBrand)],
+  };
+}
+
 export function useLibrary({
   library, setLibrary,
   libraryFolders, setLibraryFolders,
   activeDocId, setActiveDocId,
-  history, slides, brand, brandRoster, activeBrandId,
+  history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
   setLibraryOpen, toast, setError,
 }) {
+  // Algumas ações encadeiam "criar pasta" e "aplicar ao projeto" no mesmo
+  // clique. O ref é atualizado antes do próximo render para a segunda ação não
+  // validar contra a lista antiga capturada pelo callback.
+  const foldersLive = useRef(libraryFolders);
+  foldersLive.current = libraryFolders;
   // Snapshot imediato: trocar/exportar não depende do debounce de autosave.
   const live = useRef(null);
   live.current = { id: activeDocId || library[0]?.id, doc: history.state };
@@ -59,22 +98,23 @@ export function useLibrary({
       : item));
   }, [library, setLibrary, toast]);
   const setDocFolder = useCallback((docId, folderId) => {
-    setLibrary(prev => setEntryFolder(prev, docId, folderId, libraryFolders));
-  }, [libraryFolders, setLibrary]);
+    setLibrary(prev => setEntryFolder(prev, docId, folderId, foldersLive.current));
+  }, [setLibrary]);
   const setDocPublicationDate = useCallback((docId, date) => {
     setLibrary(prev => setEntryPublicationDate(prev, docId, date));
   }, [setLibrary]);
   const createFolder = useCallback((name) => {
     const id = uid();
     try {
-      const next = createLibraryFolder(libraryFolders, name, () => id);
+      const next = createLibraryFolder(foldersLive.current, name, () => id);
+      foldersLive.current = next;
       setLibraryFolders(next);
       return id;
     } catch (error) {
       toast(error.message, 'error');
       return null;
     }
-  }, [libraryFolders, setLibraryFolders, toast]);
+  }, [setLibraryFolders, toast]);
   const renameFolder = useCallback((folderId, name) => {
     try {
       setLibraryFolders(renameLibraryFolder(libraryFolders, folderId, name));
@@ -100,21 +140,9 @@ export function useLibrary({
   const newDoc = useCallback((seedDoc = null, name = 'Novo carrossel') => {
     // Aplica brand ativo no doc novo
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
-    const hydratedBrand = hydrateBrandTextColors({ ...activeBrand });
-    const seeded = seedDoc || {};
-    // Projeto novo = contexto próprio vazio (não herda styleKit de outro projeto).
-    // Se seedDoc trouxer styleKit (ex.: template), respeita; senão começa limpo.
-    const baseDoc = {
-      ...DEFAULT_DOC,
-      ...seeded,
-      brand: hydratedBrand,
-      styleKit: seeded.styleKit
-        ? seeded.styleKit
-        : { stylePrompt: '', contextMd: '', refImages: [] },
-      slides: Array.isArray(seeded.slides) && seeded.slides.length
-        ? seeded.slides
-        : [mkSlide(1, hydratedBrand)],
-    };
+    // Projeto novo = contexto próprio vazio, salvo quando o seed traz contexto.
+    // A identidade do seed tem precedência sobre o perfil global ativo.
+    const baseDoc = buildSeededLibraryDoc(seedDoc, activeBrand);
     const entry = mkLibEntry(baseDoc, name);
     const snapshot = live.current;
     setLibrary(prev => [entry, ...snapshotEntries(prev, snapshot)]);
@@ -185,14 +213,15 @@ export function useLibrary({
     const activeBrand = brandRoster.find((b) => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
     const hydratedBrand = hydrateBrandTextColors({ ...activeBrand });
     const entries = drafts.map((draft) => {
-      const seedDoc = {
-        ...DEFAULT_DOC,
-        ...(draft.seedDoc || {}),
-        brand: draft.seedDoc?.brand
-          ? hydrateBrandTextColors(draft.seedDoc.brand)
-          : hydratedBrand,
-        slides: [mkSlide(1, hydratedBrand)],
-      };
+      const rawSeed = draft.seedDoc && typeof draft.seedDoc === 'object'
+        ? draft.seedDoc
+        : {};
+      const seedDoc = buildSeededLibraryDoc({
+        ...rawSeed,
+        quickPromptDraft: typeof rawSeed.quickPromptDraft === 'string'
+          ? rawSeed.quickPromptDraft
+          : String(draft.quickPrompt || ''),
+      }, hydratedBrand);
       return mkLibEntry(seedDoc, draft.name || 'Rascunho da série', {
         folderId: draft.folderId || '',
         publicationDate: draft.publicationDate || '',
@@ -239,7 +268,15 @@ export function useLibrary({
           return dataUrl ? { ...sl, bgImage: dataUrl } : sl;
         } catch { return sl; }
       }));
-      return { ...entry, doc: { ...entry.doc, slides: novos, styleKit: await exportProjectReferences(entry.doc.styleKit) } };
+      return {
+        ...entry,
+        doc: {
+          ...entry.doc,
+          slides: novos,
+          brand: await exportBrandLogo(entry.doc.brand),
+          styleKit: await exportProjectReferences(entry.doc.styleKit),
+        },
+      };
     }),
   ), []);
 
@@ -262,14 +299,26 @@ export function useLibrary({
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
     let docs;
-    try { docs = await comImagensEmbutidas(snapshotEntries(library)); }
+    let brands;
+    try {
+      [docs, brands] = await Promise.all([
+        comImagensEmbutidas(snapshotEntries(library)),
+        Promise.all((brandRoster || []).map((profile) => exportBrandLogo(profile))),
+      ]);
+    }
     catch (err) { toast(err.message, 'error'); return; }
-    const blob = new Blob([JSON.stringify({ vcVersion: 2, folders: libraryFolders, docs }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({
+      vcVersion: 3,
+      folders: libraryFolders,
+      brands,
+      activeBrandId,
+      docs,
+    }, null, 2)], { type: 'application/json' });
     const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
     toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
     trackEvent('export_json_full', { project_count: String(library.length), size_kb: String(Math.round(blob.size / 1024)) });
-  }, [library, libraryFolders, toast, comImagensEmbutidas]);
+  }, [library, libraryFolders, brandRoster, activeBrandId, toast, comImagensEmbutidas]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
   const importDocRef = useRef(null);
@@ -288,6 +337,26 @@ export function useLibrary({
           parsed.folders,
           uid,
         );
+        const existingBrandIds = new Set((brandRoster || []).map((profile) => profile.id));
+        const importedProfiles = [];
+        const brandRemap = new Map();
+        const importedProfileById = new Map();
+        const hasPortableProfiles = Array.isArray(parsed.brands) && parsed.brands.length > 0;
+        for (const rawProfile of (hasPortableProfiles ? parsed.brands : [])) {
+          if (!rawProfile || typeof rawProfile !== 'object') continue;
+          const originalId = String(rawProfile.id || '');
+          const nextId = originalId && !existingBrandIds.has(originalId) ? originalId : uid();
+          existingBrandIds.add(nextId);
+          const restored = hydrateBrandTextColors(await importBrandLogo({
+            ...rawProfile,
+            id: nextId,
+          }));
+          restored.brandTone = normalizeBrandTone(restored.brandTone);
+          restored.useBrandVoice = restored.useBrandVoice !== false;
+          importedProfiles.push(restored);
+          importedProfileById.set(nextId, restored);
+          if (originalId) brandRemap.set(originalId, nextId);
+        }
         // Cada doc importado recebe um novo id pra evitar conflitos
         const newEntries = docs.map(e => normalizeLibraryEntry({
           ...e,
@@ -300,7 +369,64 @@ export function useLibrary({
         // IndexedDB agora, senão voltariam a pesar no localStorage e seriam
         // apagadas quando a quota enchesse.
         for (const entry of newEntries) {
-          if (entry.doc) entry.doc.styleKit = await migrateProjectReferences(entry.doc.styleKit);
+          if (entry.doc) {
+            const portableBrandLogo = entry.doc.brand?.logo;
+            const portableKitLogo = entry.doc.styleKit?.logo?.dataUrl;
+            const originalBrandId = String(entry.doc.brand?.id || '');
+            entry.doc.styleKit = await migrateProjectReferences(entry.doc.styleKit);
+            // Em backups v1/v2, vários projetos podiam usar o mesmo id
+            // (`default`) com bios e logos diferentes. Só é seguro deduplicar
+            // por id quando o backup trouxe a coleção explícita de perfis v3.
+            const mappedBrandId = hasPortableProfiles
+              ? brandRemap.get(originalBrandId)
+              : null;
+            const mappedProfile = importedProfileById.get(mappedBrandId);
+            if (mappedProfile) {
+              entry.doc.brand = hydrateBrandTextColors({
+                ...entry.doc.brand,
+                id: mappedProfile.id,
+                logo: mappedProfile.logo || null,
+                logoImageId: mappedProfile.logoImageId || null,
+              });
+            } else if (
+              portableBrandLogo
+              && portableBrandLogo === portableKitLogo
+              && entry.doc.styleKit?.logo?.imageId
+            ) {
+              entry.doc.brand = {
+                ...entry.doc.brand,
+                logo: null,
+                logoImageId: entry.doc.styleKit.logo.imageId,
+              };
+            } else {
+              entry.doc.brand = await importBrandLogo(entry.doc.brand);
+            }
+            // Backups v1/v2 não tinham `brands`. Transformamos cada identidade
+            // encontrada nos projetos em perfil reutilizável, remapeando IDs que
+            // já existam neste navegador.
+            if (!mappedProfile && entry.doc.brand) {
+              let profileId = null;
+              let profile = null;
+              if (!profile) {
+                profileId = originalBrandId && !existingBrandIds.has(originalBrandId)
+                  ? originalBrandId
+                  : uid();
+                existingBrandIds.add(profileId);
+                profile = hydrateBrandTextColors({ ...entry.doc.brand, id: profileId });
+                profile.brandTone = normalizeBrandTone(profile.brandTone);
+                profile.useBrandVoice = profile.useBrandVoice !== false;
+                importedProfiles.push(profile);
+                importedProfileById.set(profileId, profile);
+                if (hasPortableProfiles && originalBrandId) brandRemap.set(originalBrandId, profileId);
+              }
+              entry.doc.brand = hydrateBrandTextColors({
+                ...entry.doc.brand,
+                id: profileId,
+                logo: profile.logo || null,
+                logoImageId: profile.logoImageId || null,
+              });
+            }
+          }
           const slides = entry?.doc?.slides;
           if (!Array.isArray(slides)) continue;
           entry.doc = {
@@ -314,8 +440,18 @@ export function useLibrary({
         }
         setLibrary(prev => [...newEntries, ...prev]);
         setLibraryFolders(importedFolders);
+        if (importedProfiles.length) {
+          setBrandRoster?.((current) => [...current, ...importedProfiles]);
+        }
         // Ativa o primeiro importado
         setActiveDocId(newEntries[0].id);
+        const requestedActiveBrand = hasPortableProfiles
+          ? brandRemap.get(String(parsed.activeBrandId || ''))
+          : null;
+        const firstImportedBrand = newEntries[0]?.doc?.brand?.id;
+        if (requestedActiveBrand || firstImportedBrand) {
+          setActiveBrandId?.(requestedActiveBrand || firstImportedBrand);
+        }
         setLibraryOpen(false);
         setShellView('project');
       } catch {
@@ -325,7 +461,11 @@ export function useLibrary({
       }
     };
     reader.readAsText(file);
-  }, [libraryFolders, setLibrary, setLibraryFolders, setActiveDocId, setLibraryOpen, setShellView]);
+  }, [
+    libraryFolders, brandRoster,
+    setLibrary, setLibraryFolders, setBrandRoster,
+    setActiveDocId, setActiveBrandId, setLibraryOpen, setShellView,
+  ]);
 
   return {
     renameDoc, setDocStatus, setDocFolder, setDocPublicationDate,

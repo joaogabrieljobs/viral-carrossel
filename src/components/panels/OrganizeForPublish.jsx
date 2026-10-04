@@ -141,6 +141,7 @@ export function OrganizeForPublish({
                 className="vc-btn"
                 disabled={creating || !String(newFolderName || '').trim()}
                 onClick={createFolder}
+                aria-label="Criar pasta e aplicar a este projeto"
                 title="Criar pasta e aplicar a este projeto"
                 style={{
                   minHeight: 40, minWidth: 40, padding: '0 12px', borderRadius: 10,

@@ -1,10 +1,9 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useEffect, useMemo } from 'react';
-import { Sparkles, Loader2, Bookmark, X, Upload, ChevronRight, ChevronLeft, Check, Settings } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Sparkles, Loader2, Bookmark, X, ChevronRight, ChevronLeft, Check, Settings } from 'lucide-react';
 import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
 import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
-import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
 import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
@@ -24,7 +23,7 @@ const CARD_VISUAL_STYLE_OPTIONS = [
   { id: 'inset_h_bottom', short: 'FOTO ↓', desc: 'Texto no topo, faixa de foto em baixo.' },
 ];
 
-/** Modo narrativo interno por arquétipo (template) — utilizador não escolhe (só em Personalizado). */
+/** Modo narrativo interno por arquétipo; a pessoa só escolhe no modo Personalizado. */
 const QUICK_TEMPLATE_NARRATIVE_MODE = {
   erro_comum: 'editorial',
   tendencia: 'editorial',
@@ -33,9 +32,10 @@ const QUICK_TEMPLATE_NARRATIVE_MODE = {
 };
 
 function GenerateModal({
-  open, onClose, onGenerate,
+  open, onClose, onGenerate, onCancelGeneration,
   defaultNiche='', defaultTopic='', defaultTone='', defaultAudience='',
   hasOpenAI=false, hasAnthropic=false, onOpenKeys,
+  defaultWithImages = true,
   imageProviderLabel = 'GPT Image 2',
   brandSummary, materialSummary,
   onGoToMaterial,
@@ -82,18 +82,22 @@ function GenerateModal({
   // marca atual sem mudanças. Aplicado ao brand no momento de gerar.
   const [visualPreset, setVisualPresetLocal] = useState(defaultVisualPreset);
   useEffect(() => { if (open) setVisualPresetLocal(defaultVisualPreset); }, [open, defaultVisualPreset]);
-  // Cópia local mutável dos eixos da imagem (commit no doc só ao gerar)
+  // Cópia local mutável dos eixos da imagem (salva no documento apenas ao gerar).
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
   const setAxis = (key, val) => setParams(p => ({ ...p, [key]: val }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  // Step 3: utilizador pode desmarcar geração de imagens e ir só com texto.
-  const [wantImages, setWantImages] = useState(!!hasOpenAI);
-  useEffect(() => { if (open) setWantImages(!!hasOpenAI); }, [open, hasOpenAI]);
+  // Etapa 3: a pessoa escolhe entre gerar só o texto ou texto e imagens.
+  const [wantImages, setWantImages] = useState(!!hasOpenAI && !!defaultWithImages);
+  useEffect(() => {
+    if (open) setWantImages(!!hasOpenAI && !!defaultWithImages);
+  }, [open, hasOpenAI, defaultWithImages]);
+  const [creativePresetsOpen, setCreativePresetsOpen] = useState(false);
+  useEffect(() => { if (open) setCreativePresetsOpen(false); }, [open]);
 
-  // Wizard multi-step: 1=Ideia, 2=Formato, 3=Imagens, 4=Revisão.
-  // Reset pra step 1 sempre que reabre — usuário pega o fluxo limpo.
+  // Fluxo em etapas: 1=Ideia, 2=Formato, 3=Imagens, 4=Revisão.
+  // Volta à etapa 1 sempre que reabre, para iniciar um fluxo limpo.
   const [step, setStep] = useState(1);
   useEffect(() => { if (open) setStep(1); }, [open]);
   const STEPS = useMemo(() => ([
@@ -102,7 +106,7 @@ function GenerateModal({
     { id: 3, label: 'Imagens' },
     { id: 4, label: 'Revisão' },
   ]), []);
-  // Labels amigáveis para densidade (IDs internos preservados pra compatibilidade
+  // Rótulos amigáveis para densidade (IDs internos preservados para compatibilidade
   // com docs salvos). "1/1, 1/2..." era abstrato — "Denso/Balanceado/Minimal"
   // comunica intenção direta.
   const DENSITY_FRIENDLY = useMemo(() => ({
@@ -113,9 +117,73 @@ function GenerateModal({
     '1_5': 'Mínimo',
   }), []);
 
-  useEffect(()=>{ if(open){ setErr(''); if(defaultTopic) setTopic(defaultTopic); } },[open,defaultTopic]);
-  useEffect(()=>{ if(defaultNiche) setNiche(defaultNiche); },[defaultNiche]);
-  useEffect(()=>{ if(defaultAudience) setAudience(defaultAudience); },[defaultAudience]);
+  useEffect(() => {
+    if (!open) return;
+    setErr('');
+    // Também copia valores vazios: ao trocar de projeto, nenhum rascunho do
+    // projeto anterior pode sobreviver no modal.
+    setTopic(defaultTopic || '');
+    setNiche(defaultNiche || '');
+    setAudience(defaultAudience || '');
+  }, [open, defaultTopic, defaultNiche, defaultAudience]);
+
+  const dialogRef = useRef(null);
+  const stepPanelRef = useRef(null);
+  const previousStepRef = useRef(step);
+  const returnFocusRef = useRef(null);
+  const requestClose = () => {
+    if (busy) {
+      onCancelGeneration?.();
+      return;
+    }
+    onClose?.();
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    const focusTimer = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      returnFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Ao trocar de etapa, o botão acionado sai da árvore ou muda de função.
+  // Move o foco para o novo painel para que teclado e leitor de tela recebam
+  // imediatamente o conteúdo certo, inclusive ao chegar à revisão.
+  useEffect(() => {
+    if (!open || previousStepRef.current === step) return undefined;
+    previousStepRef.current = step;
+    const focusTimer = window.requestAnimationFrame(() => {
+      stepPanelRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(focusTimer);
+  }, [open, step]);
+
+  const onDialogKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      requestClose();
+      return;
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return;
+    const controls = [...dialogRef.current.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (!first) {
+      event.preventDefault();
+      dialogRef.current.focus();
+    } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const hasMaterialPack =
     Array.isArray(materialSummary) && materialSummary.length > 0;
@@ -137,9 +205,8 @@ function GenerateModal({
     return '';
   })();
 
-  // Step 1 exige tema válido (resolvedGenerationTopic já cobre fallbacks
-  // de nicho/contexto). Demais steps liberados — usuário pode revisar valores
-  // default e seguir adiante.
+  // A etapa 1 exige tema válido (resolvedGenerationTopic já cobre alternativas
+  // de nicho e contexto). As demais etapas permitem revisar os valores padrão.
   const canProceed = step === 1 ? !!resolvedGenerationTopic : true;
 
   if (!open) return null;
@@ -164,8 +231,8 @@ function GenerateModal({
       onCreativePresetChange?.(packCreative);
       onSlideTextDensityChange?.(textDensity);
       onCardVisualStyleChange?.(cardStyle);
-      // Aplica padrão visual ao brand ANTES da geração — IA usa as cores
-      // novas pra recomendar paleta consistente nos slides.
+      // Aplica o padrão visual à marca ANTES da geração; a IA usa as novas
+      // cores para recomendar uma paleta consistente nos slides.
       if (visualPreset && onVisualPresetChange) onVisualPresetChange(visualPreset);
       const result = await onGenerate({
         topic: resolvedGenerationTopic,
@@ -188,8 +255,17 @@ function GenerateModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel vc-modal-scroll" onClick={e=>e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => { if (!busy) onClose?.(); }}>
+      <div
+        ref={dialogRef}
+        className="modal-panel vc-modal-scroll"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generate-modal-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={e=>e.stopPropagation()}
+      >
         {/* Header */}
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -201,21 +277,21 @@ function GenerateModal({
               width:32, height:32, borderRadius:8, background:'var(--accent)',
               display:'flex', alignItems:'center', justifyContent:'center',
             }}>
-              <Sparkles size={14} color="#fff"/>
+              <Sparkles size={14} color="var(--text-on-accent)"/>
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Configurar carrossel</div>
+              <div id="generate-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Configurar carrossel</div>
               <div className="vc-eyebrow">Passo {step} de {STEPS.length} · {STEPS[step-1].label}</div>
             </div>
           </div>
-          <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
+          <button onClick={requestClose} className="vc-icon-btn" aria-label={busy ? 'Cancelar geração' : 'Fechar'}>
             <X size={16}/>
           </button>
         </div>
 
-        {/* Stepper — clicável apenas pra steps já alcançados; avanço é controlado
-            pelo Continuar (que valida campos obrigatórios). */}
-        <div role="tablist" aria-label="Etapas do wizard" style={{
+        {/* Indicador de etapas: apenas etapas já alcançadas são clicáveis;
+            Continuar valida os campos obrigatórios antes de avançar. */}
+        <div role="tablist" aria-label="Etapas da configuração" style={{
           display:'flex', gap:4, padding:'10px 14px',
           borderBottom:'1px solid var(--border)',
           background:'var(--bg-sidebar)', flexShrink:0, zIndex:1,
@@ -230,6 +306,7 @@ function GenerateModal({
                 key={s.id}
                 type="button"
                 role="tab"
+                id={`gen-step-tab-${s.id}`}
                 aria-selected={isActive}
                 aria-controls={`gen-step-${s.id}`}
                 disabled={!isClickable || busy}
@@ -250,7 +327,7 @@ function GenerateModal({
                   width:22, height:22, borderRadius:'50%',
                   display:'flex', alignItems:'center', justifyContent:'center',
                   background: (isActive || isCompleted) ? 'var(--accent)' : 'var(--bg-pearl)',
-                  color: (isActive || isCompleted) ? '#fff' : 'var(--text-muted)',
+                  color: (isActive || isCompleted) ? 'var(--text-on-accent)' : 'var(--text-muted)',
                   fontSize:11, fontWeight:700, flexShrink:0,
                   border: `1px solid ${(isActive || isCompleted) ? 'var(--accent)' : 'var(--hairline)'}`,
                   fontVariantNumeric:'tabular-nums',
@@ -269,9 +346,12 @@ function GenerateModal({
         </div>
 
         <div
+          ref={stepPanelRef}
           className="vc-modal-scroll-body"
           id={`gen-step-${step}`}
           role="tabpanel"
+          aria-labelledby={`gen-step-tab-${step}`}
+          tabIndex={-1}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -280,8 +360,8 @@ function GenerateModal({
             paddingBottom: 24,
           }}
         >
-          {/* ═══════════ STEP 1 — IDEIA ═══════════
-              Pacote criativo, tema, hooks salvos. Personalizado expõe modo
+          {/* ═══════════ ETAPA 1 — IDEIA ═══════════
+              Tema, pacote criativo e ganchos salvos. Personalizado expõe modo
               narrativo, nicho, público. Outros pacotes mostram aviso explicando
               estrutura fixa. */}
           {step === 1 && (
@@ -320,7 +400,7 @@ function GenerateModal({
                     style={{
                       alignSelf:'flex-start', minHeight:44, padding:'0 20px',
                       borderRadius:9999, border:'none', background:'var(--accent)',
-                      color:'#fff', fontSize:13, fontWeight:600,
+                      color:'var(--text-on-accent)', fontSize:13, fontWeight:600,
                       fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
                       cursor:'pointer', transition:'transform 0.1s var(--ease-smooth)',
                     }}
@@ -333,56 +413,17 @@ function GenerateModal({
                 </div>
               )}
 
-              {/* Pacote criativo — primeiro: define se há camada editorial fixa ou fluxo personalizado */}
+              {/* O pedido vem antes das opções de estrutura para reduzir a carga
+                  cognitiva, especialmente em telas pequenas. */}
               <div>
-                <label className="vc-label">Pacote criativo da IA</label>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {CREATIVE_PRESETS.map((p) => {
-                    const on = packCreative === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setPackCreative(p.id)}
-                        style={{
-                          textAlign:'left', padding:'12px 14px', borderRadius:11,
-                          border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                          background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
-                          cursor:'pointer', transition:'border-color 0.12s',
-                        }}
-                      >
-                        <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>{p.label}</div>
-                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4, lineHeight:1.4 }}>{p.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="vc-label" htmlFor="generation-objective">O que você quer com este conteúdo?</label>
-                <select id="generation-objective" className="vc-input" value={contentObjective} onChange={e => setContentObjective(e.target.value)}>
-                  {CONTENT_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-                <p style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>
-                  {CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.desc}
-                </p>
-                {performanceSettings.account && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
-                  {performanceSettings.enabled === false ? 'Histórico desativado para este projeto.'
-                    : performanceGuidance.preferredStructureId ? 'Seu histórico será considerado na escolha da estrutura. O tema e o pacote continuam prioritários.'
-                      : 'Histórico: ainda sem comparação suficiente para este briefing. A geração segue pelo conteúdo.'}
-                </p>}
-              </div>
-
-              {/* Topic */}
-              <div>
-                <label className="vc-label">Sobre o que é o conteúdo?</label>
+                <label className="vc-label" htmlFor="generation-topic">Sobre o que é o conteúdo?</label>
                 <textarea
+                  id="generation-topic"
                   value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
                   placeholder="Ex: como freelancers usam IA para triplicar a produtividade sem estresse"
                   className="vc-input vc-textarea"
                 />
-                {/* B2: Hooks salvos pra este nicho — clicar preenche o tema */}
+                {/* Ganchos salvos para este nicho; um clique preenche o tema. */}
                 {(() => {
                   const suggestions = getHooksForNiche(hookLibrary, niche, 3);
                   if (suggestions.length === 0) return null;
@@ -390,7 +431,7 @@ function GenerateModal({
                     <div style={{ marginTop: 8 }}>
                       <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <Bookmark size={10} aria-hidden/>
-                        Hooks salvos {niche ? `(nicho «${niche}»)` : ''}
+                        Ganchos salvos {niche ? `(nicho «${niche}»)` : ''}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {suggestions.map(h => (
@@ -425,10 +466,101 @@ function GenerateModal({
                         {isQuickTemplatePreset(packCreative) ? (
                           <>O pacote <span style={{ fontWeight:600 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span> segue o arco dos Templates prontos — use este campo ou Marca/Conteúdo como fonte do tema.</>
                         ) : (
-                          <>O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema em jogo.</>
+                          <>O pacote <span style={{ fontWeight:600 }}>Tendência/Cultura</span> já traz estrutura e voz típicas — use este campo ou o material de Marca/Conteúdo como fonte para o tema desejado.</>
                         )}
                       </>
                     )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="vc-label" htmlFor="generation-objective">O que você quer com este conteúdo?</label>
+                <select id="generation-objective" className="vc-input" value={contentObjective} onChange={e => setContentObjective(e.target.value)}>
+                  {CONTENT_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <p style={{ fontSize:12, color:'var(--text-secondary)', marginTop:6 }}>
+                  {CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.desc}
+                </p>
+                {performanceSettings.account && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  {performanceSettings.enabled === false ? 'Histórico desativado para este projeto.'
+                    : performanceGuidance.preferredStructureId ? 'Seu histórico será considerado na escolha da estrutura. O tema e o pacote continuam prioritários.'
+                      : 'Histórico: ainda sem comparação suficiente para este briefing. A geração segue pelo conteúdo.'}
+                </p>}
+              </div>
+
+              {/* A lista completa continua disponível, mas fechada por padrão para
+                  evitar uma rolagem extensa antes de a pessoa informar o pedido. */}
+              <div
+                data-vc-collapsible="creative-presets"
+                style={{
+                  border:'1px solid var(--hairline)', borderRadius:11,
+                  background:'var(--bg-card)', overflow:'hidden',
+                }}
+              >
+                <button
+                  type="button"
+                  aria-expanded={creativePresetsOpen}
+                  aria-controls="creative-preset-options"
+                  aria-label={`Escolher pacote criativo. Selecionado: ${CREATIVE_PRESET_BY_ID[packCreative]?.label}`}
+                  onClick={() => setCreativePresetsOpen((current) => !current)}
+                  style={{
+                    width:'100%', minHeight:64, padding:'11px 14px', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+                    border:0, background:'transparent', textAlign:'left',
+                    color:'var(--text-primary)', fontFamily:'var(--font-ui)',
+                  }}
+                >
+                  <span style={{ display:'inline-flex', flexDirection:'column', gap:3, minWidth:0 }}>
+                    <span style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'0.02em' }}>Pacote criativo da IA</span>
+                    <span style={{ fontSize:13, fontWeight:600, letterSpacing:'-0.011em' }}>
+                      {CREATIVE_PRESET_BY_ID[packCreative]?.label}
+                    </span>
+                    <span style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.4 }}>
+                      Toque para comparar todas as estruturas.
+                    </span>
+                  </span>
+                  <ChevronRight
+                    size={17}
+                    aria-hidden
+                    style={{
+                      flexShrink:0, color:'var(--text-muted)',
+                      transform: creativePresetsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                      transition:'transform 0.15s var(--ease-smooth)',
+                    }}
+                  />
+                </button>
+                {creativePresetsOpen && (
+                  <div
+                    id="creative-preset-options"
+                    role="radiogroup"
+                    aria-label="Pacote criativo da IA"
+                    style={{ display:'flex', flexDirection:'column', gap:8, padding:'4px 10px 10px' }}
+                  >
+                    {CREATIVE_PRESETS.map((p) => {
+                      const on = packCreative === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => {
+                            setPackCreative(p.id);
+                            setCreativePresetsOpen(false);
+                          }}
+                          style={{
+                            textAlign:'left', padding:'12px 14px', borderRadius:11,
+                            border:`1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
+                            background: on ? 'var(--accent-surface)' : 'var(--bg-card)',
+                            cursor:'pointer', transition:'border-color 0.12s',
+                          }}
+                        >
+                          <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>{p.label}</div>
+                          <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4, lineHeight:1.4 }}>{p.desc}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -473,41 +605,41 @@ function GenerateModal({
             </>
           )}
 
-          {/* ═══════════ STEP 2 — FORMATO ═══════════
+          {/* ═══════════ ETAPA 2 — FORMATO ═══════════
               Padrão visual (paleta/fontes/tipografia), número de cards,
-              densidade de texto, estilo da foto. Tudo que afeta o look. */}
+              densidade de texto e estilo da foto. Tudo o que afeta a aparência. */}
           {step === 2 && (
             <>
-              {/* Padrão visual — 12 presets curados extraídos de referências
+              {/* Padrão visual: 12 opções selecionadas a partir de referências
                   reais (NBA editorial, case study neon, luxury, viral hype...).
-                  Override APENAS de cores/fontes/tipografia — não mexe em
-                  creativePreset nem layout dos slides. */}
+                  Altera APENAS cores, fontes e tipografia; não muda o pacote
+                  criativo nem o leiaute dos slides. */}
               <VisualStylePicker
                 value={visualPreset}
                 onChange={setVisualPresetLocal}
                 presets={VISUAL_PRESETS}
               />
 
-              {/* Slide count — decisão imediata pro usuário */}
+              {/* Quantidade de cards. */}
               <div>
-                <label className="vc-label">Número de cards</label>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <div className="vc-label" id="generation-card-count-label">Número de cards</div>
+                <div role="group" aria-labelledby="generation-card-count-label" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                   {[3,4,5,6,7,8,9,10].map(n=>(
-                    <button key={n} onClick={()=>setCount(n)} style={{
+                    <button type="button" key={n} aria-pressed={count === n} onClick={()=>setCount(n)} style={{
                       width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
                       cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
                       fontVariantNumeric:'tabular-nums',
                       transition:'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
                       background: count===n ? 'var(--accent)' : 'var(--bg-pearl)',
                       border: `1px solid ${count===n ? 'var(--accent)' : 'var(--hairline)'}`,
-                      color: count===n ? '#fff' : 'var(--text-primary)',
+                      color: count===n ? 'var(--text-on-accent)' : 'var(--text-primary)',
                     }}>{n}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Densidade de texto — labels amigáveis (DENSITY_FRIENDLY). ID interno
-                  preservado pra compat com docs salvos. */}
+              {/* Densidade de texto com rótulos amigáveis. O identificador interno
+                  permanece para manter a compatibilidade com documentos salvos. */}
               <div>
                 <label className="vc-label" id="slide-text-density-label">Texto por card</label>
                 <div
@@ -532,7 +664,7 @@ function GenerateModal({
                           transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
                           background: on ? 'var(--accent)' : 'var(--bg-pearl)',
                           border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                          color: on ? '#fff' : 'var(--text-primary)',
+                          color: on ? 'var(--text-on-accent)' : 'var(--text-primary)',
                         }}
                       >
                         {friendly}
@@ -550,7 +682,7 @@ function GenerateModal({
                 </div>
               </div>
 
-              {/* Estilo visual da foto vs texto (layout clássico) */}
+              {/* Estilo visual da foto em relação ao texto, no leiaute clássico. */}
               <div>
                 <label className="vc-label" id="card-visual-style-label">Estilo dos cards</label>
                 <div
@@ -575,7 +707,7 @@ function GenerateModal({
                           transition: 'background-color 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth)',
                           background: on ? 'var(--accent)' : 'var(--bg-pearl)',
                           border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
-                          color: on ? '#fff' : 'var(--text-primary)',
+                          color: on ? 'var(--text-on-accent)' : 'var(--text-primary)',
                         }}
                       >
                         <PhotoRegionMiniIcon regionId={opt.id} active={on} />
@@ -593,92 +725,61 @@ function GenerateModal({
                   letterSpacing: '-0.011em', marginTop: 4,
                 }}>
                   {CARD_VISUAL_STYLE_OPTIONS.find((o) => o.id === cardStyle)?.desc}{' '}
-                  Aplica-se ao layout clássico (sem canvas no card). Pacotes Cultura podem alterar alguns slides (sanduíche / tela cheia).
+                  Aplica-se ao leiaute clássico (sem canvas no card). Pacotes de Cultura podem alterar alguns slides (sanduíche ou tela cheia).
                 </div>
               </div>
             </>
           )}
 
-          {/* ═══════════ STEP 3 — IMAGENS ═══════════ */}
+          {/* ═══════════ ETAPA 3 — IMAGENS ═══════════ */}
           {step === 3 && (
             <>
-              <div>
-                <label className="vc-label">Imagens dos Cards</label>
+              <fieldset style={{ margin:0, padding:0, border:0, minWidth:0 }}>
+                <legend className="vc-label">O que você quer gerar?</legend>
                 {hasOpenAI ? (
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    <button
-                      type="button"
-                      onClick={() => setWantImages(true)}
-                      aria-pressed={wantImages}
-                      style={{
-                        padding:'12px 14px', borderRadius:11, cursor:'pointer', textAlign:'left',
-                        border: wantImages ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
-                        background: wantImages ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
-                        position:'relative', fontFamily:'var(--font-ui)',
-                      }}
-                    >
-                      {wantImages && (
-                        <span style={{
-                          position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
-                          background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
-                          letterSpacing:'-0.011em',
-                        }}>Ativo</span>
-                      )}
-                      <div style={{
-                        fontSize:13, fontWeight:600, color:'var(--text-primary)',
-                        marginBottom:3, letterSpacing:'-0.011em',
-                        display:'flex', alignItems:'center', gap:8,
-                      }}>
-                        <span aria-hidden style={{
-                          width:18, height:18, borderRadius:9999, flexShrink:0,
-                          border: wantImages ? 'none' : '1.5px solid var(--border)',
-                          background: wantImages ? 'var(--accent)' : 'transparent',
-                          color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center',
-                          fontSize:11, fontWeight:700,
-                        }}>{wantImages ? '✓' : ''}</span>
-                        Gerar com {imageProviderLabel}
-                      </div>
-                      <div style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'-0.011em', paddingLeft:26 }}>
-                        Geração a partir do tema e das palavras-chave de cada slide
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setWantImages(false)}
-                      aria-pressed={!wantImages}
-                      style={{
-                        padding:'12px 14px', borderRadius:11, cursor:'pointer', textAlign:'left',
-                        border: !wantImages ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
-                        background: !wantImages ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
-                        position:'relative', fontFamily:'var(--font-ui)',
-                      }}
-                    >
-                      {!wantImages && (
-                        <span style={{
-                          position:'absolute', top:-9, right:8, fontSize:11, fontWeight:600,
-                          background:'var(--accent)', color:'#fff', padding:'2px 9px', borderRadius:9999,
-                          letterSpacing:'-0.011em',
-                        }}>Ativo</span>
-                      )}
-                      <div style={{
-                        fontSize:13, fontWeight:600, color:'var(--text-primary)',
-                        marginBottom:3, letterSpacing:'-0.011em',
-                        display:'flex', alignItems:'center', gap:8,
-                      }}>
-                        <span aria-hidden style={{
-                          width:18, height:18, borderRadius:9999, flexShrink:0,
-                          border: !wantImages ? 'none' : '1.5px solid var(--border)',
-                          background: !wantImages ? 'var(--accent)' : 'transparent',
-                          color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center',
-                          fontSize:11, fontWeight:700,
-                        }}>{!wantImages ? '✓' : ''}</span>
-                        Pular imagens
-                      </div>
-                      <div style={{ fontSize:11, color:'var(--text-muted)', letterSpacing:'-0.011em', paddingLeft:26 }}>
-                        Só texto agora — gera cada imagem depois, card a card
-                      </div>
-                    </button>
+                  <div role="radiogroup" aria-label="Escopo da geração" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {[
+                      {
+                        id:'text', label:'Só texto', withImages:false,
+                        description:'Gera o conteúdo agora; você pode criar as imagens depois, card a card.',
+                      },
+                      {
+                        id:'text_images', label:'Texto e imagens', withImages:true,
+                        description:`Gera o conteúdo e as imagens com ${imageProviderLabel}.`,
+                      },
+                    ].map((option) => {
+                      const selected = wantImages === option.withImages;
+                      return (
+                        <label
+                          key={option.id}
+                          style={{
+                            display:'flex', alignItems:'flex-start', gap:11,
+                            padding:'12px 14px', borderRadius:11, cursor:'pointer',
+                            border: selected ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
+                            background: selected ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
+                            fontFamily:'var(--font-ui)',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="generate-modal-scope"
+                            value={option.id}
+                            checked={selected}
+                            onChange={() => setWantImages(option.withImages)}
+                            aria-label={option.label}
+                            style={{ width:18, height:18, margin:'1px 0 0', flexShrink:0, accentColor:'var(--accent)' }}
+                          />
+                          <span style={{ display:'flex', flexDirection:'column', gap:3, minWidth:0 }}>
+                            <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em' }}>
+                              {option.label}
+                            </span>
+                            <span style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.4, letterSpacing:'-0.011em' }}>
+                              {option.description}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{
@@ -686,7 +787,7 @@ function GenerateModal({
                     border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
                     fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
                   }}>
-                    Sem provedor de imagem, o carrossel sai com texto e palavras-chave. Depois use Upload/URL em cada card, ou configure uma chave OpenAI em ⚙.
+                    Só texto está disponível. Depois, envie um arquivo ou informe uma URL em cada card para adicionar imagens, ou configure uma chave OpenAI em ⚙.
                   </div>
                 )}
                 {!hasOpenAI && (
@@ -697,7 +798,7 @@ function GenerateModal({
                     display:'flex', flexDirection:'column', gap:8,
                   }}>
                     <div>
-                      Em ⚙ → Configuração escolha <b>OpenAI</b> (GPT Image) e cole a chave.
+                      Em ⚙ → Configuração, escolha <b>OpenAI</b> (GPT Image) e cole a chave.
                     </div>
                     {onOpenKeys && (
                       <button
@@ -705,7 +806,7 @@ function GenerateModal({
                         onClick={() => { onClose(); setTimeout(onOpenKeys, 80); }}
                         style={{
                           alignSelf:'flex-start',
-                          background:'var(--accent)', color:'#fff', border:'none',
+                          background:'var(--accent)', color:'var(--text-on-accent)', border:'none',
                           borderRadius:6, padding:'6px 12px', fontSize:11, fontWeight:600,
                           cursor:'pointer', fontFamily:'var(--font-ui)',
                           display:'flex', alignItems:'center', gap:6,
@@ -716,7 +817,7 @@ function GenerateModal({
                     )}
                   </div>
                 )}
-              </div>
+              </fieldset>
 
               {/* Eixos só quando vai gerar imagens agora. */}
               {hasOpenAI && wantImages && (
@@ -725,19 +826,18 @@ function GenerateModal({
             </>
           )}
 
-          {/* ═══════════ STEP 4 — REVISÃO ═══════════
-              Recap das escolhas + contexto aplicado + erros. Botões de gerar
-              vivem no footer fixo, mas mostramos aqui o hint do que cada um faz. */}
+          {/* ═══════════ ETAPA 4 — REVISÃO ═══════════
+              Resumo das escolhas, contexto aplicado e eventuais erros. */}
           {step === 4 && (
             <>
-              {/* Recap das escolhas — comunicação clara antes do clique final */}
+              {/* Resumo das escolhas antes da ação final. */}
               <div style={{
                 padding:'14px 16px', borderRadius:11,
                 border:'1px solid var(--hairline)', background:'var(--bg-pearl)',
                 display:'flex', flexDirection:'column', gap:10,
               }}>
                 <div style={{ fontSize:11, fontWeight:600, color:'var(--text-muted)', fontFamily:'var(--font-ui)', letterSpacing:'0.04em', textTransform:'uppercase' }}>
-                  Pronto pra gerar
+                  Pronto para gerar
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'minmax(0,auto) 1fr', columnGap:14, rowGap:8, fontSize:13, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', alignItems:'center' }}>
                   <span style={{ color:'var(--text-muted)' }}>Tema</span>
@@ -776,14 +876,14 @@ function GenerateModal({
                   <span style={{ color:'var(--text-muted)' }}>Estilo</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CARD_VISUAL_STYLE_OPTIONS.find(o=>o.id===cardStyle)?.short}</span>
 
-                  <span style={{ color:'var(--text-muted)' }}>Imagens</span>
+                  <span style={{ color:'var(--text-muted)' }}>Escopo</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
-                    {hasOpenAI && wantImages ? imageProviderLabel : 'Pular — só texto'}
+                    {hasOpenAI && wantImages ? 'Texto e imagens' : 'Só texto'}
                   </span>
                 </div>
               </div>
 
-              {/* Contexto que será injetado no prompt — feedback claro pro user */}
+              {/* Contexto que será incluído no pedido enviado à IA. */}
               {((brandSummary && brandSummary.length) || (materialSummary && materialSummary.length)) && (
                 <div style={{
                   fontSize:13, color:'var(--text-secondary)', background:'var(--success-surface)',
@@ -802,25 +902,25 @@ function GenerateModal({
                 </div>
               )}
 
-              {/* Hint alinhado à escolha do passo 3 */}
+              {/* Explica a escolha da etapa 3 sem oferecer uma segunda decisão. */}
               <div style={{
                 fontSize:11, color:'var(--text-muted)', lineHeight:1.47, letterSpacing:'-0.011em',
                 padding:'10px 12px', borderRadius:11, border:'1px solid var(--hairline)', background:'var(--bg-card)',
               }}>
                 {hasOpenAI && wantImages ? (
                   <>
-                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto + imagem:</span> mais lento, usa créditos do provedor de imagem.
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto e imagens:</span> a geração leva mais tempo e usa créditos do provedor de imagem.
                   </>
                 ) : (
                   <>
-                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> rápido — gera as imagens depois, card a card.
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> gera o conteúdo agora; as imagens podem ser criadas depois, card a card.
                   </>
                 )}
               </div>
 
               {err && (
-                <div style={{
-                  fontSize:13, color:'#c5251c', background:'rgba(255,59,48,0.10)', letterSpacing:'-0.011em',
+                <div role="alert" aria-live="assertive" style={{
+                  fontSize:13, color:'var(--danger-text)', background:'rgba(255,59,48,0.10)', letterSpacing:'-0.011em',
                   border:'1px solid #7f1d1d', borderRadius:8, padding:'10px 14px',
                   fontFamily:'var(--font-ui)',
                 }}>{err}</div>
@@ -829,10 +929,9 @@ function GenerateModal({
           )}
         </div>
 
-        {/* ═══════════ FOOTER FIXO ═══════════
-            Voltar/Cancelar à esquerda, Continuar (steps 1-3) ou Gerar (step 4)
-            à direita. Continuar valida canProceed; em step 4 mostra 2 botões
-            de geração com mesma lógica de disabled da versão antiga. */}
+        {/* ═══════════ RODAPÉ FIXO ═══════════
+            Voltar ou Cancelar à esquerda; Continuar nas etapas 1 a 3; e uma
+            única ação de geração na etapa 4. */}
         <div style={{
           display:'flex', gap:8, padding:'14px 20px',
           borderTop:'1px solid var(--border)',
@@ -841,13 +940,12 @@ function GenerateModal({
           alignItems:'center', flexWrap:'wrap',
         }}>
           <button
-            onClick={step === 1 ? onClose : () => setStep(step - 1)}
-            disabled={busy}
+            onClick={busy ? onCancelGeneration : (step === 1 ? onClose : () => setStep(step - 1))}
             className="vc-btn vc-btn-ghost"
             style={{ height:44, padding:'0 16px', display:'inline-flex', alignItems:'center', gap:6 }}
           >
-            {step > 1 && <ChevronLeft size={15}/>}
-            {step === 1 ? 'Cancelar' : 'Voltar'}
+            {!busy && step > 1 && <ChevronLeft size={15}/>}
+            {busy ? 'Cancelar geração' : (step === 1 ? 'Cancelar' : 'Voltar')}
           </button>
           <div style={{ flex:1 }}/>
           {step < 4 && (
@@ -860,7 +958,7 @@ function GenerateModal({
                 height:44, minWidth:160, padding:'0 22px', borderRadius:9999, border:'none',
                 cursor: (canProceed && !busy) ? 'pointer' : 'not-allowed',
                 background: (canProceed && !busy) ? 'var(--accent)' : 'var(--bg-pearl)',
-                color: (canProceed && !busy) ? '#fff' : 'var(--text-muted)',
+                color: (canProceed && !busy) ? 'var(--text-on-accent)' : 'var(--text-muted)',
                 fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                 opacity: (canProceed && !busy) ? 1 : 0.6,
@@ -871,22 +969,22 @@ function GenerateModal({
             </button>
           )}
           {step === 4 && (
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
-              {/* CTA principal respeita a escolha do passo 3 (gerar ou pular imagens). */}
+            <div style={{ display:'flex', justifyContent:'flex-end' }}>
+              {/* A ação final respeita a única escolha feita na etapa 3. */}
               <button
                 type="button"
                 onClick={() => run({ withImages: !!(hasOpenAI && wantImages) })}
                 disabled={busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)}
                 title={
                   hasOpenAI && wantImages
-                    ? `Gera texto E imagens (${imageProviderLabel})`
-                    : 'Gera só texto e palavras-chave. Pode gerar cada imagem depois no card.'
+                    ? `Gera texto e imagens com ${imageProviderLabel}`
+                    : 'Gera só texto e palavras-chave. Você pode criar cada imagem depois, no respectivo card.'
                 }
                 style={{
                   height:44, padding:'0 18px', borderRadius:9999, border:'none',
                   cursor: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'not-allowed' : 'pointer',
                   background: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'var(--bg-pearl)' : 'var(--accent)',
-                  color: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'var(--text-muted)' : '#fff',
+                  color: (busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)) ? 'var(--text-muted)' : 'var(--text-on-accent)',
                   fontSize:14, fontWeight:600, fontFamily:'var(--font-ui)',
                   letterSpacing:'-0.014em',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
@@ -897,32 +995,10 @@ function GenerateModal({
                 {busy
                   ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
                   : hasOpenAI && wantImages
-                    ? <><Sparkles size={15}/>Texto + imagem</>
+                    ? <><Sparkles size={15}/>Gerar texto e imagens</>
                     : <><Sparkles size={15}/>Gerar só texto</>
                 }
               </button>
-              {/* Atalho oposto — se escolheu imagens, ainda pode forçar só texto (e vice-versa). */}
-              {hasOpenAI && (
-                <button
-                  type="button"
-                  onClick={() => run({ withImages: !wantImages })}
-                  disabled={busy || !resolvedGenerationTopic}
-                  title={wantImages
-                    ? 'Ignora a escolha acima e gera só texto'
-                    : `Gera texto E imagens (${imageProviderLabel}) mesmo assim`}
-                  style={{
-                    height:44, padding:'0 16px', borderRadius:9999,
-                    cursor: (busy || !resolvedGenerationTopic) ? 'not-allowed' : 'pointer',
-                    background: 'var(--bg-pearl)', color: 'var(--text-primary)',
-                    fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
-                    letterSpacing:'-0.014em', border:'1px solid var(--border)',
-                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                    opacity: (busy || !resolvedGenerationTopic) ? 0.6 : 1,
-                  }}
-                >
-                  {wantImages ? 'Só texto' : 'Texto + imagem'}
-                </button>
-              )}
             </div>
           )}
         </div>

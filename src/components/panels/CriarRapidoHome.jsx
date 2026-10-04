@@ -5,7 +5,7 @@ import { BrandTonePanel } from './BrandTonePanel.jsx';
 import { buildIdentityChecklist, projectHasCarouselContent } from '../../utils/context-status.js';
 import { storeSlideLogo } from '../../utils/slide-logo.js';
 import { Download, Image as ImageIcon, Loader2, Sparkles, Type, SlidersHorizontal, Upload } from 'lucide-react';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const BTN_CAPS = {
   textTransform: 'uppercase',
@@ -13,6 +13,13 @@ const BTN_CAPS = {
   fontFamily: 'var(--font-mono)',
   fontWeight: 600,
 };
+
+/** Resolve o modo que o Criar rápido enviará ao mesmo motor do editor. */
+export function resolveQuickNarrativeMode(objectiveId, fallbackMode = 'none') {
+  return OBJECTIVE_TEMPLATES.find((item) => item.id === objectiveId)?.narrativeMode
+    || fallbackMode
+    || 'none';
+}
 
 /**
  * Home no caminho «Criar rápido» — sequência curta e retomável (Fatia 1).
@@ -29,9 +36,12 @@ export function CriarRapidoHome({
   onQuickGenerate,
   genBusy = false,
   hasOpenAI = false,
+  hasTextAI = false,
   onNeedKeys,
   onAnalyzeBrandTone,
   analyzingBrandTone = false,
+  narrativeMode = 'none',
+  onNarrativeModeChange = () => {},
   toast,
   onExportAll,
   onExportBackup,
@@ -50,49 +60,85 @@ export function CriarRapidoHome({
 }) {
   const logoRef = useRef(null);
   const promptRef = useRef(null);
+  const projectRef = useRef(projectId);
+  projectRef.current = projectId;
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [scopeImages, setScopeImages] = useState(false);
   const [objectiveId, setObjectiveId] = useState(null);
   const checklist = buildIdentityChecklist({ brand, styleKit });
+  const identityItems = checklist.items.filter((item) => ['brief', 'tone', 'logo'].includes(item.id));
+  const identityComplete = identityItems.every((item) => item.ready);
+  const [editingIdentity, setEditingIdentity] = useState(() => !identityComplete);
+  const previousIdentityCompleteRef = useRef(identityComplete);
   const hasResult = projectHasCarouselContent(slides);
   const promptTrim = String(quickPrompt || '').trim();
   const shortBio = String(brand?.bio || '').trim();
+
+  useEffect(() => {
+    setUploadingLogo(false);
+    setObjectiveId(null);
+  }, [projectId]);
+
+  useEffect(() => {
+    setEditingIdentity(!identityComplete);
+    previousIdentityCompleteRef.current = identityComplete;
+  // A identidade deve ser reavaliada ao abrir outro projeto. Alterações dentro
+  // do projeto atual não fecham o formulário enquanto a pessoa ainda o edita.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+  useEffect(() => {
+    const wasComplete = previousIdentityCompleteRef.current;
+    if (!wasComplete && identityComplete) setEditingIdentity(false);
+    if (wasComplete && !identityComplete) setEditingIdentity(true);
+    previousIdentityCompleteRef.current = identityComplete;
+  }, [identityComplete]);
 
   const onLogoFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    const uploadProjectId = projectId;
     setUploadingLogo(true);
     try {
       const stored = await storeSlideLogo(file);
-      URL.revokeObjectURL(stored.logoImage);
-      const reader = new FileReader();
-      const dataUrl = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Falha ao ler a logo.'));
-        reader.readAsDataURL(file);
-      });
+      // O upload pode terminar depois de a pessoa abrir outro projeto. Nesse
+      // caso os bytes ficam no armazenamento para limpeza posterior, mas nunca
+      // aplicamos a identidade no documento que passou a estar ativo.
+      if (projectRef.current !== uploadProjectId) {
+        URL.revokeObjectURL(stored.logoImage);
+        return;
+      }
       setStyleKit?.((prev) => ({
         ...prev,
         logo: { imageId: stored.logoImageId, name: file.name },
         logoOnGenerate: true,
       }));
-      setBrand?.({ ...brand, logo: dataUrl, logoPosition: brand?.logoPosition || 'tr', logoSize: brand?.logoSize ?? 120, logoOpacity: brand?.logoOpacity ?? 90 });
+      setBrand?.((current) => ({
+        ...current,
+        logo: stored.logoImage,
+        logoImageId: stored.logoImageId,
+        logoPosition: current?.logoPosition || 'tr',
+        logoSize: current?.logoSize ?? 120,
+        logoOpacity: current?.logoOpacity ?? 90,
+      }));
       toast?.('Logo salva. Novos cards deste projeto já saem com ela.', 'success');
       trackEvent('criar_rapido_logo');
     } catch (err) {
-      toast?.(err.message || 'Não foi possível salvar a logo.', 'error');
+      if (projectRef.current === uploadProjectId) {
+        toast?.(err.message || 'Não foi possível salvar a logo.', 'error');
+      }
     } finally {
-      setUploadingLogo(false);
+      if (projectRef.current === uploadProjectId) setUploadingLogo(false);
     }
   };
 
   const handleGenerate = async () => {
     if (!promptTrim || genBusy) return;
+    const effectiveNarrativeMode = resolveQuickNarrativeMode(objectiveId, narrativeMode);
     trackEvent('criar_rapido_generate', { with_images: scopeImages ? '1' : '0' });
     await onQuickGenerate?.(promptTrim, {
       withImages: !!(scopeImages && hasOpenAI),
-      narrativeMode: 'none',
+      narrativeMode: effectiveNarrativeMode,
     });
   };
 
@@ -104,14 +150,31 @@ export function CriarRapidoHome({
         background: 'var(--bg-card)',
         fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)',
       }}>
-        <strong style={{ color: 'var(--text-secondary)' }}>{checklist.status.label}.</strong>{' '}
-        {checklist.status.id === 'sem'
-          ? 'A geração depende do pedido — o resultado pode sair genérico.'
-          : checklist.status.id === 'basico'
-            ? 'Já há orientação mínima da marca.'
-            : 'Brief, tom e identidade prontos para reutilizar.'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <strong style={{ color: 'var(--text-secondary)' }}>
+              {identityComplete
+                ? `${styleKit?.name || brand?.name || 'Marca'} — identidade salva automaticamente`
+                : checklist.status.label}
+            </strong>
+            {!identityComplete ? (
+              <span>{' '}· Complete brief, tom e logo para manter a identidade nas próximas criações.</span>
+            ) : null}
+          </div>
+          {identityComplete ? (
+            <button
+              type="button"
+              className="vc-btn vc-btn-ghost"
+              aria-expanded={editingIdentity}
+              onClick={() => setEditingIdentity((open) => !open)}
+              style={{ minHeight: 34, padding: '0 12px', flexShrink: 0, fontSize: 11 }}
+            >
+              {editingIdentity ? 'Fechar' : 'Editar'}
+            </button>
+          ) : null}
+        </div>
         <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {checklist.items.filter((i) => ['brief', 'tone', 'logo'].includes(i.id)).map((item) => (
+          {identityItems.map((item) => (
             <span key={item.id} style={{
               fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
               textTransform: 'uppercase', padding: '3px 8px', borderRadius: 9999,
@@ -124,6 +187,7 @@ export function CriarRapidoHome({
         </div>
       </div>
 
+      {editingIdentity ? <>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label className="vc-label-sm">Conte sobre sua marca</label>
         <textarea
@@ -170,10 +234,12 @@ export function CriarRapidoHome({
         setBrand={setBrand}
         onAnalyze={onAnalyzeBrandTone}
         analyzing={analyzingBrandTone}
-        hasOpenAI={hasOpenAI}
+        hasTextAI={hasTextAI}
         onNeedKeys={onNeedKeys}
         toast={toast}
+        projectId={projectId}
       />
+      </> : null}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <label className="vc-label-sm">Diga o que quer publicar</label>
@@ -192,12 +258,13 @@ export function CriarRapidoHome({
                   if (!applied) return;
                   trackEvent('objective_template', { id: t.id, surface: 'criar_rapido' });
                   setObjectiveId(t.id);
+                  onNarrativeModeChange(applied.narrativeMode);
                   if (!String(quickPrompt || '').trim()) {
                     setQuickPrompt(applied.quickPrompt);
                     requestAnimationFrame(() => promptRef.current?.focus?.());
                     toast?.(`Pedido preenchido: ${t.label}`, 'success', 2800);
                   } else {
-                    toast?.(`Objetivo «${t.label}» — o pedido atual mantém-se; o modo sugerido é ${t.narrativeMode}.`, 'info', 3500);
+                    toast?.(`Objetivo «${t.label}» aplicado ao pedido atual.`, 'info', 3500);
                   }
                 }}
                 style={{

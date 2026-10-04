@@ -1,9 +1,47 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Sparkles, SlidersHorizontal, Settings, Check, ChevronRight } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
 import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../utils/ui-depth-labels.js';
 
 export default function ModesIntroModal({ open, onSelect, onClose, currentMode = 'criador' }) {
+  const dialogRef = useRef(null);
+  const returnFocusRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    const focusTimer = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      returnFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  const onDialogKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose?.();
+      return;
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return;
+    const controls = [...dialogRef.current.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (!first) {
+      event.preventDefault();
+      dialogRef.current.focus();
+    } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   if (!open) return null;
   const MODES = [
     {
@@ -29,14 +67,20 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
       label: APP_MODE_UI.studio.label,
       tagline: APP_MODE_UI.studio.tagline,
       desc: APP_MODE_UI.studio.desc,
-      features: ['Tudo do controlo profissional', '+ Composição (Layout)', '+ Tracking/Leading', '+ Zonas canvas'],
+      features: ['Tudo do controle profissional', '+ Composição (Layout)', '+ Tracking/Leading', '+ Zonas canvas'],
     },
   ];
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modes-intro-title">
+    <div className="modal-overlay" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal-panel"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modes-intro-title"
+        tabIndex={-1}
         style={{
           maxWidth: 720,
           padding: 0,
@@ -92,12 +136,13 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                 key={m.id}
                 type="button"
                 onClick={() => onSelect(m.id)}
+                aria-pressed={isCurrent}
 
                 style={{
                   textAlign: 'left',
                   padding: '18px 20px',
                   borderRadius: 16,
-                  border: `1px solid ${isCurrent ? 'rgba(255, 45, 141, 0.42)' : 'var(--glass-border)'}`,
+                  border: `1px solid ${isCurrent ? 'var(--accent)' : 'var(--control-border)'}`,
                   background: isCurrent
                     ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,45,141,0.03) 100%)'
                     : 'rgba(255, 255, 255, 0.04)',
@@ -114,12 +159,12 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                 onMouseEnter={(e) => {
                   if (!isCurrent) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.borderColor = 'var(--glass-border-strong)';
+                    e.currentTarget.style.borderColor = 'var(--accent)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  if (!isCurrent) e.currentTarget.style.borderColor = 'var(--glass-border)';
+                  if (!isCurrent) e.currentTarget.style.borderColor = 'var(--control-border)';
                 }}
               >
                 {/* Icon */}
@@ -216,7 +261,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
               className="vc-btn vc-btn-ghost"
               style={{
                 minHeight: 40, padding: '0 14px',
-                borderRadius: 9999, border: '1px solid var(--border)',
+                borderRadius: 9999, border: '1px solid var(--control-border)',
                 background: 'transparent', color: 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
                 cursor: 'pointer', letterSpacing: '-0.011em',
@@ -230,7 +275,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
               style={{
                 minHeight: 40, padding: '0 18px',
                 borderRadius: 9999, border: 'none',
-                background: 'var(--accent)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--text-on-accent)',
                 fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
                 cursor: 'pointer', letterSpacing: '-0.011em',
                 display: 'inline-flex', alignItems: 'center', gap: 6,

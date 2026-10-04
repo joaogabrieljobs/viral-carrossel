@@ -21,6 +21,7 @@ export const MOVABLE_ELEMENTS = [
   { key: 'text', label: 'Bloco de texto' },
   { key: 'title', label: 'Título' },
   { key: 'subtitle', label: 'Subtítulo' },
+  { key: 'bodyAfterImage', label: 'Texto abaixo da imagem' },
   { key: 'photo', label: 'Foto (enquadramento)' },
   { key: 'headerBar', label: 'Barra editorial' },
   { key: 'pageBadge', label: 'Contador N/M' },
@@ -89,4 +90,48 @@ export function resetElementOffsetsPatch(slide, chave = null) {
   const next = { ...(slide?.elementOffsets || {}) };
   delete next[chave];
   return { elementOffsets: next };
+}
+
+function sumOffsets(a, b) {
+  return {
+    x: clampOffsetPct((a?.x || 0) + (b?.x || 0)),
+    y: clampOffsetPct((a?.y || 0) + (b?.y || 0)),
+  };
+}
+
+function ownOffset(slide, key) {
+  return Object.prototype.hasOwnProperty.call(slide?.elementOffsets || {}, key)
+    ? getElementOffset(slide, key)
+    : null;
+}
+
+/**
+ * Converte o arrasto antigo do bloco Cultura/sanduíche em posições individuais.
+ * É um patch por card e idempotente: aplicar duas vezes não soma deslocamentos.
+ */
+export function unlockGroupedElementsPatch(slide) {
+  const current = { ...(slide?.elementOffsets || {}) };
+  if (slide?.elementsUnlocked === true) {
+    return { elementsUnlocked: true, elementOffsets: current };
+  }
+
+  const canvasGrouped = !!(
+    slide?.canvas?.enabled
+    && ['sandwich', 'stat'].includes(slide?.canvas?.variant)
+  );
+  const fluidCultureGrouped = !!(
+    String(slide?.bodyAfterImage || '').trim()
+  );
+
+  if (canvasGrouped || fluidCultureGrouped) {
+    // Nesse renderer, `subtitle` movia a zona inferior inteira. Migra para a
+    // chave certa antes de libertar o subtítulo superior.
+    const oldBottom = ownOffset(slide, 'subtitle');
+    if (oldBottom) current.bodyAfterImage = sumOffsets(ownOffset(slide, 'bodyAfterImage'), oldBottom);
+    delete current.subtitle;
+  }
+  // `text` permanece como deslocamento-base não interativo do contentor.
+  // Assim a moldura de recorte fica no mesmo lugar e desbloquear não provoca
+  // saltos; cada filho passa a mover-se relativamente a essa base.
+  return { elementsUnlocked: true, elementOffsets: current };
 }

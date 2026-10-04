@@ -71,6 +71,7 @@ function ProjectStyleKitPanel({
   hasOpenAI = false,
   onNeedKeys = null,
   material = null,
+  projectId = null,
 }) {
   const alive = useRef(true);
   const uploadVersion = useRef(0);
@@ -81,7 +82,7 @@ function ProjectStyleKitPanel({
   const logoInputRef = useRef(null);
   const kit = styleKit || { stylePrompt: '', contextMd: '', refImages: [] };
   const refs = Array.isArray(kit.refImages) ? kit.refImages : [];
-  const hasContent = styleKitHasContent(kit);
+  const hasContent = styleKitHasContent(kit) || !!kit.logo?.imageId || !!kit.logo?.dataUrl;
   const nome = (projectName || '').trim() || 'este projeto';
 
   const patch = (partial) => {
@@ -166,6 +167,7 @@ function ProjectStyleKitPanel({
       <Field label="Nome do contexto" hint="Apelido curto deste projeto (ex.: MUSA).">
         <input
           className="vc-input"
+          aria-label="Nome do contexto"
           value={kit.name || ''}
           maxLength={60}
           placeholder="Ex.: MUSA"
@@ -175,7 +177,20 @@ function ProjectStyleKitPanel({
 
       <Field label="Logo" hint="PNG transparente. Preferência: aplicar nos novos cards do projeto.">
         {kit.logo ? (
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{kit.logo.name || 'Logo salva'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {kit.logo.name || 'Logo salva'}
+            </span>
+            <button
+              type="button"
+              className="vc-btn vc-btn-ghost"
+              onClick={() => patch({ logo: null })}
+              aria-label="Remover logo deste projeto"
+              style={{ minHeight: 36, padding: '0 10px', color: '#f87171' }}
+            >
+              <Trash2 size={13} /> Remover
+            </button>
+          </div>
         ) : null}
         <button
           type="button"
@@ -243,9 +258,10 @@ function ProjectStyleKitPanel({
           setBrand={setBrand}
           onAnalyze={onAnalyzeBrandTone}
           analyzing={analyzingBrandTone}
-          hasOpenAI={hasOpenAI}
+          hasTextAI={hasOpenAI}
           onNeedKeys={onNeedKeys}
           toast={toast}
+          projectId={projectId}
         />
       ) : null}
 

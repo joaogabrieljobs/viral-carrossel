@@ -20,6 +20,8 @@ const shiftDays = (key, days) => {
   ].join('-');
 };
 
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** No Criar rápido, pasta/data/status ficam atrás de «Organizar». */
 async function expandOrganize(dialog) {
   const btn = dialog.getByRole('button', { name: 'Organizar' }).first();
@@ -48,7 +50,8 @@ test('organiza projeto em pasta e conserva a pauta no calendário após reload',
   await expect(dialog.getByLabel(new RegExp(`Estado de ${projectName}`, 'i'))).toHaveValue('scheduled');
 
   await dialog.getByRole('tab', { name: 'Calendário' }).click();
-  await expect(dialog.getByRole('button', { name: projectName, exact: true })).toBeVisible();
+  const eventName = new RegExp(`^${escapeRegExp(projectName)}\\. Data: .+\\. Status: .+\\. Pasta: Campanha Outubro\\.$`, 'i');
+  await expect(dialog.getByRole('button', { name: eventName })).toBeVisible();
   await expect(dialog.getByText(/não publica automaticamente no Instagram/i)).toBeVisible();
 
   await page.reload();
@@ -86,4 +89,76 @@ test('fila editorial mostra atrasados e permite marcar publicado', async ({ page
   await dialog.getByRole('tab', { name: 'Biblioteca' }).click();
   await expandOrganize(dialog);
   await expect(dialog.getByLabel(new RegExp(`Estado de ${projectName}`, 'i'))).toHaveValue('published');
+});
+
+test('limpa filtros da Biblioteca antes de abrir Calendário ou Fila', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
+
+  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  const search = dialog.getByRole('searchbox', { name: /buscar carrosséis/i });
+  await search.fill('projeto que não existe');
+  await expect(dialog.getByText(/nenhum carrossel corresponde/i)).toBeVisible();
+
+  await dialog.getByRole('tab', { name: 'Calendário' }).click();
+  await expect(dialog.getByText(/projeto.*ainda sem data/i)).toBeVisible();
+  await dialog.getByRole('tab', { name: 'Biblioteca' }).click();
+  await expect(search).toHaveValue('');
+});
+
+test('Escape fecha a Biblioteca e devolve o foco ao botão que a abriu', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+
+  const trigger = page.getByRole('button', { name: /abrir biblioteca/i }).first();
+  await trigger.focus();
+  await trigger.click({ force: true });
+  await expect(page.getByRole('dialog', { name: /biblioteca de carrosséis/i })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: /biblioteca de carrosséis/i })).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test('confirmações recebem foco, Escape devolve ao gatilho e abrir projeto foca o editor', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
+
+  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  await dialog.getByLabel('Nome da nova pasta').fill('Pasta temporária');
+  await dialog.getByRole('button', { name: 'Criar pasta' }).click();
+
+  const deleteFolder = dialog.getByRole('button', { name: 'Excluir pasta Pasta temporária' });
+  await deleteFolder.click();
+  await expect(dialog.getByRole('button', { name: 'Confirmar exclusão da pasta Pasta temporária' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(deleteFolder).toBeFocused();
+
+  const deleteProject = dialog.getByRole('button', { name: /^Apagar / }).first();
+  await deleteProject.click();
+  await expect(dialog.getByRole('button', { name: /^Confirmar exclusão de / })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(deleteProject).toBeFocused();
+
+  await dialog.getByRole('button', { name: /^Abrir / }).first().click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[aria-label="Áreas de edição do projeto"] [role="tab"][aria-selected="true"]')).toBeFocused();
+});
+
+test('cabeçalho e ações da Biblioteca cabem em celular sem rolagem horizontal', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
+
+  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  await expect(dialog.getByRole('tab', { name: 'Calendário' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /novo carrossel/i })).toBeVisible();
+  const hasOverflow = await dialog.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+  expect(hasOverflow).toBe(false);
 });

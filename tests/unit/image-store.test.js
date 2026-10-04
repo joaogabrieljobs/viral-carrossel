@@ -1,7 +1,13 @@
 // A quota do localStorage apagava imagens para conseguir gravar o documento.
 // Estes casos travam o contrato do novo store: o que sai do que se persiste.
 import { describe, it, expect } from 'vitest';
-import { semImagensDeRuntime, idsDeImagemEmUso, dataUrlParaBlob, newImageId } from '../../src/utils/image-store.js';
+import {
+  semImagensDeRuntime,
+  semLogosDeRuntimeDasMarcas,
+  idsDeImagemEmUso,
+  dataUrlParaBlob,
+  newImageId,
+} from '../../src/utils/image-store.js';
 
 const lib = (slides) => [{ id: 'd1', name: 'Doc', doc: { slides } }];
 
@@ -26,15 +32,54 @@ describe('semImagensDeRuntime', () => {
     const entrada = lib([{ id: 's1', title: 'T' }]);
     expect(semImagensDeRuntime(entrada)).toEqual(entrada);
   });
+
+  it('não associa por engano a logo da marca à logo diferente do kit do projeto', () => {
+    const entrada = [{
+      id: 'd1',
+      doc: {
+        slides: [],
+        styleKit: { logo: { imageId: 'logo_1' } },
+        brand: { name: 'MUSA', logo: 'data:image/png;base64,AAAA' },
+      },
+    }];
+    const out = semImagensDeRuntime(entrada);
+    expect(out[0].doc.brand.logo).toBe('data:image/png;base64,AAAA');
+    expect(out[0].doc.brand.logoImageId).toBeUndefined();
+    expect(out[0].doc.styleKit.logo.imageId).toBe('logo_1');
+  });
+
+  it('remove a cópia base64 da logo quando a própria marca aponta para o arquivo', () => {
+    const entrada = [{
+      id: 'd1',
+      doc: {
+        slides: [],
+        brand: {
+          name: 'MUSA',
+          logoImageId: 'logo_1',
+          logo: 'data:image/png;base64,AAAA',
+        },
+      },
+    }];
+    const out = semImagensDeRuntime(entrada);
+    expect(out[0].doc.brand.logo).toBeUndefined();
+    expect(out[0].doc.brand.logoImageId).toBe('logo_1');
+  });
+
+  it('remove URLs de runtime dos perfis de marca sem apagar o ID', () => {
+    expect(semLogosDeRuntimeDasMarcas([
+      { id: 'musa', logoImageId: 'logo_1', logo: 'blob:http://local/logo' },
+    ])).toEqual([{ id: 'musa', logoImageId: 'logo_1' }]);
+  });
 });
 
 describe('idsDeImagemEmUso', () => {
   it('junta ids de todos os projetos, sem repetir', () => {
     const l = [
       { doc: { slides: [{ bgImageId: 'a' }, { bgImageId: 'b' }] } },
-      { doc: { slides: [{ bgImageId: 'b' }, { title: 'sem foto' }] } },
+      { doc: { slides: [{ bgImageId: 'b' }, { title: 'sem foto' }], brand: { logoImageId: 'logo' } } },
     ];
-    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'b']);
+    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'b', 'logo']);
+    expect(idsDeImagemEmUso([], [{ logoImageId: 'perfil' }])).toEqual(['perfil']);
     expect(idsDeImagemEmUso(null)).toEqual([]);
   });
 });

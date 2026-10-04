@@ -45,11 +45,40 @@ export function normalizeSeriesIdeas(raw, { max = 8 } = {}) {
 }
 
 /**
+ * Copia a identidade necessária para gerar. Evidências brutas usadas para
+ * analisar o tom ficam no projeto de origem; replicá-las em cada rascunho
+ * multiplicaria o JSON/localStorage sem melhorar a voz já consolidada.
+ */
+export function cloneSeriesBrand(brand) {
+  if (!brand || typeof brand !== 'object') return null;
+  const {
+    voiceImageTexts: _voiceImageTexts,
+    voiceSampleText: _voiceSampleText,
+    voiceSourceUrls: _voiceSourceUrls,
+    ...identity
+  } = brand;
+  const tone = brand.brandTone && typeof brand.brandTone === 'object'
+    ? {
+        ...brand.brandTone,
+        traits: Array.isArray(brand.brandTone.traits) ? [...brand.brandTone.traits] : [],
+        samplePhrases: Array.isArray(brand.brandTone.samplePhrases)
+          ? [...brand.brandTone.samplePhrases]
+          : [],
+      }
+    : brand.brandTone;
+  return {
+    ...identity,
+    brandTone: tone,
+  };
+}
+
+/**
  * Seed de documento para rascunho de série (slides vazios + prompt/material).
  * O caller passa styleKit/brand já normalizados do projeto origem.
  */
 export function buildSeriesDraftSeed({
   idea,
+  brand = null,
   styleKit = null,
   objectiveId = 'educar',
   folderId = '',
@@ -70,6 +99,7 @@ export function buildSeriesDraftSeed({
     seedDoc: {
       mode: objective.narrativeMode,
       creativePreset: 'livre',
+      ...(brand && typeof brand === 'object' ? { brand: cloneSeriesBrand(brand) } : {}),
       styleKit: styleKit
         ? {
             stylePrompt: styleKit.stylePrompt || '',
@@ -85,8 +115,11 @@ export function buildSeriesDraftSeed({
         context: '',
       },
       caption: '',
-      // slides omitidos → newDoc cria um card vazio com a marca ativa
+      // Persistido no próprio doc: cada rascunho recupera o seu pedido ao abrir.
+      quickPromptDraft: prompt,
+      // slides omitidos → useLibrary cria um card vazio com a marca deste seed.
     },
+    // Compatibilidade com callers antigos que aplicam o prompt imediatamente.
     quickPrompt: prompt,
   };
 }

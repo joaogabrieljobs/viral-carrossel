@@ -144,6 +144,7 @@ function NarrativaStudioPanels({
   analyzingBrandTone = false,
   hasOpenAI = false,
   onNeedKeys = null,
+  projectId = null,
 }) {
   const [scope, setScope] = useState('text');
   const effectiveScope = hasImages ? scope : 'text';
@@ -196,6 +197,7 @@ function NarrativaStudioPanels({
             hasOpenAI={hasOpenAI}
             onNeedKeys={onNeedKeys}
             material={material}
+            projectId={projectId}
           />
         </AccordionPanel>
       </div>
