@@ -398,6 +398,7 @@ import {
 import {
   buildBrandToneAnalysisPrompt,
   brandToneFromAnalysis,
+  parseBrandToneAnalysisResponse,
   brandToneIsReady,
 } from './src/utils/brand-tone.js';
 import {
@@ -3150,7 +3151,13 @@ ${capRules}
         socialEvidence: options.socialEvidence,
       });
       const raw = await runAIJob(
-        () => callAI(prompt, { json: true, openaiKey, signal: job.signal, maxTokens: 2048 }),
+        () => callAI(prompt, {
+          json: true,
+          jsonParser: parseBrandToneAnalysisResponse,
+          openaiKey,
+          signal: job.signal,
+          maxTokens: 3072,
+        }),
         job.signal,
       );
       throwIfGenerationCancelled(job.signal);

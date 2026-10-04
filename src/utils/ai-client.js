@@ -117,7 +117,11 @@ const getTextModel = (provider) =>
   _aiRuntimeSettings.textModels?.[provider] || DEFAULT_AI_SETTINGS.textModels[provider];
 const getProviderKey = (provider) => String(_aiRuntimeSettings.keys?.[provider] || '').trim();
 
-const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = null, signal } = {}) => {
+const parseStructuredText = (text, json, jsonParser) => (
+  json ? (typeof jsonParser === 'function' ? jsonParser(text) : extractJSON(text)) : text.trim()
+);
+
+const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal } = {}) => {
   const body = {
     model: getTextModel('anthropic'),
     max_tokens: maxTokens,
@@ -167,11 +171,11 @@ const callAnthropic = async (userMsg, { json = false, maxTokens = 4096, tools = 
     .map(b => b.text)
     .join('\n');
   if (!text.trim()) throw new Error('Claude retornou conteúdo vazio.');
-  return json ? extractJSON(text) : text.trim();
+  return parseStructuredText(text, json, jsonParser);
 };
 
 // Backend OpenAI — Chat Completions com a família GPT-5.6.
-const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key, signal }) => {
+const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, key, signal }) => {
   key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
@@ -216,7 +220,7 @@ const callOpenAIChat = async (userMsg, { json = false, maxTokens = 4096, key, si
   }
   const text = data.choices?.[0]?.message?.content || '';
   if (!text.trim()) throw new Error('OpenAI retornou conteúdo vazio.');
-  return json ? extractJSON(text) : text.trim();
+  return parseStructuredText(text, json, jsonParser);
 };
 
 const COMPATIBLE_DIRECT_URLS = {
@@ -251,7 +255,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, maxTokens = 4096, signal } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -334,7 +338,7 @@ const callCompatibleChat = async (
       if (i < modelCandidates.length - 1) continue;
       throw lastError;
     }
-    return json ? extractJSON(text) : text.trim();
+    return parseStructuredText(text, json, jsonParser);
   }
 
   throw lastError || new Error('Viral AI indisponível. Tenta de novo.');
@@ -342,18 +346,18 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, maxTokens = 4096, openaiKey = null, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
   if (provider === 'kimi' && !getProviderKey('kimi')) provider = 'zai';
 
-  if (provider === 'anthropic') return callAnthropic(userMsg, { json, maxTokens, signal });
+  if (provider === 'anthropic') return callAnthropic(userMsg, { json, jsonParser, maxTokens, signal });
   if (provider === 'openai') {
-    return callOpenAIChat(userMsg, { json, maxTokens, signal, key: getProviderKey('openai') || openaiKey });
+    return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, maxTokens, signal });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);

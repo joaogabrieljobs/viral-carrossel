@@ -42,25 +42,37 @@ test('analisar meu tom usa somente IA de texto e não inicia carrossel', async (
   await mockApi(page, {
     session: textOnlySession,
     extra: {
+      '/api/fetch-source': (route) => route.fulfill({
+        json: {
+          ok: true,
+          text: 'MUSA — direção criativa para quem quer transformar ideia em linguagem visual. Clareza antes de volume. Criatividade com intenção, processo e repertório.',
+        },
+      }),
       '/api/ai/compatible': async (route) => {
         const promptText = route.request().postDataJSON().payload.messages.find((message) => message.role === 'user').content;
         prompts.push(promptText);
         analysisStarted = true;
         await pending;
-        return route.fulfill({ json: completion({
-          summary: 'Direto, humano e preciso',
-          traits: ['direto', 'humano', 'preciso'],
-          do: 'Nomeie o mecanismo com exemplos concretos.',
-          dont: 'Evite tom de guru e frases vazias.',
-          ctaStyle: 'Convide para um próximo passo simples.',
-          samplePhrases: ['Clareza antes de volume.', 'A ideia precisa caber na vida real.'],
-        }) });
+        return route.fulfill({ json: {
+          choices: [{ message: { content: `\`\`\`json
+{
+  "resumo": "Direto, humano e preciso",
+  "traços": ["direto", "humano", "preciso",],
+  "faça": "Nomeie o mecanismo com exemplos concretos.\nMostre o processo.",
+  "evite": "Tom de guru e frases vazias",
+  "estilo_cta": "Convide para um próximo passo simples",
+  "frases_exemplo": ["Clareza antes de volume.",],
+}
+\`\`\`` } }],
+        } });
       },
     },
   });
   await page.goto('/?app=1');
   await page.getByRole('button', { name: /continuar no editor/i }).click();
   const before = await doc(page);
+  await page.getByRole('button', { name: /Usar publicações para extrair o DNA/i }).click();
+  await page.getByLabel('Links do perfil e das publicações').fill('https://instagram.com/musa.exemplo');
   const analyzeButton = page.getByRole('button', { name: 'Analisar meu tom', exact: true });
   await expect(analyzeButton).toBeVisible();
   await analyzeButton.click();
@@ -72,8 +84,11 @@ test('analisar meu tom usa somente IA de texto e não inicia carrossel', async (
   expect((await doc(page)).slides).toEqual(before.slides);
   releaseAnalysis();
   await expect(page.getByText('Confirme o tom antes de guardar', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '1 fonte lida' })).toBeVisible();
   expect(prompts).toHaveLength(1);
   expect(prompts[0]).toContain('estrategista de voz de marca');
+  expect(prompts[0]).toContain('https://instagram.com/musa.exemplo');
+  expect(prompts[0]).toContain('Clareza antes de volume');
   expect(prompts[0]).not.toContain('Crie um carrossel de');
   expect((await doc(page)).slides).toEqual(before.slides);
   await page.getByRole('button', { name: 'Guardar tom da marca', exact: true }).click();

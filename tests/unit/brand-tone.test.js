@@ -5,6 +5,7 @@ import {
   brandToneIsReady,
   normalizeBrandTone,
   buildBrandToneAnalysisPrompt,
+  parseBrandToneAnalysisResponse,
 } from '../../src/utils/brand-tone.js';
 import {
   resolveGenMode,
@@ -107,5 +108,49 @@ describe('brand-tone (voz transversal)', () => {
     expect(p).toContain('Publicação original sobre posicionamento');
     expect(p).toContain('"ctaStyle"');
     expect(p).not.toContain('"narrativeArc"');
+  });
+
+  it('recupera JSON do provedor com quebras literais, vírgulas finais e aliases em português', () => {
+    const parsed = parseBrandToneAnalysisResponse(`\`\`\`json
+{
+  "resumo": "Direto e humano",
+  "traços": ["claro", "próximo",],
+  "faça": "Use exemplos reais.\n+Nomeie o problema.",
+  "evite": "Promessas vazias",
+  "estilo_cta": "Convite simples",
+  "frases_exemplo": ["Clareza antes de volume.",],
+}
+\`\`\``);
+    expect(parsed.summary).toBe('Direto e humano');
+    expect(parsed.traits).toEqual(['claro', 'próximo']);
+    expect(parsed.do).toContain('Nomeie o problema');
+    expect(parsed.ctaStyle).toBe('Convite simples');
+  });
+
+  it('aceita envelopes compatíveis e conteúdo JSON serializado dentro de result', () => {
+    const parsed = parseBrandToneAnalysisResponse({
+      choices: [{ message: { content: JSON.stringify({
+        result: JSON.stringify({
+          summary: 'Editorial e preciso',
+          traits: ['editorial', 'preciso'],
+          do: 'Explica o mecanismo.',
+        }),
+      }) } }],
+    });
+    expect(parsed.summary).toBe('Editorial e preciso');
+    expect(parsed.traits).toEqual(['editorial', 'preciso']);
+  });
+
+  it('recupera resposta rotulada e rejeita análise sem perfil utilizável', () => {
+    expect(parseBrandToneAnalysisResponse(`Resumo: Sóbrio e próximo
+Traços: claro; humano; preciso
+Faça: frases curtas e exemplos concretos
+Evite: tom de guru
+CTA: convite direto`)).toMatchObject({
+      summary: 'Sóbrio e próximo',
+      traits: ['claro', 'humano', 'preciso'],
+    });
+    expect(() => parseBrandToneAnalysisResponse('Aqui está a análise solicitada.'))
+      .toThrow(/análise voltou incompleta/i);
   });
 });

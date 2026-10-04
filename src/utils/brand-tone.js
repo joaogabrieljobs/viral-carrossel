@@ -5,21 +5,175 @@
  */
 
 import { buildSocialToneEvidenceBlock } from './social-tone.js';
+import { extractJSON } from './parsers.js';
 
 const FIELD_MAX = 1200;
 const TRAIT_MAX = 8;
 const PHRASE_MAX = 6;
+
+const TONE_KEY_ALIASES = Object.freeze({
+  summary: ['summary', 'resumo', 'perfil', 'descricao', 'descrição'],
+  traits: ['traits', 'tracos', 'traços', 'caracteristicas', 'características'],
+  do: ['do', 'faca', 'faça', 'fazer', 'recomendacoes', 'recomendações'],
+  dont: ['dont', 'evite', 'evitar', 'nao_fazer', 'não_fazer'],
+  ctaStyle: ['ctastyle', 'cta_style', 'estilocta', 'estilo_cta', 'cta'],
+  samplePhrases: ['samplephrases', 'sample_phrases', 'frasesexemplo', 'frases_exemplo', 'exemplos'],
+});
 
 function asString(v, max = FIELD_MAX) {
   return String(v || '').trim().slice(0, max);
 }
 
 function asStringList(v, maxItems, itemMax = 80) {
-  if (!Array.isArray(v)) return [];
-  return v
+  const values = Array.isArray(v)
+    ? v
+    : typeof v === 'string'
+      ? v.split(/\n|[;•|]/)
+      : [];
+  return values
     .map((x) => asString(x, itemMax))
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function stripDiacritics(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function readToneField(source, field) {
+  if (!source || typeof source !== 'object') return undefined;
+  const aliases = TONE_KEY_ALIASES[field] || [field];
+  const entries = Object.entries(source);
+  const match = entries.find(([key]) => aliases.includes(stripDiacritics(key).replace(/[\s-]/g, '_')));
+  return match?.[1];
+}
+
+function unwrapTonePayload(raw) {
+  let value = raw;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return value;
+    if (Array.isArray(value)) {
+      value = value[0];
+      continue;
+    }
+    if (readToneField(value, 'summary') != null || readToneField(value, 'traits') != null) return value;
+    value = value.result
+      ?? value.data
+      ?? value.output
+      ?? value.content
+      ?? value.message?.content
+      ?? value.choices?.[0]?.message?.content;
+  }
+  return value;
+}
+
+function repairJsonText(raw) {
+  const input = String(raw || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/```(?:json)?\s*/gi, '')
+    .replace(/```/g, '')
+    .trim();
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const char of input) {
+    if (escaped) {
+      out += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && inString) {
+      out += char;
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      out += char;
+      continue;
+    }
+    if (inString && char === '\n') {
+      out += '\\n';
+      continue;
+    }
+    if (inString && char === '\r') continue;
+    if (inString && char === '\t') {
+      out += '\\t';
+      continue;
+    }
+    out += char;
+  }
+  return out.replace(/,\s*([}\]])/g, '$1');
+}
+
+function parseLabeledToneText(raw) {
+  const text = String(raw || '').replace(/```/g, '').trim();
+  const labels = {
+    summary: 'summary|resumo|perfil|descri(?:ç|c)ão',
+    traits: 'traits|tra(?:ç|c)os|caracter(?:í|i)sticas',
+    do: 'do|fa(?:ç|c)a|fazer|recomenda(?:ç|c)(?:ões|oes)',
+    dont: "don't|dont|evite|evitar|n(?:ã|a)o fazer",
+    ctaStyle: 'ctaStyle|cta_style|estilo(?: do)? cta|cta',
+    samplePhrases: 'samplePhrases|sample_phrases|frases? exemplo|exemplos',
+  };
+  const found = {};
+  const allLabels = Object.values(labels).join('|');
+  for (const [field, label] of Object.entries(labels)) {
+    const pattern = new RegExp(`(?:^|\\n)\\s*(?:#{1,4}\\s*)?(?:["'*_-]\\s*)?(?:${label})(?:\\s*["'*_-])?\\s*[:：-]\\s*([\\s\\S]*?)(?=\\n\\s*(?:#{1,4}\\s*)?(?:["'*_-]\\s*)?(?:${allLabels})(?:\\s*["'*_-])?\\s*[:：-]|$)`, 'i');
+    const match = text.match(pattern);
+    if (match?.[1]?.trim()) found[field] = match[1].trim();
+  }
+  return Object.keys(found).length >= 2 ? found : null;
+}
+
+function normalizeAnalysisFields(source) {
+  return {
+    summary: asString(readToneField(source, 'summary'), 280),
+    traits: asStringList(readToneField(source, 'traits'), TRAIT_MAX),
+    do: asString(readToneField(source, 'do'), FIELD_MAX),
+    dont: asString(readToneField(source, 'dont'), FIELD_MAX),
+    ctaStyle: asString(readToneField(source, 'ctaStyle'), FIELD_MAX),
+    samplePhrases: asStringList(readToneField(source, 'samplePhrases'), PHRASE_MAX, 120),
+  };
+}
+
+/**
+ * Interpreta a resposta do provedor sem exigir que ela venha num único formato.
+ * Mantém a validação do conteúdo: wrappers, aliases e pequenos desvios de JSON
+ * são aceitos, mas texto sem um perfil de voz utilizável continua sendo erro.
+ */
+export function parseBrandToneAnalysisResponse(raw) {
+  let source = unwrapTonePayload(raw);
+  if (typeof source === 'string') {
+    try {
+      source = extractJSON(source);
+    } catch {
+      try {
+        source = extractJSON(repairJsonText(source));
+      } catch {
+        source = parseLabeledToneText(source);
+      }
+    }
+    source = unwrapTonePayload(source);
+    if (typeof source === 'string') {
+      try { source = extractJSON(repairJsonText(source)); }
+      catch { source = parseLabeledToneText(source); }
+    }
+  }
+  const normalized = normalizeAnalysisFields(source);
+  const evidenceCount = [
+    normalized.summary,
+    normalized.traits.length ? normalized.traits.join(' ') : '',
+    normalized.do,
+    normalized.dont,
+    normalized.ctaStyle,
+    normalized.samplePhrases.length ? normalized.samplePhrases.join(' ') : '',
+  ].filter(Boolean).length;
+  if (!normalized.summary || evidenceCount < 2) {
+    throw new Error('A análise voltou incompleta. Tente novamente — suas fontes continuam salvas.');
+  }
+  return normalized;
 }
 
 function isLegacyGeneratedMethod(method) {
@@ -125,7 +279,7 @@ Responda APENAS com JSON válido (sem markdown):
 
 /** Converte resposta da IA + monta method persistido. */
 export function brandToneFromAnalysis(raw) {
-  const src = raw && typeof raw === 'object' ? raw : {};
+  const src = normalizeAnalysisFields(raw && typeof raw === 'object' ? raw : {});
   const draft = {
     summary: asString(src.summary, 280),
     traits: asStringList(src.traits, TRAIT_MAX),
