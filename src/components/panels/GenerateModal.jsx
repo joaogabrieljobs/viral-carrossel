@@ -247,6 +247,7 @@ function GenerateModal({
         contentObjective,
         slideTextDensity: textDensity,
         cardVisualStyle: cardStyle,
+        visualPreset,
         fetchImagesNow: !!withImages,
       });
       if (!result?.cancelled) onClose();

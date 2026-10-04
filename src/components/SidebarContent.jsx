@@ -237,6 +237,9 @@ function SidebarContent({
   exportDoc = null,
   generateMissingImages = null,
   imagesBatchBusy = false,
+  quickCardCount = 'auto',
+  setQuickCardCount = () => {},
+  autoAdjustAllSlides = null,
   onOpenSeries = null,
   libraryFolders = [],
   setDocFolder = null,
@@ -738,7 +741,7 @@ function SidebarContent({
                 >
                   {anyCanvasEnabled
                     ? <><Check size={14} strokeWidth={2.5}/>Composição ativa</>
-                    : <><Sparkles size={14}/>Ativar composição</>}
+                    : <><Sparkles size={14}/>{slides.some((item) => item.canvas?.applied) ? 'Editar composição' : 'Ativar composição'}</>}
                 </button>
                 {anyCanvasEnabled && (
                   <button
@@ -756,7 +759,7 @@ function SidebarContent({
                     onMouseEnter={e => { e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.textDecorationColor='var(--text-muted)'; }}
                     onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.textDecorationColor='var(--hairline)'; }}
                   >
-                    Desativar composição
+                    Concluir edição
                   </button>
                 )}
                 {anyCanvasSaved && (
@@ -796,7 +799,9 @@ function SidebarContent({
                 />
                 {!anyCanvasEnabled && (
                   <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, letterSpacing:'-0.005em' }}>
-                    Disponível depois de ativar a composição.
+                    {anyCanvasSaved
+                      ? 'O layout salvo continua aplicado. Clique em Editar composição para mover as áreas.'
+                      : 'Crie a composição para dividir o card em áreas editáveis.'}
                   </div>
                 )}
               </div>
@@ -895,6 +900,33 @@ function SidebarContent({
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
                   Tem grade de rule-of-thirds + crosshair pra centralizar com precisão.
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateSlide({
+                      bgImage: null,
+                      bgImageId: null,
+                      bgImageSource: null,
+                      bgImageFailed: false,
+                      bgX: 50,
+                      bgY: 50,
+                      bgZoom: 100,
+                      bgFit: 'cover',
+                      bgMirror: false,
+                      presentationImgAdjust: undefined,
+                    });
+                    toast?.('Imagem removida deste card. Use desfazer se precisar.', 'success');
+                  }}
+                  style={{
+                    width:'100%', minHeight:40, borderRadius:11, cursor:'pointer',
+                    border:'1px solid rgba(239,68,68,.45)', background:'rgba(239,68,68,.08)',
+                    color:'var(--danger, #ef4444)', fontSize:12, fontWeight:600,
+                    fontFamily:'var(--font-ui)', display:'flex', alignItems:'center',
+                    justifyContent:'center', gap:7,
+                  }}
+                >
+                  <Trash2 size={14} aria-hidden/> Excluir imagem deste card
+                </button>
               </S>
             ) : null}
 
@@ -1108,6 +1140,30 @@ function SidebarContent({
                 onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
               >
                 <Zap size={11} style={{ color:'var(--accent)' }}/>Gerar 5 variações de gancho
+              </button>
+              <button
+                type="button"
+                disabled={!String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.bodyAfterImage || '').trim()}
+                onClick={() => {
+                  updateSlide({
+                    title: '',
+                    subtitle: '',
+                    bodyAfterImage: '',
+                    destaqueSpans: undefined,
+                  });
+                  toast?.('Textos removidos deste card. Use desfazer se precisar.', 'success');
+                }}
+                style={{
+                  width:'100%', minHeight:40, borderRadius:11,
+                  cursor: (!String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.bodyAfterImage || '').trim()) ? 'not-allowed' : 'pointer',
+                  border:'1px solid rgba(239,68,68,.45)', background:'rgba(239,68,68,.08)',
+                  color:'var(--danger, #ef4444)', fontSize:12, fontWeight:600,
+                  fontFamily:'var(--font-ui)', display:'flex', alignItems:'center',
+                  justifyContent:'center', gap:7,
+                  opacity: (!String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.bodyAfterImage || '').trim()) ? 0.45 : 1,
+                }}
+              >
+                <Trash2 size={14} aria-hidden/> Limpar textos deste card
               </button>
             </S>)}
 
@@ -2630,6 +2686,7 @@ function SidebarContent({
                     onClick={() =>
                       setBrand((b) => ({
                         ...b,
+                        visualIdentityLocked: true,
                         bg: p.bg,
                         titleColor: p.title,
                         subtitleColor: p.subtitle,
@@ -2658,12 +2715,13 @@ function SidebarContent({
             </S>
 
             <S title="Cores manuais" hint="Título = primeira e última folha · Subtítulo = linha curta nos slides do meio · Texto = parágrafos e blocos de corpo (sanduíche inclusive). Destaques = trechos marcados no editor.">
-              <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v})}/>
+              <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v,visualIdentityLocked:true})}/>
               <Toggle
                 label="Intercalar fundo entre cards"
                 value={!!brand.interleaveBg}
-                onChange={(v) => setBrand({
-                  ...brand,
+                  onChange={(v) => setBrand({
+                    ...brand,
+                    visualIdentityLocked: true,
                   interleaveBg: v,
                   ...((v && !(String(brand.bgAlternate || '').trim())) ? { bgAlternate: '#f5f5f7' } : {}),
                 })}
@@ -2680,7 +2738,7 @@ function SidebarContent({
                 <ColorRow
                   label="Segundo fundo"
                   value={(brand.bgAlternate && String(brand.bgAlternate).trim()) ? brand.bgAlternate : '#f5f5f7'}
-                  onChange={v=>setBrand({ ...brand, bgAlternate: v })}
+                  onChange={v=>setBrand({ ...brand, bgAlternate: v, visualIdentityLocked: true })}
                 />
               ) : null}
               {(() => {
@@ -2688,17 +2746,17 @@ function SidebarContent({
                 const activeBgImage = slides[activeIdx]?.bgImage;
                 return (
                   <>
-                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v})} contrastBg={brand.bg} contrastKind="large"/>
-                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v})} contrastBg={brand.bg} contrastKind="body"/>
-                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v})} contrastBg={brand.bg} contrastKind="body"/>
-                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v})} contrastBg={brand.bg} contrastKind="body"/>
+                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="large"/>
+                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
+                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
+                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
                     {activeBgImage ? (
                       <button
                         type="button"
                         onClick={async () => {
                           const hex = await extractDominantColor(activeBgImage);
                           if (hex) {
-                            setBrand({ ...brand, accent: hex });
+                            setBrand({ ...brand, accent: hex, visualIdentityLocked: true });
                             toast(`Cor de destaque extraída da foto: ${hex}`, 'success');
                           } else {
                             toast('Não consegui extrair cor dominante (imagem muito uniforme?).', 'warning');
@@ -3233,6 +3291,9 @@ function SidebarContent({
                   }}
                   onGenerateImages={generateMissingImages}
                   imagesBusy={imagesBatchBusy}
+                  quickCardCount={quickCardCount}
+                  onQuickCardCountChange={setQuickCardCount}
+                  onAutoAdjustAll={autoAdjustAllSlides}
                   projectId={activeDocId || activeEntry?.id}
                   folderId={activeEntry?.folderId || ''}
                   publicationDate={activeEntry?.publicationDate || ''}
@@ -3326,12 +3387,12 @@ function SidebarContent({
                       >
                         <div style={{
                           width: 36, height: 44, borderRadius: 6, flexShrink: 0,
-                          background: hasImg
-                            ? `url(${s.bgImage}) center/cover, ${s.bg || brand.bg || '#0a0a0a'}`
-                            : (s.bg || brand.bg || '#0a0a0a'),
+                          background: s.bg || brand.bg || '#0a0a0a',
                           border: '1px solid var(--glass-border)',
-                          position: 'relative',
+                          position: 'relative', overflow: 'hidden',
                         }}>
+                          {hasImg ? <img src={s.bgImage} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:`${s.bgX ?? 50}% ${s.bgY ?? 50}%` }}/> : null}
+                          {hasImg ? <span aria-hidden style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.18)' }}/> : null}
                           <span style={{
                             position: 'absolute', bottom: 2, left: 3,
                             fontSize: 8, fontWeight: 700, color: '#fff',
@@ -3358,6 +3419,65 @@ function SidebarContent({
                     </div>
                   );
                 })}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  disabled={imagesBatchBusy || !generateMissingImages}
+                  onClick={() => generateMissingImages?.(selectedSlideIds.length ? selectedSlideIds : null)}
+                  style={{ minHeight: 44, fontSize: 11 }}
+                >
+                  {imagesBatchBusy ? <Loader2 size={14} style={{ animation:'spin .8s linear infinite' }}/> : <ImageIcon size={14}/>}
+                  {selectedSlideIds.length ? `Gerar imagens (${selectedSlideIds.length})` : 'Gerar imagens pendentes'}
+                </button>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  onClick={() => autoAdjustAllSlides?.()}
+                  disabled={!autoAdjustAllSlides}
+                  style={{ minHeight: 44, fontSize: 11 }}
+                >
+                  <SlidersHorizontal size={14}/> Autoajustar todos
+                </button>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  disabled={!selectedSlideIds.length}
+                  onClick={() => {
+                    const ids = new Set(selectedSlideIds);
+                    setSlides?.((current) => current.map((item) => ids.has(item.id) ? {
+                      ...item,
+                      bgImage: null,
+                      bgImageId: null,
+                      bgImageSource: null,
+                      bgImageFailed: false,
+                    } : item));
+                    toast?.(`Imagem removida de ${selectedSlideIds.length} card${selectedSlideIds.length === 1 ? '' : 's'}.`, 'success');
+                  }}
+                  style={{ minHeight: 44, fontSize: 11, color: selectedSlideIds.length ? 'var(--danger, #ef4444)' : undefined }}
+                >
+                  <Trash2 size={14}/> Excluir imagens
+                </button>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  disabled={!selectedSlideIds.length}
+                  onClick={() => {
+                    const ids = new Set(selectedSlideIds);
+                    setSlides?.((current) => current.map((item) => ids.has(item.id) ? {
+                      ...item,
+                      title: '',
+                      subtitle: '',
+                      bodyAfterImage: '',
+                      destaqueSpans: undefined,
+                    } : item));
+                    toast?.(`Textos limpos de ${selectedSlideIds.length} card${selectedSlideIds.length === 1 ? '' : 's'}. Use desfazer se precisar.`, 'success');
+                  }}
+                  style={{ minHeight: 44, fontSize: 11, color: selectedSlideIds.length ? 'var(--danger, #ef4444)' : undefined }}
+                >
+                  <Trash2 size={14}/> Limpar textos
+                </button>
               </div>
             </S>
           </>

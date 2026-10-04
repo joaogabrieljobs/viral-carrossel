@@ -189,14 +189,19 @@ O Instagram não oferece leitura irrestrita de qualquer perfil por URL. A conex�
 
 ## Estado depois da geração
 
-A primeira camada apresenta quatro ações:
+A primeira camada apresenta cinco ações:
 
 - **Ajustar texto**
 - **Gerar imagens**
+- **Autoajustar cards**
 - **Baixar**
 - **Mais controle**
 
 “Mais controle” leva ao Diretor sem recriar o carrossel.
+
+Ao escolher **Gerar imagens**, o produto pergunta quais cards receberão imagem. O usuário pode selecionar todos ou apenas alguns; cards que já têm imagem também podem ser regenerados quando forem selecionados explicitamente. O cancelamento continua sendo global para o lote.
+
+Na lista compartilhada de cards, a seleção em massa permite gerar imagens, autoajustar, excluir imagens e limpar textos. No editor de um card, as ações **Excluir imagem deste card** e **Limpar textos deste card** ficam junto ao conteúdo correspondente e podem ser desfeitas.
 
 A opção de legenda pode ficar dentro de Baixar:
 
@@ -225,6 +230,18 @@ Estados de progresso devem comunicar resultado:
 - “Cancelar geração” permanece disponível globalmente.
 
 O cancelamento global cobre texto, imagens, refinos, legenda, ganchos, série, leitura de fontes, OCR e análise de tom. Ele interrompe o lote inteiro, descarta respostas tardias e preserva etapas já concluídas. Uma requisição já entregue ao provedor pode ter sido contabilizada antes do cancelamento; a interface não promete estorno automático desse consumo.
+
+## Estado global, do carrossel e do card
+
+Criar rápido, Controle profissional e Studio editam o mesmo documento. A profundidade da interface não cria uma cópia nem perde os ajustes feitos em outro modo.
+
+- **Padrões do projeto:** identidade, paleta, fontes, preset visual, logo, recorte padrão, organização do texto, quantidade preferida e autoajuste na geração. Cards novos herdam esses valores.
+- **Decisões do carrossel:** quantidade final, modo narrativo e quais cards entram num lote de imagens.
+- **Ajustes do card:** texto, imagem, recorte, composição, logo e deslocamentos próprios. Permanecem locais ao card até o usuário escolher uma ação “aplicar em todos”.
+
+Presets visuais são aplicados de forma determinística no momento da geração. A troca limpa resíduos do preset anterior — fundo customizado, padrão, composição, tom de superfície e ornamentos — para que a prévia corresponda ao resultado. Uma paleta personalizada marca a identidade visual como definida pelo usuário e não pode ser substituída silenciosamente por sugestões da IA.
+
+Imagens geradas entram em `cover`, centralizadas e sem margem vazia. O autoajuste reduz tipografia quando necessário e mantém texto e zonas dentro das áreas seguras. A composição possui três estados: zonas sugeridas pela geração, composição aplicada e edição ativa. Zonas sugeridas não restringem o texto; depois que o usuário ativa e ajusta a composição, concluir a edição preserva o layout.
 
 # Caminho 2 — Controle profissional
 

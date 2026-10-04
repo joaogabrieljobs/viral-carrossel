@@ -311,6 +311,7 @@ import {
   slideHasPendingPhotoIntent,
   inferCanvasDefaults,
   applyFinalizeCanvasMarginsToSlides,
+  autoAdjustSlides,
   canvasZonesFontScalePatch,
   sandwichPhotoZoneImgStyle,
   attachGenerationCanvasLayouts,
@@ -961,6 +962,8 @@ export default function App() {
   const slideTextDensityRaw = doc.slideTextDensity ?? '1_1';
   const slideTextDensity = SLIDE_TEXT_DENSITY_BY_ID[slideTextDensityRaw] ? slideTextDensityRaw : '1_1';
   const cardVisualStyle = normalizeCardVisualStyle(doc.cardVisualStyle);
+  const quickCardCount = doc.quickCardCount === 'auto' ? 'auto' : (Number(doc.quickCardCount) || 'auto');
+  const autoAdjustOnGenerate = doc.autoAdjustOnGenerate !== false;
 
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
   const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
@@ -1044,6 +1047,10 @@ export default function App() {
     cardVisualStyle: typeof next === 'function'
       ? next(normalizeCardVisualStyle(d.cardVisualStyle))
       : normalizeCardVisualStyle(next),
+  })), [history]);
+  const setQuickCardCount = useCallback(next => history.set(d => ({
+    ...d,
+    quickCardCount: typeof next === 'function' ? next(d.quickCardCount ?? 'auto') : next,
   })), [history]);
 
   const [libraryOpen, setLibraryOpen] = useState(false);  // declarado antes de useLibrary (usa setLibraryOpen)
@@ -2322,6 +2329,11 @@ export default function App() {
     toast('Edição da composição desativada — o layout ajustado fica no card.', 'info');
   }, [setSlides, toast]);
 
+  const autoAdjustAllSlides = useCallback(() => {
+    setSlides((prev) => autoAdjustSlides(prev, { creativePreset, fmt }));
+    toast('Todos os cards foram ajustados às áreas seguras.', 'success');
+  }, [creativePreset, fmt, setSlides, toast]);
+
   const removeCanvasLayout = useCallback(() => {
     setSlides((prev) => removeCanvasLayoutSlides(prev));
     setCanvasEditMode(false);
@@ -2471,7 +2483,18 @@ export default function App() {
       throwIfGenerationCancelled(job.signal);
       setSlides(prev => {
         const j = prev.findIndex(sl => sl.id === slideId);
-        return j < 0 ? prev : prev.map((sl, k) => (k === j ? { ...sl, ...patchImg, imgMode: 'dalle', overlay: 70, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+        return j < 0 ? prev : prev.map((sl, k) => (k === j ? {
+          ...sl,
+          ...patchImg,
+          imgMode: 'dalle',
+          overlay: 70,
+          bgFit: 'cover',
+          bgX: 50,
+          bgY: 50,
+          bgZoom: 100,
+          bgImageFailed: false,
+          bgImageSource: 'ai',
+        } : sl));
       });
       toast(`Slide ${idx + 1}: imagem gerada`, 'success');
     } catch (e) {
@@ -2570,6 +2593,7 @@ export default function App() {
     contentObjective: objectiveArg,
     slideTextDensity: densityArg,
     cardVisualStyle: cardStyleArg,
+    visualPreset: visualPresetArg,
     fetchImagesNow = true,
     announcement = false,
     remix = false,
@@ -2609,6 +2633,7 @@ export default function App() {
     });
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
+    const effectiveVisualPreset = visualPresetArg ?? visualPreset ?? null;
     const modeDef = resolveGenMode(effectiveMode);
     const brandBlock = buildBrandBlock(brand);
     const brandVoiceBlock = buildBrandVoiceBlock(brand, {
@@ -2706,7 +2731,18 @@ ${jsonShapeLine}`;
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
-    const generationBrand = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
+    // O modal aplica o preset e dispara a geração no mesmo gesto. Não dependemos
+    // do próximo render do React: a marca efetiva já nasce com a paleta/fontes
+    // escolhidas, evitando que o primeiro lote use o preset anterior.
+    const presetBrand = effectiveVisualPreset
+      ? applyVisualPreset(brand, effectiveVisualPreset)
+      : brand;
+    const generationBrand = {
+      ...presetBrand,
+      ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked)
+        ? projectDesignBrandPatch(result.projectDesign)
+        : {}),
+    };
     let projectLogoAsset = null;
     if (styleKit?.logoOnGenerate !== false && styleKit?.logo) {
       try {
@@ -2720,7 +2756,10 @@ ${jsonShapeLine}`;
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
-    let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : applyFinalizeCanvasMarginsToSlides(
+    const visualSlideOverrides = effectiveVisualPreset
+      ? getSlideOverridesForPreset(effectiveVisualPreset)
+      : {};
+    let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       let q = ((s.imageQuery ?? s.image_query) || '').trim();
@@ -2750,6 +2789,7 @@ ${jsonShapeLine}`;
         photoRegion: projectDesignInstructions && result.projectDesign?.layout === 'fullbleed' ? 'full' : cvStyle,
         ...(projectDesignInstructions && result.projectDesign?.layout === 'fullbleed' && q
           ? { composition: i === nSlides - 1 ? 'cta_close' : 'hook_fullbleed' } : {}),
+        ...visualSlideOverrides,
       };
 
       if (isTendenciaCulturaPreset(cp)) {
@@ -2806,9 +2846,12 @@ ${jsonShapeLine}`;
       return { ...base, overlay: q ? 70 : 0 };
       }),
       { creativePreset: cp, slideTextDensity: td },
-      ),
-      fmt,
-    );
+    ));
+    if (!remix) {
+      newSlides = autoAdjustOnGenerate
+        ? autoAdjustSlides(newSlides, { creativePreset: cp, fmt })
+        : applyFinalizeCanvasMarginsToSlides(newSlides, fmt);
+    }
     if (!remix) {
       newSlides = applyGenerationLogoPolicy(newSlides, {
         enabled: styleKit?.logoOnGenerate !== false,
@@ -2826,7 +2869,9 @@ ${jsonShapeLine}`;
       setHasLastGenerate(true);
     }
     history.set(d => ({
-      ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp, slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp,
+      ...(effectiveVisualPreset ? { visualPreset: effectiveVisualPreset } : {}),
+      slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
       editorialContext: { topic, niche: n || '', generatedAt: new Date().toISOString(), suggestedStructureId: performanceGuidance.preferredStructureId },
     }));
     setActiveIdx(0); setShellView('project');
@@ -2889,7 +2934,16 @@ ${jsonShapeLine}`;
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+              setSlides(prev => prev.map((sl, idx) => idx === i ? {
+                ...sl,
+                ...patchImg,
+                bgFit: 'cover',
+                bgX: 50,
+                bgY: 50,
+                bgZoom: 100,
+                bgImageFailed: false,
+                bgImageSource: 'ai',
+              } : sl));
           } catch(e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
             imgFailCount++;
@@ -3097,14 +3151,19 @@ ${capRules}
   };
 
   /** Geração rápida a partir do prompt da aba Narrativa (usa styleKit + material). */
-  const handleQuickGenerateFromNarrativa = async (promptText, { withImages = false, narrativeMode = 'none' } = {}) => {
+  const handleQuickGenerateFromNarrativa = async (promptText, { withImages = false, narrativeMode = 'none', cardCount = 'auto' } = {}) => {
     const topic = String(promptText || '').trim();
     if (!topic) {
       toast('Escreva o que você quer gerar no prompt.', 'error');
       return;
     }
     try {
-      const { count, announcement } = resolveQuickGenerationRequest(topic, slides.length >= 3 && slides.length <= 12 ? slides.length : 6);
+      const resolved = resolveQuickGenerationRequest(topic, 6);
+      const preferredCount = cardCount === 'auto' ? resolved.count : Number(cardCount);
+      const count = Number.isInteger(preferredCount) && preferredCount >= 1 && preferredCount <= 12
+        ? preferredCount
+        : resolved.count;
+      const { announcement } = resolved;
       const toneFromBrand = (brandToneIsReady(brand) && brand.useBrandVoice !== false)
         ? (brand.brandTone?.summary || brand.defaultTone || '').trim()
         : ((brand.defaultTone || '').trim() || 'direto e concreto');
@@ -3124,6 +3183,7 @@ ${capRules}
         contentObjective: announcement ? 'leads' : contentObjective,
         slideTextDensity: announcement ? '1_5' : slideTextDensity,
         cardVisualStyle,
+        visualPreset,
         fetchImagesNow: withImages && hasOpenAI,
       });
     } catch (e) {
@@ -3496,6 +3556,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
     exportPhotosOnly,
     visualPreset,
     applyVisualPreset: applyVisualStylePreset,
+    quickCardCount,
+    setQuickCardCount,
+    autoAdjustAllSlides,
     appMode,
     setActiveIdx,
     activeEntry,
@@ -3503,10 +3566,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
     analyzeBrandTone,
     setAppMode,
     exportDoc,
-    generateMissingImages: async () => {
+    generateMissingImages: async (targetSlideIds = null) => {
+      const targetSet = Array.isArray(targetSlideIds) && targetSlideIds.length
+        ? new Set(targetSlideIds)
+        : null;
       const idxs = slides
         .map((s, i) => ({ s, i }))
-        .filter(({ s }) => !(s.bgImage || s.bgImageId) && String(s.imageQuery || '').trim())
+        .filter(({ s }) => String(s.imageQuery || '').trim())
+        .filter(({ s }) => targetSet ? targetSet.has(s.id) : !(s.bgImage || s.bgImageId))
         .map(({ i }) => i);
       if (!idxs.length) {
         toast('Nenhum card pendente de imagem (ou sem palavras-chave).', 'info');
@@ -3964,10 +4031,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   <div style={{
                     width:44, height:56, borderRadius:4, overflow:'hidden', position:'relative',
                     background: resolveSlideBrandBg(brand, i, s),
-                    backgroundImage: s.bgImage?`url(${s.bgImage})`:'none',
-                    backgroundSize:'cover', backgroundPosition:'center',
                     ...(stripThumbFil ? { filter: stripThumbFil } : {}),
                   }}>
+                    {s.bgImage ? (
+                      <img
+                        src={s.bgImage}
+                        alt=""
+                        loading="eager"
+                        style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:`${s.bgX ?? 50}% ${s.bgY ?? 50}%` }}
+                      />
+                    ) : null}
                     {s.bgImage && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)' }}/>}
                     <span style={{
                       position:'absolute', bottom:3, left:4,

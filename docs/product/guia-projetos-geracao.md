@@ -27,6 +27,12 @@ Abra **Prompt para gerar** e escreva um pedido concreto, por exemplo: “Crie 3 
 3. Clique em **Gerar com contexto e referências**. A quantidade explícita no pedido é respeitada dentro do limite de 1–12 cards.
 4. Revise o resultado antes de exportar. O brief orienta o modelo; não elimina a necessidade de conferir fatos e o visual.
 
+No **Criar rápido**, a quantidade pode ficar em **Auto** ou ser definida antes da primeira geração. Auto respeita uma quantidade escrita no pedido e usa seis cards quando o pedido não informa esse número.
+
+Depois de gerar, **Gerar imagens** abre a seleção de cards. Escolha todos ou somente os cards desejados. A lista **Cards** também oferece ações em massa para gerar imagens, autoajustar, excluir imagens e limpar textos. No card aberto, use **Excluir imagem deste card** ou **Limpar textos deste card**; o histórico permite desfazer.
+
+**Autoajustar cards** coloca imagens em preenchimento total, centraliza o recorte e reduz blocos longos para as áreas seguras. Em Layout, a geração pode preparar zonas sugeridas sem ativar a composição. Quando o usuário ativa, move as áreas e conclui a edição, o arranjo permanece aplicado; **Remover composição** é a ação que volta ao layout padrão.
+
 A opção de modo narrativo é salva no projeto. O rascunho do prompt permanece ao mudar a orientação/tamanho da tela, mas é limpo ao trocar de projeto e não é um arquivo salvo para reutilização após recarregar.
 
 Os modos de interface **Criar rápido, Controle profissional e Studio** (internamente criador/diretor/studio) controlam ferramentas visíveis; não são modos narrativos nem o plano comercial «Criador».

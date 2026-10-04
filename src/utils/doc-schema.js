@@ -226,6 +226,10 @@ const DEFAULT_DOC = {
   slideTextDensity: '1_1',
   /** Região da foto por defeito nos slides gerados / novos (`photoRegion`). */
   cardVisualStyle: 'full',
+  /** Quantidade preferida no Criar rápido. `auto` respeita o pedido ou decide pelo tema. */
+  quickCardCount: 'auto',
+  /** Mantém todo texto e toda foto dentro das áreas ao terminar uma geração. */
+  autoAdjustOnGenerate: true,
 };
 
 /** URLs de demo que ficaram presas em docs persistidos — removidas de «Fontes & referências» ao hidratar. */
@@ -312,6 +316,11 @@ function ensureDocShape(d) {
   if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';
   if (out.cardVisualStyle == null) out.cardVisualStyle = 'full';
   if (!CARD_VISUAL_STYLE_IDS.has(out.cardVisualStyle)) out.cardVisualStyle = 'full';
+  if (out.quickCardCount !== 'auto') {
+    const quickCount = Number(out.quickCardCount);
+    out.quickCardCount = Number.isInteger(quickCount) && quickCount >= 1 && quickCount <= 12 ? quickCount : 'auto';
+  }
+  out.autoAdjustOnGenerate = out.autoAdjustOnGenerate !== false;
   if (typeof out.caption !== 'string') out.caption = '';
   return out;
 }

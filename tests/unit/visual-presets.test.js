@@ -177,4 +177,14 @@ describe('applyVisualPreset — troca de padrão não acumula assinatura', () =>
     }
     expect(getSlideOverridesForPreset('bold_promo_rosa').strikethroughText).toBeTruthy();
   });
+
+  it('trocar preset limpa fundo, composição e resíduos do card anterior', () => {
+    const overrides = getSlideOverridesForPreset('minimal_clean');
+    expect(overrides.customBg).toBeNull();
+    expect(overrides.canvas).toBeNull();
+    expect(overrides.composition).toBe('');
+    expect(overrides.bgPattern).toBe('none');
+    expect(overrides.cultureTone).toBe('');
+    expect(overrides.useCultureLayout).toBe(false);
+  });
 });

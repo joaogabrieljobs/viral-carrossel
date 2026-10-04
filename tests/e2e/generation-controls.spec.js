@@ -310,6 +310,8 @@ test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ p
 
   await page.getByRole('tab', { name: /^Home$/i }).first().click();
   await page.getByRole('button', { name: 'Gerar imagens', exact: true }).click();
+  await expect(page.getByText('Quais cards terão imagem?')).toBeVisible();
+  await page.getByRole('button', { name: 'Gerar 3 imagens', exact: true }).click();
   await expect.poll(() => imageCalls).toBe(1);
   await page.getByRole('button', { name: /Cancelar (?:geração|operação)/i }).click();
   releaseFirstImage();
@@ -319,6 +321,32 @@ test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ p
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   expect(imageCalls).toBe(1);
   expect((await doc(page)).slides.filter(s => s.bgImageId)).toHaveLength(0);
+});
+
+test('ações globais dos cards geram, excluem imagem e limpam texto selecionado', async ({ page }) => {
+  await openEditor(page, {
+    '/api/ai/compatible': route => {
+      const p = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+      return route.fulfill({ json: completion(p.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : draft()) });
+    },
+    '/api/ai/sjinn-image': route => route.fulfill({ json: { b64_json: PNG, mime: 'image/png' } }),
+  });
+  await prompt(page);
+  await generate(page);
+  await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
+
+  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('button', { name: 'Selecionar card 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Gerar imagens (1)', exact: true }).click();
+  await expect.poll(async () => !!(await doc(page))?.slides[0]?.bgImageId).toBe(true);
+
+  await page.getByRole('button', { name: 'Excluir imagens', exact: true }).click();
+  await expect.poll(async () => (await doc(page))?.slides[0]?.bgImageId ?? null).toBeNull();
+  await page.getByRole('button', { name: 'Limpar textos', exact: true }).click();
+  await expect.poll(async () => {
+    const first = (await doc(page))?.slides[0];
+    return [first?.title, first?.subtitle, first?.bodyAfterImage].join('|');
+  }).toBe('||');
 });
 
 test('logo PNG transparente pertence só ao card escolhido e volta no reload/backup', async ({ page }) => {

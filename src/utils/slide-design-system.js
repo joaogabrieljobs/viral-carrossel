@@ -278,6 +278,7 @@ export function applyCompositionToSlide(slide, compositionId, zonesByKey = {}) {
     // Layout → Ativar composição.
     next.canvas = {
       enabled: false,
+      applied: false,
       variant: comp.canvasVariant,
       zones: { ...zones },
     };

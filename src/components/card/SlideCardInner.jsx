@@ -1456,11 +1456,12 @@ const SlideCardInner = React.forwardRef(({
   );
 
   let inner;
-  // Só com a composição LIGADA é que o card usa zonas de altura fixa. Desligada,
-  // o texto corre livre no card inteiro: era o que faltava para aumentar o
-  // subtítulo sem ele sair da área visível.
+  // Zonas guardadas são o layout persistido. `enabled` controla apenas a edição
+  // das molduras; desligar a edição nunca pode desmontar o card já ajustado.
   const cvEnabled = !!(slide.canvas && slide.canvas.enabled && slide.canvas.zones);
-  const cvHasZones = cvEnabled;
+  // `enabled` abre a edição; `applied` mantém o layout depois de concluir.
+  // Zonas apenas sugeridas pela geração não limitam o texto na primeira visita.
+  const cvHasZones = !!(slide.canvas && slide.canvas.zones && (slide.canvas.enabled || slide.canvas.applied));
   const cvVar = slide.canvas?.variant;
   const cultureLayoutInferred = inferCanvasDefaults(slide, creativePreset);
   const cultureVariantForLayout = slide.canvas?.variant ?? cultureLayoutInferred.variant;
@@ -1471,7 +1472,7 @@ const SlideCardInner = React.forwardRef(({
   // Idem para os layouts sanduíche: sem composição ligada usa-se a variante
   // fluida (mais abaixo), que cresce com o texto em vez de o cortar.
   const useCultureCanvasZones =
-    cvEnabled &&
+    cvHasZones &&
     (sandwich || cultureStatFlat) &&
     (cultureVariantForLayout === 'sandwich' || cultureVariantForLayout === 'stat');
 

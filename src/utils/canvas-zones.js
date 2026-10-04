@@ -164,6 +164,18 @@ function applyFinalizeCanvasMarginsToSlides(slides, fmt = 'carrossel') {
   });
 }
 
+/**
+ * Aplica o mesmo ajuste seguro do botão a uma coleção inteira. Esta é a fonte
+ * única usada pela geração rápida, pelo Studio e pela ação global pós-gerar.
+ */
+function autoAdjustSlides(slides, { creativePreset = 'livre', fmt = 'carrossel' } = {}) {
+  const adjusted = slides.map((slide) => ({
+    ...slide,
+    ...slideAutoAdjustPatch(slide, { creativePreset, fmt }),
+  }));
+  return applyFinalizeCanvasMarginsToSlides(adjusted, fmt);
+}
+
 /** Ao mudar `titleSize` / `subSize` com canvas ativo: escala alturas das molduras de texto (~tamanho do tipo); a zona foto cede espaço até ao mínimo. */
 function canvasZonesFontScalePatch(prevSlide, mergedSlide) {
   const canvas = mergedSlide.canvas;
@@ -399,7 +411,8 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
         return {
           ...s,
           canvas: {
-            enabled: true,
+            enabled: false,
+            applied: false,
             variant: 'classic',
             zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
           },
@@ -407,13 +420,14 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
       }
       if (firstPair && !q) {
         const d = inferCanvasDefaults({ ...s, bodyAfterImage: '', useCultureLayout: false }, 'livre');
-        return { ...s, canvas: { enabled: false, variant: d.variant, zones: { ...d.zones } } };
+        return { ...s, canvas: { enabled: false, applied: false, variant: d.variant, zones: { ...d.zones } } };
       }
       if (s.useCultureLayout && bod && q) {
         return {
           ...s,
           canvas: {
-            enabled: true,
+            enabled: false,
+            applied: false,
             variant: 'sandwich',
             // Mesmo do botão (zonas amplas) — evita corte de texto denso
             zones: { ...DEFAULT_CANVAS_ZONES_SANDWICH },
@@ -423,21 +437,22 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
       if (s.useCultureLayout && bod && !q) {
         return {
           ...s,
-          canvas: { enabled: true, variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } },
+          canvas: { enabled: false, applied: false, variant: 'stat', zones: { ...DEFAULT_CANVAS_ZONES_STAT } },
         };
       }
       if (!s.useCultureLayout && q && i >= 2) {
         return {
           ...s,
           canvas: {
-            enabled: true,
+            enabled: false,
+            applied: false,
             variant: 'classic',
             zones: { ...DEFAULT_CANVAS_ZONES_COVER_FULLBLEED },
           },
         };
       }
       const d = inferCanvasDefaults({ ...s }, creativePreset);
-      return { ...s, canvas: { enabled: false, variant: d.variant, zones: { ...d.zones } } };
+      return { ...s, canvas: { enabled: false, applied: false, variant: d.variant, zones: { ...d.zones } } };
     }
 
     const d = inferCanvasDefaults(s, creativePreset);
@@ -446,7 +461,8 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
     return {
       ...s,
       canvas: {
-        enabled: true,
+        enabled: false,
+        applied: false,
         variant: d.variant,
         zones: { ...d.zones },
       },
@@ -461,15 +477,15 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
 function enableCanvasLayoutSlides(slides, creativePreset) {
   return slides.map((s) => {
     const hasSaved = !!(s.canvas?.zones && typeof s.canvas.zones === 'object' && s.canvas.variant);
-    if (hasSaved) return { ...s, canvas: { ...s.canvas, enabled: true } };
+    if (hasSaved) return { ...s, canvas: { ...s.canvas, enabled: true, applied: true } };
     const d = inferCanvasDefaults(s, creativePreset);
-    return { ...s, canvas: { enabled: true, variant: d.variant, zones: { ...d.zones } } };
+    return { ...s, canvas: { enabled: true, applied: true, variant: d.variant, zones: { ...d.zones } } };
   });
 }
 
-/** «Desativar composição»: sai do modo de edição, mantém zonas e render composto. */
+/** «Desativar composição»: sai da edição; as zonas continuam a compor o card. */
 function disableCanvasLayoutSlides(slides) {
-  return slides.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false } } : s));
+  return slides.map((s) => (s.canvas ? { ...s, canvas: { ...s.canvas, enabled: false, applied: true } } : s));
 }
 
 /** «Remover composição»: volta ao layout padrão (full-bleed / photoRegion). */
@@ -486,6 +502,7 @@ export {
   slideHasPendingPhotoIntent,
   inferCanvasDefaults,
   applyFinalizeCanvasMarginsToSlides,
+  autoAdjustSlides,
   canvasZonesFontScalePatch,
   sandwichPhotoZoneImgStyle,
   attachGenerationCanvasLayouts,

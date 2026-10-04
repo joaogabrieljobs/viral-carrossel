@@ -785,7 +785,7 @@ export function applyVisualPreset(brand, presetId) {
   if (!preset) return brand;
   const limpo = { ...brand };
   for (const k of PRESET_BRAND_SIGNATURE_KEYS) delete limpo[k];
-  const next = { ...limpo, ...preset.brand };
+  const next = { ...limpo, ...preset.brand, visualIdentityLocked: true };
   // Mesma regra anti-faux-bold dos pickers: fontes Google capadas a 700
   // não podem receber peso 800/900 vindo do preset.
   if (next.textTitleWeight != null) {
@@ -810,5 +810,19 @@ export function getSlideOverridesForPreset(presetId) {
   for (const k of PRESET_SLIDE_SIGNATURE_KEYS) {
     if (!(k in defaults)) reset[k] = undefined;
   }
-  return { ...reset, ...defaults };
+  return {
+    // O preset escolhido passa a ser a fonte de verdade visual. Resíduos do
+    // padrão anterior (cinza por card, Cultura, molduras e offsets) eram a
+    // causa de previews que não correspondiam ao resultado aplicado.
+    customBg: null,
+    cultureTone: '',
+    bgPattern: 'none',
+    textBg: false,
+    useCultureLayout: false,
+    composition: '',
+    canvas: null,
+    elementOffsets: {},
+    ...reset,
+    ...defaults,
+  };
 }
