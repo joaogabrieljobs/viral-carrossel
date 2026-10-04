@@ -41,6 +41,14 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     materialBlock: prompts.buildMaterialBlock(material),
     materialPriorityBlock: prompts.buildMaterialPriorityBlock(material),
     contextoModoPerso: 'Tom próximo', brandBlock: prompts.buildBrandBlock({ bio: 'Escola de escrita' }),
+    brandVoiceBlock: prompts.buildBrandVoiceBlock({
+      useBrandVoice: true,
+      brandTone: {
+        summary: 'Direto, editorial e humano',
+        traits: ['preciso', 'sem tom de guru'],
+        method: 'MÉTODO TOM DA MARCA: nomeie o mecanismo e corte frases vazias.',
+      },
+    }),
     imgParamsBlock: '', idiomaRegra: 'Texto em português brasileiro',
     modoNarrativoBloco: cp === 'tendencia_cultura' ? 'Use apenas o PACOTE TENDÊNCIA/CULTURA' : prompts.GEN_MODE_BY_ID.editorial.method,
     tendenciaPackBlock: cp === 'tendencia_cultura' ? prompts.buildTendenciaCulturaPackBlock(count, density) : '',
@@ -74,6 +82,8 @@ describe('montagem final dos prompts de texto', () => {
     expect(final).toContain('exatamente 7 itens');
     expect(final).toContain('Legenda até 2200');
     expect(final).toContain('tema solicitado define o assunto');
+    expect(final).toContain('VOZ DA MARCA');
+    expect(final).toContain('não substitui o arco');
   });
 
   it('Cultura tem arco próprio, faixas únicas e legenda da skill', () => {

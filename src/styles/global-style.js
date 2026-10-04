@@ -39,8 +39,8 @@ export const GLOBAL_STYLE = `
     --bg-glass-strong: rgba(255, 255, 255, 0.10);
     --bg-glass-deep:   rgba(255, 255, 255, 0.14);
     --bg-dark-glass:   rgba(10, 10, 10, 0.42);
-    --glass-border:    rgba(255, 255, 255, 0.10);
-    --glass-border-strong: rgba(255, 255, 255, 0.18);
+    --glass-border:    rgba(255, 255, 255, 0.16);
+    --glass-border-strong: rgba(255, 255, 255, 0.26);
     --glass-highlight: rgba(255, 255, 255, 0.22);
 
     /* Blur tokens */
@@ -50,12 +50,12 @@ export const GLOBAL_STYLE = `
     --blur-lg: 24px;
     --blur-xl: 40px;
 
-    /* Borders */
-    --border: rgba(255, 255, 255, 0.10);
-    --border-muted: rgba(255, 255, 255, 0.06);
-    --hairline: rgba(255, 255, 255, 0.10);
-    --divider-soft: rgba(255, 255, 255, 0.04);
-    --border-on-dark: rgba(255, 255, 255, 0.10);
+    /* Borders — contrastes legíveis no dark (UI/UX Pro Max a11y) */
+    --border: rgba(255, 255, 255, 0.18);
+    --border-muted: rgba(255, 255, 255, 0.10);
+    --hairline: rgba(255, 255, 255, 0.16);
+    --divider-soft: rgba(255, 255, 255, 0.08);
+    --border-on-dark: rgba(255, 255, 255, 0.18);
 
     /* Text on dark */
     --text-primary: #f3f0eb;
@@ -84,11 +84,17 @@ export const GLOBAL_STYLE = `
     --danger: #ff3b30;
     --warning: #ff9500;
 
-    /* Typography */
-    --font-ui: 'Inter', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
-    --font-display: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+    /* Typography — stack de sistema primeiro (WWDC: optical sizing + legibilidade) */
+    --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Helvetica Neue', system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-    --font-serif: 'Inter', system-ui, serif;
+    --font-serif: -apple-system, 'Inter', system-ui, serif;
+
+    /* Motion Apple — response curta no press; settle suave no resto */
+    --ease-out-press: cubic-bezier(0.2, 0.9, 0.3, 1);
+    --ease-out-settle: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-press: 100ms;
+    --motion-settle: 280ms;
 
     /* Radius scale Narrative OS */
     --radius-xs: 8px;
@@ -166,23 +172,29 @@ export const GLOBAL_STYLE = `
     font-family: var(--font-ui);
     font-size: 17px;
     line-height: 1.47;
-    letter-spacing: -0.014em;
+    letter-spacing: -0.011em;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv11', 'ss01', 'kern' 1;
+    font-optical-sizing: auto;
     text-rendering: optimizeLegibility;
     overscroll-behavior-x: none;
     padding-top: env(safe-area-inset-top, 0);
+    touch-action: manipulation;
   }
 
-  /* Headlines — peso marca hierarquia (Figma usa display weight forte; UI compacta mantém 600) */
+  /* Headlines — tracking negativo cresce com o tamanho (UI Typography WWDC) */
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     font-weight: 600;
     letter-spacing: -0.022em;
+    line-height: 1.2;
     color: var(--text-primary);
+    font-optical-sizing: auto;
   }
+  h1 { letter-spacing: -0.028em; line-height: 1.08; }
+  h2 { letter-spacing: -0.024em; }
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -318,8 +330,7 @@ export const GLOBAL_STYLE = `
     outline-offset: 1px;
   }
 
-  /* A11Y — Reduced motion: respeita preferência do sistema (Mac/iOS/Windows).
-     Reduz animações drasticamente sem desabilitá-las (mantém feedback de estado). */
+  /* A11Y — Reduced motion: cross-fade / settle curto, sem vestibular. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -328,6 +339,45 @@ export const GLOBAL_STYLE = `
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+    button:not(:disabled):active,
+    .vc-btn:active,
+    .tab-bar-item:active,
+    .vc-seg-item:active {
+      transform: none !important;
+    }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .vc-glass,
+    .vc-glass-dark,
+    .vc-glass-card,
+    .vc-card-elevated,
+    .modal-overlay,
+    .modal-panel,
+    .vc-sidebar-panel,
+    .vc-sidebar-dock,
+    .export-fab,
+    .vc-btn-ghost,
+    .vc-input {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .vc-sidebar-panel,
+    .vc-sidebar-dock,
+    .modal-panel {
+      background: var(--bg-secondary) !important;
+    }
+    .modal-overlay {
+      background: rgba(5, 4, 10, 0.88) !important;
+    }
+  }
+  @media (prefers-contrast: more) {
+    :root {
+      --glass-border: rgba(255, 255, 255, 0.32);
+      --glass-border-strong: rgba(255, 255, 255, 0.48);
+      --hairline: rgba(255, 255, 255, 0.32);
+      --border: rgba(255, 255, 255, 0.36);
+      --text-muted: rgba(243, 240, 235, 0.72);
     }
   }
   @keyframes shimmer {
@@ -462,8 +512,8 @@ export const GLOBAL_STYLE = `
   button[style*="background: var(--bg-card)"]:not(:disabled),
   label[style*="background:var(--bg-card)"],
   label[style*="background: var(--bg-card)"] {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-color: var(--glass-border) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: var(--glass-border-strong) !important;
     color: var(--text-secondary) !important;
     backdrop-filter: blur(12px) !important;
     -webkit-backdrop-filter: blur(12px) !important;
@@ -472,8 +522,8 @@ export const GLOBAL_STYLE = `
   /* Botões inativos com bg=bg-pearl → glass dark mais sutil ainda */
   button[style*="background:var(--bg-pearl)"]:not(:disabled),
   button[style*="background: var(--bg-pearl)"]:not(:disabled) {
-    background: rgba(255, 255, 255, 0.04) !important;
-    border-color: var(--glass-border) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--glass-border-strong) !important;
     color: var(--text-secondary) !important;
   }
 
@@ -519,18 +569,30 @@ export const GLOBAL_STYLE = `
      transitions cubic-bezier suaves. Mantém identidade magenta. — */
   .vc-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    gap: 8px; font-family: var(--font-ui); font-weight: 500;
+    gap: 8px; font-family: var(--font-ui); font-weight: 600;
     border-radius: 9999px; cursor: pointer;
     transition:
       transform 0.18s var(--ease-smooth),
       box-shadow 0.22s var(--ease-smooth),
       background 0.22s var(--ease-smooth),
-      color 0.22s var(--ease-smooth);
-    border: none; outline: none; position: relative; overflow: hidden;
+      color 0.22s var(--ease-smooth),
+      border-color 0.18s var(--ease-smooth);
+    /* Default = ghost legível — evita botão “sem linha” quando só tem .vc-btn */
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border-strong);
+    outline: none; position: relative; overflow: hidden;
     letter-spacing: -0.014em;
     font-feature-settings: 'cv11', 'ss01';
     -webkit-tap-highlight-color: transparent;
-    will-change: transform;
+    min-height: 40px;
+    padding: 0 16px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .vc-btn:hover:not(:disabled):not(.vc-btn-primary) {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.34);
+    color: var(--text-primary);
   }
   .vc-btn:active { transform: scale(0.96); }
   .vc-btn:focus-visible { outline: 2px solid var(--accent-focus); outline-offset: 3px; }
@@ -539,9 +601,9 @@ export const GLOBAL_STYLE = `
   /* Primary pill — gradient 135deg magenta + sombra colored + glow no hover */
   .vc-btn-primary {
     color: #fff;
-    padding: 0 22px; height: 40px; font-size: 14px; font-weight: 500;
+    padding: 0 22px; height: 40px; font-size: 14px; font-weight: 600;
     background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
       0 8px 24px rgba(255, 45, 141, 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
@@ -661,42 +723,81 @@ export const GLOBAL_STYLE = `
     box-shadow: 0 0 8px rgba(255, 45, 141, 0.5);
   }
 
-  /* Tab bar — grid 3-col × 2 rows. Active com ambient glow magenta
-     (Narrative OS premium). */
+  /* Tab bar — grelha 3 col. Linhas via gap (última linha incompleta não
+     quebra bordas; o seletor nth-last-child(-n+3) removia a linha de
+     Texto/Layout quando Marca era o 7.º item). */
+  [data-vc-tour="sidebar-tabs"] {
+    gap: 1px;
+    background: var(--glass-border-strong);
+    border-bottom: 1px solid var(--glass-border-strong);
+  }
   .tab-bar-item {
     padding: 11px 6px; font-size: 12px; font-weight: 500;
     letter-spacing: -0.014em; text-transform: none;
     font-family: var(--font-ui); cursor: pointer; border: none;
-    background: transparent; display: flex; align-items: center;
+    background: var(--bg-sidebar); display: flex; align-items: center;
     justify-content: center; gap: 6px; position: relative;
-    transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: color 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      background 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     outline: none; color: var(--text-muted);
-    min-height: 44px;
-    border-right: 1px solid var(--glass-border);
-    border-bottom: 1px solid var(--glass-border);
+    min-height: 48px;
   }
-  .tab-bar-item:nth-child(3n) { border-right: none; }
-  .tab-bar-item:nth-last-child(-n+3) { border-bottom: none; }
   .tab-bar-item.active {
     color: #fff; font-weight: 600;
-    background: linear-gradient(135deg, rgba(255,45,141,0.16) 0%, rgba(255,45,141,0.06) 100%);
+    background: linear-gradient(135deg, rgba(255,45,141,0.22) 0%, rgba(255,45,141,0.08) 100%);
     box-shadow:
+      inset 0 0 0 1px rgba(255, 45, 141, 0.45),
       inset 0 0 24px rgba(255, 45, 141, 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
   .tab-bar-item.active::after {
-    content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
+    content: ''; position: absolute; bottom: 0; left: 10px; right: 10px;
     height: 2px; background: var(--accent); border-radius: 99px;
     box-shadow: 0 0 12px rgba(255, 45, 141, 0.6);
   }
   .tab-bar-item:hover:not(.active) {
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
   }
   .tab-bar-item:focus-visible {
     outline: 2px solid var(--accent-focus, var(--accent));
     outline-offset: -2px;
     border-radius: 4px;
+  }
+
+  /* Segmented controls / chips de opção — alvo ≥40px, borda sempre visível */
+  .vc-seg {
+    display: grid;
+    gap: 6px;
+  }
+  .vc-seg-item {
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border-strong);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s var(--ease-smooth), border-color 0.15s, color 0.15s, transform 0.1s;
+  }
+  .vc-seg-item:hover:not(:disabled):not([aria-pressed="true"]):not(.active) {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: var(--text-primary);
+  }
+  .vc-seg-item[aria-pressed="true"],
+  .vc-seg-item.active {
+    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 45, 141, 0.28), inset 0 1px 0 rgba(255,255,255,0.16);
   }
 
   /* Slide thumbs — foco com anel de primário (--accent-focus) */

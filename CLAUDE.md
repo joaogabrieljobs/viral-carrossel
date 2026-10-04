@@ -5,6 +5,8 @@ Gerador de carrosséis Instagram com IA. Vite + React 18; monólito `ViralCarros
 ## Documentos de contexto (spec-driven)
 
 - Uso atual: **docs/product/guia-projetos-geracao.md** (contexto, escopo, modos, remix, cancelamento, logo e backup)
+- Tese de produto (duas profundidades): **docs/product/duas-profundidades-criacao.md** (Criar rápido × Controle profissional; Fatias 0–3)
+- Organização editorial: **docs/product/organizacao-calendario.md** (pastas, estados, data da pauta, calendário local e regras de backup)
 - Contratos atuais: **docs/engineering/controles-geracao-projeto.md** · docs/engineering/referencias-imagem-plano.md · docs/engineering/recuperacao-senha.md
 - Landing: **docs/LANDING-COPY.md**; preços/quotas vêm de `shared/plans.js`, texto incluso e chave própria opcional.
 - Auditorias históricas: docs/audit.md (2026-08-07) · docs/audit-produto.md (2026-08-07) · docs/audit-ia-2026-09-15.md. Achados e linhas retratam a versão auditada; consultar revisões posteriores e o código atual antes de reutilizá-los.

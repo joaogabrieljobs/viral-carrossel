@@ -1,6 +1,6 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, FileText, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { Download, FileText, Image as ImageIcon, ChevronDown, Copy, Archive } from 'lucide-react';
 import { FORMATS } from '../../utils/formats.js';
 
 // ─── EXPORT MORE FORMATS — único dropdown "Baixar" com todas as saídas ────────
@@ -12,6 +12,12 @@ function ExportMoreFormats({
   activeIdx, onExportSlide,
   onExportAll, onExportPDF, onExportPhotosOnly,
   hideSlideOption = false,
+  caption = '',
+  onCopyCaption = null,
+  onExportPackage = null,
+  onExportBackup = null,
+  genCaption = false,
+  onGenerateCaption = null,
 }) {
   const [open, setOpen] = React.useState(false);
   const refMenu = React.useRef(null);
@@ -78,7 +84,11 @@ function ExportMoreFormats({
             padding:6, display:'flex', flexDirection:'column', gap:2, zIndex:50,
           }}
         >
-          {/* Card individual — primeira opção, era o CTA fixo antes */}
+          <p style={{
+            margin: '4px 10px 8px', fontSize: 10, lineHeight: 1.4, color: 'var(--text-muted)',
+          }}>
+            Baixa os ficheiros. A publicação é no Instagram.
+          </p>
           {!hideSlideOption && onExportSlide && (
             <button
               role="menuitem"
@@ -104,11 +114,55 @@ function ExportMoreFormats({
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <Download size={13} style={{ color:'var(--text-muted)' }}/>
-            <span style={{ flex:1 }}>Carrossel completo</span>
+            <span style={{ flex:1 }}>Baixar PNGs (ZIP)</span>
             <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
-              ZIP · {slides.length} cards
+              {slides.length} cards
             </span>
           </button>
+          {onCopyCaption ? (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setOpen(false); onCopyCaption(); }}
+              disabled={genCaption}
+              style={menuItemStyle}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Copy size={13} style={{ color:'var(--text-muted)' }}/>
+              <span style={{ flex:1 }}>
+                {String(caption || '').trim() ? 'Copiar legenda' : (onGenerateCaption ? 'Gerar e copiar legenda' : 'Copiar legenda')}
+              </span>
+            </button>
+          ) : null}
+          {onExportPackage ? (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setOpen(false); onExportPackage(); }}
+              disabled={exporting || genCaption}
+              style={menuItemStyle}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Archive size={13} style={{ color:'var(--accent)' }}/>
+              <span style={{ flex:1, fontWeight: 600 }}>PNGs + copiar legenda</span>
+            </button>
+          ) : null}
+          {onExportBackup ? (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setOpen(false); onExportBackup(); }}
+              style={menuItemStyle}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <FileText size={13} style={{ color:'var(--text-muted)' }}/>
+              <span style={{ flex:1 }}>Fazer backup do projeto</span>
+              <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>JSON</span>
+            </button>
+          ) : null}
           <button
             role="menuitem"
             type="button"

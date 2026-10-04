@@ -9,6 +9,7 @@ import ProjectWorkflowShowcase from './landing/ProjectWorkflowShowcase.jsx';
 import LandingPlans from './landing/LandingPlans.jsx';
 import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
+import { APP_MODE_UI } from '../utils/ui-depth-labels.js';
 
 /** Assets em public/landing/ — samples otimizados WebP (slides editoriais) */
 const IMG = {
@@ -67,7 +68,7 @@ const CAPABILITIES = [
   { icon: Layers, label: 'Só texto ou texto e imagens', hint: 'Escolha antes de gerar e antes de refazer o tom' },
   { icon: Layout, label: 'Oito modos narrativos + Nenhum', hint: 'Uma estrutura para sua ideia, ou liberdade para seguir o pedido' },
   { icon: Wand2, label: 'Oito tons para refazer', hint: 'Variação de voz com o visual preservado no remix de texto' },
-  { icon: Palette, label: 'Logo salva no projeto', hint: 'PNG transparente · aplicar no card selecionado · tamanho e posição' },
+  { icon: Palette, label: 'Logo salva no projeto', hint: 'PNG transparente · aplicar nos novos cards · overrides por card' },
   { icon: Image, label: 'Referências no fluxo', hint: 'Moodboard para orientar geradores de imagem compatíveis' },
   { icon: Download, label: 'Exportação pronta', hint: 'PNG individual ou em lote · PDF completo' },
   { icon: Instagram, label: 'Criação no celular', hint: 'Edite, cancele a geração e exporte também no mobile' },
@@ -76,21 +77,21 @@ const CAPABILITIES = [
 const MODES = [
   {
     id: 'criador',
-    label: 'Criador',
-    tag: 'Comece aqui',
-    desc: 'Traga o pedido e o contexto. Escolha o que gerar e receba uma primeira versão para editar.',
+    label: APP_MODE_UI.criador.label,
+    tag: APP_MODE_UI.criador.tagline,
+    desc: APP_MODE_UI.criador.desc,
   },
   {
     id: 'diretor',
-    label: 'Diretor',
-    tag: 'Refine a ideia',
-    desc: 'Ajuste gancho, tom, ordem, imagens e tipografia até o carrossel soar como você.',
+    label: APP_MODE_UI.diretor.label,
+    tag: APP_MODE_UI.diretor.tagline,
+    desc: APP_MODE_UI.diretor.desc,
   },
   {
     id: 'studio',
-    label: 'Studio',
-    tag: 'Controle visual',
-    desc: 'Trabalhe grids, tracking, composição e detalhes de cada página quando cada pixel importa.',
+    label: APP_MODE_UI.studio.label,
+    tag: APP_MODE_UI.studio.tagline,
+    desc: APP_MODE_UI.studio.desc,
   },
 ];
 
@@ -186,7 +187,7 @@ const FAQ = [
   },
   {
     q: 'Preciso importar minha logo toda vez?',
-    a: 'Não. Salve uma logo PNG transparente de até 2 MB no projeto. Depois, selecione um card e use Aplicar logo do projeto neste card. Você pode ajustar tamanho e posição sem importar o arquivo novamente.',
+    a: 'Não. Salve uma logo PNG transparente de até 2 MB no projeto. Por padrão ela aplica-se aos novos cards; pode desativar a preferência ou ocultar/reposicionar card a card.',
   },
   {
     q: 'Posso interromper uma geração?',
@@ -202,7 +203,7 @@ const FAQ = [
   },
   {
     q: 'Preciso ser designer ou copywriter?',
-    a: 'Não. Comece no modo Criador e refine o resultado. Os modos Diretor e Studio dão acesso a mais controles. Os oito modos narrativos são outra escolha: definem a estrutura do conteúdo, com a opção Nenhum para seguir o pedido sem fórmula predefinida.',
+    a: 'Não. Comece em Criar rápido e refine o resultado. Controle profissional e Studio abrem mais controlos. Os modos narrativos são outra escolha: definem a estrutura do conteúdo; o tom de voz da marca acompanha qualquer modo. «Seguir meu pedido» gera sem fórmula predefinida.',
   },
   {
     q: 'Funciona no celular?',
@@ -362,7 +363,7 @@ function RevealSection({ children, variant = 'rise', style, className = '', eage
   );
 }
 
-export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
+export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogin, isMobile }) {
   const heroRef = useRef(null);
 
   // Refs pros efeitos GSAP (reveal de texto, parallax de imagem e header
@@ -794,6 +795,28 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               Criar meu primeiro carrossel
               <ArrowRight size={14} />
             </button>
+            {onEnterProfessional ? (
+              <button
+                type="button"
+                onClick={onEnterProfessional}
+                style={{
+                  height: isMobile ? 46 : 50,
+                  padding: isMobile ? '0 18px' : '0 22px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid var(--glass-border-strong)',
+                  background: 'var(--bg-glass)',
+                  backdropFilter: 'blur(18px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+                  color: 'var(--text-primary)',
+                  fontSize: isMobile ? 13 : 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                Quero controle profissional
+              </button>
+            ) : (
             <button
               type="button"
               onClick={(e) => {
@@ -825,6 +848,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
             >
               Ver como funciona
             </button>
+            )}
           </div>
           <p style={{
             margin: 0,
@@ -1499,7 +1523,7 @@ export default function OnboardingLanding({ onEnter, onLogin, isMobile }) {
               }}
             >
               <Sparkles size={16} />
-              Começar no modo Criador
+              Começar em Criar rápido
               <ArrowRight size={14} />
             </button>
             <p style={{

@@ -6,6 +6,9 @@ import {
   buildGenerationImageLayer,
   GEN_MODES,
   GEN_MODE_BY_ID,
+  resolveGenMode,
+  buildBrandVoiceBlock,
+  normalizeNarrativeModeId,
   midSubtitleBandFor,
   buildGenerationSlideLayoutRules,
   buildSlideTextDensityOverrides,
@@ -34,6 +37,7 @@ describe('módulo generation-prompts (extração do monólito)', () => {
       expect(GEN_MODE_BY_ID[m.id]).toBe(m);
       expect(m.method.length).toBeGreaterThan(100);
     }
+    expect(GEN_MODE_BY_ID.brand_tone).toBeUndefined();
   });
 
   it('prosa das regras de layout usa a faixa da fonte única (por modo)', () => {
@@ -63,6 +67,12 @@ describe('módulo generation-prompts (extração do monólito)', () => {
     expect(stripLeadingSlideCardLabel('Slide 3: O gancho real')).toBe('O gancho real');
     expect(buildBrandBlock({ bio: 'Marca X', handle: '@x' })).toContain('IDENTIDADE VERBAL');
     expect(buildHookVariationRules('viral', 'livre')).toContain('gancho');
+    expect(normalizeNarrativeModeId('brand_tone')).toBe('none');
+    expect(buildBrandVoiceBlock({
+      useBrandVoice: true,
+      brandTone: { summary: 'X', method: 'MÉTODO TOM DA MARCA — teste com conteúdo suficiente para passar do mínimo exigido no perfil.' },
+    })).toContain('VOZ DA MARCA');
+    expect(resolveGenMode('editorial').id).toBe('editorial');
   });
 });
 

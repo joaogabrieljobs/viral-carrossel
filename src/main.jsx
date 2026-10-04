@@ -55,18 +55,61 @@ class RootErrorBoundary extends React.Component {
 
 function BootScreen() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#0e0c14',
-      color: '#8a8696',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      fontSize: 14,
-    }}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="A carregar"
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+        background: '#0e0c14',
+        color: '#8a8696',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: 14,
+      }}
+    >
       <style>{GLOBAL_STYLE}</style>
-      A carregar…
+      <img
+        src="/favicon.png"
+        alt=""
+        width={56}
+        height={56}
+        decoding="async"
+        style={{
+          display: 'block',
+          width: 56,
+          height: 56,
+          borderRadius: 14,
+          objectFit: 'cover',
+          boxShadow: '0 0 28px rgba(255, 45, 141, 0.22)',
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          width: 120,
+          height: 3,
+          borderRadius: 99,
+          background: 'rgba(255,255,255,0.08)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: '40%',
+            height: '100%',
+            borderRadius: 99,
+            background: 'rgba(255, 45, 141, 0.85)',
+            animation: 'vc-boot-bar 1.1s ease-in-out infinite',
+          }}
+        />
+      </div>
+      <style>{`@keyframes vc-boot-bar { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
+      <span style={{ letterSpacing: '-0.011em' }}>A carregar…</span>
     </div>
   );
 }

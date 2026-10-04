@@ -47,17 +47,26 @@ function dismissOnboardingLanding() {
 
 // ─── BIBLIOTECA + PERFIS DE MARCA ─────────────────────────────────────────────
 // Esquema novo de persistência (lazily migrado a partir do `vc_doc` antigo):
-//   vc_library = [{ id, name, status, createdAt, updatedAt, doc }]
+//   vc_library = [{ id, name, status, folderId, publicationDate, createdAt, updatedAt, doc }]
+//   vc_library_folders = [{ id, name, createdAt }]
 //   vc_brands  = [{ id, name, ...brand }]
 //   vc_active_doc_id   = string (qual carrossel está sendo editado agora)
 //   vc_active_brand_id = string (qual perfil de marca aplicar por padrão em novos carrosséis)
 // Cria uma entrada de biblioteca a partir de um doc completo.
-const mkLibEntry = (doc, name = 'Sem título') => {
+const mkLibEntry = (doc, name = 'Sem título', metadata = {}) => {
   const now = Date.now();
+  const publicationDate = metadata.publicationDate || '';
+  let status = ['draft', 'ready', 'scheduled', 'published'].includes(metadata.status)
+    ? metadata.status
+    : 'draft';
+  // Data editorial local → Agendado (exceto se já marcado Publicado).
+  if (publicationDate && status !== 'published') status = 'scheduled';
   return {
     id: uid(),
     name,
-    status: 'draft',
+    status,
+    folderId: metadata.folderId || '',
+    publicationDate,
     createdAt: now,
     updatedAt: now,
     doc,

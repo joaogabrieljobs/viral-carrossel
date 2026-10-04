@@ -3,6 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { Sparkles, Wand2, Loader2, X, ChevronDown, Check, Settings, SlidersHorizontal } from 'lucide-react';
 import { SectionLabel as S } from './SectionLabel.jsx';
 import { FORMATS } from '../../utils/formats.js';
+import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../../utils/ui-depth-labels.js';
 
 /** Proporção de exportação — uma linha no desktop; grelha largura total no mobile (evita barra apertada). */
 function EditorFormatSelector({ fmt, setFmt, layout }) {
@@ -113,20 +114,16 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
   );
 }
 
-/**
- * ModeSwitcher — chip dropdown pra trocar entre Criador / Diretor / Studio.
- * Controla progressive disclosure global do Narrative OS (FASE 2).
- *
- * - Criador (90% users): só tema, estilo, intensidade, gerar. Tabs reduzidas.
- * - Diretor (intermediate): + narrativa, branding, composição, IA, estética.
- * - Studio (advanced): tudo + grids, tracking, overlays, canvas, ajustes finos.
- */
 const APP_MODES = [
-  { id: 'criador',  label: 'Criador',  icon: Sparkles,    desc: 'Simples — tema, estilo e gerar' },
-  { id: 'diretor',  label: 'Diretor',  icon: SlidersHorizontal, desc: 'Controle intermediário' },
-  { id: 'studio',   label: 'Studio',   icon: Settings,    desc: 'Avançado — todos os controles' },
+  { id: 'criador',  label: APP_MODE_UI.criador.label,  icon: Sparkles,    desc: APP_MODE_UI.criador.shortDesc },
+  { id: 'diretor',  label: APP_MODE_UI.diretor.label,  icon: SlidersHorizontal, desc: APP_MODE_UI.diretor.shortDesc },
+  { id: 'studio',   label: APP_MODE_UI.studio.label,   icon: Settings,    desc: APP_MODE_UI.studio.shortDesc },
 ];
 
+/**
+ * ModeSwitcher — chip dropdown pra trocar profundidade de UI.
+ * IDs internos: criador / diretor / studio (não confundir com plano comercial Criador).
+ */
 function ModeSwitcher({ value, onChange, compact = false }) {
   const [open, setOpen] = React.useState(false);
   // Posição calculada em px (não CSS `absolute` relativo ao wrapper) porque o
@@ -251,6 +248,12 @@ function ModeSwitcher({ value, onChange, compact = false }) {
               </button>
             );
           })}
+          <p style={{
+            margin: '4px 8px 8px', fontSize: 10, lineHeight: 1.45,
+            color: 'var(--text-muted)', letterSpacing: '-0.005em',
+          }}>
+            {DEPTH_LAYERS_HINT}
+          </p>
         </div>
       )}
     </div>

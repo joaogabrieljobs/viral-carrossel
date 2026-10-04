@@ -1,9 +1,11 @@
-import { GEN_MODES } from '../../utils/generation-prompts.js';
+import { GEN_MODES, resolveGenMode, normalizeNarrativeModeId } from '../../utils/generation-prompts.js';
 import React, { useState } from 'react';
 import { GenerationScopePicker } from '../GenerationScopePicker.jsx';
 import { BookOpen, ChevronDown, FileText, Loader2, Sparkles, Type } from 'lucide-react';
 import { ProjectStyleKitPanel } from './ProjectStyleKitPanel.jsx';
 import { styleKitHasContent } from '../../utils/style-kit.js';
+import { brandToneIsReady } from '../../utils/brand-tone.js';
+import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
 
 /**
  * Cabeçalho de acordeão — clica para maximizar / minimizar.
@@ -30,13 +32,17 @@ function AccordionHeader({
         alignItems: 'center',
         gap: 12,
         padding: '12px 14px',
+        minHeight: 56,
         borderRadius: open && connectBody ? '12px 12px 0 0' : 12,
-        border: `1px solid ${open ? 'var(--text-primary)' : 'var(--hairline)'}`,
-        borderBottom: open && connectBody ? '1px solid var(--hairline)' : undefined,
-        background: open ? 'var(--bg-base)' : 'var(--bg-parchment)',
+        border: `1px solid ${open ? 'rgba(255, 45, 141, 0.45)' : 'var(--glass-border-strong)'}`,
+        borderBottom: open && connectBody ? '1px solid var(--glass-border)' : undefined,
+        background: open
+          ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,255,255,0.04) 100%)'
+          : 'rgba(255, 255, 255, 0.04)',
         cursor: 'pointer',
         textAlign: 'left',
         fontFamily: 'var(--font-ui)',
+        boxShadow: open ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
         transition: 'border-color 0.15s, background-color 0.15s, transform 0.1s',
       }}
       onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.98)'; }}
@@ -87,10 +93,10 @@ function AccordionPanel({ open, children, flushBottom = false }) {
   return (
     <div style={{
       padding: 14,
-      border: '1px solid var(--text-primary)',
+      border: '1px solid rgba(255, 45, 141, 0.28)',
       borderTop: 'none',
       borderRadius: flushBottom ? 0 : '0 0 12px 12px',
-      background: 'var(--bg-base)',
+      background: 'rgba(255, 255, 255, 0.03)',
       display: 'flex',
       flexDirection: 'column',
       gap: 16,
@@ -119,8 +125,6 @@ function NarrativaStudioPanels({
   setStyleKit,
   toast,
   projectName = '',
-  onOpenProjects = null,
-  onNewProject = null,
   quickPrompt,
   setQuickPrompt,
   onQuickGenerate,
@@ -133,6 +137,13 @@ function NarrativaStudioPanels({
   cardChildren = null,
   materialChildren = null,
   materialSummary = '',
+  material = null,
+  brand = null,
+  setBrand = null,
+  onAnalyzeBrandTone = null,
+  analyzingBrandTone = false,
+  hasOpenAI = false,
+  onNeedKeys = null,
 }) {
   const [scope, setScope] = useState('text');
   const effectiveScope = hasImages ? scope : 'text';
@@ -140,6 +151,10 @@ function NarrativaStudioPanels({
   const hasKit = styleKitHasContent(kit);
   const promptTrim = (quickPrompt || '').trim();
   const nome = (projectName || '').trim() || 'este projeto';
+  const toneReady = brandToneIsReady(brand);
+  const useVoice = toneReady && brand?.useBrandVoice !== false;
+  const modeId = normalizeNarrativeModeId(narrativeMode);
+  const modeDef = resolveGenMode(modeId);
   const contextBadge = hasKit
     ? [
         `«${nome}»`,
@@ -174,8 +189,13 @@ function NarrativaStudioPanels({
             setStyleKit={setStyleKit}
             toast={toast}
             projectName={projectName}
-            onOpenProjects={onOpenProjects}
-            onNewProject={onNewProject}
+            brand={brand}
+            setBrand={setBrand}
+            onAnalyzeBrandTone={onAnalyzeBrandTone}
+            analyzingBrandTone={analyzingBrandTone}
+            hasOpenAI={hasOpenAI}
+            onNeedKeys={onNeedKeys}
+            material={material}
           />
         </AccordionPanel>
       </div>
@@ -216,19 +236,60 @@ function NarrativaStudioPanels({
           />
           <fieldset disabled={genBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <legend style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Modo narrativo</legend>
-            <div role="group" aria-label="Modo narrativo" style={{ display: 'flex', overflowX: 'auto', gap: 6, paddingBottom: 8 }}>
-              {[GEN_MODES.find(item => item.id === 'none'), ...GEN_MODES.filter(item => item.id !== 'none')].map(item => (
-                <button key={item.id} type="button" aria-pressed={narrativeMode === item.id} title={item.desc} onClick={() => onNarrativeModeChange(item.id)}
-                  style={{ flexShrink: 0, minHeight: 40, padding: '8px 12px', borderRadius: 9999, border: `1px solid ${narrativeMode === item.id ? 'var(--accent)' : 'var(--border)'}`, background: narrativeMode === item.id ? 'var(--accent-surface)' : 'var(--bg-card)', color: 'var(--text-primary)', cursor: genBusy ? 'not-allowed' : 'pointer' }}>{item.label}</button>
-              ))}
-            </div>
-            <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: 0 }}>{GEN_MODES.find(item => item.id === narrativeMode)?.desc}</p>
+            <select
+              className="vc-input"
+              aria-label="Modo narrativo"
+              value={modeId}
+              onChange={(e) => onNarrativeModeChange(normalizeNarrativeModeId(e.target.value))}
+              style={{
+                width: '100%',
+                minHeight: 44,
+                borderRadius: 10,
+                cursor: genBusy ? 'not-allowed' : 'pointer',
+                appearance: 'auto',
+              }}
+            >
+              {[GEN_MODES.find((item) => item.id === 'none'), ...GEN_MODES.filter((item) => item.id !== 'none')]
+                .filter(Boolean)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {genModeUiLabel(item.id, item.label)}
+                  </option>
+                ))}
+            </select>
+            <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
+              {modeDef?.desc}
+            </p>
+            {toneReady ? (
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12,
+                fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={useVoice}
+                  disabled={genBusy || !setBrand}
+                  onChange={(e) => setBrand?.({ ...brand, useBrandVoice: e.target.checked })}
+                  style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--accent)' }}
+                />
+                <span>
+                  Falar como minha marca
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Voz sobre a estrutura do modo — não substitui o arco narrativo.
+                  </span>
+                </span>
+              </label>
+            ) : (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '10px 0 0', lineHeight: 1.45 }}>
+                Sem tom analisado. Em Contexto ou Home, use «Analisar meu tom» para manter a voz da marca.
+              </p>
+            )}
           </fieldset>
           <GenerationScopePicker value={effectiveScope} onChange={setScope} disabled={genBusy} hasImages={hasImages} />
           <button
             type="button"
             disabled={genBusy || !promptTrim}
-            onClick={() => onQuickGenerate?.(promptTrim, { withImages: effectiveScope === 'text_images', narrativeMode })}
+            onClick={() => onQuickGenerate?.(promptTrim, { withImages: effectiveScope === 'text_images', narrativeMode: modeId })}
             style={{
               width: '100%', height: 44, borderRadius: 9999, border: 'none',
               cursor: genBusy || !promptTrim ? 'not-allowed' : 'pointer',

@@ -1,4 +1,4 @@
-import { brandWithSlideLogo } from '../../utils/slide-logo.js';
+import { brandWithSlideLogo, LOGO_SIZE_DEFAULT } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Layout, Video, User } from 'lucide-react';
@@ -624,7 +624,7 @@ const ClassicCanvasInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         const style = {
           position:'absolute',
@@ -1059,7 +1059,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         const style = {
           position: 'absolute',
@@ -1724,7 +1724,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           const st = {
             position:'absolute',
@@ -2029,7 +2029,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = (brand.logoSize ?? 30) * (f.w / 1080);
+          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           const style = {
             position:'absolute',
@@ -2558,7 +2558,7 @@ const SlideCardInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? 30) * (f.w / 1080); // proporção em relação ao slide
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080); // proporção em relação ao slide
         // Quando o handle está no topo direito e a logo no topo direito, desloca a logo pra baixo do handle
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         const style = {

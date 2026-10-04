@@ -43,6 +43,7 @@ function AccountHomeShell({
   useOwnImageKey = false,
   accountTab = 'projects',
   setAccountTab,
+  appMode = 'criador',
 }) {
   const totalCards = useMemo(
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
@@ -248,15 +249,22 @@ function AccountHomeShell({
             <button
               type="button"
               onClick={() => onOpenSettings()}
-              aria-label="Configurar IA"
+              aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
               style={{
                 ...headerBtn,
-                border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
-                background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-pearl)',
+                color: 'var(--text-secondary)',
+                position: 'relative',
               }}
             >
               <Settings size={13} /> IA
+              {aiReady ? (
+                <span aria-hidden style={{
+                  position: 'absolute', top: 6, right: 6, width: 7, height: 7,
+                  borderRadius: 99, background: 'var(--success)',
+                }} />
+              ) : null}
             </button>
           ) : (
             <>
@@ -271,14 +279,21 @@ function AccountHomeShell({
                 <button
                   type="button"
                   onClick={() => onOpenSettings()}
+                  aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
                   style={{
                     ...headerBtn,
-                    border: `1px solid ${aiReady ? 'var(--success-border)' : 'var(--border)'}`,
-                    background: aiReady ? 'var(--success-surface)' : 'var(--bg-pearl)',
-                    color: aiReady ? 'var(--success-text)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-pearl)',
+                    color: 'var(--text-secondary)',
+                    position: 'relative',
                   }}
                 >
                   <Settings size={13} /> Configurar IA
+                  {aiReady ? (
+                    <span aria-hidden style={{
+                      width: 7, height: 7, borderRadius: 99, background: 'var(--success)', marginLeft: 2,
+                    }} />
+                  ) : null}
                 </button>
               </nav>
               <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -393,7 +408,9 @@ function AccountHomeShell({
                 {projectName}
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                No editor: Marca → Conteúdo → Cards → IA
+                {appMode === 'criador'
+                  ? 'Contexto → Pedido → Gerar → Baixar'
+                  : 'No editor: Contexto → Narrativa → Visual → Exportar'}
               </p>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -425,6 +442,7 @@ function AccountHomeShell({
             </div>
           </section>
 
+          {(appMode !== 'criador' || library.length >= 2) ? (
           <section aria-label="Resumo">
             <div style={{
               display: 'grid',
@@ -462,6 +480,7 @@ function AccountHomeShell({
               ))}
             </div>
           </section>
+          ) : null}
 
           <section aria-label="Lista de projetos" style={{ display: 'grid', gap: 14 }}>
             <div style={{
@@ -694,8 +713,8 @@ function AccountHomeShell({
                     <button type="button" onClick={() => duplicateDoc(entry.id)} title="Duplicar"
                       aria-label={`Duplicar ${entry.name}`}
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 44,
+                        height: 44,
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         cursor: 'pointer',
@@ -709,8 +728,8 @@ function AccountHomeShell({
                     <button type="button" onClick={() => exportDoc(entry.id)} title="Exportar JSON"
                       aria-label={`Exportar ${entry.name}`}
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 44,
+                        height: 44,
                         borderRadius: 8,
                         border: '1px solid var(--border)',
                         cursor: 'pointer',
@@ -739,8 +758,8 @@ function AccountHomeShell({
                           Confirmar eliminação
                         </button>
                         <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar eliminação" style={{
-                          width: 36,
-                          height: 36,
+                          width: 44,
+                          height: 44,
                           borderRadius: 8,
                           border: '1px solid var(--border)',
                           cursor: 'pointer',
@@ -755,7 +774,7 @@ function AccountHomeShell({
                       <button type="button" onClick={() => setConfirmDeleteId(entry.id)}
                         aria-label={`Apagar ${entry.name}`}
                         style={{
-                          width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)',
+                          width: 44, height: 44, borderRadius: 8, border: '1px solid var(--border)',
                           cursor: 'pointer',
                           background: 'var(--bg-base)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff3b30',

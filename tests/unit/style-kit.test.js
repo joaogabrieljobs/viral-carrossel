@@ -19,6 +19,7 @@ describe('style-kit', () => {
       stylePrompt: '',
       contextMd: '',
       refImages: [],
+      logoOnGenerate: true,
     });
     const dirty = normalizeStyleKit({
       stylePrompt: '  luz suave  ',
@@ -38,7 +39,7 @@ describe('style-kit', () => {
   it('detecta conteúdo e limpa', () => {
     expect(styleKitHasContent({})).toBe(false);
     expect(styleKitHasContent({ stylePrompt: 'x' })).toBe(true);
-    expect(clearStyleKit()).toEqual({ stylePrompt: '', contextMd: '', refImages: [] });
+    expect(clearStyleKit()).toEqual({ stylePrompt: '', contextMd: '', refImages: [], logoOnGenerate: true });
   });
 
   it('monta blocos de texto e imagem', () => {
@@ -85,7 +86,7 @@ describe('style-kit', () => {
 describe('doc-schema styleKit', () => {
   it('ensureDocShape hidrata styleKit em docs antigos', () => {
     const shaped = ensureDocShape({ ...DEFAULT_DOC, styleKit: undefined });
-    expect(shaped.styleKit).toEqual({ stylePrompt: '', contextMd: '', refImages: [] });
+    expect(shaped.styleKit).toEqual({ stylePrompt: '', contextMd: '', refImages: [], logoOnGenerate: true });
     const withKit = ensureDocShape({
       brand: {},
       slides: [],

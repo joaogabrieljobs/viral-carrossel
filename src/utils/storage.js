@@ -5,6 +5,7 @@ import { Home } from 'lucide-react';
 // Chaves centralizadas — nunca use string literal de localStorage diretamente.
 const SK = {
   library:       'vc_library',
+  libraryFolders:'vc_library_folders',
   legacyDoc:     'vc_doc',
   activeDocId:   'vc_active_doc_id',
   brands:        'vc_brands',
@@ -35,6 +36,8 @@ const SK = {
   appMode:       'vc_app_mode',
   /** Onboarding dos 3 modos — primeira visita ou clique no chip "?". */
   modesIntro:    'vc_modes_intro_done',
+  /** Fatia 2: utilizador já viu o aviso de backup na 1ª sessão. */
+  backupNudgeDone: 'vc_backup_nudge_done',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */

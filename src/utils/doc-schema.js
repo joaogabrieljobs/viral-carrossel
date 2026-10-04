@@ -2,9 +2,10 @@
 import { Layout, X } from 'lucide-react';
 import { SCHEMA_VERSION, migrateDoc } from './schema-migration.js';
 import { hydrateBrandTextColors } from './brand-helpers.js';
+import { normalizeBrandTone } from './brand-tone.js';
 import { FORMATS } from './formats.js';
 import { clampTitleWeight } from './slide-design-system.js';
-import { GEN_MODES, CREATIVE_PRESETS, SLIDE_TEXT_DENSITY_BY_ID } from './generation-prompts.js';
+import { GEN_MODES, CREATIVE_PRESETS, SLIDE_TEXT_DENSITY_BY_ID, normalizeNarrativeModeId } from './generation-prompts.js';
 import { normalizeContentObjective } from './editorial-strategy.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
@@ -141,6 +142,10 @@ const DEFAULT_BRAND = {
   defaultTone: '',
   defaultAudience: '',
   signature: '',
+  /** Perfil de voz analisado (Home → Tom de voz). Acompanha todos os modos narrativos. */
+  brandTone: null,
+  /** Quando true e há brandTone, injeta voz da marca em toda geração. */
+  useBrandVoice: true,
   links: '',
   // Logo (data URL) — aplicado automaticamente nos slides quando setado
   logo: null,
@@ -167,7 +172,7 @@ const DEFAULT_BRAND = {
   customTitleFont: null,
   /** Fonte própria (corpo / subtítulo) */
   customBodyFont: null,
-  logoSize: 30,           // tamanho do logo em px na escala real (1080px)
+  logoSize: 120,          // px na escala 1080 (slider marca/card: 40–480)
   logoPosition: 'tr',     // canto: 'tl' | 'tr' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
   /** Barra editorial fina no topo dos cards (modo Tendência/Cultura) — opcional. */
@@ -258,7 +263,14 @@ function ensureDocShape(d) {
     ...DEFAULT_DOC,
     ...migrated,
     __v: SCHEMA_VERSION,
-    brand: hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(migrated.brand && typeof migrated.brand === 'object' ? migrated.brand : {}) }),
+    brand: (() => {
+      const b = hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(migrated.brand && typeof migrated.brand === 'object' ? migrated.brand : {}) });
+      return {
+        ...b,
+        brandTone: normalizeBrandTone(b.brandTone),
+        useBrandVoice: b.useBrandVoice === false ? false : true,
+      };
+    })(),
     material: { ...DEFAULT_DOC.material, ...(migrated.material && typeof migrated.material === 'object' ? migrated.material : {}) },
     imgParams: { ...DEFAULT_DOC.imgParams, ...(migrated.imgParams && typeof migrated.imgParams === 'object' ? migrated.imgParams : {}) },
     styleKit: normalizeStyleKit(migrated.styleKit),
@@ -277,7 +289,7 @@ function ensureDocShape(d) {
   }
   if (!FORMATS[out.fmt]) out.fmt = 'carrossel';
   if (!out.mode) out.mode = 'editorial';
-  if (!GEN_MODES.some(m => m.id === out.quickNarrativeMode)) out.quickNarrativeMode = 'none';
+  out.quickNarrativeMode = normalizeNarrativeModeId(out.quickNarrativeMode);
   if (out.creativePreset == null) out.creativePreset = 'livre';
   if (out.creativePreset === 'estudio_editorial') out.creativePreset = 'tendencia_cultura';
   if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';

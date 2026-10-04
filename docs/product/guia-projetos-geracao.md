@@ -22,14 +22,14 @@ O **material** em Add Conteúdo é a matéria-prima do post: texto-base, fontes 
 
 Abra **Prompt para gerar** e escreva um pedido concreto, por exemplo: “Crie 3 cards anunciando o lançamento do MUSA. Destaque a geração de imagens e termine com um convite para conhecer o studio.”
 
-1. Escolha um **modo narrativo**: Editorial, Profundo, Odisseia da Dor, Viral Trends, Storytelling, Passo-a-passo, Jornalístico ou Sensacionalista. **Nenhum** segue o pedido e o brief sem impor uma fórmula narrativa.
+1. Escolha um **modo narrativo**: Editorial, Profundo, Odisseia da Dor, Viral Trends, Storytelling, Passo-a-passo, Jornalístico ou Sensacionalista. **Seguir meu pedido** (Nenhum) segue o pedido e o brief sem impor uma fórmula narrativa. O **tom de voz da marca** é independente e acompanha qualquer modo quando analisado e activo.
 2. Escolha **Só texto** ou **Texto e imagens**. Só texto é o padrão. Imagens exigem saldo no plano ou chave própria configurada.
 3. Clique em **Gerar com contexto e referências**. A quantidade explícita no pedido é respeitada dentro do limite de 1–12 cards.
 4. Revise o resultado antes de exportar. O brief orienta o modelo; não elimina a necessidade de conferir fatos e o visual.
 
 A opção de modo narrativo é salva no projeto. O rascunho do prompt permanece ao mudar a orientação/tamanho da tela, mas é limpo ao trocar de projeto e não é um arquivo salvo para reutilização após recarregar.
 
-Os modos de interface **Criador, Diretor e Studio** controlam ferramentas visíveis; não são modos narrativos.
+Os modos de interface **Criar rápido, Controle profissional e Studio** (internamente criador/diretor/studio) controlam ferramentas visíveis; não são modos narrativos nem o plano comercial «Criador».
 
 ## Refazer com outro tom
 
@@ -50,14 +50,10 @@ Uma solicitação já aceita pelo provedor pode continuar sendo processada. O ca
 
 ## Aplicar uma logo já salva
 
-1. Selecione o card.
-2. Vá a **Narrativa → Editar Card → Logo** (também disponível na aba Marca).
-3. Clique em **Aplicar logo do projeto neste card**. Não é necessário reenviar o PNG.
-4. Ajuste tamanho e um dos quatro cantos. Repita nos outros cards desejados.
-
-Se a logo PNG já existir no perfil da marca, o painel oferece **Aplicar logo já importada da marca**. O upload direto pelo card também salva o arquivo no projeto para reutilização. A logo global da marca continua tendo seu próprio controle; aplicar uma logo por card não modifica esse perfil.
-
-**Remover logo deste card** oculta a logo no card selecionado. A logo salva no projeto continua disponível. **Usar logo da marca neste card** remove o override e volta à configuração da marca.
+1. Importe a logo PNG no contexto do projeto (ou em Marca).
+2. Preferência do projeto: **Aplicar a logo nos novos cards deste projeto** (ligada por omissão após importar).
+3. Em **Marca → Logo**, use **Inserir logo em todos os cards** para os cards já existentes.
+4. Por card: ocultar, reposicionar, tamanho/opacidade ou PNG só deste card.
 
 ## Salvar, transferir e exportar
 

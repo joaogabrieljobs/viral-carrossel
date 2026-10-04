@@ -7,7 +7,7 @@ export function GenerationScopePicker({ value, onChange, disabled = false, hasIm
       <legend style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>O que você quer gerar?</legend>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {[['text', 'Só texto'], ['text_images', 'Texto e imagens']].map(([id, label]) => (
-          <label key={id} style={{ padding: 10, borderRadius: 10, border: `1px solid ${value === id ? 'var(--accent)' : 'var(--border)'}`, background: value === id ? 'var(--accent-surface)' : 'var(--bg-card)', fontSize: 12, cursor: disabled || (id === 'text_images' && !hasImages) ? 'not-allowed' : 'pointer' }}>
+          <label key={id} style={{ padding: 12, minHeight: 44, borderRadius: 10, border: `1px solid ${value === id ? 'var(--accent)' : 'var(--glass-border-strong)'}`, background: value === id ? 'var(--accent-surface)' : 'var(--bg-card)', fontSize: 12, cursor: disabled || (id === 'text_images' && !hasImages) ? 'not-allowed' : 'pointer' }}>
             <input type="radio" name={name} value={id} checked={value === id} disabled={id === 'text_images' && !hasImages} onChange={() => onChange(id)} style={{ accentColor: 'var(--accent)', marginRight: 6 }} />
             {label}
           </label>

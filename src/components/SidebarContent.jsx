@@ -1,14 +1,15 @@
 import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
+import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT } from '../utils/slide-logo.js';
 import { isGenerationCancelled, startAIJob, runAIJob, throwIfGenerationCancelled } from '../utils/generation-control.js';
 import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
-import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal } from 'lucide-react';
+import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal, FolderPlus } from 'lucide-react';
 import { extractDominantColor } from '../utils/color-extraction.js';
 import { saveHookToLibrary } from '../utils/hooks-library.js';
 import VisualStylePicker from './VisualStylePicker.jsx';
 import { VISUAL_PRESETS, applyVisualPreset } from '../styles/visual-presets.jsx';
-import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../utils/brand-helpers.js';
+import { hydrateBrandTextColors, effectiveTitleFontFamily, resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { SectionLabel as S } from './ui/SectionLabel.jsx';
 import { PALETTES, TITLE_FONTS } from '../utils/design-data.js';
 import { clampTitleWeight } from '../utils/slide-design-system.js';
@@ -18,6 +19,14 @@ import { DEFAULT_PRESENTATION_IMG_ADJUST, presentationAdjustIsNeutral, presentat
 import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
 import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
 import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
+import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
+import { projectHasCarouselContent } from '../utils/context-status.js';
+import { trackEvent, lsGet } from '../utils/telemetry.js';
+import { appModeLabel } from '../utils/ui-depth-labels.js';
+import { copyTextToClipboard, exportCarouselPackage } from '../utils/export-package.js';
+import { SK, lsSet } from '../utils/storage.js';
+import { OrganizeForPublish } from './panels/OrganizeForPublish.jsx';
+import { ObjectiveTemplateChips } from './panels/ObjectiveTemplateChips.jsx';
 import { ExportMoreFormats } from './panels/ExportMoreFormats.jsx';
 import { RefineBtn } from './ui/editor-chrome.jsx';
 import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch } from '../utils/card-elements.js';
@@ -146,6 +155,7 @@ function SidebarContent({
   setHookLibrary,
   niche,
   slide, slides, activeIdx, brand, setBrand, updateSlide,
+  setSlides = null,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
   exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
@@ -162,6 +172,9 @@ function SidebarContent({
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
   setLibraryOpen = () => {}, libraryCount = 0,
+  library = [],
+  activeDocId = null,
+  onOpenProject = null,
   onNewProject = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
@@ -192,17 +205,93 @@ function SidebarContent({
   setActiveIdx = () => {},
   activeEntry = null,
   onOpenResults = () => {},
+  analyzingBrandTone = false,
+  analyzeBrandTone = null,
+  setAppMode = null,
+  exportDoc = null,
+  generateMissingImages = null,
+  imagesBatchBusy = false,
+  onOpenSeries = null,
+  libraryFolders = [],
+  setDocFolder = null,
+  setDocPublicationDate = null,
+  createFolder = null,
+  setDocStatus = null,
 }) {
   const imageTargetRef = useRef(null);
   imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
   const [dalleLoading, setDalleLoading] = React.useState(false);
   /** Accordion da aba Narrativa: context | prompt | card | null */
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
+  const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
+  const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
   // O rascunho do prompt vive no editor; este painel pode desmontar no mobile.
   React.useLayoutEffect(() => {
     setNarrativaPanel('prompt');
   }, [activeEntry?.id]);
+  React.useEffect(() => {
+    setSelectedSlideIds([]);
+    setObjectiveTemplateId(null);
+  }, [activeEntry?.id]);
 
+  const toggleSlideSelect = React.useCallback((id, e) => {
+    e?.stopPropagation?.();
+    setSelectedSlideIds((prev) => (
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    ));
+  }, []);
+
+  const handleCopyCaption = React.useCallback(async () => {
+    try {
+      let text = String(caption || '').trim();
+      if (!text && generateCaption) {
+        toast?.('A gerar legenda…', 'info');
+        text = String(await generateCaption() || '').trim();
+      }
+      await copyTextToClipboard(text);
+      trackEvent('caption_copy');
+      toast?.('Legenda copiada. Cole no Instagram.', 'success');
+    } catch (e) {
+      toast?.(e.message || 'Não foi possível copiar a legenda.', 'error');
+    }
+  }, [caption, generateCaption, toast]);
+
+  const handleExportPackage = React.useCallback(async () => {
+    try {
+      trackEvent('export_package');
+      let text = String(caption || '').trim();
+      if (!text && generateCaption) {
+        toast?.('A preparar legenda do pacote…', 'info');
+        text = String(await generateCaption() || '').trim();
+      }
+      const result = await exportCarouselPackage({ exportAll, caption: text });
+      if (result.captionCopied) {
+        toast?.('PNGs baixados e legenda copiada. Publique no Instagram e, se quiser, marque como Publicado na Fila.', 'success', 7500);
+      } else {
+        toast?.('PNGs baixados. Gere a legenda se quiser copiá-la também.', 'success', 6500);
+      }
+      const projectId = activeDocId || activeEntry?.id;
+      if (projectId && setDocStatus && activeEntry?.status !== 'published') {
+        // Checklist pós-pacote: não marca sozinho — pergunta.
+        const mark = window.confirm(
+          'Pacote pronto.\n\n1) PNGs baixados\n2) Legenda' + (result.captionCopied ? ' copiada' : ' a gerar') + '\n3) Publicar no Instagram (fora do Viral)\n\nJá publicou? Marcar este projeto como Publicado?',
+        );
+        if (mark) {
+          setDocStatus(projectId, 'published');
+          trackEvent('mark_published', { from: 'export_package' });
+          toast?.('Projeto marcado como Publicado.', 'success', 3500);
+        }
+      }
+      if (!lsGet(SK.backupNudgeDone, false)) {
+        lsSet(SK.backupNudgeDone, true);
+        toast?.('Dica: em Exportar → Backup JSON guarda o projeto neste browser.', 'info', 7000);
+      }
+    } catch (e) {
+      toast?.(e.message || 'Falha no pacote de exportação.', 'error');
+    }
+  }, [caption, generateCaption, exportAll, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
+
+  // remove unused ensureCaptionText if I left it - check
   /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
   const BarraTamanho = ({ campo, rotulo, padrao = 100 }) => {
     const valor = Number(brand[campo] ?? padrao);
@@ -294,11 +383,21 @@ function SidebarContent({
   };
 
   const btnStyle = (active) => ({
-    padding:'7px 0', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer',
-    fontFamily:'var(--font-ui)', transition:'all 0.12s', border:'1px solid',
-    display:'flex', alignItems:'center', justifyContent:'center', gap:5,
+    padding: '8px 0',
+    borderRadius: 10,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'var(--font-ui)',
+    transition: 'all 0.12s',
+    border: '1px solid',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    minHeight: 40,
     background: active ? 'var(--accent)' : 'var(--bg-card)',
-    borderColor: active ? 'var(--accent)' : 'var(--border)',
+    borderColor: active ? 'var(--accent)' : 'var(--glass-border-strong)',
     color: active ? '#fff' : 'var(--text-secondary)',
   });
 
@@ -482,7 +581,38 @@ function SidebarContent({
       </div>
 
       {/* Scrollable body */}
-      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:20, paddingBottom:24 }}>
+      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
+
+        {tab === 'narrativa' && appMode === 'criador' && projectHasCarouselContent(slides) && (
+          <S title="Depois de gerar" hint="Revise, baixe ou abra mais controlos — sem recriar o carrossel.">
+            <PostGenerateActions
+              onAdjustText={() => setNarrativaPanel('card')}
+              onGenerateImages={generateMissingImages}
+              onDownload={() => { trackEvent('criar_rapido_export', { surface: 'narrativa' }); handleExportPackage(); }}
+              onMoreControl={() => {
+                setAppMode?.('diretor');
+                trackEvent('depth_switch', { to: 'diretor', from: 'criar_rapido' });
+                toast?.(`${appModeLabel('diretor')} ativo.`, 'success', 3500);
+              }}
+              exporting={exporting}
+              imagesBusy={imagesBatchBusy}
+              hasOpenAI={hasOpenAI}
+            />
+            <div style={{ marginTop: 10 }}>
+              <OrganizeForPublish
+                projectId={activeDocId || activeEntry?.id}
+                folderId={activeEntry?.folderId || ''}
+                publicationDate={activeEntry?.publicationDate || ''}
+                folders={libraryFolders}
+                onSetFolder={setDocFolder}
+                onSetPublicationDate={setDocPublicationDate}
+                onCreateFolder={createFolder}
+                toast={toast}
+                compact
+              />
+            </div>
+          </S>
+        )}
 
         {tab === 'narrativa' && (
           <NarrativaStudioPanels
@@ -493,8 +623,6 @@ function SidebarContent({
             setStyleKit={setStyleKit}
             toast={toast}
             projectName={activeEntry?.name}
-            onOpenProjects={() => setLibraryOpen(true)}
-            onNewProject={onNewProject}
             quickPrompt={quickPrompt}
             setQuickPrompt={setQuickPrompt}
             onQuickGenerate={async (text, options) => {
@@ -505,6 +633,13 @@ function SidebarContent({
             hasImages={hasOpenAI}
             narrativeMode={quickNarrativeMode}
             onNarrativeModeChange={onQuickNarrativeModeChange}
+            brand={brand}
+            setBrand={setBrand}
+            onAnalyzeBrandTone={analyzeBrandTone}
+            analyzingBrandTone={analyzingBrandTone}
+            hasOpenAI={hasOpenAI}
+            onNeedKeys={() => setKeysOpen?.(true)}
+            material={material}
             activeIdx={activeIdx}
             slidesCount={slides.length}
             materialSummary={(() => {
@@ -536,7 +671,7 @@ function SidebarContent({
           <>
             {(tab==='layout'||tab==='slide') && (<S
               title="Composição"
-              hint="Divide o card em áreas que você redimensiona: uma para o texto, outra para a foto. Opcional — sem composição o texto usa o card inteiro."
+              hint="Divide o card em áreas: texto e foto. Opcional."
             >
               {/* Polish: CTA primário com fontWeight 600 + ícone (era 400 e
                   parecia botão fantasma). Quando ativo, vira selo de sucesso
@@ -1328,7 +1463,7 @@ function SidebarContent({
               </div>
             </S>)}
 
-            {(tab==='layout'||tab==='slide') && (<><details className="vc-adjust-details" style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
+            {(tab==='layout'||tab==='slide') && (<><details className="vc-adjust-details" style={{ border:'1px solid var(--glass-border-strong)', borderRadius:12, background:'var(--bg-card)' }}>
               <summary style={{
                 padding:'10px 12px',
                 cursor:'pointer',
@@ -1361,7 +1496,7 @@ function SidebarContent({
               </div>
             </details>
 
-            <details className="vc-adjust-details" open style={{ border:'1px solid var(--hairline)', borderRadius:12, background:'var(--bg-card)' }}>
+            <details className="vc-adjust-details" open style={{ border:'1px solid var(--glass-border-strong)', borderRadius:12, background:'var(--bg-card)' }}>
               <summary style={{
                 padding:'10px 12px',
                 cursor:'pointer',
@@ -1546,16 +1681,15 @@ function SidebarContent({
                 <label className="vc-label-sm">
                   Peso da fonte
                 </label>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4 }}>
+                <div className="vc-seg" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                   {[400, 600, 700, 800].map(w => (
-                    <button key={w} onClick={()=>updateSlide({titleWeight:w})}
-                      style={{
-                        padding:'7px 0', borderRadius:6, fontSize:11, cursor:'pointer',
-                        fontWeight:w, fontFamily: effectiveTitleFontFamily(brand), transition:'all 0.12s',
-                        background: (slide.titleWeight ?? 800) === w ? 'var(--text-primary)' : 'var(--bg-card)',
-                        border: `1px solid ${(slide.titleWeight ?? 800) === w ? 'transparent' : 'var(--border)'}`,
-                        color:    (slide.titleWeight ?? 800) === w ? 'var(--bg-base)'  : 'var(--text-secondary)',
-                      }}
+                    <button
+                      key={w}
+                      type="button"
+                      className={`vc-seg-item${(slide.titleWeight ?? 800) === w ? ' active' : ''}`}
+                      aria-pressed={(slide.titleWeight ?? 800) === w}
+                      onClick={() => updateSlide({ titleWeight: w })}
+                      style={{ fontWeight: w, fontFamily: effectiveTitleFontFamily(brand) }}
                     >{w}</button>
                   ))}
                 </div>
@@ -1564,20 +1698,19 @@ function SidebarContent({
                 <label className="vc-label-sm">
                   Caixa
                 </label>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                <div className="vc-seg" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                   {[
                     { id:'normal', label:'Normal' },
                     { id:'upper',  label:'AaA → AAA' },
                     { id:'lower',  label:'AaA → aaa' },
                   ].map(c => (
-                    <button key={c.id} onClick={()=>updateSlide({titleCase:c.id})}
-                      style={{
-                        padding:'7px 4px', borderRadius:6, fontSize:10, cursor:'pointer',
-                        fontWeight:600, fontFamily:'var(--font-ui)', transition:'all 0.12s',
-                        background: (slide.titleCase ?? 'normal') === c.id ? 'var(--text-primary)' : 'var(--bg-card)',
-                        border: `1px solid ${(slide.titleCase ?? 'normal') === c.id ? 'transparent' : 'var(--border)'}`,
-                        color:    (slide.titleCase ?? 'normal') === c.id ? 'var(--bg-base)'  : 'var(--text-secondary)',
-                      }}
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`vc-seg-item${(slide.titleCase ?? 'normal') === c.id ? ' active' : ''}`}
+                      aria-pressed={(slide.titleCase ?? 'normal') === c.id}
+                      onClick={() => updateSlide({ titleCase: c.id })}
+                      style={{ fontSize: 10 }}
                     >{c.label}</button>
                   ))}
                 </div>
@@ -1756,21 +1889,15 @@ function SidebarContent({
             Padrão Visual ganha protagonismo aqui — era enterrado na Marca. */}
         {tab==='visual' && (
           <>
-            <div style={{
-              padding: '4px 0 4px',
-              fontSize: 13, color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em', lineHeight: 1.5,
-            }}>
-              <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Escolha um padrão visual.</strong>
-              {' '}Paleta, fontes e tipografia mudam de uma vez — cada estilo tem assinatura própria.
-            </div>
-            <VisualStylePicker
-              value={visualPreset}
-              onChange={applyVisualPresetCb}
-              presets={VISUAL_PRESETS}
-              title=""
-              suggestedId={suggestVisualPresetForCreative(creativePreset)}
-            />
+            <S title="Padrão visual" hint="Paleta, fontes e tipografia de uma vez. Não altera o texto dos slides.">
+              <VisualStylePicker
+                value={visualPreset}
+                onChange={applyVisualPresetCb}
+                presets={VISUAL_PRESETS}
+                title=""
+                suggestedId={suggestVisualPresetForCreative(creativePreset)}
+              />
+            </S>
           </>
         )}
 
@@ -1780,7 +1907,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Perfis de marca" hint="Salve combinações completas (cores, fontes, logo, bio, tom) e troque entre clientes/projetos com 1 clique.">
+              <S title="Perfis de marca" hint="Combinações salvas (cores, fontes, logo, bio). Troca entre clientes com 1 clique.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{
@@ -2353,117 +2480,26 @@ function SidebarContent({
               </S>
             )}
 
-            {tab==='brand' && (<S title="Logo da marca" hint="Aplicado automaticamente em todos os cards. PNG transparente é o ideal.">
-              {brand.logo ? (
-                <div style={{
-                  display:'flex', alignItems:'center', gap:10,
-                  background:'var(--bg-card)', border:'1px solid var(--border)',
-                  borderRadius:9, padding:10,
-                }}>
-                  <div style={{
-                    width:54, height:54, borderRadius:6, flexShrink:0,
-                    background:`url(${brand.logo}) center/contain no-repeat`,
-                    border:'1px solid var(--border)',
-                    backgroundColor:'rgba(255,255,255,0.04)',
-                  }}/>
-                  <div style={{ flex:1, fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
-                    Logo aplicada · canto {{ tl:'sup. esquerdo', tr:'sup. direito', bl:'inf. esquerdo', br:'inf. direito' }[brand.logoPosition || 'tr']}
-                  </div>
-                  <button
-                    onClick={() => setBrand({ ...brand, logo: null })}
-                    aria-label="Remover logo" title="Remover logo"
-                    style={{ width:30, height:30, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                  >
-                    <Trash2 size={11}/>
-                  </button>
-                </div>
-              ) : (
-                // Mesmo padrão drop-zone do avatar: borda sólida hairline,
-                // ícone num círculo accent, hover = fundo accent-surface.
-                <label
-                  style={{
-                    display:'flex', alignItems:'center', gap:12,
-                    padding:'12px 14px', minHeight:60, borderRadius:11,
-                    cursor:'pointer',
-                    background:'var(--bg-card)', border:'1px solid var(--hairline)',
-                    color:'var(--text-secondary)',
-                    fontFamily:'var(--font-ui)',
-                    transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
-                  }}
-                  onMouseEnter={e=>{
-                    e.currentTarget.style.borderColor='var(--accent)';
-                    e.currentTarget.style.background='var(--accent-surface)';
-                  }}
-                  onMouseLeave={e=>{
-                    e.currentTarget.style.borderColor='var(--hairline)';
-                    e.currentTarget.style.background='var(--bg-card)';
-                  }}
-                >
-                  <span style={{
-                    width:32, height:32, borderRadius:'50%', flexShrink:0,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    background:'var(--accent-surface)', color:'var(--accent)',
-                  }} aria-hidden>
-                    <Upload size={14} strokeWidth={2.25}/>
-                  </span>
-                  <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0 }}>
-                    <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
-                      Carregar logo da marca
-                    </span>
-                    <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                      PNG · JPG · SVG — até 2&nbsp;MB (PNG transparente é o ideal)
-                    </span>
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                    style={{ display:'none' }}
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 2 * 1024 * 1024) {
-                        toast?.('Imagem muito grande. Máximo 2MB.', 'error');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => setBrand({ ...brand, logo: reader.result });
-                      reader.readAsDataURL(file);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-              )}
-              {brand.logo && (
-                <>
-                  <div>
-                    <label className="vc-label-sm">Posição</label>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
-                      {[
-                        { id:'tl', label:'↖' },
-                        { id:'tr', label:'↗' },
-                        { id:'bl', label:'↙' },
-                        { id:'br', label:'↘' },
-                      ].map(p => {
-                        const on = (brand.logoPosition || 'tr') === p.id;
-                        return (
-                          <button key={p.id} onClick={()=>setBrand({...brand, logoPosition: p.id})}
-                            style={{
-                              padding:'8px 0', borderRadius:6, fontSize:14, cursor:'pointer',
-                              background: on ? 'var(--text-primary)' : 'var(--bg-card)',
-                              border: `1px solid ${on ? 'transparent' : 'var(--border)'}`,
-                              color: on ? 'var(--bg-base)' : 'var(--text-secondary)',
-                              fontWeight:700,
-                            }}
-                          >{p.label}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <Slider label="Tamanho da logo" value={brand.logoSize ?? 30} min={20} max={80} onChange={v=>setBrand({...brand, logoSize: v})}/>
-                  <Slider label="Opacidade" value={brand.logoOpacity ?? 90} min={20} max={100} onChange={v=>setBrand({...brand, logoOpacity: v})}/>
-                </>
-              )}
-            </S>)}
+            {tab==='brand' && (
+              <S
+                title="Logo"
+                hint={`Padrão da marca em todos os cards · ajustes e ocultar só no card ${activeIdx + 1}.`}
+              >
+                <SlideLogoPanel
+                  key={`${activeEntry?.id}-${slide.id}`}
+                  slide={slide}
+                  updateSlide={updateSlide}
+                  toast={toast}
+                  styleKit={styleKit}
+                  setStyleKit={setStyleKit}
+                  brand={brand}
+                  setBrand={setBrand}
+                  setSlides={setSlides}
+                  cardIndex={activeIdx}
+                  selectedSlideIds={selectedSlideIds}
+                />
+              </S>
+            )}
 
             {tab==='brand' && (<S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais preciso, mais consistente o carrossel fica.">
               <div>
@@ -2919,154 +2955,340 @@ function SidebarContent({
 
         {/* HOME / Storyboard — visão geral do projeto. Sequência de cards,
             estatísticas, fluxo narrativo. "Mesa criativa" cinematográfica. */}
-        {(tab === 'brand' || (tab === 'narrativa' && narrativaPanel === 'card')) && (
-          <S title={`Logo — card ${activeIdx + 1}`}>
-            <SlideLogoPanel key={`${activeEntry?.id}-${slide.id}`} slide={slide} updateSlide={updateSlide} toast={toast} styleKit={styleKit} setStyleKit={setStyleKit} brand={brand} />
-          </S>
-        )}
-
         {tab==='home' && (
           <>
-            {/* Saudação + status */}
-            <div style={{
-              padding: '18px 16px',
-              borderRadius: 16,
-              border: '1px solid var(--glass-border-strong)',
-              background: 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(143,125,255,0.06) 100%)',
-              backdropFilter: 'blur(18px)',
-              WebkitBackdropFilter: 'blur(18px)',
-              boxShadow: '0 0 32px rgba(255, 45, 141, 0.10), inset 0 1px 0 rgba(255,255,255,0.10)',
-            }}>
-              <div style={{
-                fontSize: 11, fontWeight: 600, color: 'var(--accent)',
-                letterSpacing: '0.06em', textTransform: 'uppercase',
-                marginBottom: 6, fontFamily: 'var(--font-mono)',
-              }}>
-                Storyboard
-              </div>
-              <div style={{
-                fontSize: 18, fontWeight: 600, color: 'var(--text-primary)',
-                letterSpacing: '-0.016em', lineHeight: 1.25, marginBottom: 4,
-                fontFamily: 'var(--font-display)',
-              }}>
-                {activeEntry?.name || 'Carrossel sem título'}
-              </div>
-              <div style={{
-                fontSize: 12, color: 'var(--text-muted)',
-                letterSpacing: '-0.005em',
-              }}>
-                {slides.length} card{slides.length === 1 ? '' : 's'} ·
-                {' '}{slides.filter(s => s.bgImage).length} com imagem ·
-                {' '}{slides.filter(s => (s.title || '').trim()).length} com título
-                {styleKitHasContent(styleKit) ? ' · contexto definido' : ''}
-              </div>
-            </div>
-
-            <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenResults} style={{ width: '100%' }}>
-              Resultados das publicações
-            </button>
-
-            <ProjectStyleKitPanel
-              key={activeEntry?.id}
-              styleKit={styleKit}
-              setStyleKit={setStyleKit}
-              toast={toast}
-              projectName={activeEntry?.name}
-              onOpenProjects={() => setLibraryOpen(true)}
-              onNewProject={onNewProject}
-            />
-
-            {/* Fluxo narrativo — mini-thumbs vertical */}
-            <S title="Fluxo da narrativa" hint="Sequência dos cards e progressão. Clique pra editar.">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {slides.map((s, i) => {
-                  const isActive = i === activeIdx;
-                  const hasImg = !!s.bgImage;
-                  const titlePreview = (s.title || '').trim().slice(0, 50) || '— sem título —';
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setActiveIdx(i)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: 10, borderRadius: 12,
-                        border: `1px solid ${isActive ? 'rgba(255, 45, 141, 0.42)' : 'var(--glass-border)'}`,
-                        background: isActive
-                          ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,45,141,0.03) 100%)'
-                          : 'rgba(255, 255, 255, 0.04)',
-                        cursor: 'pointer', textAlign: 'left',
-                        boxShadow: isActive
-                          ? '0 0 16px rgba(255, 45, 141, 0.16), inset 0 1px 0 rgba(255,255,255,0.08)'
-                          : 'none',
-                        transition: 'all 0.18s var(--ease-smooth)',
-                      }}
-                    >
-                      {/* Mini thumb */}
-                      <div style={{
-                        width: 40, height: 50, borderRadius: 6, flexShrink: 0,
-                        background: hasImg
-                          ? `url(${s.bgImage}) center/cover, ${s.bg || brand.bg || '#0a0a0a'}`
-                          : (s.bg || brand.bg || '#0a0a0a'),
-                        border: '1px solid var(--glass-border)',
-                        position: 'relative',
-                      }}>
+            <S
+              title="Projetos"
+              hint="Escolhe o carrossel. Cada um tem contexto próprio."
+            >
+              <div
+                role="list"
+                aria-label="Projetos salvos"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: 8,
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                  paddingRight: 2,
+                }}
+              >
+                {[...library]
+                  .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  .map((entry) => {
+                    const isActive = entry.id === (activeDocId || activeEntry?.id);
+                    const slidesOf = entry.doc?.slides || [];
+                    const first = slidesOf[0];
+                    const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, first || {}) || '#0a0a0a';
+                    const label = (entry.name || 'Sem título').trim() || 'Sem título';
+                    return (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        role="listitem"
+                        aria-current={isActive ? 'true' : undefined}
+                        aria-label={`Abrir projeto ${label}`}
+                        title={label}
+                        onClick={() => {
+                          if (isActive) return;
+                          if (onOpenProject) onOpenProject(entry.id);
+                          else setLibraryOpen(true);
+                        }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: 10,
+                          minHeight: 112,
+                          borderRadius: 12,
+                          border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
+                          background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
+                          cursor: isActive ? 'default' : 'pointer',
+                          textAlign: 'center',
+                          minWidth: 0,
+                          transition: 'border-color 0.15s, background-color 0.15s, transform 0.1s',
+                        }}
+                        onMouseDown={(e) => {
+                          if (!isActive) e.currentTarget.style.transform = 'scale(0.97)';
+                        }}
+                        onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      >
+                        <div
+                          aria-hidden
+                          style={{
+                            width: 48,
+                            height: 60,
+                            borderRadius: 8,
+                            flexShrink: 0,
+                            background: bg,
+                            backgroundImage: first?.bgImage ? `url(${first.bgImage})` : 'none',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            border: '1px solid var(--glass-border-strong)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {first?.bgImage ? (
+                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' }} />
+                          ) : null}
+                          <span style={{
+                            position: 'absolute', bottom: 3, left: 4, right: 4,
+                            fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                          }}>
+                            {String(slidesOf.length).padStart(2, '0')}
+                          </span>
+                        </div>
                         <span style={{
-                          position: 'absolute', bottom: 2, left: 3,
-                          fontSize: 8, fontWeight: 700, color: '#fff',
-                          fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
-                          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                        }}>{String(i + 1).padStart(2, '0')}</span>
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 12, fontWeight: 600,
+                          fontSize: 12, fontWeight: 600, lineHeight: 1.3,
                           color: isActive ? 'var(--accent)' : 'var(--text-primary)',
                           letterSpacing: '-0.011em',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          marginBottom: 2,
-                        }}>{titlePreview}</div>
-                        <div style={{
-                          fontSize: 10, color: 'var(--text-muted)',
-                          letterSpacing: '-0.005em',
-                          display: 'flex', alignItems: 'center', gap: 6,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          width: '100%',
+                          wordBreak: 'break-word',
                         }}>
-                          {hasImg && <><ImageIcon size={9}/>foto</>}
-                          {hasImg && (s.title || '').trim() && <span style={{ opacity: 0.5 }}>·</span>}
-                          {(s.title || '').trim() && <><Type size={9}/>texto</>}
-                          {!hasImg && !(s.title || '').trim() && <span style={{ color: 'var(--text-muted)' }}>vazio</span>}
-                        </div>
-                      </div>
-                      {isActive && (
-                        <span style={{
-                          fontSize: 9, fontWeight: 700, color: 'var(--accent)',
-                          fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                        }}>Ativo</span>
-                      )}
-                    </button>
-                  );
-                })}
+                          {label}
+                        </span>
+                        {isActive ? (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, color: 'var(--accent)',
+                            fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                          }}>
+                            Aberto
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                {onNewProject ? (
+                  <button
+                    type="button"
+                    aria-label="Criar novo projeto"
+                    onClick={onNewProject}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      padding: 10,
+                      minHeight: 112,
+                      borderRadius: 12,
+                      border: '1.5px dashed var(--glass-border-strong)',
+                      background: 'rgba(255,255,255,0.03)',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)',
+                      transition: 'border-color 0.15s, transform 0.1s',
+                    }}
+                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  >
+                    <FolderPlus size={20} strokeWidth={2} />
+                    <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.011em' }}>
+                      Novo
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  onClick={() => setLibraryOpen(true)}
+                  style={{ flex: 1, minHeight: 40, fontSize: 12, fontWeight: 600 }}
+                >
+                  <Layers size={13} /> Biblioteca
+                </button>
+                {appMode === 'criador' ? null : (
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-primary"
+                  onClick={() => setSetupOpen?.(true)}
+                  style={{ flex: 1, minHeight: 40, fontSize: 12 }}
+                >
+                  <Sparkles size={13} /> Gerar com IA
+                </button>
+                )}
               </div>
             </S>
 
-            {/* Ação rápida — gerar novo */}
-            <S title="Ações rápidas">
-              <button
-                onClick={() => setSetupOpen?.(true)}
-                style={{
-                  width: '100%', minHeight: 48, borderRadius: 9999,
-                  background: 'linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.10)',
-                  color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                  letterSpacing: '-0.011em', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: '0 8px 24px rgba(255, 45, 141, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18)',
-                }}
-              >
-                <Sparkles size={15}/>Novo carrossel com IA
-              </button>
+            <S
+              title={appMode === 'criador' ? 'Criar rápido' : 'Contexto'}
+              hint={appMode === 'criador'
+                ? 'Ideia → carrossel da sua marca → revisar → baixar'
+                : `${activeEntry?.name || 'Projeto'} · ${slides.length} cards · brief e referências só deste carrossel`}
+            >
+              {appMode === 'criador' ? (
+                <CriarRapidoHome
+                  brand={brand}
+                  setBrand={setBrand}
+                  styleKit={styleKit}
+                  setStyleKit={setStyleKit}
+                  slides={slides}
+                  quickPrompt={quickPrompt}
+                  setQuickPrompt={setQuickPrompt}
+                  onQuickGenerate={async (text, options) => {
+                    const result = await onQuickGenerate?.(text, options);
+                    if (result && !result.cancelled) {
+                      setTab('narrativa');
+                      setNarrativaPanel('card');
+                    }
+                    return result;
+                  }}
+                  genBusy={genBusy}
+                  hasOpenAI={hasOpenAI}
+                  onNeedKeys={() => setKeysOpen?.(true)}
+                  onAnalyzeBrandTone={analyzeBrandTone}
+                  analyzingBrandTone={analyzingBrandTone}
+                  toast={toast}
+                  onExportAll={handleExportPackage}
+                  onExportBackup={exportDoc ? () => exportDoc(activeDocId || activeEntry?.id) : null}
+                  exporting={exporting}
+                  onMoreControl={() => {
+                    setAppMode?.('diretor');
+                    trackEvent('depth_switch', { to: 'diretor', from: 'criar_rapido' });
+                    toast?.(`${appModeLabel('diretor')} ativo — mesmos cards e identidade.`, 'success', 4000);
+                  }}
+                  onAdjustText={() => {
+                    setTab('narrativa');
+                    setNarrativaPanel('card');
+                  }}
+                  onGenerateImages={generateMissingImages}
+                  imagesBusy={imagesBatchBusy}
+                  projectId={activeDocId || activeEntry?.id}
+                  folderId={activeEntry?.folderId || ''}
+                  publicationDate={activeEntry?.publicationDate || ''}
+                  folders={libraryFolders}
+                  onSetFolder={setDocFolder}
+                  onSetPublicationDate={setDocPublicationDate}
+                  onCreateFolder={createFolder}
+                />
+              ) : (
+                <>
+                  <ProjectStyleKitPanel
+                    key={activeEntry?.id}
+                    styleKit={styleKit}
+                    setStyleKit={setStyleKit}
+                    toast={toast}
+                    projectName={activeEntry?.name}
+                    brand={brand}
+                    setBrand={setBrand}
+                    onAnalyzeBrandTone={analyzeBrandTone}
+                    analyzingBrandTone={analyzingBrandTone}
+                    hasOpenAI={hasOpenAI}
+                    onNeedKeys={() => setKeysOpen?.(true)}
+                    material={material}
+                  />
+                  <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenResults} style={{ width: '100%', minHeight: 40, marginTop: 4 }}>
+                    Resultados das publicações
+                  </button>
+                </>
+              )}
+            </S>
+
+            <S title="Cards" hint="Ordem da narrativa. Marca a caixa para ações em massa (logo).">
+              {selectedSlideIds.length > 0 ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                  marginBottom: 8, padding: '8px 10px', borderRadius: 10,
+                  border: '1px solid var(--hairline)', background: 'var(--accent-surface)',
+                  fontSize: 12,
+                }}>
+                  <span style={{ fontWeight: 600 }}>{selectedSlideIds.length} selecionado{selectedSlideIds.length === 1 ? '' : 's'}</span>
+                  <button
+                    type="button"
+                    className="vc-btn vc-btn-ghost"
+                    onClick={() => setSelectedSlideIds([])}
+                    style={{ minHeight: 28, fontSize: 11 }}
+                  >
+                    Limpar
+                  </button>
+                </div>
+              ) : null}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {slides.map((s, i) => {
+                  const isActive = i === activeIdx;
+                  const isSelected = selectedSlideIds.includes(s.id);
+                  const hasImg = !!s.bgImage;
+                  const titlePreview = (s.title || '').trim().slice(0, 50) || '— sem título —';
+                  return (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: 8, borderRadius: 12, minHeight: 60,
+                        border: `1px solid ${isActive ? 'rgba(255, 45, 141, 0.45)' : isSelected ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
+                        background: isActive ? 'var(--accent-surface)' : 'rgba(255, 255, 255, 0.04)',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        aria-label={isSelected ? `Desmarcar card ${i + 1}` : `Selecionar card ${i + 1}`}
+                        aria-pressed={isSelected}
+                        onClick={(e) => toggleSlideSelect(s.id, e)}
+                        style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--hairline)'}`,
+                          background: isSelected ? 'var(--accent)' : 'transparent',
+                          color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                        }}
+                      >
+                        {isSelected ? <Check size={12} /> : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveIdx(i)}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', gap: 12,
+                          padding: 4, border: 'none', background: 'transparent',
+                          cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                        }}
+                      >
+                        <div style={{
+                          width: 36, height: 44, borderRadius: 6, flexShrink: 0,
+                          background: hasImg
+                            ? `url(${s.bgImage}) center/cover, ${s.bg || brand.bg || '#0a0a0a'}`
+                            : (s.bg || brand.bg || '#0a0a0a'),
+                          border: '1px solid var(--glass-border)',
+                          position: 'relative',
+                        }}>
+                          <span style={{
+                            position: 'absolute', bottom: 2, left: 3,
+                            fontSize: 8, fontWeight: 700, color: '#fff',
+                            fontFamily: 'var(--font-mono)',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                          }}>{String(i + 1).padStart(2, '0')}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 13, fontWeight: 600,
+                            color: isActive ? 'var(--accent)' : 'var(--text-primary)',
+                            letterSpacing: '-0.011em',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>{titlePreview}</div>
+                        </div>
+                        {isActive ? (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, color: 'var(--accent)',
+                            fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                          }}>Ativo</span>
+                        ) : null}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </S>
           </>
         )}
@@ -3075,6 +3297,36 @@ function SidebarContent({
         {tab==='narrativa' && narrativaPanel==='card' && (
           <>
             <S title="Gerar conteúdo">
+              {appMode !== 'criador' ? (
+                <div style={{ marginBottom: 10 }}>
+                  <ObjectiveTemplateChips
+                    activeId={objectiveTemplateId}
+                    quickPrompt={quickPrompt}
+                    onApply={(applied) => {
+                      setObjectiveTemplateId(applied.id);
+                      if (!String(quickPrompt || '').trim()) setQuickPrompt(applied.quickPrompt);
+                      onQuickNarrativeModeChange?.(applied.narrativeMode);
+                      toast?.('Objetivo aplicado ao pedido.', 'success', 2800);
+                    }}
+                    compact
+                  />
+                </div>
+              ) : null}
+              {onOpenSeries && appMode !== 'criador' ? (
+                <button
+                  type="button"
+                  className="vc-btn"
+                  onClick={() => { trackEvent('series_open'); onOpenSeries(); }}
+                  style={{
+                    width: '100%', height: 40, borderRadius: 10, marginBottom: 8,
+                    border: '1px solid var(--hairline)', background: 'var(--bg-card)',
+                    fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: 8, cursor: 'pointer',
+                  }}
+                >
+                  <Layers size={14} /> Gerar série
+                </button>
+              ) : null}
               <button onClick={()=>setSetupOpen(true)} style={{
                 width:'100%', height:44, borderRadius:9999, border:'none', cursor:'pointer',
                 background:'var(--accent)',
@@ -3201,10 +3453,29 @@ function SidebarContent({
           exportProgress={exportProgress}
           activeIdx={activeIdx}
           onExportSlide={exportSlide}
-          onExportAll={exportAll}
+          onExportAll={() => {
+            trackEvent('export_click', { surface: 'sidebar_footer' });
+            exportAll();
+          }}
           onExportPDF={exportPDF}
           onExportPhotosOnly={exportPhotosOnly}
           hideSlideOption={false}
+          caption={caption}
+          genCaption={genCaption}
+          onCopyCaption={handleCopyCaption}
+          onExportPackage={handleExportPackage}
+          onExportBackup={exportDoc ? () => {
+            trackEvent('backup_json');
+            exportDoc(activeDocId || activeEntry?.id);
+            lsSet(SK.backupNudgeDone, true);
+          } : null}
+        />
+        <span
+          title="O Viral prepara os arquivos. A publicação é no Instagram."
+          style={{
+            display: 'none',
+          }}
+          aria-hidden
         />
         <button
           onClick={() => setLibraryOpen(true)}
@@ -3228,8 +3499,8 @@ function SidebarContent({
             : 'Projetos'}
         </button>
         <span
-          title="Salvando automaticamente"
-          aria-label="Salvando automaticamente"
+          title="Salvando automaticamente neste navegador. Faça backup JSON para não perder o trabalho."
+          aria-label="Salvo neste navegador"
           style={{
             display:'inline-flex', alignItems:'center', gap:4,
             fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)',

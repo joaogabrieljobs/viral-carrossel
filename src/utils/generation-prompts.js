@@ -11,6 +11,8 @@ import {
 import { TEMPLATES, PALETTES } from './design-data.js';
 import { INSTAGRAM_HASHTAG_LIMIT, INSTAGRAM_CAPTION_LIMIT } from './editorial-strategy.js';
 import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
+import { normalizeBrandTone } from './brand-tone.js';
+import { genModeUiLabel } from './ui-depth-labels.js';
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
 // de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
@@ -153,6 +155,46 @@ Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo
 ];
 const GEN_MODE_BY_ID = Object.fromEntries(GEN_MODES.map(m => [m.id, m]));
 
+/** IDs legados que deixaram de ser modos narrativos. */
+const LEGACY_NARRATIVE_MODE_ALIASES = {
+  brand_tone: 'none',
+};
+
+/** Normaliza id de modo (migra `brand_tone` → `none`). */
+function normalizeNarrativeModeId(modeId) {
+  const raw = typeof modeId === 'string' ? modeId : 'none';
+  const mapped = LEGACY_NARRATIVE_MODE_ALIASES[raw] || raw;
+  return GEN_MODE_BY_ID[mapped] ? mapped : 'none';
+}
+
+/** Resolve o modo narrativo (só estrutura de arco — tom de voz é camada aparte). */
+function resolveGenMode(modeId) {
+  return GEN_MODE_BY_ID[normalizeNarrativeModeId(modeId)] || GEN_MODES.find((m) => m.id === 'none') || GEN_MODES[0];
+}
+
+/**
+ * Bloco de VOZ transversal — acompanha qualquer modo narrativo.
+ * Spec: tom ≠ modo; «Falar como minha marca» aplica-se sobre a estrutura escolhida.
+ */
+function buildBrandVoiceBlock(brand, { enabled = true } = {}) {
+  if (enabled === false) return '';
+  const tone = normalizeBrandTone(brand?.brandTone);
+  if (!tone?.method) return '';
+  return `
+VOZ DA MARCA (obrigatória — aplica-se SOBRE o modo narrativo; não substitui o arco):
+Perfil: ${tone.summary}
+${tone.traits?.length ? `Traços: ${tone.traits.join('; ')}.` : ''}
+Siga o método de voz abaixo sem abandonar a estrutura do modo narrativo pedido:
+${tone.method}
+`;
+}
+
+/** Label amigável do modo (caminho rápido) + desc interna. */
+function genModeDisplay(modeId) {
+  const m = resolveGenMode(modeId);
+  return { ...m, uiLabel: genModeUiLabel(m.id, m.label) };
+}
+
 function quickTemplateIdFromPreset(presetId) {
   if (presetId == null || typeof presetId !== 'string') return null;
   if (!presetId.startsWith('quick_')) return null;
@@ -204,7 +246,13 @@ const buildBrandBlock = (brand) => {
   const parts = [];
   if (brandField(brand?.bio))         parts.push(`• Sobre o perfil: ${brandField(brand.bio)}`);
   if (brandField(brand?.positioning)) parts.push(`• Posicionamento: ${brandField(brand.positioning)}`);
+  if (brandField(brand?.defaultTone)) parts.push(`• Tom de voz: ${brandField(brand.defaultTone)}`);
   if (brandField(brand?.signature))   parts.push(`• Assinatura/CTA recorrente: ${brandField(brand.signature)}`);
+  const tone = normalizeBrandTone(brand?.brandTone);
+  if (tone?.summary) {
+    parts.push(`• Tom da marca (perfil): ${brandField(tone.summary)}`);
+    if (tone.traits?.length) parts.push(`• Traços: ${tone.traits.join('; ')}`);
+  }
   // Placeholder não é identidade — não vai como contexto para a IA. Aceita a
   // grafia antiga porque brands salvos antes da troca ainda a carregam.
   if (brand?.handle?.trim() && !['@seuperfil', '@seu.perfil'].includes(brand.handle.trim()))
@@ -1245,6 +1293,10 @@ export {
   QUICK_TEMPLATE_CREATIVE_PRESET_ENTRIES,
   GEN_MODES,
   GEN_MODE_BY_ID,
+  resolveGenMode,
+  normalizeNarrativeModeId,
+  buildBrandVoiceBlock,
+  genModeDisplay,
   isPersoHybridDensity,
   buildPersoHybridLayoutBlock,
   buildBrandBlock,

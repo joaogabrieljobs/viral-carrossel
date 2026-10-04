@@ -17,6 +17,8 @@ const DEFAULT_STYLE_KIT = {
   stylePrompt: '',
   contextMd: '',
   refImages: [],
+  /** Quando true, novos cards / gerações já saem com a logo do projeto/marca visível. */
+  logoOnGenerate: true,
 };
 
 function uid() {
@@ -36,6 +38,7 @@ function normalizeStyleKit(raw) {
       ? { logo: { name: asString(src.logo.name).slice(0, 80) || 'Logo do projeto', ...(src.logo.imageId ? { imageId: src.logo.imageId } : { dataUrl: src.logo.dataUrl }) } } : {}),
     stylePrompt: asString(src.stylePrompt).slice(0, STYLE_PROMPT_MAX),
     contextMd: asString(src.contextMd).slice(0, CONTEXT_MD_MAX),
+    logoOnGenerate: src.logoOnGenerate === false ? false : true,
     refImages: refs
       .filter((r) => r && typeof r === 'object' && ((typeof r.imageId === 'string' && r.imageId) || (typeof r.dataUrl === 'string' && r.dataUrl.startsWith('data:image/'))))
       .slice(0, MAX_REF_IMAGES)

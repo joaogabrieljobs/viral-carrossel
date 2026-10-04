@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles, SlidersHorizontal, Settings, Check, ChevronRight } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
+import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../utils/ui-depth-labels.js';
 
 export default function ModesIntroModal({ open, onSelect, onClose, currentMode = 'criador' }) {
   if (!open) return null;
@@ -8,27 +9,27 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
     {
       id: 'criador',
       icon: Sparkles,
-      label: 'Criador',
-      tagline: 'Pra começar agora',
-      desc: 'Pra quem quer criar carrosséis sem se preocupar com detalhes técnicos. Tema + estilo + gerar.',
-      features: ['Padrões visuais prontos', 'Geração com IA', 'Imagem automática', 'Identidade da marca'],
+      label: APP_MODE_UI.criador.label,
+      tagline: APP_MODE_UI.criador.tagline,
+      desc: APP_MODE_UI.criador.desc,
+      features: ['Contexto curto da marca', 'Geração com IA', 'Logo nos novos cards', 'Exportar PNG'],
       recommended: true,
     },
     {
       id: 'diretor',
       icon: SlidersHorizontal,
-      label: 'Diretor',
-      tagline: 'Controle intermediário',
-      desc: 'Pra quem quer afinar tom, narrativa, tipografia. Mais controle sem complexidade técnica.',
-      features: ['Tudo do Criador', '+ Tipografia (Texto)', '+ Refinamento de tom', '+ Variações IA'],
+      label: APP_MODE_UI.diretor.label,
+      tagline: APP_MODE_UI.diretor.tagline,
+      desc: APP_MODE_UI.diretor.desc,
+      features: ['Tudo do caminho rápido', '+ Tipografia (Texto)', '+ Refinamento e remix', '+ Modos narrativos'],
     },
     {
       id: 'studio',
       icon: Settings,
-      label: 'Studio',
-      tagline: 'Avançado — tudo aberto',
-      desc: 'Pra designers e usuários experientes. Composição livre, grids, tracking, overlays, zonas.',
-      features: ['Tudo do Diretor', '+ Composição (Layout)', '+ Tracking/Leading', '+ Zonas canvas'],
+      label: APP_MODE_UI.studio.label,
+      tagline: APP_MODE_UI.studio.tagline,
+      desc: APP_MODE_UI.studio.desc,
+      features: ['Tudo do controlo profissional', '+ Composição (Layout)', '+ Tracking/Leading', '+ Zonas canvas'],
     },
   ];
   return (
@@ -76,9 +77,8 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
             letterSpacing: '-0.011em', lineHeight: 1.5, margin: 0,
             maxWidth: 480, marginInline: 'auto',
           }}>
-            Escolha como quer trabalhar. Pode mudar a qualquer momento no chip
-            <strong style={{ color: 'var(--accent)', fontWeight: 600 }}> Modo </strong>
-            no topo.
+            Escolha a profundidade de criação. Pode mudar a qualquer momento no chip do topo.{' '}
+            {DEPTH_LAYERS_HINT}
           </p>
         </div>
 
@@ -209,19 +209,36 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
           }}>
             Pode mudar quando quiser no chip de modo
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              minHeight: 40, padding: '0 18px',
-              borderRadius: 9999, border: '1px solid var(--border)',
-              background: 'var(--bg-card)', color: 'var(--text-primary)',
-              fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
-              cursor: 'pointer', letterSpacing: '-0.011em',
-            }}
-          >
-            Fechar
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="vc-btn vc-btn-ghost"
+              style={{
+                minHeight: 40, padding: '0 14px',
+                borderRadius: 9999, border: '1px solid var(--border)',
+                background: 'transparent', color: 'var(--text-muted)',
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                cursor: 'pointer', letterSpacing: '-0.011em',
+              }}
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelect('criador')}
+              style={{
+                minHeight: 40, padding: '0 18px',
+                borderRadius: 9999, border: 'none',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                cursor: 'pointer', letterSpacing: '-0.011em',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              Começar no Criar rápido <ChevronRight size={14} aria-hidden />
+            </button>
+          </div>
         </div>
       </div>
     </div>

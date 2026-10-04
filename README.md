@@ -87,6 +87,7 @@ Base publicada em 28/09/2026: `d2043b6`, **343 testes de código + 66 testes de 
 ## Documentação
 
 - [Guia de projetos e geração](docs/product/guia-projetos-geracao.md)
+- [Organização por pastas e calendário editorial](docs/product/organizacao-calendario.md)
 - [Controles de geração e logo: contratos e testes](docs/engineering/controles-geracao-projeto.md)
 - [Copy da landing](docs/LANDING-COPY.md)
 - [Revisão editorial dos prompts](docs/revisao-prompts-texto.md)

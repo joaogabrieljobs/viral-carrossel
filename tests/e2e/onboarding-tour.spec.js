@@ -1,9 +1,22 @@
 // Regressão do crash React #185 (loop de render no tour) e do realce vazio:
 // o tour abria empilhado no modal de boas-vindas e destacava elementos tapados.
+// Tour automático só após conteúdo real; estes testes abrem via Ajuda.
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
-const TOTAL_PASSOS = 7;
+const TOTAL_PASSOS = 3;
+
+async function openTourFromHelp(page) {
+  await page.getByRole('button', { name: /fechar/i }).first().click();
+  const cont = page.getByRole('button', { name: /Continuar no editor/i });
+  if (await cont.isVisible().catch(() => false)) {
+    await cont.click();
+  }
+  // Desktop: ícone ?; mobile: barra.
+  const help = page.getByRole('button', { name: /Ajuda|ajuda e atalhos|\?/i }).first();
+  await help.click();
+  await page.getByRole('button', { name: /Ver tour guiado/i }).click();
+}
 
 test.describe('Tour de onboarding', () => {
   test('não abre empilhado no modal de boas-vindas', async ({ page }) => {
@@ -11,12 +24,12 @@ test.describe('Tour de onboarding', () => {
     await page.goto('/?app=1');
 
     await expect(page.getByText('Bem-vindo', { exact: false }).first()).toBeVisible({ timeout: 10_000 });
-    // 850ms do tour + folga: enquanto o modal está aberto, nenhum card de tour.
+    // 850ms do tour + folga: enquanto o modal está aberto (e canvas vazio), nenhum card de tour.
     await page.waitForTimeout(1600);
     await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
 
-  test('percorre os 7 passos sem erro de console e sem realce fora de alvo', async ({ page }) => {
+  test('percorre os 3 passos sem erro de console e sem realce fora de alvo', async ({ page }) => {
     const erros = [];
     page.on('console', (m) => { if (m.type() === 'error') erros.push(m.text()); });
     page.on('pageerror', (e) => erros.push(String(e)));
@@ -24,7 +37,7 @@ test.describe('Tour de onboarding', () => {
     await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
 
-    await page.getByRole('button', { name: /fechar/i }).first().click();
+    await openTourFromHelp(page);
     const card = page.locator('[data-vc-tour-card]');
     await expect(card).toBeVisible({ timeout: 10_000 });
 
@@ -56,7 +69,7 @@ test.describe('Copy do tour', () => {
   test('nenhum passo fala de .env, chave de API ou ambiente local', async ({ page }) => {
     await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /fechar/i }).first().click();
+    await openTourFromHelp(page);
     const card = page.locator('[data-vc-tour-card]');
     await expect(card).toBeVisible({ timeout: 10_000 });
 

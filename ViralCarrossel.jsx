@@ -53,6 +53,7 @@ import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
 import PromptDialog from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
+import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
 import { FORMATS } from './src/utils/formats.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
@@ -70,6 +71,9 @@ import {
 import {
   GEN_MODES,
   GEN_MODE_BY_ID,
+  resolveGenMode,
+  normalizeNarrativeModeId,
+  buildBrandVoiceBlock,
   isPersoHybridDensity,
   buildBrandBlock,
   buildImgParamsBlockPT,
@@ -233,6 +237,7 @@ import {
   PRESET_NICHES,
   ResearchPanel,
 } from './src/components/panels/ResearchPanel.jsx';
+import { SeriesPanel } from './src/components/panels/SeriesPanel.jsx';
 import {
   vcIsCoarseTouchDevice,
   vcPhotoZoneTapSlopPx,
@@ -389,11 +394,12 @@ import {
   generateDALLEWithRetry,
 } from './src/utils/ai-client.js';
 import {
-  DEFAULT_AI_SETTINGS,
-  IMAGE_PROVIDERS,
-  normalizeAISettings,
-  TEXT_PROVIDERS,
-} from './src/config/ai-providers.js';
+  buildBrandToneAnalysisPrompt,
+  brandToneFromAnalysis,
+  brandToneIsReady,
+} from './src/utils/brand-tone.js';
+import { resolveLogoDataUrl, brandLogoInsertPatch, stampLogoVisibleOnSlides } from './src/utils/slide-logo.js';
+import { appModeLabel } from './src/utils/ui-depth-labels.js';
 
 const OnboardingLanding = lazy(() => import('./src/components/OnboardingLanding.jsx'));
 const Paywall = lazy(() => import('./src/components/Paywall.jsx'));
@@ -815,10 +821,14 @@ export default function App() {
   // ── BIBLIOTECA + PERFIS DE MARCA (multi-doc) ────────────────────────────────
   // Schema novo (vc_library + vc_brands). Migra automaticamente do `vc_doc`
   // legado se existir e a biblioteca estiver vazia.
+  const [libraryFolders, setLibraryFolders] = useState(() => (
+    normalizeLibraryFolders(lsGet(SK.libraryFolders, []))
+  ));
   const [library, setLibrary] = useState(() => {
+    const folders = normalizeLibraryFolders(lsGet(SK.libraryFolders, []));
     const lib = lsGet(SK.library, null);
     if (Array.isArray(lib) && lib.length) {
-      return lib.map((e) => ({ ...e, doc: ensureDocShape(e.doc || {}) }));
+      return lib.map((e) => normalizeLibraryEntry({ ...e, doc: ensureDocShape(e.doc || {}) }, folders));
     }
     const legacy = lsGet(SK.legacyDoc, null);
     if (legacy && legacy.slides?.length) {
@@ -842,6 +852,8 @@ export default function App() {
 
   const libraryPersistRef = useRef(library);
   libraryPersistRef.current = library;
+  const libraryFoldersPersistRef = useRef(libraryFolders);
+  libraryFoldersPersistRef.current = libraryFolders;
   /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
   const flushPersistRef = useRef(null);
 
@@ -855,6 +867,7 @@ export default function App() {
     const flushLibrary = () => {
       if (flushPersistRef.current) { flushPersistRef.current(); return; }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
+      lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
     };
     const onHidden = () => {
       if (document.visibilityState === 'hidden') flushLibrary();
@@ -879,6 +892,7 @@ export default function App() {
     }, 100);
     return () => clearTimeout(t);
   }, [library]);
+  useEffect(() => { lsSet(SK.libraryFolders, libraryFolders); }, [libraryFolders]);
   useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
   useEffect(() => { lsSet(SK.brands, brandRoster); }, [brandRoster]);
   useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
@@ -1009,11 +1023,13 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);  // declarado antes de useLibrary (usa setLibraryOpen)
   const { toasts, dismissToast, toast, setError } = useToasts();
   const {
-    renameDoc, setDocStatus, openDoc, newDoc, duplicateDoc, deleteDoc,
+    renameDoc, setDocStatus, setDocFolder, setDocPublicationDate,
+    createFolder, renameFolder, deleteFolder,
+    openDoc, newDoc, duplicateDoc, newFromContext, createSeriesDrafts, deleteDoc,
     exportDoc, exportAllDocs, handleImportFile,
     shellView, setShellView, importDocRef,
   } = useLibrary({
-    library, setLibrary, activeDocId, setActiveDocId,
+    library, setLibrary, libraryFolders, setLibraryFolders, activeDocId, setActiveDocId,
     history, slides, brand, brandRoster, activeBrandId, setLibraryOpen, toast, setError,
   });
 
@@ -1059,6 +1075,7 @@ export default function App() {
     ));
     libraryPersistRef.current = lib;
     lsSet(SK.library, semImagensDeRuntime(lib));
+    lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
     if (activeDocId) lsSet(SK.activeDocId, activeDocId);
     lsSet(SK.brands, brandRoster);
     lsSet(SK.activeBrandId, activeBrandId);
@@ -1119,6 +1136,7 @@ export default function App() {
   const [thumbQaMode, setThumbQaMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [seriesOpen, setSeriesOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -1422,11 +1440,11 @@ export default function App() {
     || (selectedTextProvider === 'zai');
   const [niche, setNiche] = useState('');
 
-  // Tour guiado — primeira visita (pode repetir pela ajuda). Espera o modal de
-  // boas-vindas fechar: empilhado, o realce do tour caía atrás do modal e lia-se
-  // como um retângulo rosa vazio (auditoria §4 «tour + modes-intro empilhados»).
+  // Tour guiado — só após a 1.ª geração (ou conteúdo real), para não tapar
+  // a Home / Criar rápido. Pode repetir pela ajuda.
   useEffect(() => {
     if (typeof window === 'undefined' || landingOpen || modesIntroOpen) return undefined;
+    if (isDefault(slides)) return undefined;
     try {
       if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
       if (!localStorage.getItem(SK.onboarding)) {
@@ -1435,7 +1453,7 @@ export default function App() {
       }
     } catch { /* ignore */ }
     return undefined;
-  }, [landingOpen, modesIntroOpen]);
+  }, [landingOpen, modesIntroOpen, slides]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -1693,10 +1711,10 @@ export default function App() {
         height: isMobile ? 40 : 40,
         padding: isMobile ? '0 14px' : '0 20px',
         borderRadius: 9999,
-        border: 'none',
+        border: appMode === 'criador' ? '1px solid var(--border)' : 'none',
         cursor: 'pointer',
-        background: 'var(--accent)',
-        color: '#fff',
+        background: appMode === 'criador' ? 'var(--bg-card)' : 'var(--accent)',
+        color: appMode === 'criador' ? 'var(--text-primary)' : '#fff',
         fontSize: 13,
         fontWeight: 600,
         fontFamily: 'var(--font-ui)',
@@ -1709,8 +1727,8 @@ export default function App() {
       onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
-      <Sparkles size={14} />
-      {isMobile ? 'Gerar' : 'Gerar com IA'}
+      <Sparkles size={14} color={appMode === 'criador' ? 'var(--accent)' : undefined} />
+      {isMobile ? 'Gerar' : (appMode === 'criador' ? 'Assistente IA' : 'Gerar com IA')}
     </button>
   );
 
@@ -1802,8 +1820,19 @@ export default function App() {
           : 'Configurar provedores de IA',
         ariaLabel: 'Configurar IA',
         tour: 'settings',
-        active: hasAnyAI,
-        children: <Settings size={13} />,
+        active: false,
+        style: hasAnyAI ? { position: 'relative' } : {},
+        children: (
+          <>
+            <Settings size={13} />
+            {hasAnyAI ? (
+              <span aria-hidden style={{
+                position: 'absolute', top: 5, right: 5, width: 6, height: 6,
+                borderRadius: 99, background: 'var(--success)',
+              }} />
+            ) : null}
+          </>
+        ),
       })}
       {!isMobile && editorIconBtn({
         onClick: () => setResearchOpen(true),
@@ -2315,15 +2344,18 @@ export default function App() {
       ? 'editorial'
       : isQuickTemplatePreset(cp)
         ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(cp)] || 'editorial')
-        : (chosenNarrativeMode || mode || 'editorial');
+        : normalizeNarrativeModeId(chosenNarrativeMode || mode || 'editorial');
     const tdRaw = densityArg ?? slideTextDensity ?? '1_1';
     const performanceGuidance = buildPerformanceGuidance(library, {
       ...performanceSettings, objective, niche: n || '', mode: effectiveMode, presetId: cp,
     });
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
-    const modeDef = GEN_MODE_BY_ID[effectiveMode] || GEN_MODES[0];
+    const modeDef = resolveGenMode(effectiveMode);
     const brandBlock = buildBrandBlock(brand);
+    const brandVoiceBlock = buildBrandVoiceBlock(brand, {
+      enabled: brand.useBrandVoice !== false && brandToneIsReady(brand),
+    });
     const projectContextBlock = buildProjectContextBlock(styleKit);
     const styleKitTextHint = buildStyleKitTextHint(styleKit);
     const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
@@ -2384,6 +2416,7 @@ ${effectiveMode === 'none' ? '' : buildEditorialStrategyBlock(objective, cp, per
 ${effectiveMode === 'none' ? '' : performanceGuidance.prompt}
 
 ${modoNarrativoBloco}
+${brandVoiceBlock}
 ${tendenciaPackBlock}
 ${quickPackBlock ? `${quickPackBlock}\n` : ''}
 
@@ -2415,11 +2448,18 @@ ${jsonShapeLine}`;
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
 
-    const generationBrand = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
+    const generationBrandBase = { ...brand, ...(projectDesignInstructions ? projectDesignBrandPatch(result.projectDesign) : {}) };
+    let generationBrand = generationBrandBase;
+    if (styleKit?.logoOnGenerate !== false) {
+      try {
+        const logoUrl = await resolveLogoDataUrl(generationBrandBase, styleKit);
+        if (logoUrl) generationBrand = { ...generationBrandBase, ...brandLogoInsertPatch(logoUrl, generationBrandBase) };
+      } catch { /* logo opcional — geração segue sem bloquear */ }
+    }
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
-    const newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : applyFinalizeCanvasMarginsToSlides(
+    let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : applyFinalizeCanvasMarginsToSlides(
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       let q = ((s.imageQuery ?? s.image_query) || '').trim();
@@ -2508,6 +2548,9 @@ ${jsonShapeLine}`;
       ),
       fmt,
     );
+    if (styleKit?.logoOnGenerate !== false && generationBrand?.logo) {
+      newSlides = stampLogoVisibleOnSlides(newSlides);
+    }
     checkActive();
     if (!remix) {
       lastGenerateArgsRef.current = {
@@ -2621,6 +2664,12 @@ ${jsonShapeLine}`;
         slide_count: String(newSlides.length),
         image_failures: String(imgFailCount),
       });
+      try {
+        if (!lsGet(SK.backupNudgeDone, false)) {
+          lsSet(SK.backupNudgeDone, true);
+          toast('Projeto salvo neste navegador. Em Exportar → Backup JSON cria uma cópia portátil.', 'info', 7500);
+        }
+      } catch { /* */ }
       return { cancelled: false };
     } catch (err) {
       if (isGenerationCancelled(err) || job.signal.aborted) return { cancelled: true };
@@ -2723,7 +2772,11 @@ ${capRules}
       const finalCaption = normalizeInstagramCaption(r);
 
       if (activeProjectRef.current === projectId) setCaption(finalCaption);
-    } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
+      return finalCaption;
+    } catch(e) {
+      if (!isGenerationCancelled(e)) setError(e.message);
+      return '';
+    }
     finally { job.finish(); setGenCaption(false); }
   };
 
@@ -2787,15 +2840,20 @@ ${capRules}
     }
     try {
       const { count, announcement } = resolveQuickGenerationRequest(topic, slides.length >= 3 && slides.length <= 12 ? slides.length : 6);
+      const toneFromBrand = (brandToneIsReady(brand) && brand.useBrandVoice !== false)
+        ? (brand.brandTone?.summary || brand.defaultTone || '').trim()
+        : ((brand.defaultTone || '').trim() || 'direto e concreto');
       return await handleGenerate({
         topic,
         count,
         niche: styleKit.contextMd.trim() ? '' : (niche || ''),
-        tone: styleKit.contextMd.trim() ? 'Use a voz do brief do projeto; na ausência, PT-BR direto e concreto' : ((brand.defaultTone || '').trim() || 'direto e concreto'),
+        tone: styleKit.contextMd.trim() && !(brandToneIsReady(brand) && brand.useBrandVoice !== false)
+          ? 'Use a voz do brief do projeto; na ausência, PT-BR direto e concreto'
+          : (toneFromBrand || 'direto e concreto'),
         audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
         imgMode: 'dalle',
         imgParams,
-        mode: GEN_MODE_BY_ID[narrativeMode] ? narrativeMode : 'none',
+        mode: normalizeNarrativeModeId(narrativeMode),
         announcement,
         creativePreset: 'livre',
         contentObjective: announcement ? 'leads' : contentObjective,
@@ -2808,6 +2866,41 @@ ${capRules}
       return { cancelled: true };
     }
   };
+
+  const [analyzingBrandTone, setAnalyzingBrandTone] = useState(false);
+  /** Analisa e devolve o rascunho — o painel confirma antes de gravar (spec Fatia 2 / alinhamento). */
+  const analyzeBrandTone = useCallback(async () => {
+    if (analyzingBrandTone) return null;
+    if (!hasOpenAI) {
+      setKeysOpen(true);
+      toast('Configure a chave de IA para analisar o tom.', 'info');
+      return null;
+    }
+    const job = startAIJob('brand-tone');
+    setAnalyzingBrandTone(true);
+    try {
+      const prompt = buildBrandToneAnalysisPrompt({
+        brand,
+        styleKit,
+        projectName: activeEntry?.name || styleKit?.name || '',
+      });
+      const raw = await runAIJob(
+        () => callAI(prompt, { json: true, openaiKey, signal: job.signal, maxTokens: 2048 }),
+        job.signal,
+      );
+      throwIfGenerationCancelled(job.signal);
+      const parsed = raw?.result ?? raw;
+      const tone = brandToneFromAnalysis(parsed);
+      if (!tone?.method) throw new Error('A IA não devolveu um perfil de tom utilizável.');
+      return tone;
+    } catch (e) {
+      if (!isGenerationCancelled(e)) toast(e?.message || 'Não foi possível analisar o tom.', 'error', 6000);
+      return null;
+    } finally {
+      job.finish?.();
+      setAnalyzingBrandTone(false);
+    }
+  }, [analyzingBrandTone, hasOpenAI, brand, styleKit, activeEntry?.name, openaiKey, toast, setKeysOpen]);
 
   // Refina TODOS os slides com uma instrução geral (passa contexto para coerência)
   const refineAll = useCallback(async (instruction) => {
@@ -3010,7 +3103,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
       // Qualquer overlay bloqueia os atalhos. Landing/paywall/login e a intro de
       // modos faltavam: com eles abertos, setas/Delete/F agiam no documento por baixo.
-      const anyModalOpen = resultsOpen || setupOpen || researchOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
+      const anyModalOpen = resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
 
@@ -3072,7 +3165,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides.length, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
@@ -3080,6 +3173,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     setHookLibrary, niche,
     onOpenResults: () => setResultsOpen(true),
     slide, slides, activeIdx, brand, setBrand, updateSlide,
+    setSlides,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
     exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
@@ -3095,6 +3189,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
     setLibraryOpen, libraryCount: library.length,
+    library,
+    activeDocId,
+    onOpenProject: openDoc,
     onNewProject: () => newDoc(null, 'Novo carrossel'),
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,
@@ -3126,6 +3223,32 @@ Retorne APENAS JSON: ${refineAllWantsBody
     appMode,
     setActiveIdx,
     activeEntry,
+    analyzingBrandTone,
+    analyzeBrandTone,
+    setAppMode,
+    exportDoc,
+    generateMissingImages: async () => {
+      const idxs = slides
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => !(s.bgImage || s.bgImageId) && String(s.imageQuery || '').trim())
+        .map(({ i }) => i);
+      if (!idxs.length) {
+        toast('Nenhum card pendente de imagem (ou sem palavras-chave).', 'info');
+        return;
+      }
+      trackEvent('criar_rapido_images', { count: String(idxs.length) });
+      for (const i of idxs) {
+        // eslint-disable-next-line no-await-in-loop
+        await generateSlideImageAt(i);
+      }
+    },
+    imagesBatchBusy: Object.values(slideImgGenBusy || {}).some(Boolean),
+    onOpenSeries: () => setSeriesOpen(true),
+    libraryFolders,
+    setDocFolder,
+    setDocPublicationDate,
+    createFolder,
+    setDocStatus,
   };
 
   const desktopThumbWidth = f.w * previewScale;
@@ -3148,6 +3271,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
         <Suspense fallback={null}>
           <OnboardingLanding
             onEnter={completeLanding}
+            onEnterProfessional={() => {
+              setAppMode('diretor');
+              trackEvent('landing_enter_profissional');
+              completeLanding();
+            }}
             onLogin={() => { setLoginHint(''); setLoginOpen(true); }}
             isMobile={isMobile}
           />
@@ -3236,6 +3364,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           hasImageAI={hasOpenAI}
           isMobile={isMobile}
           useOwnImageKey={useOwnImageKey}
+          appMode={appMode}
           onGenerate={() => setSetupOpen(true)}
           onOpenLibrary={() => setLibraryOpen(true)}
           onOpenTemplates={() => setTemplatesOpen(true)}
@@ -3610,8 +3739,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     marginBottom:12,
                     lineHeight:1.07,
                   }}>
-                    Crie seu carrossel<br/>
-                    <span style={{ color:'var(--accent)' }}>viral.</span>
+                    {appMode === 'criador' ? (
+                      <>Escreva o pedido<br/><span style={{ color:'var(--accent)' }}>e gere.</span></>
+                    ) : (
+                      <>Crie seu carrossel<br/><span style={{ color:'var(--accent)' }}>viral.</span></>
+                    )}
                   </div>
                   <p style={{
                     fontSize:17,
@@ -3621,12 +3753,31 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     letterSpacing:'-0.011em',
                     fontWeight:400,
                   }}>
-                    {isMobile
-                      ? 'Informe o tema e a IA gera gancho, slides e legenda prontos para postar.'
-                      : <>Informe o tema e a IA gera gancho,<br/>slides e legenda prontos para postar.</>}
+                    {appMode === 'criador'
+                      ? (isMobile
+                        ? 'Na barra lateral: contexto → pedido → Gerar carrossel → baixar.'
+                        : <>Na sidebar: contexto → pedido → Gerar → baixar.<br/>Um caminho até o PNG.</>)
+                      : (isMobile
+                        ? 'Informe o tema e a IA gera gancho, slides e legenda prontos para postar.'
+                        : <>Informe o tema e a IA gera gancho,<br/>slides e legenda prontos para postar.</>)}
                   </p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                    <button onClick={()=>setSetupOpen(true)} aria-label="Gerar carrossel com IA" style={{
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (appMode === 'criador') {
+                          setTab('home');
+                          if (isMobile) setDrawerOpen(true);
+                          requestAnimationFrame(() => {
+                            const el = document.querySelector('[data-vc-quick-prompt]');
+                            el?.focus?.();
+                          });
+                          return;
+                        }
+                        setSetupOpen(true);
+                      }}
+                      aria-label={appMode === 'criador' ? 'Escrever o pedido na sidebar' : 'Gerar carrossel com IA'}
+                      style={{
                       minHeight:48,
                       borderRadius:9999,
                       border:'none',
@@ -3644,7 +3795,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       padding: '0 20px',
                       transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                     }}>
-                      <Sparkles size={16}/>Gerar carrossel com IA
+                      <Sparkles size={16}/>
+                      {appMode === 'criador' ? 'Escrever o pedido' : 'Gerar carrossel com IA'}
                     </button>
                     <div style={{
                       display:'grid',
@@ -3785,12 +3937,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       }}>
                         <div style={{ fontWeight:600, marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
                           <Sparkles size={12} style={{ color:'var(--accent)' }}/>
-                          Comece em 3 caminhos
+                          {appMode === 'criador' ? 'Comece pelo pedido' : 'Comece em 3 caminhos'}
                         </div>
                         <div style={{ opacity:0.85, fontSize:10, lineHeight:1.6 }}>
-                          → Click <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
-                          → Escolha um <strong style={{ color:'#fff' }}>Template pronto</strong><br/>
-                          → Ou edite o título e copy aqui mesmo
+                          {appMode === 'criador' ? (
+                            <>→ Escreva o pedido na <strong style={{ color:'#fff' }}>sidebar</strong><br/>
+                            → Toque em <strong style={{ color:'#fff' }}>Gerar carrossel</strong><br/>
+                            → Revise e baixe os PNGs</>
+                          ) : (
+                            <>→ Click <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
+                            → Escolha um <strong style={{ color:'#fff' }}>Template pronto</strong><br/>
+                            → Ou edite o título e copy aqui mesmo</>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4213,7 +4371,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <ModesIntroModal
         open={modesIntroOpen}
         currentMode={appMode}
-        onSelect={(m) => { setAppMode(m); closeModesIntro(); toast(`Modo ${m.charAt(0).toUpperCase() + m.slice(1)} ativo. Boa criação!`, 'success', 4000); }}
+        onSelect={(m) => { setAppMode(m); closeModesIntro(); toast(`${appModeLabel(m)} ativo. Pode mudar a qualquer momento.`, 'success', 4000); }}
         onClose={closeModesIntro}
       />
 
@@ -4314,6 +4472,21 @@ Retorne APENAS JSON: ${refineAllWantsBody
         creativePreset={creativePreset}
         openaiKey={openaiKey}
       />
+      <SeriesPanel
+        open={seriesOpen}
+        onClose={() => setSeriesOpen(false)}
+        brand={brand}
+        styleKit={styleKit}
+        folderId={activeEntry?.folderId || ''}
+        folders={libraryFolders}
+        onCreateFolder={createFolder}
+        openaiKey={openaiKey}
+        toast={toast}
+        onCreateDrafts={async (drafts) => {
+          createSeriesDrafts(drafts);
+          if (drafts[0]?.quickPrompt) setQuickPrompt(drafts[0].quickPrompt);
+        }}
+      />
       <TemplatesModal
         open={templatesOpen}
         onClose={()=>setTemplatesOpen(false)}
@@ -4390,16 +4563,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={libraryOpen}
         onClose={()=>setLibraryOpen(false)}
         library={library}
+        folders={libraryFolders}
         activeDocId={activeDocId}
         onOpen={openDoc}
         onNew={()=>newDoc()}
         onDuplicate={duplicateDoc}
+        onNewFromContext={newFromContext}
         onDelete={deleteDoc}
         onRename={renameDoc}
         onSetStatus={setDocStatus}
+        onSetFolder={setDocFolder}
+        onSetPublicationDate={setDocPublicationDate}
+        onCreateFolder={createFolder}
+        onRenameFolder={renameFolder}
+        onDeleteFolder={deleteFolder}
         onExportDoc={exportDoc}
         onExportAll={exportAllDocs}
         onImportTrigger={() => importDocRef.current?.click()}
+        appMode={appMode}
       />
       {/* Input oculto para importar JSON */}
       <input

@@ -17,62 +17,33 @@ export function getOnboardingSteps(isMobile, empty) {
   let panelSel = '';
   if (!isMobile) panelSel = '[data-vc-tour="sidebar-tabs"]';
   else if (!empty) panelSel = '[data-vc-tour="mobile-bar"]';
-  // Nomes reais das abas (EDITOR_TABS em SidebarContent): Home, Narrativa, Visual,
-  // Imagem, Texto, Layout, Marca. Texto e Layout só aparecem nos modos Diretor e Studio.
   const panelBody = !isMobile
-    ? 'Narrativa muda o texto dos cards. Visual troca cores e fontes. Imagem cuida da foto de cada card. Marca guarda o seu @ e a identidade. Nos modos Diretor e Studio aparecem também Texto e Layout, com ajustes finos.'
+    ? 'Na sidebar: peça o carrossel, revise o texto e baixe os PNGs. Nos modos Controle profissional e Studio aparecem mais abas de ajuste fino.'
     : empty
-      ? 'Depois do primeiro carrossel, a barra de baixo dá acesso a Narrativa, Visual, Imagem e Marca.'
-      : 'Toque nos ícones da barra de baixo para abrir cada painel de edição.';
+      ? 'Depois do primeiro carrossel, a barra de baixo dá acesso à edição.'
+      : 'Toque nos ícones da barra de baixo para abrir cada painel.';
 
   return [
     {
       id: 'welcome',
       title: 'Bem-vindo ao Viral Carrossel',
       body:
-        'Um tour rápido: onde pedir o carrossel à IA, onde editar cada card e onde ficam os seus projetos. Pode pular agora e rever depois no ícone de ajuda.',
+        'Três passos: pedir o carrossel à IA, rever os cards e baixar. Pode pular agora e rever depois na ajuda.',
       selector: null,
     },
     {
       id: 'generate',
       title: 'Gerar com IA',
       body:
-        'Diga o tema e escolha o estilo. A IA escreve o gancho, os cards do meio, o fecho e a legenda — no tom da sua marca.',
+        'No Criar rápido, escreva o pedido na sidebar e toque em Gerar carrossel. No header, Gerar abre o assistente completo.',
       selector: '[data-vc-tour="generate"]',
     },
     {
       id: 'library',
       title: 'Seus projetos',
-      body:
-        'Cada carrossel fica guardado neste navegador. Em Projetos você abre, duplica, renomeia e exporta — e pode importar um arquivo guardado antes.',
-      selector: '[data-vc-tour="library"]',
-    },
-    {
-      id: 'thumbs',
-      title: 'Miniaturas',
-      body:
-        'Cada miniatura é um card. Toque para editar; arraste para mudar a ordem da história.',
-      selector: '[data-vc-tour="thumbnails"]',
-    },
-    {
-      id: 'panel',
-      title: 'Onde editar',
-      body: panelBody,
-      selector: panelSel || null,
-    },
-    {
-      id: 'settings',
-      title: 'Configurar IA',
-      body:
-        'Não precisa configurar nada para começar: o texto já vem incluso no seu plano, e as imagens também nos planos Criador, Pro e Max. Se preferir usar a sua própria conta da OpenAI ou do Claude, é aqui que cola a chave.',
-      selector: '[data-vc-tour="settings"]',
-    },
-    {
-      id: 'refs',
-      title: 'Vozes de referência',
-      body:
-        'Ao configurar o carrossel, no pacote Personalizado, escolha uma voz de referência para inspirar o ritmo do texto. Serve de inspiração de tom — nada é copiado de ninguém.',
-      selector: '[data-vc-tour="ref-profiles"]',
+      body: panelBody
+        + ' Em Projetos você abre, organiza a fila e exporta — tudo fica neste navegador.',
+      selector: panelSel || '[data-vc-tour="library"]',
     },
   ];
 }
@@ -258,8 +229,15 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 16 }}>
           <button
             type="button"
-            className="vc-btn vc-btn-ghost"
-            style={{ height: 36, padding: '0 14px', fontSize: 13 }}
+            className={idx === 0 ? 'vc-btn vc-btn-primary' : 'vc-btn vc-btn-ghost'}
+            style={{
+              height: 36,
+              padding: '0 14px',
+              fontSize: 13,
+              ...(idx === 0
+                ? {}
+                : { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }),
+            }}
             onClick={onDismiss}
           >
             Pular
@@ -274,7 +252,19 @@ export default function OnboardingTour({ open, onDismiss, isMobile, empty, setTa
             >
               Voltar
             </button>
-            <button type="button" className="vc-btn vc-btn-primary" style={{ height: 36, padding: '0 18px', fontSize: 13 }} onClick={advance}>
+            <button
+              type="button"
+              className={idx === 0 ? 'vc-btn vc-btn-ghost' : 'vc-btn vc-btn-primary'}
+              style={{
+                height: 36,
+                padding: '0 18px',
+                fontSize: 13,
+                ...(idx === 0
+                  ? { border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)' }
+                  : {}),
+              }}
+              onClick={advance}
+            >
               {last ? 'Concluir' : 'Avançar'}
             </button>
           </div>

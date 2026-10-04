@@ -17,9 +17,19 @@ import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
 import { SK } from '../utils/storage.js';
 import { lsSet } from '../utils/storage.js';
+import {
+  createLibraryFolder,
+  mergeImportedFolders,
+  normalizeLibraryEntry,
+  removeLibraryFolder,
+  renameLibraryFolder,
+  setEntryFolder,
+  setEntryPublicationDate,
+} from '../utils/library-organizer.js';
 
 export function useLibrary({
   library, setLibrary,
+  libraryFolders, setLibraryFolders,
   activeDocId, setActiveDocId,
   history, slides, brand, brandRoster, activeBrandId,
   setLibraryOpen, toast, setError,
@@ -39,8 +49,43 @@ export function useLibrary({
     setLibrary(prev => prev.map(e => e.id === docId ? { ...e, name: newName, updatedAt: Date.now() } : e));
   }, []);
   const setDocStatus = useCallback((docId, newStatus) => {
-    setLibrary(prev => prev.map(e => e.id === docId ? { ...e, status: newStatus, updatedAt: Date.now() } : e));
-  }, []);
+    const entry = library.find((item) => item.id === docId);
+    if (newStatus === 'scheduled' && !entry?.publicationDate) {
+      toast('Escolha uma data no calendário antes de marcar como agendado.', 'info', 4200);
+      return;
+    }
+    setLibrary(prev => prev.map((item) => item.id === docId
+      ? { ...item, status: newStatus, updatedAt: Date.now() }
+      : item));
+  }, [library, setLibrary, toast]);
+  const setDocFolder = useCallback((docId, folderId) => {
+    setLibrary(prev => setEntryFolder(prev, docId, folderId, libraryFolders));
+  }, [libraryFolders, setLibrary]);
+  const setDocPublicationDate = useCallback((docId, date) => {
+    setLibrary(prev => setEntryPublicationDate(prev, docId, date));
+  }, [setLibrary]);
+  const createFolder = useCallback((name) => {
+    const id = uid();
+    try {
+      const next = createLibraryFolder(libraryFolders, name, () => id);
+      setLibraryFolders(next);
+      return id;
+    } catch (error) {
+      toast(error.message, 'error');
+      return null;
+    }
+  }, [libraryFolders, setLibraryFolders, toast]);
+  const renameFolder = useCallback((folderId, name) => {
+    try {
+      setLibraryFolders(renameLibraryFolder(libraryFolders, folderId, name));
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  }, [libraryFolders, setLibraryFolders, toast]);
+  const deleteFolder = useCallback((folderId) => {
+    setLibrary(prev => removeLibraryFolder(prev, [], folderId).library);
+    setLibraryFolders(prev => removeLibraryFolder([], prev, folderId).folders);
+  }, [setLibrary, setLibraryFolders]);
   const [shellView, setShellView] = useState(readInitialShellView);
   useEffect(() => {
     lsSet(SK.shellView, shellView);
@@ -83,10 +128,83 @@ export function useLibrary({
       const currentEntries = snapshotEntries(prev, snapshot);
       const src = currentEntries.find(e => e.id === docId);
       if (!src) return prev;
-      const copy = mkLibEntry(JSON.parse(JSON.stringify(src.doc)), `${src.name} (cópia)`);
+      const copy = mkLibEntry(JSON.parse(JSON.stringify(src.doc)), `${src.name} (cópia)`, { folderId: src.folderId || '' });
       return [copy, ...currentEntries];
     });
   }, []);
+
+  /** Novo projeto com o mesmo contexto (styleKit + brand), slides vazios — Fatia 3 recorrente. */
+  const newFromContext = useCallback((docId) => {
+    flushCurrent();
+    const snapshot = live.current;
+    const src = (library.find((e) => e.id === docId)
+      || (snapshot.id === docId ? { id: docId, doc: snapshot.doc, name: '', folderId: '' } : null));
+    const liveSrc = src?.id === snapshot.id
+      ? { ...src, doc: snapshot.doc }
+      : src;
+    if (!liveSrc?.doc) {
+      toast?.('Projeto de origem não encontrado.', 'error');
+      return;
+    }
+    const srcDoc = ensureDocShape(liveSrc.doc);
+    const hydratedBrand = hydrateBrandTextColors({ ...(srcDoc.brand || DEFAULT_BRAND) });
+    const kit = srcDoc.styleKit || { stylePrompt: '', contextMd: '', refImages: [] };
+    const seed = {
+      brand: hydratedBrand,
+      styleKit: {
+        stylePrompt: kit.stylePrompt || '',
+        contextMd: kit.contextMd || '',
+        refImages: Array.isArray(kit.refImages) ? [...kit.refImages] : [],
+        logo: kit.logo || null,
+        logoOnGenerate: kit.logoOnGenerate !== false,
+      },
+      mode: srcDoc.mode || 'editorial',
+      creativePreset: srcDoc.creativePreset || 'livre',
+      material: { content: '', sources: '', context: '' },
+      caption: '',
+      slides: [mkSlide(1, hydratedBrand)],
+    };
+    const baseName = (liveSrc.name || 'Projeto').replace(/\s*\(cópia\)\s*$/i, '').trim() || 'Projeto';
+    const entry = mkLibEntry(seed, `${baseName} · novo`, { folderId: liveSrc.folderId || '' });
+    setLibrary((prev) => [entry, ...snapshotEntries(prev, snapshot)]);
+    setActiveDocId(entry.id);
+    setLibraryOpen(false);
+    setShellView('project');
+    trackEvent('new_from_context');
+    toast?.('Novo projeto com o mesmo contexto. Cards em branco.', 'success', 4000);
+  }, [library, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, toast, snapshotEntries]);
+
+  /**
+   * Cria vários rascunhos de série a partir de seeds (ideias aprovadas).
+   * Abre o primeiro rascunho. Herda styleKit do seed.
+   */
+  const createSeriesDrafts = useCallback((drafts = []) => {
+    if (!Array.isArray(drafts) || !drafts.length) return;
+    flushCurrent();
+    const snapshot = live.current;
+    const activeBrand = brandRoster.find((b) => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
+    const hydratedBrand = hydrateBrandTextColors({ ...activeBrand });
+    const entries = drafts.map((draft) => {
+      const seedDoc = {
+        ...DEFAULT_DOC,
+        ...(draft.seedDoc || {}),
+        brand: draft.seedDoc?.brand
+          ? hydrateBrandTextColors(draft.seedDoc.brand)
+          : hydratedBrand,
+        slides: [mkSlide(1, hydratedBrand)],
+      };
+      return mkLibEntry(seedDoc, draft.name || 'Rascunho da série', {
+        folderId: draft.folderId || '',
+        publicationDate: draft.publicationDate || '',
+      });
+    });
+    setLibrary((prev) => [...entries, ...snapshotEntries(prev, snapshot)]);
+    setActiveDocId(entries[0].id);
+    setLibraryOpen(false);
+    setShellView('project');
+    trackEvent('series_drafts_created', { count: String(entries.length) });
+    return entries;
+  }, [brandRoster, activeBrandId, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, snapshotEntries]);
   const deleteDoc = useCallback((docId) => {
     setLibrary(prev => {
       const next = prev.filter(e => e.id !== docId);
@@ -131,24 +249,27 @@ export function useLibrary({
     let comImagens;
     try { [comImagens] = await comImagensEmbutidas([entry]); }
     catch (err) { toast(err.message, 'error'); return; }
-    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs: [comImagens] }, null, 2)], { type: 'application/json' });
+    const folders = comImagens.folderId
+      ? libraryFolders.filter(folder => folder.id === comImagens.folderId)
+      : [];
+    const blob = new Blob([JSON.stringify({ vcVersion: 2, folders, docs: [comImagens] }, null, 2)], { type: 'application/json' });
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
     await downloadBlob(blob, fname);
     toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
     trackEvent('export_json_single', { size_kb: String(Math.round(blob.size / 1024)) });
-  }, [library, toast, comImagensEmbutidas]);
+  }, [library, libraryFolders, toast, comImagensEmbutidas]);
 
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
     let docs;
     try { docs = await comImagensEmbutidas(snapshotEntries(library)); }
     catch (err) { toast(err.message, 'error'); return; }
-    const blob = new Blob([JSON.stringify({ vcVersion: 1, docs }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ vcVersion: 2, folders: libraryFolders, docs }, null, 2)], { type: 'application/json' });
     const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
     toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
     trackEvent('export_json_full', { project_count: String(library.length), size_kb: String(Math.round(blob.size / 1024)) });
-  }, [library, toast, comImagensEmbutidas]);
+  }, [library, libraryFolders, toast, comImagensEmbutidas]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)
   const importDocRef = useRef(null);
@@ -162,13 +283,19 @@ export function useLibrary({
         const parsed = JSON.parse(ev.target.result);
         const docs = parsed.docs || (Array.isArray(parsed) ? parsed : null);
         if (!docs?.length) throw new Error('Formato inválido');
+        const { folders: importedFolders, remap: folderRemap } = mergeImportedFolders(
+          libraryFolders,
+          parsed.folders,
+          uid,
+        );
         // Cada doc importado recebe um novo id pra evitar conflitos
-        const newEntries = docs.map(e => ({
+        const newEntries = docs.map(e => normalizeLibraryEntry({
           ...e,
           id: uid(),
           name: e.name || 'Importado',
+          folderId: folderRemap.get(e.folderId) || '',
           importedAt: Date.now(),
-        }));
+        }, importedFolders));
         // As imagens vêm embutidas em data URL no backup. Passam para o
         // IndexedDB agora, senão voltariam a pesar no localStorage e seriam
         // apagadas quando a quota enchesse.
@@ -186,6 +313,7 @@ export function useLibrary({
           };
         }
         setLibrary(prev => [...newEntries, ...prev]);
+        setLibraryFolders(importedFolders);
         // Ativa o primeiro importado
         setActiveDocId(newEntries[0].id);
         setLibraryOpen(false);
@@ -197,10 +325,12 @@ export function useLibrary({
       }
     };
     reader.readAsText(file);
-  }, []);
+  }, [libraryFolders, setLibrary, setLibraryFolders, setActiveDocId, setLibraryOpen, setShellView]);
 
   return {
-    renameDoc, setDocStatus, openDoc, newDoc, duplicateDoc, deleteDoc,
+    renameDoc, setDocStatus, setDocFolder, setDocPublicationDate,
+    createFolder, renameFolder, deleteFolder,
+    openDoc, newDoc, duplicateDoc, newFromContext, createSeriesDrafts, deleteDoc,
     exportDoc, exportAllDocs, handleImportFile,
     shellView, setShellView, importDocRef,
   };

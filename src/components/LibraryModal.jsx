@@ -1,352 +1,1012 @@
-import React, { useState } from 'react';
-import { BookOpen, X, Plus, Download, Upload, Copy, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  BookOpen,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Folder,
+  FolderPlus,
+  Layers,
+  ListOrdered,
+  Pencil,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from '../utils/library-helpers.js';
+import {
+  UNFILED_FOLDER_ID,
+  calendarDays,
+  entriesByPublicationDate,
+  monthKey,
+  shiftMonth,
+  localDateKey,
+  buildEditorialQueue,
+} from '../utils/library-organizer.js';
 
-export default function LibraryModal({ open, onClose, library, activeDocId, onOpen, onNew, onDuplicate, onDelete, onRename, onSetStatus, onExportDoc, onExportAll, onImportTrigger }) {
+const controlStyle = {
+  minHeight: 36,
+  padding: '0 10px',
+  borderRadius: 8,
+  background: 'var(--bg-elevated)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border)',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 11,
+};
+
+const actionButtonStyle = {
+  width: 44,
+  height: 44,
+  borderRadius: 8,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-elevated)',
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const folderIconStyle = {
+  width: 26,
+  height: 26,
+  padding: 0,
+  border: 0,
+  borderLeft: '1px solid var(--border)',
+  background: 'transparent',
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const folderChipStyle = (active) => ({
+  fontSize: 11,
+  padding: '5px 11px',
+  borderRadius: 99,
+  cursor: 'pointer',
+  fontFamily: 'var(--font-ui)',
+  fontWeight: 600,
+  background: active ? 'rgba(255,77,46,0.12)' : 'var(--bg-elevated)',
+  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+  color: active ? 'var(--accent)' : 'var(--text-secondary)',
+});
+
+const fieldLabelStyle = {
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 5,
+};
+
+const fieldLabelTextStyle = {
+  color: 'var(--text-muted)',
+  fontSize: 9.5,
+  fontWeight: 700,
+  fontFamily: 'var(--font-mono)',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+};
+
+const dayNames = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
+
+const monthLabel = (key) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!match) return '';
+  const label = new Date(Number(match[1]), Number(match[2]) - 1, 1)
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+function FolderOrganizer({
+  folders,
+  folderFilter,
+  onFolderFilter,
+  library,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+}) {
+  const [newFolderName, setNewFolderName] = useState('');
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  const [confirmDeleteFolderId, setConfirmDeleteFolderId] = useState(null);
+
+  const submitNewFolder = (event) => {
+    event.preventDefault();
+    const name = newFolderName.trim();
+    if (!name) return;
+    const createdId = onCreateFolder?.(name);
+    if (createdId) {
+      setNewFolderName('');
+    }
+  };
+
+  const beginRename = (folder) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+    setConfirmDeleteFolderId(null);
+  };
+
+  const commitRename = () => {
+    const name = editingFolderName.trim();
+    if (editingFolderId && name) onRenameFolder?.(editingFolderId, name);
+    setEditingFolderId(null);
+  };
+
+  return (
+    <section
+      aria-label="Organização por pastas"
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 9, padding: 12,
+        borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--text-secondary)' }}>
+          <Folder size={14}/>
+          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-ui)' }}>PASTAS</span>
+        </div>
+        <form onSubmit={submitNewFolder} style={{ display: 'flex', gap: 6, flex: '1 1 250px', maxWidth: 340 }}>
+          <input
+            type="text"
+            value={newFolderName}
+            onChange={(event) => setNewFolderName(event.target.value)}
+            placeholder="Nova pasta"
+            aria-label="Nome da nova pasta"
+            maxLength={60}
+            className="vc-input"
+            style={{ flex: 1, minWidth: 0, minHeight: 36 }}
+          />
+          <button
+            type="submit"
+            aria-label="Criar pasta"
+            title="Criar pasta"
+            disabled={!newFolderName.trim()}
+            style={{
+              ...actionButtonStyle,
+              opacity: newFolderName.trim() ? 1 : 0.45,
+              cursor: newFolderName.trim() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            <FolderPlus size={14}/>
+          </button>
+        </form>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => onFolderFilter('all')}
+          aria-pressed={folderFilter === 'all'}
+          style={folderChipStyle(folderFilter === 'all')}
+        >
+          Todas <span style={{ opacity: 0.65 }}>({library.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onFolderFilter(UNFILED_FOLDER_ID)}
+          aria-pressed={folderFilter === UNFILED_FOLDER_ID}
+          style={folderChipStyle(folderFilter === UNFILED_FOLDER_ID)}
+        >
+          Sem pasta <span style={{ opacity: 0.65 }}>({library.filter((entry) => !entry.folderId).length})</span>
+        </button>
+
+        {folders.map((folder) => {
+          const active = folderFilter === folder.id;
+          const editing = editingFolderId === folder.id;
+          const confirming = confirmDeleteFolderId === folder.id;
+          const count = library.filter((entry) => entry.folderId === folder.id).length;
+
+          if (editing) {
+            return (
+              <div key={folder.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editingFolderName}
+                  onChange={(event) => setEditingFolderName(event.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitRename();
+                    if (event.key === 'Escape') setEditingFolderId(null);
+                  }}
+                  aria-label={`Novo nome da pasta ${folder.name}`}
+                  className="vc-input"
+                  maxLength={60}
+                  style={{ width: 150, minHeight: 30, padding: '4px 8px', fontSize: 11 }}
+                />
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={folder.id}
+              style={{
+                display: 'inline-flex', alignItems: 'center', borderRadius: 99,
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'rgba(255,77,46,0.12)' : 'var(--bg-elevated)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => onFolderFilter(folder.id)}
+                aria-pressed={active}
+                style={{
+                  padding: '5px 8px 5px 11px', border: 0, background: 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {folder.name} <span style={{ opacity: 0.65 }}>({count})</span>
+              </button>
+              {confirming ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteFolder?.(folder.id);
+                      if (active) onFolderFilter('all');
+                      setConfirmDeleteFolderId(null);
+                    }}
+                    title="Confirmar exclusão. Os projetos ficarão sem pasta."
+                    aria-label={`Confirmar exclusão da pasta ${folder.name}`}
+                    style={{
+                      height: 26, padding: '0 7px', border: 0, borderLeft: '1px solid var(--border)',
+                      background: 'transparent', color: '#f87171', cursor: 'pointer', fontSize: 10,
+                      fontWeight: 800, fontFamily: 'var(--font-ui)',
+                    }}
+                  >OK</button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteFolderId(null)}
+                    title="Cancelar exclusão"
+                    aria-label="Cancelar exclusão da pasta"
+                    style={folderIconStyle}
+                  ><X size={11}/></button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => beginRename(folder)}
+                    title={`Renomear ${folder.name}`}
+                    aria-label={`Renomear pasta ${folder.name}`}
+                    style={folderIconStyle}
+                  ><Pencil size={10}/></button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDeleteFolderId(folder.id);
+                      setEditingFolderId(null);
+                    }}
+                    title={`Excluir ${folder.name}`}
+                    aria-label={`Excluir pasta ${folder.name}`}
+                    style={{ ...folderIconStyle, color: '#f87171' }}
+                  ><Trash2 size={10}/></button>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {confirmDeleteFolderId ? (
+        <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.45, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
+          Excluir uma pasta não apaga carrosséis. Os projetos dela voltam para “Sem pasta”.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen }) {
+  const days = calendarDays(currentMonth);
+  const grouped = entriesByPublicationDate(library, currentMonth);
+  const today = localDateKey();
+  const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
+  const withoutDate = library.filter((entry) => !entry.publicationDate);
+
+  return (
+    <div style={{ padding: '14px 20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div
+        role="note"
+        style={{
+          display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 9,
+          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.23)',
+          color: 'var(--text-secondary)', fontSize: 11.5, lineHeight: 1.45, fontFamily: 'var(--font-ui)',
+        }}
+      >
+        <CalendarDays size={15} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }}/>
+        <span><strong style={{ color: 'var(--text-primary)' }}>Planejamento local:</strong> este calendário organiza sua pauta. O Viral Carrossel não publica automaticamente no Instagram.</span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <button type="button" onClick={() => onMonthChange(shiftMonth(currentMonth, -1))} aria-label="Mês anterior" style={actionButtonStyle}>
+          <ChevronLeft size={15}/>
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>
+            {monthLabel(currentMonth)}
+          </div>
+          <button
+            type="button"
+            onClick={() => onMonthChange(monthKey())}
+            style={{ border: 0, background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--font-ui)', padding: '3px 6px' }}
+          >Ir para hoje</button>
+        </div>
+        <button type="button" onClick={() => onMonthChange(shiftMonth(currentMonth, 1))} aria-label="Próximo mês" style={actionButtonStyle}>
+          <ChevronRight size={15}/>
+        </button>
+      </div>
+
+      <div style={{ overflowX: 'auto', paddingBottom: 2 }}>
+        <div style={{ minWidth: 760 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 5, marginBottom: 5 }}>
+            {dayNames.map((day) => (
+              <div key={day} style={{ padding: '5px 7px', color: 'var(--text-muted)', fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>
+                {day}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 5 }}>
+            {days.map((date, index) => {
+              const entries = date ? grouped.get(date) || [] : [];
+              const isToday = date === today;
+              return (
+                <div
+                  key={date || `blank-${index}`}
+                  aria-label={date ? `${date}: ${entries.length} projeto(s)` : undefined}
+                  style={{
+                    minHeight: 116, padding: 7, borderRadius: 8,
+                    background: date ? (isToday ? 'rgba(255,77,46,0.055)' : 'var(--bg-card)') : 'transparent',
+                    border: date ? `1px solid ${isToday ? 'var(--accent)' : 'var(--border)'}` : '1px solid transparent',
+                  }}
+                >
+                  {date ? (
+                    <>
+                      <div style={{
+                        width: 23, height: 23, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 99, background: isToday ? 'var(--accent)' : 'transparent',
+                        color: isToday ? '#fff' : 'var(--text-muted)', fontSize: 10.5, fontWeight: 700,
+                        fontFamily: 'var(--font-mono)', marginBottom: 4,
+                      }}>
+                        {Number(date.slice(-2))}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {entries.map((entry) => {
+                          const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
+                          const folderName = folderById.get(entry.folderId)?.name;
+                          return (
+                            <button
+                              type="button"
+                              key={entry.id}
+                              onClick={() => onOpen(entry.id)}
+                              title={`${entry.name}${folderName ? ` · ${folderName}` : ''}`}
+                              style={{
+                                width: '100%', minWidth: 0, padding: '6px 7px', borderRadius: 6,
+                                background: status.bg, border: `1px solid ${status.border}`,
+                                color: 'var(--text-primary)', cursor: 'pointer', textAlign: 'left',
+                                fontSize: 9.5, lineHeight: 1.25, fontWeight: 650, fontFamily: 'var(--font-ui)',
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <span aria-hidden="true" style={{ color: status.color, marginRight: 4 }}>●</span>
+                              {entry.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {withoutDate.length ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap',
+          padding: '10px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-card)',
+          color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-ui)',
+        }}>
+          <span><strong style={{ color: 'var(--text-secondary)' }}>{withoutDate.length}</strong> projeto{withoutDate.length !== 1 ? 's' : ''} ainda sem data.</span>
+          <span>Defina a data na aba Biblioteca ou na Fila.</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function QueueSection({ title, hint, entries, emptyLabel, folders, onOpen, onSetStatus, accent }) {
+  const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div>
+        <div style={{
+          fontSize: 12, fontWeight: 700, color: accent || 'var(--text-primary)',
+          fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
+        }}>
+          {title}
+          <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+            {entries.length}
+          </span>
+        </div>
+        {hint ? (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.4 }}>{hint}</div>
+        ) : null}
+      </div>
+      {!entries.length ? (
+        <div style={{
+          padding: '12px 14px', borderRadius: 10, border: '1px dashed var(--border)',
+          color: 'var(--text-muted)', fontSize: 12,
+        }}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {entries.map((entry) => {
+            const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
+            const folderName = folderById.get(entry.folderId)?.name;
+            return (
+              <div
+                key={entry.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 10,
+                  border: '1px solid var(--border)', background: 'var(--bg-card)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onOpen(entry.id)}
+                  style={{
+                    flex: 1, minWidth: 0, border: 'none', background: 'transparent',
+                    cursor: 'pointer', textAlign: 'left', padding: 0,
+                  }}
+                >
+                  <div style={{
+                    fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {entry.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {[
+                      entry.publicationDate || 'Sem data',
+                      folderName || 'Sem pasta',
+                      status.label,
+                    ].join(' · ')}
+                  </div>
+                </button>
+                {onSetStatus && entry.status !== 'published' ? (
+                  <button
+                    type="button"
+                    className="vc-btn"
+                    onClick={() => onSetStatus(entry.id, 'published')}
+                    title="Marcar como publicado (manual — fora do Viral)"
+                    aria-label={`Marcar ${entry.name} como publicado`}
+                    style={{
+                      minHeight: 32, padding: '0 10px', borderRadius: 8, fontSize: 10, fontWeight: 600,
+                      border: '1px solid var(--hairline)', background: 'var(--bg-pearl)', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Marcar publicado
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LibraryQueue({ library, folders, onOpen, onSetStatus }) {
+  const queue = useMemo(() => buildEditorialQueue(library), [library]);
+  return (
+    <div style={{ padding: '14px 20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div
+        role="note"
+        style={{
+          display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 9,
+          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.23)',
+          color: 'var(--text-secondary)', fontSize: 11.5, lineHeight: 1.45, fontFamily: 'var(--font-ui)',
+        }}
+      >
+        <ListOrdered size={15} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          <strong style={{ color: 'var(--text-primary)' }}>Fila editorial local.</strong>{' '}
+          Organiza o que publicar a seguir. A publicação continua a ser feita por si no Instagram.
+        </span>
+      </div>
+
+      <QueueSection
+        title="Atrasados"
+        hint="Com data anterior a hoje e ainda não marcados como publicados."
+        entries={queue.overdue}
+        emptyLabel="Nada atrasado."
+        folders={folders}
+        onOpen={onOpen}
+        onSetStatus={onSetStatus}
+        accent="#f87171"
+      />
+      <QueueSection
+        title="Próximos 7 dias"
+        hint={`De ${queue.today} até ${queue.horizon} (planeamento local).`}
+        entries={queue.next7}
+        emptyLabel="Nada agendado nesta janela."
+        folders={folders}
+        onOpen={onOpen}
+        onSetStatus={onSetStatus}
+      />
+      <QueueSection
+        title="Sem data"
+        hint="Projetos ativos sem data editorial — úteis para organizar a seguir."
+        entries={queue.undated.slice(0, 20)}
+        emptyLabel="Todos os projetos ativos têm data ou já foram publicados."
+        folders={folders}
+        onOpen={onOpen}
+        onSetStatus={onSetStatus}
+      />
+      {queue.undated.length > 20 ? (
+        <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>
+          +{queue.undated.length - 20} sem data — veja na Biblioteca.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export default function LibraryModal({
+  open,
+  onClose,
+  library = [],
+  folders = [],
+  activeDocId,
+  onOpen,
+  onNew,
+  onDuplicate,
+  onNewFromContext,
+  onDelete,
+  onRename,
+  onSetStatus,
+  onSetFolder,
+  onSetPublicationDate,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onExportDoc,
+  onExportAll,
+  onImportTrigger,
+  appMode = 'criador',
+}) {
   useScrollLock(open);
-  const [filter, setFilter] = useState('all'); // all | draft | ready | published
+  const [view, setView] = useState('library');
+  const [filter, setFilter] = useState('all');
+  const [folderFilter, setFolderFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState(monthKey());
+  const [organizeIds, setOrganizeIds] = useState(() => new Set());
+  const compactCards = appMode === 'criador';
+  const showLibraryFilters = view === 'library';
 
-  if (!open) return null;
-
-  const items = library
-    .filter(e => filter === 'all' || e.status === filter)
-    .filter(e => !search.trim() || e.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-
-  const counts = {
-    all:       library.length,
-    draft:     library.filter(e => e.status === 'draft').length,
-    ready:     library.filter(e => e.status === 'ready').length,
-    published: library.filter(e => e.status === 'published').length,
+  const toggleOrganize = (id) => {
+    setOrganizeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const startEdit = (entry) => { setEditingId(entry.id); setEditingName(entry.name); };
+  const visibleItems = useMemo(() => library
+    .filter((entry) => filter === 'all' || entry.status === filter)
+    .filter((entry) => folderFilter === 'all'
+      || (folderFilter === UNFILED_FOLDER_ID ? !entry.folderId : entry.folderId === folderFilter))
+    .filter((entry) => !search.trim() || entry.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)), [library, filter, folderFilter, search]);
+
+  const counts = useMemo(() => ({
+    all: library.length,
+    ...Object.fromEntries(STATUS_DEFS.map((status) => [
+      status.id,
+      library.filter((entry) => entry.status === status.id).length,
+    ])),
+  }), [library]);
+  const statusFilters = [{ id: 'all', label: 'Todos' }, ...STATUS_DEFS];
+
+  const startEdit = (entry) => {
+    setEditingId(entry.id);
+    setEditingName(entry.name);
+  };
   const commitEdit = () => {
     if (editingId && editingName.trim()) onRename(editingId, editingName.trim());
     setEditingId(null);
   };
 
+  if (!open) return null;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel modal-panel-wide" onClick={e => e.stopPropagation()} style={{ maxWidth: 720 }}>
-        {/* Header */}
+      <div
+        className="modal-panel modal-panel-wide"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: view === 'calendar' ? 1040 : 860 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Biblioteca de carrosséis"
+      >
         <div style={{
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          padding:'16px 20px', borderBottom:'1px solid var(--border)',
-          position:'sticky', top:0, background:'var(--bg-sidebar)', zIndex:1,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+          padding: '14px 20px', borderBottom: '1px solid var(--border)',
+          position: 'sticky', top: 0, background: 'var(--bg-sidebar)', zIndex: 2,
         }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:32, height:32, borderRadius:8, background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <BookOpen size={14} color="var(--text-secondary)"/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {view === 'calendar'
+                ? <CalendarDays size={14} color="var(--text-secondary)"/>
+                : view === 'queue'
+                  ? <ListOrdered size={14} color="var(--text-secondary)"/>
+                  : <BookOpen size={14} color="var(--text-secondary)"/>}
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Biblioteca</div>
-              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{counts.all} projetos salvos</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.022em' }}>Projetos</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {counts.all === 1 ? '1 carrossel salvo' : `${counts.all} carrosséis salvos`}
+              </div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
-            <X size={16}/>
-          </button>
+
+          <div role="tablist" aria-label="Visualização dos projetos" style={{ display: 'flex', padding: 3, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+            {[
+              { id: 'library', label: 'Biblioteca', icon: BookOpen },
+              { id: 'queue', label: 'Fila', icon: ListOrdered },
+              { id: 'calendar', label: 'Calendário', icon: CalendarDays },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const active = view === tab.id;
+              return (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  key={tab.id}
+                  onClick={() => setView(tab.id)}
+                  style={{
+                    minHeight: 32, padding: '0 11px', borderRadius: 7, border: 0, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: active ? 'var(--bg-elevated)' : 'transparent',
+                    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontSize: 11, fontWeight: 650, fontFamily: 'var(--font-ui)',
+                    boxShadow: active ? '0 1px 5px rgba(0,0,0,0.18)' : 'none',
+                  }}
+                ><Icon size={12}/>{tab.label}</button>
+              );
+            })}
+          </div>
+
+          <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn"><X size={16}/></button>
         </div>
 
-        {/* Toolbar */}
-        <div style={{ padding:'14px 20px 0', display:'flex', flexDirection:'column', gap:12 }}>
-          <div style={{ display:'flex', gap:8 }}>
+        <div style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
+              type="button"
               onClick={() => onNew()}
               style={{
-                height:40, flex:1, borderRadius:9, border:'none', cursor:'pointer',
-                background:'linear-gradient(135deg, var(--accent), #e03220)',
-                color:'#fff', fontSize:13, fontWeight:700, fontFamily:'var(--font-ui)',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                boxShadow:'0 4px 14px rgba(255,77,46,0.25)',
+                height: 40, flex: 1, borderRadius: 9, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--accent), #e03220)', color: '#fff',
+                fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: '0 4px 14px rgba(255,77,46,0.25)',
               }}
-            >
-              <Plus size={14}/>Novo carrossel
-            </button>
-            <button
-              onClick={onExportAll}
-              title="Exportar toda a biblioteca como JSON"
-              style={{
-                height:40, padding:'0 14px', borderRadius:9, cursor:'pointer',
-                background:'var(--bg-card)', border:'1px solid var(--border)',
-                color:'var(--text-secondary)', fontSize:12, fontWeight:600,
-                fontFamily:'var(--font-ui)', display:'flex', alignItems:'center', gap:6,
-              }}
-            >
+            ><Plus size={14}/>Novo carrossel</button>
+            <button type="button" onClick={onExportAll} title="Exportar toda a biblioteca como JSON" style={{ ...controlStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Download size={13}/>Exportar
             </button>
-            <button
-              onClick={onImportTrigger}
-              title="Importar projetos de um arquivo JSON"
-              style={{
-                height:40, padding:'0 14px', borderRadius:9, cursor:'pointer',
-                background:'var(--bg-card)', border:'1px solid var(--border)',
-                color:'var(--text-secondary)', fontSize:12, fontWeight:600,
-                fontFamily:'var(--font-ui)', display:'flex', alignItems:'center', gap:6,
-              }}
-            >
+            <button type="button" onClick={onImportTrigger} title="Importar projetos de um arquivo JSON" style={{ ...controlStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Upload size={13}/>Importar
             </button>
           </div>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar pelo nome..."
-              className="vc-input"
-              style={{ flex:1 }}
-            />
-          </div>
-          <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-            {[
-              { id:'all',       label:'Todos' },
-              { id:'draft',     label:'Rascunhos' },
-              { id:'ready',     label:'Prontos' },
-              { id:'published', label:'Publicados' },
-            ].map(f => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                style={{
-                  fontSize:11, padding:'5px 11px', borderRadius:99, cursor:'pointer',
-                  fontFamily:'var(--font-ui)', fontWeight:600, transition:'all 0.12s',
-                  background: filter === f.id ? 'var(--accent)' : 'var(--bg-card)',
-                  border: `1px solid ${filter === f.id ? 'var(--accent)' : 'var(--border)'}`,
-                  color: filter === f.id ? '#fff' : 'var(--text-secondary)',
-                }}
-              >
-                {f.label} <span style={{ opacity:0.6, marginLeft:3 }}>({counts[f.id]})</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Cards */}
-        <div style={{ padding:'14px 20px 20px', display:'flex', flexDirection:'column', gap:8 }}>
-          {items.length === 0 && (() => {
-            // Empty state diferenciado: biblioteca 100% vazia (primeira visita) vs filtro
-            const totalLibrary = library.filter(e => !isDefault(e.doc?.slides || [])).length;
-            const isFirstVisit = totalLibrary === 0 && !search.trim() && filter === 'all';
-            if (isFirstVisit) {
-              return (
-                <div style={{
-                  padding:'48px 24px', textAlign:'center', display:'flex', flexDirection:'column',
-                  alignItems:'center', gap:14, color:'var(--text-secondary)', fontFamily:'var(--font-ui)',
-                }}>
-                  <div style={{
-                    width:60, height:60, borderRadius:16, background:'var(--success-surface)',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <BookOpen size={24} style={{ color:'var(--accent)' }}/>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:16, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.018em', marginBottom:4 }}>
-                      Sua biblioteca está vazia
-                    </div>
-                    <div style={{ fontSize:13, lineHeight:1.55, maxWidth:320, color:'var(--text-muted)', letterSpacing:'-0.011em' }}>
-                      Crie seu primeiro carrossel — depois ele aparece aqui com auto-save, nome editável e ações de duplicar/exportar.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { onClose(); onNew?.(); }}
-                    style={{
-                      marginTop:6, padding:'10px 18px', borderRadius:9999, cursor:'pointer',
-                      background:'var(--accent)', color:'#fff', border:'none',
-                      fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
-                      letterSpacing:'-0.011em', display:'inline-flex', alignItems:'center', gap:8,
-                    }}
-                  >
-                    <Plus size={14}/>
-                    Criar primeiro carrossel
-                  </button>
-                </div>
-              );
-            }
-            return (
-              <div style={{
-                padding:'40px 20px', textAlign:'center', color:'var(--text-muted)',
-                fontSize:13, fontFamily:'var(--font-ui)',
-              }}>
-                {search.trim() ? 'Nenhum carrossel com esse nome.' : 'Nenhum carrossel neste filtro.'}
-              </div>
-            );
-          })()}
-          {items.map(entry => {
-            const isActive = entry.id === activeDocId;
-            const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
-            const slides = entry.doc?.slides || [];
-            const firstSlide = slides[0];
-            const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {}) || '#0a0a0a';
-            const editing = editingId === entry.id;
-            return (
-              <div
-                key={entry.id}
-                style={{
-                  background: isActive ? 'rgba(255,77,46,0.06)' : 'var(--bg-card)',
-                  border:`1.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                  borderRadius:11, padding:12,
-                  display:'flex', flexDirection:'column', gap:10,
-                  transition:'all 0.12s',
-                }}
-              >
-                <div style={{ display:'flex', alignItems:'flex-start', gap:12, minWidth:0 }}>
-                {/* Mini-thumbnail */}
+          {showLibraryFilters ? (
+            <>
+          <FolderOrganizer
+            folders={folders}
+            folderFilter={folderFilter}
+            onFolderFilter={setFolderFilter}
+            library={library}
+            onCreateFolder={onCreateFolder}
+            onRenameFolder={onRenameFolder}
+            onDeleteFolder={onDeleteFolder}
+          />
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar pelo nome..."
+              aria-label="Buscar carrosséis"
+              className="vc-input"
+              style={{ flex: '1 1 220px' }}
+            />
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {statusFilters.map((statusFilter) => (
                 <button
                   type="button"
-                  onClick={() => onOpen(entry.id)}
+                  key={statusFilter.id}
+                  onClick={() => setFilter(statusFilter.id)}
+                  aria-pressed={filter === statusFilter.id}
                   style={{
-                    width:56, height:70, borderRadius:6, flexShrink:0, cursor:'pointer',
-                    background: bg,
-                    backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
-                    backgroundSize:'cover', backgroundPosition:'center',
-                    border:'1px solid rgba(255,255,255,0.06)',
-                    position:'relative', overflow:'hidden',
+                    fontSize: 11, padding: '5px 10px', borderRadius: 99, cursor: 'pointer',
+                    fontFamily: 'var(--font-ui)', fontWeight: 600, transition: 'all 0.12s',
+                    background: filter === statusFilter.id ? 'var(--accent)' : 'var(--bg-card)',
+                    border: `1px solid ${filter === statusFilter.id ? 'var(--accent)' : 'var(--border)'}`,
+                    color: filter === statusFilter.id ? '#fff' : 'var(--text-secondary)',
                   }}
-                  aria-label={`Abrir ${entry.name}`}
                 >
-                  {firstSlide?.bgImage && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)' }}/>}
-                  <span style={{
-                    position:'absolute', bottom:3, left:5, fontSize:7, fontWeight:700,
-                    color:'rgba(255,255,255,0.7)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
-                  }}>
-                    {String(slides.length).padStart(2,'0')}
-                  </span>
+                  {statusFilter.label} <span style={{ opacity: 0.65, marginLeft: 3 }}>({counts[statusFilter.id] || 0})</span>
                 </button>
+              ))}
+            </div>
+          </div>
+            </>
+          ) : null}
+        </div>
 
-                {/* Conteúdo */}
-                <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:6 }}>
-                  {editing ? (
-                    <input
-                      autoFocus
-                      type="text"
-                      value={editingName}
-                      onChange={e => setEditingName(e.target.value)}
-                      onBlur={commitEdit}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') commitEdit();
-                        if (e.key === 'Escape') setEditingId(null);
+        {view === 'calendar' ? (
+          <LibraryCalendar
+            library={visibleItems}
+            folders={folders}
+            currentMonth={calendarMonth}
+            onMonthChange={setCalendarMonth}
+            onOpen={onOpen}
+          />
+        ) : view === 'queue' ? (
+          <LibraryQueue
+            library={library}
+            folders={folders}
+            onOpen={onOpen}
+            onSetStatus={onSetStatus}
+          />
+        ) : (
+          <div style={{ padding: '14px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {visibleItems.length === 0 && (() => {
+              const totalLibrary = library.filter((entry) => !isDefault(entry.doc?.slides || [])).length;
+              const hasActiveFilter = search.trim() || filter !== 'all' || folderFilter !== 'all';
+              const isFirstVisit = totalLibrary === 0 && !hasActiveFilter;
+              if (isFirstVisit) {
+                return (
+                  <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)' }}>
+                    <div style={{ width: 60, height: 60, borderRadius: 16, background: 'var(--success-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <BookOpen size={24} style={{ color: 'var(--accent)' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.018em', marginBottom: 4 }}>
+                        Sua biblioteca está vazia
+                      </div>
+                      <div style={{ fontSize: 13, lineHeight: 1.55, maxWidth: 340, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
+                        Crie seu primeiro carrossel. Depois organize em pastas, defina a data da pauta e acompanhe pelo calendário.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); onNew?.(); }}
+                      style={{
+                        marginTop: 6, padding: '10px 18px', borderRadius: 9999, cursor: 'pointer',
+                        background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13,
+                        fontWeight: 600, fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
                       }}
-                      className="vc-input"
-                      style={{ padding:'6px 8px', fontSize:13, fontWeight:600 }}
-                    />
-                  ) : (
+                    ><Plus size={14}/>Criar primeiro carrossel</button>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'var(--font-ui)' }}>
+                  Nenhum carrossel corresponde aos filtros atuais.
+                </div>
+              );
+            })()}
+
+            {visibleItems.map((entry) => {
+              const isActive = entry.id === activeDocId;
+              const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
+              const slides = entry.doc?.slides || [];
+              const firstSlide = slides[0];
+              const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {}) || '#0a0a0a';
+              const editing = editingId === entry.id;
+              const organizeOpen = !compactCards || organizeIds.has(entry.id);
+              const folderName = folders.find((f) => f.id === entry.folderId)?.name;
+              return (
+                <article
+                  key={entry.id}
+                  style={{
+                    background: isActive ? 'rgba(255,77,46,0.06)' : 'var(--bg-card)',
+                    border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 11,
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
                     <button
                       type="button"
                       onClick={() => onOpen(entry.id)}
-                      onDoubleClick={() => startEdit(entry)}
                       style={{
-                        background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left',
-                        fontSize:13.5, fontWeight:600, color:'var(--text-primary)',
-                        fontFamily:'var(--font-ui)', letterSpacing:'-0.011em',
-                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
-                        maxWidth:'100%',
+                        width: 56, height: 70, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
+                        background: bg, backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
+                        backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.06)',
+                        position: 'relative', overflow: 'hidden',
                       }}
-                      title={entry.name + ' (clique duplo para renomear)'}
+                      aria-label={`Abrir ${entry.name}`}
                     >
-                      {entry.name}
+                      {firstSlide?.bgImage ? <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}/> : null}
+                      <span style={{ position: 'absolute', bottom: 3, left: 5, fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+                        {String(slides.length).padStart(2, '0')}
+                      </span>
                     </button>
-                  )}
-                  <div style={{
-                    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
-                    fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
-                  }}>
-                    <span style={{
-                      padding:'2px 7px', borderRadius:99,
-                      background: status.bg, color: status.color,
-                      border: `1px solid ${status.border}`, fontWeight:700,
-                    }}>{status.label}</span>
-                    <span>{slides.length} card{slides.length !== 1 ? 's' : ''}</span>
-                    {entry.updatedAt ? (
-                      <span style={{ opacity:0.7 }}>{fmtDate(entry.updatedAt)}</span>
+
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {editing ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingName}
+                          onChange={(event) => setEditingName(event.target.value)}
+                          onBlur={commitEdit}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') commitEdit();
+                            if (event.key === 'Escape') setEditingId(null);
+                          }}
+                          className="vc-input"
+                          style={{ padding: '6px 8px', fontSize: 13, fontWeight: 600 }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onOpen(entry.id)}
+                          onDoubleClick={() => startEdit(entry)}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left',
+                            fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                            letterSpacing: '-0.011em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+                          }}
+                          title={`${entry.name} (clique duplo para renomear)`}
+                        >{entry.name}</button>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+                        <span style={{ padding: '2px 7px', borderRadius: 99, background: status.bg, color: status.color, border: `1px solid ${status.border}`, fontWeight: 700 }}>
+                          {status.label}
+                        </span>
+                        <span>{slides.length} card{slides.length !== 1 ? 's' : ''}</span>
+                        {entry.updatedAt ? <span style={{ opacity: 0.7 }}>{fmtDate(entry.updatedAt)}</span> : null}
+                        {compactCards && !organizeOpen ? (
+                          <span style={{ opacity: 0.75 }}>
+                            {[folderName || 'Sem pasta', entry.publicationDate || 'Sem data'].join(' · ')}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  {compactCards && !organizeOpen ? (
+                    <button
+                      type="button"
+                      className="vc-btn vc-btn-ghost"
+                      onClick={() => toggleOrganize(entry.id)}
+                      aria-expanded={false}
+                      style={{
+                        alignSelf: 'flex-start', minHeight: 36, padding: '0 12px', borderRadius: 8,
+                        fontSize: 11, fontWeight: 600, border: '1px solid var(--hairline)',
+                      }}
+                    >
+                      Organizar
+                    </button>
+                  ) : null}
+
+                  {organizeOpen ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8 }}>
+                    <label style={fieldLabelStyle}>
+                      <span style={fieldLabelTextStyle}>Pasta</span>
+                      <select
+                        value={entry.folderId || ''}
+                        onChange={(event) => onSetFolder?.(entry.id, event.target.value)}
+                        aria-label={`Pasta de ${entry.name}`}
+                        style={{ ...controlStyle, width: '100%', cursor: 'pointer' }}
+                      >
+                        <option value="">Sem pasta</option>
+                        {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+                      </select>
+                    </label>
+
+                    <label style={fieldLabelStyle}>
+                      <span style={fieldLabelTextStyle}>Data da pauta</span>
+                      <input
+                        type="date"
+                        value={entry.publicationDate || ''}
+                        onChange={(event) => onSetPublicationDate?.(entry.id, event.target.value)}
+                        aria-label={`Data de publicação de ${entry.name}`}
+                        style={{ ...controlStyle, width: '100%', boxSizing: 'border-box', colorScheme: 'dark' }}
+                      />
+                    </label>
+
+                    <label style={fieldLabelStyle}>
+                      <span style={fieldLabelTextStyle}>Status</span>
+                      <select
+                        value={entry.status}
+                        onChange={(event) => onSetStatus(entry.id, event.target.value)}
+                        aria-label={`Estado de ${entry.name}`}
+                        style={{ ...controlStyle, width: '100%', cursor: 'pointer' }}
+                      >
+                        {STATUS_DEFS.map((statusDef) => <option key={statusDef.id} value={statusDef.id}>{statusDef.label}</option>)}
+                      </select>
+                    </label>
+                    {compactCards ? (
+                      <button
+                        type="button"
+                        className="vc-btn vc-btn-ghost"
+                        onClick={() => toggleOrganize(entry.id)}
+                        style={{
+                          alignSelf: 'end', minHeight: 36, padding: '0 12px', borderRadius: 8,
+                          fontSize: 11, fontWeight: 600, border: '1px solid var(--hairline)',
+                        }}
+                      >
+                        Recolher
+                      </button>
                     ) : null}
                   </div>
-                </div>
-                </div>
+                  ) : null}
 
-                {/* Ações — linha própria (evita overlap no mobile) */}
-                <div style={{
-                  display:'flex', alignItems:'center', justifyContent:'space-between',
-                  gap:8, flexWrap:'wrap',
-                }}>
-                  <select
-                    value={entry.status}
-                    onChange={e => onSetStatus(entry.id, e.target.value)}
-                    onClick={e => e.stopPropagation()}
-                    aria-label={`Estado de ${entry.name}`}
-                    style={{
-                      fontSize:11, padding:'6px 8px', borderRadius:8,
-                      background:'var(--bg-elevated)', color:'var(--text-secondary)',
-                      border:'1px solid var(--border)', fontFamily:'var(--font-mono)',
-                      cursor:'pointer', appearance:'auto', minHeight:32, flex:'1 1 120px', maxWidth:160,
-                    }}
-                  >
-                    {STATUS_DEFS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                  </select>
-                  <div style={{ display:'flex', gap:6, flexShrink:0, marginLeft:'auto' }}>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(entry)}
-                      aria-label="Renomear" title="Renomear"
-                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDuplicate(entry.id)}
-                      aria-label="Duplicar" title="Duplicar"
-                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                    >
-                      <Copy size={12}/>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onExportDoc(entry.id)}
-                      aria-label="Exportar como JSON" title="Exportar como JSON"
-                      style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                    >
-                      <Download size={12}/>
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => startEdit(entry)} aria-label={`Renomear ${entry.name}`} title="Renomear" style={actionButtonStyle}><Pencil size={12}/></button>
+                    <button type="button" onClick={() => onDuplicate(entry.id)} aria-label={`Duplicar ${entry.name}`} title="Duplicar" style={actionButtonStyle}><Copy size={12}/></button>
+                    {onNewFromContext ? (
+                      <button
+                        type="button"
+                        onClick={() => onNewFromContext(entry.id)}
+                        aria-label={`Novo com o contexto de ${entry.name}`}
+                        title="Novo com este contexto"
+                        style={actionButtonStyle}
+                      >
+                        <Layers size={12}/>
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => onExportDoc(entry.id)} aria-label={`Exportar ${entry.name} como JSON`} title="Exportar como JSON" style={actionButtonStyle}><Download size={12}/></button>
                     {confirmDeleteId === entry.id ? (
                       <>
                         <button
                           type="button"
                           onClick={() => { onDelete(entry.id); setConfirmDeleteId(null); }}
                           title="Confirmar exclusão"
-                          style={{ height:36, padding:'0 10px', borderRadius:8, border:'1px solid rgba(248,113,113,0.5)', background:'rgba(248,113,113,0.15)', color:'#f87171', cursor:'pointer', fontSize:11, fontWeight:700, fontFamily:'var(--font-ui)' }}
-                        >OK</button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          aria-label="Cancelar" title="Cancelar"
-                          style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                        ><X size={12}/></button>
+                          style={{ height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.5)', background: 'rgba(248,113,113,0.15)', color: '#f87171', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-ui)' }}
+                        >Apagar</button>
+                        <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar exclusão" title="Cancelar" style={actionButtonStyle}><X size={12}/></button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteId(entry.id)}
-                        aria-label="Apagar" title="Apagar"
-                        style={{ width:36, height:36, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                      >
-                        <Trash2 size={12}/>
-                      </button>
+                      <button type="button" onClick={() => setConfirmDeleteId(entry.id)} aria-label={`Apagar ${entry.name}`} title="Apagar" style={{ ...actionButtonStyle, color: '#f87171' }}><Trash2 size={12}/></button>
                     )}
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

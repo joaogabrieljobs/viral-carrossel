@@ -2,6 +2,7 @@
 export const STATUS_DEFS = [
   { id: 'draft',     label: 'Rascunho',  color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.3)' },
   { id: 'ready',     label: 'Pronto',    color: '#86efac', bg: 'rgba(34,197,94,0.10)',  border: 'rgba(34,197,94,0.3)' },
+  { id: 'scheduled', label: 'Agendado',  color: '#fbbf24', bg: 'rgba(245,158,11,0.11)', border: 'rgba(245,158,11,0.34)' },
   { id: 'published', label: 'Publicado', color: '#a78bfa', bg: 'rgba(167,139,250,0.10)',border: 'rgba(167,139,250,0.3)' },
 ];
 export const STATUS_BY_ID = Object.fromEntries(STATUS_DEFS.map(s => [s.id, s]));

@@ -3,6 +3,7 @@ import React from 'react';
 import { Sparkles, Flame, Instagram, Target, Camera } from 'lucide-react';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { GEN_MODES, GEN_MODE_BY_ID } from '../../utils/generation-prompts.js';
+import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
 import { REFERENCE_PROFILES } from '../../utils/brand-visuals.js';
 
 /** Sugestões de voz de referência por modo narrativo (opcional — serve de guia, não de regra fixa). */
@@ -71,7 +72,7 @@ function ModePicker({ value, onChange }) {
                     color: on ? 'var(--accent)' : 'var(--text-secondary)',
                   }}
                 />
-                {m.label}
+                {genModeUiLabel(m.id, m.label)}
               </div>
               <div style={{
                 fontSize:10.5, color:'var(--text-muted)', lineHeight:1.4,
@@ -133,7 +134,7 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
                 style={{ flexShrink:0, marginTop:2, color:'var(--text-secondary)' }}
               />
               <span>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{m.label}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{genModeUiLabel(m.id, m.label)}</span>
                 {' — '}
                 {NARRATIVE_MODE_REF_VOICE_PAIRING[m.id]}
               </span>
