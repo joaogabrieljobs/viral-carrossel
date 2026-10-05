@@ -54,6 +54,7 @@ function GenerateModal({
   onCardVisualStyleChange,
   visualPreset: defaultVisualPreset = null,
   onVisualPresetChange,
+  visualPresets = VISUAL_PRESETS,
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
   hookLibrary = [],
@@ -618,7 +619,7 @@ function GenerateModal({
               <VisualStylePicker
                 value={visualPreset}
                 onChange={setVisualPresetLocal}
-                presets={VISUAL_PRESETS}
+                presets={visualPresets}
               />
 
               {/* Quantidade de cards. */}

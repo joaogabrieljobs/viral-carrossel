@@ -11,6 +11,7 @@ import {
   importBrandLogo,
   resolveLogoDataUrl,
   applyLogoAssetToSlides,
+  applyLogoLayoutToSlides,
   applyGenerationLogoPolicy,
 } from '../../src/utils/slide-logo.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
@@ -48,6 +49,17 @@ describe('logo por card', () => {
     expect(result[2]).toBe(slides[2]);
     expect(brandWithSlideLogo(brand, result[0]).logo).toBe('brand-a.png');
     expect(brandWithSlideLogo(brand, result[1]).logo).toBe('blob:project-b');
+  });
+  it('replica posição, tamanho, opacidade e arrasto livre do card atual', () => {
+    const slides = [
+      { id: 'a', elementOffsets: { logo: { x: 17, y: -9 }, title: { x: 2, y: 3 } }, logoPosition: 'bl', logoSize: 280, logoOpacity: 64 },
+      { id: 'b', elementOffsets: { logo: { x: -5, y: 8 }, title: { x: 4, y: 5 } }, logoPosition: 'tr', logoSize: 90 },
+    ];
+    const result = applyLogoLayoutToSlides(slides, { sourceSlide: slides[0], brand: {}, ids: null });
+    expect(result[1]).toMatchObject({ logoPosition: 'bl', logoSize: 280, logoOpacity: 64, logoHidden: false });
+    expect(result[1].elementOffsets.logo).toEqual({ x: 17, y: -9 });
+    expect(result[1].elementOffsets.title).toEqual({ x: 4, y: 5 });
+    expect(result[1].elementOffsets.logo).not.toBe(slides[0].elementOffsets.logo);
   });
   it('respeita “não aplicar nos novos cards” e mantém logo de projeto como camada', () => {
     const slides = [{ id: 'a' }, { id: 'b', logoHidden: false }];

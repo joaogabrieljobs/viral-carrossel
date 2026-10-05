@@ -6,6 +6,7 @@ import {
   clearSlideLogoLayout,
   resolveLogoDataUrl,
   applyLogoAssetToSlides,
+  applyLogoLayoutToSlides,
   stampLogoVisibleOnSlides,
   hideLogoOnSlides,
   LOGO_SIZE_MIN,
@@ -51,7 +52,7 @@ export function SlideLogoPanel({
   const hidden = !!slide.logoHidden;
   const hasCustom = !!(slide.logoImageId && !hidden);
   const cardN = cardIndex + 1;
-  const hasLogoSource = !!(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId);
+  const hasLogoSource = !!(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId || slide?.logoImageId || slide?.logoImage);
   const logoOnGenerate = styleKit?.logoOnGenerate !== false;
 
   const setBrandLogo = (partial) => {
@@ -78,38 +79,45 @@ export function SlideLogoPanel({
     }
     setBusy(true);
     try {
-      const dataUrl = await resolveLogoDataUrl(brand, styleKit);
+      const dataUrl = slide?.logoImage || await resolveLogoDataUrl(brand, styleKit);
       if (!alive.current) return;
-      if (!dataUrl) {
+      if (!dataUrl && !slide?.logoImageId) {
         toast?.('Carrega uma logo da marca ou do projeto primeiro.', 'error');
         return;
       }
       const projectLogoId = styleKit?.logo?.imageId || null;
-      let logoImageId = projectLogoId || brand?.logoImageId || null;
-      let logoImage = dataUrl;
+      // O card selecionado é a fonte de verdade: se ele usa um PNG próprio,
+      // “Aplicar em todos” replica esse arquivo e o seu ajuste visual.
+      let logoImageId = slide?.logoImageId || projectLogoId || brand?.logoImageId || null;
+      let logoImage = slide?.logoImage || dataUrl;
       // Backups legados podem trazer apenas data URL. Para uma camada por card,
       // os bytes precisam primeiro de um ID durável no IndexedDB.
-      if ((ids || projectLogoId) && !logoImageId) {
+      if ((ids || projectLogoId || slide?.logoImage) && !logoImageId) {
         const stored = await storeSlideLogo(await origemParaBlob(dataUrl));
         logoImageId = stored.logoImageId;
         logoImage = stored.logoImage;
       }
-      if (ids || projectLogoId) {
-        setSlides((list) => applyLogoAssetToSlides(list, {
+      setSlides((list) => {
+        const withAsset = (ids || projectLogoId || slide?.logoImageId || slide?.logoImage)
+          ? applyLogoAssetToSlides(list, {
+              ids,
+              logoImageId,
+              logoImage,
+              hideUnselected: false,
+            })
+          // A fonte já é a marca global; basta controlar a visibilidade.
+          : stampLogoVisibleOnSlides(list, ids);
+        return applyLogoLayoutToSlides(withAsset, {
+          sourceSlide: slide,
+          brand,
           ids,
-          logoImageId,
-          logoImage,
-          hideUnselected: false,
-        }));
-      } else {
-        // A fonte já é a marca global; basta controlar a visibilidade.
-        setSlides((list) => stampLogoVisibleOnSlides(list, ids));
-      }
+        });
+      });
       if (!onlySelected) setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: true }));
       toast?.(
         ids
           ? `Logo aplicada em ${ids.length} card${ids.length === 1 ? '' : 's'} selecionado${ids.length === 1 ? '' : 's'}. Desfazer: Cmd+Z.`
-          : 'Logo inserida em todos os cards. Desfazer: Cmd+Z.',
+          : 'Logo e ajuste do card atual aplicados em todos. Desfazer: Cmd+Z.',
         'success',
         5500,
       );

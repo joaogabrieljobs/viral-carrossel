@@ -118,6 +118,23 @@ const VC_PHOTO_ZONE_HIT_LAYER_STYLE = {
   boxSizing: 'border-box',
 };
 
+/** Superfície glass compartilhada por todos os renderizadores de card.
+ * A cor semitransparente continua visível no PNG mesmo quando o motor de
+ * captura não suporta backdrop-filter. */
+function vcTextGlassSurfaceStyle(slide, f) {
+  if (!slide?.textBg) return {};
+  const opacity = Math.max(10, Math.min(90, Number(slide.textBgOpacity) || 55));
+  const alpha = 0.18 + (opacity / 100) * 0.72;
+  return {
+    background: `rgba(7,8,13,${alpha.toFixed(3)})`,
+    backdropFilter: 'blur(18px) saturate(135%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(135%)',
+    border: `${Math.max(1, f.w * 0.0015)}px solid rgba(255,255,255,0.22)`,
+    boxShadow: '0 14px 36px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)',
+    borderRadius: f.w * 0.025,
+  };
+}
+
 /** Migra modos antigos e `web_trend` (desativado na UI) → GPT Image. */
 const normalizeSlideImgMode = (m) => {
   void m;
@@ -427,6 +444,7 @@ const ClassicCanvasInner = React.forwardRef(({
           backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           borderRadius: slide.textBg ? f.w * 0.022 : 0,
+          ...vcTextGlassSurfaceStyle(slide, f),
           padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
         }}
         deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
@@ -492,6 +510,7 @@ const ClassicCanvasInner = React.forwardRef(({
           backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
           borderRadius: slide.textBg ? f.w * 0.022 : 0,
+          ...vcTextGlassSurfaceStyle(slide, f),
           padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
           display: 'flex',
           flexDirection: 'column',
@@ -733,6 +752,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
       WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
       borderRadius: slide.textBg ? f.w * 0.025 : 0,
+      ...vcTextGlassSurfaceStyle(slide, f),
       padding: slide.textBg ? `${f.h * 0.028}px ${f.w * 0.04}px` : 0,
       display: 'inline-flex',
       flexDirection: 'column',
@@ -1545,6 +1565,7 @@ const SlideCardInner = React.forwardRef(({
             ...pctBox(topR, f),
             ...VC_TEXT_ZONE_STYLE,
             zIndex: 4,
+            ...vcTextGlassSurfaceStyle(slide, f),
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
               hasElementOffset(slide, 'title') || hasElementOffset(slide, 'subtitle'),
@@ -1701,6 +1722,7 @@ const SlideCardInner = React.forwardRef(({
             ...pctBox(botR, f),
             ...VC_TEXT_ZONE_STYLE,
             zIndex: 4,
+            ...vcTextGlassSurfaceStyle(slide, f),
             overflow: 'hidden',
             padding: `${padYCv}px ${padXCvBottom}px`,
             display: 'flex',
@@ -1857,6 +1879,7 @@ const SlideCardInner = React.forwardRef(({
             // deslocados podem atravessar a antiga zona e só a borda do card os limita.
             justifyContent: 'flex-start',
             ...VC_TEXT_ZONE_STYLE,
+            ...vcTextGlassSurfaceStyle(slide, f),
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
               ['title', 'subtitle', 'bodyAfterImage', 'photo']
@@ -2429,6 +2452,7 @@ const SlideCardInner = React.forwardRef(({
               backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
               WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
               borderRadius: slide.textBg ? f.w*0.025 : 0,
+              ...vcTextGlassSurfaceStyle(slide, f),
               padding: slide.textBg ? `${f.h*0.028}px ${f.w*0.04}px` : 0,
               display:'inline-flex', flexDirection:'column',
               alignItems:

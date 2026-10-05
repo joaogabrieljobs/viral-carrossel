@@ -81,6 +81,37 @@ export function applyLogoAssetToSlides(slides = [], {
   });
 }
 
+/**
+ * Replica em outros cards a aparência exata da logo do card de origem.
+ * Inclui o deslocamento feito por arrasto livre, além de posição, tamanho e
+ * opacidade. Se a origem não tem deslocamento, remove o deslocamento antigo do
+ * destino para que todos terminem realmente iguais.
+ */
+export function applyLogoLayoutToSlides(slides = [], {
+  sourceSlide = {},
+  brand = {},
+  ids = null,
+} = {}) {
+  const filter = ids ? new Set(ids) : null;
+  const controls = resolveLogoControls(brand, sourceSlide);
+  const sourceLogoOffset = sourceSlide?.elementOffsets?.logo;
+  return (slides || []).map((target) => {
+    if (filter && !filter.has(target?.id)) return target;
+    const elementOffsets = { ...(target?.elementOffsets || {}) };
+    if (sourceLogoOffset && typeof sourceLogoOffset === 'object') {
+      elementOffsets.logo = { ...sourceLogoOffset };
+    } else {
+      delete elementOffsets.logo;
+    }
+    return {
+      ...target,
+      ...controls,
+      logoHidden: false,
+      elementOffsets,
+    };
+  });
+}
+
 /** Política única para novos cards: desligado oculta; logo do projeto vira
  * camada por card; logo do perfil continua herdada sem alterar a identidade. */
 export function applyGenerationLogoPolicy(slides = [], {

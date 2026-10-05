@@ -305,8 +305,8 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '{ano}',
       // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
       showPageBadge: true,
-      // Subtítulo OFF — visual hierarchy é eyebrow + título rosa pastel
-      subtitleVisible: false,
+      // Subtítulo preservado — o padrão muda hierarquia sem apagar conteúdo
+      subtitleVisible: true,
     },
     // Slide overrides — alinhamento esquerda + texto bottom-left forçados
     slideDefaults: {
@@ -344,8 +344,8 @@ export const VISUAL_PRESETS = [
       showStarOrnament: true,
       // Pill do rodapé é CTA — não repete o rótulo que já está no header.
       footerPillText: 'VEJA O CASO COMPLETO',
-      // Subtítulo OFF — só eyebrow + título dominam
-      subtitleVisible: false,
+      // Subtítulo preservado — pode ser editado ou ocultado manualmente
+      subtitleVisible: true,
     },
     slideDefaults: {
       layout: 'bl',
@@ -386,8 +386,8 @@ export const VISUAL_PRESETS = [
       footerPillBg: 'rgba(0,0,0,0.55)',
       footerPillFg: '#fff5d1',
       footerPillArrow: false,  // sem seta — visual mais compacto
-      // Subtítulo OFF — quote/mood usa só o título
-      subtitleVisible: false,
+      // Subtítulo preservado ao trocar de padrão
+      subtitleVisible: true,
     },
     slideDefaults: {
       layout: 'bc',
@@ -426,8 +426,8 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '©{ano}',
       showPageBadge: false,  // promo não usa contador
       showStarOrnament: false,
-      // Subtítulo OFF — espaço pro strikethrough/after-title
-      subtitleVisible: false,
+      // Subtítulo preservado junto do strikethrough/after-title
+      subtitleVisible: true,
     },
     slideDefaults: {
       layout: 'bl',
@@ -473,8 +473,8 @@ export const VISUAL_PRESETS = [
       footerPillText: '{handle}',
       footerPillBg: 'rgba(255,255,255,0.12)',  // cinza translúcido
       footerPillFg: '#f0ead6',
-      // Subtítulo OFF — só eyebrow + título cream dominam
-      subtitleVisible: false,
+      // Subtítulo preservado junto da hierarquia editorial
+      subtitleVisible: true,
     },
     slideDefaults: {
       layout: 'bc',  // bottom-center
@@ -627,8 +627,8 @@ export const VISUAL_PRESETS = [
       footerPillText: 'ARRASTA PRO LADO',
       footerPillBg: 'rgba(255,255,255,0.95)',
       footerPillFg: '#0a0a0a',
-      // Subtítulo OFF — título dominante + pill cobrem toda comunicação
-      subtitleVisible: false,
+      // Subtítulo preservado mesmo com título dominante e pill
+      subtitleVisible: true,
     },
     slideDefaults: {
       layout: 'bl',
@@ -780,12 +780,23 @@ export const PRESET_SLIDE_SIGNATURE_KEYS = [
   'eyebrowText', 'strikethroughText', 'afterTitleText',
 ];
 
-export function applyVisualPreset(brand, presetId) {
-  const preset = VISUAL_PRESET_BY_ID[presetId];
+function resolveVisualPreset(presetId, presets = VISUAL_PRESETS) {
+  if (presets === VISUAL_PRESETS) return VISUAL_PRESET_BY_ID[presetId];
+  return (presets || []).find((item) => item?.id === presetId) || VISUAL_PRESET_BY_ID[presetId];
+}
+
+export function applyVisualPreset(brand, presetId, presets = VISUAL_PRESETS) {
+  const preset = resolveVisualPreset(presetId, presets);
   if (!preset) return brand;
   const limpo = { ...brand };
   for (const k of PRESET_BRAND_SIGNATURE_KEYS) delete limpo[k];
-  const next = { ...limpo, ...preset.brand, visualIdentityLocked: true };
+  const next = {
+    ...limpo,
+    ...preset.brand,
+    // Um padrão muda a forma, nunca apaga conteúdo já escrito.
+    subtitleVisible: true,
+    visualIdentityLocked: true,
+  };
   // Mesma regra anti-faux-bold dos pickers: fontes Google capadas a 700
   // não podem receber peso 800/900 vindo do preset.
   if (next.textTitleWeight != null) {
@@ -801,8 +812,8 @@ export function applyVisualPreset(brand, presetId) {
  *
  * Uso: `setSlides(slides.map(s => ({ ...s, ...getSlideOverrides(presetId) })))`
  */
-export function getSlideOverridesForPreset(presetId) {
-  const preset = VISUAL_PRESET_BY_ID[presetId];
+export function getSlideOverridesForPreset(presetId, presets = VISUAL_PRESETS) {
+  const preset = resolveVisualPreset(presetId, presets);
   const defaults = preset?.slideDefaults || {};
   // Zera a assinatura anterior antes de aplicar a nova: sem isto o eyebrow de
   // um preset e o preço riscado de outro sobreviviam ao troca-troca.

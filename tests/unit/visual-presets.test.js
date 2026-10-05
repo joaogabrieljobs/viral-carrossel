@@ -135,6 +135,12 @@ describe('padrões visuais — contraste', () => {
 });
 
 describe('applyVisualPreset — troca de padrão não acumula assinatura', () => {
+  it('nenhum padrão visual apaga o subtítulo existente', () => {
+    for (const preset of VISUAL_PRESETS) {
+      expect(preset.brand.subtitleVisible, preset.id).not.toBe(false);
+      expect(applyVisualPreset({ subtitleVisible: false }, preset.id).subtitleVisible, preset.id).toBe(true);
+    }
+  });
   it('todo campo de assinatura escrito por algum preset está na lista de limpeza', () => {
     // A lista é o que impede o eyebrow de um padrão de sobreviver no próximo.
     // Um campo novo num preset sem entrada aqui volta a vazar em silêncio.

@@ -48,7 +48,12 @@ import {
   openBillingPortal,
   logoutAccess,
 } from './src/lib/billing.js';
-import { VISUAL_PRESETS, VISUAL_PRESET_BY_ID, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
+import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
+import {
+  createCustomVisualPreset,
+  readCustomVisualPresets,
+  writeCustomVisualPresets,
+} from './src/utils/custom-visual-presets.js';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
@@ -1018,6 +1023,14 @@ export default function App() {
   // Persistido no doc — antes era useState local e o picker "esquecia" a
   // seleção em reload/troca de projeto, mesmo com as cores já aplicadas.
   const visualPreset = doc.visualPreset ?? null;
+  const [customVisualPresets, setCustomVisualPresets] = useState(() => readCustomVisualPresets());
+  const visualPresets = useMemo(
+    () => [...VISUAL_PRESETS, ...customVisualPresets],
+    [customVisualPresets],
+  );
+  useEffect(() => {
+    writeCustomVisualPresets(customVisualPresets);
+  }, [customVisualPresets]);
   const setVisualPreset = useCallback(next => history.set(d => ({
     ...d,
     visualPreset: typeof next === 'function' ? next(d.visualPreset ?? null) : next,
@@ -1025,19 +1038,19 @@ export default function App() {
   const applyVisualStylePreset = useCallback((presetId) => {
     if (!presetId) return;
     setVisualPreset(presetId);
-    setBrand((b) => applyVisualPreset(b, presetId));
+    setBrand((b) => applyVisualPreset(b, presetId, visualPresets));
     // Aplica overrides de slide (align, layout) se preset definir slideDefaults.
     // Cada slide preserva seus campos próprios — só sobrescreve os do preset.
-    const slideOverrides = getSlideOverridesForPreset(presetId);
+    const slideOverrides = getSlideOverridesForPreset(presetId, visualPresets);
     if (Object.keys(slideOverrides).length > 0) {
       setSlides((slides) => slides.map((s) => ({ ...s, ...slideOverrides })));
     }
     // Alinha pele visual + arco narrativo (utilizador pode mudar depois).
-    const fromPreset = VISUAL_PRESET_BY_ID?.[presetId]?.creativePreset
+    const fromPreset = visualPresets.find((item) => item.id === presetId)?.creativePreset
       || suggestCreativePresetForVisual(presetId);
     if (fromPreset) setCreativePreset(fromPreset);
     trackEvent('visual_preset_applied', { preset: presetId, creativePreset: fromPreset || null });
-  }, [setBrand, setSlides, setCreativePreset]);
+  }, [setBrand, setSlides, setCreativePreset, visualPresets]);
   const setSlideTextDensity = useCallback(next => history.set(d => ({
     ...d,
     slideTextDensity: typeof next==='function' ? next(d.slideTextDensity ?? '1_1') : next,
@@ -1152,6 +1165,18 @@ export default function App() {
   }, [doc, activeDocId]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const saveCustomVisualPreset = useCallback((label) => {
+    const preset = createCustomVisualPreset({
+      label,
+      brand,
+      slide: slides[activeIdx] || slides[0] || {},
+      creativePreset,
+    });
+    setCustomVisualPresets((current) => [...current, preset]);
+    setVisualPreset(preset.id);
+    toast(`Padrão “${preset.label}” salvo na biblioteca visual.`, 'success', 5200);
+    trackEvent('custom_visual_preset_saved', { preset: preset.id });
+  }, [activeIdx, brand, creativePreset, setVisualPreset, slides, toast]);
   /**
    * Quadro do desktop: os cards ficam numa fila que rola na horizontal. Clicar
    * numa miniatura só mudava `activeIdx` — o quadro não andava, então a partir
@@ -2735,7 +2760,7 @@ ${jsonShapeLine}`;
     // do próximo render do React: a marca efetiva já nasce com a paleta/fontes
     // escolhidas, evitando que o primeiro lote use o preset anterior.
     const presetBrand = effectiveVisualPreset
-      ? applyVisualPreset(brand, effectiveVisualPreset)
+      ? applyVisualPreset(brand, effectiveVisualPreset, visualPresets)
       : brand;
     const generationBrand = {
       ...presetBrand,
@@ -2757,7 +2782,7 @@ ${jsonShapeLine}`;
     const nSlides = result.slides.length;
 
     const visualSlideOverrides = effectiveVisualPreset
-      ? getSlideOverridesForPreset(effectiveVisualPreset)
+      ? getSlideOverridesForPreset(effectiveVisualPreset, visualPresets)
       : {};
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
@@ -2876,8 +2901,8 @@ ${jsonShapeLine}`;
     }));
     setActiveIdx(0); setShellView('project');
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
-    // trazem `subtitleVisible: false` (look só-título) e escondiam o texto recém
-    // gerado sem o utilizador perceber que havia uma caixa desmarcada em Marca.
+    // versões antigas podiam deixar `subtitleVisible: false` gravado no projeto e
+    // esconder o texto recém-gerado sem o utilizador perceber.
     if (!remix && newSlides.some((sl) => String(sl.subtitle || '').trim())) {
       setBrand((b) => (b?.subtitleVisible === false ? { ...b, subtitleVisible: true } : b));
     }
@@ -3556,6 +3581,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     exportPhotosOnly,
     visualPreset,
     applyVisualPreset: applyVisualStylePreset,
+    visualPresets,
+    saveCustomVisualPreset,
     quickCardCount,
     setQuickCardCount,
     autoAdjustAllSlides,
@@ -4804,6 +4831,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         onCardVisualStyleChange={setCardVisualStyle}
         visualPreset={visualPreset}
         onVisualPresetChange={applyVisualStylePreset}
+        visualPresets={visualPresets}
         material={material}
         setMaterial={setMaterial}
         hookLibrary={hookLibrary}

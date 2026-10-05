@@ -8,7 +8,7 @@ import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2,
 import { extractDominantColor } from '../utils/color-extraction.js';
 import { saveHookToLibrary } from '../utils/hooks-library.js';
 import VisualStylePicker from './VisualStylePicker.jsx';
-import { VISUAL_PRESETS, applyVisualPreset } from '../styles/visual-presets.jsx';
+import { VISUAL_PRESETS } from '../styles/visual-presets.jsx';
 import { hydrateBrandTextColors, effectiveTitleFontFamily, resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { SectionLabel as S } from './ui/SectionLabel.jsx';
 import { PALETTES, TITLE_FONTS } from '../utils/design-data.js';
@@ -227,6 +227,8 @@ function SidebarContent({
   hasLastGenerate = false,
   visualPreset = null,
   applyVisualPreset: applyVisualPresetCb = () => {},
+  visualPresets = VISUAL_PRESETS,
+  saveCustomVisualPreset = null,
   appMode = 'criador',
   setActiveIdx = () => {},
   activeEntry = null,
@@ -254,6 +256,7 @@ function SidebarContent({
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
+  const [customPresetName, setCustomPresetName] = React.useState('');
   const groupedCultureElements = !!(
     (creativePreset === 'tendencia_cultura' || slide?.useCultureLayout)
     && String(slide?.bodyAfterImage || '').trim()
@@ -2015,10 +2018,44 @@ function SidebarContent({
               <VisualStylePicker
                 value={visualPreset}
                 onChange={applyVisualPresetCb}
-                presets={VISUAL_PRESETS}
+                presets={visualPresets}
                 title=""
                 suggestedId={suggestVisualPresetForCreative(creativePreset)}
               />
+              {saveCustomVisualPreset ? (
+                <div style={{
+                  marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--hairline)',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <label className="vc-label-sm" htmlFor="vc-custom-preset-name">Salvar o seu padrão</label>
+                  <input
+                    id="vc-custom-preset-name"
+                    className="vc-input"
+                    value={customPresetName}
+                    maxLength={50}
+                    placeholder="Ex.: Padrão da minha marca"
+                    onChange={(event) => setCustomPresetName(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="vc-btn"
+                    onClick={() => {
+                      saveCustomVisualPreset(customPresetName);
+                      setCustomPresetName('');
+                    }}
+                    style={{
+                      minHeight: 44, borderRadius: 9999, border: 'none',
+                      background: 'var(--accent)', color: 'var(--accent-on-dark, #fff)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Bookmark size={14} /> Salvar padrão personalizado
+                  </button>
+                  <p style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+                    Ele entra nesta biblioteca e fica disponível nos outros projetos deste navegador.
+                  </p>
+                </div>
+              ) : null}
             </S>
           </>
         )}
