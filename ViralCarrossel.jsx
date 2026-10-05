@@ -1165,6 +1165,8 @@ export default function App() {
   }, [doc, activeDocId]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [selectedCardElement, setSelectedCardElement] = useState(null);
+  useEffect(() => { setSelectedCardElement(null); }, [activeIdx]);
   const saveCustomVisualPreset = useCallback((label) => {
     const preset = createCustomVisualPreset({
       label,
@@ -2147,6 +2149,11 @@ export default function App() {
     setSlides(s => s.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)));
   }, []);
 
+  const patchInlineTextAt = useCallback((idx, field, text) => {
+    if (!field) return;
+    updateSlideAt(idx, { [field]: text });
+  }, [updateSlideAt]);
+
   /** Novo deslocamento de um elemento do card (arrasto direto na pré-visualização). */
   const patchElementOffsetAt = useCallback((idx, chave, offset) => {
     setSlides((prev) => prev.map((s, i) => (
@@ -2594,6 +2601,23 @@ export default function App() {
     const next = slides.filter((_,j)=>j!==i).map((s,j)=>({...s,num:j+1}));
     setSlides(next); setActiveIdx(Math.min(activeIdx, next.length-1));
   }, [slides, activeIdx]);
+  const deleteCardTarget = useCallback((i) => {
+    if (selectedCardElement?.slideId === slides[i]?.id && selectedCardElement.key) {
+      const key = selectedCardElement.key;
+      if (key === 'photo') {
+        updateSlideAt(i, { bgImage: null, imageId: null, videoId: null, bgImageFailed: false });
+      } else if (key === 'logo') {
+        updateSlideAt(i, { logoHidden: true });
+      } else {
+        const hiddenElements = Array.from(new Set([...(slides[i]?.hiddenElements || []), key]));
+        updateSlideAt(i, { hiddenElements });
+      }
+      setSelectedCardElement(null);
+      toast('Elemento removido. Use Desfazer para recuperar.', 'success', 3500);
+      return;
+    }
+    deleteSlide(i);
+  }, [deleteSlide, selectedCardElement, slides, toast, updateSlideAt]);
   const duplicateSlide = useCallback((i) => {
     const dup = {...slides[i], id:uid(), num:slides.length+1};
     const next = [...slides]; next.splice(i+1,0,dup);
@@ -3959,7 +3983,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
         )}
       </header>
 
-      <ProjectContextBanner styleKit={styleKit} projectName={activeEntry?.name} />
+      <ProjectContextBanner
+        styleKit={styleKit}
+        projectName={activeEntry?.name}
+        onUndo={history.undo}
+        canUndo={history.canUndo}
+      />
 
       {/* ── BODY ── */}
       <div className="vc-editor-shell" style={{ flex:1, display:'flex', overflow:'hidden' }}>
@@ -4289,6 +4318,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     enableZoneSwapDrag={canvasEditMode}
                     movableElements={!canvasEditMode}
                     onElementOffsetChange={patchElementOffsetAt}
+                    onInlineTextChange={(field, text) => patchInlineTextAt(activeIdx, field, text)}
+                    onElementSelect={(key) => setSelectedCardElement({ slideId: slide.id, key })}
+                    selectedElement={selectedCardElement?.slideId === slide.id ? selectedCardElement.key : null}
                   />
                   {showPreviewAlignGrid ? (
                     <div
@@ -4399,6 +4431,22 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)'; }}
                     >
                       <Maximize2 size={15}/>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteCardTarget(activeIdx)}
+                      disabled={slides.length <= 1 && selectedCardElement?.slideId !== slide.id}
+                      title={selectedCardElement?.slideId === slide.id ? 'Excluir elemento selecionado' : (slides.length <= 1 ? 'O projeto precisa manter pelo menos um card' : `Excluir card ${activeIdx + 1}`)}
+                      aria-label={selectedCardElement?.slideId === slide.id ? 'Excluir elemento selecionado' : `Excluir card ${activeIdx + 1}`}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999,
+                        cursor: slides.length <= 1 && selectedCardElement?.slideId !== slide.id ? 'not-allowed' : 'pointer',
+                        background:'transparent', border:'none', color:'#f87171',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        opacity: slides.length <= 1 && selectedCardElement?.slideId !== slide.id ? 0.35 : 1,
+                      }}
+                    >
+                      <Trash2 size={15}/>
                     </button>
                     <button
                       type="button"
@@ -4548,6 +4596,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         enableZoneSwapDrag={canvasEditMode}
                         movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}
+                        onInlineTextChange={(field, text) => patchInlineTextAt(i, field, text)}
+                        onElementSelect={(key) => { setActiveIdx(i); setSelectedCardElement({ slideId: s.id, key }); }}
+                        selectedElement={selectedCardElement?.slideId === s.id ? selectedCardElement.key : null}
                       />
                       {showPreviewAlignGrid ? (
                         <div
@@ -4582,6 +4633,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
                         ><Maximize2 size={11}/></button>
+                        <button
+                          onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); deleteCardTarget(i); }}
+                          disabled={slides.length <= 1 && selectedCardElement?.slideId !== s.id}
+                          title={selectedCardElement?.slideId === s.id ? 'Excluir elemento selecionado' : (slides.length <= 1 ? 'O projeto precisa manter pelo menos um card' : `Excluir card ${i+1}`)}
+                          aria-label={selectedCardElement?.slideId === s.id ? 'Excluir elemento selecionado' : `Excluir card ${i+1}`}
+                          style={{
+                            background:'none', border:'none', color:'#f87171',
+                            cursor: slides.length <= 1 && selectedCardElement?.slideId !== s.id ? 'not-allowed' : 'pointer', padding:6, borderRadius:6,
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            minWidth:32, minHeight:32, opacity: slides.length <= 1 && selectedCardElement?.slideId !== s.id ? 0.35 : 1,
+                          }}
+                        ><Trash2 size={11}/></button>
                         <button
                           onClick={(e)=>{ e.stopPropagation(); setShowPreviewAlignGrid(g => !g); }}
                           title={showPreviewAlignGrid ? 'Esconder grade de alinhamento' : 'Mostrar grade de alinhamento em todos os cards'}

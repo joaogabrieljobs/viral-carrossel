@@ -135,6 +135,70 @@ function vcTextGlassSurfaceStyle(slide, f) {
   };
 }
 
+/** O centro usa margem em vez de `transform`, preservando o translate do arraste livre. */
+function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin) {
+  if (pos === 'tl') Object.assign(style, { top: margin, left: margin });
+  else if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
+  else if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
+  else if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+  else if (pos === 'c') Object.assign(style, {
+    top: '50%', left: '50%', marginTop: -sizePx / 2, marginLeft: -sizePx / 2,
+  });
+}
+
+/** Texto editável no próprio card. Um clique continua selecionando/arrastando;
+ * o segundo clique entra na edição e grava no histórico ao sair. */
+function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = {}, children }) {
+  const [editing, setEditing] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!editing || !ref.current) return;
+    ref.current.focus();
+    const selection = window.getSelection?.();
+    const range = document.createRange?.();
+    if (selection && range) {
+      range.selectNodeContents(ref.current);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }, [editing]);
+  const commit = React.useCallback(() => {
+    const next = String(ref.current?.innerText ?? ref.current?.textContent ?? '').trim();
+    setEditing(false);
+    if (next !== String(value ?? '').trim()) onCommit?.(next);
+  }, [onCommit, value]);
+  return (
+    <Tag
+      {...elementProps}
+      ref={ref}
+      contentEditable={editing}
+      suppressContentEditableWarning={editing}
+      data-vc-inline-editable="true"
+      data-vc-editing={editing ? 'true' : 'false'}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (onCommit) setEditing(true);
+      }}
+      onPointerDown={editing ? (event) => event.stopPropagation() : elementProps.onPointerDown}
+      onBlur={editing ? commit : undefined}
+      onKeyDown={editing ? (event) => {
+        event.stopPropagation();
+        if (event.key === 'Escape') { event.preventDefault(); setEditing(false); }
+        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); commit(); }
+      } : elementProps.onKeyDown}
+      title={editing ? 'Edite o texto e clique fora para salvar' : `${elementProps.title || ''}${elementProps.title ? ' · ' : ''}Duplo clique para editar`}
+      style={{
+        ...(elementProps.style || {}),
+        ...(editing ? { outline: '2px solid var(--accent)', outlineOffset: 4, cursor: 'text', userSelect: 'text' } : null),
+      }}
+    >
+      {editing ? String(value ?? '') : children}
+    </Tag>
+  );
+}
+
 /** Migra modos antigos e `web_trend` (desativado na UI) → GPT Image. */
 const normalizeSlideImgMode = (m) => {
   void m;
@@ -310,6 +374,7 @@ const ClassicCanvasInner = React.forwardRef(({
   swapSlideIdx = null,
   swapZoneKeys,
   interactionScale = 1,
+  onInlineTextChange = null,
   /** Arrasto livre; vem do SlideCardInner. Ausente quando o chrome de zonas
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
@@ -440,12 +505,8 @@ const ClassicCanvasInner = React.forwardRef(({
           justifyContent: Lzn.jc,
           alignItems: Lzn.ai,
           textAlign: slide.align,
-          background: textBgColor,
-          backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-          WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-          borderRadius: slide.textBg ? f.w * 0.022 : 0,
-          ...vcTextGlassSurfaceStyle(slide, f),
-          padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padTitleXp}px`,
+          background: 'transparent',
+          padding: `${padYZn}px ${padTitleXp}px`,
         }}
         deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
         minScale={0.45}
@@ -462,7 +523,7 @@ const ClassicCanvasInner = React.forwardRef(({
             alignItems: alignInner,
           }}
         >
-        <h1 style={{
+        <InlineEditableText as="h1" value={slide.title} onCommit={(text) => onInlineTextChange?.('title', text)} elementProps={{ style: {
           color: titleInk,
           fontFamily: titleFF,
           fontSize: f.w * 0.084 * (slide.titleSize / 100) * titleScale,
@@ -482,7 +543,7 @@ const ClassicCanvasInner = React.forwardRef(({
             slide.titleCase === 'lower' ? 'lowercase' :
             isBebas ? 'uppercase' : 'none',
           textShadow: shadow,
-        }}>{culture ? (
+        } }}>{culture ? (
           <CultureInlineRich
             text={slide.title || ''}
             destaqueSpans={slide.destaqueSpans?.title}
@@ -494,7 +555,7 @@ const ClassicCanvasInner = React.forwardRef(({
             fontWeight={slide.titleWeight ?? 800}
             letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
           />
-        ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
+        ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</InlineEditableText>
         </div>
         )}
       </OverflowScaler>
@@ -506,12 +567,8 @@ const ClassicCanvasInner = React.forwardRef(({
           ...VC_TEXT_ZONE_STYLE,
           zIndex: 4,
           overflow: 'hidden',
-          background: textBgColor,
-          backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-          WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-          borderRadius: slide.textBg ? f.w * 0.022 : 0,
-          ...vcTextGlassSurfaceStyle(slide, f),
-          padding: slide.textBg ? `${f.h * 0.024}px ${f.w * 0.03}px` : `${padYZn}px ${padSubtitleXp}px`,
+          background: 'transparent',
+          padding: `${padYZn}px ${padSubtitleXp}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: Lzn.jc,
@@ -524,13 +581,16 @@ const ClassicCanvasInner = React.forwardRef(({
         {(subScale) => (
         <div
           style={{
-            width: '100%',
+            width: slide.textBg ? 'fit-content' : '100%',
             minWidth: 0,
-            alignSelf: 'stretch',
+            maxWidth: '100%',
+            alignSelf: alignInner === 'center' ? 'center' : alignInner === 'flex-end' ? 'flex-end' : 'flex-start',
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
             alignItems: alignInner,
+            ...vcTextGlassSurfaceStyle(slide, f),
+            padding: slide.textBg ? `${f.h * 0.018}px ${f.w * 0.026}px` : 0,
           }}
         >
         {slide.subtitle && brand.subtitleVisible !== false && (
@@ -550,7 +610,7 @@ const ClassicCanvasInner = React.forwardRef(({
               />
             </div>
           ) : (
-            <p style={{
+            <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => onInlineTextChange?.('subtitle', text)} elementProps={{ style: {
               color: bodyInk,
               fontFamily: bodyFF,
               fontSize: f.w * 0.028 * (slide.subSize / 100) * subScale,
@@ -564,7 +624,7 @@ const ClassicCanvasInner = React.forwardRef(({
               boxSizing: 'border-box',
               letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
               textShadow: shadow,
-            }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
+            } }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
           )
         )}
         </div>
@@ -662,10 +722,7 @@ const ClassicCanvasInner = React.forwardRef(({
           backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
           zIndex: 23,
         };
-        if (pos === 'tl') Object.assign(style, { top: margin,    left: margin });
-        if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
-        if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
-        if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
         return <div style={style} aria-hidden/>;
       })()}
 
@@ -830,8 +887,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     )
   ) : null;
 
-  const bothText = textGlass(<>{titleEl}{subtitleEl}</>);
-  const titleOnlyWrapped = textGlass(<>{titleEl}</>);
+  const bothText = <>{titleEl}{textGlass(<>{subtitleEl}</>)}</>;
+  const titleOnlyWrapped = titleEl;
   const subOnlyWrapped = textGlass(<>{subtitleEl}</>);
 
   const bandClickable = !!(onPhotoZoneClick && (showCanvasChrome || slideHasPendingPhotoIntent(slide)) && !slide.bgImage);
@@ -1098,10 +1155,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
           backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
           zIndex: 23,
         };
-        if (pos === 'tl') Object.assign(style, { top: margin, left: margin });
-        if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
-        if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
-        if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
         return <div style={style} aria-hidden />;
       })()}
     </div>
@@ -1123,6 +1177,11 @@ const SlideCardInner = React.forwardRef(({
   movableElements = false,
   /** `(chave, {x, y}) => void` — novo deslocamento, em % do card. */
   onElementOffsetChange = null,
+  /** `(campo, texto) => void` — edição direta por duplo clique. */
+  onInlineTextChange = null,
+  /** Seleção do elemento para a ação de excluir da barra rápida. */
+  onElementSelect = null,
+  selectedElement = null,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
@@ -1160,6 +1219,11 @@ const SlideCardInner = React.forwardRef(({
   const aoMover = React.useCallback((chave, off) => {
     offsetRef.current?.(slideIdx, chave, off);
   }, [slideIdx]);
+  const inlineTextRef = React.useRef(onInlineTextChange);
+  inlineTextRef.current = onInlineTextChange;
+  const commitInlineText = React.useCallback((campo, texto) => {
+    inlineTextRef.current?.(campo, texto);
+  }, []);
   const bindDrag = useElementDrag({
     f, slide, onOffsetChange: aoMover,
     enabled: !!(movableElements && onElementOffsetChange),
@@ -1167,16 +1231,31 @@ const SlideCardInner = React.forwardRef(({
   });
   /** Props de arrasto + deslocamento gravado, prontas para espalhar. */
   const mov = React.useCallback((chave, estiloBase) => {
+    const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
     const off = elementOffsetStyle(slide, chave, f);
     const drag = bindDrag(chave);
-    if (!off && !drag) return estiloBase ? { style: estiloBase } : null;
+    if (!off && !drag && !hidden) return estiloBase ? { style: estiloBase } : null;
     // O selo do rodapé já usa translateX(-50%) para centrar; sobrescrever o
     // transform mandava-o para a esquerda no primeiro pixel de arrasto.
     const transformBase = estiloBase?.transform;
     const style = { ...(estiloBase || {}), ...(drag?.style || {}), ...(off || {}) };
+    if (hidden) Object.assign(style, { display: 'none', pointerEvents: 'none' });
     if (transformBase && off) style.transform = `${transformBase} ${off.transform}`;
-    return { ...(drag || {}), 'data-vc-movable': chave, style };
-  }, [slide, f, bindDrag]);
+    if (selectedElement === chave) {
+      style.outline = '2px solid var(--accent)';
+      style.outlineOffset = 4;
+    }
+    return {
+      ...(drag || {}),
+      onClick: (event) => {
+        event.stopPropagation();
+        onElementSelect?.(chave);
+      },
+      'data-vc-movable': chave,
+      'data-vc-selected': selectedElement === chave ? 'true' : undefined,
+      style,
+    };
+  }, [slide, f, bindDrag, onElementSelect, selectedElement]);
 
   /**
    * Só os handlers, sem aplicar `translate`. É o caso da foto em tela cheia:
@@ -1513,7 +1592,7 @@ const SlideCardInner = React.forwardRef(({
     const padXCvBottom = canvasCultureSandwichBottomPaddingXPx(f, slide);
     const padYCv = f.h * (0.004 + insetZn * 0.002);
     const topR = z.top ? clampRect(z.top) : { x: 6, y: 8, w: 88, h: 28 };
-    const photoR = z.photo ? clampRect(z.photo) : { x: 6, y: 30, w: 88, h: 42 };
+    const photoR = z.photo ? clampRect(z.photo) : { x: 0, y: 30, w: 100, h: 42 };
     const botR = z.bottom ? clampRect(z.bottom) : { x: 6, y: 74, w: 88, h: 23 };
     const sandwichPhotoInteractive = !!((showCanvasChrome || (sandwich && slideHasPendingPhotoIntent(slide))) && onPhotoZoneClick);
     const sandwichPhotoNativeHit = !!(sandwichPhotoInteractive && onPhotoZoneNativeFile);
@@ -1565,7 +1644,6 @@ const SlideCardInner = React.forwardRef(({
             ...pctBox(topR, f),
             ...VC_TEXT_ZONE_STYLE,
             zIndex: 4,
-            ...vcTextGlassSurfaceStyle(slide, f),
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
               hasElementOffset(slide, 'title') || hasElementOffset(slide, 'subtitle'),
@@ -1594,7 +1672,7 @@ const SlideCardInner = React.forwardRef(({
             }}
           >
           {(slide.title || '').trim() ? (
-            <h2 {...movSeparate('title', {
+            <InlineEditableText as="h2" value={slide.title} onCommit={(text) => commitInlineText('title', text)} elementProps={movSeparate('title', {
               margin: 0,
               fontFamily: titleFF,
               overflowWrap: 'break-word',
@@ -1617,7 +1695,7 @@ const SlideCardInner = React.forwardRef(({
                 fontWeight={slide.titleWeight ?? 600}
                 letterSpacing={`${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`}
               />
-            </h2>
+            </InlineEditableText>
           ) : null}
           <CultureRichParagraphs
             text={slide.subtitle}
@@ -1778,10 +1856,7 @@ const SlideCardInner = React.forwardRef(({
             backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
             zIndex: 20,
           };
-          if (pos === 'tl') Object.assign(st, { top: margin, left: margin });
-          if (pos === 'tr') Object.assign(st, { top: topOffset, right: margin });
-          if (pos === 'bl') Object.assign(st, { bottom: margin, left: margin });
-          if (pos === 'br') Object.assign(st, { bottom: margin, right: margin });
+          vcApplyLogoPosition(st, pos, margin, sizePx, topOffset);
           return <div {...mov('logo', st)} aria-hidden={movableElements ? undefined : true}/>;
         })()}
       </div>
@@ -1879,7 +1954,6 @@ const SlideCardInner = React.forwardRef(({
             // deslocados podem atravessar a antiga zona e só a borda do card os limita.
             justifyContent: 'flex-start',
             ...VC_TEXT_ZONE_STYLE,
-            ...vcTextGlassSurfaceStyle(slide, f),
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
               ['title', 'subtitle', 'bodyAfterImage', 'photo']
@@ -1897,7 +1971,7 @@ const SlideCardInner = React.forwardRef(({
         >
           {(scale) => (<>
           {(slide.title || '').trim() ? (
-            <h2 {...movSeparate('title', {
+            <InlineEditableText as="h2" value={slide.title} onCommit={(text) => commitInlineText('title', text)} elementProps={movSeparate('title', {
               margin: 0,
               fontFamily: titleFF,
               overflowWrap: 'break-word',
@@ -1918,21 +1992,27 @@ const SlideCardInner = React.forwardRef(({
                 fontWeight={600}
                 letterSpacing="-0.024em"
               />
-            </h2>
+            </InlineEditableText>
           ) : null}
-          <CultureRichParagraphs
-            text={slide.subtitle}
-            destaqueSpans={slide.destaqueSpans?.subtitle}
-            ink={cr.subtitleInk}
-            accentColor={cr.accentInk}
-            fontFamily={bodyFF}
-            fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
-            lineHeight={1.42}
-            fontWeight={600}
-            letterSpacing="-0.018em"
-            paraGap={f.h*0.012}
-            paragraphProps={elementsUnlocked ? mov('subtitle') : null}
-          />
+          <div style={{
+            ...vcTextGlassSurfaceStyle(slide, f),
+            padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
+            width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box',
+          }}>
+            <CultureRichParagraphs
+              text={slide.subtitle}
+              destaqueSpans={slide.destaqueSpans?.subtitle}
+              ink={cr.subtitleInk}
+              accentColor={cr.accentInk}
+              fontFamily={bodyFF}
+              fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
+              lineHeight={1.42}
+              fontWeight={600}
+              letterSpacing="-0.018em"
+              paraGap={f.h*0.012}
+              paragraphProps={elementsUnlocked ? mov('subtitle') : null}
+            />
+          </div>
           {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
             <div
               data-vc-photo-zone="1"
@@ -2089,10 +2169,7 @@ const SlideCardInner = React.forwardRef(({
             backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
             zIndex: 20,
           };
-          if (pos === 'tl') Object.assign(style, { top: margin,    left: margin });
-          if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
-          if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
-          if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+          vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
           return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
         })()}
         {brand.showHandle && slide.showHandle && !hideInstaBadge && (brand.handle || '').trim() && (
@@ -2175,6 +2252,7 @@ const SlideCardInner = React.forwardRef(({
         swapZoneKeys={undefined}
         interactionScale={scale}
         mov={showCanvasChrome ? movOffsetOnly : mov}
+        onInlineTextChange={commitInlineText}
       />
     );
   } else if (normalizePhotoRegion(slide) !== 'full' && !cvHasZones && !(sandwich || cultureStatFlat)) {
@@ -2448,12 +2526,8 @@ const SlideCardInner = React.forwardRef(({
           }}>
             <div {...mov('text', {
               pointerEvents: movableElements ? 'auto' : 'none',
-              background:textBgColor,
-              backdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-              WebkitBackdropFilter: slide.textBg ? 'blur(8px)' : 'none',
-              borderRadius: slide.textBg ? f.w*0.025 : 0,
-              ...vcTextGlassSurfaceStyle(slide, f),
-              padding: slide.textBg ? `${f.h*0.028}px ${f.w*0.04}px` : 0,
+              background:'transparent',
+              padding: 0,
               display:'inline-flex', flexDirection:'column',
               alignItems:
                 slide.align==='center'  ? 'center'   :
@@ -2497,7 +2571,7 @@ const SlideCardInner = React.forwardRef(({
                   textShadow: shadow,
                 }}>{slide.eyebrowText}</span>
               )}
-              <h1 {...mov('title', {
+              <InlineEditableText as="h1" value={slide.title} onCommit={(text) => commitInlineText('title', text)} elementProps={mov('title', {
                 color: displayTitleInk, fontFamily: titleFF,
                 fontSize:f.w*0.084*(slide.titleSize/100),
                 lineHeight:(slide.titleLeading ?? 105)/100,
@@ -2526,17 +2600,20 @@ const SlideCardInner = React.forwardRef(({
                   fontWeight={slide.titleWeight ?? 800}
                   letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
                 />
-              ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
+              ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</InlineEditableText>
               {/* Subtítulo — preset controla via brand.subtitleVisible/Weight/Case
                   (presets editoriais como Sports/NMLSS escondem subtítulo pra
                   não competir com eyebrow+título). */}
               {slide.subtitle && brand.subtitleVisible !== false && (
                 cultureRichText ? (
-                  <div {...mov('subtitle', {
+                  <InlineEditableText as="div" value={slide.subtitle} onCommit={(text) => commitInlineText('subtitle', text)} elementProps={mov('subtitle', {
                     margin:0,
                     maxWidth:'100%',
                     letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                     textShadow: shadow,
+                    ...vcTextGlassSurfaceStyle(slide, f),
+                    padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
+                    width: 'fit-content',
                   })}>
                     <CultureRichParagraphs
                       text={slide.subtitle}
@@ -2550,9 +2627,9 @@ const SlideCardInner = React.forwardRef(({
                       letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
                       paraGap={f.h*0.010}
                     />
-                  </div>
+                  </InlineEditableText>
                 ) : (
-                <p {...mov('subtitle', {
+                <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => commitInlineText('subtitle', text)} elementProps={mov('subtitle', {
                   color: displayBodyInk, fontFamily: bodyFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
@@ -2563,13 +2640,17 @@ const SlideCardInner = React.forwardRef(({
                   textTransform: brand.subtitleCase === 'upper' ? 'uppercase'
                     : brand.subtitleCase === 'lower' ? 'lowercase' : 'none',
                   fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
-                })}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
+                  ...vcTextGlassSurfaceStyle(slide, f),
+                  padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
+                  borderRadius: slide.textBg ? f.w*0.025 : 0,
+                  width: 'fit-content', maxWidth: '100%',
+                })}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
               ))}
               {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
                   do título. Suporta strikethroughText pra preço antigo riscado:
                   "DE R$99" riscado + "POR R$0,00 (100% GRATUITO)" intacto. */}
               {slide.afterTitleText && (
-                <p style={{
+                <div {...mov('offer', {
                   color: displayTitleInk, fontFamily: titleFF,
                   fontSize: f.w*0.034,
                   fontWeight: slide.titleWeight ?? 800,
@@ -2581,17 +2662,19 @@ const SlideCardInner = React.forwardRef(({
                   flexWrap: 'wrap',
                   gap: f.w*0.014,
                   alignItems: 'baseline',
-                }}>
+                })}>
                   {slide.strikethroughText && (
-                    <span style={{
+                    <InlineEditableText as="span" value={slide.strikethroughText} onCommit={(text) => commitInlineText('strikethroughText', text)} elementProps={{ style: {
                       textDecoration: 'line-through',
                       textDecorationColor: brand.accent || '#dc2626',
                       textDecorationThickness: f.w*0.004,
                       opacity: 0.85,
-                    }}>{slide.strikethroughText}</span>
+                    } }}>{slide.strikethroughText}</InlineEditableText>
                   )}
-                  <span>{slide.afterTitleText}</span>
-                </p>
+                  <InlineEditableText as="span" value={slide.afterTitleText} onCommit={(text) => commitInlineText('afterTitleText', text)}>
+                    {slide.afterTitleText}
+                  </InlineEditableText>
+                </div>
               )}
             </div>
           </div>
@@ -2620,10 +2703,7 @@ const SlideCardInner = React.forwardRef(({
           backgroundImage: `url(${brand.logo})`,
           backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
         };
-        if (pos === 'tl') Object.assign(style, { top: margin,    left: margin });
-        if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
-        if (pos === 'bl') Object.assign(style, { bottom: margin, left: margin });
-        if (pos === 'br') Object.assign(style, { bottom: margin, right: margin });
+        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
         return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
       })()}
     </div>

@@ -177,7 +177,7 @@ const DEFAULT_BRAND = {
   /** Fonte própria (corpo / subtítulo) */
   customBodyFont: null,
   logoSize: 120,          // px na escala 1080 (slider marca/card: 40–480)
-  logoPosition: 'tr',     // canto: 'tl' | 'tr' | 'bl' | 'br'
+  logoPosition: 'tr',     // posição: 'tl' | 'tr' | 'c' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
   /** Barra editorial fina no topo dos cards (modo Tendência/Cultura) — opcional. */
   /** Tamanho de cada item da assinatura, em % (100 = tamanho de origem do padrão).

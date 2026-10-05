@@ -477,7 +477,20 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
 function enableCanvasLayoutSlides(slides, creativePreset) {
   return slides.map((s) => {
     const hasSaved = !!(s.canvas?.zones && typeof s.canvas.zones === 'object' && s.canvas.variant);
-    if (hasSaved) return { ...s, canvas: { ...s.canvas, enabled: true, applied: true } };
+    if (hasSaved) {
+      // Sugestões antigas de geração usavam uma foto 88% larga. Na primeira
+      // ativação promovemos apenas esse default antigo para full bleed; zonas
+      // já aplicadas/editadas continuam exatamente como o utilizador deixou.
+      const oldPhoto = s.canvas.variant === 'sandwich' ? s.canvas.zones.photo : null;
+      const legacySuggestedPhoto = s.canvas.applied !== true
+        && oldPhoto
+        && Math.abs(Number(oldPhoto.x) - 6) < 0.01
+        && Math.abs(Number(oldPhoto.w) - 88) < 0.01;
+      const zones = legacySuggestedPhoto
+        ? { ...s.canvas.zones, photo: { ...oldPhoto, x: 0, w: 100 } }
+        : s.canvas.zones;
+      return { ...s, canvas: { ...s.canvas, zones, enabled: true, applied: true } };
+    }
     const d = inferCanvasDefaults(s, creativePreset);
     return { ...s, canvas: { enabled: true, applied: true, variant: d.variant, zones: { ...d.zones } } };
   });

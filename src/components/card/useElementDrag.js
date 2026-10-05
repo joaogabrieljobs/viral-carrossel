@@ -13,6 +13,7 @@ const ROTULOS_ELEMENTO = {
   title: 'Título',
   subtitle: 'Subtítulo',
   bodyAfterImage: 'Texto abaixo da imagem',
+  offer: 'Preço / oferta',
   photo: 'Foto',
   headerBar: 'Barra editorial',
   pageBadge: 'Contador de páginas',

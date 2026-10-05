@@ -22,6 +22,7 @@ export const MOVABLE_ELEMENTS = [
   { key: 'title', label: 'Título' },
   { key: 'subtitle', label: 'Subtítulo' },
   { key: 'bodyAfterImage', label: 'Texto abaixo da imagem' },
+  { key: 'offer', label: 'Preço / oferta' },
   { key: 'photo', label: 'Foto (enquadramento)' },
   { key: 'headerBar', label: 'Barra editorial' },
   { key: 'pageBadge', label: 'Contador N/M' },

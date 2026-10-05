@@ -27,7 +27,9 @@ const DEFAULT_CANVAS_ZONES_CLASSIC = {
 
 const DEFAULT_CANVAS_ZONES_SANDWICH = {
   top: { x: 6, y: 7, w: 88, h: 22 },
-  photo: { x: 6, y: 31, w: 88, h: 41 },
+  // A imagem é uma faixa visual do card, por isso nasce full bleed. As zonas
+  // de texto continuam com margem editorial independente.
+  photo: { x: 0, y: 31, w: 100, h: 41 },
   bottom: { x: 6, y: 74, w: 88, h: 23 },
 };
 
@@ -307,7 +309,7 @@ function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
     rebalanceForTextMin();
 
     const top = clampRect({ ...prevTp, x: ux, w: uw, y: topY, h: blkTopH });
-    const photo = clampRect({ ...prevPh, x: ux, w: uw, y: photoY, h: photoH });
+    const photo = clampRect({ ...prevPh, x: 0, w: 100, y: photoY, h: photoH });
     const bottom = clampRect({ ...prevBt, x: ux, w: uw, y: botY, h: blkBotH });
 
     zones = { ...zones, top, photo, bottom };

@@ -18,6 +18,35 @@ describe('composição (canvas) — activar/desactivar preserva o que o utilizad
     expect(s.canvas.zones.photo).toBeTruthy();
   });
 
+  it('composição sanduíche cria a faixa de foto a ocupar 100% da largura', () => {
+    const [s] = enableCanvasLayoutSlides([{
+      ...base,
+      bodyAfterImage: 'Fecho',
+      imageQuery: 'foto editorial',
+      useCultureLayout: true,
+    }], 'tendencia_cultura');
+    expect(s.canvas.variant).toBe('sandwich');
+    expect(s.canvas.zones.photo.x).toBe(0);
+    expect(s.canvas.zones.photo.w).toBe(100);
+  });
+
+  it('corrige a sugestão sanduíche antiga na primeira ativação sem sobrescrever edição aplicada', () => {
+    const legacy = {
+      ...base,
+      canvas: { enabled: false, applied: false, variant: 'sandwich', zones: {
+        top: { x: 6, y: 7, w: 88, h: 22 },
+        photo: { x: 6, y: 31, w: 88, h: 41 },
+        bottom: { x: 6, y: 74, w: 88, h: 23 },
+      } },
+    };
+    const [upgraded] = enableCanvasLayoutSlides([legacy], 'tendencia_cultura');
+    expect(upgraded.canvas.zones.photo).toMatchObject({ x: 0, w: 100 });
+
+    const edited = { ...legacy, canvas: { ...legacy.canvas, applied: true } };
+    const [preserved] = enableCanvasLayoutSlides([edited], 'tendencia_cultura');
+    expect(preserved.canvas.zones.photo).toMatchObject({ x: 6, w: 88 });
+  });
+
   it('desactivar guarda as zonas; reactivar reutiliza-as em vez de repor os defaults', () => {
     const [on] = enableCanvasLayoutSlides([base], 'livre');
     const moved = { ...on, canvas: { ...on.canvas, zones: { ...on.canvas.zones, photo: { x: 10, y: 55, w: 80, h: 40 } } } };

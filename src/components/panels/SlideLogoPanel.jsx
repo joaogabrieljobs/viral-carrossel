@@ -19,6 +19,7 @@ import { Slider } from '../ui/primitives.jsx';
 const POS = [
   { id: 'tl', label: '↖' },
   { id: 'tr', label: '↗' },
+  { id: 'c', label: '●' },
   { id: 'bl', label: '↙' },
   { id: 'br', label: '↘' },
 ];
@@ -296,7 +297,7 @@ export function SlideLogoPanel({
           <>
             <div>
               <label className="vc-label-sm">Posição padrão</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
                 {POS.map((p) => {
                   const on = (brand.logoPosition || 'tr') === p.id;
                   return (
@@ -460,6 +461,7 @@ export function SlideLogoPanel({
               >
                 <option value="tl">Superior esquerda ↖</option>
                 <option value="tr">Superior direita ↗</option>
+                <option value="c">Centro ●</option>
                 <option value="bl">Inferior esquerda ↙</option>
                 <option value="br">Inferior direita ↘</option>
               </select>

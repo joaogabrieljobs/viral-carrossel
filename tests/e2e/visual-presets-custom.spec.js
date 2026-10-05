@@ -46,12 +46,46 @@ test('glass cria uma superfície visível no card e não só um toggle', async (
     const card = [...document.querySelectorAll('div')]
       .find((node) => node.style.width === '1080px' && node.style.height === '1350px');
     if (!card) return null;
-    const glass = [...card.querySelectorAll('div')].find((node) => node.style.backdropFilter.includes('blur(18px)'));
+    const glass = [...card.querySelectorAll('*')].find((node) => node.style.backdropFilter.includes('blur(18px)'));
     if (!glass) return null;
-    return { background: glass.style.background, border: glass.style.border, shadow: glass.style.boxShadow };
+    const title = card.querySelector('h1')?.innerText || '';
+    return {
+      background: glass.style.background,
+      border: glass.style.border,
+      shadow: glass.style.boxShadow,
+      text: glass.innerText,
+      title,
+      width: glass.getBoundingClientRect().width,
+      cardWidth: card.getBoundingClientRect().width,
+    };
   });
   expect(surface).not.toBeNull();
   expect(surface.background).toContain('rgba(7, 8, 13');
   expect(surface.border).toContain('rgba(255, 255, 255, 0.22)');
   expect(surface.shadow).toContain('rgba(0, 0, 0, 0.28)');
+  expect(surface.text).not.toContain(surface.title);
+  expect(surface.width).toBeLessThan(surface.cardWidth * 0.94);
+});
+
+test('duplo clique edita o título no card e a lixeira remove o elemento selecionado', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
+  await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+
+  const title = page.locator('main h1[data-vc-inline-editable="true"]').first();
+  await title.dispatchEvent('dblclick');
+  await expect(title).toHaveAttribute('contenteditable', 'true');
+  await title.evaluate((node) => {
+    node.innerText = 'Título editado no próprio card';
+    node.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  await expect.poll(async () => (await currentDoc(page))?.slides?.[0]?.title).toBe('Título editado no próprio card');
+
+  await title.dispatchEvent('click');
+  const remove = page.getByRole('button', { name: 'Excluir elemento selecionado' }).first();
+  await expect(remove).toBeVisible();
+  await remove.dispatchEvent('click');
+  await expect.poll(async () => (await currentDoc(page))?.slides?.[0]?.hiddenElements || []).toContain('title');
 });
