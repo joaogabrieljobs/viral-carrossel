@@ -233,7 +233,8 @@ export function useExport({
         if (i > 0) pdf.addPage([f.w, f.h], f.h > f.w ? 'portrait' : 'landscape');
         pdf.addImage(dataUrl, 'JPEG', 0, 0, f.w, f.h);
       }
-      pdf.save(`carrossel-${Date.now()}.pdf`);
+      const pdfStem = fmt === 'apresentacao' ? 'apresentacao' : 'carrossel';
+      pdf.save(`${pdfStem}-${Date.now()}.pdf`);
       toast(`PDF com ${slides.length} slides gerado`, 'success');
     } catch(e) { setError('Erro ao gerar PDF: '+e.message); }
     finally { setExporting(false); }

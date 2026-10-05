@@ -207,6 +207,7 @@ function SidebarContent({
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
   creativePreset = 'livre',
+  setCreativePreset = () => {},
   fmt = 'carrossel',
   applyTypographyToAllCards,
   applyBrandTypographyToAllSlides,
@@ -3285,8 +3286,10 @@ function SidebarContent({
             <S
               title={appMode === 'criador' ? 'Criar rápido' : 'Contexto'}
               hint={appMode === 'criador'
-                ? 'Ideia → carrossel da sua marca → revisar → baixar'
-                : `${activeEntry?.name || 'Projeto'} · ${slides.length} cards · brief e referências só deste carrossel`}
+                ? (creativePreset === 'apresentacao'
+                  ? 'Tema → deck 16:9 → revisar → PDF'
+                  : 'Ideia → carrossel da sua marca → revisar → baixar')
+                : `${activeEntry?.name || 'Projeto'} · ${slides.length} ${creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'slides' : 'cards'} · brief e referências só deste projeto`}
             >
               {appMode === 'criador' ? (
                 <CriarRapidoHome
@@ -3331,6 +3334,8 @@ function SidebarContent({
                   quickCardCount={quickCardCount}
                   onQuickCardCountChange={setQuickCardCount}
                   onAutoAdjustAll={autoAdjustAllSlides}
+                  creativePreset={creativePreset}
+                  onCreativePresetChange={setCreativePreset}
                   projectId={activeDocId || activeEntry?.id}
                   folderId={activeEntry?.folderId || ''}
                   publicationDate={activeEntry?.publicationDate || ''}
@@ -3363,7 +3368,7 @@ function SidebarContent({
               )}
             </S>
 
-            <S title="Cards" hint="Ordem da narrativa. Marca a caixa para ações em massa (logo).">
+            <S title={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Slides' : 'Cards'} hint={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Ordem do deck. Marca a caixa para ações em massa (logo).' : 'Ordem da narrativa. Marca a caixa para ações em massa (logo).'}>
               {selectedSlideIds.length > 0 ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,

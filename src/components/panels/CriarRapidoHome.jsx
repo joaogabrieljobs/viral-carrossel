@@ -60,7 +60,10 @@ export function CriarRapidoHome({
   onSetFolder = null,
   onSetPublicationDate = null,
   onCreateFolder = null,
+  creativePreset = 'livre',
+  onCreativePresetChange = null,
 }) {
+  const isPresentation = creativePreset === 'apresentacao';
   const logoRef = useRef(null);
   const promptRef = useRef(null);
   const projectRef = useRef(projectId);
@@ -144,12 +147,18 @@ export function CriarRapidoHome({
 
   const handleGenerate = async () => {
     if (!promptTrim || genBusy) return;
-    const effectiveNarrativeMode = resolveQuickNarrativeMode(objectiveId, narrativeMode);
-    trackEvent('criar_rapido_generate', { with_images: scopeImages ? '1' : '0' });
+    const effectiveNarrativeMode = isPresentation
+      ? 'editorial'
+      : resolveQuickNarrativeMode(objectiveId, narrativeMode);
+    trackEvent('criar_rapido_generate', {
+      with_images: scopeImages ? '1' : '0',
+      product: isPresentation ? 'apresentacao' : 'carrossel',
+    });
     await onQuickGenerate?.(promptTrim, {
       withImages: !!(scopeImages && hasOpenAI),
       narrativeMode: effectiveNarrativeMode,
       cardCount: quickCardCount,
+      productKind: isPresentation ? 'apresentacao' : 'carrossel',
     });
   };
 
@@ -163,6 +172,41 @@ export function CriarRapidoHome({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label className="vc-label-sm">O que quer criar</label>
+        <div className="vc-seg" role="group" aria-label="Tipo de entrega" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {[
+            { id: 'carrossel', label: 'Carrossel IG' },
+            { id: 'apresentacao', label: 'Apresentação' },
+          ].map(({ id, label }) => {
+            const active = id === 'apresentacao' ? isPresentation : !isPresentation;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`vc-seg-item${active ? ' active' : ''}`}
+                aria-pressed={active}
+                disabled={genBusy || !onCreativePresetChange}
+                onClick={() => {
+                  if (!onCreativePresetChange) return;
+                  onCreativePresetChange(id === 'apresentacao' ? 'apresentacao' : 'livre');
+                  if (id === 'apresentacao') onQuickCardCountChange?.('10');
+                  trackEvent('product_kind_switch', { to: id });
+                }}
+                style={{ minHeight: 40, fontSize: 12 }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          {isPresentation
+            ? 'Deck 16:9 estilo Gamma — pitch, aula ou proposta. Exporta PDF paisagem.'
+            : 'Cards verticais para o feed do Instagram (4:5).'}
+        </p>
+      </section>
+
       <div style={{
         padding: '10px 12px', borderRadius: 12,
         border: '1px solid var(--glass-border-strong)',
@@ -266,7 +310,8 @@ export function CriarRapidoHome({
       </> : null}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label className="vc-label-sm">Diga o que quer publicar</label>
+        <label className="vc-label-sm">{isPresentation ? 'Diga o tema da apresentação' : 'Diga o que quer publicar'}</label>
+        {!isPresentation ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {OBJECTIVE_TEMPLATES.map((t) => {
             const active = objectiveId === t.id;
@@ -304,22 +349,25 @@ export function CriarRapidoHome({
             );
           })}
         </div>
+        ) : null}
         <textarea
           ref={promptRef}
           data-vc-quick-prompt=""
           className="vc-input vc-textarea"
-          aria-label="Pedido para gerar carrossel"
+          aria-label={isPresentation ? 'Pedido para gerar apresentação' : 'Pedido para gerar carrossel'}
           rows={5}
           value={quickPrompt || ''}
           onChange={(e) => setQuickPrompt(e.target.value)}
           disabled={genBusy}
-          placeholder={'Ex.: Explique por que…\nAnuncie o lançamento de…\nConte a história de…\nCrie um passo a passo sobre…'}
+          placeholder={isPresentation
+            ? 'Ex.: Pitch de 10 slides sobre…\nAula introdutória de…\nProposta comercial para…\nRelatório executivo de…'
+            : 'Ex.: Explique por que…\nAnuncie o lançamento de…\nConte a história de…\nCrie um passo a passo sobre…'}
           style={{ minHeight: 110, resize: 'vertical', lineHeight: 1.5, fontSize: 14 }}
         />
         <div>
-          <div className="vc-label-sm" style={{ marginBottom: 7 }}>Quantidade de cards</div>
-          <div className="vc-seg" role="group" aria-label="Quantidade de cards" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
-            {['auto', 3, 5, 6, 8, 10].map((value) => {
+          <div className="vc-label-sm" style={{ marginBottom: 7 }}>{isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'}</div>
+          <div className="vc-seg" role="group" aria-label={isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'} style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
+            {(isPresentation ? ['auto', 6, 8, 10, 12, 14] : ['auto', 3, 5, 6, 8, 10]).map((value) => {
               const active = quickCardCount === value;
               return (
                 <button
@@ -337,7 +385,9 @@ export function CriarRapidoHome({
             })}
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-            Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards.
+            {isPresentation
+              ? 'Auto escolhe cerca de 10 slides; o arco cobre capa, agenda, corpo e fecho.'
+              : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -384,7 +434,7 @@ export function CriarRapidoHome({
         >
           {genBusy
             ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> Criando o texto…</>
-            : <><Sparkles size={14} /> Gerar carrossel</>}
+            : <><Sparkles size={14} /> {isPresentation ? 'Gerar apresentação' : 'Gerar carrossel'}</>}
         </button>
       </section>
 
@@ -433,7 +483,9 @@ export function CriarRapidoHome({
         fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
-        <span>O Viral prepara os arquivos. A publicação é feita por você no Instagram.</span>
+        <span>{isPresentation
+          ? 'O Viral prepara os slides. Exporte PDF 16:9 e apresente onde quiser.'
+          : 'O Viral prepara os arquivos. A publicação é feita por você no Instagram.'}</span>
         <span>Seus projetos ficam neste navegador. Faça um backup para não perder o trabalho.</span>
         {onExportBackup ? (
           <button

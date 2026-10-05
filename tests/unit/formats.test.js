@@ -13,6 +13,10 @@ describe('FORMATS', () => {
     expect(FORMATS.stories).toMatchObject({ w: 1080, h: 1920 });
   });
 
+  it('apresentação é 1920x1080 (16:9)', () => {
+    expect(FORMATS.apresentacao).toMatchObject({ w: 1920, h: 1080, label: 'Apresentação 16:9' });
+  });
+
   it('todo formato define safe zones percentuais', () => {
     for (const f of Object.values(FORMATS)) {
       expect(f.edgePct).toBeGreaterThan(0);

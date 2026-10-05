@@ -447,7 +447,29 @@ function AccountHomeShell({
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}
               >
-                <Plus size={14} /> Novo projeto
+                <Plus size={14} /> Novo carrossel
+              </button>
+              <button
+                type="button"
+                onClick={() => newDoc(
+                  {
+                    creativePreset: 'apresentacao',
+                    fmt: 'apresentacao',
+                    mode: 'editorial',
+                    quickCardCount: '10',
+                    slideTextDensity: '1_2',
+                  },
+                  'Nova apresentação',
+                )}
+                style={{
+                  height: 40, padding: '0 16px', borderRadius: 9999,
+                  border: '1px solid var(--border)', background: 'var(--bg-base)',
+                  color: 'var(--text-primary)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <Layers size={14} /> Nova apresentação
               </button>
             </div>
           </section>

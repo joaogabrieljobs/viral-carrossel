@@ -523,6 +523,11 @@ PRIORIDADE DO MATERIAL E DO TEMA:
 /** Pacotes criativos da geração — id `livre` = Personalizado. Entre T/C e Personalizado: arquétipos «Templates prontos» (Erro Comum, Tendência de Mercado, …). */
 const CREATIVE_PRESETS = [
   {
+    id: 'apresentacao',
+    label: 'Apresentação',
+    desc: 'Deck 16:9 estilo Gamma: capa, agenda, argumentos e fecho — para pitch, aula ou proposta. Não é carrossel de feed.',
+  },
+  {
     id: 'tendencia_cultura',
     label: 'Tendência/Cultura',
     desc: 'Carrossel de tendência e cultura: nomeia o que o público já sente no mundo — não lista de dicas nem aula de conceito. Gatilhos: identificação, alívio, autoridade.',
@@ -734,6 +739,9 @@ function coerceCultureTone(v) {
 }
 
 function buildGenerationIntroLine(presetId) {
+  if (presetId === 'apresentacao') {
+    return 'Atue como designer de apresentações e estrategista de narrativa. Produza um DECK 16:9 (não carrossel Instagram): uma ideia por slide, tipografia dominante, JSON válido apenas — sem markdown, sem texto extra.';
+  }
   if (isTendenciaCulturaPreset(presetId)) {
     return 'Atue como estrategista de cultura digital e comportamento em rede. Produza um carrossel que NOMEIE um fenômeno que o público já percebia — não lista de dicas nem aula solta de conceito. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
   }

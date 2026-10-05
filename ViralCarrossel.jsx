@@ -131,6 +131,13 @@ import {
   resolveMaterialPromptParts,
 } from './src/utils/generation-prompts.js';
 import {
+  isApresentacaoPreset,
+  buildApresentacaoPackBlock,
+  buildApresentacaoRefineHint,
+  presentationDocPatch,
+  APRESENTACAO_PRESET_ID,
+} from './src/utils/presentation.js';
+import {
   normalizeStyleKit,
   buildProjectContextBlock,
   buildStyleKitTextHint,
@@ -989,7 +996,14 @@ export default function App() {
   );
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
-    return { ...d, fmt: FORMATS[raw] ? raw : 'carrossel' };
+    const nextFmt = FORMATS[raw] ? raw : 'carrossel';
+    if (nextFmt === 'apresentacao') {
+      return { ...d, ...presentationDocPatch(), fmt: nextFmt };
+    }
+    if (d.fmt === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
+      return { ...d, fmt: nextFmt, creativePreset: 'livre' };
+    }
+    return { ...d, fmt: nextFmt };
   }), [history]);
 
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
@@ -1017,10 +1031,17 @@ export default function App() {
     ...d,
     mode: typeof next==='function' ? next(d.mode || 'editorial') : next,
   })), [history]);
-  const setCreativePreset = useCallback(next => history.set(d => ({
-    ...d,
-    creativePreset: typeof next==='function' ? next(d.creativePreset ?? 'livre') : next,
-  })), [history]);
+  const setCreativePreset = useCallback(next => history.set(d => {
+    const creativePreset = typeof next === 'function' ? next(d.creativePreset ?? 'livre') : next;
+    if (isApresentacaoPreset(creativePreset)) {
+      return { ...d, ...presentationDocPatch(), creativePreset };
+    }
+    // Sai do deck: volta ao feed 4:5 se ainda estava em 16:9.
+    if (isApresentacaoPreset(d.creativePreset) && d.fmt === 'apresentacao') {
+      return { ...d, creativePreset, fmt: 'carrossel' };
+    }
+    return { ...d, creativePreset };
+  }), [history]);
 
   // ── PADRÃO VISUAL ────────────────────────────────────────────────────────
   // Trackeia qual dos 12 presets visuais o user escolheu (null = nenhum).
@@ -2695,7 +2716,9 @@ export default function App() {
     const effectiveAxes = axes || imgParams;
     const cp = presetArg ?? creativePreset ?? 'livre';
     const objective = normalizeContentObjective(objectiveArg ?? contentObjective);
-    const effectiveMode = isTendenciaCulturaPreset(cp)
+    const effectiveMode = isApresentacaoPreset(cp)
+      ? 'editorial'
+      : isTendenciaCulturaPreset(cp)
       ? 'editorial'
       : isQuickTemplatePreset(cp)
         ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(cp)] || 'editorial')
@@ -2722,6 +2745,7 @@ export default function App() {
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()));
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
+    const apresentacaoPackBlock = isApresentacaoPreset(cp) ? buildApresentacaoPackBlock(count) : '';
     const quickTid = quickTemplateIdFromPreset(cp);
     const quickPackBlock = quickTid ? buildQuickTemplatePackBlock(quickTid, count) : '';
 
@@ -2737,7 +2761,7 @@ REGRA DE IDIOMA (obrigatória):
 `;
 
     const contextoModoPerso =
-      isTendenciaCulturaPreset(cp)
+      isApresentacaoPreset(cp) || isTendenciaCulturaPreset(cp)
         ? ''
         : isQuickTemplatePreset(cp)
           ? [
@@ -2751,7 +2775,9 @@ REGRA DE IDIOMA (obrigatória):
               `Tom de voz solicitado: ${tone}`,
             ].filter(Boolean).join('\n');
     const modoNarrativoBloco =
-      effectiveMode === 'none' ? modeDef.method : announcement && !chosenNarrativeMode ? 'Arco publicitário: apresente o produto e a possibilidade concreta que ele oferece, desenvolva benefícios sustentados pelo brief e encerre com um próximo passo. Cada card deve ser uma peça pronta para o público.' : isTendenciaCulturaPreset(cp)
+      effectiveMode === 'none' ? modeDef.method : announcement && !chosenNarrativeMode ? 'Arco publicitário: apresente o produto e a possibilidade concreta que ele oferece, desenvolva benefícios sustentados pelo brief e encerre com um próximo passo. Cada card deve ser uma peça pronta para o público.' : isApresentacaoPreset(cp)
+        ? '(Contexto estrutural: use apenas o PACOTE APRESENTAÇÃO abaixo — ignore arcos de carrossel Instagram.)'
+        : isTendenciaCulturaPreset(cp)
         ? '(Contexto estrutural: use apenas o PACOTE TENDÊNCIA/CULTURA abaixo — ignore modos narrativos editoriais tipo editorial/viral/storytelling.)'
         : modeDef.method;
 
@@ -2760,8 +2786,12 @@ REGRA DE IDIOMA (obrigatória):
       String(materialPriorityBlock || '').trim()
     );
 
+    const deliveryLine = isApresentacaoPreset(cp)
+      ? `Crie uma APRESENTAÇÃO (deck 16:9) de ${count} slides sobre: "${topic}"`
+      : `Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"`;
+
     const prompt = `${introLine}
-${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}Crie um carrossel de ${count} slides para Instagram sobre: "${topic}"
+${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}${deliveryLine}
 ${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}${projectContextBlock}${styleKitTextHint}
 ${hasPromptMaterial ? '' : `${materialBlock}${materialPriorityBlock}`}${imgParamsBlock}
 
@@ -2773,6 +2803,7 @@ ${effectiveMode === 'none' ? '' : performanceGuidance.prompt}
 
 ${modoNarrativoBloco}
 ${brandVoiceBlock}
+${apresentacaoPackBlock}
 ${tendenciaPackBlock}
 ${quickPackBlock ? `${quickPackBlock}\n` : ''}
 
@@ -2865,6 +2896,18 @@ ${jsonShapeLine}`;
         ...visualSlideOverrides,
       };
 
+      if (isApresentacaoPreset(cp)) {
+        // Deck 16:9: tipografia dominante, bodyAfterImage vazio, layout centrado.
+        return {
+          ...base,
+          layout: 'mc',
+          align: 'center',
+          photoRegion: 'full',
+          useCultureLayout: false,
+          bodyAfterImage: '',
+          overlay: i === 0 ? Math.max(55, Number(base.overlay) || 60) : (Number(base.overlay) || 45),
+        };
+      }
       if (isTendenciaCulturaPreset(cp)) {
         let rawBody = typeof s.bodyAfterImage === 'string'
           ? s.bodyAfterImage
@@ -2943,6 +2986,7 @@ ${jsonShapeLine}`;
     }
     history.set(d => ({
       ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp,
+      ...(isApresentacaoPreset(cp) ? { fmt: 'apresentacao' } : {}),
       ...(effectiveVisualPreset ? { visualPreset: effectiveVisualPreset } : {}),
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
       editorialContext: { topic, niche: n || '', generatedAt: new Date().toISOString(), suggestedStructureId: performanceGuidance.preferredStructureId },
@@ -3227,18 +3271,26 @@ ${capRules}
   };
 
   /** Geração rápida a partir do prompt da aba Narrativa (usa styleKit + material). */
-  const handleQuickGenerateFromNarrativa = async (promptText, { withImages = false, narrativeMode = 'none', cardCount = 'auto' } = {}) => {
+  const handleQuickGenerateFromNarrativa = async (promptText, {
+    withImages = false,
+    narrativeMode = 'none',
+    cardCount = 'auto',
+    productKind = null,
+  } = {}) => {
     const topic = String(promptText || '').trim();
     if (!topic) {
       toast('Escreva o que você quer gerar no prompt.', 'error');
       return;
     }
     try {
-      const resolved = resolveQuickGenerationRequest(topic, 6);
+      const wantPresentation = productKind === 'apresentacao' || isApresentacaoPreset(creativePreset);
+      if (wantPresentation) setCreativePreset(APRESENTACAO_PRESET_ID);
+      const resolved = resolveQuickGenerationRequest(topic, wantPresentation ? 10 : 6);
       const preferredCount = cardCount === 'auto' ? resolved.count : Number(cardCount);
-      const count = Number.isInteger(preferredCount) && preferredCount >= 1 && preferredCount <= 12
+      const maxSlides = wantPresentation ? 16 : 12;
+      const count = Number.isInteger(preferredCount) && preferredCount >= 1 && preferredCount <= maxSlides
         ? preferredCount
-        : resolved.count;
+        : (wantPresentation ? 10 : resolved.count);
       const { announcement } = resolved;
       const toneFromBrand = (brandToneIsReady(brand) && brand.useBrandVoice !== false)
         ? (brand.brandTone?.summary || brand.defaultTone || '').trim()
@@ -3253,11 +3305,11 @@ ${capRules}
         audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
         imgMode: 'dalle',
         imgParams,
-        mode: normalizeNarrativeModeId(narrativeMode),
-        announcement,
-        creativePreset: 'livre',
-        contentObjective: announcement ? 'leads' : contentObjective,
-        slideTextDensity: announcement ? '1_5' : slideTextDensity,
+        mode: wantPresentation ? 'editorial' : normalizeNarrativeModeId(narrativeMode),
+        announcement: wantPresentation ? false : announcement,
+        creativePreset: wantPresentation ? APRESENTACAO_PRESET_ID : (creativePreset || 'livre'),
+        contentObjective: wantPresentation ? 'auto' : (announcement ? 'leads' : contentObjective),
+        slideTextDensity: wantPresentation ? '1_2' : (announcement ? '1_5' : slideTextDensity),
         cardVisualStyle,
         visualPreset,
         fetchImagesNow: withImages && hasOpenAI,
@@ -3344,6 +3396,7 @@ Instrução: ${instruction}
 REGRAS DE VOZ:
 ${voiceBulk}
 ${buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity)}
+${isApresentacaoPreset(creativePreset) ? buildApresentacaoRefineHint() : ''}
 ${refineAllHybrid ? '- Layout Personalizado (1/1 ou 1/2): do 3.º slide em diante o card é sanduíche — reescreva também "bodyAfterImage" (payoff abaixo da foto) mantendo o campo vazio nos slides 1–2.\n' : ''}- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
 - Respeite a identidade verbal e o material acima.
 
@@ -3611,6 +3664,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     slideImgGenBusy,
     generateSlideImageAt,
     creativePreset,
+    setCreativePreset,
     fmt,
     applyTypographyToAllCards,
     applyBrandTypographyToAllSlides,
@@ -4187,7 +4241,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     {appMode === 'criador' ? (
                       <>Escreva o pedido<br/><span style={{ color:'var(--accent)' }}>e gere.</span></>
                     ) : (
-                      <>Crie seu carrossel<br/><span style={{ color:'var(--accent)' }}>viral.</span></>
+                      <>Carrossel ou<br/><span style={{ color:'var(--accent)' }}>apresentação.</span></>
                     )}
                   </div>
                   <p style={{
@@ -4200,11 +4254,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   }}>
                     {appMode === 'criador'
                       ? (isMobile
-                        ? 'Na barra lateral: contexto → pedido → Gerar carrossel → baixar.'
-                        : <>Na sidebar: contexto → pedido → Gerar → baixar.<br/>Um caminho até o PNG.</>)
+                        ? 'Na barra lateral: escolha Carrossel ou Apresentação → pedido → Gerar.'
+                        : <>Na sidebar: Carrossel IG ou Apresentação → pedido → Gerar.<br/>PNG do feed ou PDF 16:9.</>)
                       : (isMobile
-                        ? 'Informe o tema e a IA gera gancho, slides e legenda prontos para postar.'
-                        : <>Informe o tema e a IA gera gancho,<br/>slides e legenda prontos para postar.</>)}
+                        ? 'Feed Instagram ou deck 16:9 estilo Gamma — a IA monta o texto dos slides.'
+                        : <>Feed Instagram ou deck 16:9 (estilo Gamma).<br/>A IA monta gancho, slides e fecho.</>)}
                   </p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     <button
@@ -4242,6 +4296,45 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     }}>
                       <Sparkles size={16}/>
                       {appMode === 'criador' ? 'Escrever o pedido' : 'Gerar carrossel com IA'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreativePreset(APRESENTACAO_PRESET_ID);
+                        if (appMode === 'criador') {
+                          setTab('home');
+                          if (isMobile) setDrawerOpen(true);
+                          requestAnimationFrame(() => {
+                            document.querySelector('[data-vc-quick-prompt]')?.focus?.();
+                          });
+                          return;
+                        }
+                        setSetupOpen(true);
+                      }}
+                      aria-label="Gerar apresentação com IA"
+                      style={{
+                        minHeight:48,
+                        borderRadius:9999,
+                        border:'1px solid var(--border)',
+                        cursor:'pointer',
+                        background:'var(--bg-elevated)',
+                        color:'var(--text-primary)',
+                        fontSize:15,
+                        fontWeight:600,
+                        fontFamily:'var(--font-ui)',
+                        letterSpacing:'-0.016em',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:10,
+                        padding: '0 20px',
+                        transition:'border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
+                      }}
+                      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
+                      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    >
+                      <Layers size={16}/>
+                      Gerar apresentação
                     </button>
                     <div style={{
                       display:'grid',
