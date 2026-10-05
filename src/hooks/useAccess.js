@@ -15,8 +15,9 @@ import {
 import { shouldShowOnboardingLanding, dismissOnboardingLanding } from '../utils/landing-gate.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { SK } from '../utils/storage.js';
+import { clearAccountLocalData } from '../utils/clear-account-data.js';
 
-export function useAccess({ setShellView, onLeaveEditor }) {
+export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -173,11 +174,16 @@ export function useAccess({ setShellView, onLeaveEditor }) {
       if (url) window.location.href = url;
     } catch (e) {
       console.warn('[billing] portal', e);
-      alert(e?.message || 'Não foi possível abrir o portal de assinatura.');
+      const msg = e?.message || 'Não foi possível abrir o portal de assinatura.';
+      if (typeof toast === 'function') toast(msg, 'error', 5000);
+      else console.error(msg);
     }
-  }, []);
+  }, [toast]);
   const handleLogout = useCallback(async () => {
     await logoutAccess();
+    // FE-001/002/003: cookie já morreu; limpa biblioteca, BYOK e IndexedDB
+    // antes do reload para o próximo utilizador no mesmo browser não herdar.
+    await clearAccountLocalData();
     trackEvent('logout');
     // Sessão morta no servidor — recarrega pro shell reavaliar (paywall/landing).
     window.location.assign('/');

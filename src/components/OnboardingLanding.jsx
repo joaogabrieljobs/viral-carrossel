@@ -463,11 +463,15 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           background: var(--accent-hover) !important;
           box-shadow: 0 8px 32px rgba(255, 45, 141, 0.35);
         }
-        /* Botões do topo sobre fotografia: contorno próprio + anel de foco visível.
-           Sem isto ficavam texto branco sem moldura, invisíveis em zonas claras da foto. */
+        /* Botões do topo sobre fotografia: fundo opaco o bastante para AA
+           mesmo em zonas claras da foto (WEB-010). */
+        .vc-landing-navbtn {
+          background: rgba(14, 12, 20, 0.55) !important;
+          border-color: rgba(255, 255, 255, 0.28) !important;
+        }
         .vc-landing-navbtn:hover {
           border-color: var(--accent) !important;
-          background: rgba(255, 45, 141, 0.18) !important;
+          background: rgba(255, 45, 141, 0.28) !important;
         }
         .vc-landing-navbtn:focus-visible,
         .vc-landing-cta:focus-visible {
@@ -626,13 +630,14 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           <div style={{
             position: 'absolute',
             inset: 0,
+            // Overlay mais denso na zona de texto (esquerda / baixo) — WEB-010.
             background: isMobile
               ? `
-                linear-gradient(180deg, rgba(14,12,20,0.35) 0%, rgba(14,12,20,0.2) 32%, rgba(14,12,20,0.88) 72%, rgba(14,12,20,0.96) 100%)
+                linear-gradient(180deg, rgba(14,12,20,0.55) 0%, rgba(14,12,20,0.35) 28%, rgba(14,12,20,0.9) 68%, rgba(14,12,20,0.97) 100%)
               `
               : `
-                linear-gradient(90deg, rgba(14,12,20,0.92) 0%, rgba(14,12,20,0.72) 38%, rgba(14,12,20,0.25) 68%, rgba(14,12,20,0.4) 100%),
-                linear-gradient(180deg, rgba(14,12,20,0.35) 0%, transparent 40%, rgba(14,12,20,0.55) 100%)
+                linear-gradient(90deg, rgba(14,12,20,0.94) 0%, rgba(14,12,20,0.82) 36%, rgba(14,12,20,0.35) 66%, rgba(14,12,20,0.5) 100%),
+                linear-gradient(180deg, rgba(14,12,20,0.45) 0%, transparent 38%, rgba(14,12,20,0.65) 100%)
               `,
           }} />
         </div>

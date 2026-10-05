@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: { message: 'Method Not Allowed' } });
   }
 
-  const limited = consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'anthropic' });
+  const limited = await consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'anthropic' });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec, true);
 
   const access = await requireActiveSubscription(req, res, { errorShape: 'nested' });

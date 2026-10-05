@@ -256,57 +256,76 @@ export function useLibrary({
    * navegador, logo exportar só o `bgImageId` daria um ficheiro que abre sem fotos
    * noutra máquina. Aqui voltam a ser embutidas em data URL.
    */
-  const comImagensEmbutidas = useCallback(async (entries) => Promise.all(
-    (entries || []).map(async (entry) => {
-      const slides = entry?.doc?.slides;
-      if (!Array.isArray(slides)) return entry;
-      const novos = await Promise.all(slides.map(async (sl) => {
-        sl = await exportSlideLogo(sl);
-        if (!sl?.bgImageId) return sl;
-        try {
-          const dataUrl = await imagemComoDataUrl(sl.bgImageId);
-          return dataUrl ? { ...sl, bgImage: dataUrl } : sl;
-        } catch { return sl; }
-      }));
-      return {
-        ...entry,
-        doc: {
-          ...entry.doc,
-          slides: novos,
-          brand: await exportBrandLogo(entry.doc.brand),
-          styleKit: await exportProjectReferences(entry.doc.styleKit),
-        },
-      };
-    }),
-  ), []);
+  const comImagensEmbutidas = useCallback(async (entries) => {
+    let missingBg = 0;
+    const out = await Promise.all(
+      (entries || []).map(async (entry) => {
+        const slides = entry?.doc?.slides;
+        if (!Array.isArray(slides)) return entry;
+        const novos = await Promise.all(slides.map(async (sl) => {
+          sl = await exportSlideLogo(sl);
+          if (!sl?.bgImageId) return sl;
+          try {
+            const dataUrl = await imagemComoDataUrl(sl.bgImageId);
+            if (!dataUrl) {
+              missingBg += 1;
+              return sl;
+            }
+            return { ...sl, bgImage: dataUrl };
+          } catch {
+            missingBg += 1;
+            return sl;
+          }
+        }));
+        return {
+          ...entry,
+          doc: {
+            ...entry.doc,
+            slides: novos,
+            brand: await exportBrandLogo(entry.doc.brand),
+            styleKit: await exportProjectReferences(entry.doc.styleKit),
+          },
+        };
+      }),
+    );
+    return { entries: out, missingBg };
+  }, []);
 
   const exportDoc = useCallback(async (docId) => {
     const entry = snapshotEntries(library).find(e => e.id === docId);
     if (!entry) return;
     let comImagens;
-    try { [comImagens] = await comImagensEmbutidas([entry]); }
-    catch (err) { toast(err.message, 'error'); return; }
+    let missingBg = 0;
+    try {
+      const packed = await comImagensEmbutidas([entry]);
+      [comImagens] = packed.entries;
+      missingBg = packed.missingBg;
+    } catch (err) { toast(err.message, 'error'); return; }
     const folders = comImagens.folderId
       ? libraryFolders.filter(folder => folder.id === comImagens.folderId)
       : [];
     const blob = new Blob([JSON.stringify({ vcVersion: 2, folders, docs: [comImagens] }, null, 2)], { type: 'application/json' });
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
     await downloadBlob(blob, fname);
-    toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
-    trackEvent('export_json_single', { size_kb: String(Math.round(blob.size / 1024)) });
+    if (missingBg > 0) {
+      toast(`Backup "${fname}" salvo — ${missingBg} slide(s) sem imagem de fundo no ficheiro.`, 'warning', 5500);
+    } else {
+      toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
+    }
+    trackEvent('export_json_single', { size_kb: String(Math.round(blob.size / 1024)), missing_bg: String(missingBg) });
   }, [library, libraryFolders, toast, comImagensEmbutidas]);
 
   // Exporta TODA a biblioteca de uma vez
   const exportAllDocs = useCallback(async () => {
     let docs;
     let brands;
+    let missingBg = 0;
     try {
-      [docs, brands] = await Promise.all([
-        comImagensEmbutidas(snapshotEntries(library)),
-        Promise.all((brandRoster || []).map((profile) => exportBrandLogo(profile))),
-      ]);
-    }
-    catch (err) { toast(err.message, 'error'); return; }
+      const packed = await comImagensEmbutidas(snapshotEntries(library));
+      docs = packed.entries;
+      missingBg = packed.missingBg;
+      brands = await Promise.all((brandRoster || []).map((profile) => exportBrandLogo(profile)));
+    } catch (err) { toast(err.message, 'error'); return; }
     const blob = new Blob([JSON.stringify({
       vcVersion: 3,
       folders: libraryFolders,
@@ -316,8 +335,16 @@ export function useLibrary({
     }, null, 2)], { type: 'application/json' });
     const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
-    toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
-    trackEvent('export_json_full', { project_count: String(library.length), size_kb: String(Math.round(blob.size / 1024)) });
+    if (missingBg > 0) {
+      toast(`Backup completo "${fname}" — ${library.length} projeto(s), ${missingBg} slide(s) sem imagem.`, 'warning', 6500);
+    } else {
+      toast(`Backup completo "${fname}" — ${library.length} projeto(s). Guarde em local seguro.`, 'success', 5500);
+    }
+    trackEvent('export_json_full', {
+      project_count: String(library.length),
+      size_kb: String(Math.round(blob.size / 1024)),
+      missing_bg: String(missingBg),
+    });
   }, [library, libraryFolders, brandRoster, activeBrandId, toast, comImagensEmbutidas]);
 
   // Importa um arquivo .json exportado anteriormente (merge na biblioteca)

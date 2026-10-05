@@ -61,7 +61,7 @@ function Avatar({ profile, name, size = 72 }) {
 
 function EditProfileModal({ open, draft, onChange, onClose, onSave, email }) {
   const fileRef = useRef(null);
-  if (!open) return null;
+  const [avatarError, setAvatarError] = useState('');
 
   const setField = (key, value) => onChange({ ...draft, [key]: value });
   const setSocial = (key, value) => onChange({
@@ -73,16 +73,41 @@ function EditProfileModal({ open, draft, onChange, onClose, onSave, email }) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
+    // Limite do ficheiro de entrada; a data URL final é comprimida (~256px / JPEG).
     if (file.size > 2.5 * 1024 * 1024) {
-      window.alert('Use uma imagem até 2,5 MB.');
+      setAvatarError('Use uma imagem até 2,5 MB.');
       return;
     }
+    setAvatarError('');
     const reader = new FileReader();
     reader.onload = () => {
-      onChange({ ...draft, avatarDataUrl: String(reader.result || '') });
+      const raw = String(reader.result || '');
+      const img = new Image();
+      img.onload = () => {
+        const maxSide = 256;
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          onChange({ ...draft, avatarDataUrl: raw });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        // JPEG ~0.82: avatar 256px fica tipicamente <80 KB (FE-012).
+        const compressed = canvas.toDataURL('image/jpeg', 0.82);
+        onChange({ ...draft, avatarDataUrl: compressed });
+      };
+      img.onerror = () => onChange({ ...draft, avatarDataUrl: raw });
+      img.src = raw;
     };
     reader.readAsDataURL(file);
   };
+
+  if (!open) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 12000 }}>
@@ -167,6 +192,11 @@ function EditProfileModal({ open, draft, onChange, onClose, onSave, email }) {
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickAvatar} />
             </div>
           </div>
+          {avatarError ? (
+            <p role="alert" style={{ margin: 0, fontSize: 13, color: 'var(--danger, #b42318)', fontWeight: 600 }}>
+              {avatarError}
+            </p>
+          ) : null}
 
           <Field label="Nome">
             <input

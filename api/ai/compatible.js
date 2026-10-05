@@ -59,7 +59,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: { message: 'Method not allowed' } });
 
-  const limited = consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'compatible' });
+  const limited = await consumeRateLimit(req, { limit: 40, windowMs: 60_000, keyPrefix: 'compatible' });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec, true);
 
   const access = await requireActiveSubscription(req, res, { errorShape: 'nested' });
@@ -103,6 +103,11 @@ export default async function handler(req, res) {
     if (payload.stream || payload.tools || payload.functions || payload.tool_choice) {
       return res.status(400).json({ error: { message: 'Esta opção avançada não está disponível com a IA incluída no plano. Use a sua própria chave em Configurar IA.' } });
     }
+    // Sem fan-out de completions (auditoria BE-PAYLOAD-N): força n=1.
+    if (payload.n != null && Number(payload.n) !== 1) {
+      return res.status(400).json({ error: { message: 'A IA incluída no plano só permite uma conclusão por pedido.' } });
+    }
+    payload.n = 1;
     if (messagesChars(payload) > PLATFORM_MAX_PROMPT_CHARS) {
       return res.status(413).json({ error: { message: 'O material colado em Fontes é demasiado longo. Reduza o texto e tente de novo.' } });
     }

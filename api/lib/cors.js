@@ -2,15 +2,17 @@
 // Nunca refletir Origin arbitrário: endpoints carregam cookie de acesso
 // (billing/auth) ou chave de API do host (proxies IA).
 export function allowedOrigins() {
-  return new Set(
-    [
-      (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, ''),
-      'https://viralcarrossel.com.br',
-      'https://www.viralcarrossel.com.br',
-      'http://localhost:5173',
-      'http://localhost:4173',
-    ].filter(Boolean),
-  );
+  const origins = [
+    (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, ''),
+    'https://viralcarrossel.com.br',
+    'https://www.viralcarrossel.com.br',
+  ];
+  // Localhost só fora de produção (auditoria BE-CORS-LOCAL).
+  const vercelEnv = process.env.VERCEL_ENV || '';
+  if (vercelEnv !== 'production') {
+    origins.push('http://localhost:5173', 'http://localhost:4173');
+  }
+  return new Set(origins.filter(Boolean));
 }
 
 /**

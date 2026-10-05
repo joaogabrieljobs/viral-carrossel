@@ -1,5 +1,5 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, ChevronRight, Settings, Layers, User, Image as ImageIcon } from 'lucide-react';
 import AccountProfile from './AccountProfile.jsx';
 import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
@@ -52,6 +52,8 @@ function AccountHomeShell({
 
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const PAGE_SIZE = 48;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const navBtn = (id, label, Icon) => {
     const active = accountTab === id;
@@ -120,6 +122,14 @@ function AccountHomeShell({
       .filter(e => !search.trim() || (e.name || '').toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   ), [library, search]);
+
+  // FE-014: reset da janela visível ao mudar busca/biblioteca.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, library.length]);
+
+  const visibleItems = items.slice(0, visibleCount);
+  const hasMore = items.length > visibleCount;
 
   const aiReady = hasTextAI && hasImageAI;
   const projectName = activeEntryName || 'Sem título';
@@ -552,7 +562,7 @@ function AccountHomeShell({
                 : 'Ainda sem projetos. Crie um novo ou gere com IA.'}
             </div>
           )}
-          {items.map(entry => {
+          {visibleItems.map(entry => {
             const isActive = entry.id === activeDocId;
             const slides = entry.doc?.slides || [];
             const firstSlide = slides[0];
@@ -786,6 +796,25 @@ function AccountHomeShell({
               </div>
             );
           })}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              style={{
+                height: 44,
+                borderRadius: 9999,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: 'var(--font-ui)',
+                cursor: 'pointer',
+              }}
+            >
+              Mostrar mais ({items.length - visibleCount} restantes)
+            </button>
+          )}
         </div>
 
           <p style={{

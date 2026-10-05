@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Use GET ou POST' });
   }
 
-  const limited = consumeRateLimit(req, { limit: 20, windowMs: 60_000, keyPrefix: 'fetch-source' });
+  const limited = await consumeRateLimit(req, { limit: 20, windowMs: 60_000, keyPrefix: 'fetch-source' });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   const access = await requireActiveSubscription(req, res, { asJson: true });

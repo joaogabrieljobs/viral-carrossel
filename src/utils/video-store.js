@@ -84,6 +84,24 @@ export async function videoDelete(id) {
   });
 }
 
+/** Apaga a base inteira (logout / troca de conta). Best-effort. */
+export async function videoWipeDatabase() {
+  try {
+    if (_dbPromise) {
+      const db = await _dbPromise.catch(() => null);
+      try { db?.close(); } catch { /* */ }
+      _dbPromise = null;
+    }
+  } catch { /* */ }
+  if (typeof indexedDB === 'undefined') return;
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+    req.onblocked = () => resolve();
+  });
+}
+
 /** Lista todos os ids guardados — útil pra cleanup de orphans. */
 export async function videoListIds() {
   const db = await openDB();

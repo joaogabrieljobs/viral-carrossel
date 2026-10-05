@@ -21,6 +21,8 @@ import {
   periodBoundsFromSubscription,
 } from './plans.js';
 import { getQuotaUsage } from './image-quota.js';
+import { invalidateActiveAccessForCustomer } from './require-access.js';
+import { consumeRateLimit, rateLimitResponse } from './rate-limit.js';
 
 import { applyCors } from './cors.js';
 
@@ -41,6 +43,9 @@ export async function handleSession(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const limited = await consumeRateLimit(req, { limit: 60, windowMs: 60_000, keyPrefix: 'session' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   if (billingDisabled()) {
     return res.status(200).json({
@@ -67,6 +72,7 @@ export async function handleSession(req, res) {
 
     const sub = await findActiveSubscription(access.customerId);
     if (!sub) {
+      invalidateActiveAccessForCustomer(access.customerId);
       return res.status(200).json({
         active: false,
         email: access.email,
@@ -122,8 +128,7 @@ export async function handleCheckout(req, res) {
     return res.status(400).json({ error: 'Billing desativado neste ambiente' });
   }
 
-  const { consumeRateLimit, rateLimitResponse } = await import('./rate-limit.js');
-  const limited = consumeRateLimit(req, { limit: 8, windowMs: 60_000, keyPrefix: 'checkout' });
+  const limited = await consumeRateLimit(req, { limit: 8, windowMs: 60_000, keyPrefix: 'checkout' });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   try {
@@ -195,6 +200,9 @@ export async function handleConfirm(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const limited = await consumeRateLimit(req, { limit: 20, windowMs: 60_000, keyPrefix: 'confirm' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
+
   try {
     const { sessionId } = readJson(req);
     if (!sessionId) return res.status(400).json({ error: 'sessionId obrigatório' });
@@ -253,6 +261,9 @@ export async function handlePortal(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const limited = await consumeRateLimit(req, { limit: 10, windowMs: 60_000, keyPrefix: 'portal' });
+  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
+
   try {
     const access = await readCurrentAccessCookie(req);
     if (!access?.customerId) {
@@ -278,6 +289,10 @@ export async function handleLogout(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const access = await readCurrentAccessCookie(req);
+    if (access?.customerId) invalidateActiveAccessForCustomer(access.customerId);
+  } catch { /* cookie já inválido */ }
   clearAccessCookie(res);
   return res.status(200).json({ ok: true });
 }

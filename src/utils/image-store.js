@@ -94,6 +94,24 @@ export async function imageDelete(id) {
   });
 }
 
+/** Apaga a base inteira (logout / troca de conta). Best-effort. */
+export async function imageWipeDatabase() {
+  try {
+    if (_dbPromise) {
+      const db = await _dbPromise.catch(() => null);
+      try { db?.close(); } catch { /* */ }
+      _dbPromise = null;
+    }
+  } catch { /* */ }
+  if (typeof indexedDB === 'undefined') return;
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+    req.onblocked = () => resolve();
+  });
+}
+
 export async function imageListIds() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -104,12 +122,15 @@ export async function imageListIds() {
 }
 
 /** Apaga o que nenhum slide referencia. Corre uma vez por sessão. */
-export async function imageCleanupOrphans(keepIds) {
+export async function imageCleanupOrphans(keepIds, { graceMs = 5 * 60_000 } = {}) {
   const keep = new Set((keepIds || []).filter(Boolean));
   const all = await imageListIds();
-  // Uploads em andamento ainda podem não ter chegado ao autosave.
+  // Uploads/imports recentes ainda podem não ter chegado ao autosave (FE-011).
+  const grace = Math.max(60_000, Number(graceMs) || 0);
   const candidates = await Promise.all(all.filter(id => !keep.has(id)).map(imageGet));
-  const orfas = candidates.filter(entry => entry && entry.savedAt < Date.now() - 60_000).map(entry => entry.id);
+  const orfas = candidates
+    .filter(entry => entry && entry.savedAt < Date.now() - grace)
+    .map(entry => entry.id);
   await Promise.all(orfas.map((id) => imageDelete(id)));
   return orfas.length;
 }

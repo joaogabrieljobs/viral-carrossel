@@ -6,10 +6,10 @@ import { readAccessCookie, readCurrentAccessCookie, billingDisabled } from './ac
 import { findActiveSubscription } from './stripe.js';
 
 // Uploads de carrossel fazem várias chamadas OCR em sequência. Um cache curto
-// evita repetir duas consultas Stripe por imagem sem prolongar acesso revogado
-// por mais do que alguns segundos.
+// evita repetir duas consultas Stripe por imagem — TTL baixo para não prolongar
+// acesso após cancelamento (auditoria BE-003).
 const activeAccessCache = new Map();
-const ACTIVE_ACCESS_CACHE_MS = 15_000;
+const ACTIVE_ACCESS_CACHE_MS = 2_000;
 
 function cachedAccessKey(req) {
   try {
@@ -18,6 +18,15 @@ function cachedAccessKey(req) {
       ? `${token.customerId}:${token.iatMs || token.iat || 0}`
       : '';
   } catch { return ''; }
+}
+
+/** Remove entradas de um cliente (logout, cancelamento, sessão inactiva). */
+export function invalidateActiveAccessForCustomer(customerId) {
+  if (!customerId) return;
+  const prefix = `${customerId}:`;
+  for (const key of activeAccessCache.keys()) {
+    if (key.startsWith(prefix)) activeAccessCache.delete(key);
+  }
 }
 
 /**
@@ -62,6 +71,7 @@ export async function requireActiveSubscription(req, res, opts = {}) {
   try {
     const sub = await findActiveSubscription(access.customerId);
     if (!sub) {
+      invalidateActiveAccessForCustomer(access.customerId);
       fail(402, 'Assinatura inativa. Renove o plano para continuar.');
       return null;
     }

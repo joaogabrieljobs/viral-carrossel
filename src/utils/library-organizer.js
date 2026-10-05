@@ -33,6 +33,18 @@ export function normalizePublicationDate(value) {
     : '';
 }
 
+export function normalizePerformanceSettings(value) {
+  if (!value || typeof value !== 'object') return null;
+  const windowDaysRaw = Number(value.windowDays);
+  return {
+    account: String(value.account || '').trim().slice(0, 80),
+    windowDays: Number.isFinite(windowDaysRaw)
+      ? Math.max(1, Math.min(90, Math.floor(windowDaysRaw)))
+      : 7,
+    enabled: value.enabled !== false,
+  };
+}
+
 export function normalizeLibraryEntry(entry, folders = []) {
   const folderIds = new Set(normalizeLibraryFolders(folders).map((folder) => folder.id));
   const folderId = folderIds.has(String(entry?.folderId || '')) ? String(entry.folderId) : '';
@@ -40,7 +52,14 @@ export function normalizeLibraryEntry(entry, folders = []) {
   const status = ['draft', 'ready', 'scheduled', 'published'].includes(entry?.status)
     ? entry.status
     : 'draft';
-  return { ...entry, folderId, publicationDate, status };
+  const next = { ...entry, folderId, publicationDate, status };
+  // FE-006: campo declarativo — não depende só do spread acidental.
+  if (entry && Object.prototype.hasOwnProperty.call(entry, 'performanceSettings')) {
+    const normalized = normalizePerformanceSettings(entry.performanceSettings);
+    if (normalized) next.performanceSettings = normalized;
+    else delete next.performanceSettings;
+  }
+  return next;
 }
 
 export function createLibraryFolder(folders, name, idFactory = () => Math.random().toString(36).slice(2, 10)) {

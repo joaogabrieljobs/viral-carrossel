@@ -21,12 +21,26 @@ export function getStripe() {
   return _stripe;
 }
 
-export function getAppUrl(req) {
-  const fromEnv = (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, '');
+/**
+ * URL canónica da app (checkout success/cancel, OAuth redirect, portal).
+ * Nunca confiar em Host / X-Forwarded-Host — open redirect (WEB-001/006).
+ * Produção: APP_URL obrigatória. Preview Vercel: VERCEL_URL. Dev: localhost.
+ */
+export function getAppUrl(_req) {
+  const fromEnv = cleanEnv(process.env.APP_URL || process.env.VITE_APP_URL || '')
+    .replace(/\/$/, '');
   if (fromEnv) return fromEnv;
-  const proto = req?.headers?.['x-forwarded-proto'] || 'https';
-  const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
-  if (host) return `${proto}://${host}`;
+
+  const vercelUrl = String(process.env.VERCEL_URL || '').trim().replace(/\/$/, '');
+  if (vercelUrl) return `https://${vercelUrl}`;
+
+  const vercelEnv = process.env.VERCEL_ENV || '';
+  const isProd = vercelEnv === 'production'
+    || (!vercelEnv && process.env.NODE_ENV === 'production');
+  if (isProd) {
+    throw new Error('APP_URL não configurada em produção');
+  }
+
   return 'http://localhost:5173';
 }
 

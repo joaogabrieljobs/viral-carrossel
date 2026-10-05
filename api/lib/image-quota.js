@@ -5,7 +5,7 @@
  *   1. Upstash Redis REST — incremento atómico, é o melhor quando existe.
  *   2. Metadados do cliente Stripe — sem serviço extra, sobrevive a cold starts.
  *      É o que segura a quota desde que a base Upstash deste projeto foi apagada.
- *   3. Map em memória — só testes e dev com BILLING_DISABLED.
+ *   3. Map em memória — só testes e dev (nunca em produção Vercel — BE-005).
  *
  * O caminho 2 existe porque o 3 não é quota nenhuma: reiniciava a cada instância,
  * logo um assinante gerava sem limite e a plataforma pagava (auditoria H5).
@@ -14,7 +14,7 @@ import { stripeQuotaGet, stripeQuotaConsume, stripeQuotaRefund } from './quota-s
 
 const memory = new Map();
 
-/** Tecto por instância no último recurso (sem Upstash e sem Stripe utilizável). */
+/** Tecto por instância no último recurso (não-prod / testes). Em prod falha fechado. */
 export const DEGRADED_FALLBACK_CAP = 25;
 let _warnedNoUpstash = false;
 
@@ -25,6 +25,10 @@ function hasUpstash() {
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
   );
+}
+
+function isProductionQuotaStrict() {
+  return process.env.VERCEL_ENV === 'production';
 }
 
 function quotaKey(customerId, periodStartSec) {
@@ -69,7 +73,9 @@ function podeUsarStripe(customerId) {
 
 /**
  * Executa no primeiro armazenamento disponível: Upstash, senão Stripe, senão
- * memória. `memoryFn` recebe `degraded: true` quando a contagem deixou de ser
+ * memória. Em produção, se Stripe falhar (sem Upstash), falha fechado — não
+ * concede 25 créditos por instância (auditoria BE-005).
+ * `memoryFn` recebe `degraded: true` quando a contagem deixou de ser
  * partilhada entre instâncias — é o sinal para aplicar o tecto de último recurso.
  */
 async function withQuotaStore(upstashFn, memoryFn, stripeFn, customerId) {
@@ -88,7 +94,18 @@ async function withQuotaStore(upstashFn, memoryFn, stripeFn, customerId) {
       return await stripeFn();
     } catch (e) {
       console.error('[image-quota] contador no Stripe falhou:', e?.message || e);
+      if (isProductionQuotaStrict()) {
+        const err = new Error('quota_store_unavailable');
+        err.code = 'quota_store_unavailable';
+        throw err;
+      }
     }
+  }
+  if (isProductionQuotaStrict() && podeUsarStripe(customerId)) {
+    // Stripe era o caminho esperado e falhou — não degradar a memória em prod.
+    const err = new Error('quota_store_unavailable');
+    err.code = 'quota_store_unavailable';
+    throw err;
   }
   return memoryFn({ degraded: true });
 }

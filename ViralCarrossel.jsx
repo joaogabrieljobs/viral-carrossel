@@ -888,10 +888,14 @@ export default function App() {
     const onHidden = () => {
       if (document.visibilityState === 'hidden') flushLibrary();
     };
+    // pagehide + beforeunload: Safari iOS por vezes não dispara visibilitychange
+    // ao fechar o tab (auditoria FE-007).
     window.addEventListener('pagehide', flushLibrary);
+    window.addEventListener('beforeunload', flushLibrary);
     document.addEventListener('visibilitychange', onHidden);
     return () => {
       window.removeEventListener('pagehide', flushLibrary);
+      window.removeEventListener('beforeunload', flushLibrary);
       document.removeEventListener('visibilitychange', onHidden);
     };
   }, []);
@@ -1232,7 +1236,7 @@ export default function App() {
     reopenLanding,
     openPortal,
     handleLogout,
-  } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false) });
+  } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false), toast });
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
@@ -1242,13 +1246,19 @@ export default function App() {
   const { aiSettings, setAISettings, openaiKey, anthropicKey } = useAiSettings();
   // Biblioteca de hooks aprovados (B2)
   const [hookLibrary, setHookLibrary] = useState(() => lsGet(SK.hookLibrary, []));
-  // FASE 2 Narrative OS: Sistema de Modos (Criador/Diretor/Studio)
-  // Default Criador — esconde complexidade pra 90% dos users.
-  // Persiste em localStorage pra preservar entre sessions.
-  const [appMode, setAppModeState] = useState(() => {
+  // FASE 2 Narrative OS: Sistema de Modos (Criador/Diretor/Studio).
+  // Default Criador até a sessão estar resolvida — evita herdar o modo do
+  // utilizador anterior no mesmo browser antes do logout limpar (FE-015).
+  const [appMode, setAppModeState] = useState('criador');
+  const appModeHydratedRef = useRef(false);
+  useEffect(() => {
+    if (appModeHydratedRef.current) return;
+    if (access.status === 'loading') return;
+    appModeHydratedRef.current = true;
+    if (!access.active) return;
     const saved = lsGet(SK.appMode, 'criador');
-    return ['criador', 'diretor', 'studio'].includes(saved) ? saved : 'criador';
-  });
+    if (['criador', 'diretor', 'studio'].includes(saved)) setAppModeState(saved);
+  }, [access.status, access.active]);
   const setAppMode = useCallback((next) => {
     if (!['criador', 'diretor', 'studio'].includes(next)) return;
     setAppModeState(next);
@@ -1558,9 +1568,10 @@ export default function App() {
     return () => { cancelled = true; };
   }, [activeEntry?.id, doc.styleKit]);
 
-  // Limpeza das imagens que nenhum projeto referencia — uma vez por sessão.
+  // Limpeza das imagens que nenhum projeto referencia.
+  // Duas passagens: cedo (após boot) e tarde (após imports/edits) — FE-011.
   useEffect(() => {
-    const t = setTimeout(async () => {
+    const run = async () => {
       try {
         const removidas = await imageCleanupOrphans(idsDeImagemEmUso(
           libraryPersistRef.current,
@@ -1568,8 +1579,10 @@ export default function App() {
         ));
         if (removidas > 0) console.log(`[imagem] limpeza: ${removidas} imagem(ns) órfã(s) removida(s)`);
       } catch { /* IndexedDB indisponível */ }
-    }, 6000);
-    return () => clearTimeout(t);
+    };
+    const t1 = setTimeout(run, 8_000);
+    const t2 = setTimeout(run, 5 * 60_000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1993,8 +2006,19 @@ export default function App() {
     <button
       type="button"
       data-vc-tour="generate"
-      onClick={() => setSetupOpen(true)}
-      aria-label="Gerar carrossel com IA"
+      onClick={() => {
+        // Criar rápido: foca a sidebar (mesmo fluxo do canvas vazio) — UX-003R.
+        if (appMode === 'criador') {
+          setTab('home');
+          if (isMobile) setDrawerOpen(true);
+          requestAnimationFrame(() => {
+            document.querySelector('[data-vc-quick-prompt]')?.focus?.();
+          });
+          return;
+        }
+        setSetupOpen(true);
+      }}
+      aria-label={appMode === 'criador' ? 'Escrever o pedido na sidebar' : 'Gerar carrossel com IA'}
       style={{
         height: isMobile ? 40 : 40,
         padding: isMobile ? '0 14px' : '0 20px',
@@ -3035,6 +3059,9 @@ ${jsonShapeLine}`;
       try {
         if (!lsGet(SK.backupNudgeDone, false)) {
           lsSet(SK.backupNudgeDone, true);
+          // FE-013: flush síncrono antes do toast — o autosave 100ms ainda
+          // podia estar pendente quando o utilizador fechasse a aba.
+          flushPersistNow();
           toast('Projeto salvo neste navegador. Em Exportar → Backup JSON cria uma cópia portátil.', 'info', 7500);
         }
       } catch { /* */ }

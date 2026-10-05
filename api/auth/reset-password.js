@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const limited = consumeRateLimit(req, { limit: 10, windowMs: 15 * 60_000, keyPrefix: 'reset-password' });
+  const limited = await consumeRateLimit(req, { limit: 10, windowMs: 15 * 60_000, keyPrefix: 'reset-password' });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
   let body = req.body;
   try { if (typeof body === 'string') body = JSON.parse(body); } catch { body = null; }

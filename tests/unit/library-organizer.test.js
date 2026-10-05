@@ -24,6 +24,21 @@ describe('organização da biblioteca', () => {
     });
   });
 
+  it('normaliza performanceSettings de forma declarativa (FE-006)', () => {
+    const withPerf = normalizeLibraryEntry({
+      id: 'p',
+      status: 'draft',
+      performanceSettings: { account: ' @marca ', windowDays: 120, enabled: false },
+    }, []);
+    expect(withPerf.performanceSettings).toEqual({
+      account: '@marca',
+      windowDays: 90,
+      enabled: false,
+    });
+    const without = normalizeLibraryEntry({ id: 'q', status: 'draft' }, []);
+    expect(without.performanceSettings).toBeUndefined();
+  });
+
   it('valida datas reais e agenda o projeto sem alterar publicados', () => {
     expect(normalizePublicationDate('2026-02-29')).toBe('');
     expect(normalizePublicationDate('2028-02-29')).toBe('2028-02-29');

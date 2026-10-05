@@ -55,7 +55,7 @@ test.describe('Jornadas de billing', () => {
     await expect.poll(() => page.url()).not.toContain('billing=');
   });
 
-  test('CA-04 logout: perfil → Sair da conta → sessão encerrada', async ({ page }) => {
+  test('CA-04 logout: perfil → Sair da conta → sessão encerrada e dados locais limpos', async ({ page }) => {
     let logoutChamado = false;
     let sessaoAtual = SESSAO_ATIVA;
     await mockApi(page, {
@@ -71,6 +71,13 @@ test.describe('Jornadas de billing', () => {
     });
 
     await page.goto('/?app=1');
+    // Semeia dados de conta A — após logout não podem sobreviver (FE-001/003).
+    await page.evaluate(() => {
+      localStorage.setItem('vc_library', JSON.stringify([{ id: 'proj-a' }]));
+      localStorage.setItem('vc_ai_keys', JSON.stringify({ openai: 'sk-secret' }));
+      localStorage.setItem('vc_user_profile', JSON.stringify({ name: 'Alice' }));
+    });
+
     // home shell → aba Perfil
     await page.getByRole('button', { name: /perfil/i }).first().click();
     const sair = page.getByRole('button', { name: /sair da conta/i });
@@ -81,6 +88,11 @@ test.describe('Jornadas de billing', () => {
 
     // logout dispara e o gate volta (landing ou paywall — sem sessão)
     await expect.poll(() => logoutChamado, { timeout: 10_000 }).toBe(true);
+    await expect.poll(async () => page.evaluate(() => ({
+      library: localStorage.getItem('vc_library'),
+      keys: localStorage.getItem('vc_ai_keys'),
+      profile: localStorage.getItem('vc_user_profile'),
+    })), { timeout: 10_000 }).toEqual({ library: null, keys: null, profile: null });
   });
 
   test('CA-05 ?app=1 combinado com login=no_subscription não descarta o param', async ({ page }) => {
