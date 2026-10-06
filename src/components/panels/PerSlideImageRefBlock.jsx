@@ -2,13 +2,40 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 
+function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide') {
+  if (busy) {
+    return {
+      label: 'Gerando…',
+      title: `Gerando a imagem deste ${itemLabel}.`,
+    };
+  }
+  if (slide.bgImage) {
+    return {
+      label: 'Regenerar imagem',
+      title: `Substitui a imagem atual deste ${itemLabel} por uma nova geração.`,
+    };
+  }
+  if (slide.bgImageFailed) {
+    return {
+      label: 'Tentar novamente',
+      title: `Tentar gerar novamente a imagem deste ${itemLabel}.`,
+    };
+  }
+  return {
+    label: 'Gerar imagem',
+    title: `Gera apenas a imagem deste ${itemLabel} (usa 1 imagem da quota).`,
+  };
+}
+
 function PerSlideImageRefBlock({
   slide, width, onChangeExtra, onRemoveRef, onPickRef,
   onGenerateImage, generateImageBusy, generateImageDisabled,
+  itemLabel = 'slide',
   collapsible = false,
 }) {
   const extra = slide.imgExtraPrompt ?? '';
   const ref = slide.refImage;
+  const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao
   // mesmo tempo repetia a mesma caixa 7 vezes e empurrava os cards para baixo.
   // Abre sozinho quando o slide já tem referência ou prompt extra.
@@ -20,11 +47,12 @@ function PerSlideImageRefBlock({
       onClick={onGenerateImage}
       disabled={generateImageDisabled || generateImageBusy}
       aria-busy={generateImageBusy || undefined}
+      aria-label={imageAction.label}
       className="vc-btn vc-btn-ghost"
       title={
         generateImageDisabled
-          ? 'Defina palavras-chave de imagem neste card (aba Cards ou ao gerar o carrossel).'
-          : 'Gera só a imagem deste slide (usa 1 imagem da quota).'
+          ? `Defina palavras-chave de imagem neste ${itemLabel} antes de gerar.`
+          : imageAction.title
       }
       style={{
         flex: 1,
@@ -48,7 +76,7 @@ function PerSlideImageRefBlock({
       ) : (
         <Sparkles size={12} />
       )}
-      Gerar imagem
+      <span aria-live="polite">{imageAction.label}</span>
     </button>
   );
 
@@ -61,7 +89,7 @@ function PerSlideImageRefBlock({
           onClick={() => setAberto(true)}
           className="vc-btn vc-btn-ghost"
           aria-expanded={false}
-          title="Referência e direção da imagem deste slide"
+          title={`Referência e direção da imagem deste ${itemLabel}`}
           style={{
             height: 34, borderRadius: 9999, fontSize: 12, fontWeight: 500, padding: '0 12px',
             fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
@@ -133,7 +161,7 @@ function PerSlideImageRefBlock({
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <label className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
-            Prompt extra (este slide)
+            Prompt extra (este {itemLabel})
           </label>
           <textarea
             value={extra}
@@ -170,5 +198,6 @@ function PerSlideImageRefBlock({
 }
 
 export {
+  perSlideImageActionState,
   PerSlideImageRefBlock,
 };

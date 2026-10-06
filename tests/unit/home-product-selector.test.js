@@ -18,7 +18,9 @@ describe('seletor de produto na Home e na Biblioteca', () => {
   it('usa uma única escolha para criar ou gerar na Home da conta', () => {
     const code = source('src/components/AccountHomeShell.jsx');
 
-    expect(code).toContain("const [creationType, setCreationType] = useState('carrossel')");
+    expect(code).toContain('useState(() => projectKindOf(activeProject))');
+    expect(code).toContain("entry?.doc?.productKind === 'apresentacao'");
+    expect(code).toContain('setCreationType(projectKindOf(activeProject))');
     expect(code).toContain("onGenerate?.(creationType)");
     expect(code).toContain("newDoc?.(creationType)");
     expect(code).toContain("{product.singular} · {slides.length}");

@@ -404,8 +404,9 @@ const ClassicCanvasInner = React.forwardRef(({
     slide.align === 'right' ? 'flex-end' :
     slide.align === 'justify' ? 'stretch' : 'flex-start';
   const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage;
+  const photoFailed = slide.bgImageFailed === true || (!!slide.bgImage && imgReady && imgErr);
   const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
-  const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone));
+  const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
   const photoZoneBoxStyle = { ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' };
   const photoZoneChildren = (
@@ -454,17 +455,19 @@ const ClassicCanvasInner = React.forwardRef(({
               borderTopColor:'var(--accent)',
               animation:'spin 0.9s linear infinite',
             }}/>
-            <span style={{ color:'rgba(255,255,255,0.55)', fontSize:f.w*0.026, fontWeight:600, letterSpacing:'-0.011em' }}>
-              {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
+            <span role="status" style={{ color:'rgba(255,255,255,0.55)', fontSize:f.w*0.026, fontWeight:600, letterSpacing:'-0.011em' }}>
+              Carregando imagem…
             </span>
           </div>
         )}
-        {(showCanvasChrome || pendingPhotoZone) && !slide.bgImage && !forExport && (
+        {(showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !forExport && (
           <div style={{
             position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
             color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
           }}>
-            {pendingPhotoZone ? 'Toque para inserir foto' : 'Clique para inserir foto'}
+            {photoFailed
+              ? 'Imagem indisponível — toque para substituir'
+              : pendingPhotoZone ? 'Toque para inserir foto' : 'Clique para inserir foto'}
           </div>
         )}
     </>
@@ -512,6 +515,7 @@ const ClassicCanvasInner = React.forwardRef(({
         }}
         deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
         minScale={0.45}
+        hardMinScale={showSupportingText ? 0.32 : 0.45}
       >
         {(titleScale) => (
         <div
@@ -589,6 +593,7 @@ const ClassicCanvasInner = React.forwardRef(({
           slide.subLeading,
         ]}
         minScale={0.62}
+        hardMinScale={showSupportingText ? 0.45 : 0.62}
       >
         {(subScale) => (
         <div
@@ -2113,7 +2118,7 @@ const SlideCardInner = React.forwardRef(({
                   : undefined
               }
             >
-              {forExport ? '' : (slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto')}
+              {forExport ? '' : (slide.bgImageFailed ? 'Imagem indisponível — toque para substituir' : 'Toque para inserir foto')}
               {flatPhotoNativeHit ? (
                 <input
                   type="file"
@@ -2428,7 +2433,7 @@ const SlideCardInner = React.forwardRef(({
             cursor: onPhotoZoneClick ? 'pointer' : undefined,
           }}
         >
-          {slide.bgImageFailed ? 'Falha ao gerar — toque para tentar de novo' : 'Toque para inserir foto'}
+          {slide.bgImageFailed ? 'Imagem indisponível — toque para substituir' : 'Toque para inserir foto'}
           {fullBleedNativeHit ? (
             <input
               type="file"

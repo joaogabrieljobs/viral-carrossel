@@ -57,4 +57,36 @@ describe('texto complementar em cards de apresentação', () => {
     expect(html).toContain('Fonte: relatório anual 2026');
     expect(html).toContain('valores não auditados');
   });
+
+  it('distingue falha de geração do convite comum para inserir foto', () => {
+    const html = renderPresentation(false, {
+      bgImage: null,
+      bgImageFailed: true,
+      imageQuery: 'gráfico executivo que falhou',
+    });
+
+    expect(html).toContain('Imagem indisponível — toque para substituir');
+    expect(html).not.toContain('Toque para inserir foto');
+  });
+
+  it('mostra carregamento enquanto a imagem ainda não ficou pronta no renderer', () => {
+    const html = renderPresentation(false, {
+      bgImage: 'data:image/png;base64,abc',
+      bgImageFailed: false,
+    });
+
+    expect(html).toContain('Carregando imagem…');
+    expect(html).toContain('role="status"');
+  });
+
+  it('não inclui estados de interface da imagem na árvore de exportação', () => {
+    const html = renderPresentation(true, {
+      bgImage: null,
+      bgImageFailed: true,
+      imageQuery: 'gráfico executivo que falhou',
+    });
+
+    expect(html).not.toContain('Imagem indisponível');
+    expect(html).not.toContain('Toque para inserir foto');
+  });
 });

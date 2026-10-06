@@ -14,7 +14,9 @@ const CREATION_TYPES = [
 ];
 
 const projectKindOf = (entry) => (
-  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+  entry?.doc?.productKind === 'apresentacao'
+    || entry?.doc?.fmt === 'apresentacao'
+    || entry?.doc?.creativePreset === 'apresentacao'
     ? 'apresentacao'
     : 'carrossel'
 );
@@ -67,12 +69,21 @@ function AccountHomeShell({
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
     [library],
   );
+  const activeProject = library.find((entry) => entry.id === activeDocId) || library[0];
+  const activeProjectCopy = projectKindCopy(activeProject);
 
   const [search, setSearch] = useState('');
-  const [creationType, setCreationType] = useState('carrossel');
+  const [creationType, setCreationType] = useState(() => projectKindOf(activeProject));
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const PAGE_SIZE = 48;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // A Home desmonta enquanto o editor está aberto. Ao voltar, o seletor deve
+  // refletir o projeto ativo — inclusive quando o documento foi convertido ou
+  // importado apenas com `productKind`.
+  useEffect(() => {
+    setCreationType(projectKindOf(activeProject));
+  }, [activeProject?.id, activeProject?.doc?.productKind, activeProject?.doc?.fmt, activeProject?.doc?.creativePreset]);
 
   const navBtn = (id, label, Icon) => {
     const active = accountTab === id;
@@ -194,8 +205,6 @@ function AccountHomeShell({
 
   const aiReady = hasTextAI && hasImageAI;
   const projectName = activeEntryName || 'Sem título';
-  const activeProject = library.find((entry) => entry.id === activeDocId) || library[0];
-  const activeProjectCopy = projectKindCopy(activeProject);
 
   const headerBtn = {
     height: isMobile ? 40 : 36,

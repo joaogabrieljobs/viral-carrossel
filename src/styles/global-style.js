@@ -813,8 +813,8 @@ export const GLOBAL_STYLE = `
     cursor: pointer; flex-shrink: 0;
   }
   .slide-thumb.active { box-shadow: 0 0 0 2px var(--accent); }
-  .slide-thumb:not(.active) { opacity: 0.5; }
-  .slide-thumb:not(.active):hover { opacity: 0.9; }
+  .slide-thumb:not(.active) { opacity: 1; }
+  .slide-thumb:not(.active):hover { transform: translateY(-1px); }
   .slide-thumb:active { transform: scale(0.95); }
 
   .palette-swatch { transition: transform 0.1s var(--ease-smooth); border-radius: 8px; }

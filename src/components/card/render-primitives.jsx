@@ -165,11 +165,97 @@ function CultureRichParagraphs({
 // dentro dele, e o scale uniforme garante hierarquia tipográfica preservada.
 //
 // Uso:
-//   <OverflowScaler containerStyle={{...}} deps={[title, subtitle, body]} minScale={0.7}>
+//   <OverflowScaler
+//     containerStyle={{...}}
+//     deps={[title, subtitle, body]}
+//     minScale={0.7}
+//     hardMinScale={0.48}
+//   >
 //     {(scale) => (<>... fontSize={baseSize * scale} ...</>)}
 //   </OverflowScaler>
 /** `containerProps` passa handlers ao contentor (usado pelo arrasto livre). */
-function OverflowScaler({ containerStyle, containerProps = null, deps = [], minScale = AUTOFIT_MIN_SCALE, children }) {
+function overflowScaleFloor(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0.28, Math.min(1, parsed));
+}
+
+// Último recurso para conteúdo excepcionalmente denso. A geração respeita os
+// limites editoriais, e este piso mantém a menor tipografia legível. Conteúdo
+// além desta capacidade deve ser redistribuído entre slides em vez de virar
+// caracteres quase invisíveis.
+const OVERFLOW_ABSOLUTE_MIN_SCALE = 0.28;
+
+function overflowFitRatio(available, content) {
+  const parsedAvailable = Number(available);
+  const parsedContent = Number(content);
+  if (!Number.isFinite(parsedAvailable) || parsedAvailable <= 0) return 1;
+  if (!Number.isFinite(parsedContent) || parsedContent <= 0) return 1;
+  return Math.min(1, parsedAvailable / parsedContent);
+}
+
+/**
+ * Calcula o passo seguinte sem perder a hierarquia entre os filhos: todos os
+ * tamanhos continuam a receber o mesmo multiplicador. `minScale` e o piso
+ * editorial normal. Se ainda houver corte nesse piso, uma segunda medicao pode
+ * recorrer a `hardMinScale`, reservado para conteudo excepcionalmente denso.
+ * Persistindo o corte nesse segundo piso, as medicoes seguintes podem chegar ao
+ * piso absoluto. Altura e largura participam do mesmo calculo deterministico.
+ */
+function nextOverflowScale({
+  currentScale,
+  clientHeight,
+  contentHeight,
+  clientWidth = 0,
+  contentWidth = 0,
+  photoHeight = 0,
+  minScale = AUTOFIT_MIN_SCALE,
+  hardMinScale = minScale,
+  absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+}) {
+  const current = overflowScaleFloor(currentScale, 1);
+  const softFloor = overflowScaleFloor(minScale, AUTOFIT_MIN_SCALE);
+  const hardFloor = Math.min(softFloor, overflowScaleFloor(hardMinScale, softFloor));
+  const absoluteFloor = Math.min(
+    hardFloor,
+    overflowScaleFloor(absoluteMinScale, OVERFLOW_ABSOLUTE_MIN_SCALE),
+  );
+  const fixedPhoto = Math.max(0, Number(photoHeight) || 0);
+  const parsedClientHeight = Number(clientHeight);
+  const parsedContentHeight = Number(contentHeight);
+  const hasVerticalMeasurement = Number.isFinite(parsedClientHeight)
+    && parsedClientHeight > 0
+    && Number.isFinite(parsedContentHeight)
+    && parsedContentHeight > 0;
+  const textContent = Math.max(1, parsedContentHeight - fixedPhoto);
+  const textAvailable = Math.max(1, parsedClientHeight - fixedPhoto);
+  const verticalRatio = hasVerticalMeasurement
+    ? overflowFitRatio(textAvailable, textContent)
+    : 1;
+  const horizontalRatio = overflowFitRatio(clientWidth, contentWidth);
+  const fitRatio = Math.min(verticalRatio, horizontalRatio);
+  if (fitRatio >= 1) return current;
+
+  const desired = current * fitRatio * 0.98;
+  const reachedSoftFloor = current <= softFloor + 0.003;
+  const reachedHardFloor = current <= hardFloor + 0.003;
+  const floor = !reachedSoftFloor
+    ? softFloor
+    : reachedHardFloor
+      ? absoluteFloor
+      : hardFloor;
+  return Math.min(current, Math.max(floor, desired));
+}
+
+function OverflowScaler({
+  containerStyle,
+  containerProps = null,
+  deps = [],
+  minScale = AUTOFIT_MIN_SCALE,
+  hardMinScale = minScale,
+  absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+  children,
+}) {
   const ref = React.useRef(null);
   const [scale, setScale] = React.useState(1);
   const iterationsRef = React.useRef(0);
@@ -188,7 +274,8 @@ function OverflowScaler({ containerStyle, containerProps = null, deps = [], minS
     if (iterationsRef.current > 8) return;
     iterationsRef.current++;
     const clientH = el.clientHeight;
-    if (clientH <= 0) return;
+    const clientW = el.clientWidth;
+    if (clientH <= 0 && clientW <= 0) return;
     // ATENÇÃO: `scrollHeight` só enxerga transbordo para BAIXO. Estas zonas usam
     // `justify-content: flex-end` (layouts bl/bc/br), e nelas o conteúdo que não
     // cabe sai pelo TOPO — scrollHeight === clientHeight e o scaler concluía que
@@ -196,6 +283,7 @@ function OverflowScaler({ containerStyle, containerProps = null, deps = [], minS
     // para qualquer valor de justify-content.
     const cs = window.getComputedStyle(el);
     const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const padH = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
     // UNIDADES: `clientHeight` e `offsetHeight` são px de LAYOUT; o
     // `getBoundingClientRect` é px de ECRÃ, já multiplicado pelo `scale()` da
     // pré-visualização. Misturar os dois fazia a soma dos filhos sair 3× menor
@@ -203,18 +291,37 @@ function OverflowScaler({ containerStyle, containerProps = null, deps = [], minS
     // título voltava a ser cortado, e só fora da escala 1 (a exportação, onde
     // isto foi testado da primeira vez, tem escala 1 e passava).
     let filhosH = 0;
-    for (const filho of el.children) filhosH += filho.offsetHeight || 0;
+    let filhoMaisLargo = 0;
+    for (const filho of el.children) {
+      filhosH += filho.offsetHeight || 0;
+      filhoMaisLargo = Math.max(
+        filhoMaisLargo,
+        filho.offsetWidth || 0,
+        filho.scrollWidth || 0,
+      );
+    }
     const contentH = Math.max(el.scrollHeight, Math.ceil(filhosH + padV));
-    if (contentH <= clientH + 1) return;
+    const contentW = Math.max(el.scrollWidth, Math.ceil(filhoMaisLargo + padH));
+    const overflowsVertically = clientH > 0 && contentH > clientH + 1;
+    const overflowsHorizontally = clientW > 0 && contentW > clientW + 1;
+    if (!overflowsVertically && !overflowsHorizontally) return;
     // Desconta photo zone (altura fixa, não escala)
     const photoEl = el.querySelector('[data-vc-photo-zone="1"]');
     const photoH = photoEl ? photoEl.offsetHeight || 0 : 0;
-    const textContentH = Math.max(1, contentH - photoH);
-    const availForText = Math.max(1, clientH - photoH);
     // Estimativa: scale precisa ajustar pela razão de área (h escalada ≈ h × scale)
     // Safety factor 0.98: tira um pequeno respiro pra evitar ficar exatamente no limite,
     // mas suficientemente conservador pra não encolher demais.
-    const target = Math.max(minScale, scale * (availForText / textContentH) * 0.98);
+    const target = nextOverflowScale({
+      currentScale: scale,
+      clientHeight: clientH,
+      contentHeight: contentH,
+      clientWidth: clientW,
+      contentWidth: contentW,
+      photoHeight: photoH,
+      minScale,
+      hardMinScale,
+      absoluteMinScale,
+    });
     if (target < scale - 0.003) {
       setScale(target);
     }
@@ -246,5 +353,7 @@ export {
   clipAccentIntervalsToWindow,
   CultureInlineRich,
   CultureRichParagraphs,
+  OVERFLOW_ABSOLUTE_MIN_SCALE,
+  nextOverflowScale,
   OverflowScaler,
 };

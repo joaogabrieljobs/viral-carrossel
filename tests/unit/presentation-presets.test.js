@@ -179,6 +179,30 @@ describe('padrões visuais de apresentação', () => {
     expect(second.canvas.zones.title.x).toBe(6);
   });
 
+  it('reserva altura legível em todas as composições do Pitch Noturno', () => {
+    const cases = [
+      ['context', 0, 'pitch-cover', 28, 18],
+      ['diagram', 2, 'pitch-content', 35, 42],
+      ['question', 3, 'pitch-divider', 34, 24],
+      ['data', 4, 'pitch-data', 28, 50],
+      ['demo', 5, 'pitch-demo', 29, 21],
+      ['decision', 7, 'pitch-close', 32, 26],
+    ];
+
+    for (const [visualRole, index, compositionId, minTitleH, minSubtitleH] of cases) {
+      const result = getPresentationCompositionOverrides('pitch', {
+        stage: { visualRole }, index, count: 8,
+      });
+      const { title, subtitle } = result.canvas.zones;
+
+      expect(result.presentationCompositionId).toBe(compositionId);
+      expect(title.h, `${compositionId}: título`).toBeGreaterThanOrEqual(minTitleH);
+      expect(subtitle.h, `${compositionId}: subtítulo`).toBeGreaterThanOrEqual(minSubtitleH);
+      expect(title.y + title.h, `${compositionId}: zonas não se sobrepõem`)
+        .toBeLessThanOrEqual(subtitle.y);
+    }
+  });
+
   it('reserva evidência sem fabricar imagem, gráfico ou conteúdo', () => {
     const result = getPresentationCompositionOverrides(
       'presentation_data',

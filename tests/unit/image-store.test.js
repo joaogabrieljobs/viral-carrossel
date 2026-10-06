@@ -7,6 +7,9 @@ import {
   idsDeImagemEmUso,
   dataUrlParaBlob,
   newImageId,
+  applyPersistedImagePatches,
+  applySlidePatchIfImageCurrent,
+  slideImageIdentity,
 } from '../../src/utils/image-store.js';
 
 const lib = (slides) => [{ id: 'd1', name: 'Doc', doc: { slides } }];
@@ -95,6 +98,66 @@ describe('utilitários', () => {
     const a = newImageId(); const b = newImageId();
     expect(a).toMatch(/^img_/);
     expect(a).not.toBe(b);
+  });
+});
+
+describe('applyPersistedImagePatches', () => {
+  it('conclui a migração da data URL legada quando a origem ainda é a mesma', () => {
+    const source = 'data:image/png;base64,AAAA';
+    const slides = [{ id: 's1', bgImage: source, bgImageId: null }];
+    const out = applyPersistedImagePatches(slides, [{
+      id: 's1',
+      expectedImageId: null,
+      expectedSource: source,
+      patch: { bgImage: 'blob:http://local/1', bgImageId: 'img_1' },
+    }]);
+    expect(out[0]).toMatchObject({ bgImage: 'blob:http://local/1', bgImageId: 'img_1' });
+  });
+
+  it('não sobrescreve uma imagem trocada enquanto a migração estava em andamento', () => {
+    const slides = [{ id: 's1', bgImage: 'blob:http://local/nova', bgImageId: 'img_nova' }];
+    const out = applyPersistedImagePatches(slides, [{
+      id: 's1',
+      expectedImageId: null,
+      expectedSource: 'data:image/png;base64,AAAA',
+      patch: { bgImage: 'blob:http://local/antiga', bgImageId: 'img_antiga' },
+    }]);
+    expect(out).toBe(slides);
+    expect(out[0].bgImageId).toBe('img_nova');
+  });
+
+  it('hidrata pelo id esperado e ignora resultado atrasado de outro id', () => {
+    const slides = [
+      { id: 's1', bgImageId: 'img_1', bgImage: null },
+      { id: 's2', bgImageId: 'img_nova', bgImage: null },
+    ];
+    const out = applyPersistedImagePatches(slides, [
+      { id: 's1', expectedImageId: 'img_1', patch: { bgImage: 'blob:http://local/1' } },
+      { id: 's2', expectedImageId: 'img_antiga', patch: { bgImage: 'blob:http://local/antiga' } },
+    ]);
+    expect(out[0].bgImage).toBe('blob:http://local/1');
+    expect(out[1]).toBe(slides[1]);
+  });
+});
+
+describe('applySlidePatchIfImageCurrent', () => {
+  it('aplica a resposta quando a imagem continua igual', () => {
+    const slides = [{ id: 's1', bgImageId: 'img_antiga', bgImage: 'blob:antiga' }];
+    const out = applySlidePatchIfImageCurrent(slides, {
+      id: 's1',
+      expectedImageIdentity: slideImageIdentity(slides[0]),
+      patch: { bgImageId: 'img_nova', bgImage: 'blob:nova' },
+    });
+    expect(out[0].bgImageId).toBe('img_nova');
+  });
+
+  it('ignora resposta atrasada depois de troca ou exclusão da imagem', () => {
+    const expected = slideImageIdentity({ bgImageId: 'img_antiga' });
+    const changed = [{ id: 's1', bgImageId: 'img_usuario', bgImage: 'blob:usuario' }];
+    const removed = [{ id: 's1', bgImageId: null, bgImage: null }];
+    const patch = { id: 's1', expectedImageIdentity: expected, patch: { bgImageId: 'img_resposta' } };
+    expect(applySlidePatchIfImageCurrent(changed, patch)).toBe(changed);
+    expect(applySlidePatchIfImageCurrent(removed, patch)).toBe(removed);
   });
 });
 

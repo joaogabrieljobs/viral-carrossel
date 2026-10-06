@@ -431,22 +431,49 @@ async function blobFromSlideRef(refImage, signal) {
 }
 
 /** Prompt completo para GPT Image (geração ou edição com referência). */
-function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference = false, priorityFirst = false } = {}) {
+function normalizeImageAspectRatio(value) {
+  return ['1:1', '16:9', '9:16', '3:2', '2:3', '4:5', 'auto'].includes(value)
+    ? value
+    : '4:5';
+}
+
+/**
+ * O endpoint SJinn trabalha com uma lista fechada de proporções e não aceita
+ * 4:5. Mantemos 2:3 como aproximação vertical histórica; 16:9 passa sem
+ * conversão para que apresentações sejam realmente geradas em landscape.
+ */
+function resolveSjinnAspectRatio(aspectRatio = '4:5') {
+  const ratio = normalizeImageAspectRatio(aspectRatio);
+  return ratio === '4:5' ? '2:3' : ratio;
+}
+
+function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
+  withReference = false,
+  priorityFirst = false,
+  aspectRatio = '4:5',
+} = {}) {
   const safeTheme = (q || '').slice(0, 280);
   const axisTags = buildImgParamsTagsEN(imgParams);
   const extra = (imgExtraPrompt || '').trim().slice(0, 3000);
+  const presentationWide = normalizeImageAspectRatio(aspectRatio) === '16:9';
+  const canvasRule = presentationWide
+    ? 'Compose for a widescreen 16:9 presentation canvas with intentional negative space for editable type.'
+    : 'Compose for a portrait social-media canvas with intentional negative space for editable type.';
+  const mediumRule = presentationWide
+    ? 'Create a widescreen 16:9 presentation visual. Choose the medium that best communicates the claim: editorial photography, clean diagrammatic illustration, product demonstration, comparison or data-inspired abstraction. Keep generous negative space for editable type.'
+    : 'Use photorealistic real-photograph rendering with generous text-friendly negative space.';
   if (extra || withReference) {
     return `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
       (withReference ? 'REFERENCE IMAGES ARE ATTACHED: use them as a moodboard for composition, light and visual language. Do not copy faces, characters, lettering or logos unless explicitly requested.\n' : '') +
       (extra ? `BRAND / CLIENT DIRECTION (takes precedence over generic defaults):\n${extra}\n\n` : 'Match the visual medium, palette, materials and composition of the attached references in a new scene aligned with this card.\n\n') +
-      'Create the visual language requested above, including illustration, 3D, collage or photography when specified. Keep natural subject colors unless directed otherwise. Reserve readable space for editable type. HARD RULES: no text, no captions, no watermarks, no logos inside the image.';
+      `${canvasRule} Create the visual language requested above, including illustration, 3D, collage or photography when specified. Keep natural subject colors unless directed otherwise. HARD RULES: no text, no captions, no watermarks, no logos inside the image.`;
   }
   if (priorityFirst) {
     // Caminho SJinn corta a 4000 chars: o que importa (tema, marca, regras duras) vai à frente
     // e o art-direction longo fica no fim, onde um corte custa menos (auditoria H8).
     let head =
       `THEME OF THIS CARD: ${safeTheme}${axisTags}\n\n` +
-      'HARD RULES: photorealistic real-photograph rendering; generous text-friendly negative space; strictly no text, no captions, no watermarks, no logos inside the image.\n\n' +
+      `HARD RULES: ${mediumRule} Strictly no text, no captions, no watermarks, no logos inside the image.\n\n` +
       'ART DIRECTION (follow as far as it fits the theme):\n';
     return head + GPT_IMAGE_ART_DIRECTION;
   }
@@ -454,19 +481,29 @@ function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference =
     `${GPT_IMAGE_ART_DIRECTION}\n\n` +
     `THEME OF THIS CARD: ${safeTheme}` +
     `${axisTags}`;
-  body += `\n\nNow create the image following all the directions above. Use photorealistic real-photograph rendering.`;
+  body += `\n\nNow create the image following all the directions above. ${mediumRule}`;
   return body;
 }
 
-async function generateZaiImage(q, imgParams, imgExtraPrompt, signal) {
+function resolveZaiImageSize(model, aspectRatio = '4:5') {
+  const ratio = normalizeImageAspectRatio(aspectRatio);
+  if (ratio === '16:9') return model === 'glm-image' ? '1728x960' : '1344x768';
+  if (ratio === '9:16') return model === 'glm-image' ? '960x1728' : '768x1344';
+  if (ratio === '3:2') return model === 'glm-image' ? '1568x1056' : '1152x864';
+  if (ratio === '1:1') return model === 'glm-image' ? '1280x1280' : '1024x1024';
+  return model === 'glm-image' ? '1088x1472' : '864x1152';
+}
+
+async function generateZaiImage(q, imgParams, imgExtraPrompt, signal, options = {}) {
   const apiKey = getProviderKey('zai');
   if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
+  const aspectRatio = normalizeImageAspectRatio(options.aspectRatio);
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, aspectRatio });
   const payload = {
     model,
     prompt: prompt.slice(0, 32000),
-    size: model === 'glm-image' ? '1088x1472' : '864x1152',
+    size: resolveZaiImageSize(model, aspectRatio),
     quality: model === 'glm-image' ? 'hd' : 'standard',
   };
   const useDirect = IS_LOCAL_DEV;
@@ -516,6 +553,27 @@ const OPENAI_IMAGE_MODELS = [
   { name: 'dall-e-3',      size: '1024x1792', quality: 'hd', style: 'natural', responseFormat: true },
 ];
 
+function resolveOpenAIImageSize(model, aspectRatio = '4:5') {
+  const ratio = normalizeImageAspectRatio(aspectRatio);
+  if (ratio === '1:1') return '1024x1024';
+  if (ratio === '16:9') {
+    if (/^gpt-image-2(?:\.|-|$)/.test(model.name)) return '1536x864';
+    return model.name === 'dall-e-3' ? '1792x1024' : '1536x1024';
+  }
+  if (ratio === '3:2') {
+    return model.name === 'dall-e-3' ? '1792x1024' : '1536x1024';
+  }
+  if (ratio === '9:16') {
+    if (/^gpt-image-2(?:\.|-|$)/.test(model.name)) return '864x1536';
+    return model.size;
+  }
+  if (ratio === '2:3') {
+    if (/^gpt-image-2(?:\.|-|$)/.test(model.name)) return '1024x1536';
+    return model.size;
+  }
+  return model.size;
+}
+
 let _cachedModel = null; // memoiza o primeiro modelo que funcionou nesta sessão
 function getOpenAIImageOrder() {
   const selectedName = _aiRuntimeSettings.imageModels?.openai || 'gpt-image-2';
@@ -527,7 +585,7 @@ function getOpenAIImageOrder() {
 }
 
 /** Geração com uma ou mais imagens de referência (API edits — multipart). */
-async function generateDALLEEdits(refBlob, prompt, apiKey, signal) {
+async function generateDALLEEdits(refBlob, prompt, apiKey, signal, options = {}) {
   const referenceBlobs = Array.isArray(refBlob) ? refBlob : [refBlob];
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
   const headers = {};
@@ -546,7 +604,7 @@ async function generateDALLEEdits(refBlob, prompt, apiKey, signal) {
     fd.append('model', model.name);
     fd.append('prompt', prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000));
     fd.append('n', '1');
-    fd.append('size', model.size);
+    fd.append('size', resolveOpenAIImageSize(model, options.aspectRatio));
     fd.append('quality', model.quality);
     if (model.style) fd.append('style', model.style);
     if (model.responseFormat) fd.append('response_format', 'b64_json');
@@ -598,9 +656,15 @@ async function generateDALLEEdits(refBlob, prompt, apiKey, signal) {
 
 const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
   const { imgExtraPrompt, signal } = options || {};
+  const requestedAspectRatio = normalizeImageAspectRatio(options.aspectRatio);
+  const aspectRatio = resolveSjinnAspectRatio(requestedAspectRatio);
   const refs = await prepareImageReferencesForUpload(options.refImages || (options.refImage ? [options.refImage] : []));
   throwIfGenerationCancelled(signal);
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: refs.length > 0, priorityFirst: true });
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
+    withReference: refs.length > 0,
+    priorityFirst: true,
+    aspectRatio: requestedAspectRatio,
+  });
   let res;
   try {
     res = await fetch('/api/ai/sjinn-image', {
@@ -610,7 +674,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: prompt.slice(0, 4000),
-        aspectRatio: '2:3',
+        aspectRatio,
         resolution: '1K',
         imageList: refs,
       }),
@@ -656,19 +720,25 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
 
   if (_aiRuntimeSettings.imageProvider === 'zai') {
     if (refs.length) throw Object.assign(new Error('Este gerador não aceita referências. Selecione OpenAI com chave própria para usar o moodboard.'), { code: 'reference_unsupported' });
-    return generateZaiImage(q, imgParams, imgExtraPrompt, signal);
+    return generateZaiImage(q, imgParams, imgExtraPrompt, signal, options);
   }
   apiKey = getProviderKey('openai') || apiKey;
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
 
   if (refs.length) {
     const blobs = await Promise.all(refs.slice(0, 4).map(ref => blobFromSlideRef(ref, signal)));
-    const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: true });
+    const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
+      withReference: true,
+      aspectRatio: options.aspectRatio,
+    });
     throwIfGenerationCancelled(signal);
-    return generateDALLEEdits(blobs, promptRef, apiKey, signal);
+    return generateDALLEEdits(blobs, promptRef, apiKey, signal, options);
   }
 
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false });
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
+    withReference: false,
+    aspectRatio: options.aspectRatio,
+  });
   const headers = { 'Content-Type': 'application/json' };
   if (IS_LOCAL_DEV) {
     if (apiKey) headers['x-openai-key'] = apiKey;
@@ -685,7 +755,7 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
       model: model.name,
       prompt: prompt.slice(0, model.name === 'dall-e-3' ? 4000 : 32000),
       n: 1,
-      size: model.size,
+      size: resolveOpenAIImageSize(model, options.aspectRatio),
       quality: model.quality,
     };
     if (model.style) body.style = model.style;
@@ -786,7 +856,11 @@ export {
   GPT_IMAGE_ART_DIRECTION,
   dataUrlToBlob,
   blobFromSlideRef,
+  normalizeImageAspectRatio,
+  resolveSjinnAspectRatio,
   buildGptImageFullPrompt,
+  resolveZaiImageSize,
+  resolveOpenAIImageSize,
   generateZaiImage,
   OPENAI_IMAGE_MODELS,
   getOpenAIImageOrder,

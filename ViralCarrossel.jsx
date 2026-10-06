@@ -28,6 +28,9 @@ import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
 import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
 import {
   guardarImagemDoSlide,
+  applyPersistedImagePatches,
+  applySlidePatchIfImageCurrent,
+  slideImageIdentity,
   imageGet,
   imageDelete,
   imageCleanupOrphans,
@@ -448,6 +451,13 @@ const ImageCropModal = lazy(() => import('./src/components/ImageCropModal.jsx'))
 const PhotoPositionModal = lazy(() => import('./src/components/PhotoPositionModal.jsx'));
 const KeysModal = lazy(() => import('./src/components/KeysModal.jsx'));
 const TemplatesModal = lazy(() => import('./src/components/TemplatesModal.jsx'));
+
+function imageAspectRatioForFormat(fmt) {
+  if (fmt === 'apresentacao') return '16:9';
+  if (fmt === 'quadrado') return '1:1';
+  if (fmt === 'stories') return '9:16';
+  return '4:5';
+}
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 
@@ -1183,6 +1193,16 @@ export default function App() {
     );
   }, [brand, newDoc]);
 
+  useEffect(() => {
+    if (!activeEntry?.id) return;
+    const currentName = String(activeEntry.name || '').trim();
+    if (activeProductKind === 'apresentacao' && currentName === 'Novo carrossel') {
+      renameDoc(activeEntry.id, 'Nova apresentação');
+    } else if (activeProductKind === 'carrossel' && currentName === 'Nova apresentação') {
+      renameDoc(activeEntry.id, 'Novo carrossel');
+    }
+  }, [activeEntry?.id, activeEntry?.name, activeProductKind, renameDoc]);
+
   // ── PERFIS DE MARCA: handlers ───────────────────────────────────────────────
   const applyBrand = useCallback((brandId) => {
     const b = brandRoster.find(x => x.id === brandId);
@@ -1298,6 +1318,8 @@ export default function App() {
    */
   const boardScrollRef = useRef(null);
   const boardCardRefs = useRef([]);
+  const thumbnailStripRef = useRef(null);
+  const thumbnailRefs = useRef([]);
   const [tab, setTab] = useState('home');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [canvasEditMode, setCanvasEditMode] = useState(false);
@@ -1317,6 +1339,32 @@ export default function App() {
     quadro.scrollBy({ left: delta, behavior: 'smooth' });
   }, [activeIdx]);
 
+  // Um projeto novo pode começar no mesmo índice do anterior (normalmente 0).
+  // Nesse caso o efeito acima não dispara e a fila conserva o scrollLeft antigo,
+  // abrindo o deck com os primeiros slides escondidos. A identidade do primeiro
+  // slide também muda ao gerar novamente no mesmo projeto, por isso participa da
+  // dependência.
+  useLayoutEffect(() => {
+    const quadro = boardScrollRef.current;
+    if (quadro) quadro.scrollTo({ left: 0, behavior: 'auto' });
+    const faixa = thumbnailStripRef.current;
+    if (faixa) faixa.scrollTo({ left: 0, behavior: 'auto' });
+  }, [activeDocId, slides[0]?.id]);
+
+  // A miniatura ativa precisa acompanhar a navegação em decks longos.
+  useEffect(() => {
+    const faixa = thumbnailStripRef.current;
+    const alvo = thumbnailRefs.current[activeIdx];
+    if (!faixa || !alvo) return;
+    const left = alvo.offsetLeft;
+    const right = left + alvo.offsetWidth;
+    if (left >= faixa.scrollLeft && right <= faixa.scrollLeft + faixa.clientWidth) return;
+    faixa.scrollTo({
+      left: Math.max(0, left - (faixa.clientWidth - alvo.offsetWidth) / 2),
+      behavior: 'smooth',
+    });
+  }, [activeIdx, activeDocId, slides.length]);
+
   /** QA: simula leitura à distância do polegar (tipo menor no preview). */
   const [thumbQaMode, setThumbQaMode] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -1326,6 +1374,14 @@ export default function App() {
     setSetupProductKind(normalizedKind);
     setSetupOpen(true);
   }, [activeProductKind]);
+  const generateProjectByKind = useCallback((kind = activeProductKind) => {
+    const normalizedKind = kind === 'apresentacao' ? 'apresentacao' : 'carrossel';
+    // A Home é também a porta de criação. Se o pedido troca o tipo de produto,
+    // abre um destino próprio antes do wizard para não transformar/apagar o
+    // projeto que estava aberto.
+    if (normalizedKind !== activeProductKind) createProjectByKind(normalizedKind);
+    openGenerationSetup(normalizedKind);
+  }, [activeProductKind, createProjectByKind, openGenerationSetup]);
   const setSetupOpenForSidebar = useCallback((open, kind = activeProductKind) => {
     if (open) openGenerationSetup(kind);
     else setSetupOpen(false);
@@ -1626,45 +1682,59 @@ export default function App() {
   useEffect(() => {
     let cancelado = false;
     (async () => {
-      const alvo = (slidesLiveRef.current || []).map((sl, i) => ({ sl, i }));
+      const alvo = (slidesLiveRef.current || []).map((sl) => ({ sl, id: sl.id }));
       const paraMigrar = alvo.filter(({ sl }) => typeof sl.bgImage === 'string' && sl.bgImage.startsWith('data:') && !sl.bgImageId);
       const paraHidratar = alvo.filter(({ sl }) => sl.bgImageId && !sl.bgImage);
       if (!paraMigrar.length && !paraHidratar.length) return;
 
       const patches = [];
-      for (const { sl, i } of paraMigrar) {
+      for (const { sl, id } of paraMigrar) {
         try {
           const patch = await guardarImagemDoSlide(sl.bgImage);
           if (patch.bgImageId) {
             imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
-            patches.push({ i, patch });
+            patches.push({ id, expectedImageId: null, expectedSource: sl.bgImage, patch });
           }
         } catch (e) { console.warn('[imagem] migração falhou:', e?.message || e); }
       }
-      for (const { sl, i } of paraHidratar) {
+      for (const { sl, id } of paraHidratar) {
         const cache = imagemUrlsRef.current.get(sl.bgImageId);
-        if (cache) { patches.push({ i, patch: { bgImage: cache } }); continue; }
+        if (cache) {
+          patches.push({ id, expectedImageId: sl.bgImageId, patch: { bgImage: cache, bgImageFailed: false, bgImageError: null } });
+          continue;
+        }
         try {
           const entry = await imageGet(sl.bgImageId);
           if (entry?.blob) {
             const url = URL.createObjectURL(entry.blob);
             imagemUrlsRef.current.set(sl.bgImageId, url);
-            patches.push({ i, patch: { bgImage: url } });
+            patches.push({ id, expectedImageId: sl.bgImageId, patch: { bgImage: url, bgImageFailed: false, bgImageError: null } });
+          } else {
+            // Um ID sem bytes no IndexedDB deixava o slide num limbo: parecia
+            // sem imagem e também era excluído do lote de reparação para sempre.
+            patches.push({
+              id,
+              expectedImageId: sl.bgImageId,
+              patch: {
+                bgImage: null,
+                bgImageId: null,
+                bgImageFailed: true,
+                bgImageError: 'stored_image_missing',
+              },
+            });
           }
-        } catch (e) { console.warn('[imagem] leitura falhou:', e?.message || e); }
+        } catch (e) {
+          console.warn('[imagem] leitura falhou:', e?.message || e);
+          // Falha de transação/abertura pode ser temporária. Preservar o ID é
+          // essencial: os bytes podem continuar íntegros no IndexedDB.
+        }
       }
       if (cancelado || !patches.length) return;
       // `setSilent`: hidratar não é edição do utilizador, não entra no undo.
       history.setSilent((d) => {
         const slidesAtuais = d.slides || [];
-        let mudou = false;
-        const proximos = slidesAtuais.map((sl, i) => {
-          const p = patches.find((x) => x.i === i);
-          if (!p || sl.bgImage) return sl;
-          mudou = true;
-          return { ...sl, ...p.patch };
-        });
-        return mudou ? { ...d, slides: proximos } : d;
+        const proximos = applyPersistedImagePatches(slidesAtuais, patches);
+        return proximos === slidesAtuais ? d : { ...d, slides: proximos };
       });
     })();
     return () => { cancelado = true; };
@@ -2034,8 +2104,9 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
-  /* Desktop estreito: header de 1 linha não cabe (grupo direito = 730px). */
-  const headerTight = !isMobile && vw < 1200;
+  /* Desktop estreito: header de 1 linha não cabe (grupo direito = 730px).
+     Em 1280px o nome + Salvar chegavam a ficar recortados sobre Projetos. */
+  const headerTight = !isMobile && vw < 1400;
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
@@ -2046,10 +2117,16 @@ export default function App() {
       const base = Math.min((vw - side * 2) / f.w, 0.92);
       return thumbQaMode ? base * 0.72 : base;
     }
-    // Desktop: thumbnail compacta na faixa horizontal (QA reduz ~feed 4:5 à distância).
-    const base = Math.min(360 / f.w, 0.44);
+    // No desktop, a apresentação é uma superfície de edição 16:9. Limitá-la à
+    // mesma largura de uma miniatura 4:5 tornava texto, erros e zonas de imagem
+    // praticamente ilegíveis. O alvo cresce com a área útil e mantém um limite
+    // confortável para a fila horizontal.
+    const targetWidth = fmt === 'apresentacao'
+      ? Math.min(920, Math.max(720, (vw - 272) * 0.66))
+      : 360;
+    const base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
-  }, [isMobile, vw, f, thumbQaMode]);
+  }, [isMobile, vw, f, fmt, thumbQaMode]);
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const empty = isDefault(slides);
@@ -2336,7 +2413,12 @@ export default function App() {
         return;
       }
       void guardarImagemDoSlide(url).then((patch) => {
-        updateSlideAt(sIdx, { ...patch, bgImageSource: 'imported' });
+        updateSlideAt(sIdx, {
+          ...patch,
+          bgImageSource: 'imported',
+          bgImageFailed: false,
+          bgImageError: null,
+        });
       });
     });
   }, [updateSlideAt, toast]);
@@ -2389,31 +2471,93 @@ export default function App() {
       toast(`Vídeo grande demais (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: 60 MB. Comprima antes (CapCut, HandBrake).`, 'error', 6000);
       return;
     }
+    const targetProjectId = activeProjectRef.current;
+    const targetSlide = slidesLiveRef.current?.[activeIdx];
+    if (!targetProjectId || !targetSlide?.id) return;
+    const targetSlideId = targetSlide.id;
+    const expectedImageIdentity = slideImageIdentity(targetSlide);
+    const expectedVideoId = targetSlide.videoId || null;
     try {
       const id = newVideoId();
       await videoPut(id, file, { mime: file.type, name: file.name });
-      // Limpa videoId antigo se houver (cleanup async, não bloqueia)
-      const oldId = slides[activeIdx]?.videoId;
-      if (oldId) {
-        videoDelete(oldId).catch(() => {});
-        const oldUrl = videoUrlsRef.current[oldId];
-        if (oldUrl) {
-          try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
-        }
+      const liveTarget = activeProjectRef.current === targetProjectId
+        ? slidesLiveRef.current?.find((slide) => slide.id === targetSlideId)
+        : null;
+      if (
+        !liveTarget
+        || slideImageIdentity(liveTarget) !== expectedImageIdentity
+        || (liveTarget.videoId || null) !== expectedVideoId
+      ) {
+        videoDelete(id).catch(() => {});
+        return;
       }
       // Cria object URL imediato pra render rápido. Sync = mapa module-level
       // atualiza ANTES do próximo render (não fica 1 ciclo atrás).
       const url = URL.createObjectURL(file);
       setVideoUrlsSync(prev => ({ ...prev, [id]: url }));
       // Atualiza slide: limpa bgImage (mutual exclusion), seta videoId
-      updateSlide({
-        videoId: id,
-        videoMime: file.type || 'video/mp4',
-        videoName: file.name,
-        bgImage: null,
-        bgImageFailed: false,
-        bgImageSource: null,
+      let patchApplied = false;
+      setSlides((prev) => {
+        if (activeProjectRef.current !== targetProjectId) return prev;
+        const current = prev.find((slide) => slide.id === targetSlideId);
+        if (!current || (current.videoId || null) !== expectedVideoId) return prev;
+        const next = applySlidePatchIfImageCurrent(prev, {
+          id: targetSlideId,
+          expectedImageIdentity,
+          patch: {
+            videoId: id,
+            videoMime: file.type || 'video/mp4',
+            videoName: file.name,
+            bgImage: null,
+            bgImageId: null,
+            bgImageFailed: false,
+            bgImageError: null,
+            bgImageSource: null,
+          },
+        });
+        if (next !== prev) patchApplied = true;
+        return next;
       });
+      // O updater acima pode ser descartado se o utilizador trocar de projeto,
+      // slide, imagem ou vídeo enquanto o IndexedDB conclui a escrita. Espere o
+      // commit do React e só então remova o vídeo anterior. Assim uma corrida
+      // nunca deixa o documento apontando para um blob que já foi apagado.
+      await new Promise((resolve) => {
+        const schedule = typeof requestAnimationFrame === 'function'
+          ? requestAnimationFrame
+          : (callback) => setTimeout(callback, 0);
+        schedule(() => schedule(resolve));
+      });
+      if (!patchApplied) {
+        videoDelete(id).catch(() => {});
+        setVideoUrlsSync((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        try { URL.revokeObjectURL(url); } catch { /* */ }
+        return;
+      }
+
+      const appliedTarget = activeProjectRef.current === targetProjectId
+        ? slidesLiveRef.current?.find((slide) => slide.id === targetSlideId)
+        : null;
+      const oldId = expectedVideoId;
+      // Se o utilizador já saiu do projeto (ou substituiu novamente o vídeo),
+      // mantenha o blob anterior por segurança. A limpeza de órfãos da próxima
+      // sessão o remove sem risco de quebrar um projeto persistido.
+      if (oldId && appliedTarget?.videoId === id) {
+        videoDelete(oldId).catch(() => {});
+        const oldUrl = videoUrlsRef.current[oldId];
+        setVideoUrlsSync((prev) => {
+          const next = { ...prev };
+          delete next[oldId];
+          return next;
+        });
+        if (oldUrl) {
+          try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
+        }
+      }
       const usage = await videoStorageUsage().catch(() => null);
       const usageNote = usage ? ` · uso total ${usage.totalMB.toFixed(1)} MB / ${usage.count} vídeos` : '';
       toast(`Vídeo importado (${(file.size / 1024 / 1024).toFixed(1)} MB)${usageNote}`, 'success', 4000);
@@ -2422,7 +2566,7 @@ export default function App() {
       console.error('[video] erro ao importar:', e);
       toast(`Erro ao importar vídeo: ${e.message}`, 'error', 6000);
     }
-  }, [activeIdx, slides, updateSlide, toast]);
+  }, [activeIdx, setSlides, toast]);
 
   // Remover vídeo do slide ativo (apaga do IndexedDB também)
   const removeVideoFromActiveSlide = useCallback(async () => {
@@ -2470,7 +2614,13 @@ export default function App() {
         return prev.map((sl, j) => {
           if (j >= cap) return sl;
           const data = urls[j];
-          return data ? { ...sl, ...data, bgImageSource: 'imported' } : sl;
+          return data ? {
+            ...sl,
+            ...data,
+            bgImageSource: 'imported',
+            bgImageFailed: false,
+            bgImageError: null,
+          } : sl;
         });
       });
 
@@ -2531,8 +2681,15 @@ export default function App() {
       if (!a || !b) return prev;
       const next = [...prev];
       if (zone === 'photo') {
-        next[fromIdx] = { ...a, bgImage: b.bgImage, bgImageId: b.bgImageId ?? null };
-        next[toIdx] = { ...b, bgImage: a.bgImage, bgImageId: a.bgImageId ?? null };
+        const imageKeys = [
+          'bgImage', 'bgImageId', 'bgImageSource', 'bgImageFailed', 'bgImageError',
+          'bgFit', 'bgZoom', 'bgPosX', 'bgPosY', 'bgFlipX', 'bgFlipY', 'bgOpacity',
+        ];
+        const imagePatch = (source) => Object.fromEntries(
+          imageKeys.map((key) => [key, source[key] ?? (key === 'bgImageId' ? null : undefined)]),
+        );
+        next[fromIdx] = { ...a, ...imagePatch(b) };
+        next[toIdx] = { ...b, ...imagePatch(a) };
       } else if (zone === 'title') {
         next[fromIdx] = { ...a, title: b.title };
         next[toIdx] = { ...b, title: a.title };
@@ -2617,19 +2774,29 @@ export default function App() {
     toast('Ajustes da foto gravados no projeto.', 'success');
   }, [setSlides, toast]);
 
-  const generateSlideImageAt = useCallback(async (idx, parentSignal = null) => {
-    const snap = slides[idx];
-    if (!snap) return;
+  const generateSlideImageAt = useCallback(async (idx, parentSignal = null, target = null) => {
+    const generationProjectId = target?.projectId || activeProjectRef.current;
+    if (!generationProjectId || activeProjectRef.current !== generationProjectId) {
+      return { ok: false, reason: 'stale_target' };
+    }
+    const liveSlides = slidesLiveRef.current || slides;
+    const snap = target?.slideId
+      ? liveSlides.find((slide) => slide.id === target.slideId)
+      : (liveSlides[idx] || slides[idx]);
+    if (!snap) return { ok: false, reason: 'slide_missing' };
     const slideId = snap.id;
-    if (slideImgGenIdsRef.current.has(slideId)) return;
+    const expectedImageIdentity = slideImageIdentity(snap);
+    if (slideImgGenIdsRef.current.has(slideId)) return { ok: false, reason: 'already_generating', slideId };
+
+    const itemLabel = fmt === 'apresentacao' ? 'slide' : 'card';
 
     const q = (snap.imageQuery || '').trim();
     if (!q) {
       toast(
-        'Este card ainda não tem palavras-chave de imagem. Gere o carrossel com IA ou defina-as em Cards → Imagem de fundo.',
+        `Este ${itemLabel} ainda não tem palavras-chave de imagem. Defina uma direção de imagem antes de gerar.`,
         'error',
       );
-      return;
+      return { ok: false, reason: 'missing_query', slideId };
     }
 
     if (!hasOpenAI) {
@@ -2640,7 +2807,7 @@ export default function App() {
       } else {
         toast('Configure a chave de imagem em Configurar IA.', 'error');
       }
-      return;
+      return { ok: false, reason: 'image_provider_unavailable', slideId };
     }
 
     slideImgGenIdsRef.current.add(slideId);
@@ -2651,28 +2818,49 @@ export default function App() {
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, snap.imgExtraPrompt),
+        aspectRatio: imageAspectRatioForFormat(fmt),
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
       const patchImg = await guardarImagemDoSlide(url);
       throwIfGenerationCancelled(job.signal);
-      setSlides(prev => {
-        const j = prev.findIndex(sl => sl.id === slideId);
-        return j < 0 ? prev : prev.map((sl, k) => (k === j ? {
-          ...sl,
+      const liveTarget = activeProjectRef.current === generationProjectId
+        ? slidesLiveRef.current?.find((slide) => slide.id === slideId)
+        : null;
+      if (!liveTarget || slideImageIdentity(liveTarget) !== expectedImageIdentity) {
+        if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
+        return { ok: false, reason: 'stale_target', slideId };
+      }
+      setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applySlidePatchIfImageCurrent(prev, {
+        id: slideId,
+        expectedImageIdentity,
+        patch: {
           ...patchImg,
           imgMode: 'dalle',
-          overlay: 70,
           bgFit: 'cover',
           bgX: 50,
           bgY: 50,
           bgZoom: 100,
           bgImageFailed: false,
+          bgImageError: null,
           bgImageSource: 'ai',
-        } : sl));
-      });
-      toast(`Slide ${idx + 1}: imagem gerada`, 'success');
+        },
+      }));
+      toast(`${itemLabel === 'slide' ? 'Slide' : 'Card'} ${idx + 1}: imagem gerada`, 'success');
+      return { ok: true, slideId };
     } catch (e) {
-      if (!isGenerationCancelled(e)) toast(`GPT Image: ${e.message}`, 'error');
+      if (isGenerationCancelled(e)) throw e;
+      if (activeProjectRef.current === generationProjectId) {
+        setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+          id: slideId,
+          expectedImageIdentity,
+          patch: {
+            bgImageFailed: true,
+            bgImageError: e?.code || e?.message || 'generation_failed',
+          },
+        }));
+        toast(`Imagem do ${itemLabel} ${idx + 1}: ${e.message}`, 'error');
+      }
+      return { ok: false, slideId, error: e };
     } finally {
       job.finish();
       slideImgGenIdsRef.current.delete(slideId);
@@ -2682,7 +2870,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, styleKit, setSlides, toast]);
+  }, [slides, fmt, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, styleKit, setSlides, toast]);
 
   useEffect(() => {
     const onQuota = (ev) => {
@@ -2779,7 +2967,14 @@ export default function App() {
     if (selectedCardElement?.slideId === slides[i]?.id && selectedCardElement.key) {
       const key = selectedCardElement.key;
       if (key === 'photo') {
-        updateSlideAt(i, { bgImage: null, imageId: null, videoId: null, bgImageFailed: false });
+        updateSlideAt(i, {
+          bgImage: null,
+          bgImageId: null,
+          bgImageSource: null,
+          bgImageError: null,
+          videoId: null,
+          bgImageFailed: false,
+        });
       } else if (key === 'logo') {
         updateSlideAt(i, { logoHidden: true });
       } else {
@@ -3050,6 +3245,15 @@ ${jsonShapeLine}`;
         q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
       }
+      // Os presets oficiais de apresentação reservam uma zona visual em todos
+      // os estágios. Se o modelo omitir a query, deixar a zona vazia parece uma
+      // geração quebrada e contradiz a escolha “gerar imagens”. Criamos uma
+      // direção larga, sem texto incorporado, a partir da ideia do próprio slide.
+      if (!q && isPresentationGeneration && (title || subtitle)) {
+        const seed = `${title}. ${subtitle}`.trim().slice(0, 220);
+        q = `widescreen presentation visual illustrating: ${seed}. Editorial evidence or clean diagrammatic concept, strong 16:9 composition, no embedded text, no logo`;
+        console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} da apresentação — usando fallback semântico.`);
+      }
       const base = {
         ...mkSlide(i + 1, generationBrand),
         title,
@@ -3250,13 +3454,15 @@ ${jsonShapeLine}`;
 
     if (fetchImagesNow) {
       if (hasOpenAI) {
-        const slidesWithImage = newSlides.map((sl, i) => ({ sl, i, q: result.slides[i]?.imageQuery || sl.imageQuery }))
+        const slidesWithImage = newSlides.map((sl, i) => ({ sl, slideId: sl.id, i, q: result.slides[i]?.imageQuery || sl.imageQuery }))
                                           .filter(x => !!(x.q && String(x.q).trim()));
         const totalImgs = slidesWithImage.length;
         let doneImgs = 0;
+        const attemptedImageSlideIds = new Set();
         setGenProgress({ phase: 'images', current: 0, total: totalImgs, label: `Gerando imagens (0/${totalImgs})…` });
-        for (const { i, q } of slidesWithImage) {
+        for (const { slideId, i, q } of slidesWithImage) {
           if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
+          attemptedImageSlideIds.add(slideId);
           setGenProgress({
             phase: 'images',
             current: doneImgs,
@@ -3269,12 +3475,13 @@ ${jsonShapeLine}`;
               signal: job.signal,
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
+              aspectRatio: isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
             });
             checkActive();
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? {
+              setSlides(prev => prev.map((sl) => sl.id === slideId ? {
                 ...sl,
                 ...patchImg,
                 bgFit: 'cover',
@@ -3282,6 +3489,7 @@ ${jsonShapeLine}`;
                 bgY: 50,
                 bgZoom: 100,
                 bgImageFailed: false,
+                bgImageError: null,
                 bgImageSource: 'ai',
               } : sl));
           } catch(e) {
@@ -3289,16 +3497,42 @@ ${jsonShapeLine}`;
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
-              setSlides(prev => prev.map((sl, idx) => idx === i ? { ...sl, bgImageFailed: true } : sl));
+              setSlides(prev => prev.map((sl) => sl.id === slideId ? {
+                ...sl,
+                bgImageFailed: true,
+                bgImageError: e?.code || e?.message || 'generation_failed',
+              } : sl));
             // Quota esgotada / plano sem imagens / sessão: os restantes cards falhariam igual — pára aqui (auditoria H6).
             if (['reference_unsupported', 'reference_invalid', 'reference_storage_unconfigured', 'reference_upload_failed', 'quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
               if (!abort.cancelled) toast(e.message, 'error', 7000);
               imgQuotaStop = true;
+              doneImgs++;
+              setGenProgress({
+                phase: 'images',
+                current: doneImgs,
+                total: totalImgs,
+                label: `Geração interrompida (${doneImgs}/${totalImgs})`,
+              });
               break;
             }
           }
           doneImgs++;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
+        }
+        if (imgQuotaStop) {
+          const remainingIds = new Set(
+            slidesWithImage
+              .filter(({ slideId }) => !attemptedImageSlideIds.has(slideId))
+              .map(({ slideId }) => slideId),
+          );
+          if (remainingIds.size) {
+            imgFailCount += remainingIds.size;
+            setSlides(prev => prev.map((sl) => remainingIds.has(sl.id) ? {
+              ...sl,
+              bgImageFailed: true,
+              bgImageError: 'batch_generation_stopped',
+            } : sl));
+          }
         }
       }
 
@@ -3331,7 +3565,9 @@ ${jsonShapeLine}`;
           lsSet(SK.backupNudgeDone, true);
           // FE-013: flush síncrono antes do toast — o autosave 100ms ainda
           // podia estar pendente quando o utilizador fechasse a aba.
-          flushPersistNow();
+          // A imagem acabou de entrar por `setSlides`; esperar o próximo tick
+          // evita gravar o snapshot anterior sem os blobs/IDs recém-gerados.
+          window.setTimeout(() => flushPersistRef.current?.(), 0);
           toast('Projeto salvo neste navegador. Em Exportar → Backup JSON cria uma cópia portátil.', 'info', 7500);
         }
       } catch { /* */ }
@@ -3480,7 +3716,12 @@ ${isPresentationSummary
         toast('Não foi possível processar a imagem.', 'error', 4500);
         return;
       }
-      void guardarImagemDoSlide(url).then((patch) => updateSlide({ ...patch, bgImageSource: 'imported' }));
+      void guardarImagemDoSlide(url).then((patch) => updateSlide({
+        ...patch,
+        bgImageSource: 'imported',
+        bgImageFailed: false,
+        bgImageError: null,
+      }));
     });
     e.target.value = '';
   };
@@ -3806,21 +4047,33 @@ Retorne APENAS JSON: ${refineAllWantsBody
         if (abort.cancelled || activeProjectRef.current !== projectId) break;
         const q = tpl.slides[i]?.q;
         if (!q) continue;
+        const slideId = newSlides[i]?.id;
         try {
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
             signal: templateJob.signal,
             refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
             imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
+            aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
           });
           const patchImg = await guardarImagemDoSlide(url);
           if (!abort.cancelled && activeProjectRef.current === projectId)
-            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, ...patchImg, bgImageFailed: false, bgImageSource: 'ai' } : sl));
+            setSlides(prev => prev.map((sl) => sl.id === slideId ? {
+              ...sl,
+              ...patchImg,
+              bgImageFailed: false,
+              bgImageError: null,
+              bgImageSource: 'ai',
+            } : sl));
         } catch (e) {
           if (isGenerationCancelled(e)) break;
           failCount++;
           console.warn(`Template imagem slide ${i + 1}:`, e.message);
           if (!abort.cancelled && activeProjectRef.current === projectId)
-            setSlides(prev => prev.map((sl, j) => j === i ? { ...sl, bgImageFailed: true } : sl));
+            setSlides(prev => prev.map((sl) => sl.id === slideId ? {
+              ...sl,
+              bgImageFailed: true,
+              bgImageError: e?.code || e?.message || 'generation_failed',
+            } : sl));
         }
       }
       templateJob.finish();
@@ -3829,7 +4082,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
           : `${failCount} imagens do template não carregaram. Toque no card para tentar de novo.`, 'warning', 5000);
     })();
-  }, [activeProductKind, history, toast, setSlides, hasOpenAI, openaiKey, imgParams, styleKit]);
+  }, [activeProductKind, fmt, history, toast, setSlides, hasOpenAI, openaiKey, imgParams, styleKit]);
 
   // Reordena slides (drag-and-drop)
   const reorderSlides = useCallback((from, to) => {
@@ -3950,7 +4203,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     activeDocId,
     onOpenProject: openDoc,
     onNewProject: createProjectByKind,
-    onGenerateProject: openGenerationSetup,
+    onGenerateProject: generateProjectByKind,
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,
     openRefImagePicker,
@@ -3997,25 +4250,91 @@ Retorne APENAS JSON: ${refineAllWantsBody
       const targetSet = Array.isArray(targetSlideIds) && targetSlideIds.length
         ? new Set(targetSlideIds)
         : null;
-      const idxs = slides
+      const candidates = slides
         .map((s, i) => ({ s, i }))
         .filter(({ s }) => String(s.imageQuery || '').trim())
-        .filter(({ s }) => targetSet ? targetSet.has(s.id) : !(s.bgImage || s.bgImageId))
-        .map(({ i }) => i);
-      if (!idxs.length) {
-        toast('Nenhum card pendente de imagem (ou sem palavras-chave).', 'info');
+        .filter(({ s }) => !s.bgImage)
+        .filter(({ s }) => targetSet ? targetSet.has(s.id) : true);
+      if (!candidates.length) {
+        toast(`Nenhum ${activeProductKind === 'apresentacao' ? 'slide' : 'card'} pendente de imagem (ou sem palavras-chave).`, 'info');
         return;
       }
-      trackEvent('criar_rapido_images', { count: String(idxs.length) });
+      trackEvent('criar_rapido_images', { count: String(candidates.length) });
       // Mantém um job pai vivo durante o lote. Sem ele, cancelar abortava apenas
       // a imagem atual e o loop começava o card seguinte como uma nova geração.
       const batchJob = startAIJob();
+      const generationProjectId = activeProjectRef.current;
+      let generated = 0;
+      let restored = 0;
+      let failed = 0;
       try {
-        for (const i of idxs) {
+        for (const { s, i } of candidates) {
           throwIfGenerationCancelled(batchJob.signal);
+          if (activeProjectRef.current !== generationProjectId) break;
+          // Um ID persistido pode estar apenas aguardando hidratação. Recupera
+          // seus bytes antes de gastar quota; se o registro sumiu, limpa o ID
+          // órfão para que a geração abaixo possa reparar o slide.
+          if (s.bgImageId) {
+            let storageReadFailed = false;
+            try {
+              const cached = imagemUrlsRef.current.get(s.bgImageId);
+              const entry = cached ? null : await imageGet(s.bgImageId);
+              const restoredUrl = cached || (entry?.blob ? URL.createObjectURL(entry.blob) : null);
+              if (restoredUrl) {
+                imagemUrlsRef.current.set(s.bgImageId, restoredUrl);
+                setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applyPersistedImagePatches(prev, [{
+                  id: s.id,
+                  expectedImageId: s.bgImageId,
+                  patch: { bgImage: restoredUrl, bgImageFailed: false, bgImageError: null },
+                }]));
+                restored++;
+                continue;
+              }
+            } catch (error) {
+              console.warn('[imagem] recuperação antes do lote falhou:', error?.message || error);
+              storageReadFailed = true;
+            }
+            if (storageReadFailed) {
+              // Uma falha de leitura pode ser temporária. Não apaga a referência
+              // persistida nem gasta quota gerando outra imagem por cima dela.
+              setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applyPersistedImagePatches(prev, [{
+                id: s.id,
+                expectedImageId: s.bgImageId,
+                patch: { bgImageFailed: true, bgImageError: 'stored_image_unavailable' },
+              }]));
+              failed++;
+              continue;
+            }
+          }
           // eslint-disable-next-line no-await-in-loop
-          await generateSlideImageAt(i, batchJob.signal);
+          const result = await generateSlideImageAt(i, batchJob.signal, {
+            projectId: generationProjectId,
+            slideId: s.id,
+          });
+          if (result?.ok) generated++;
+          else {
+            failed++;
+            if (s.bgImageId && result?.reason !== 'stale_target' && result?.reason !== 'already_generating') {
+              setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applyPersistedImagePatches(prev, [{
+                id: s.id,
+                expectedImageId: s.bgImageId,
+                patch: {
+                  bgImage: null,
+                  bgImageId: null,
+                  bgImageFailed: true,
+                  bgImageError: 'stored_image_missing',
+                },
+              }]));
+            }
+          }
           throwIfGenerationCancelled(batchJob.signal);
+        }
+        const parts = [];
+        if (generated) parts.push(`${generated} gerada${generated === 1 ? '' : 's'}`);
+        if (restored) parts.push(`${restored} recuperada${restored === 1 ? '' : 's'}`);
+        if (failed) parts.push(`${failed} com falha`);
+        if (parts.length) {
+          toast(`Imagens: ${parts.join(' · ')}.`, failed ? 'warning' : 'success', 5200);
         }
       } catch (error) {
         if (!isGenerationCancelled(error)) {
@@ -4035,6 +4354,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
   };
 
   const desktopThumbWidth = f.w * previewScale;
+  const isPresentationProject = activeProductKind === 'apresentacao';
+  const stripThumbWidth = isPresentationProject ? 80 : 44;
+  const stripThumbHeight = isPresentationProject ? 45 : 56;
 
   if (landingOpen) {
     return (
@@ -4148,7 +4470,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           isMobile={isMobile}
           useOwnImageKey={useOwnImageKey}
           appMode={appMode}
-          onGenerate={openGenerationSetup}
+          onGenerate={generateProjectByKind}
           onOpenLibrary={() => setLibraryOpen(true)}
           onOpenTemplates={() => setTemplatesOpen(true)}
           onOpenResearch={() => setResearchOpen(true)}
@@ -4291,7 +4613,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           <BrandLogo height={26} style={{ maxWidth: 220 }} />
           <div style={{ minWidth: 0 }}>
             {activeEntry && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'nowrap', minWidth: 0 }}>
                 <button
                   type="button"
                   onClick={async () => {
@@ -4308,14 +4630,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   style={{
                     fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    maxWidth: headerVeryTight ? 110 : 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    maxWidth: headerTight ? 96 : 160, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textAlign: 'left',
                   }}
                   title="Clique para renomear"
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                <SavedIndicator savedAt={lastSavedAt} />
+                {!headerTight && <SavedIndicator savedAt={lastSavedAt} />}
                 <button
                   type="button"
                   onClick={salvarProjeto}
@@ -4326,7 +4648,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     border: '1px solid var(--border)', background: 'var(--bg-card)',
                     color: 'var(--text-primary)', fontSize: 11, fontWeight: 600,
                     fontFamily: 'var(--font-ui)', cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+                    display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
                   <Save size={11} aria-hidden/> Salvar
@@ -4334,7 +4656,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             )}
           </div>
-          {!headerVeryTight && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
+          {!headerTight && editorPillBtn(() => goAccount('projects'), 'Projetos', Home)}
         </div>
 
         {/* Centro — Gerar com IA */}
@@ -4435,12 +4757,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
             transition: 'max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s, padding 0.32s, transform 0.32s, border-color 0.22s',
           }}
           >
-            <div style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2 }}>
+            <div
+              ref={thumbnailStripRef}
+              style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2, scrollPaddingInline:8 }}
+            >
               {slides.map((s, i) => {
                 const stripThumbFil = slideStoredPresentationCssFilter(s);
                 return (
                 <button
                   key={s.id}
+                  ref={(el) => { thumbnailRefs.current[i] = el; }}
                   onClick={()=>setActiveIdx(i)}
                   draggable
                   onDragStart={e=>{
@@ -4458,22 +4784,39 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   className={`slide-thumb ${i===activeIdx?'active':''}`}
                   style={{ background:'none', border:'none', padding:0, cursor:'grab' }}
                   title="Clique para selecionar · arraste para reordenar"
-                  aria-label={`Slide ${i+1} de ${slides.length}`}
+                  aria-label={`${isPresentationProject ? 'Slide' : 'Card'} ${i+1} de ${slides.length}`}
                 >
                   <div style={{
-                    width:44, height:56, borderRadius:4, overflow:'hidden', position:'relative',
+                    width:stripThumbWidth, height:stripThumbHeight, borderRadius:4, overflow:'hidden', position:'relative',
                     background: resolveSlideBrandBg(brand, i, s),
                     ...(stripThumbFil ? { filter: stripThumbFil } : {}),
                   }}>
+                    <span style={{
+                      position:'absolute', left:5, right:5, top:'50%', transform:'translateY(-50%)',
+                      fontSize:isPresentationProject ? 5.5 : 5, lineHeight:1.14, fontWeight:700,
+                      color:'rgba(255,255,255,0.82)', overflow:'hidden', display:'-webkit-box',
+                      WebkitLineClamp: isPresentationProject ? 2 : 3, WebkitBoxOrient:'vertical',
+                      textAlign:'left', overflowWrap:'anywhere',
+                    }}>
+                      {s.bgImageFailed ? 'Imagem pendente' : (s.title || 'Sem título')}
+                    </span>
                     {s.bgImage ? (
-                      <img
-                        src={s.bgImage}
-                        alt=""
-                        loading="eager"
-                        style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:`${s.bgX ?? 50}% ${s.bgY ?? 50}%` }}
-                      />
+                      <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
+                        <img
+                          src={s.bgImage}
+                          alt=""
+                          loading="eager"
+                          onError={(event) => { event.currentTarget.parentElement.style.display = 'none'; }}
+                          style={{
+                            position:'absolute', inset:0, width:'100%', height:'100%',
+                            objectFit:s.bgFit === 'contain' ? 'contain' : 'cover',
+                            objectPosition:`${s.bgX ?? 50}% ${s.bgY ?? 50}%`,
+                            transform:`scale(${Math.max(0.5, (s.bgZoom ?? 100) / 100)}) scaleX(${s.bgMirror ? -1 : 1})`,
+                          }}
+                        />
+                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.10)' }}/>
+                      </div>
                     ) : null}
-                    {s.bgImage && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)' }}/>}
                     <span style={{
                       position:'absolute', bottom:3, left:4,
                       fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.7)',
@@ -4483,8 +4826,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 </button>
                 );
               })}
-              <button onClick={addSlide} aria-label="Adicionar card ao carrossel" style={{
-                flexShrink:0, width:44, height:56, borderRadius:4,
+              <button onClick={addSlide} aria-label={`Adicionar ${isPresentationProject ? 'slide à apresentação' : 'card ao carrossel'}`} style={{
+                flexShrink:0, width:stripThumbWidth, height:stripThumbHeight, borderRadius:4,
                 border:'1px dashed var(--border)', background:'transparent',
                 color:'var(--text-muted)', cursor:'pointer', display:'flex',
                 alignItems:'center', justifyContent:'center',
@@ -4569,7 +4912,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                           });
                           return;
                         }
-                        openGenerationSetup('carrossel');
+                        generateProjectByKind('carrossel');
                       }}
                       aria-label={appMode === 'criador' ? 'Escrever o pedido na sidebar' : 'Gerar carrossel com IA'}
                       style={{
@@ -4605,7 +4948,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                           });
                           return;
                         }
-                        openGenerationSetup('apresentacao');
+                        generateProjectByKind('apresentacao');
                       }}
                       aria-label="Gerar apresentação com IA"
                       style={{
@@ -4952,6 +5295,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   onPickRef={() => openRefImagePicker(activeIdx)}
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
+                  itemLabel={isPresentationProject ? 'slide' : 'card'}
                   generateImageDisabled={
                     !(slide.imageQuery || '').trim() ||
                     (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
@@ -4960,7 +5304,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             ) : (
               // Desktop: all slides row
-              <div style={{ padding:'28px 24px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%' }}>
+              <div style={{ padding:'28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%' }}>
                 {slides.map((s,i)=>(
                   <div
                     key={s.id}
@@ -4989,10 +5333,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         boxShadow: i===activeIdx
                           ? '0 0 0 2px var(--accent-focus)'
                           : 'none',
-                        opacity: i===activeIdx ? 1 : 0.65,
                       }}
-                      onMouseEnter={e=>{ if(i!==activeIdx) e.currentTarget.style.opacity='0.9'; }}
-                      onMouseLeave={e=>{ if(i!==activeIdx) e.currentTarget.style.opacity='0.65'; }}
                     >
                       <SlideCard
                         slide={s}
@@ -5118,6 +5459,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onPickRef={() => openRefImagePicker(i)}
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}
+                      itemLabel={isPresentationProject ? 'slide' : 'card'}
                       generateImageDisabled={
                         !((s.imageQuery || '').trim()) ||
                         (normalizeSlideImgMode(s.imgMode) === 'dalle' && !hasOpenAI)
@@ -5128,7 +5470,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 {/* Respiro no fim da fila: o padding-right do contentor flex não
                     entra no scrollWidth, e sem isto o último card fica colado
                     à borda quando se rola até ao fim. */}
-                <div aria-hidden style={{ flexShrink:0, width:4 }}/>
+                <div
+                  aria-hidden
+                  style={{
+                    flexShrink:0,
+                    width:Math.max(48, Math.floor((vw - 272 - desktopThumbWidth) / 2)),
+                  }}
+                />
               </div>
             )}
           </div>
@@ -5404,8 +5752,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <ImageCropModal
         open={imageCropOpen && !!slide.bgImage}
         imageSrc={slide.bgImage || ''}
+        fmt={fmt}
         onClose={() => setImageCropOpen(false)}
-        onApply={(dataUrl) => { void guardarImagemDoSlide(dataUrl).then((patch) => updateSlide(patch)); }}
+        onApply={(dataUrl) => { void guardarImagemDoSlide(dataUrl).then((patch) => updateSlide({
+          ...patch,
+          bgImageSource: 'edited',
+          bgImageFailed: false,
+          bgImageError: null,
+        })); }}
       />
       <PhotoPositionModal
         open={photoPositionOpen}

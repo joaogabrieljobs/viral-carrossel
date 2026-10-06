@@ -68,7 +68,7 @@ const IMAGE_FOCAL_XY = {
 /** Presets de «modo» da imagem (encaixe + zoom). */
 const IMAGE_MODE_PRESETS = [
   { id: 'full', label: 'Preencher', sub: 'cobre a zona · sem barras', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100 } },
-  { id: 'show_all', label: 'Mais quadrado', sub: 'foto toda visível · vãos com fundo do card', patch: { bgFit: 'contain', bgX: 50, bgY: 50, bgZoom: 100 } },
+  { id: 'show_all', label: 'Mais quadrado', sub: 'foto toda visível · vãos com fundo da arte', patch: { bgFit: 'contain', bgX: 50, bgY: 50, bgZoom: 100 } },
   { id: 'vertical', label: 'Mais vertical', sub: 'recorte lateral', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 132 } },
   { id: 'wide', label: 'Mais largo', sub: 'vê mais da cena', patch: { bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 86 } },
   { id: 'manual', label: 'Manual', sub: 'zoom % · tamanho livre', patch: { bgFit: 'custom' } },
@@ -151,18 +151,45 @@ const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
 const visibleEditorTabs = (appMode) =>
   EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
 
+// O Studio tem sete áreas. Uma grelha fixa de três colunas deixava a última
+// aba sozinha numa terceira linha. Dividimos cada linha nas mesmas 12 colunas:
+// 7 abas viram 4 + 3, 6 viram 3 + 3 e 5 viram 3 + 2, sem células vazias.
+function editorTabGridSpan(total, index) {
+  const safeTotal = Math.max(1, Number(total) || 1);
+  const firstRowCount = Math.ceil(safeTotal / 2);
+  const rowCount = index < firstRowCount
+    ? firstRowCount
+    : Math.max(1, safeTotal - firstRowCount);
+  return `span ${12 / rowCount}`;
+}
+
 const HOME_CREATION_TYPES = [
   { id: 'carrossel', label: 'Carrossel', icon: Layers },
   { id: 'apresentacao', label: 'Apresentação', icon: Layout },
 ];
 
 const projectKindOf = (entry) => (
-  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+  entry?.doc?.productKind === 'apresentacao'
+  || entry?.doc?.fmt === 'apresentacao'
+  || entry?.doc?.creativePreset === 'apresentacao'
     ? 'apresentacao'
     : 'carrossel'
 );
 
-function UnlockGroupedElementsNotice({ onUnlock }) {
+const storyboardThumbDimensions = (isPresentation) => (
+  isPresentation ? { width: 64, height: 36 } : { width: 36, height: 44 }
+);
+
+function imageTargetMatches(current, expected) {
+  return Boolean(
+    current
+    && expected
+    && current.projectId === expected.projectId
+    && current.slideId === expected.slideId,
+  );
+}
+
+function UnlockGroupedElementsNotice({ onUnlock, itemLabel = 'card' }) {
   return (
     <div style={{
       display:'flex', flexDirection:'column', gap:8, padding:10,
@@ -170,7 +197,7 @@ function UnlockGroupedElementsNotice({ onUnlock }) {
       background:'var(--bg-card)',
     }}>
       <p style={{ fontSize:11, color:'var(--text-secondary)', margin:0, lineHeight:1.5, fontFamily:'var(--font-ui)' }}>
-        Este card ainda usa o movimento agrupado antigo. Separe para arrastar título, subtítulo, foto e texto final individualmente.
+        Este {itemLabel} ainda usa o movimento agrupado antigo. Separe para arrastar título, subtítulo, foto e texto final individualmente.
       </p>
       <button
         type="button"
@@ -182,7 +209,7 @@ function UnlockGroupedElementsNotice({ onUnlock }) {
           display:'flex', alignItems:'center', justifyContent:'center', gap:7,
         }}
       >
-        <Move size={14} aria-hidden /> Separar elementos deste card
+        <Move size={14} aria-hidden /> Separar elementos deste {itemLabel}
       </button>
     </div>
   );
@@ -273,9 +300,30 @@ function SidebarContent({
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
   const [customPresetName, setCustomPresetName] = React.useState('');
   const [homeCreationType, setHomeCreationType] = React.useState(() => (
-    creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'apresentacao' : 'carrossel'
+    activeEntry?.doc?.productKind === 'apresentacao'
+    || creativePreset === 'apresentacao'
+    || fmt === 'apresentacao'
+      ? 'apresentacao'
+      : 'carrossel'
   ));
-  const isPresentationProject = creativePreset === 'apresentacao' || fmt === 'apresentacao';
+  const isPresentationProject = activeEntry?.doc?.productKind === 'apresentacao'
+    || creativePreset === 'apresentacao'
+    || fmt === 'apresentacao';
+  const itemLabel = isPresentationProject ? 'slide' : 'card';
+  const itemsLabel = isPresentationProject ? 'slides' : 'cards';
+  const editorTabs = visibleEditorTabs(appMode);
+  const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
+
+  // A escolha da Home também descreve o projeto aberto. Ao trocar de projeto
+  // ou converter o documento, atualiza o seletor e os CTAs; uma escolha manual
+  // posterior continua livre até o tipo real do projeto mudar de novo.
+  React.useEffect(() => {
+    setHomeCreationType(projectKindOf({ doc: {
+      productKind: activeEntry?.doc?.productKind,
+      fmt,
+      creativePreset,
+    } }));
+  }, [activeEntry?.id, activeEntry?.doc?.productKind, creativePreset, fmt]);
   const productVisualPresets = React.useMemo(
     () => visualPresets.filter((preset) => (
       isPresentationProject
@@ -293,8 +341,8 @@ function SidebarContent({
   const unlockActiveCardElements = React.useCallback(() => {
     updateSlide(unlockGroupedElementsPatch(slide));
     setCanvasEditMode(false);
-    toast?.('Elementos separados neste card. Agora cada parte pode ser movida individualmente.', 'success', 5200);
-  }, [setCanvasEditMode, slide, toast, updateSlide]);
+    toast?.(`Elementos separados neste ${itemLabel}. Agora cada parte pode ser movida individualmente.`, 'success', 5200);
+  }, [itemLabel, setCanvasEditMode, slide, toast, updateSlide]);
   // O rascunho do prompt vive no editor; este painel pode desmontar no mobile.
   React.useLayoutEffect(() => {
     setNarrativaPanel('prompt');
@@ -422,14 +470,23 @@ function SidebarContent({
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, slide.imgExtraPrompt),
+        aspectRatio: isPresentationProject ? '16:9' : (fmt === 'quadrado' ? '1:1' : fmt === 'stories' ? '9:16' : '4:5'),
       });
       // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
       const patch = await guardarImagemDoSlide(url);
       throwIfGenerationCancelled(job.signal);
-      if (imageTargetRef.current.projectId !== target.projectId || imageTargetRef.current.slideId !== target.slideId) return;
-      updateSlide({ ...patch, overlay: 70, bgImageSource: 'ai' });
-    } catch(e) { if (!isGenerationCancelled(e)) toast?.('GPT Image 2: '+e.message, 'error'); }
-    finally { job.finish(); setDalleLoading(false); }
+      if (!imageTargetMatches(imageTargetRef.current, target)) return;
+      updateSlide({ ...patch, bgImageFailed: false, bgImageError: null, bgImageSource: 'ai' });
+    } catch(e) {
+      if (!isGenerationCancelled(e) && imageTargetMatches(imageTargetRef.current, target)) {
+        updateSlide({ bgImageFailed: true, bgImageError: e?.code || e?.message || 'generation_failed' });
+        toast?.('GPT Image 2: '+e.message, 'error');
+      }
+    }
+    finally {
+      job.finish();
+      setDalleLoading(false);
+    }
   };
 
   const replaceImg = async () => {
@@ -450,6 +507,7 @@ function SidebarContent({
   };
 
   const askUrlImg = async () => {
+    const target = imageTargetRef.current;
     const u = await askPrompt({
       title: 'Imagem por URL',
       label: 'URL DA IMAGEM',
@@ -457,7 +515,21 @@ function SidebarContent({
       placeholder: 'https://...',
       cta: 'Usar imagem',
     });
-    if (u) updateSlide(await guardarImagemDoSlide(u));
+    if (!u) return;
+    try {
+      const patch = await guardarImagemDoSlide(u);
+      if (!imageTargetMatches(imageTargetRef.current, target)) return;
+      updateSlide({
+        ...patch,
+        bgImageSource: 'imported',
+        bgImageFailed: false,
+        bgImageError: null,
+      });
+    } catch (error) {
+      if (imageTargetMatches(imageTargetRef.current, target)) {
+        toast?.(error?.message || 'Não foi possível carregar a imagem desta URL.', 'error');
+      }
+    }
   };
 
   const btnStyle = (active) => ({
@@ -626,10 +698,10 @@ function SidebarContent({
         role="tablist"
         aria-label="Áreas de edição do projeto"
         style={{
-          // Grid 3 colunas — 6 domínios em 2 linhas, todos visíveis sem overflow.
-          // Era flex single-row que cortava quando passou de 4 itens.
+          // Doze colunas permitem equilibrar 5, 6 ou 7 áreas em duas linhas,
+          // sempre ocupando toda a largura (Studio fica 4 + 3).
           display:'grid',
-          gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
+          gridTemplateColumns:'repeat(12, minmax(0, 1fr))',
           rowGap: 0,
           borderBottom:'1px solid var(--border)',
           boxShadow:'0 6px 12px -8px rgba(0,0,0,0.18)',
@@ -637,10 +709,7 @@ function SidebarContent({
           position:'relative', zIndex:1,
         }}
       >
-        {(() => {
-          // FASE 2 Narrative OS — tabs filtradas por appMode (fonte única EDITOR_TABS)
-          return visibleEditorTabs(appMode);
-        })().map(t=>{
+        {editorTabs.map((t, index)=>{
           const active = tab===t.id;
           return (
             <button
@@ -651,6 +720,7 @@ function SidebarContent({
               aria-current={active ? 'page' : undefined}
               onClick={()=>setTab(t.id)}
               className={`tab-bar-item ${active?'active':''}`}
+              style={{ gridColumn: editorTabGridSpan(editorTabs.length, index), minWidth: 0 }}
             >
               <t.icon size={13} strokeWidth={active ? 2.25 : 2}/>{t.label}
             </button>
@@ -751,7 +821,7 @@ function SidebarContent({
           <>
             {(tab==='layout'||tab==='slide') && (<S
               title="Composição"
-              hint="Divide o card em áreas: texto e foto. Opcional."
+              hint={`Divide o ${itemLabel} em áreas: texto e foto. Opcional.`}
             >
               {/* Polish: CTA primário com fontWeight 600 + ícone (era 400 e
                   parecia botão fantasma). Quando ativo, vira selo de sucesso
@@ -786,7 +856,7 @@ function SidebarContent({
                   <button
                     type="button"
                     onClick={disableCanvasLayout}
-                    aria-label="Desativar composição em todos os cards"
+                    aria-label={`Desativar composição em todos os ${itemsLabel}`}
                     style={{
                       alignSelf:'center', minHeight:32, padding:'0 14px',
                       cursor:'pointer', border:'none', background:'transparent',
@@ -826,7 +896,7 @@ function SidebarContent({
                 style={{ opacity: anyCanvasEnabled ? 1 : 0.45, cursor: anyCanvasEnabled ? undefined : 'not-allowed', transition:'opacity 0.15s' }}
               >
                 <Toggle
-                  label="Mostrar zonas no card"
+                  label={`Mostrar zonas no ${itemLabel}`}
                   value={canvasEditMode}
                   onChange={(v) => {
                     if (!anyCanvasEnabled) {
@@ -840,7 +910,7 @@ function SidebarContent({
                   <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)', marginTop:4, letterSpacing:'-0.005em' }}>
                     {anyCanvasSaved
                       ? 'O layout salvo continua aplicado. Clique em Editar composição para mover as áreas.'
-                      : 'Crie a composição para dividir o card em áreas editáveis.'}
+                      : `Crie a composição para dividir o ${itemLabel} em áreas editáveis.`}
                   </div>
                 )}
               </div>
@@ -848,7 +918,7 @@ function SidebarContent({
 
             {(tab==='imagem'||tab==='slide') && (<S
               title="Importar imagens"
-              hint="Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do card. O primeiro ficheiro vai para o slide 1, o segundo para o slide 2, e assim por diante."
+              hint={`Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do ${itemLabel}. O primeiro ficheiro vai para o ${itemLabel} 1, o segundo para o ${itemLabel} 2, e assim por diante.`}
             >
               {/* Polish: 3 botões com mesmo padrão drop-zone (ícone num
                   círculo accent + label primary + subtítulo). Hover puxa
@@ -878,20 +948,20 @@ function SidebarContent({
                       <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar em lote</span>
-                        <span style={importSub}>Distribui um arquivo por slide na ordem (1 → N)</span>
+                        <span style={importSub}>Distribui um arquivo por {itemLabel} na ordem (1 → N)</span>
                       </span>
                     </button>
                     <button type="button" onClick={() => openPhotoZoneImport?.(activeIdx)} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
                       <span style={importIconWrap} aria-hidden><ImageIcon size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
-                        <span style={importTitle}>Importar foto neste slide</span>
-                        <span style={importSub}>Substitui só a zona de imagem do card {activeIdx + 1}</span>
+                        <span style={importTitle}>Importar foto neste {itemLabel}</span>
+                        <span style={importSub}>Substitui só a zona de imagem do {itemLabel} {activeIdx + 1}</span>
                       </span>
                     </button>
                     <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} aria-label="MP4 / MOV / WebM até 60 MB. Substitui foto se houver." title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
                       <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
-                        <span style={importTitle}>Importar vídeo neste slide</span>
+                        <span style={importTitle}>Importar vídeo neste {itemLabel}</span>
                         <span style={importSub}>MP4 · MOV · WebM — até 60 MB · substitui a foto</span>
                       </span>
                     </button>
@@ -911,7 +981,7 @@ function SidebarContent({
                         onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; }}
                       >
                         <Trash2 size={11} aria-hidden/>
-                        Remover vídeo do slide
+                        Remover vídeo do {itemLabel}
                         {slide.videoName ? <span style={{ opacity:0.6, marginLeft:4 }}>({slide.videoName.slice(0, 18)}…)</span> : null}
                       </button>
                     ) : null}
@@ -954,7 +1024,7 @@ function SidebarContent({
                       bgMirror: false,
                       presentationImgAdjust: undefined,
                     });
-                    toast?.('Imagem removida deste card. Use desfazer se precisar.', 'success');
+                    toast?.(`Imagem removida deste ${itemLabel}. Use desfazer se precisar.`, 'success');
                   }}
                   style={{
                     width:'100%', minHeight:40, borderRadius:11, cursor:'pointer',
@@ -964,7 +1034,7 @@ function SidebarContent({
                     justifyContent:'center', gap:7,
                   }}
                 >
-                  <Trash2 size={14} aria-hidden/> Excluir imagem deste card
+                  <Trash2 size={14} aria-hidden/> Excluir imagem deste {itemLabel}
                 </button>
               </S>
             ) : null}
@@ -1009,7 +1079,7 @@ function SidebarContent({
 
             {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (<S title={`Texto — ${isPresentationProject ? 'slide' : 'card'} ${activeIdx+1} / ${slides.length}`}>
               {groupedCultureElements ? (
-                <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} />
+                <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} itemLabel={itemLabel} />
               ) : null}
               <div>
                 <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
@@ -1202,14 +1272,14 @@ function SidebarContent({
                   opacity: (!String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.bodyAfterImage || '').trim()) ? 0.45 : 1,
                 }}
               >
-                <Trash2 size={14} aria-hidden/> Limpar textos deste card
+                <Trash2 size={14} aria-hidden/> Limpar textos deste {itemLabel}
               </button>
             </S>)}
 
             {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (
               <S
-                title="Textos de assinatura deste card"
-                hint="Vêm preenchidos pelos padrões visuais (Bold Promo, Case Study…). São por card — deixe vazio para esconder."
+                title={`Textos de assinatura deste ${itemLabel}`}
+                hint={`Vêm preenchidos pelos padrões visuais (Bold Promo, Case Study…). São por ${itemLabel} — deixe vazio para esconder.`}
               >
                 <div>
                   <label className="vc-label-sm">Sobrelinha (acima do título)</label>
@@ -1248,8 +1318,8 @@ function SidebarContent({
 
             {tab==='narrativa' && narrativaPanel==='card' && (
               <S
-                title={`Logo — card ${activeIdx + 1}`}
-                hint="Use a logo já salva no projeto, ou importe um PNG apenas para este card."
+                title={`Logo — ${itemLabel} ${activeIdx + 1}`}
+                hint={`Use a logo já salva no projeto, ou importe um PNG apenas para este ${itemLabel}.`}
               >
                 <SlideLogoPanel
                   key={`card-logo-${activeEntry?.id}-${slide.id}`}
@@ -1271,6 +1341,7 @@ function SidebarContent({
             {(tab==='imagem'||tab==='slide') && (
               <PerSlideImageRefBlock
                 slide={slide}
+                itemLabel={itemLabel}
                 onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
                 onRemoveRef={() => updateSlide({ refImage: null })}
                 onPickRef={() => openRefImagePicker(activeIdx)}
@@ -1358,14 +1429,14 @@ function SidebarContent({
                       color:'var(--text-muted)',
                       textTransform:'uppercase',
                       marginBottom:6,
-                    }}>Área da foto no card</div>
+                    }}>Área da foto no {itemLabel}</div>
                     {photoInsetBlocked ? (
                       <div style={{
                         fontSize:11, lineHeight:1.47, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
                         background:'var(--bg-pearl)', border:'1px solid var(--hairline)', borderRadius:11, padding:'8px 10px',
                       }}>
                         Faixa com margens e cantos arredondados só no <strong style={{ fontWeight:600 }}>layout clássico</strong>
-                        {' '}(sem canvas e sem sanduíche cultura neste card).
+                        {' '}(sem canvas e sem sanduíche cultura neste {itemLabel}).
                       </div>
                     ) : (
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
@@ -1682,7 +1753,7 @@ function SidebarContent({
                   }}>
                     Com composição ativa, esta grelha afeta o posicionamento <strong style={{ fontWeight:600 }}>dentro</strong>
                     {' '}das zonas de texto do preview (junto com «Distância das bordas»).
-                    Para mover o quadro inteiro no card, use o modo edição de zonas no preview e arraste a moldura.
+                    Para mover o quadro inteiro no {itemLabel}, use o modo edição de zonas no preview e arraste a moldura.
                   </div>
                 )}
                 <div>
@@ -1922,8 +1993,8 @@ function SidebarContent({
                   type="button"
                   disabled={!applyTypographyToAllCards || slides.length <= 1}
                   onClick={() => applyTypographyToAllCards?.()}
-                  title={slides.length <= 1 ? 'Precisa de pelo menos dois cards' : 'Copia tamanhos, espaçamento e legibilidade para todos os slides'}
-                  aria-label="Aplicar tipografia deste card a todos os slides"
+                  title={slides.length <= 1 ? `Precisa de pelo menos dois ${itemsLabel}` : `Copia tamanhos, espaçamento e legibilidade para todos os ${itemsLabel}`}
+                  aria-label={`Aplicar tipografia deste ${itemLabel} a todos os ${itemsLabel}`}
                   style={{
                     width:'100%', minHeight:44,
                     padding:'0 16px',
@@ -1948,7 +2019,7 @@ function SidebarContent({
                   onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   <Layers size={14} strokeWidth={2}/>
-                  Aplicar em todos os cards
+                  Aplicar em todos os {itemsLabel}
                 </button>
                 <p style={{
                   margin:'8px 0 0',
@@ -1960,7 +2031,7 @@ function SidebarContent({
                   Usa os ajustes de <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Tamanho</strong>,{' '}
                   <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Espaçamento</strong>,
                   {' '}<strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Título &amp; subtítulo</strong>{' '}
-                  e <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste card em todos os slides (não altera textos nem posição no grid).
+                  e <strong style={{ fontWeight:600, color:'var(--text-secondary)' }}>Legibilidade</strong> deste {itemLabel} em todos os {itemsLabel} (não altera textos nem posição no grid).
                 </p>
               </div>
             </S>)}
@@ -1970,10 +2041,10 @@ function SidebarContent({
               return (
                 <S
                   title="Posição livre"
-                  hint="Clique no meio de qualquer elemento do card e arraste. Vale para texto, foto, barra editorial, selo e ornamentos."
+                  hint={`Clique no meio de qualquer elemento do ${itemLabel} e arraste. Vale para texto, foto, barra editorial, selo e ornamentos.`}
                 >
                   {groupedCultureElements ? (
-                    <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} />
+                    <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} itemLabel={itemLabel} />
                   ) : null}
                   {movidos.length ? (
                     <>
@@ -2011,7 +2082,7 @@ function SidebarContent({
                     </>
                   ) : !groupedCultureElements ? (
                     <p style={{ fontSize:11, color:'var(--text-muted)', margin:0, lineHeight:1.5, fontFamily:'var(--font-ui)' }}>
-                      Nada foi movido neste card. Arraste um elemento na pré-visualização
+                      Nada foi movido neste {itemLabel}. Arraste um elemento na pré-visualização
                       e ele aparece aqui para repor.
                     </p>
                   ) : null}
@@ -2050,7 +2121,7 @@ function SidebarContent({
             Padrão Visual ganha protagonismo aqui — era enterrado na Marca. */}
         {tab==='visual' && (
           <>
-            <S title="Padrão visual" hint="Paleta, fontes e tipografia de uma vez. Não altera o texto dos slides.">
+            <S title="Padrão visual" hint={`Paleta, fontes e tipografia de uma vez. Não altera o texto dos ${itemsLabel}.`}>
               <VisualStylePicker
                 value={visualPreset}
                 onChange={applyVisualPresetCb}
@@ -2141,7 +2212,7 @@ function SidebarContent({
             {/* Padrão Visual migrado pra aba Visual (FASE 1 Narrative OS).
                 Marca agora foca em identidade pura: logo, handle, bio, tom. */}
 
-            {tab==='texto' && (<S title="Texto nos slides" hint="Padrão da marca para tamanho, tracking e peso. Cards novos herdam; ajustes finos por card continuam em Cards.">
+            {tab==='texto' && (<S title={`Texto nos ${itemsLabel}`} hint={`Padrão da marca para tamanho, tracking e peso. ${itemsLabel[0].toUpperCase() + itemsLabel.slice(1)} novos herdam; ajustes finos por ${itemLabel} continuam na edição individual.`}>
               <div>
                 <div style={{
                   fontFamily:'var(--font-mono)',
@@ -2253,7 +2324,7 @@ function SidebarContent({
                 <button
                   type="button"
                   onClick={() => applyBrandTypographyToAllSlides?.()}
-                  aria-label="Aplicar tipografia da marca a todos os slides"
+                  aria-label={`Aplicar tipografia da marca a todos os ${itemsLabel}`}
                   style={{
                     width:'100%', minHeight:44,
                     padding:'0 16px',
@@ -2277,7 +2348,7 @@ function SidebarContent({
                   onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   <Layers size={14} strokeWidth={2}/>
-                  Aplicar tipografia a todos os slides
+                  Aplicar tipografia a todos os {itemsLabel}
                 </button>
                 <p style={{
                   margin:'8px 0 0',
@@ -2286,12 +2357,12 @@ function SidebarContent({
                   letterSpacing:'-0.011em',
                   color:'var(--text-muted)',
                 }}>
-                  Não altera textos nem layout — só copia os valores acima para cada card (como em Cards → Legibilidade → Aplicar em todos).
+                  Não altera textos nem layout — só copia os valores acima para cada {itemLabel}.
                 </p>
               </div>
             </S>)}
 
-            {tab==='brand' && (<S title="Perfil Instagram" hint="A foto do perfil aparece no círculo colorido ao lado do @ nos cards (aba Marca).">
+            {tab==='brand' && (<S title="Perfil Instagram" hint={`A foto do perfil aparece no círculo colorido ao lado do @ nos ${itemsLabel} (aba Marca).`}>
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input
@@ -2301,7 +2372,7 @@ function SidebarContent({
                   className="vc-input"
                 />
               </div>
-              <Toggle label="Mostrar @ nos slides" value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
+              <Toggle label={`Mostrar @ nos ${itemsLabel}`} value={brand.showHandle} onChange={v=>setBrand({...brand,showHandle:v})}/>
               <details
                 className="vc-adjust-details"
                 style={{
@@ -2325,7 +2396,7 @@ function SidebarContent({
                   textTransform: 'uppercase',
                   userSelect: 'none',
                 }}>
-                  Posição do @ no card
+                  Posição do @ no {itemLabel}
                   <ChevronDown size={14} strokeWidth={2} style={{ opacity: 0.45, flexShrink: 0 }} aria-hidden />
                 </summary>
                 <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2386,7 +2457,7 @@ function SidebarContent({
                     </div>
                   </div>
                     <div style={{ flex:1, fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
-                      Aparece dentro do anel do badge nos cards.
+                      Aparece dentro do anel do badge nos {itemsLabel}.
                     </div>
                     <button
                       type="button"
@@ -2433,7 +2504,7 @@ function SidebarContent({
                     </summary>
                     <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.45, margin: 0, fontFamily: 'var(--font-ui)' }}>
-                        Posição, rotação e zoom valem só para a foto dentro do anel do @ nos cards.
+                        Posição, rotação e zoom valem só para a foto dentro do anel do @ nos {itemsLabel}.
                       </p>
                       <Slider label="Esquerda → direita" value={brand.handleAvatarPosX ?? 50} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleAvatarPosX: v })} />
                       <Slider label="Topo → base" value={brand.handleAvatarPosY ?? 50} min={0} max={100} onChange={(v) => setBrand({ ...brand, handleAvatarPosY: v })} />
@@ -2511,7 +2582,7 @@ function SidebarContent({
                         Carregar foto de perfil
                       </span>
                       <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                        Sem foto, os cards mostram 📷 · PNG · JPG · WebP até 2&nbsp;MB
+                        Sem foto, os {itemsLabel} mostram 📷 · PNG · JPG · WebP até 2&nbsp;MB
                       </span>
                     </span>
                     <input
@@ -2540,7 +2611,7 @@ function SidebarContent({
             {tab==='brand' && (
               <S
                 title="Barra editorial (topo)"
-                hint="Faixa fina no topo do card. Vem preenchida pelos padrões visuais — aqui você troca por texto seu. Deixe vazio para esconder."
+                hint={`Faixa fina no topo do ${itemLabel}. Vem preenchida pelos padrões visuais — aqui você troca por texto seu. Deixe vazio para esconder.`}
               >
                 <div>
                   <label className="vc-label-sm">Esquerda</label>
@@ -2579,7 +2650,7 @@ function SidebarContent({
             {tab==='brand' && (
               <S
                 title="Selo do rodapé (pill)"
-                hint="Cápsula centrada na base do card — CTA, hashtag ou handle. Vazio esconde."
+                hint={`Cápsula centrada na base do ${itemLabel} — CTA, hashtag ou handle. Vazio esconde.`}
               >
                 <div>
                   <label className="vc-label-sm">Texto</label>
@@ -2679,7 +2750,7 @@ function SidebarContent({
             {tab==='brand' && (
               <S
                 title="Logo"
-                hint={`Padrão da marca em todos os cards · ajustes e ocultar só no card ${activeIdx + 1}.`}
+                hint={`Padrão da marca em todos os ${itemsLabel} · ajustes e ocultar só no ${itemLabel} ${activeIdx + 1}.`}
               >
                 <SlideLogoPanel
                   key={`${activeEntry?.id}-${slide.id}`}
@@ -2788,10 +2859,10 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Cores manuais" hint="Título = primeira e última folha · Subtítulo = linha curta nos slides do meio · Texto = parágrafos e blocos de corpo (sanduíche inclusive). Destaques = trechos marcados no editor.">
+            <S title="Cores manuais" hint={`Título = primeira e última folha · Subtítulo = linha curta nos ${itemsLabel} do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor.`}>
               <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v,visualIdentityLocked:true})}/>
               <Toggle
-                label="Intercalar fundo entre cards"
+                label={`Intercalar fundo entre ${itemsLabel}`}
                 value={!!brand.interleaveBg}
                   onChange={(v) => setBrand({
                     ...brand,
@@ -2805,7 +2876,7 @@ function SidebarContent({
                   fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', fontFamily:'var(--font-ui)',
                   color:'var(--text-muted)', marginTop:-4, marginBottom:2,
                 }}>
-                  Slides 1 e 3 usam «Fundo» · 2 e 4 usam a segunda cor. Um «Fundo por slide» substitui esta regra nesse card.
+                  {itemsLabel[0].toUpperCase() + itemsLabel.slice(1)} 1 e 3 usam «Fundo» · 2 e 4 usam a segunda cor. Um «Fundo por {itemLabel}» substitui esta regra nesse {itemLabel}.
                 </div>
               ) : null}
               {brand.interleaveBg ? (
@@ -2845,7 +2916,7 @@ function SidebarContent({
                         }}
                       >
                         <Sparkles size={14} style={{ color: 'var(--accent)' }} aria-hidden/>
-                        <span>Usar cor dominante da foto do card atual como «Destaques»</span>
+                        <span>Usar cor dominante da foto do {itemLabel} atual como «Destaques»</span>
                       </button>
                     ) : null}
                   </>
@@ -3061,7 +3132,7 @@ function SidebarContent({
           <>
             <S
               title="Conteúdo base"
-              hint="Texto, anotação ou rascunho que a IA usará como matéria-prima ao gerar/refinar slides. Pode ser longo."
+              hint={`Texto, anotação ou rascunho que a IA usará como matéria-prima ao gerar/refinar ${itemsLabel}. Pode ser longo.`}
             >
               <textarea
                 value={material.content || ''}
@@ -3409,7 +3480,7 @@ function SidebarContent({
                   onMoreControl={() => {
                     setAppMode?.('diretor');
                     trackEvent('depth_switch', { to: 'diretor', from: 'criar_rapido' });
-                    toast?.(`${appModeLabel('diretor')} ativo — mesmos cards e identidade.`, 'success', 4000);
+                    toast?.(`${appModeLabel('diretor')} ativo — mesmos ${itemsLabel} e identidade.`, 'success', 4000);
                   }}
                   onAdjustText={() => {
                     setTab('narrativa');
@@ -3493,7 +3564,7 @@ function SidebarContent({
                     >
                       <button
                         type="button"
-                        aria-label={isSelected ? `Desmarcar card ${i + 1}` : `Selecionar card ${i + 1}`}
+                        aria-label={isSelected ? `Desmarcar ${itemLabel} ${i + 1}` : `Selecionar ${itemLabel} ${i + 1}`}
                         aria-pressed={isSelected}
                         onClick={(e) => toggleSlideSelect(s.id, e)}
                         style={{
@@ -3508,6 +3579,7 @@ function SidebarContent({
                       </button>
                       <button
                         type="button"
+                        aria-label={`Abrir ${itemLabel} ${i + 1}: ${titlePreview}`}
                         onClick={() => setActiveIdx(i)}
                         style={{
                           flex: 1, display: 'flex', alignItems: 'center', gap: 12,
@@ -3516,7 +3588,7 @@ function SidebarContent({
                         }}
                       >
                         <div style={{
-                          width: 36, height: 44, borderRadius: 6, flexShrink: 0,
+                          width: storyboardThumb.width, height: storyboardThumb.height, borderRadius: 6, flexShrink: 0,
                           background: s.bg || brand.bg || '#0a0a0a',
                           border: '1px solid var(--glass-border)',
                           position: 'relative', overflow: 'hidden',
@@ -3583,7 +3655,7 @@ function SidebarContent({
                       bgImageSource: null,
                       bgImageFailed: false,
                     } : item));
-                    toast?.(`Imagem removida de ${selectedSlideIds.length} card${selectedSlideIds.length === 1 ? '' : 's'}.`, 'success');
+                    toast?.(`Imagem removida de ${selectedSlideIds.length} ${selectedSlideIds.length === 1 ? itemLabel : itemsLabel}.`, 'success');
                   }}
                   style={{ minHeight: 44, fontSize: 11, color: selectedSlideIds.length ? 'var(--danger, #ef4444)' : undefined }}
                 >
@@ -3602,7 +3674,7 @@ function SidebarContent({
                       bodyAfterImage: '',
                       destaqueSpans: undefined,
                     } : item));
-                    toast?.(`Textos limpos de ${selectedSlideIds.length} card${selectedSlideIds.length === 1 ? '' : 's'}. Use desfazer se precisar.`, 'success');
+                    toast?.(`Textos limpos de ${selectedSlideIds.length} ${selectedSlideIds.length === 1 ? itemLabel : itemsLabel}. Use desfazer se precisar.`, 'success');
                   }}
                   style={{ minHeight: 44, fontSize: 11, color: selectedSlideIds.length ? 'var(--danger, #ef4444)' : undefined }}
                 >
@@ -3851,5 +3923,9 @@ export {
   EDITOR_TABS,
   APP_MODE_RANK,
   visibleEditorTabs,
+  editorTabGridSpan,
+  projectKindOf,
+  storyboardThumbDimensions,
+  imageTargetMatches,
   SidebarContent,
 };

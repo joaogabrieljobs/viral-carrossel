@@ -3,19 +3,39 @@ import { X, Loader2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
 import { FORMATS } from '../utils/formats.js';
 
-export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
+export function getImageCropFormat(fmt = 'carrossel') {
+  const key = Object.prototype.hasOwnProperty.call(FORMATS, fmt) ? fmt : 'carrossel';
+  const format = FORMATS[key];
+  return {
+    key,
+    width: format.w,
+    height: format.h,
+    aspectRatio: format.w / format.h,
+    label: key === 'apresentacao'
+      ? `16:9 (apresentação ${format.w}×${format.h})`
+      : key === 'quadrado'
+        ? `1:1 (${format.w}×${format.h})`
+        : key === 'stories'
+          ? `9:16 (Stories ${format.w}×${format.h})`
+          : `4:5 (feed Instagram ${format.w}×${format.h})`,
+    subject: key === 'apresentacao' ? 'slide' : 'card',
+  };
+}
+
+export default function ImageCropModal({ open, imageSrc, fmt = 'carrossel', onClose, onApply }) {
   useScrollLock(open);
-  const carAr = FORMATS.carrossel.w / FORMATS.carrossel.h;
+  const cropFormat = getImageCropFormat(fmt);
+  const targetAspectRatio = cropFormat.aspectRatio;
   const [nat, setNat] = useState({ w: 0, h: 0 });
   const [cropN, setCropN] = useState({ x: 0, y: 0, w: 0, h: 0 });
-  const [lockStory, setLockStory] = useState(true);
+  const [lockFormat, setLockFormat] = useState(true);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState('');
   const dragRef = useRef(null);
   const natRef = useRef({ w: 0, h: 0 });
   const dispRef = useRef({ w: 0, h: 0 });
-  const lockStoryRef = useRef(true);
-  lockStoryRef.current = lockStory;
+  const lockFormatRef = useRef(true);
+  lockFormatRef.current = lockFormat;
 
   const maxWp = typeof window !== 'undefined' ? Math.min(520, window.innerWidth - 48) : 520;
   const maxHp = typeof window !== 'undefined' ? Math.min(Math.floor(window.innerHeight * 0.46), 440) : 440;
@@ -29,14 +49,14 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
   const fullImageCrop = useCallback((nw, nh) => ({ x: 0, y: 0, w: nw, h: nh }), []);
 
   const centeredLockedCrop = useCallback((nw, nh) => {
-    let iw = Math.min(nw, nh * carAr);
-    let ih = iw / carAr;
+    let iw = Math.min(nw, nh * targetAspectRatio);
+    let ih = iw / targetAspectRatio;
     if (ih > nh) {
       ih = nh;
-      iw = ih * carAr;
+      iw = ih * targetAspectRatio;
     }
     return { x: (nw - iw) / 2, y: (nh - ih) / 2, w: iw, h: ih };
-  }, [carAr]);
+  }, [targetAspectRatio]);
 
   useEffect(() => {
     if (!open || !imageSrc) {
@@ -56,7 +76,7 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
         return;
       }
       setNat({ w: nw, h: nh });
-      const init = lockStoryRef.current ? centeredLockedCrop(nw, nh) : fullImageCrop(nw, nh);
+      const init = lockFormatRef.current ? centeredLockedCrop(nw, nh) : fullImageCrop(nw, nh);
       setCropN(init);
     };
     img.onerror = () => setHint('Não foi possível carregar esta imagem.');
@@ -66,8 +86,8 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
 
   useEffect(() => {
     if (!nat.w || !nat.h) return;
-    setCropN(lockStory ? centeredLockedCrop(nat.w, nat.h) : fullImageCrop(nat.w, nat.h));
-  }, [lockStory]); // eslint-disable-line react-hooks/exhaustive-deps
+    setCropN(lockFormat ? centeredLockedCrop(nat.w, nat.h) : fullImageCrop(nat.w, nat.h));
+  }, [lockFormat, targetAspectRatio]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     if (!open) return undefined;
@@ -98,28 +118,28 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
         let brx = Math.min(Math.max(st.brx + dxN, ox + mn), nw);
         let bry = Math.min(Math.max(st.bry + dyN, oy + mn), nh);
         let nwR = brx - ox;
-        let nhR = lockStoryRef.current ? nwR / carAr : bry - oy;
-        if (lockStoryRef.current) {
+        let nhR = lockFormatRef.current ? nwR / targetAspectRatio : bry - oy;
+        if (lockFormatRef.current) {
           const maxW = nw - ox;
           const maxH = nh - oy;
           if (nwR > maxW) {
             nwR = maxW;
-            nhR = nwR / carAr;
+            nhR = nwR / targetAspectRatio;
           }
           if (nhR > maxH) {
             nhR = maxH;
-            nwR = nhR * carAr;
+            nwR = nhR * targetAspectRatio;
           }
         } else {
           nwR = Math.min(Math.max(nwR, mn), nw - ox);
           nhR = Math.min(Math.max(nhR, mn), nh - oy);
         }
         let minNw = nwR >= mn ? nwR : mn;
-        let minNh = lockStoryRef.current ? minNw / carAr : (nhR >= mn ? nhR : mn);
-        if (lockStoryRef.current && oy + minNh > nh) minNh = nh - oy;
-        if (!lockStoryRef.current && oy + minNh > nh) minNh = nh - oy;
+        let minNh = lockFormatRef.current ? minNw / targetAspectRatio : (nhR >= mn ? nhR : mn);
+        if (lockFormatRef.current && oy + minNh > nh) minNh = nh - oy;
+        if (!lockFormatRef.current && oy + minNh > nh) minNh = nh - oy;
         if (ox + minNw > nw) minNw = nw - ox;
-        if (lockStoryRef.current) minNh = minNw / carAr;
+        if (lockFormatRef.current) minNh = minNw / targetAspectRatio;
         setCropN({ x: ox, y: oy, w: minNw, h: minNh });
       }
     };
@@ -134,7 +154,7 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [open, carAr, dwPx, dhPx]);
+  }, [open, targetAspectRatio, dwPx, dhPx]);
 
   function badMouseButton(ev) {
     return ev.pointerType === 'mouse' && ev.button !== 0;
@@ -241,7 +261,7 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
           background: 'var(--bg-sidebar)',
         }}>
           <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>
-            Recortar imagem do card
+            Recortar imagem do {cropFormat.subject}
           </div>
           <button type="button" onClick={() => !busy && onClose()} aria-label="Fechar" disabled={busy} className="vc-icon-btn" style={{ cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.4 : 1 }}>
             <X size={16}/>
@@ -252,14 +272,14 @@ export default function ImageCropModal({ open, imageSrc, onClose, onApply }) {
             margin: 0, fontSize: 13, lineHeight: 1.47, letterSpacing: '-0.011em', fontWeight: 400,
             color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
           }}>
-            Arraste a moldura para posicionar; puxe o canto inferior direito para redimensionar. Opção «4:5» alinha ao feed (1080×1350).
+            Arraste a moldura para posicionar; puxe o canto inferior direito para redimensionar. A proporção acompanha o formato atual.
           </p>
           <label style={{
             display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
             letterSpacing: '-0.011em', fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)', userSelect: 'none',
           }}>
-            <input type="checkbox" checked={lockStory} disabled={busy} onChange={(ev) => setLockStory(ev.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: busy ? 'not-allowed' : 'pointer' }}/>
-            Travar proporção 4:5 (feed Instagram)
+            <input type="checkbox" checked={lockFormat} disabled={busy} onChange={(ev) => setLockFormat(ev.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: busy ? 'not-allowed' : 'pointer' }}/>
+            Travar proporção {cropFormat.label}
           </label>
           {hint ? (
             <div style={{

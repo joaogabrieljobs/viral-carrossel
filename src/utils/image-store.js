@@ -196,6 +196,55 @@ export async function guardarImagemDoSlide(src, meta = {}) {
   }
 }
 
+/**
+ * Aplica resultados assíncronos de migração/hidratação sem sobrescrever uma
+ * imagem que o utilizador trocou enquanto o IndexedDB respondia.
+ *
+ * `expectedImageId` string = hidratação/ausência do registro persistido.
+ * `expectedImageId: null` + `expectedSource` = migração de data URL legada.
+ */
+export function applyPersistedImagePatches(slides = [], patches = []) {
+  let changed = false;
+  const next = (slides || []).map((slide) => {
+    const candidate = patches.find((item) => item?.id === slide?.id);
+    if (!candidate) return slide;
+    if (candidate.expectedImageId) {
+      if (slide.bgImage || slide.bgImageId !== candidate.expectedImageId) return slide;
+    } else {
+      if (slide.bgImageId) return slide;
+      if (candidate.expectedSource != null && slide.bgImage !== candidate.expectedSource) return slide;
+    }
+    changed = true;
+    return { ...slide, ...(candidate.patch || {}) };
+  });
+  return changed ? next : slides;
+}
+
+/** Identidade estável da foto usada para comparar resultados assíncronos. */
+export function slideImageIdentity(slide) {
+  if (slide?.bgImageId) return `id:${slide.bgImageId}`;
+  if (slide?.bgImage) return `src:${slide.bgImage}`;
+  return 'none';
+}
+
+/**
+ * Aplica uma geração/upload apenas se a foto não mudou durante a operação.
+ * Evita que uma resposta atrasada reverta uma substituição ou exclusão recente.
+ */
+export function applySlidePatchIfImageCurrent(slides = [], {
+  id,
+  expectedImageIdentity,
+  patch,
+} = {}) {
+  let changed = false;
+  const next = (slides || []).map((slide) => {
+    if (slide?.id !== id || slideImageIdentity(slide) !== expectedImageIdentity) return slide;
+    changed = true;
+    return { ...slide, ...(patch || {}) };
+  });
+  return changed ? next : slides;
+}
+
 /** Para exportar backup: devolve a imagem embutida em data URL. */
 export async function imagemComoDataUrl(id) {
   const entry = await imageGet(id);

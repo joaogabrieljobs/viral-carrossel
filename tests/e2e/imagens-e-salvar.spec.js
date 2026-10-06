@@ -44,7 +44,9 @@ test.describe('Salvar projeto', () => {
 
     const salvar = page.getByRole('button', { name: /salvar projeto agora/i });
     await expect(salvar).toBeVisible({ timeout: 10_000 });
-    await salvar.click({ force: true });
+    // Clique real: se o header voltar a recortar/sobrepor o botão, o teste deve
+    // falhar no hit target em vez de disparar acidentalmente “Projetos”.
+    await salvar.click();
     await expect(page.getByText(/projeto salvo neste navegador/i)).toBeVisible({ timeout: 5_000 });
 
     // O que foi gravado sobrevive ao reload.

@@ -16,6 +16,133 @@ import { blobFromSlideRef } from '../utils/ai-client.js';
 const loadHtml2Canvas = async () => (await import('html2canvas')).default;
 const loadJsPdf = async () => (await import('jspdf')).jsPDF;
 
+/** Extrai todas as URLs de `background-image`, inclusive em camadas múltiplas. */
+export function extractCssBackgroundUrls(backgroundImage) {
+  const source = String(backgroundImage || '');
+  const urls = [];
+  const re = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)/gi;
+  let match;
+  while ((match = re.exec(source))) {
+    const value = String(match[1] ?? match[2] ?? match[3] ?? '').trim();
+    if (value) urls.push(value);
+  }
+  return urls;
+}
+
+/**
+ * Aguarda tanto tags <img> quanto imagens usadas via CSS. Os cards renderizam
+ * fotos principalmente em `background-image`; esperar só <img> permitia que
+ * html2canvas capturasse um placeholder vazio.
+ */
+export async function waitForExportAssets(roots, {
+  timeoutMs = 3000,
+  imageUrls = [],
+  ImageCtor = typeof globalThis.Image === 'function' ? globalThis.Image : null,
+  getStyle = typeof globalThis.getComputedStyle === 'function'
+    ? (node) => globalThis.getComputedStyle(node)
+    : null,
+} = {}) {
+  const liveRoots = (Array.isArray(roots) ? roots : []).filter(Boolean);
+  const domImages = [];
+  const cssUrls = new Set(
+    (Array.isArray(imageUrls) ? imageUrls : [])
+      .map((url) => String(url || '').trim())
+      .filter(Boolean),
+  );
+
+  liveRoots.forEach((root) => {
+    root.querySelectorAll?.('img')?.forEach?.((img) => domImages.push(img));
+    if (!getStyle) return;
+    const nodes = [root, ...(root.querySelectorAll?.('*') || [])];
+    nodes.forEach((node) => {
+      let backgroundImage = '';
+      try { backgroundImage = getStyle(node)?.backgroundImage || ''; } catch { return; }
+      extractCssBackgroundUrls(backgroundImage).forEach((url) => cssUrls.add(url));
+    });
+  });
+
+  const waitForDomImage = (img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise((resolve) => {
+      let timer;
+      const done = () => {
+        clearTimeout(timer);
+        img.removeEventListener?.('load', done);
+        img.removeEventListener?.('error', done);
+        resolve();
+      };
+      img.addEventListener?.('load', done, { once: true });
+      img.addEventListener?.('error', done, { once: true });
+      timer = setTimeout(done, timeoutMs);
+    });
+  };
+
+  const preloadCssImage = (url) => {
+    if (!ImageCtor) return Promise.resolve();
+    return new Promise((resolve) => {
+      const img = new ImageCtor();
+      let timer;
+      const done = () => {
+        clearTimeout(timer);
+        img.onload = null;
+        img.onerror = null;
+        resolve();
+      };
+      img.onload = done;
+      img.onerror = done;
+      timer = setTimeout(done, timeoutMs);
+      img.src = url;
+      if (img.complete) queueMicrotask(done);
+    });
+  };
+
+  await Promise.all([
+    ...domImages.map(waitForDomImage),
+    ...Array.from(cssUrls, preloadCssImage),
+  ]);
+}
+
+/** URLs conhecidas pelo documento, ainda que o renderer não tenha montado o fundo. */
+export function slideImageUrls(slides) {
+  return Array.from(new Set(
+    (Array.isArray(slides) ? slides : [])
+      .map((slide) => String(slide?.bgImage || '').trim())
+      .filter(Boolean),
+  ));
+}
+
+/**
+ * Prepara os assets em duas fases. A primeira usa o estado dos slides porque o
+ * renderer só monta certos backgrounds depois do próprio preload. Depois que
+ * React teve tempo de renderizar, a segunda fase inspeciona o DOM final e cobre
+ * também logos, tags <img> e outras camadas CSS.
+ */
+export async function waitForExportReadiness({
+  slides = [],
+  roots = [],
+  fontsReady = typeof document !== 'undefined' ? document.fonts?.ready : null,
+  waitForFrames = () => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }),
+  waitForAssets = waitForExportAssets,
+} = {}) {
+  const directUrls = slideImageUrls(slides);
+
+  // Não depende do background já existir no DOM.
+  await waitForAssets([], { imageUrls: directUrls });
+
+  if (fontsReady) {
+    try { await fontsReady; } catch {}
+  }
+
+  await waitForFrames();
+
+  // Confirma os assets realmente montados depois do paint do renderer.
+  await waitForAssets((Array.isArray(roots) ? roots : []).filter(Boolean), {
+    imageUrls: directUrls,
+  });
+}
+
 export function useExport({
   slides,
   fmt,
@@ -25,28 +152,10 @@ export function useExport({
   setError,
   toast,
 }) {
-  const waitForRender = async () => {
-    if (document.fonts?.ready) {
-      try { await document.fonts.ready; } catch {}
-    }
-    // 2 frames pra garantir que o React fez paint do DOM offscreen
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    // Aguarda imagens dentro dos refs offscreen carregarem
-    const imgs = [];
-    for (const id in slideRefs.current) {
-      const el = slideRefs.current[id];
-      if (!el) continue;
-      el.querySelectorAll('img').forEach(img => imgs.push(img));
-    }
-    await Promise.all(imgs.map(img => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise(res => {
-        img.addEventListener('load',  res, { once:true });
-        img.addEventListener('error', res, { once:true });
-        setTimeout(res, 3000); // failsafe
-      });
-    }));
-  };
+  const waitForRender = async () => waitForExportReadiness({
+    slides,
+    roots: Object.values(slideRefs.current || {}),
+  });
 
   const renderSlideToCanvas = async (slideObj) => {
     const h2c = await loadHtml2Canvas();

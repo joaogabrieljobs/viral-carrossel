@@ -521,7 +521,14 @@ export function useLibrary({
             slides: await Promise.all(slides.map(async (sl) => {
               sl = await importSlideLogo(sl);
               if (typeof sl?.bgImage !== 'string' || !sl.bgImage.startsWith('data:')) return sl;
-              try { return { ...sl, ...(await guardarImagemDoSlide(sl.bgImage)) }; } catch { return sl; }
+              try {
+                return {
+                  ...sl,
+                  ...(await guardarImagemDoSlide(sl.bgImage)),
+                  bgImageFailed: false,
+                  bgImageError: null,
+                };
+              } catch { return sl; }
             })),
           };
         }

@@ -30,7 +30,8 @@ describe('desbloqueio individual de elementos do card Cultura', () => {
   it('oferece o CTA no painel e aplica o patch somente ao card selecionado', () => {
     const sidebar = source('src/components/SidebarContent.jsx');
 
-    expect(sidebar).toContain('Separar elementos deste card');
+    expect(sidebar).toContain('Separar elementos deste {itemLabel}');
+    expect(sidebar).toContain('itemLabel={itemLabel}');
     expect(sidebar).toMatch(/updateSlide\(unlockGroupedElementsPatch\(slide\)\)/);
     expect(sidebar).toMatch(/tab==='narrativa' && narrativaPanel==='card'/);
 
