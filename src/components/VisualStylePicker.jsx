@@ -1,11 +1,12 @@
 /**
- * VisualStylePicker — grelha de padrões visuais do carrossel.
- * Preview maior (proporção 4:5), tipografia legível, seleção limpa.
+ * VisualStylePicker — grelha de padrões visuais por produto.
+ * O preview respeita a proporção do catálogo (carrossel 4:5 ou deck 16:9).
  */
 
 import React from 'react';
 import { Check } from 'lucide-react';
 import { renderPresetPreview } from '../styles/visual-presets.jsx';
+import { renderPresentationPresetPreview } from '../styles/presentation-presets.jsx';
 
 function paletteSwatches(preset) {
   const b = preset?.brand || {};
@@ -19,6 +20,8 @@ export default function VisualStylePicker({
   title = 'Escolha o padrão visual',
   /** id do padrão que combina com o conteúdo atual (ponte template/IA → visual). */
   suggestedId = null,
+  /** Permite forçar a proporção; sem valor, cada preset declara seu produto. */
+  aspectRatio = null,
 }) {
   const selected = presets.find((p) => p.id === value) || null;
 
@@ -49,6 +52,8 @@ export default function VisualStylePicker({
           const isActive = value === p.id;
           const isSuggested = !isActive && suggestedId === p.id;
           const swatches = paletteSwatches(p);
+          const previewAspect = aspectRatio || (p.productKind === 'apresentacao' ? '16 / 9' : '4 / 5');
+          const isPresentationPreview = p.productKind === 'apresentacao' || previewAspect === '16 / 9';
 
           return (
             <button
@@ -132,7 +137,7 @@ export default function VisualStylePicker({
 
               <div style={{
                 width: '100%',
-                aspectRatio: '4 / 5',
+                aspectRatio: previewAspect,
                 background: 'var(--bg-parchment)',
                 display: 'flex',
                 alignItems: 'center',
@@ -143,12 +148,14 @@ export default function VisualStylePicker({
                 <div style={{
                   width: '100%',
                   height: '100%',
-                  maxWidth: 92,
+                  maxWidth: isPresentationPreview ? '100%' : 92,
                   borderRadius: 8,
                   overflow: 'hidden',
                   boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
                 }}>
-                  {renderPresetPreview(p, { width: '100%', height: '100%' })}
+                  {isPresentationPreview
+                    ? renderPresentationPresetPreview(p, { width: '100%', height: '100%' })
+                    : renderPresetPreview(p, { width: '100%', height: '100%' })}
                 </div>
               </div>
 

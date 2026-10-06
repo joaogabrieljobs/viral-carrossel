@@ -44,6 +44,12 @@ export function normalizeCustomVisualPresets(value) {
       brand: pick(item.brand, BRAND_FIELDS),
       slideDefaults: pick(item.slideDefaults, SLIDE_FIELDS),
       creativePreset: typeof item.creativePreset === 'string' ? item.creativePreset : undefined,
+      productKind: item.productKind === 'apresentacao' || item.creativePreset === 'apresentacao'
+        ? 'apresentacao'
+        : 'carrossel',
+      aspectRatio: item.productKind === 'apresentacao' || item.creativePreset === 'apresentacao'
+        ? '16:9'
+        : '4:5',
       savedAt: Number(item.savedAt) || Date.now(),
     }))
     .filter((item) => item.id && !ids.has(item.id) && ids.add(item.id))
@@ -68,7 +74,7 @@ export function writeCustomVisualPresets(presets, storage = globalThis?.localSto
   return true;
 }
 
-export function createCustomVisualPreset({ label, brand = {}, slide = {}, creativePreset } = {}) {
+export function createCustomVisualPreset({ label, brand = {}, slide = {}, creativePreset, productKind } = {}) {
   const now = Date.now();
   const rand = Math.random().toString(36).slice(2, 7);
   return {
@@ -83,6 +89,12 @@ export function createCustomVisualPreset({ label, brand = {}, slide = {}, creati
     },
     slideDefaults: pick(slide, SLIDE_FIELDS),
     creativePreset,
+    productKind: productKind === 'apresentacao' || creativePreset === 'apresentacao'
+      ? 'apresentacao'
+      : 'carrossel',
+    aspectRatio: productKind === 'apresentacao' || creativePreset === 'apresentacao'
+      ? '16:9'
+      : '4:5',
     savedAt: now,
   };
 }

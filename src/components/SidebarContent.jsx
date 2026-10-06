@@ -151,6 +151,17 @@ const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
 const visibleEditorTabs = (appMode) =>
   EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
 
+const HOME_CREATION_TYPES = [
+  { id: 'carrossel', label: 'Carrossel', icon: Layers },
+  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+];
+
+const projectKindOf = (entry) => (
+  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+    ? 'apresentacao'
+    : 'carrossel'
+);
+
 function UnlockGroupedElementsNotice({ onUnlock }) {
   return (
     <div style={{
@@ -202,6 +213,7 @@ function SidebarContent({
   activeDocId = null,
   onOpenProject = null,
   onNewProject = null,
+  onGenerateProject = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
@@ -242,6 +254,8 @@ function SidebarContent({
   imagesBatchBusy = false,
   quickCardCount = 'auto',
   setQuickCardCount = () => {},
+  presentationPath = 'auto',
+  setPresentationPath = () => {},
   autoAdjustAllSlides = null,
   onOpenSeries = null,
   libraryFolders = [],
@@ -258,6 +272,18 @@ function SidebarContent({
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
   const [customPresetName, setCustomPresetName] = React.useState('');
+  const [homeCreationType, setHomeCreationType] = React.useState(() => (
+    creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'apresentacao' : 'carrossel'
+  ));
+  const isPresentationProject = creativePreset === 'apresentacao' || fmt === 'apresentacao';
+  const productVisualPresets = React.useMemo(
+    () => visualPresets.filter((preset) => (
+      isPresentationProject
+        ? preset.productKind === 'apresentacao'
+        : preset.productKind !== 'apresentacao'
+    )),
+    [isPresentationProject, visualPresets],
+  );
   const groupedCultureElements = !!(
     (creativePreset === 'tendencia_cultura' || slide?.useCultureLayout)
     && String(slide?.bodyAfterImage || '').trim()
@@ -289,26 +315,34 @@ function SidebarContent({
     try {
       let text = String(caption || '').trim();
       if (!text && generateCaption) {
-        toast?.('A gerar legenda…', 'info');
+        toast?.(isPresentationProject ? 'A gerar resumo…' : 'A gerar legenda…', 'info');
         text = String(await generateCaption() || '').trim();
       }
       await copyTextToClipboard(text);
       trackEvent('caption_copy');
-      toast?.('Legenda copiada. Cole no Instagram.', 'success');
+      toast?.(isPresentationProject ? 'Resumo da apresentação copiado.' : 'Legenda copiada. Cole no Instagram.', 'success');
     } catch (e) {
-      toast?.(e.message || 'Não foi possível copiar a legenda.', 'error');
+      toast?.(e.message || `Não foi possível copiar ${isPresentationProject ? 'o resumo' : 'a legenda'}.`, 'error');
     }
-  }, [caption, generateCaption, toast]);
+  }, [caption, generateCaption, isPresentationProject, toast]);
 
   const handleExportPackage = React.useCallback(async () => {
     try {
       trackEvent('export_package');
       let text = String(caption || '').trim();
       if (!text && generateCaption) {
-        toast?.('A preparar legenda do pacote…', 'info');
+        toast?.(isPresentationProject ? 'A preparar resumo da apresentação…' : 'A preparar legenda do pacote…', 'info');
         text = String(await generateCaption() || '').trim();
       }
       const result = await exportCarouselPackage({ exportAll, caption: text });
+      if (isPresentationProject) {
+        toast?.(
+          result.captionCopied ? 'Slides baixados e resumo copiado.' : 'Slides baixados.',
+          'success',
+          5500,
+        );
+        return;
+      }
       if (result.captionCopied) {
         toast?.('PNGs baixados e legenda copiada. Publique no Instagram e, se quiser, marque como Publicado na Fila.', 'success', 7500);
       } else {
@@ -333,7 +367,7 @@ function SidebarContent({
     } catch (e) {
       toast?.(e.message || 'Falha no pacote de exportação.', 'error');
     }
-  }, [caption, generateCaption, exportAll, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
+  }, [caption, generateCaption, exportAll, isPresentationProject, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
 
   // remove unused ensureCaptionText if I left it - check
   /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
@@ -628,7 +662,7 @@ function SidebarContent({
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
 
         {tab === 'narrativa' && appMode === 'criador' && projectHasCarouselContent(slides) && (
-          <S title="Depois de gerar" hint="Revise, baixe ou abra mais controlos — sem recriar o carrossel.">
+          <S title="Depois de gerar" hint={`Revise, baixe ou abra mais controlos — sem recriar ${isPresentationProject ? 'a apresentação' : 'o carrossel'}.`}>
             <PostGenerateActions
               onAdjustText={() => setNarrativaPanel('card')}
               onGenerateImages={generateMissingImages}
@@ -641,8 +675,9 @@ function SidebarContent({
               exporting={exporting}
               imagesBusy={imagesBatchBusy}
               hasOpenAI={hasOpenAI}
+              itemLabel={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'slides' : 'cards'}
             />
-            <div style={{ marginTop: 10 }}>
+            {!isPresentationProject && <div style={{ marginTop: 10 }}>
               <OrganizeForPublish
                 projectId={activeDocId || activeEntry?.id}
                 folderId={activeEntry?.folderId || ''}
@@ -654,7 +689,7 @@ function SidebarContent({
                 toast={toast}
                 compact
               />
-            </div>
+            </div>}
           </S>
         )}
 
@@ -972,14 +1007,14 @@ function SidebarContent({
               </S>
             ) : null}
 
-            {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (<S title={`Texto — card ${activeIdx+1} / ${slides.length}`}>
+            {(tab==='slide' || (tab==='narrativa' && narrativaPanel==='card')) && (<S title={`Texto — ${isPresentationProject ? 'slide' : 'card'} ${activeIdx+1} / ${slides.length}`}>
               {groupedCultureElements ? (
                 <UnlockGroupedElementsNotice onUnlock={unlockActiveCardElements} />
               ) : null}
               <div>
                 <label className="vc-label-sm" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                   <span>Título</span>
-                  {(slide.title || '').trim() ? (
+                  {!isPresentationProject && (slide.title || '').trim() ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -1129,7 +1164,7 @@ function SidebarContent({
                 Marcar Destaque
               </button>
               <RefineBtn onRefine={refineSlide} busy={refining} label="Refinar com IA"/>
-              <button
+              {!isPresentationProject && <button
                 onClick={()=>setHookVarsOpen(true)}
                 disabled={refining}
                 aria-label="Gerar variações de gancho"
@@ -1144,7 +1179,7 @@ function SidebarContent({
                 onMouseLeave={e=>{e.currentTarget.style.color='var(--text-secondary)';e.currentTarget.style.borderColor='var(--border)';}}
               >
                 <Zap size={11} style={{ color:'var(--accent)' }}/>Gerar 5 variações de gancho
-              </button>
+              </button>}
               <button
                 type="button"
                 disabled={!String(slide.title || '').trim() && !String(slide.subtitle || '').trim() && !String(slide.bodyAfterImage || '').trim()}
@@ -1155,7 +1190,7 @@ function SidebarContent({
                     bodyAfterImage: '',
                     destaqueSpans: undefined,
                   });
-                  toast?.('Textos removidos deste card. Use desfazer se precisar.', 'success');
+                  toast?.(`Textos removidos deste ${isPresentationProject ? 'slide' : 'card'}. Use desfazer se precisar.`, 'success');
                 }}
                 style={{
                   width:'100%', minHeight:40, borderRadius:11,
@@ -2019,9 +2054,10 @@ function SidebarContent({
               <VisualStylePicker
                 value={visualPreset}
                 onChange={applyVisualPresetCb}
-                presets={visualPresets}
+                presets={productVisualPresets}
                 title=""
-                suggestedId={suggestVisualPresetForCreative(creativePreset)}
+                suggestedId={isPresentationProject ? null : suggestVisualPresetForCreative(creativePreset)}
+                aspectRatio={isPresentationProject ? '16 / 9' : '4 / 5'}
               />
               {saveCustomVisualPreset ? (
                 <div style={{
@@ -3121,8 +3157,41 @@ function SidebarContent({
           <>
             <S
               title="Projetos"
-              hint="Escolhe o carrossel. Cada um tem contexto próprio."
+              hint="Escolha o projeto ou defina o que deseja criar. Cada um mantém seu próprio contexto."
             >
+              <div
+                role="group"
+                aria-label="Tipo de projeto para criar"
+                style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
+                  padding: 4, marginBottom: 10, borderRadius: 10,
+                  border: '1px solid var(--glass-border-strong)', background: 'var(--bg-card)',
+                }}
+              >
+                {HOME_CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+                  const active = homeCreationType === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setHomeCreationType(id)}
+                      style={{
+                        minHeight: 40, padding: '0 8px', borderRadius: 8,
+                        border: active ? '1px solid var(--accent)' : '1px solid transparent',
+                        background: active ? 'var(--accent-surface)' : 'transparent',
+                        color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                        cursor: 'pointer', fontSize: 11, fontWeight: 650,
+                        fontFamily: 'var(--font-ui)', display: 'inline-flex',
+                        alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                    >
+                      <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
               <div
                 role="list"
                 aria-label="Projetos salvos"
@@ -3143,13 +3212,19 @@ function SidebarContent({
                     const first = slidesOf[0];
                     const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, first || {}) || '#0a0a0a';
                     const label = (entry.name || 'Sem título').trim() || 'Sem título';
+                    const projectKind = projectKindOf(entry);
+                    const isPresentation = projectKind === 'apresentacao';
+                    const productLabel = isPresentation ? 'Apresentação' : 'Carrossel';
+                    const itemLabel = isPresentation
+                      ? `${slidesOf.length} slide${slidesOf.length === 1 ? '' : 's'}`
+                      : `${slidesOf.length} card${slidesOf.length === 1 ? '' : 's'}`;
                     return (
                       <button
                         key={entry.id}
                         type="button"
                         role="listitem"
                         aria-current={isActive ? 'true' : undefined}
-                        aria-label={`Abrir projeto ${label}`}
+                        aria-label={`Abrir ${productLabel.toLowerCase()} ${label}`}
                         title={label}
                         onClick={() => {
                           if (isActive) return;
@@ -3180,8 +3255,8 @@ function SidebarContent({
                         <div
                           aria-hidden
                           style={{
-                            width: 48,
-                            height: 60,
+                            width: isPresentation ? 72 : 48,
+                            height: isPresentation ? 41 : 60,
                             borderRadius: 8,
                             flexShrink: 0,
                             background: bg,
@@ -3218,6 +3293,13 @@ function SidebarContent({
                         }}>
                           {label}
                         </span>
+                        <span style={{
+                          fontSize: 8.5, fontWeight: 650, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-mono)', letterSpacing: '0.035em',
+                          textTransform: 'uppercase', lineHeight: 1.25,
+                        }}>
+                          {productLabel} · {itemLabel}
+                        </span>
                         {isActive ? (
                           <span style={{
                             fontSize: 9, fontWeight: 700, color: 'var(--accent)',
@@ -3233,8 +3315,8 @@ function SidebarContent({
                 {onNewProject ? (
                   <button
                     type="button"
-                    aria-label="Criar novo projeto"
-                    onClick={onNewProject}
+                    aria-label={`Criar ${homeCreationType === 'apresentacao' ? 'nova apresentação' : 'novo carrossel'}`}
+                    onClick={() => onNewProject(homeCreationType)}
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -3256,7 +3338,7 @@ function SidebarContent({
                   >
                     <FolderPlus size={20} strokeWidth={2} />
                     <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.011em' }}>
-                      Novo
+                      {homeCreationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
                     </span>
                   </button>
                 ) : null}
@@ -3274,10 +3356,14 @@ function SidebarContent({
                 <button
                   type="button"
                   className="vc-btn vc-btn-primary"
-                  onClick={() => setSetupOpen?.(true)}
+                  onClick={() => {
+                    if (onGenerateProject) onGenerateProject(homeCreationType);
+                    else setSetupOpen?.(true);
+                  }}
                   style={{ flex: 1, minHeight: 40, fontSize: 12 }}
                 >
-                  <Sparkles size={13} /> Gerar com IA
+                  <Sparkles size={13} />
+                  {homeCreationType === 'apresentacao' ? 'Gerar apresentação' : 'Gerar carrossel'}
                 </button>
                 )}
               </div>
@@ -3336,6 +3422,8 @@ function SidebarContent({
                   onAutoAdjustAll={autoAdjustAllSlides}
                   creativePreset={creativePreset}
                   onCreativePresetChange={setCreativePreset}
+                  presentationPath={presentationPath}
+                  onPresentationPathChange={setPresentationPath}
                   projectId={activeDocId || activeEntry?.id}
                   folderId={activeEntry?.folderId || ''}
                   publicationDate={activeEntry?.publicationDate || ''}
@@ -3544,7 +3632,7 @@ function SidebarContent({
                   />
                 </div>
               ) : null}
-              {onOpenSeries && appMode !== 'criador' ? (
+              {onOpenSeries && appMode !== 'criador' && !isPresentationProject ? (
                 <button
                   type="button"
                   className="vc-btn"
@@ -3572,10 +3660,10 @@ function SidebarContent({
               onMouseDown={e=>e.currentTarget.style.transform='scale(0.98)'}
               onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
               >
-                <Sparkles size={14}/>Novo carrossel com IA
+                <Sparkles size={14}/>{isPresentationProject ? 'Nova apresentação com IA' : 'Novo carrossel com IA'}
               </button>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                <button onClick={()=>setTemplatesOpen?.(true)} style={{
+                {!isPresentationProject && <button onClick={()=>setTemplatesOpen?.(true)} style={{
                   height:38, borderRadius:8, cursor:'pointer',
                   background:'var(--bg-card)', border:'1px solid var(--border)',
                   color:'var(--text-secondary)', fontSize:11,
@@ -3587,7 +3675,7 @@ function SidebarContent({
                 aria-label="Abrir templates prontos"
                 >
                   <Layout size={12}/>Templates
-                </button>
+                </button>}
                 <button onClick={()=>setResearchOpen(true)} style={{
                   height:38, borderRadius:8, cursor:'pointer',
                   background:'var(--bg-card)', border:'1px solid var(--border)',
@@ -3604,7 +3692,10 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Refinar todos os cards" hint="Aplica uma instrução a todo o carrossel mantendo coerência narrativa.">
+            <S
+              title={`Refinar todos os ${isPresentationProject ? 'slides' : 'cards'}`}
+              hint={`Aplica uma instrução a ${isPresentationProject ? 'toda a apresentação preservando o caminho e as evidências' : 'todo o carrossel mantendo coerência narrativa'}.`}
+            >
               {/* Variante prominent: CTA drop-zone (círculo accent + título +
                   subtítulo) pra ler como botão e não como fundo desbotado. */}
               <RefineBtn
@@ -3612,7 +3703,7 @@ function SidebarContent({
                 busy={refining}
                 variant="prominent"
                 label="Refinar com IA"
-                subtitle="Aplica uma instrução em todos os cards de uma vez"
+                subtitle={`Aplica uma instrução em todos os ${isPresentationProject ? 'slides' : 'cards'} de uma vez`}
               />
             </S>
 
@@ -3622,7 +3713,7 @@ function SidebarContent({
               </S>
             ) : null}
 
-            <S title="Legenda do post">
+            <S title={isPresentationProject ? 'Resumo e notas da apresentação' : 'Legenda do post'}>
               {caption ? (
                 <>
                   <textarea value={caption} onChange={e=>setCaption(e.target.value)} rows={7}
@@ -3662,10 +3753,10 @@ function SidebarContent({
                   </span>
                   <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0, textAlign:'left' }}>
                     <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
-                      Gerar legenda para o post
+                      {isPresentationProject ? 'Gerar resumo da apresentação' : 'Gerar legenda para o post'}
                     </span>
                     <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                      IA escreve com base no carrossel atual
+                      {isPresentationProject ? 'IA sintetiza o deck e o próximo passo' : 'IA escreve com base no carrossel atual'}
                     </span>
                   </span>
                 </button>

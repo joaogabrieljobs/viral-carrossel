@@ -23,6 +23,15 @@ import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
 import { SK } from '../utils/storage.js';
 import { lsSet } from '../utils/storage.js';
+import { presentationDocPatch } from '../utils/presentation.js';
+import {
+  applyCarouselVisualPresetToDoc,
+  applyPresentationVisualPresetToDoc,
+} from '../utils/presentation-state.js';
+import {
+  DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
+  PRESENTATION_VISUAL_PRESETS,
+} from '../styles/presentation-presets.jsx';
 import {
   createLibraryFolder,
   mergeImportedFolders,
@@ -67,6 +76,7 @@ export function useLibrary({
   activeDocId, setActiveDocId,
   history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
   setLibraryOpen, toast, setError,
+  visualPresets = PRESENTATION_VISUAL_PRESETS,
 }) {
   // Algumas ações encadeiam "criar pasta" e "aplicar ao projeto" no mesmo
   // clique. O ref é atualizado antes do próximo render para a segunda ação não
@@ -162,7 +172,7 @@ export function useLibrary({
   }, []);
 
   /** Novo projeto com o mesmo contexto (styleKit + brand), slides vazios — Fatia 3 recorrente. */
-  const newFromContext = useCallback((docId) => {
+  const newFromContext = useCallback((docId, requestedKind = null) => {
     flushCurrent();
     const snapshot = live.current;
     const src = (library.find((e) => e.id === docId)
@@ -175,9 +185,30 @@ export function useLibrary({
       return;
     }
     const srcDoc = ensureDocShape(liveSrc.doc);
+    const sourceKind = srcDoc.fmt === 'apresentacao' || srcDoc.creativePreset === 'apresentacao'
+      ? 'apresentacao'
+      : 'carrossel';
+    const productKind = requestedKind === 'apresentacao' || requestedKind === 'carrossel'
+      ? requestedKind
+      : sourceKind;
     const hydratedBrand = hydrateBrandTextColors({ ...(srcDoc.brand || DEFAULT_BRAND) });
+    const presentationPresetId = sourceKind === 'apresentacao' && srcDoc.visualPreset
+      ? srcDoc.visualPreset
+      : DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
+    const carouselPresetId = sourceKind === 'carrossel'
+      ? visualPresets.find((preset) => (
+          preset?.id === srcDoc.visualPreset && preset.productKind !== 'apresentacao'
+        ))?.id || null
+      : null;
     const kit = srcDoc.styleKit || { stylePrompt: '', contextMd: '', refImages: [] };
-    const seed = {
+    const baseSeed = {
+      ...(productKind === 'apresentacao'
+        ? presentationDocPatch({ pathId: srcDoc.presentationPath })
+        : {
+            productKind: 'carrossel',
+            fmt: 'carrossel',
+            creativePreset: sourceKind === 'carrossel' ? (srcDoc.creativePreset || 'livre') : 'livre',
+          }),
       brand: hydratedBrand,
       styleKit: {
         stylePrompt: kit.stylePrompt || '',
@@ -187,11 +218,34 @@ export function useLibrary({
         logoOnGenerate: kit.logoOnGenerate !== false,
       },
       mode: srcDoc.mode || 'editorial',
-      creativePreset: srcDoc.creativePreset || 'livre',
+      ...(productKind === 'apresentacao' ? {
+        visualPreset: presentationPresetId,
+      } : {
+        visualPreset: String(srcDoc.visualPreset || '').startsWith('presentation_')
+          ? null
+          : (srcDoc.visualPreset || null),
+      }),
       material: { content: '', sources: '', context: '' },
       caption: '',
       slides: [mkSlide(1, hydratedBrand)],
     };
+    const seed = productKind === 'apresentacao'
+      ? applyPresentationVisualPresetToDoc(
+          baseSeed,
+          presentationPresetId,
+          visualPresets,
+          { initialize: true },
+        )
+      : sourceKind === 'apresentacao'
+        ? applyCarouselVisualPresetToDoc(baseSeed)
+        : carouselPresetId
+          ? applyCarouselVisualPresetToDoc(
+              baseSeed,
+              carouselPresetId,
+              visualPresets,
+              { fmt: baseSeed.fmt },
+            )
+          : baseSeed;
     const baseName = (liveSrc.name || 'Projeto').replace(/\s*\(cópia\)\s*$/i, '').trim() || 'Projeto';
     const entry = mkLibEntry(seed, `${baseName} · novo`, { folderId: liveSrc.folderId || '' });
     setLibrary((prev) => [entry, ...snapshotEntries(prev, snapshot)]);
@@ -199,8 +253,14 @@ export function useLibrary({
     setLibraryOpen(false);
     setShellView('project');
     trackEvent('new_from_context');
-    toast?.('Novo projeto com o mesmo contexto. Cards em branco.', 'success', 4000);
-  }, [library, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, toast, snapshotEntries]);
+    toast?.(
+      productKind === 'apresentacao'
+        ? 'Nova apresentação com o mesmo contexto. Slides em branco.'
+        : 'Novo carrossel com o mesmo contexto. Cards em branco.',
+      'success',
+      4000,
+    );
+  }, [library, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, toast, snapshotEntries, visualPresets]);
 
   /**
    * Cria vários rascunhos de série a partir de seeds (ideias aprovadas).

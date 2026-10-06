@@ -1,7 +1,7 @@
 import { isGenerationCancelled } from '../../utils/generation-control.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, RefreshCw, X, Zap, ChevronRight, Instagram } from 'lucide-react';
+import { Loader2, RefreshCw, X, Zap, ChevronRight } from 'lucide-react';
 import { buildBrandBlock, buildNarrativeModeReminder, buildHookVariationRules, buildCarouselTextContext } from '../../utils/generation-prompts.js';
 import { buildContentObjectiveReminder } from '../../utils/editorial-strategy.js';
 import { buildProjectContextBlock } from '../../utils/style-kit.js';
@@ -22,12 +22,15 @@ function HookVariationsModal({
   styleKit = null,
   narrativeMode = 'editorial',
   creativePreset = 'livre',
+  productKind = 'carrossel',
 }) {
   const [busy, setBusy] = useState(false);
   const [hooks, setHooks] = useState([]);
   const [err, setErr] = useState('');
+  const isPresentation = productKind === 'apresentacao' || creativePreset === 'apresentacao';
 
   const run = useCallback(async () => {
+    if (isPresentation) return;
     setBusy(true); setErr(''); setHooks([]);
     try {
       const brandBlock = buildBrandBlock(brand);
@@ -67,11 +70,12 @@ Retorne APENAS JSON: {"hooks":[{"title":"...","subtitle":"frase curta de 1 linha
     brand,
     material,
     styleKit,
+    isPresentation,
   ]);
 
-  useEffect(() => { if (open) run(); }, [open, run]);
+  useEffect(() => { if (open && !isPresentation) run(); }, [open, isPresentation, run]);
 
-  if (!open) return null;
+  if (!open || isPresentation) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel" onClick={e=>e.stopPropagation()}>

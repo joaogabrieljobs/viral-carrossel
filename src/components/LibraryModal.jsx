@@ -8,6 +8,7 @@ import {
   Download,
   Folder,
   FolderPlus,
+  Layout,
   Layers,
   ListOrdered,
   Pencil,
@@ -101,6 +102,24 @@ const projectViews = [
   { id: 'queue', label: 'Fila', icon: ListOrdered },
   { id: 'calendar', label: 'Calendário', icon: CalendarDays },
 ];
+
+const CREATION_TYPES = [
+  { id: 'carrossel', label: 'Carrossel', icon: Layers },
+  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+];
+
+const projectKindOf = (entry) => (
+  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+    ? 'apresentacao'
+    : 'carrossel'
+);
+
+const projectKindCopy = (entry) => {
+  const kind = projectKindOf(entry);
+  return kind === 'apresentacao'
+    ? { kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+};
 
 function useModalKeyboard(open, onClose) {
   const dialogRef = useRef(null);
@@ -408,7 +427,7 @@ function FolderOrganizer({
 
       {confirmDeleteFolderId ? (
         <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.45, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-          Excluir uma pasta não apaga carrosséis. Os projetos dela voltam para “Sem pasta”.
+          Excluir uma pasta não apaga projetos. Os itens dela voltam para “Sem pasta”.
         </p>
       ) : null}
     </section>
@@ -433,7 +452,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
         }}
       >
         <CalendarDays size={15} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }}/>
-        <span><strong style={{ color: 'var(--text-primary)' }}>Planejamento local:</strong> este calendário organiza sua pauta. O Viral Carrossel não publica automaticamente no Instagram.</span>
+        <span><strong style={{ color: 'var(--text-primary)' }}>Planejamento local:</strong> este calendário organiza sua pauta. O app não publica nem apresenta automaticamente em plataformas externas.</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -636,7 +655,7 @@ function LibraryQueue({ library, folders, onOpen, onSetStatus }) {
         <ListOrdered size={15} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
         <span>
           <strong style={{ color: 'var(--text-primary)' }}>Fila editorial local.</strong>{' '}
-          Organize o que publicar a seguir. A publicação continua sendo feita por você no Instagram.
+          Organize o que publicar ou apresentar a seguir. A entrega continua sendo feita por você.
         </span>
       </div>
 
@@ -706,6 +725,7 @@ export default function LibraryModal({
   const [filter, setFilter] = useState('all');
   const [folderFilter, setFolderFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [creationType, setCreationType] = useState('carrossel');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -735,6 +755,8 @@ export default function LibraryModal({
 
   const counts = useMemo(() => ({
     all: library.length,
+    carrossel: library.filter((entry) => projectKindOf(entry) === 'carrossel').length,
+    apresentacao: library.filter((entry) => projectKindOf(entry) === 'apresentacao').length,
     ...Object.fromEntries(STATUS_DEFS.map((status) => [
       status.id,
       library.filter((entry) => entry.status === status.id).length,
@@ -813,7 +835,7 @@ export default function LibraryModal({
         style={{ maxWidth: view === 'calendar' ? 1040 : 860 }}
         role="dialog"
         aria-modal="true"
-        aria-label="Biblioteca de carrosséis"
+        aria-label="Biblioteca de projetos"
         tabIndex={-1}
       >
         <div className="vc-library-header" style={{
@@ -832,7 +854,9 @@ export default function LibraryModal({
             <div>
               <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.022em' }}>Projetos</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                {counts.all === 1 ? '1 carrossel salvo' : `${counts.all} carrosséis salvos`}
+                {counts.all === 0
+                  ? 'Nenhum projeto salvo'
+                  : `${counts.all} projeto${counts.all === 1 ? '' : 's'} · ${counts.carrossel} ${counts.carrossel === 1 ? 'carrossel' : 'carrosséis'} · ${counts.apresentacao} ${counts.apresentacao === 1 ? 'apresentação' : 'apresentações'}`}
               </div>
             </div>
           </div>
@@ -870,12 +894,45 @@ export default function LibraryModal({
         </div>
 
         <div className="vc-library-toolbar" style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="vc-library-actions" style={{ display: 'flex', gap: 8 }}>
+          <div className="vc-library-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div
+              role="group"
+              aria-label="Tipo de projeto para criar"
+              style={{
+                display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: 3,
+                padding: 3, borderRadius: 9, border: '1px solid var(--control-border)',
+                background: 'var(--bg-card)', flex: '1 1 260px',
+              }}
+            >
+              {CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+                const active = creationType === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setCreationType(id)}
+                    style={{
+                      minHeight: 34, padding: '0 10px', borderRadius: 7,
+                      border: active ? '1px solid var(--accent)' : '1px solid transparent',
+                      background: active ? 'var(--accent-surface)' : 'transparent',
+                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                      cursor: 'pointer', fontSize: 11, fontWeight: 650,
+                      fontFamily: 'var(--font-ui)', display: 'inline-flex',
+                      alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
             <button
               ref={newProjectButtonRef}
               type="button"
               className="vc-btn vc-btn-primary vc-library-new"
-              onClick={() => onNew()}
+              onClick={() => onNew?.(creationType)}
               style={{
                 height: 40, flex: 1, borderRadius: 9, border: 'none', cursor: 'pointer',
                 background: 'var(--accent)', color: 'var(--text-on-accent)',
@@ -883,7 +940,10 @@ export default function LibraryModal({
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: '0 4px 14px rgba(255,77,46,0.25)',
               }}
-            ><Plus size={14}/>Novo carrossel</button>
+            >
+              <Plus size={14}/>
+              {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
+            </button>
             <button type="button" onClick={onExportAll} title="Exportar toda a biblioteca como JSON" style={{ ...controlStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Download size={13}/>Exportar
             </button>
@@ -910,7 +970,7 @@ export default function LibraryModal({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar pelo nome..."
-              aria-label="Buscar carrosséis"
+              aria-label="Buscar projetos"
               className="vc-input"
               style={{ flex: '1 1 220px' }}
             />
@@ -977,25 +1037,28 @@ export default function LibraryModal({
                         Sua biblioteca está vazia
                       </div>
                       <div style={{ fontSize: 13, lineHeight: 1.55, maxWidth: 340, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-                        Crie seu primeiro carrossel. Depois organize em pastas, defina a data da pauta e acompanhe pelo calendário.
+                        Escolha entre carrossel e apresentação. Depois organize o projeto em pastas e acompanhe seu planejamento.
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => { onClose(); onNew?.(); }}
+                      onClick={() => { onClose(); onNew?.(creationType); }}
                       style={{
                         marginTop: 6, padding: '10px 18px', borderRadius: 9999, cursor: 'pointer',
                         background: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none', fontSize: 13,
                         fontWeight: 600, fontFamily: 'var(--font-ui)', letterSpacing: '-0.011em',
                         display: 'inline-flex', alignItems: 'center', gap: 8,
                       }}
-                    ><Plus size={14}/>Criar primeiro carrossel</button>
+                    >
+                      <Plus size={14}/>
+                      {creationType === 'apresentacao' ? 'Criar primeira apresentação' : 'Criar primeiro carrossel'}
+                    </button>
                   </div>
                 );
               }
               return (
                 <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'var(--font-ui)' }}>
-                  Nenhum carrossel corresponde aos filtros atuais.
+                  Nenhum projeto corresponde aos filtros atuais.
                 </div>
               );
             })()}
@@ -1006,6 +1069,8 @@ export default function LibraryModal({
               const slides = entry.doc?.slides || [];
               const firstSlide = slides[0];
               const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {}) || '#0a0a0a';
+              const product = projectKindCopy(entry);
+              const isPresentation = product.kind === 'apresentacao';
               const editing = editingId === entry.id;
               const organizeOpen = !compactCards || organizeIds.has(entry.id);
               const folderName = folders.find((f) => f.id === entry.folderId)?.name;
@@ -1024,7 +1089,7 @@ export default function LibraryModal({
                       type="button"
                       onClick={() => openProject(entry.id)}
                       style={{
-                        width: 56, height: 70, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
+                        width: isPresentation ? 92 : 56, height: isPresentation ? 52 : 70, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
                         background: bg, backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
                         backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.06)',
                         position: 'relative', overflow: 'hidden',
@@ -1071,7 +1136,7 @@ export default function LibraryModal({
                         <span style={{ padding: '2px 7px', borderRadius: 99, background: status.bg, color: status.color, border: `1px solid ${status.border}`, fontWeight: 700 }}>
                           {status.label}
                         </span>
-                        <span>{slides.length} card{slides.length !== 1 ? 's' : ''}</span>
+                        <span>{product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}</span>
                         {entry.updatedAt ? <span style={{ opacity: 0.7 }}>{fmtDate(entry.updatedAt)}</span> : null}
                         {compactCards && !organizeOpen ? (
                           <span style={{ opacity: 0.75 }}>
@@ -1167,7 +1232,7 @@ export default function LibraryModal({
                     {onNewFromContext ? (
                       <button
                         type="button"
-                        onClick={() => onNewFromContext(entry.id)}
+                        onClick={() => onNewFromContext(entry.id, product.kind)}
                         aria-label={`Novo com o contexto de ${entry.name}`}
                         title="Novo com este contexto"
                         style={actionButtonStyle}

@@ -525,7 +525,7 @@ const CREATIVE_PRESETS = [
   {
     id: 'apresentacao',
     label: 'Apresentação',
-    desc: 'Deck 16:9 estilo Gamma: capa, agenda, argumentos e fecho — para pitch, aula ou proposta. Não é carrossel de feed.',
+    desc: 'Deck 16:9: capa, afirmações, evidências e decisão — para pitch, aula, proposta, relatório ou keynote. Não é carrossel de feed.',
   },
   {
     id: 'tendencia_cultura',
@@ -754,6 +754,14 @@ function buildGenerationIntroLine(presetId) {
 }
 
 function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial') {
+  if (presetId === 'apresentacao') {
+    return `REGRAS DE TEXTO — APRESENTAÇÃO 16:9:
+- Escreva para leitura em tela e fala do apresentador: uma ideia central por slide, hierarquia clara e frases concretas.
+- Use o tom da marca (${tone || 'profissional, claro e direto'}) sem jargão de rede social, chamada para salvar, compartilhar ou comentar.
+- Em slides de conteúdo, o título deve afirmar a conclusão; o subtítulo sustenta a afirmação com uma explicação coerente de 1–3 frases.
+- Quando o conteúdo exigir enumeração, use poucas linhas reais com quebra de linha. Nunca simule bullets separando itens com “·”.
+- Evite repetir a mesma estrutura verbal em todos os slides e não transforme o deck em uma sequência de slogans.`;
+  }
   if (narrativeMode === 'none') return `LINGUAGEM: siga a voz do brief e o tom solicitado: ${tone || 'natural e concreto'}. Não force um registro editorial ou uma fórmula narrativa.`;
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
   const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
@@ -831,6 +839,18 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9) {
+  if (creativePresetId === 'apresentacao') {
+    const { lo, hi } = scaledCharBand(90, 240, textDensityId);
+    return `
+REGRAS DE LEITURA E COMPOSIÇÃO — DECK 16:9:
+- Capa: título de 3–9 palavras e subtítulo de até ${scaledCeiling(120, textDensityId)} caracteres.
+- Miolo: título conclusivo de 3–12 palavras; subtítulo normalmente entre ${lo} e ${hi} caracteres, com uma explicação coerente ou até quatro linhas reais quando uma enumeração for indispensável.
+- Nunca simule listas unindo itens com “·”. Prefira prosa curta, uma tabela/diagrama visual ou linhas separadas por quebra de linha.
+- Síntese/fecho: conclusão ou próximo passo claro, sem CTA de Instagram.
+- Varie a função visual dos ${slideCount} slides: capa, mapa/agenda, afirmação, explicação, dado/prova, comparação, síntese e fecho conforme o caminho escolhido.
+- Não escreva “slide N”, “arraste”, “salve”, “compartilhe”, hashtags ou instruções de feed.
+- bodyAfterImage fica vazio por padrão; use-o somente para fonte, unidade, período, ressalva ou instrução indispensável. Cada slide deve funcionar projetado em uma tela ampla.`;
+  }
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
     return buildPersoHybridLayoutBlock(slideCount, textDensityId);
   }
@@ -979,6 +999,18 @@ ${hookVisualHint}
 }
 
 function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false) {
+  if (presetId === 'apresentacao') {
+    const directionLine = projectDirection
+      ? '• A estética, técnica e atmosfera descritas no brief do projeto têm prioridade.'
+      : '• Mantenha uma linguagem visual coerente do primeiro ao último slide.';
+    return `imageQuery — DIREÇÃO DE ARTE PARA APRESENTAÇÃO 16:9:
+• INGLÊS, 8–15 palavras: assunto + contexto + composição horizontal + luz/linguagem visual.
+• Relacione a imagem ao ponto específico do slide sobre “${topic}”${n ? ` (nicho: ${n})` : ''}${audience ? ` (público: ${audience})` : ''}; não use a mesma cena em todo o deck.
+• Prefira enquadramento horizontal com espaço negativo para texto e um foco visual claro.
+• Não desenhe texto, números, gráficos rotulados, logo ou marca-d’água dentro da imagem.
+• Use imagem somente quando ela acrescentar evidência, contexto ou atmosfera; imageQuery pode ser "" em slides tipográficos, agenda, quadro comparativo ou síntese.
+${directionLine}`;
+  }
   if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
 • INGLÊS, 8–15 palavras: sujeito + ação + ambiente + linguagem visual/luz extraída do brief.
 • Relacione a cena à mensagem específica do card. Varie cenas mantendo a identidade do projeto.
@@ -1024,6 +1056,13 @@ function buildNarrativeModeReminder(modeId) {
 /** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo + densidade de texto. */
 function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { presetId = 'livre', slideIndex, slideCount } = {}) {
   const positioned = Number.isInteger(slideIndex) && slideCount > 0;
+  if (presetId === 'apresentacao') {
+    const { lo, hi } = scaledCharBand(90, 240, textDensityId);
+    return `- Preserve a função desta posição no deck e uma ideia central por slide.
+- Em slide de conteúdo, use título como afirmação-conclusão e subtítulo como apoio entre ${lo} e ${hi} caracteres quando houver material suficiente.
+- Não simule listas com “·”. bodyAfterImage serve apenas para fonte, unidade, período, ressalva ou instrução indispensável.
+- Não introduza linguagem de carrossel, gesto de arrastar, hashtags ou CTA social.`;
+  }
   const culture = isTendenciaCulturaPreset(presetId);
   const hybrid = isPersoHybridDensity(presetId, textDensityId);
   const sandwich = positioned && ((culture && slideIndex > 0 && slideIndex < slideCount - 1) || (hybrid && slideIndex >= 2));
@@ -1064,6 +1103,10 @@ function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { p
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
 function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
+  if (presetId === 'apresentacao') {
+    return `NOTAS DA APRESENTAÇÃO (campo "caption"):
+Escreva um resumo executivo curto do deck, com a ideia central e o próximo passo. Sem hashtags, emojis, pedido de curtida, salvamento, compartilhamento ou comentário.`;
+  }
   if (narrativeModeId === 'none') return 'LEGENDA: complemente o conteúdo com uma informação útil e um próximo passo pertinente ao pedido. Siga a voz do brief, sem impor uma fórmula narrativa.';
   if (isTendenciaCulturaPreset(presetId)) {
     return `ESTRUTURA DA LEGENDA CULTURA:
@@ -1174,6 +1217,10 @@ function buildHookModeVariationRules(narrativeModeId, creativePresetId) {
 }
 
 function buildRefineModeVoiceRules(presetId, narrativeMode = 'editorial') {
+  if (presetId === 'apresentacao') {
+    return `- Preserve o caminho e a função deste slide na apresentação. Em slides de conteúdo, mantenha o título como afirmação-conclusão e o subtítulo como apoio breve.
+- Não introduza gancho viral, cliffhanger, pedido de deslizar, CTA social ou itens simulados com “·”. Evidências e ressalvas devem continuar ligadas à afirmação que sustentam.`;
+  }
   if (narrativeMode === 'none') return '- Preserve a voz do brief e a entrega original, sem acrescentar um modo narrativo.';
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
   const viralMode = narrativeMode === 'viral' || narrativeMode === 'sensacionalista';
@@ -1222,6 +1269,10 @@ function buildRefineModeVoiceRules(presetId, narrativeMode = 'editorial') {
 }
 
 function buildCaptionVoiceRules(presetId, narrativeMode = 'editorial') {
+  if (presetId === 'apresentacao') {
+    return `- O campo caption funciona como resumo/notas gerais da apresentação, não como legenda de Instagram.
+- Preserve o tom da marca, sintetize o arco em até 900 caracteres e não use hashtags, emojis ou CTA de rede social.`;
+  }
   let presetLine;
   if (isTendenciaCulturaPreset(presetId)) {
     presetLine = `- Tom: jornalístico-analítico (expande o insight como algo que o leitor já sentia); sem emojis. Segundo parágrafo: pergunta que ativa identificação OU CTA orgânico. Hashtags: até ${INSTAGRAM_HASHTAG_LIMIT} específicas ao assunto; use menos se não houver outras pertinentes.`;
@@ -1271,16 +1322,32 @@ ${buildHookModeVariationRules(isTendenciaCulturaPreset(creativePresetId) ? 'edit
 
 function buildGenerationJsonContract(presetId, densityId, count, projectDesignSchema = null) {
   const slide = { title: '', subtitle: '', imageQuery: '' };
-  if (isTendenciaCulturaPreset(presetId) || isPersoHybridDensity(presetId, densityId)) slide.bodyAfterImage = '';
+  const isPresentation = presetId === 'apresentacao';
+  if (isPresentation || isTendenciaCulturaPreset(presetId) || isPersoHybridDensity(presetId, densityId)) {
+    slide.bodyAfterImage = '';
+  }
   return `Retorne um único objeto JSON com exatamente ${count} itens em slides, na ordem do arco, e caption como string.
 Use apenas os campos do modelo; todos os campos de texto são strings, nunca null, arrays ou objetos. As strings vazias do modelo indicam tipos, não conteúdo pronto.
-${'bodyAfterImage' in slide ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.' : ''}
+${isPresentation
+    ? 'Em bodyAfterImage, use apenas fonte, unidade, período, ressalva ou instrução indispensável; deixe vazio nos demais slides.'
+    : 'bodyAfterImage' in slide
+      ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
+      : ''}
 Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaques **assim** são permitidos dentro das strings quando o layout pedir.
 ${JSON.stringify({ slides: [slide], caption: '', ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}) })}`;
 }
 
 /** Viés para pesquisa de nicho — alinha ideias e ganchos ao modo/pacote do documento. */
-function buildResearchPromptBias(narrativeModeId, creativePresetId, hasWeb = true) {
+function buildResearchPromptBias(narrativeModeId, creativePresetId, hasWeb = true, presentationPath = 'auto') {
+  if (creativePresetId === 'apresentacao') {
+    return `
+Preferências do usuário para APRESENTAÇÃO 16:9 (viés suave — ${hasWeb ? 'pesquise fatos reais com fontes na web' : 'formule hipóteses explícitas, sem afirmar atualidade'}):
+- Caminho do deck: ${presentationPath || 'auto'}.
+- Procure afirmações que possam ser sustentadas por evidência, possíveis ângulos de explicação e a decisão, aprendizagem ou ação que cada ângulo ajuda o público a tomar.
+- Uma abertura de apresentação orienta a sala com contexto, tensão ou conclusão. Não use fórmulas de parada de scroll, cliffhanger, promessa viral, CTA social ou linguagem de carrossel.
+- Prefira evidência verificável, comparação, demonstração, dado com unidade/período e fonte, caso real ou diagrama explicativo. Identifique claramente hipóteses e lacunas.
+`;
+  }
   const m = GEN_MODE_BY_ID[narrativeModeId] || GEN_MODE_BY_ID.editorial;
   const p = CREATIVE_PRESET_BY_ID[creativePresetId] || CREATIVE_PRESET_BY_ID.livre;
   return `

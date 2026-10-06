@@ -36,6 +36,11 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     ...prompts, buildGenerationTaskBlock, announcement: false, projectContextBlock: '', styleKitTextHint: '', projectDesignInstructions: '', remixBlock: '', buildEditorialStrategyBlock, objective: 'auto',
     performanceGuidance,
     cp, effectiveMode: 'editorial', count, topic: 'Reuniões sem pauta',
+    isPresentationGeneration: cp === 'apresentacao',
+    deliveryLine: cp === 'apresentacao'
+      ? `Crie uma APRESENTAÇÃO (deck 16:9) de ${count} slides sobre: "Reuniões sem pauta"`
+      : `Crie um carrossel de ${count} slides para Instagram sobre: "Reuniões sem pauta"`,
+    generationTaskBlock: buildGenerationTaskBlock('Reuniões sem pauta', false),
     introLine: prompts.buildGenerationIntroLine(cp),
     hasPromptMaterial: true,
     materialBlock: prompts.buildMaterialBlock(material),
@@ -52,6 +57,7 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     imgParamsBlock: '', idiomaRegra: 'Texto em português brasileiro',
     modoNarrativoBloco: cp === 'tendencia_cultura' ? 'Use apenas o PACOTE TENDÊNCIA/CULTURA' : prompts.GEN_MODE_BY_ID.editorial.method,
     tendenciaPackBlock: cp === 'tendencia_cultura' ? prompts.buildTendenciaCulturaPackBlock(count, density) : '',
+    apresentacaoPackBlock: '',
     quickPackBlock: '',
     slideLayoutRules: prompts.buildGenerationSlideLayoutRules('editorial', cp, density, count),
     langLayer: prompts.buildGenerationLanguageLayer(cp, 'próximo', 'editorial'),

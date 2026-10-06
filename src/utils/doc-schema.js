@@ -10,6 +10,7 @@ import { normalizeContentObjective } from './editorial-strategy.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
 import { unlockGroupedElementsPatch } from './card-elements.js';
+import { normalizePresentationPath } from './presentation.js';
 
 /** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
 const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
@@ -221,6 +222,8 @@ const DEFAULT_DOC = {
   quickNarrativeMode: 'none',
   // Pacote criativo da IA — default personalizado (id interno `livre`) ou Tendência/Cultura.
   creativePreset: 'livre',
+  /** Estrutura narrativa usada apenas em decks 16:9. */
+  presentationPath: 'auto',
   contentObjective: 'auto',
   /** Volume de texto alvo nos cards ao gerar/refinar — 1/1 … 1/5 (fracionado). */
   slideTextDensity: '1_1',
@@ -311,6 +314,10 @@ function ensureDocShape(d) {
   if (out.creativePreset == null) out.creativePreset = 'livre';
   if (out.creativePreset === 'estudio_editorial') out.creativePreset = 'tendencia_cultura';
   if (!CREATIVE_PRESETS.some(p => p.id === out.creativePreset)) out.creativePreset = 'livre';
+  out.presentationPath = normalizePresentationPath(out.presentationPath);
+  out.productKind = out.fmt === 'apresentacao' || out.creativePreset === 'apresentacao'
+    ? 'apresentacao'
+    : 'carrossel';
   out.contentObjective = normalizeContentObjective(out.contentObjective);
   if (out.slideTextDensity == null) out.slideTextDensity = '1_1';
   if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';
@@ -318,7 +325,7 @@ function ensureDocShape(d) {
   if (!CARD_VISUAL_STYLE_IDS.has(out.cardVisualStyle)) out.cardVisualStyle = 'full';
   if (out.quickCardCount !== 'auto') {
     const quickCount = Number(out.quickCardCount);
-    out.quickCardCount = Number.isInteger(quickCount) && quickCount >= 1 && quickCount <= 12 ? quickCount : 'auto';
+    out.quickCardCount = Number.isInteger(quickCount) && quickCount >= 1 && quickCount <= 16 ? quickCount : 'auto';
   }
   out.autoAdjustOnGenerate = out.autoAdjustOnGenerate !== false;
   if (typeof out.caption !== 'string') out.caption = '';

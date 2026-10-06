@@ -8,6 +8,24 @@ import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
 
+const CREATION_TYPES = [
+  { id: 'carrossel', label: 'Carrossel', icon: Layers },
+  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+];
+
+const projectKindOf = (entry) => (
+  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+    ? 'apresentacao'
+    : 'carrossel'
+);
+
+const projectKindCopy = (entry) => {
+  const kind = projectKindOf(entry);
+  return kind === 'apresentacao'
+    ? { kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+};
+
 // ─── ACCOUNT HOME — visão da conta + lista de projetos (antes do editor) ─────
 function AccountHomeShell({
   library,
@@ -45,12 +63,13 @@ function AccountHomeShell({
   setAccountTab,
   appMode = 'criador',
 }) {
-  const totalCards = useMemo(
+  const totalItems = useMemo(
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
     [library],
   );
 
   const [search, setSearch] = useState('');
+  const [creationType, setCreationType] = useState('carrossel');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const PAGE_SIZE = 48;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -85,11 +104,52 @@ function AccountHomeShell({
     );
   };
 
+  const creationTypeSelector = (compact = false) => (
+    <div
+      role="group"
+      aria-label="Tipo de projeto para criar"
+      style={{
+        display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: 3,
+        padding: 3, borderRadius: 9999, border: '1px solid var(--border)',
+        background: 'var(--bg-card)', width: compact ? 'auto' : '100%',
+      }}
+    >
+      {CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+        const active = creationType === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => setCreationType(id)}
+            style={{
+              minHeight: compact ? 34 : 40,
+              padding: compact ? '0 10px' : '0 14px',
+              borderRadius: 9999,
+              border: active ? '1px solid var(--accent)' : '1px solid transparent',
+              background: active ? 'var(--accent-surface)' : 'transparent',
+              color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+              cursor: 'pointer', fontSize: compact ? 11 : 12, fontWeight: 650,
+              fontFamily: 'var(--font-ui)', display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+            }}
+          >
+            <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const createSelectedProject = () => newDoc?.(creationType);
+
   const generateBtn = (fullWidth = false) => (
     <button
       type="button"
       data-vc-tour="generate"
-      onClick={() => onGenerate()}
+      onClick={() => onGenerate?.(creationType)}
+      aria-label={`Gerar ${creationType === 'apresentacao' ? 'apresentação' : 'carrossel'} com IA`}
       style={{
         width: fullWidth ? '100%' : 'auto',
         height: fullWidth ? 48 : 40,
@@ -113,7 +173,8 @@ function AccountHomeShell({
       onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
-      <Sparkles size={fullWidth ? 15 : 14} /> Gerar com IA
+      <Sparkles size={fullWidth ? 15 : 14} />
+      {creationType === 'apresentacao' ? 'Gerar apresentação' : 'Gerar carrossel'}
     </button>
   );
 
@@ -133,6 +194,8 @@ function AccountHomeShell({
 
   const aiReady = hasTextAI && hasImageAI;
   const projectName = activeEntryName || 'Sem título';
+  const activeProject = library.find((entry) => entry.id === activeDocId) || library[0];
+  const activeProjectCopy = projectKindCopy(activeProject);
 
   const headerBtn = {
     height: isMobile ? 40 : 36,
@@ -239,9 +302,10 @@ function AccountHomeShell({
           {!isMobile && navBtn('images', 'Imagens', ImageIcon)}
         </div>
 
-        {/* Centro — Gerar com IA */}
+        {/* Centro — escolhe o produto antes de gerar */}
         {!isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            {creationTypeSelector(true)}
             {generateBtn(false)}
           </div>
         )}
@@ -280,7 +344,7 @@ function AccountHomeShell({
             <>
               <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
                 <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
-                  <Layout size={13} /> Templates
+                  <Layout size={13} /> Templates de carrossel
                 </button>
                 <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
                   <TrendingUp size={13} /> Pesquisa
@@ -365,7 +429,7 @@ function AccountHomeShell({
                 email={accessEmail}
                 libraryCount={library.length}
                 brandCount={brandCount}
-                totalCards={totalCards}
+                totalCards={totalItems}
                 aiSettings={aiSettings}
                 hasTextAI={hasTextAI}
                 hasImageAI={hasImageAI}
@@ -394,7 +458,7 @@ function AccountHomeShell({
               margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
               color: 'var(--text-muted)', maxWidth: '52ch',
             }}>
-              Continue o carrossel em edição ou comece um novo.
+              Continue o projeto em edição ou escolha o que deseja criar.
             </p>
           </header>
 
@@ -418,12 +482,15 @@ function AccountHomeShell({
                 {projectName}
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                <strong style={{ color: 'var(--text-secondary)' }}>{activeProjectCopy.singular}</strong>{' · '}
                 {appMode === 'criador'
                   ? 'Contexto → Pedido → Gerar → Baixar'
                   : 'No editor: Contexto → Narrativa → Visual → Exportar'}
               </p>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {creationTypeSelector(false)}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button
                 type="button"
                 onClick={onContinueEditor}
@@ -438,7 +505,7 @@ function AccountHomeShell({
               </button>
               <button
                 type="button"
-                onClick={() => newDoc()}
+                onClick={createSelectedProject}
                 style={{
                   height: 40, padding: '0 16px', borderRadius: 9999,
                   border: '1px solid var(--border)', background: 'var(--bg-base)',
@@ -447,30 +514,10 @@ function AccountHomeShell({
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}
               >
-                <Plus size={14} /> Novo carrossel
+                <Plus size={14} />
+                {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
               </button>
-              <button
-                type="button"
-                onClick={() => newDoc(
-                  {
-                    creativePreset: 'apresentacao',
-                    fmt: 'apresentacao',
-                    mode: 'editorial',
-                    quickCardCount: '10',
-                    slideTextDensity: '1_2',
-                  },
-                  'Nova apresentação',
-                )}
-                style={{
-                  height: 40, padding: '0 16px', borderRadius: 9999,
-                  border: '1px solid var(--border)', background: 'var(--bg-base)',
-                  color: 'var(--text-primary)', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <Layers size={14} /> Nova apresentação
-              </button>
+              </div>
             </div>
           </section>
 
@@ -484,7 +531,7 @@ function AccountHomeShell({
               {[
                 { label: 'Projetos', value: library.length },
                 { label: 'Marcas', value: brandCount },
-                { label: 'Cards', value: totalCards },
+                { label: 'Cards e slides', value: totalItems },
               ].map(({ label, value }) => (
                 <div
                   key={label}
@@ -544,7 +591,7 @@ function AccountHomeShell({
                 </button>
                 <button
                   type="button"
-                  onClick={() => newDoc()}
+                  onClick={createSelectedProject}
                   style={{
                     height: 36, padding: '0 14px', borderRadius: 9999, border: 'none',
                     cursor: 'pointer', background: 'var(--accent)', color: '#fff',
@@ -552,7 +599,8 @@ function AccountHomeShell({
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                   }}
                 >
-                  <Plus size={13} /> Novo
+                  <Plus size={13} />
+                  {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
                 </button>
               </div>
             </div>
@@ -589,6 +637,8 @@ function AccountHomeShell({
             const slides = entry.doc?.slides || [];
             const firstSlide = slides[0];
             const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {});
+            const product = projectKindCopy(entry);
+            const isPresentation = product.kind === 'apresentacao';
             return (
               <div
                 key={entry.id}
@@ -609,8 +659,8 @@ function AccountHomeShell({
                   onClick={() => openDoc(entry.id)}
                   aria-label={`Abrir ${entry.name}`}
                   style={{
-                    width: 56,
-                    height: 70,
+                    width: isPresentation ? 88 : 56,
+                    height: isPresentation ? 50 : 70,
                     borderRadius: 11,
                     flexShrink: 0,
                     cursor: 'pointer',
@@ -709,7 +759,7 @@ function AccountHomeShell({
                     color: 'var(--text-muted)',
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {slides.length} card{slides.length !== 1 ? 's' : ''}
+                    {product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}
                     {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
                 </div>
@@ -874,7 +924,7 @@ function AccountHomeShell({
         >
           {[
             { id: 'projects', label: 'Início', Icon: Layers, onClick: () => setAccountTab?.('projects') },
-            { id: 'generate', label: 'Gerar', Icon: Sparkles, onClick: () => onGenerate() },
+            { id: 'generate', label: 'Gerar', Icon: Sparkles, onClick: () => onGenerate?.(creationType) },
             { id: 'profile', label: 'Perfil', Icon: User, onClick: () => setAccountTab?.('profile') },
           ].map(({ id, label, Icon, onClick }) => {
             const active = id === 'generate' ? false : accountTab === id;

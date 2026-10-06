@@ -65,11 +65,30 @@ function estimateWrappedLines(chars, nlLines, availW_px, fsPx, charWidthFactor =
 }
 
 /**
+ * Composições de apresentação definem uma geometria editorial deliberada para
+ * o slide 16:9. O ajuste automático ainda pode reduzir tipo ou normalizar a
+ * foto, mas não deve converter essas zonas para os defaults de carrossel.
+ *
+ * `preserveZones` é o marcador atual. Os metadados de composição mantêm
+ * compatibilidade com apresentações criadas antes desse marcador existir.
+ */
+function shouldPreserveCanvasZonesDuringAutoAdjust(slide) {
+  const canvas = slide?.canvas;
+  if (!canvas?.zones || typeof canvas.zones !== 'object' || !canvas.variant) return false;
+  return canvas.preserveZones === true
+    || canvas.source === 'presentation-preset'
+    || !!slide?.presentationCompositionId;
+}
+
+/**
  * Mantém zonas dentro da margem do canvas e aumenta molduras até o texto caber (~ClassicCanvasInner + sanduíche canvas).
  */
 function finalizeCanvasMarginsForAutoAdjust(mergedSlide, f) {
   const cv = mergedSlide.canvas;
   if (!cv?.zones || typeof cv.zones !== 'object' || !cv.variant) return null;
+  if (shouldPreserveCanvasZonesDuringAutoAdjust(mergedSlide)) {
+    return { zones: cv.zones, textInsetAdvice: null, preserved: true };
+  }
 
   const edgePct = typeof f.edgePct === 'number' ? f.edgePct : CANVAS_AUTO_EDGE_PCT;
   const topSafePct = typeof f.topSafePct === 'number' ? f.topSafePct : 14;
@@ -388,5 +407,6 @@ export {
   CANVAS_AUTO_TEXT_INSET_MIN,
   tightenCanvasTextZoneRect,
   estimateWrappedLines,
+  shouldPreserveCanvasZonesDuringAutoAdjust,
   finalizeCanvasMarginsForAutoAdjust,
 };

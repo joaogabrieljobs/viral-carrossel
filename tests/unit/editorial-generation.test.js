@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CONTENT_OBJECTIVES, EDITORIAL_STRUCTURES, buildEditorialStrategyBlock, normalizeInstagramCaption } from '../../src/utils/editorial-strategy.js';
-import { applyEditorialReview, generateReviewedCarousel, validateCarouselDraft } from '../../src/utils/editorial-review.js';
+import {
+  applyEditorialReview,
+  buildEditorialReviewPrompt,
+  generateReviewedCarousel,
+  validateCarouselDraft,
+} from '../../src/utils/editorial-review.js';
 import { buildCaptionVoiceRules } from '../../src/utils/generation-prompts.js';
 import { ensureDocShape } from '../../src/utils/doc-schema.js';
 
@@ -102,5 +107,41 @@ describe('geração com uma revisão editorial', () => {
     const reviewed = applyEditorialReview(first, { edits: [{ slideIndex: 2, reason: 'Conclusão', bodyAfterImage: 'Payoff final' }] }, hybrid);
     expect(reviewed.slides[2].bodyAfterImage).toBe('Payoff final');
     expect(() => applyEditorialReview(first, { edits: [{ slideIndex: 1, reason: 'x', bodyAfterImage: 'Inválido' }] }, hybrid)).toThrow();
+  });
+  it('preserva fontes e ressalvas em apresentações sem tratá-las como legenda social', () => {
+    const presentationConfig = { count: 2, presetId: 'apresentacao', densityId: '1_2' };
+    const presentationDraft = {
+      slides: [
+        { title: 'A decisão', subtitle: 'O contexto', imageQuery: '', bodyAfterImage: '' },
+        { title: 'A receita cresceu', subtitle: 'Comparação anual', imageQuery: '', bodyAfterImage: 'Fonte: relatório 2026 · R$ milhões' },
+      ],
+      caption: 'Resumo executivo',
+    };
+    const validated = validateCarouselDraft(presentationDraft, presentationConfig);
+    expect(validated.slides[1].bodyAfterImage).toContain('Fonte: relatório 2026');
+    const reviewPrompt = buildEditorialReviewPrompt('briefing', validated, presentationConfig);
+    expect(reviewPrompt).toContain('REVISÃO DE APRESENTAÇÃO');
+    expect(reviewPrompt).toContain('Preserve bodyAfterImage');
+    expect(reviewPrompt).not.toContain('CTA coerente com o objetivo');
+  });
+
+  it('impede a revisão automática de substituir fonte, unidade ou ressalva de apresentação', () => {
+    const presentationConfig = { count: 2, presetId: 'apresentacao', densityId: '1_2' };
+    const presentationDraft = validateCarouselDraft({
+      slides: [
+        { title: 'A decisão', subtitle: 'O contexto', imageQuery: '', bodyAfterImage: '' },
+        { title: 'A receita cresceu', subtitle: 'Comparação anual', imageQuery: '', bodyAfterImage: 'Fonte: relatório auditado · R$ milhões' },
+      ],
+      caption: 'Resumo executivo',
+    }, presentationConfig);
+
+    expect(() => applyEditorialReview(presentationDraft, {
+      edits: [{
+        slideIndex: 1,
+        reason: 'Tentativa de trocar a fonte',
+        bodyAfterImage: 'Fonte inventada',
+      }],
+    }, presentationConfig)).toThrow('Edição inválida');
+    expect(presentationDraft.slides[1].bodyAfterImage).toBe('Fonte: relatório auditado · R$ milhões');
   });
 });

@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildGenerationImageLayer,
+  buildGenerationLanguageLayer,
   GEN_MODES,
   GEN_MODE_BY_ID,
   resolveGenMode,
@@ -14,6 +15,7 @@ import {
   buildSlideTextDensityOverrides,
   buildCaptionVoiceRules,
   buildRefineVoiceRules,
+  buildResearchPromptBias,
   buildBrandBlock,
   buildHookVariationRules,
   isTendenciaCulturaPreset,
@@ -155,14 +157,42 @@ describe('contratos editoriais de texto', () => {
     expect(buildHookVariationRules('storytelling', 'tendencia_cultura')).toContain('JÁ EM CURSO');
   });
 
+  it('apresentação usa afirmação e evidência sem listas falsas nem semântica social', () => {
+    const language = buildGenerationLanguageLayer('apresentacao', 'direto', 'viral');
+    const layout = buildGenerationSlideLayoutRules('viral', 'apresentacao', '1_1', 9);
+    const refine = buildRefineVoiceRules('apresentacao', 'viral');
+    const research = buildResearchPromptBias('viral', 'apresentacao', true, 'pitch');
+
+    expect(language).toContain('título deve afirmar a conclusão');
+    expect(layout).toContain('título conclusivo');
+    expect(language).toContain('Nunca simule bullets');
+    expect(layout).toContain('Nunca simule listas');
+    expect(language).not.toMatch(/itens (?:curtos )?separados por/i);
+    expect(layout).not.toMatch(/itens (?:curtos )?separados por/i);
+    expect(refine).toContain('afirmação-conclusão');
+    expect(refine).not.toContain('carrossel');
+    expect(research).toContain('Caminho do deck: pitch');
+    expect(research).toContain('evidência verificável');
+    expect(research).not.toContain('viral_hooks');
+    expect(research).not.toContain('carousel_ideas');
+  });
+
   it('schema contém exemplos JSON válidos e só valores permitidos', () => {
-    for (const [preset, density, body] of [['livre', '1_1', true], ['livre', '1_5', false], ['tendencia_cultura', '1_1', true]]) {
+    for (const [preset, density, body] of [
+      ['livre', '1_1', true],
+      ['livre', '1_5', false],
+      ['tendencia_cultura', '1_1', true],
+      ['apresentacao', '1_2', true],
+    ]) {
       const contract = buildGenerationJsonContract(preset, density, 7);
       const example = JSON.parse(contract.trim().split('\n').at(-1));
       expect(contract).toContain('exatamente 7 itens');
       expect(typeof example.caption).toBe('string');
       expect('bodyAfterImage' in example.slides[0]).toBe(body);
       expect(Object.values(example.slides[0]).every(v => typeof v === 'string')).toBe(true);
+      if (preset === 'apresentacao') {
+        expect(contract).toContain('fonte, unidade, período');
+      }
     }
   });
 });

@@ -102,12 +102,13 @@ function composeImgExtraPrompt(kit, slideExtra = '') {
 }
 
 /** Pedido de quantidade é comando; "3 erros" no tema não é quantidade de cards. */
-function resolveQuickGenerationRequest(text, fallbackCount = 6) {
-  const words = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12 };
+function resolveQuickGenerationRequest(text, fallbackCount = 6, maxCount = 12) {
+  const words = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, catorze: 14, quatorze: 14, quinze: 15, dezesseis: 16 };
   const plain = String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const match = plain.match(/\b(\d+|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\s+(?:cards?|slides?|telas?|pecas?)\b/);
+  const match = plain.match(/\b(\d+|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|catorze|quatorze|quinze|dezesseis)\s+(?:cards?|slides?|telas?|pecas?)\b/);
   const count = match ? (words[match[1]] || Number(match[1])) : fallbackCount;
-  if (!Number.isInteger(count) || count < 1 || count > 12) throw new Error('Peça entre 1 e 12 cards por geração.');
+  const ceiling = Number.isInteger(maxCount) && maxCount >= 1 ? maxCount : 12;
+  if (!Number.isInteger(count) || count < 1 || count > ceiling) throw new Error(`Peça entre 1 e ${ceiling} cards ou slides por geração.`);
   const announcement = /\b(anunciando|anuncie|anunciar|divulgue|divulgando|promova|anuncios?)\b/.test(plain);
   return { count, announcement };
 }

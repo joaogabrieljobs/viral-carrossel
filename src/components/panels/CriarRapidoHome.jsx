@@ -6,6 +6,11 @@ import { buildIdentityChecklist, projectHasCarouselContent } from '../../utils/c
 import { storeSlideLogo } from '../../utils/slide-logo.js';
 import { Check, Download, Image as ImageIcon, Loader2, Sparkles, Type, SlidersHorizontal, Upload, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  PRESENTATION_PATHS,
+  getPresentationPath,
+  normalizePresentationPath,
+} from '../../utils/presentation.js';
 
 const BTN_CAPS = {
   textTransform: 'uppercase',
@@ -62,8 +67,11 @@ export function CriarRapidoHome({
   onCreateFolder = null,
   creativePreset = 'livre',
   onCreativePresetChange = null,
+  presentationPath = 'auto',
+  onPresentationPathChange = null,
 }) {
   const isPresentation = creativePreset === 'apresentacao';
+  const normalizedPresentationPath = normalizePresentationPath(presentationPath);
   const logoRef = useRef(null);
   const promptRef = useRef(null);
   const projectRef = useRef(projectId);
@@ -134,7 +142,7 @@ export function CriarRapidoHome({
         logoSize: current?.logoSize ?? 120,
         logoOpacity: current?.logoOpacity ?? 90,
       }));
-      toast?.('Logo salva. Novos cards deste projeto já saem com ela.', 'success');
+      toast?.(`Logo salva. Novos ${isPresentation ? 'slides' : 'cards'} deste projeto já saem com ela.`, 'success');
       trackEvent('criar_rapido_logo');
     } catch (err) {
       if (projectRef.current === uploadProjectId) {
@@ -159,6 +167,7 @@ export function CriarRapidoHome({
       narrativeMode: effectiveNarrativeMode,
       cardCount: quickCardCount,
       productKind: isPresentation ? 'apresentacao' : 'carrossel',
+      presentationPath: normalizedPresentationPath,
     });
   };
 
@@ -190,7 +199,9 @@ export function CriarRapidoHome({
                 onClick={() => {
                   if (!onCreativePresetChange) return;
                   onCreativePresetChange(id === 'apresentacao' ? 'apresentacao' : 'livre');
-                  if (id === 'apresentacao') onQuickCardCountChange?.('10');
+                  if (id === 'apresentacao') {
+                    onQuickCardCountChange?.(String(getPresentationPath(normalizedPresentationPath).defaultSlideCount));
+                  }
                   trackEvent('product_kind_switch', { to: id });
                 }}
                 style={{ minHeight: 40, fontSize: 12 }}
@@ -202,9 +213,54 @@ export function CriarRapidoHome({
         </div>
         <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
           {isPresentation
-            ? 'Deck 16:9 estilo Gamma — pitch, aula ou proposta. Exporta PDF paisagem.'
+            ? 'Apresentação 16:9 — pitch, aula, proposta, relatório, caso ou keynote. Exporta PDF paisagem.'
             : 'Cards verticais para o feed do Instagram (4:5).'}
         </p>
+        {isPresentation ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 4 }}>
+            <label className="vc-label-sm">Estrutura da apresentação</label>
+            <div
+              role="group"
+              aria-label="Estrutura narrativa da apresentação"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
+            >
+              {PRESENTATION_PATHS.map((path) => {
+                const active = normalizedPresentationPath === path.id;
+                return (
+                  <button
+                    key={path.id}
+                    type="button"
+                    aria-pressed={active}
+                    title={path.description}
+                    disabled={genBusy}
+                    onClick={() => {
+                      onPresentationPathChange?.(path.id);
+                      onQuickCardCountChange?.(String(path.defaultSlideCount));
+                      trackEvent('presentation_path_selected', { path: path.id, surface: 'criar_rapido' });
+                    }}
+                    style={{
+                      minHeight: 32,
+                      padding: '0 10px',
+                      borderRadius: 9999,
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--hairline)'}`,
+                      background: active ? 'var(--accent-surface)' : 'var(--bg-card)',
+                      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                      cursor: genBusy ? 'not-allowed' : 'pointer',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 11,
+                      fontWeight: active ? 650 : 500,
+                    }}
+                  >
+                    {path.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+              {getPresentationPath(normalizedPresentationPath).description}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <div style={{
@@ -293,7 +349,7 @@ export function CriarRapidoHome({
             onChange={(e) => setStyleKit?.((prev) => ({ ...prev, logoOnGenerate: e.target.checked }))}
             style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--accent)' }}
           />
-          <span>Aplicar esta logo a todos os cards que eu gerar neste projeto</span>
+          <span>Aplicar esta logo a todos os {isPresentation ? 'slides' : 'cards'} que eu gerar neste projeto</span>
         </label>
       </section>
 
@@ -366,8 +422,8 @@ export function CriarRapidoHome({
         />
         <div>
           <div className="vc-label-sm" style={{ marginBottom: 7 }}>{isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'}</div>
-          <div className="vc-seg" role="group" aria-label={isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'} style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
-            {(isPresentation ? ['auto', 6, 8, 10, 12, 14] : ['auto', 3, 5, 6, 8, 10]).map((value) => {
+          <div className="vc-seg" role="group" aria-label={isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'} style={{ gridTemplateColumns: `repeat(${isPresentation ? 7 : 6}, minmax(0, 1fr))` }}>
+            {(isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10]).map((value) => {
               const active = quickCardCount === value;
               return (
                 <button
@@ -386,7 +442,7 @@ export function CriarRapidoHome({
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {isPresentation
-              ? 'Auto escolhe cerca de 10 slides; o arco cobre capa, agenda, corpo e fecho.'
+              ? `Auto usa cerca de ${getPresentationPath(normalizedPresentationPath).defaultSlideCount} slides e adapta o arco de ${getPresentationPath(normalizedPresentationPath).shortLabel}.`
               : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards.'}
           </p>
         </div>
@@ -449,6 +505,7 @@ export function CriarRapidoHome({
             exporting={exporting}
             imagesBusy={imagesBusy}
             hasOpenAI={hasOpenAI}
+            itemLabel={isPresentation ? 'slides' : 'cards'}
           />
           {showImagePicker ? (
             <ImageBatchPicker
@@ -462,6 +519,7 @@ export function CriarRapidoHome({
                 await onGenerateImages?.(selectedImageIds);
                 setShowImagePicker(false);
               }}
+              itemLabel={isPresentation ? 'slides' : 'cards'}
             />
           ) : null}
           <OrganizeForPublish
@@ -511,11 +569,12 @@ export function PostGenerateActions({
   imagesBusy = false,
   hasOpenAI = false,
   onAutoAdjustAll = null,
+  itemLabel = 'cards',
 }) {
   const actions = [
     { id: 'text', label: 'Ajustar texto', icon: Type, onClick: onAdjustText },
     { id: 'img', label: 'Gerar imagens', icon: ImageIcon, onClick: onGenerateImages, disabled: !hasOpenAI || imagesBusy, busy: imagesBusy },
-    { id: 'fit', label: 'Autoajustar cards', icon: SlidersHorizontal, onClick: onAutoAdjustAll },
+    { id: 'fit', label: `Autoajustar ${itemLabel}`, icon: SlidersHorizontal, onClick: onAutoAdjustAll },
     { id: 'dl', label: 'Baixar', icon: Download, onClick: onDownload, disabled: exporting, busy: exporting },
     { id: 'more', label: 'Mais controle', icon: SlidersHorizontal, onClick: onMoreControl },
   ];
@@ -550,7 +609,7 @@ export function PostGenerateActions({
   );
 }
 
-function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, onGenerate }) {
+function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, onGenerate, itemLabel = 'cards' }) {
   const eligible = slides.filter((s) => String(s.imageQuery || '').trim());
   const allSelected = eligible.length > 0 && eligible.every((s) => selectedIds.includes(s.id));
   const toggle = (id) => setSelectedIds((current) => (
@@ -561,7 +620,7 @@ function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, 
     <section style={{ padding: 12, borderRadius: 14, border: '1px solid var(--glass-border-strong)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Quais cards terão imagem?</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Quais {itemLabel} terão imagem?</div>
           <div style={{ marginTop: 2, fontSize: 10, color: 'var(--text-muted)' }}>Selecione todos ou apenas alguns.</div>
         </div>
         <button type="button" className="vc-btn vc-btn-ghost" aria-label="Fechar seleção" onClick={onClose} style={{ width: 44, minWidth: 44, height: 44, padding: 0 }}><X size={16} /></button>
@@ -572,7 +631,7 @@ function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, 
         onClick={() => setSelectedIds(allSelected ? [] : eligible.map((s) => s.id))}
         style={{ minHeight: 40, fontSize: 11 }}
       >
-        {allSelected ? 'Desmarcar todos' : 'Selecionar todos os cards'}
+        {allSelected ? 'Desmarcar todos' : `Selecionar todos os ${itemLabel}`}
       </button>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
         {eligible.map((s, index) => {

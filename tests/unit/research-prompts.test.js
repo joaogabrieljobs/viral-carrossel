@@ -10,6 +10,27 @@ const raw = {
   carousel_ideas: [{ title: 'Uma ideia', angle: 'Um recorte', sourceIndexes: [0, 99, 0] }], viral_hooks: ['Um gancho'],
 };
 
+const presentationRaw = {
+  evidence_topics: [{
+    topic: 'Tempo perdido em aprovação',
+    why: 'O ciclo atual exige quatro revisões',
+    eventDate: '2026-09-01',
+    sources: [{ name: 'Relatório interno', url: 'https://example.com/report', publishedAt: '2026-09-20' }],
+  }],
+  presentation_angles: [{
+    title: 'Um fluxo único reduz o retrabalho',
+    angle: 'Comparar processo atual e proposto',
+    evidence: 'Tempo médio por etapa',
+    decision: 'Aprovar o piloto',
+    sourceIndexes: [0],
+  }],
+  decision_openings: [{
+    title: 'Quatro revisões atrasam cada lançamento',
+    evidence: 'Tempo medido no último trimestre',
+    decision: 'Escolher o novo fluxo',
+  }],
+};
+
 describe('pesquisa atualizada com fontes', () => {
   it('distingue data de publicação/evento e não força fórmulas antigas', () => {
     const prompt = buildResearchUserPrompt({ niche: 'escrita', contentObjective: 'saves', hasWeb: true, today: '2026-09-22' });
@@ -52,5 +73,56 @@ describe('pesquisa atualizada com fontes', () => {
     const result = normalizeResearchResult(value, true);
     expect(result.trending_topics[0].sources).toEqual([]);
     expect(result.carousel_ideas[0].sourceIndexes).toEqual([]);
+  });
+
+  it('apresentação usa contrato próprio de evidência, ângulo e decisão', () => {
+    const prompt = buildResearchUserPrompt({
+      niche: 'aprovação criativa',
+      productKind: 'apresentacao',
+      creativePreset: 'apresentacao',
+      presentationPath: 'pitch',
+      hasWeb: true,
+      today: '2026-09-22',
+    });
+
+    expect(prompt).toContain('APRESENTAÇÃO 16:9');
+    expect(prompt).toContain('Caminho da apresentação: Pitch');
+    expect(prompt).toContain('"evidence_topics"');
+    expect(prompt).toContain('"presentation_angles"');
+    expect(prompt).toContain('"decision_openings"');
+    expect(prompt).not.toContain('"viral_hooks"');
+    expect(prompt).not.toContain('"carousel_ideas"');
+    expect(prompt).not.toContain('Instagram');
+
+    const result = normalizeResearchResult(presentationRaw, true, {
+      productKind: 'apresentacao',
+      creativePreset: 'apresentacao',
+    });
+    expect(result.presentation_angles).toHaveLength(1);
+    expect(result.presentation_angles[0]).toMatchObject({
+      evidence: 'Tempo médio por etapa',
+      decision: 'Aprovar o piloto',
+      sourceIndexes: [0],
+    });
+    expect(result.decision_openings[0].title).toContain('Quatro revisões');
+    expect(result).not.toHaveProperty('viral_hooks');
+    expect(result).not.toHaveProperty('carousel_ideas');
+
+    const material = researchIdeaMaterial(result.presentation_angles[0], result.evidence_topics);
+    expect(material.content).toContain('Decisão/aprendizagem: Aprovar o piloto');
+    expect(material.sources).toBe('https://example.com/report');
+  });
+
+  it('fallback de apresentação mantém lacunas explícitas e aceita resposta legada sem expor campos sociais', () => {
+    const result = normalizeResearchResult(raw, false, {
+      productKind: 'apresentacao',
+      creativePreset: 'apresentacao',
+    });
+    expect(result.evidence_topics[0].sources).toEqual([]);
+    expect(result.presentation_angles[0].title).toBe('Uma ideia');
+    expect(result.decision_openings[0].title).toBe('Um gancho');
+    expect(result.warning).toContain('valide evidências');
+    expect(result).not.toHaveProperty('viral_hooks');
+    expect(result).not.toHaveProperty('carousel_ideas');
   });
 });

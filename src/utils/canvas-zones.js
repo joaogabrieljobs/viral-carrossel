@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { FORMATS } from './formats.js';
 import { applyCompositionToSlide, getComposition, inferCompositionId } from './slide-design-system.js';
 import { isPersoHybridDensity, isTendenciaCulturaPreset } from './generation-prompts.js';
-import { DEFAULT_SLIDE_TEXT_INSET, CANVAS_ZONE_MIN, SANDWICH_PHOTO_ZONE_MIN_H_PCT, SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT, SANDWICH_TEXT_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, DEFAULT_CANVAS_ZONES_SANDWICH, DEFAULT_CANVAS_ZONES_STAT, finalizeCanvasMarginsForAutoAdjust } from './canvas-layout.js';
+import { DEFAULT_SLIDE_TEXT_INSET, CANVAS_ZONE_MIN, SANDWICH_PHOTO_ZONE_MIN_H_PCT, SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT, SANDWICH_TEXT_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, DEFAULT_CANVAS_ZONES_SANDWICH, DEFAULT_CANVAS_ZONES_STAT, shouldPreserveCanvasZonesDuringAutoAdjust, finalizeCanvasMarginsForAutoAdjust } from './canvas-layout.js';
 
 /** Heurísticas para «Ajuste automático»: texto, foto cover, e com canvas — molduras dentro da margem e alturas compatíveis com o tipo. */
 function slideAutoAdjustPatch(slide, { creativePreset, fmt = 'carrossel' }) {
@@ -82,7 +82,12 @@ function slideAutoAdjustPatch(slide, { creativePreset, fmt = 'carrossel' }) {
 
   const fFmt = FORMATS[fmt] || FORMATS.carrossel;
   const merged = { ...slide, ...patch };
-  if (merged.canvas?.zones && typeof merged.canvas.zones === 'object' && merged.canvas.variant) {
+  if (
+    merged.canvas?.zones
+    && typeof merged.canvas.zones === 'object'
+    && merged.canvas.variant
+    && !shouldPreserveCanvasZonesDuringAutoAdjust(merged)
+  ) {
     const fin = finalizeCanvasMarginsForAutoAdjust(merged, fFmt);
     if (fin?.zones) {
       patch.canvas = { ...slide.canvas, ...(patch.canvas || {}), zones: fin.zones };
@@ -142,6 +147,7 @@ function applyFinalizeCanvasMarginsToSlides(slides, fmt = 'carrossel') {
   return slides.map((slide) => {
     if (!slide.canvas?.zones || typeof slide.canvas.zones !== 'object' || !slide.canvas.variant)
       return slide;
+    if (shouldPreserveCanvasZonesDuringAutoAdjust(slide)) return slide;
     const fin = finalizeCanvasMarginsForAutoAdjust(slide, fFmt);
     if (!fin?.zones) return slide;
     const next = {
@@ -374,6 +380,13 @@ function attachGenerationCanvasLayouts(slides, { creativePreset, slideTextDensit
   return slides.map((s, i) => {
     const q = String(s.imageQuery || '').trim();
     const bod = String(s.bodyAfterImage || '').trim();
+
+    // Presets de apresentação e composições já resolvidas podem fornecer
+    // zonas explícitas. Elas têm prioridade sobre a inferência genérica para
+    // que o motor não transforme novamente um layout 16:9 em full-bleed.
+    if (s.canvas?.applied === true && s.canvas?.zones && s.canvas?.variant) {
+      return { ...s, canvas: { ...s.canvas, enabled: false, applied: true } };
+    }
 
     // Composition explícita (templates / IA futura) tem prioridade.
     if (s.composition && getComposition(s.composition)) {

@@ -6,6 +6,11 @@ import {
   disableCanvasLayoutSlides,
   removeCanvasLayoutSlides,
 } from '../../src/utils/canvas-zones.js';
+import {
+  finalizeCanvasMarginsForAutoAdjust,
+  shouldPreserveCanvasZonesDuringAutoAdjust,
+} from '../../src/utils/canvas-layout.js';
+import { FORMATS } from '../../src/utils/formats.js';
 
 const base = { id: 's1', title: 'T', subtitle: 'S', bgImage: null, canvas: null };
 
@@ -72,6 +77,77 @@ describe('composição (canvas) — activar/desactivar preserva o que o utilizad
     expect(generated.canvas?.zones).toBeTruthy();
     expect(generated.canvas?.enabled).toBe(false);
     expect(generated.canvas?.applied).toBe(false);
+  });
+
+  it('geração preserva zonas explícitas de um padrão de apresentação', () => {
+    const zones = {
+      title: { x: 6, y: 8, w: 42, h: 20 },
+      subtitle: { x: 6, y: 32, w: 42, h: 50 },
+      photo: { x: 52, y: 10, w: 42, h: 76 },
+    };
+    const [generated] = attachGenerationCanvasLayouts([{
+      ...base,
+      imageQuery: 'executive evidence on a widescreen slide',
+      canvas: { enabled: false, applied: true, variant: 'classic', zones },
+    }], { creativePreset: 'apresentacao', slideTextDensity: '1_2' });
+    expect(generated.canvas).toMatchObject({ enabled: false, applied: true, variant: 'classic' });
+    expect(generated.canvas.zones).toEqual(zones);
+  });
+
+  it('autoajuste preserva a geometria editorial explícita de apresentações 16:9', () => {
+    const zones = {
+      title: { x: 7, y: 10, w: 38, h: 22 },
+      subtitle: { x: 7, y: 36, w: 38, h: 42 },
+      photo: { x: 51, y: 8, w: 43, h: 82 },
+    };
+    const slide = {
+      ...base,
+      title: 'Uma afirmação executiva que precisa permanecer na coluna editorial definida',
+      subtitle: 'Contexto suficiente para disparar as heurísticas de ajuste.',
+      bodyAfterImage: 'Fonte: relatório anual 2026 · R$ milhões',
+      presentationCompositionId: 'executive-content',
+      canvas: {
+        enabled: false,
+        applied: true,
+        variant: 'classic',
+        source: 'presentation-preset',
+        preserveZones: true,
+        zones,
+      },
+    };
+
+    expect(shouldPreserveCanvasZonesDuringAutoAdjust(slide)).toBe(true);
+    const finalized = finalizeCanvasMarginsForAutoAdjust(slide, FORMATS.apresentacao);
+    expect(finalized).toMatchObject({ preserved: true, textInsetAdvice: null });
+    expect(finalized.zones).toBe(zones);
+
+    const [adjusted] = autoAdjustSlides([slide], {
+      creativePreset: 'apresentacao',
+      fmt: 'apresentacao',
+    });
+    expect(adjusted.canvas.zones).toBe(zones);
+    expect(adjusted.canvas).toMatchObject({
+      source: 'presentation-preset',
+      preserveZones: true,
+    });
+  });
+
+  it('reconhece apresentações antigas pelo id de composição e não migra suas zonas', () => {
+    const zones = {
+      title: { x: 52, y: 12, w: 40, h: 24 },
+      subtitle: { x: 52, y: 40, w: 40, h: 42 },
+      photo: { x: 0, y: 0, w: 48, h: 100 },
+    };
+    const legacyPresentation = {
+      ...base,
+      presentationCompositionId: 'case-content',
+      canvas: { enabled: false, applied: true, variant: 'classic', zones },
+    };
+    const [adjusted] = autoAdjustSlides([legacyPresentation], {
+      creativePreset: 'apresentacao',
+      fmt: 'apresentacao',
+    });
+    expect(adjusted.canvas.zones).toBe(zones);
   });
 
   it('autoajuste global força cover e reduz texto longo', () => {

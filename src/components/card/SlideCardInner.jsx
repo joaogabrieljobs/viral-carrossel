@@ -375,6 +375,7 @@ const ClassicCanvasInner = React.forwardRef(({
   swapZoneKeys,
   interactionScale = 1,
   onInlineTextChange = null,
+  showSupportingText = false,
   /** Arrasto livre; vem do SlideCardInner. Ausente quando o chrome de zonas
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
@@ -403,6 +404,7 @@ const ClassicCanvasInner = React.forwardRef(({
     slide.align === 'right' ? 'flex-end' :
     slide.align === 'justify' ? 'stretch' : 'flex-start';
   const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage;
+  const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
   const photoZoneBoxStyle = { ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' };
@@ -575,8 +577,18 @@ const ClassicCanvasInner = React.forwardRef(({
           alignItems: Lzn.ai,
           textAlign: slide.align,
         }}
-        deps={[slide.subtitle, slide.subSize, sr.w, sr.h, f.w, f.h, slide.subLeading]}
-        minScale={0.78}
+        deps={[
+          slide.subtitle,
+          supportingText,
+          slide.subSize,
+          slide.bodyAfterSize,
+          sr.w,
+          sr.h,
+          f.w,
+          f.h,
+          slide.subLeading,
+        ]}
+        minScale={0.62}
       >
         {(subScale) => (
         <div
@@ -626,6 +638,38 @@ const ClassicCanvasInner = React.forwardRef(({
               textShadow: shadow,
             } }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
           )
+        )}
+        {supportingText && (
+          <InlineEditableText
+            as="p"
+            value={supportingText}
+            onCommit={(text) => onInlineTextChange?.('bodyAfterImage', text)}
+            elementProps={movOu('bodyAfterImage', {
+              color: bodyInk,
+              fontFamily: bodyFF,
+              fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * subScale,
+              lineHeight: 1.35,
+              fontWeight: 500,
+              margin: slide.subtitle && brand.subtitleVisible !== false
+                ? `${f.h * 0.018 * subScale}px 0 0`
+                : 0,
+              overflowWrap: 'break-word',
+              wordBreak: 'normal',
+              maxWidth: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
+              letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+              opacity: 0.82,
+              textShadow: shadow,
+            })}
+          >
+            {textoComDestaque(
+              supportingText,
+              slide.destaqueSpans?.bodyAfterImage,
+              brand.accent,
+              700,
+            )}
+          </InlineEditableText>
         )}
         </div>
         )}
@@ -778,6 +822,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   photoRegionId,
   onPhotoZoneClick,
   showCanvasChrome,
+  showSupportingText = false,
+  onInlineTextChange = null,
   /** `(chave, estiloBase) => props` do arrasto livre; vem do SlideCardInner. */
   mov = null,
 }, ref) => {
@@ -887,9 +933,38 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     )
   ) : null;
 
-  const bothText = <>{titleEl}{textGlass(<>{subtitleEl}</>)}</>;
+  const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
+  const supportingEl = supportingText ? (
+    <InlineEditableText
+      as="p"
+      value={supportingText}
+      onCommit={(text) => onInlineTextChange?.('bodyAfterImage', text)}
+      elementProps={movOu('bodyAfterImage', {
+        color: displayBodyInk,
+        fontFamily: bodyFF,
+        fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100),
+        lineHeight: 1.35,
+        fontWeight: 500,
+        margin: 0,
+        letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+        opacity: 0.82,
+        textShadow: shadow,
+        maxWidth: '100%',
+        overflowWrap: 'break-word',
+      })}
+    >
+      {textoComDestaque(
+        supportingText,
+        slide.destaqueSpans?.bodyAfterImage,
+        brand.accent,
+        700,
+      )}
+    </InlineEditableText>
+  ) : null;
+
+  const bothText = <>{titleEl}{textGlass(<>{subtitleEl}{supportingEl}</>)}</>;
   const titleOnlyWrapped = titleEl;
-  const subOnlyWrapped = textGlass(<>{subtitleEl}</>);
+  const subOnlyWrapped = textGlass(<>{subtitleEl}{supportingEl}</>);
 
   const bandClickable = !!(onPhotoZoneClick && (showCanvasChrome || slideHasPendingPhotoIntent(slide)) && !slide.bgImage);
 
@@ -1197,6 +1272,9 @@ const SlideCardInner = React.forwardRef(({
   }, [brandRaw]);
 
   const f = FORMATS[fmt] || FORMATS.carrossel;
+  const presentationMode = fmt === 'apresentacao'
+    || !!slide.presentationPresetId
+    || !!slide.presentationCompositionId;
   const slideIdx = slideIndexProp != null ? slideIndexProp : num - 1;
   const zonePatchRef = React.useRef(onCanvasZonePatch);
   const brandPal = hydrateBrandTextColors(brand);
@@ -2253,6 +2331,7 @@ const SlideCardInner = React.forwardRef(({
         interactionScale={scale}
         mov={showCanvasChrome ? movOffsetOnly : mov}
         onInlineTextChange={commitInlineText}
+        showSupportingText={presentationMode}
       />
     );
   } else if (normalizePhotoRegion(slide) !== 'full' && !cvHasZones && !(sandwich || cultureStatFlat)) {
@@ -2289,6 +2368,8 @@ const SlideCardInner = React.forwardRef(({
         onPhotoZoneClick={onPhotoZoneClick}
         showCanvasChrome={showCanvasChrome}
         mov={mov}
+        showSupportingText={presentationMode}
+        onInlineTextChange={commitInlineText}
       />
     );
   } else {
@@ -2646,6 +2727,33 @@ const SlideCardInner = React.forwardRef(({
                   width: 'fit-content', maxWidth: '100%',
                 })}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
               ))}
+              {presentationMode && bodyAfterCulture && (
+                <InlineEditableText
+                  as="p"
+                  value={bodyAfterCulture}
+                  onCommit={(text) => commitInlineText('bodyAfterImage', text)}
+                  elementProps={mov('bodyAfterImage', {
+                    color: displayBodyInk,
+                    fontFamily: bodyFF,
+                    fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100),
+                    lineHeight: 1.35,
+                    fontWeight: 500,
+                    margin: 0,
+                    letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+                    opacity: 0.82,
+                    textShadow: shadow,
+                    maxWidth: '100%',
+                    overflowWrap: 'break-word',
+                  })}
+                >
+                  {textoComDestaque(
+                    bodyAfterCulture,
+                    slide.destaqueSpans?.bodyAfterImage,
+                    brand.accent,
+                    700,
+                  )}
+                </InlineEditableText>
+              )}
               {/* After-title text (Bold Promo Pink REF 4): linha curta abaixo
                   do título. Suporta strikethroughText pra preço antigo riscado:
                   "DE R$99" riscado + "POR R$0,00 (100% GRATUITO)" intacto. */}

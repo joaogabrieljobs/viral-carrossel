@@ -10,6 +10,17 @@ import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
 import { CONTENT_OBJECTIVES, normalizeContentObjective } from '../../utils/editorial-strategy.js';
 import { buildPerformanceGuidance } from '../../utils/publication-results.js';
 import { CARD_VISUAL_STYLE_IDS } from '../../utils/doc-schema.js';
+import {
+  APRESENTACAO_PRESET_ID,
+  DEFAULT_PRESENTATION_PATH_ID,
+  PRESENTATION_PATHS,
+  getPresentationPath,
+  normalizePresentationPath,
+} from '../../utils/presentation.js';
+import {
+  DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
+  PRESENTATION_VISUAL_PRESETS,
+} from '../../styles/presentation-presets.jsx';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -30,6 +41,50 @@ const QUICK_TEMPLATE_NARRATIVE_MODE = {
   decodificacao: 'deep',
   comportamento: 'storytelling',
 };
+
+/**
+ * Mantém os catálogos de carrossel e apresentação isolados. Presets antigos de
+ * carrossel não declaravam `productKind`, então a ausência do campo continua
+ * significando carrossel. Quando o chamador não fornece nenhum preset válido
+ * para o produto, o assistente usa o catálogo oficial correspondente.
+ */
+function filterVisualPresetsForProduct(presets, productKind) {
+  const isPresentation = productKind === 'apresentacao';
+  const received = Array.isArray(presets) ? presets : [];
+  const matching = received.filter((preset) => (
+    preset && (isPresentation
+      ? preset.productKind === 'apresentacao'
+      : preset.productKind !== 'apresentacao')
+  ));
+
+  if (matching.length) return matching;
+  return isPresentation ? PRESENTATION_VISUAL_PRESETS : VISUAL_PRESETS;
+}
+
+function resolveInitialVisualPreset({
+  presets,
+  productKind,
+  defaultVisualPreset,
+  presentationPath = DEFAULT_PRESENTATION_PATH_ID,
+}) {
+  const available = filterVisualPresetsForProduct(presets, productKind);
+  if (defaultVisualPreset && available.some((preset) => preset.id === defaultVisualPreset)) {
+    return defaultVisualPreset;
+  }
+  if (productKind !== 'apresentacao') return null;
+
+  const suggested = getPresentationPath(presentationPath).suggestedVisualPreset
+    || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
+  return available.some((preset) => preset.id === suggested)
+    ? suggested
+    : (available[0]?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID);
+}
+
+/** Impede que o assistente herde o pacote do outro produto ao ser aberto. */
+export function resolveCreativePresetForProduct(presetId, productKind) {
+  if (productKind === 'apresentacao') return APRESENTACAO_PRESET_ID;
+  return presetId === APRESENTACAO_PRESET_ID ? 'livre' : (presetId || 'livre');
+}
 
 function GenerateModal({
   open, onClose, onGenerate, onCancelGeneration,
@@ -55,16 +110,29 @@ function GenerateModal({
   visualPreset: defaultVisualPreset = null,
   onVisualPresetChange,
   visualPresets = VISUAL_PRESETS,
+  productKind = 'carrossel',
+  presentationPath: defaultPresentationPath = DEFAULT_PRESENTATION_PATH_ID,
   material = { content: '', sources: '', context: '', refProfileId: null },
   setMaterial = () => {},
   hookLibrary = [],
 }) {
+  const isPresentation = productKind === 'apresentacao';
+  const initialPresentationPath = normalizePresentationPath(defaultPresentationPath);
+  const availableVisualPresets = useMemo(
+    () => filterVisualPresetsForProduct(visualPresets, productKind),
+    [visualPresets, productKind],
+  );
   const [topic, setTopic] = useState(defaultTopic);
-  const [count, setCount] = useState(6);
+  const [count, setCount] = useState(() => (
+    isPresentation ? getPresentationPath(initialPresentationPath).defaultSlideCount : 6
+  ));
   const [niche, setNiche] = useState(defaultNiche);
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
-  const [packCreative, setPackCreative] = useState(defaultCreativePreset || 'livre');
+  const [packCreative, setPackCreative] = useState(() => (
+    resolveCreativePresetForProduct(defaultCreativePreset, productKind)
+  ));
+  const [presentationPath, setPresentationPath] = useState(initialPresentationPath);
   const [contentObjective, setContentObjective] = useState(() => normalizeContentObjective(defaultContentObjective));
   const performanceGuidance = buildPerformanceGuidance(resultsLibrary, {
     ...performanceSettings, objective: contentObjective, niche, presetId: packCreative,
@@ -73,7 +141,13 @@ function GenerateModal({
   useEffect(() => { if (open) setContentObjective(normalizeContentObjective(defaultContentObjective)); }, [open, defaultContentObjective]);
   const [textDensity, setTextDensity] = useState(defaultSlideTextDensity || '1_1');
   useEffect(() => { if (open) setMode(defaultMode); }, [open, defaultMode]);
-  useEffect(() => { if (open) setPackCreative(defaultCreativePreset || 'livre'); }, [open, defaultCreativePreset]);
+  useEffect(() => {
+    if (!open) return;
+    const nextPath = normalizePresentationPath(defaultPresentationPath);
+    setPresentationPath(nextPath);
+    setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
+    setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
+  }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
   useEffect(() => { if (open) setTextDensity(defaultSlideTextDensity || '1_1'); }, [open, defaultSlideTextDensity]);
   const [cardStyle, setCardStyle] = useState(() => normalizeCardVisualStyle(defaultCardVisualStyle));
   useEffect(() => {
@@ -81,8 +155,21 @@ function GenerateModal({
   }, [open, defaultCardVisualStyle]);
   // Padrão visual selecionado (paleta + fontes + tipografia). Null = mantém
   // marca atual sem mudanças. Aplicado ao brand no momento de gerar.
-  const [visualPreset, setVisualPresetLocal] = useState(defaultVisualPreset);
-  useEffect(() => { if (open) setVisualPresetLocal(defaultVisualPreset); }, [open, defaultVisualPreset]);
+  const [visualPreset, setVisualPresetLocal] = useState(() => resolveInitialVisualPreset({
+    presets: visualPresets,
+    productKind,
+    defaultVisualPreset,
+    presentationPath: initialPresentationPath,
+  }));
+  useEffect(() => {
+    if (!open) return;
+    setVisualPresetLocal(resolveInitialVisualPreset({
+      presets: availableVisualPresets,
+      productKind,
+      defaultVisualPreset,
+      presentationPath: defaultPresentationPath,
+    }));
+  }, [open, defaultVisualPreset, defaultPresentationPath, productKind, availableVisualPresets]);
   // Cópia local mutável dos eixos da imagem (salva no documento apenas ao gerar).
   const [params, setParams] = useState(imgParams);
   useEffect(() => { if (open) setParams(imgParams); }, [open, imgParams]);
@@ -102,11 +189,11 @@ function GenerateModal({
   const [step, setStep] = useState(1);
   useEffect(() => { if (open) setStep(1); }, [open]);
   const STEPS = useMemo(() => ([
-    { id: 1, label: 'Ideia' },
-    { id: 2, label: 'Formato' },
+    { id: 1, label: isPresentation ? 'Tema' : 'Ideia' },
+    { id: 2, label: isPresentation ? 'Estrutura' : 'Formato' },
     { id: 3, label: 'Imagens' },
     { id: 4, label: 'Revisão' },
-  ]), []);
+  ]), [isPresentation]);
   // Rótulos amigáveis para densidade (IDs internos preservados para compatibilidade
   // com docs salvos). "1/1, 1/2..." era abstrato — "Denso/Balanceado/Minimal"
   // comunica intenção direta.
@@ -192,7 +279,7 @@ function GenerateModal({
     (Array.isArray(brandSummary) && brandSummary.length > 0) ||
     hasMaterialPack;
   /** Personalizado (`livre`) expõe modo narrativo, nicho e público (tom base vem da Marca). Demais pacotes trazem estrutura fixa. */
-  const modoPersonalizado = packCreative === 'livre';
+  const modoPersonalizado = !isPresentation && packCreative === 'livre';
   const narrativeLockedForPack =
     !modoPersonalizado && isQuickTemplatePreset(packCreative)
       ? (QUICK_TEMPLATE_NARRATIVE_MODE[quickTemplateIdFromPreset(packCreative)] || 'editorial')
@@ -201,7 +288,7 @@ function GenerateModal({
   const resolvedGenerationTopic = (() => {
     const t = topic.trim();
     if (t) return t;
-    if (modoPersonalizado && niche.trim()) return `Conteúdo focado no nicho: ${niche.trim()}`;
+    if ((modoPersonalizado || isPresentation) && niche.trim()) return `Conteúdo focado no contexto: ${niche.trim()}`;
     if (hasContextPack) return 'Conteúdo baseado no material de referência e na identidade da marca.';
     return '';
   })();
@@ -209,13 +296,28 @@ function GenerateModal({
   // A etapa 1 exige tema válido (resolvedGenerationTopic já cobre alternativas
   // de nicho e contexto). As demais etapas permitem revisar os valores padrão.
   const canProceed = step === 1 ? !!resolvedGenerationTopic : true;
+  const selectedPresentationPath = getPresentationPath(presentationPath);
+  const selectPresentationPath = (pathId) => {
+    const normalized = normalizePresentationPath(pathId);
+    const route = getPresentationPath(normalized);
+    setPresentationPath(normalized);
+    setCount(route.defaultSlideCount);
+    setVisualPresetLocal(resolveInitialVisualPreset({
+      presets: availableVisualPresets,
+      productKind: 'apresentacao',
+      defaultVisualPreset: route.suggestedVisualPreset,
+      presentationPath: normalized,
+    }));
+  };
 
   if (!open) return null;
 
   const run = async ({ withImages } = { withImages: true }) => {
     if (!resolvedGenerationTopic) {
       setErr(
-        modoPersonalizado
+        isPresentation
+          ? 'Informe o tema da apresentação, o contexto ou preencha Marca e Conteúdo.'
+          : modoPersonalizado
           ? 'Informe o tema em “Sobre o que é o conteúdo?”, ou o nicho, ou preencha Marca e Conteúdo.'
           : 'Informe o tema em “Sobre o que é o conteúdo?” ou preencha Marca e Conteúdo.',
       );
@@ -224,30 +326,27 @@ function GenerateModal({
     setBusy(true); setErr('');
     try {
       const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
-      const narrativeForGenerate = modoPersonalizado
-        ? mode
-        : (narrativeLockedForPack ?? 'editorial');
-      onImgParamsChange?.(params);
-      onModeChange?.(narrativeForGenerate);
-      onCreativePresetChange?.(packCreative);
-      onSlideTextDensityChange?.(textDensity);
-      onCardVisualStyleChange?.(cardStyle);
-      // Aplica o padrão visual à marca ANTES da geração; a IA usa as novas
-      // cores para recomendar uma paleta consistente nos slides.
-      if (visualPreset && onVisualPresetChange) onVisualPresetChange(visualPreset);
+      const narrativeForGenerate = isPresentation
+        ? 'editorial'
+        : (modoPersonalizado ? mode : (narrativeLockedForPack ?? 'editorial'));
+      const creativePresetForGenerate = isPresentation ? APRESENTACAO_PRESET_ID : packCreative;
+      // Todas as escolhas ficam locais até a geração terminar. `onGenerate`
+      // recebe o pacote completo e é responsável pelo commit atômico do
+      // documento; cancelar, fechar ou falhar não pode aplicar um rascunho.
       const result = await onGenerate({
         topic: resolvedGenerationTopic,
         count,
-        niche: modoPersonalizado ? niche : '',
+        niche: (modoPersonalizado || isPresentation) ? niche : '',
         tone: toneFromBrand,
-        audience: modoPersonalizado ? audience : '',
+        audience: (modoPersonalizado || isPresentation) ? audience : '',
         imgMode: 'dalle',
         imgParams: params,
         mode: narrativeForGenerate,
-        creativePreset: packCreative,
-        contentObjective,
+        creativePreset: creativePresetForGenerate,
+        contentObjective: isPresentation ? 'auto' : contentObjective,
+        presentationPath: isPresentation ? presentationPath : undefined,
         slideTextDensity: textDensity,
-        cardVisualStyle: cardStyle,
+        cardVisualStyle: isPresentation ? 'full' : cardStyle,
         visualPreset,
         fetchImagesNow: !!withImages,
       });
@@ -282,7 +381,9 @@ function GenerateModal({
               <Sparkles size={14} color="var(--text-on-accent)"/>
             </div>
             <div>
-              <div id="generate-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Configurar carrossel</div>
+              <div id="generate-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>
+                {isPresentation ? 'Configurar apresentação' : 'Configurar carrossel'}
+              </div>
               <div className="vc-eyebrow">Passo {step} de {STEPS.length} · {STEPS[step-1].label}</div>
             </div>
           </div>
@@ -390,7 +491,7 @@ function GenerateModal({
                       </>
                     ) : (
                       <>
-                        Vai gerar só pelo tema abaixo? Para basear o carrossel em{' '}
+                        Vai gerar só pelo tema abaixo? Para basear {isPresentation ? 'a apresentação' : 'o carrossel'} em{' '}
                         <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preencha primeiro a aba{' '}
                         <span style={{ fontWeight:600 }}>Conteúdo</span> — assim a IA não inventa em cima de um ponto genérico.
                       </>
@@ -418,15 +519,19 @@ function GenerateModal({
               {/* O pedido vem antes das opções de estrutura para reduzir a carga
                   cognitiva, especialmente em telas pequenas. */}
               <div>
-                <label className="vc-label" htmlFor="generation-topic">Sobre o que é o conteúdo?</label>
+                <label className="vc-label" htmlFor="generation-topic">
+                  {isPresentation ? 'Qual é o tema da apresentação?' : 'Sobre o que é o conteúdo?'}
+                </label>
                 <textarea
                   id="generation-topic"
                   value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
-                  placeholder="Ex: como freelancers usam IA para triplicar a produtividade sem estresse"
+                  placeholder={isPresentation
+                    ? 'Ex: proposta de expansão para o mercado brasileiro em 2027'
+                    : 'Ex: como freelancers usam IA para triplicar a produtividade sem estresse'}
                   className="vc-input vc-textarea"
                 />
                 {/* Ganchos salvos para este nicho; um clique preenche o tema. */}
-                {(() => {
+                {!isPresentation && (() => {
                   const suggestions = getHooksForNiche(hookLibrary, niche, 3);
                   if (suggestions.length === 0) return null;
                   return (
@@ -459,7 +564,7 @@ function GenerateModal({
                     </div>
                   );
                 })()}
-                {hasContextPack && (
+                {hasContextPack && !isPresentation && (
                   <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6, lineHeight:1.47, letterSpacing:'-0.011em' }}>
                     {modoPersonalizado ? (
                       <>Opcional se já houver Marca e Conteúdo: você pode gerar só com esse contexto, ou preencher o nicho abaixo no lugar do tema.</>
@@ -476,6 +581,8 @@ function GenerateModal({
                 )}
               </div>
 
+              {!isPresentation && (
+                <>
               <div>
                 <label className="vc-label" htmlFor="generation-objective">O que você quer com este conteúdo?</label>
                 <select id="generation-objective" className="vc-input" value={contentObjective} onChange={e => setContentObjective(e.target.value)}>
@@ -567,6 +674,80 @@ function GenerateModal({
                 )}
               </div>
 
+                </>
+              )}
+
+              {isPresentation && (
+                <>
+                  <fieldset style={{ margin:0, padding:0, border:0, minWidth:0 }}>
+                    <legend className="vc-label">Escolha o caminho da apresentação</legend>
+                    <div
+                      role="radiogroup"
+                      aria-label="Caminho da apresentação"
+                      style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}
+                    >
+                      {PRESENTATION_PATHS.map((route) => {
+                        const selected = presentationPath === route.id;
+                        return (
+                          <button
+                            key={route.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => selectPresentationPath(route.id)}
+                            style={{
+                              minHeight:88, padding:'11px 12px', borderRadius:11,
+                              border:`1px solid ${selected ? 'var(--accent)' : 'var(--hairline)'}`,
+                              background:selected ? 'var(--accent-surface)' : 'var(--bg-card)',
+                              color:'var(--text-primary)', cursor:'pointer', textAlign:'left',
+                              fontFamily:'var(--font-ui)',
+                            }}
+                          >
+                            <span style={{ display:'block', fontSize:13, fontWeight:600, letterSpacing:'-0.011em' }}>
+                              {route.label}
+                            </span>
+                            <span style={{ display:'block', marginTop:4, fontSize:11, lineHeight:1.4, color:'var(--text-muted)' }}>
+                              {route.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <div>
+                      <label className="vc-label" htmlFor="presentation-context">Contexto ou setor</label>
+                      <input
+                        id="presentation-context"
+                        value={niche}
+                        onChange={e => setNiche(e.target.value)}
+                        placeholder="Ex: saúde, SaaS, educação"
+                        className="vc-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="vc-label" htmlFor="presentation-audience">Para quem será apresentada?</label>
+                      <input
+                        id="presentation-audience"
+                        value={audience}
+                        onChange={e => setAudience(e.target.value)}
+                        placeholder="Ex: diretoria, clientes, turma"
+                        className="vc-input"
+                      />
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize:11, color:'var(--text-muted)', lineHeight:1.47,
+                    padding:'10px 12px', background:'var(--bg-pearl)',
+                    borderRadius:11, border:'1px solid var(--hairline)',
+                  }}>
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>{selectedPresentationPath.label}:</span>{' '}
+                    {selectedPresentationPath.intent}
+                  </div>
+                </>
+              )}
+
               {/* Modo narrativo, público-alvo, nicho — só fazem parte do fluxo Personalizado */}
               {modoPersonalizado && (
                 <>
@@ -585,7 +766,7 @@ function GenerateModal({
                 </>
               )}
 
-              {!modoPersonalizado && (
+              {!isPresentation && !modoPersonalizado && (
                 <div
                   aria-live="polite"
                   style={{
@@ -619,14 +800,22 @@ function GenerateModal({
               <VisualStylePicker
                 value={visualPreset}
                 onChange={setVisualPresetLocal}
-                presets={visualPresets}
+                presets={availableVisualPresets}
+                title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha o padrão visual'}
+                suggestedId={isPresentation ? selectedPresentationPath.suggestedVisualPreset : null}
+                aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}
               />
 
-              {/* Quantidade de cards. */}
+              {/* Quantidade de cards ou slides. */}
               <div>
-                <div className="vc-label" id="generation-card-count-label">Número de cards</div>
+                <div className="vc-label" id="generation-card-count-label">
+                  {isPresentation ? 'Número de slides' : 'Número de cards'}
+                </div>
                 <div role="group" aria-labelledby="generation-card-count-label" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                  {[3,4,5,6,7,8,9,10].map(n=>(
+                  {(isPresentation
+                    ? Array.from({ length: 11 }, (_, index) => index + 6)
+                    : [3,4,5,6,7,8,9,10]
+                  ).map(n=>(
                     <button type="button" key={n} aria-pressed={count === n} onClick={()=>setCount(n)} style={{
                       width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
                       cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
@@ -643,7 +832,9 @@ function GenerateModal({
               {/* Densidade de texto com rótulos amigáveis. O identificador interno
                   permanece para manter a compatibilidade com documentos salvos. */}
               <div>
-                <label className="vc-label" id="slide-text-density-label">Texto por card</label>
+                <label className="vc-label" id="slide-text-density-label">
+                  {isPresentation ? 'Texto por slide' : 'Texto por card'}
+                </label>
                 <div
                   role="group"
                   aria-labelledby="slide-text-density-label"
@@ -685,7 +876,7 @@ function GenerateModal({
               </div>
 
               {/* Estilo visual da foto em relação ao texto, no leiaute clássico. */}
-              <div>
+              {!isPresentation && <div>
                 <label className="vc-label" id="card-visual-style-label">Estilo dos cards</label>
                 <div
                   role="group"
@@ -729,7 +920,7 @@ function GenerateModal({
                   {CARD_VISUAL_STYLE_OPTIONS.find((o) => o.id === cardStyle)?.desc}{' '}
                   Aplica-se ao leiaute clássico (sem canvas no card). Pacotes de Cultura podem alterar alguns slides (sanduíche ou tela cheia).
                 </div>
-              </div>
+              </div>}
             </>
           )}
 
@@ -743,7 +934,9 @@ function GenerateModal({
                     {[
                       {
                         id:'text', label:'Só texto', withImages:false,
-                        description:'Gera o conteúdo agora; você pode criar as imagens depois, card a card.',
+                        description:isPresentation
+                          ? 'Gera o conteúdo do deck agora; você pode criar as imagens depois, slide a slide.'
+                          : 'Gera o conteúdo agora; você pode criar as imagens depois, card a card.',
                       },
                       {
                         id:'text_images', label:'Texto e imagens', withImages:true,
@@ -789,7 +982,7 @@ function GenerateModal({
                     border:'1px solid var(--hairline)', borderRadius:11, padding:'10px 12px',
                     fontFamily:'var(--font-ui)', lineHeight:1.47, letterSpacing:'-0.011em',
                   }}>
-                    Só texto está disponível. Depois, envie um arquivo ou informe uma URL em cada card para adicionar imagens, ou configure uma chave OpenAI em ⚙.
+                    Só texto está disponível. Depois, envie um arquivo ou informe uma URL em cada {isPresentation ? 'slide' : 'card'} para adicionar imagens, ou configure uma chave OpenAI em ⚙.
                   </div>
                 )}
                 {!hasOpenAI && (
@@ -849,8 +1042,17 @@ function GenerateModal({
                       : resolvedGenerationTopic}
                   </span>
 
-                  <span style={{ color:'var(--text-muted)' }}>Pacote</span>
-                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
+                  {isPresentation ? (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Caminho</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{selectedPresentationPath.label}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Pacote</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CREATIVE_PRESET_BY_ID[packCreative]?.label}</span>
+                    </>
+                  )}
 
                   {modoPersonalizado && (
                     <>
@@ -865,18 +1067,26 @@ function GenerateModal({
                     </>
                   )}
 
-                  <span style={{ color:'var(--text-muted)' }}>Objetivo</span>
-                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.label}</span>
+                  {!isPresentation && (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Objetivo</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CONTENT_OBJECTIVES.find(o => o.id === contentObjective)?.label}</span>
+                    </>
+                  )}
                   <span style={{ color:'var(--text-muted)' }}>Revisão do texto</span>
                   <span style={{ color:'var(--text-primary)' }}>Incluída — confere clareza, repetição e coerência antes de abrir o editor.</span>
-                  <span style={{ color:'var(--text-muted)' }}>Cards</span>
+                  <span style={{ color:'var(--text-muted)' }}>{isPresentation ? 'Slides' : 'Cards'}</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{count}</span>
 
                   <span style={{ color:'var(--text-muted)' }}>Densidade</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{DENSITY_FRIENDLY[textDensity] || textDensity}</span>
 
-                  <span style={{ color:'var(--text-muted)' }}>Estilo</span>
-                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CARD_VISUAL_STYLE_OPTIONS.find(o=>o.id===cardStyle)?.short}</span>
+                  {!isPresentation && (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Estilo</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{CARD_VISUAL_STYLE_OPTIONS.find(o=>o.id===cardStyle)?.short}</span>
+                    </>
+                  )}
 
                   <span style={{ color:'var(--text-muted)' }}>Escopo</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
@@ -915,7 +1125,7 @@ function GenerateModal({
                   </>
                 ) : (
                   <>
-                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> gera o conteúdo agora; as imagens podem ser criadas depois, card a card.
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Só texto:</span> gera o conteúdo agora; as imagens podem ser criadas depois, {isPresentation ? 'slide a slide' : 'card a card'}.
                   </>
                 )}
               </div>
@@ -955,7 +1165,9 @@ function GenerateModal({
               type="button"
               onClick={() => canProceed && setStep(step + 1)}
               disabled={!canProceed || busy}
-              title={!canProceed ? 'Informe o tema (ou nicho, ou contexto Marca/Conteúdo) para continuar' : 'Próximo passo'}
+              title={!canProceed
+                ? `Informe o tema (ou ${isPresentation ? 'contexto' : 'nicho'}, ou contexto Marca/Conteúdo) para continuar`
+                : 'Próximo passo'}
               style={{
                 height:44, minWidth:160, padding:'0 22px', borderRadius:9999, border:'none',
                 cursor: (canProceed && !busy) ? 'pointer' : 'not-allowed',
@@ -980,7 +1192,7 @@ function GenerateModal({
                 title={
                   hasOpenAI && wantImages
                     ? `Gera texto e imagens com ${imageProviderLabel}`
-                    : 'Gera só texto e palavras-chave. Você pode criar cada imagem depois, no respectivo card.'
+                    : `Gera só texto. Você pode criar cada imagem depois, no respectivo ${isPresentation ? 'slide' : 'card'}.`
                 }
                 style={{
                   height:44, padding:'0 18px', borderRadius:9999, border:'none',
@@ -997,8 +1209,8 @@ function GenerateModal({
                 {busy
                   ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
                   : hasOpenAI && wantImages
-                    ? <><Sparkles size={15}/>Gerar texto e imagens</>
-                    : <><Sparkles size={15}/>Gerar só texto</>
+                    ? <><Sparkles size={15}/>{isPresentation ? 'Gerar apresentação com imagens' : 'Gerar texto e imagens'}</>
+                    : <><Sparkles size={15}/>{isPresentation ? 'Gerar apresentação' : 'Gerar só texto'}</>
                 }
               </button>
             </div>
@@ -1013,5 +1225,7 @@ export {
   normalizeCardVisualStyle,
   CARD_VISUAL_STYLE_OPTIONS,
   QUICK_TEMPLATE_NARRATIVE_MODE,
+  filterVisualPresetsForProduct,
+  resolveInitialVisualPreset,
   GenerateModal,
 };

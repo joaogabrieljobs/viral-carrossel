@@ -1,6 +1,6 @@
 import { isGenerationCancelled } from '../../utils/generation-control.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'lucide-react';
 import { buildResearchUserPrompt, normalizeResearchResult, researchIdeaMaterial } from '../../utils/research-prompts.js';
 import { callAI, callAIwithSearch } from '../../utils/ai-client.js';
@@ -11,23 +11,50 @@ const PRESET_NICHES = [
   'Carreira','Investimentos','Relacionamentos','Medicina estética','Direito',
 ];
 
-function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = 'editorial', creativePreset = 'livre', contentObjective = 'auto', openaiKey = '' }) {
+function ResearchPanel({
+  open,
+  onClose,
+  onUseIdea,
+  onSetNiche,
+  narrativeMode = 'editorial',
+  creativePreset = 'livre',
+  contentObjective = 'auto',
+  productKind = 'carrossel',
+  presentationPath = 'auto',
+  openaiKey = '',
+}) {
   const [niche, setNiche] = useState('');
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [degraded, setDegraded] = useState(false);
+  const isPresentation = productKind === 'apresentacao' || creativePreset === 'apresentacao';
+
+  useEffect(() => {
+    setData(null);
+    setErr('');
+    setDegraded(false);
+  }, [isPresentation, presentationPath]);
 
   if (!open) return null;
 
-  const researchPrompt = hasWeb => buildResearchUserPrompt({ niche, narrativeMode, creativePreset, contentObjective, hasWeb });
+  const researchOptions = { productKind: isPresentation ? 'apresentacao' : 'carrossel', creativePreset };
+  const researchPrompt = hasWeb => buildResearchUserPrompt({
+    niche,
+    narrativeMode,
+    creativePreset,
+    contentObjective,
+    productKind: researchOptions.productKind,
+    presentationPath,
+    hasWeb,
+  });
 
   const run = async () => {
     if (!niche.trim()) { setErr('Informe o nicho'); return; }
     setBusy(true); setErr(''); setData(null); setDegraded(false);
     try {
       const r = await callAIwithSearch(researchPrompt(true), { json: true });
-      setData(normalizeResearchResult(r, true));
+      setData(normalizeResearchResult(r, true, researchOptions));
       onSetNiche?.(niche);
     } catch (e1) {
       if (isGenerationCancelled(e1)) return;
@@ -37,7 +64,7 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
           researchPrompt(false),
           { json: true, openaiKey },
         );
-        setData(normalizeResearchResult(r, false));
+        setData(normalizeResearchResult(r, false, researchOptions));
         setDegraded(true);
         onSetNiche?.(niche);
       } catch (e2) {
@@ -65,8 +92,12 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
               <TrendingUp size={14} color="#fff"/>
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Pesquisa de nicho</div>
-              <div className="vc-eyebrow">Ideias e referências para seu conteúdo</div>
+              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>
+                {isPresentation ? 'Pesquisa para apresentação' : 'Pesquisa de nicho'}
+              </div>
+              <div className="vc-eyebrow">
+                {isPresentation ? 'Ângulos, evidências e decisões para o deck' : 'Ideias e referências para seu conteúdo'}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
@@ -79,7 +110,9 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
           <div style={{ display:'flex', gap:8 }}>
             <input
               value={niche} onChange={e=>setNiche(e.target.value)}
-              placeholder="Nicho ou tema (ex: nutrição, vendas B2B, saúde mental…)"
+              placeholder={isPresentation
+                ? 'Tema, setor ou decisão (ex: expansão B2B, treinamento, relatório…)'
+                : 'Nicho ou tema (ex: nutrição, vendas B2B, saúde mental…)'}
               className="vc-input" style={{ flex:1 }}
               onKeyDown={e=>{if(e.key==='Enter')run();}}
             />
@@ -114,7 +147,9 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
               fontSize:12, color:'var(--text-secondary)', background:'var(--bg-pearl)', border:'1px solid var(--hairline)',
               borderRadius:11, padding:'10px 14px', letterSpacing:'-0.011em', lineHeight:1.45, fontFamily:'var(--font-ui)',
             }}>
-              Sem pesquisa web ao vivo nesta sessão. As sugestões são hipóteses editoriais para validar, não notícias atuais.
+              {isPresentation
+                ? 'Sem pesquisa web ao vivo nesta sessão. Os ângulos e evidências sugeridas são hipóteses para validar antes de apresentar.'
+                : 'Sem pesquisa web ao vivo nesta sessão. As sugestões são hipóteses editoriais para validar, não notícias atuais.'}
             </div>
           )}
 
@@ -135,7 +170,39 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
                 </div>
               )}
 
-              {data.carousel_ideas?.length > 0 && (
+              {isPresentation && data.presentation_angles?.length > 0 && (
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+                    <Lightbulb size={12} style={{color:'var(--accent-amber)'}}/>Ângulos de apresentação — clique para usar
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {data.presentation_angles.map((idea,i)=>(
+                      <button
+                        key={i}
+                        className="idea-card"
+                        onClick={() => onUseIdea(
+                          [
+                            idea.title,
+                            idea.angle ? `Ângulo: ${idea.angle}` : '',
+                            idea.evidence ? `Evidência: ${idea.evidence}` : '',
+                            idea.decision ? `Decisão/aprendizagem: ${idea.decision}` : '',
+                          ].filter(Boolean).join('\n'),
+                          researchIdeaMaterial(idea, data.evidence_topics),
+                        )}
+                      >
+                        <div style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)', lineHeight:1.29, marginBottom:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.014em' }}>{idea.title}</div>
+                        {idea.angle && <div style={{ fontSize:11, color:'var(--text-secondary)', lineHeight:1.4, fontFamily:'var(--font-ui)' }}>{idea.angle}</div>}
+                        {idea.evidence && <div style={{ fontSize:11, color:'var(--text-secondary)', lineHeight:1.4, fontFamily:'var(--font-ui)', marginTop:6 }}><strong>Evidência:</strong> {idea.evidence}</div>}
+                        {idea.decision && <div style={{ fontSize:11, color:'var(--text-secondary)', lineHeight:1.4, fontFamily:'var(--font-ui)', marginTop:4 }}><strong>Decisão:</strong> {idea.decision}</div>}
+                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:6 }}>{idea.sourceIndexes.length ? 'Com fontes da pesquisa' : 'Hipótese para validar'}</div>
+                        <div style={{ marginTop:10, fontSize:13, color:'var(--accent)', fontWeight:600, letterSpacing:'-0.011em' }}>Usar no deck →</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isPresentation && data.carousel_ideas?.length > 0 && (
                 <div>
                   <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
                     <Lightbulb size={12} style={{color:'var(--accent-amber)'}}/>Ideias prontas — clique para usar
@@ -153,7 +220,34 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
                 </div>
               )}
 
-              {data.viral_hooks?.length > 0 && (
+              {isPresentation && data.decision_openings?.length > 0 && (
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+                    <Zap size={12} style={{color:'var(--accent)'}}/>Aberturas orientadas à decisão
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {data.decision_openings.map((opening,i)=>{
+                      const openingText = [
+                        opening.title,
+                        opening.evidence ? `Evidência: ${opening.evidence}` : '',
+                        opening.decision ? `Decisão: ${opening.decision}` : '',
+                      ].filter(Boolean).join('\n');
+                      return (
+                        <div key={i} className="hook-row">
+                          <span style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:1, width:16, flexShrink:0 }}>{String(i+1).padStart(2,'0')}</span>
+                          <span style={{ flex:1, fontSize:12, color:'var(--text-secondary)', lineHeight:1.5, fontFamily:'var(--font-ui)' }}>{opening.title}</span>
+                          <button onClick={()=>navigator.clipboard?.writeText(openingText)} aria-label="Copiar abertura" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:8, borderRadius:6, transition:'color 0.12s, background 0.12s', flexShrink:0, minWidth:32, minHeight:32, display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                            onMouseEnter={e=>{ e.currentTarget.style.color='var(--text-primary)'; e.currentTarget.style.background='rgba(0,0,0,0.04)'; }}
+                            onMouseLeave={e=>{ e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.background='none'; }}
+                          ><Copy size={11}/></button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!isPresentation && data.viral_hooks?.length > 0 && (
                 <div>
                   <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
                     <Zap size={12} style={{color:'var(--accent)'}}/>Ganchos virais
@@ -173,13 +267,15 @@ function ResearchPanel({ open, onClose, onUseIdea, onSetNiche, narrativeMode = '
                 </div>
               )}
 
-              {data.trending_topics?.length > 0 && (
+              {(isPresentation ? data.evidence_topics : data.trending_topics)?.length > 0 && (
                 <div>
                   <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', marginBottom:10, display:'flex', alignItems:'center', gap:6, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
-                    <TrendingUp size={12} style={{color:'var(--accent-amber)'}}/>{degraded ? 'Assuntos para explorar' : 'Assuntos e fontes'}
+                    <TrendingUp size={12} style={{color:'var(--accent-amber)'}}/>{isPresentation
+                      ? (degraded ? 'Evidências para validar' : 'Evidências e fontes')
+                      : (degraded ? 'Assuntos para explorar' : 'Assuntos e fontes')}
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {data.trending_topics.map((t,i)=>(
+                    {(isPresentation ? data.evidence_topics : data.trending_topics).map((t,i)=>(
                       <div key={i} style={{ background:'var(--bg-card)', borderRadius:8, padding:'10px 12px' }}>
                         <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)' }}>{t.topic}</div>
                         <div style={{ fontSize:11, color:'var(--text-secondary)', marginTop:3, lineHeight:1.4, fontFamily:'var(--font-ui)' }}>{t.why}</div>
