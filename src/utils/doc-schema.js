@@ -11,6 +11,7 @@ import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
 import { unlockGroupedElementsPatch } from './card-elements.js';
 import { normalizePresentationPath } from './presentation.js';
+import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
 
 /** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
 const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
@@ -318,6 +319,13 @@ function ensureDocShape(d) {
   out.productKind = out.fmt === 'apresentacao' || out.creativePreset === 'apresentacao'
     ? 'apresentacao'
     : 'carrossel';
+  if (out.productKind === 'apresentacao' && out.visualPreset) {
+    // IDs oficiais podem chegar como ID de runtime, `pds.*` ou alias humano.
+    // Presets personalizados desconhecidos são preservados para o catálogo
+    // local resolvê-los depois, quando estiver disponível.
+    const resolvedPresentationPreset = resolvePresentationVisualPresetDefinition(out.visualPreset);
+    if (resolvedPresentationPreset) out.visualPreset = resolvedPresentationPreset.id;
+  }
   out.contentObjective = normalizeContentObjective(out.contentObjective);
   if (out.slideTextDensity == null) out.slideTextDensity = '1_1';
   if (!SLIDE_TEXT_DENSITY_BY_ID[out.slideTextDensity]) out.slideTextDensity = '1_1';

@@ -193,4 +193,45 @@ describe('applyVisualPreset — troca de padrão não acumula assinatura', () =>
     expect(overrides.cultureTone).toBe('');
     expect(overrides.useCultureLayout).toBe(false);
   });
+
+  it('trocar uma apresentação por carrossel restaura a escala tipográfica', () => {
+    const brand = applyVisualPreset({
+      textTitleSize: 39.68,
+      textSubSize: 59.52,
+      textBodyAfterSize: 71,
+      textTitleTracking: 22,
+      textSubTracking: 15,
+      textTitleLeading: 95,
+      textSubLeading: 130,
+      bodyWeight: 400,
+      textBodyTracking: 0.5,
+      textBodyLeading: 145,
+    }, 'minimal_clean');
+    const overrides = getSlideOverridesForPreset('minimal_clean');
+
+    expect(brand.textTitleSize).toBeUndefined();
+    expect(brand.textSubSize).toBeUndefined();
+    expect(brand.textBodyAfterSize).toBeUndefined();
+    expect(brand.bodyWeight).toBeUndefined();
+    expect(brand.textBodyTracking).toBeUndefined();
+    expect(brand.textBodyLeading).toBeUndefined();
+    expect(overrides).toMatchObject({
+      titleSize: 100,
+      subSize: 100,
+      bodyAfterSize: 100,
+      titleTracking: 1,
+      subTracking: 0,
+      titleLeading: 116,
+      subLeading: 150,
+      titleWeight: 700,
+      titleCase: 'normal',
+    });
+    expect(overrides.bodyWeight).toBeUndefined();
+    expect(overrides.bodyTracking).toBeUndefined();
+    expect(overrides.bodyLeading).toBeUndefined();
+    expect(overrides.presentationGlass).toBeUndefined();
+    expect(overrides.presentationTitleSizeByComposition).toBeUndefined();
+    expect(overrides.presentationTitleLeadingByComposition).toBeUndefined();
+    expect(overrides.presentationTypographyByComposition).toBeUndefined();
+  });
 });

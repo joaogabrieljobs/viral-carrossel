@@ -23,7 +23,12 @@ export default function VisualStylePicker({
   /** Permite forçar a proporção; sem valor, cada preset declara seu produto. */
   aspectRatio = null,
 }) {
-  const selected = presets.find((p) => p.id === value) || null;
+  const catalog = Array.isArray(presets) ? presets : [];
+  const visiblePresets = catalog.filter((preset) => !preset?.hidden);
+  // Um projeto antigo pode continuar usando um preset oculto. Ele não volta à
+  // grade de escolha, mas a interface ainda identifica claramente o estilo em
+  // uso até a pessoa optar por um dos padrões atuais.
+  const selected = catalog.find((p) => p.id === value || p.sourceId === value) || null;
 
   return (
     <div role="group" aria-label={title || 'Padrões visuais'}>
@@ -48,8 +53,8 @@ export default function VisualStylePicker({
           gap: 12,
         }}
       >
-        {presets.map((p) => {
-          const isActive = value === p.id;
+        {visiblePresets.map((p) => {
+          const isActive = selected?.id === p.id;
           const isSuggested = !isActive && suggestedId === p.id;
           const swatches = paletteSwatches(p);
           const previewAspect = aspectRatio || (p.productKind === 'apresentacao' ? '16 / 9' : '4 / 5');
@@ -217,7 +222,7 @@ export default function VisualStylePicker({
             marginBottom: 4,
             fontFamily: 'var(--font-ui)',
           }}>
-            {selected.label}
+            {selected.hidden ? `Padrão legado em uso · ${selected.label}` : selected.label}
           </div>
           <div style={{
             fontSize: 12,

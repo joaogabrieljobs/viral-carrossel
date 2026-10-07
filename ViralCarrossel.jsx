@@ -3,7 +3,12 @@ import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, thro
 import { buildRemixBlock, mergeRemixedSlides } from './src/utils/carousel-remix.js';
 import { GenerationStatus } from './src/components/GenerationStatus.jsx';
 import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
-import { generateReviewedCarousel } from './src/utils/editorial-review.js';
+import {
+  assertPresentationTextLimits,
+  buildPresentationLimitsBlock,
+  generateReviewedCarousel,
+  presentationTextLimitsFromSlides,
+} from './src/utils/editorial-review.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
@@ -54,8 +59,11 @@ import {
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import {
   PRESENTATION_VISUAL_PRESETS,
+  PRESENTATION_VISUAL_PRESET_CATALOG,
   DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
+  buildPresentationDesignSystemPromptBlock,
   getPresentationCompositionOverrides,
+  resolvePresentationVisualPresetDefinition,
 } from './src/styles/presentation-presets.jsx';
 import {
   createCustomVisualPreset,
@@ -154,6 +162,7 @@ import {
   applyPresentationVisualPresetToSlide,
   applyPresentationVisualPresetToDoc,
   applyPresentationVisualPresetToSlides,
+  presentationStageAt,
 } from './src/utils/presentation-state.js';
 import {
   normalizeStyleKit,
@@ -1108,7 +1117,7 @@ export default function App() {
   const visualPreset = doc.visualPreset ?? null;
   const [customVisualPresets, setCustomVisualPresets] = useState(() => readCustomVisualPresets());
   const visualPresets = useMemo(
-    () => [...VISUAL_PRESETS, ...PRESENTATION_VISUAL_PRESETS, ...customVisualPresets],
+    () => [...VISUAL_PRESETS, ...PRESENTATION_VISUAL_PRESET_CATALOG, ...customVisualPresets],
     [customVisualPresets],
   );
   useEffect(() => {
@@ -1120,29 +1129,31 @@ export default function App() {
   })), [history]);
   const applyVisualStylePreset = useCallback((presetId) => {
     if (!presetId) return;
-    const preset = visualPresets.find((item) => item.id === presetId);
+    const preset = resolvePresentationVisualPresetDefinition(presetId, visualPresets);
+    if (!preset) return;
+    const resolvedPresetId = preset.id;
     const isPresentationVisual = preset?.productKind === 'apresentacao';
-    const fromPreset = preset?.creativePreset || suggestCreativePresetForVisual(presetId);
+    const fromPreset = preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId);
     history.set((d) => {
       if (isPresentationVisual) {
-        return applyPresentationVisualPresetToDoc(d, presetId, visualPresets, {
+        return applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
           initialize: d.productKind !== 'apresentacao' || !isApresentacaoPreset(d.creativePreset),
         });
       }
       const next = d.productKind === 'apresentacao' || isApresentacaoPreset(d.creativePreset)
-        ? applyCarouselVisualPresetToDoc(d, presetId, visualPresets, { fmt: 'carrossel' })
+        ? applyCarouselVisualPresetToDoc(d, resolvedPresetId, visualPresets, { fmt: 'carrossel' })
         : {
             ...d,
-            visualPreset: presetId,
-            brand: applyVisualPreset(d.brand, presetId, visualPresets),
+            visualPreset: resolvedPresetId,
+            brand: applyVisualPreset(d.brand, resolvedPresetId, visualPresets),
             slides: (Array.isArray(d.slides) ? d.slides : []).map((slide) => ({
               ...slide,
-              ...getSlideOverridesForPreset(presetId, visualPresets),
+              ...getSlideOverridesForPreset(resolvedPresetId, visualPresets),
             })),
           };
       return fromPreset ? { ...next, creativePreset: fromPreset } : next;
     });
-    trackEvent('visual_preset_applied', { preset: presetId, creativePreset: fromPreset || null });
+    trackEvent('visual_preset_applied', { preset: resolvedPresetId, creativePreset: fromPreset || null });
   }, [history, visualPresets]);
   const setSlideTextDensity = useCallback(next => history.set(d => ({
     ...d,
@@ -1988,10 +1999,12 @@ export default function App() {
     const FONTS_URL =
       'https://fonts.googleapis.com/css2?' +
       'family=Anton&' +
+      'family=Archivo:wght@400;500;600;700;800&' +
       'family=Archivo+Black&' +
       'family=Bebas+Neue&' +
       'family=Big+Shoulders+Display:wght@400;500;600;700;800;900&' +
       'family=Bricolage+Grotesque:wght@300;400;500;600;700&' +
+      'family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
       'family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&' +
       'family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600&' +
       'family=DM+Sans:wght@300;400;500;600;700&' +
@@ -2001,14 +2014,18 @@ export default function App() {
       'family=Funnel+Display:wght@300;400;500;600;700&' +
       'family=IBM+Plex+Mono:wght@300;400;500;600;700&' +
       'family=IBM+Plex+Sans:wght@300;400;500;600;700&' +
+      'family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&' +
       'family=Instrument+Serif:ital@0;1&' +
       'family=Inter:wght@300;400;500;600;700&' +
       'family=Inter+Tight:wght@300;400;500;600;700&' +
       'family=Italiana&' +
-      'family=JetBrains+Mono:wght@400;500;600&' +
+      'family=JetBrains+Mono:wght@400;500;600;700&' +
+      'family=Jost:wght@300;400;500;600;700&' +
       'family=Libre+Caslon+Display&' +
+      'family=Libre+Franklin:wght@300;400;500;600;700&' +
       'family=Major+Mono+Display&' +
       'family=Manrope:wght@300;400;500;600;700&' +
+      'family=Montserrat:wght@300;400;500;600;700&' +
       'family=Oswald:wght@300;400;500;600;700&' +
       'family=Outfit:wght@300;400;500;600;700&' +
       'family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&' +
@@ -2017,6 +2034,7 @@ export default function App() {
       'family=Raleway:wght@300;400;500;600;700&' +
       'family=Sora:wght@300;400;500;600;700&' +
       'family=Source+Sans+3:wght@300;400;500;600;700&' +
+      'family=Source+Serif+4:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
       'family=Space+Grotesk:wght@300;400;500;600;700&' +
       'family=Space+Mono:wght@400;700&' +
       'family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
@@ -3068,15 +3086,26 @@ export default function App() {
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
     const requestedVisualPreset = visualPresetArg ?? visualPreset ?? null;
-    const requestedVisualPresetDef = visualPresets.find((item) => item.id === requestedVisualPreset);
+    // Arquivos externos podem persistir o ID canônico da fonte (`pds.*`).
+    // Resolva-o para o ID de runtime antes de montar prompt, composições e
+    // metadados; caso contrário a geração cairia silenciosamente no padrão
+    // sugerido pelo caminho narrativo.
+    const requestedVisualPresetDef = resolvePresentationVisualPresetDefinition(
+      requestedVisualPreset,
+      visualPresets,
+    );
     const effectiveVisualPreset = isPresentationGeneration
       ? (requestedVisualPresetDef?.productKind === 'apresentacao'
-          ? requestedVisualPreset
+          ? requestedVisualPresetDef.id
           : getPresentationPath(presentationPathId).suggestedVisualPreset)
       : (requestedVisualPresetDef?.productKind === 'apresentacao'
           || (activeProductKind === 'apresentacao' && !requestedVisualPresetDef)
         ? DEFAULT_CAROUSEL_VISUAL_PRESET_ID
-        : requestedVisualPreset);
+        : (requestedVisualPresetDef?.id || requestedVisualPreset));
+    const effectiveVisualPresetDef = resolvePresentationVisualPresetDefinition(
+      effectiveVisualPreset,
+      visualPresets,
+    );
     const modeDef = resolveGenMode(effectiveMode);
     const brandBlock = buildBrandBlock(brand);
     const brandVoiceBlock = buildBrandVoiceBlock(brand, {
@@ -3095,6 +3124,26 @@ export default function App() {
     const apresentacaoPackBlock = isPresentationGeneration
       ? buildApresentacaoPackBlock(count, presentationPathId)
       : '';
+    const apresentacaoDesignBlock = isPresentationGeneration
+      ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef)
+      : '';
+    const presentationRoute = isPresentationGeneration
+      ? getPresentationPath(presentationPathId)
+      : null;
+    const presentationStages = presentationRoute?.stages || [];
+    const presentationTextLimits = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom
+      ? Array.from({ length: Number(count) }, (_, index) => {
+          const stage = presentationStageAt(presentationPathId, index, Number(count));
+          const limits = getPresentationCompositionOverrides(effectiveVisualPreset, {
+            slide: {}, stage, index, count: Number(count),
+          }).presentationTextLimits || {};
+          return {
+            title: limits.title,
+            subtitle: limits.subtitle,
+            bodyAfterImage: limits.body,
+          };
+        })
+      : null;
     const quickTid = quickTemplateIdFromPreset(cp);
     const quickPackBlock = quickTid ? buildQuickTemplatePackBlock(quickTid, count) : '';
 
@@ -3162,6 +3211,7 @@ ${effectiveMode === 'none' || isPresentationGeneration ? '' : performanceGuidanc
 ${modoNarrativoBloco}
 ${brandVoiceBlock}
 ${apresentacaoPackBlock}
+${apresentacaoDesignBlock}
 ${tendenciaPackBlock}
 ${quickPackBlock ? `${quickPackBlock}\n` : ''}
 
@@ -3184,7 +3234,12 @@ ${jsonShapeLine}`;
     const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
     const { result, reviewStatus } = await generateReviewedCarousel({
       prompt,
-      config: { count: Number(count), presetId: cp, densityId: td },
+      config: {
+        count: Number(count),
+        presetId: cp,
+        densityId: td,
+        presentationTextLimits,
+      },
       aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
       onReview: () => { checkActive(); setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Revisando clareza e coerência…' }); },
     }, callAI);
@@ -3217,23 +3272,33 @@ ${jsonShapeLine}`;
     }
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
-    const presentationRoute = isPresentationGeneration
-      ? getPresentationPath(presentationPathId)
-      : null;
-    const presentationStages = presentationRoute?.stages || [];
 
     const visualSlideOverrides = effectiveVisualPreset
       ? getSlideOverridesForPreset(effectiveVisualPreset, visualPresets)
       : {};
-    const effectiveVisualPresetDef = visualPresets.find(
-      (item) => item.id === effectiveVisualPreset,
-    );
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       let q = ((s.imageQuery ?? s.image_query) || '').trim();
       const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
       const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
+      const stageIndex = presentationStages.length <= 1 || nSlides <= 1
+        ? 0
+        : Math.round((i * (presentationStages.length - 1)) / (nSlides - 1));
+      const stage = isPresentationGeneration
+        ? (presentationStages[stageIndex] || {})
+        : {};
+      // Resolve uma única vez a composição efetiva antes de decidir se o
+      // slide precisa de imagem. Presets personalizados mantêm a composição
+      // livre do usuário e, por isso, não recebem fallback automático.
+      const compositionOverrides = isPresentationGeneration && !effectiveVisualPresetDef?.isCustom
+        ? getPresentationCompositionOverrides(effectiveVisualPreset, {
+            slide: s,
+            stage,
+            index: i,
+            count: nSlides,
+          })
+        : {};
       // Fallback: capa e encerramento de Cultura/Perso Hybrid SEMPRE devem ter foto
       // (full-bleed). Se a IA omitiu imageQuery, gera uma a partir do título+subtitle
       // em inglês básico — o pipeline DALL·E ainda passa.
@@ -3245,14 +3310,17 @@ ${jsonShapeLine}`;
         q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
       }
-      // Os presets oficiais de apresentação reservam uma zona visual em todos
-      // os estágios. Se o modelo omitir a query, deixar a zona vazia parece uma
-      // geração quebrada e contradiz a escolha “gerar imagens”. Criamos uma
-      // direção larga, sem texto incorporado, a partir da ideia do próprio slide.
-      if (!q && isPresentationGeneration && (title || subtitle)) {
+      // Só composições que declaram uma imagem obrigatória recebem fallback.
+      // Capas/divisores tipográficos continuam intencionalmente sem imagem.
+      if (
+        !q
+        && isPresentationGeneration
+        && compositionOverrides.presentationRequiresImage === true
+        && (title || subtitle)
+      ) {
         const seed = `${title}. ${subtitle}`.trim().slice(0, 220);
         q = `widescreen presentation visual illustrating: ${seed}. Editorial evidence or clean diagrammatic concept, strong 16:9 composition, no embedded text, no logo`;
-        console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} da apresentação — usando fallback semântico.`);
+        console.warn(`[handleGenerate] IA omitiu imageQuery obrigatória do slide ${i+1} da apresentação — usando fallback semântico.`);
       }
       const base = {
         ...mkSlide(i + 1, generationBrand),
@@ -3276,21 +3344,6 @@ ${jsonShapeLine}`;
           : typeof s.body_after_image === 'string'
             ? s.body_after_image
             : '';
-        const stageIndex = presentationStages.length <= 1 || nSlides <= 1
-          ? 0
-          : Math.round((i * (presentationStages.length - 1)) / (nSlides - 1));
-        const stage = presentationStages[stageIndex] || {};
-        // Presets oficiais traduzem o papel narrativo da etapa em zonas reais
-        // de título, apoio e evidência. Um preset personalizado preserva seus
-        // próprios defaults, com o fallback horizontal já usado pelo editor.
-        const compositionOverrides = effectiveVisualPresetDef?.isCustom
-          ? {}
-          : getPresentationCompositionOverrides(effectiveVisualPreset, {
-              slide: s,
-              stage,
-              index: i,
-              count: nSlides,
-            });
         const presetAlign = compositionOverrides.align || base.align || 'left';
         const deckLayout = compositionOverrides.layout || (
           presetAlign === 'center'
@@ -3403,6 +3456,12 @@ ${jsonShapeLine}`;
             productKind: 'carrossel',
           }),
       visualPreset: effectiveVisualPreset || null,
+      presentationDesignSystemId: isPresentationGeneration
+        ? (effectiveVisualPresetDef?.sourceId || null)
+        : undefined,
+      presentationDesignSystemVersion: isPresentationGeneration
+        ? (effectiveVisualPresetDef?.sourceVersion || null)
+        : undefined,
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
       editorialContext: {
         topic,
@@ -3597,6 +3656,16 @@ ${jsonShapeLine}`;
       const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const nSl = slides.length;
+      const presentationRefineTextLimits = isPresentationRefine
+        ? presentationTextLimitsFromSlides(slides)
+        : null;
+      const presentationRefineLimitsBlock = isPresentationRefine
+        ? buildPresentationLimitsBlock(
+            { presentationTextLimits: presentationRefineTextLimits },
+            nSl,
+            [activeIdx],
+          )
+        : '';
       const isCultureSandwichSlide =
         isTendenciaCulturaPreset(creativePreset) && activeIdx > 0 && activeIdx < nSl - 1;
       const isPersoHybridRefineSlide =
@@ -3624,6 +3693,7 @@ Instrução de refinamento: ${instruction}
 REGRAS:
 ${voiceRefine}
 ${isPresentationRefine ? buildApresentacaoRefineHint(presentationPath) : ''}
+${presentationRefineLimitsBlock}
 ${isPresentationRefine ? '- Preserve bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Nunca invente fonte, número, unidade ou período.\n' : ''}
 ${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
 ${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset, slideIndex: activeIdx, slideCount: nSl })}
@@ -3640,6 +3710,19 @@ Retorne exatamente: ${singleJson}`,
       };
       if (typeof r.bodyAfterImage === 'string' && refineNeedsBodyAfter) {
         patch.bodyAfterImage = stripLeadingSlideCardLabel(String(r.bodyAfterImage).trim());
+      }
+      if (isPresentationRefine) {
+        const candidateSlides = slides.map((item, index) => (
+          index === activeIdx ? { ...item, ...patch } : item
+        ));
+        const currentSlideOnlyLimits = presentationRefineTextLimits.map((limits, index) => (
+          index === activeIdx ? limits : {}
+        ));
+        assertPresentationTextLimits(
+          candidateSlides,
+          currentSlideOnlyLimits,
+          'Refinamento',
+        );
       }
       if (activeProjectRef.current === projectId) updateSlide(patch);
     } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
@@ -3784,6 +3867,10 @@ ${isPresentationSummary
       const toneFromBrand = (brandToneIsReady(brand) && brand.useBrandVoice !== false)
         ? (brand.brandTone?.summary || brand.defaultTone || '').trim()
         : ((brand.defaultTone || '').trim() || 'direto e concreto');
+      const currentVisualPresetDef = resolvePresentationVisualPresetDefinition(
+        visualPreset,
+        visualPresets,
+      );
       return await handleGenerate({
         topic,
         count,
@@ -3803,12 +3890,12 @@ ${isPresentationSummary
         slideTextDensity: wantPresentation ? '1_2' : (announcement ? '1_5' : slideTextDensity),
         cardVisualStyle,
         visualPreset: wantPresentation
-          ? (visualPresets.find((item) => item.id === visualPreset)?.productKind === 'apresentacao'
-              ? visualPreset
+          ? (currentVisualPresetDef?.productKind === 'apresentacao'
+              ? currentVisualPresetDef.id
               : presentationRoute.suggestedVisualPreset)
-          : (visualPresets.find((item) => item.id === visualPreset)?.productKind === 'apresentacao'
+          : (currentVisualPresetDef?.productKind === 'apresentacao'
               ? DEFAULT_CAROUSEL_VISUAL_PRESET_ID
-              : visualPreset),
+              : (currentVisualPresetDef?.id || visualPreset)),
         presentationPath: selectedPresentationPath,
         fetchImagesNow: withImages && hasOpenAI,
       });
@@ -3872,6 +3959,15 @@ ${isPresentationSummary
       const refineAllWantsBody = refiningPresentation
         || isTendenciaCulturaPreset(creativePreset)
         || refineAllHybrid;
+      const presentationRefineTextLimits = refiningPresentation
+        ? presentationTextLimitsFromSlides(slides)
+        : null;
+      const presentationRefineLimitsBlock = refiningPresentation
+        ? buildPresentationLimitsBlock(
+            { presentationTextLimits: presentationRefineTextLimits },
+            slides.length,
+          )
+        : '';
       const ctx = slides.map((s, i) =>
         `${i + 1}. Título: "${s.title}" | Subtítulo: "${s.subtitle}"${
           refineAllWantsBody ? ` | bodyAfterImage: ${JSON.stringify(s.bodyAfterImage ?? '')}` : ''
@@ -3894,6 +3990,7 @@ Instrução: ${instruction}
 REGRAS:
 ${voiceBulk}
 ${buildApresentacaoRefineHint(presentationPath)}
+${presentationRefineLimitsBlock}
 - Mantenha exatamente ${slides.length} slides na mesma ordem e uma ideia central por slide.
 - Nos slides de conteúdo, escreva o título como conclusão sustentada pelo subtítulo ou pela evidência disponível.
 - Não invente números, fontes, resultados ou fatos ausentes do material.
@@ -3933,8 +4030,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
       throwIfGenerationCancelled(job.signal);
       if (!r?.slides?.length) throw new Error('IA não retornou slides');
       if (activeProjectRef.current !== projectId) return;
-      setSlides(prev => prev.map((s, i) => {
-        const total = prev.length;
+      const applyRefinedSlides = source => source.map((s, i) => {
+        const total = source.length;
         const isCultureSandwich =
           isTendenciaCulturaPreset(creativePreset) && i !== 0 && i !== total - 1;
         const isHybridSandwich =
@@ -3948,7 +4045,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
             ? { bodyAfterImage: stripLeadingSlideCardLabel(String(r.slides[i].bodyAfterImage).trim()) }
             : {}),
         };
-      }));
+      });
+      const refinedSlides = applyRefinedSlides(slides);
+      if (refiningPresentation) {
+        assertPresentationTextLimits(
+          refinedSlides,
+          presentationRefineTextLimits,
+          'Refinamento',
+        );
+      }
+      setSlides(prev => applyRefinedSlides(prev));
       toast('Todos os slides refinados', 'success');
     } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
     finally { job.finish(); setRefining(false); }

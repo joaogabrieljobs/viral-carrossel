@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as prompts from '../../src/utils/generation-prompts.js';
 import { buildGenerationTaskBlock } from '../../src/utils/style-kit.js';
 import { buildEditorialStrategyBlock } from '../../src/utils/editorial-strategy.js';
+import { buildPresentationDesignSystemPromptBlock } from '../../src/styles/presentation-presets.jsx';
 
 const src = readFileSync(
   fileURLToPath(new URL('../../ViralCarrossel.jsx', import.meta.url)),
@@ -58,6 +59,9 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     modoNarrativoBloco: cp === 'tendencia_cultura' ? 'Use apenas o PACOTE TENDÊNCIA/CULTURA' : prompts.GEN_MODE_BY_ID.editorial.method,
     tendenciaPackBlock: cp === 'tendencia_cultura' ? prompts.buildTendenciaCulturaPackBlock(count, density) : '',
     apresentacaoPackBlock: '',
+    apresentacaoDesignBlock: cp === 'apresentacao'
+      ? buildPresentationDesignSystemPromptBlock('presentation_executive_minimal')
+      : '',
     quickPackBlock: '',
     slideLayoutRules: prompts.buildGenerationSlideLayoutRules('editorial', cp, density, count),
     langLayer: prompts.buildGenerationLanguageLayer(cp, 'próximo', 'editorial'),
@@ -105,11 +109,46 @@ describe('montagem final dos prompts de texto', () => {
     }
   });
 
+  it('apresentação leva limites do padrão visual ao prompt final', () => {
+    const final = assembledPrompt('apresentacao', '1_1', 8);
+    expect(final).toContain('PADRÃO VISUAL DA APRESENTAÇÃO');
+    expect(final).toContain('Teto editorial');
+    expect(final).toContain('área de evidência visual');
+  });
+
+  it('a geração usa a definição efetiva e só cria imagem quando a composição exige', () => {
+    expect(src).toContain('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef)');
+    expect(src).toContain('resolvePresentationVisualPresetDefinition(\n      requestedVisualPreset');
+    expect(src).toContain('? requestedVisualPresetDef.id');
+    expect(src).toContain('compositionOverrides.presentationRequiresImage === true');
+    expect(src).toContain('presentationTextLimits = isPresentationGeneration');
+    expect(src).toContain('presentationTextLimits,\n      },');
+    expect(src).toContain('presentationDesignSystemId: isPresentationGeneration');
+    expect(src).toContain('effectiveVisualPresetDef?.sourceVersion || null');
+
+    const generatedSlides = src.slice(
+      src.indexOf('result.slides.map((s, i) => {'),
+      src.indexOf('if (isTendenciaCulturaPreset(cp))', src.indexOf('result.slides.map((s, i) => {')),
+    );
+    expect(generatedSlides.indexOf('const compositionOverrides'))
+      .toBeLessThan(generatedSlides.indexOf('compositionOverrides.presentationRequiresImage'));
+    expect(generatedSlides).toContain('Capas/divisores tipográficos continuam intencionalmente sem imagem');
+  });
+
   it('handlers conectam contexto completo, densidade por posição e legenda compartilhada', () => {
     const single = src.slice(src.indexOf('const refineSlide ='), src.indexOf('const generateCaption ='));
     const caption = src.slice(src.indexOf('const generateCaption ='), src.indexOf('// B1: Remix'));
+    const bulk = src.slice(src.indexOf('const refineAll ='), src.indexOf('// Aplica um template pronto'));
     expect(single).toContain('buildCarouselTextContext(slides)');
     expect(single).toContain('slideIndex: activeIdx, slideCount: nSl');
+    expect(single).toContain('presentationTextLimitsFromSlides(slides)');
+    expect(single).toContain('buildPresentationLimitsBlock(');
+    expect(single).toContain('assertPresentationTextLimits(');
+    expect(single.indexOf('assertPresentationTextLimits(')).toBeLessThan(single.indexOf('updateSlide(patch)'));
+    expect(bulk).toContain('presentationTextLimitsFromSlides(slides)');
+    expect(bulk).toContain('buildPresentationLimitsBlock(');
+    expect(bulk).toContain('assertPresentationTextLimits(');
+    expect(bulk.indexOf('assertPresentationTextLimits(')).toBeLessThan(bulk.indexOf('setSlides(prev => applyRefinedSlides(prev))'));
     expect(caption).toContain('buildCarouselTextContext(slides)');
     expect(caption).toContain('buildCaptionOutlineInstructions(mode, creativePreset)');
     expect(caption).not.toContain('8-12 linhas');

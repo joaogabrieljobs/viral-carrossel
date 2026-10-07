@@ -55,6 +55,8 @@ export const TITLE_FONTS = [
   { name:'Familjen',       val:'"Familjen Grotesk", sans-serif',      cat:'sans' },
   { name:'Bricolage',      val:'"Bricolage Grotesque", sans-serif',   cat:'sans' },
   { name:'Funnel',         val:'"Funnel Display", sans-serif',        cat:'sans' },
+  { name:'Archivo',        val:'"Archivo", sans-serif',               cat:'sans' },
+  { name:'IBM Plex Sans',  val:'"IBM Plex Sans", sans-serif',         cat:'sans' },
   // Display (impacto, headlines bombásticos)
   { name:'Bebas Neue',     val:'"Bebas Neue", sans-serif',            cat:'display' },
   { name:'Anton',          val:'"Anton", sans-serif',                 cat:'display' },
@@ -67,6 +69,7 @@ export const TITLE_FONTS = [
   { name:'Playfair',       val:'"Playfair Display", serif',           cat:'serif' },
   { name:'Fraunces',       val:'"Fraunces", serif',                   cat:'serif' },
   { name:'Cormorant',      val:'"Cormorant Garamond", serif',         cat:'serif' },
+  { name:'Cormorant Display', val:'"Cormorant", serif',               cat:'serif' },
   { name:'EB Garamond',    val:'"EB Garamond", serif',                cat:'serif' },
   { name:'Spectral',       val:'"Spectral", serif',                   cat:'serif' },
   { name:'Yeseva',         val:'"Yeseva One", serif',                 cat:'serif' },
@@ -75,6 +78,7 @@ export const TITLE_FONTS = [
   // Editorial / Mono
   { name:'Instrument',     val:'"Instrument Serif", serif',           cat:'editorial' },
   { name:'Major Mono',     val:'"Major Mono Display", monospace',     cat:'mono' },
+  { name:'JetBrains Mono', val:'"JetBrains Mono", monospace',         cat:'mono' },
 ];
 
 /**

@@ -132,6 +132,32 @@ describe('fluxo do modal de geração', () => {
     })).toBeNull();
   });
 
+  it('canonicaliza o sourceId de um padrão de apresentação importado', () => {
+    const imported = {
+      id: 'presentation_cinematic',
+      sourceId: 'pds.cinematic',
+      productKind: 'apresentacao',
+    };
+    expect(resolveInitialVisualPreset({
+      presets: [imported],
+      productKind: 'apresentacao',
+      defaultVisualPreset: 'pds.cinematic',
+    })).toBe('presentation_cinematic');
+  });
+
+  it('canonicaliza um alias humano de apresentação importada', () => {
+    const imported = {
+      id: 'presentation_cinematic',
+      sourceId: 'pds.cinematic',
+      productKind: 'apresentacao',
+    };
+    expect(resolveInitialVisualPreset({
+      presets: [imported],
+      productKind: 'apresentacao',
+      defaultVisualPreset: 'manifesto',
+    })).toBe('presentation_cinematic');
+  });
+
   it('nunca herda o pacote Apresentação ao abrir o fluxo de carrossel', () => {
     expect(resolveCreativePresetForProduct('apresentacao', 'carrossel')).toBe('livre');
     expect(resolveCreativePresetForProduct('tendencia_cultura', 'carrossel')).toBe('tendencia_cultura');

@@ -451,6 +451,7 @@ export function useLibrary({
           name: e.name || 'Importado',
           folderId: folderRemap.get(e.folderId) || '',
           importedAt: Date.now(),
+          doc: ensureDocShape(e.doc || {}),
         }, importedFolders));
         // As imagens vêm embutidas em data URL no backup. Passam para o
         // IndexedDB agora, senão voltariam a pesar no localStorage e seriam

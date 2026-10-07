@@ -773,11 +773,27 @@ export const PRESET_BRAND_SIGNATURE_KEYS = [
   // Estilo do subtítulo também é assinatura: sem isto o itálico do Cinematic e
   // o MAIÚSCULAS do Editorial sobreviviam ao trocar para o Minimal Clean.
   'subtitleVisible', 'subtitleWeight', 'subtitleCase', 'subtitleItalic',
+  'subtitleFont',
+  // Escala e ritmo também pertencem ao padrão. Sem limpar estes campos, sair
+  // de uma apresentação mantinha tamanhos 16:9 nos carrosséis seguintes.
+  'textTitleSize', 'textSubSize', 'textBodyAfterSize',
+  'textTitleWeight', 'textTitleCase',
+  'textTitleTracking', 'textSubTracking',
+  'textTitleLeading', 'textSubLeading',
+  // Tipografia de corpo existe nos padrões de apresentação. Deve sair
+  // junto com eles para não contaminar um carrossel ou o próximo preset.
+  'bodyWeight', 'textBodyTracking', 'textBodyLeading',
 ];
 
 /** Mesma lógica, nos campos que vivem no slide. */
 export const PRESET_SLIDE_SIGNATURE_KEYS = [
   'eyebrowText', 'strikethroughText', 'afterTitleText',
+  'bodyTracking', 'bodyLeading', 'bodyWeight',
+  'presentationGlass',
+  'presentationTitleSizeByComposition',
+  'presentationTitleLeadingByComposition',
+  'presentationTypographyByComposition',
+  'presentationAutofit',
 ];
 
 function resolveVisualPreset(presetId, presets = VISUAL_PRESETS) {
@@ -833,6 +849,20 @@ export function getSlideOverridesForPreset(presetId, presets = VISUAL_PRESETS) {
     composition: '',
     canvas: null,
     elementOffsets: {},
+    // Base tipográfica determinística antes dos defaults do preset. Garante
+    // que trocar de produto/padrão não herde a escala do slide anterior.
+    titleSize: preset?.brand?.textTitleSize ?? 100,
+    subSize: preset?.brand?.textSubSize ?? 100,
+    bodyAfterSize: preset?.brand?.textBodyAfterSize ?? 100,
+    titleTracking: preset?.brand?.textTitleTracking ?? 0,
+    subTracking: preset?.brand?.textSubTracking ?? 0,
+    titleLeading: preset?.brand?.textTitleLeading ?? 105,
+    subLeading: preset?.brand?.textSubLeading ?? 150,
+    titleWeight: clampTitleWeight(
+      preset?.brand?.titleFont,
+      preset?.brand?.textTitleWeight ?? 700,
+    ),
+    titleCase: preset?.brand?.textTitleCase ?? 'normal',
     ...reset,
     ...defaults,
   };

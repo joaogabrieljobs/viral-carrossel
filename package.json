@@ -6,6 +6,8 @@
   "description": "Gerador de carrosséis virais para Instagram com IA",
   "scripts": {
     "dev": "vite",
+    "build:presentation-design-system": "node scripts/build-presentation-design-system.mjs",
+    "prebuild": "npm run build:presentation-design-system",
     "build": "vite build",
     "preview": "vite preview --host",
     "test": "npm run check:undef && npm run check:props && vitest run",

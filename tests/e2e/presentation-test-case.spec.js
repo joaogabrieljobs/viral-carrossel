@@ -46,6 +46,17 @@ const deck = {
   caption: 'Deck executivo sobre testes e decisão.',
 };
 
+const fittedReview = {
+  edits: [
+    { slideIndex: 0, reason: 'Encaixar a capa', title: 'A/B testing para decidir', subtitle: 'Da hipótese à decisão confiável.' },
+    { slideIndex: 1, reason: 'Encaixar o argumento', title: 'Mapeie o funil antes da métrica', subtitle: 'Conecte jornada, sinal e impacto.' },
+    { slideIndex: 2, reason: 'Encaixar o dado', title: 'Testes inconclusivos começam na hipótese', subtitle: 'Defina mecanismo, público e limiar.' },
+    { slideIndex: 3, reason: 'Encaixar a evidência', title: 'Leia efeito, incerteza e custo juntos', subtitle: 'A evidência sustenta a decisão.' },
+    { slideIndex: 4, reason: 'Encaixar a aplicação', title: 'IA acelera sem eliminar julgamento', subtitle: 'Automatize e preserve o julgamento.' },
+    { slideIndex: 5, reason: 'Encaixar o encerramento', title: 'Defina o job e avance', subtitle: 'Marque a próxima revisão.' },
+  ],
+};
+
 async function useProfessionalControls(page) {
   await page.getByRole('button', { name: /Modo atual: Criar rápido/i }).click();
   await page.getByRole('menuitem', { name: /Controle profissional/i }).click();
@@ -99,7 +110,7 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
         const prompt = route.request().postDataJSON()?.payload?.messages
           ?.find((message) => message.role === 'user')?.content || '';
         return route.fulfill({
-          json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : deck),
+          json: completion(/^REVISÃO (?:EDITORIAL|DE APRESENTAÇÃO)/.test(prompt) ? fittedReview : deck),
         });
       },
       '/api/ai/sjinn-image': (route) => {
@@ -156,8 +167,16 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
     }
     const overflow = [];
     const widths = [];
+    const scales = [];
+    const overflowAtFloor = [];
     for (const card of cards) {
       widths.push(Math.round(card.getBoundingClientRect().width));
+      for (const scaler of card.querySelectorAll('[data-vc-overflow-scale]')) {
+        scales.push(Number(scaler.getAttribute('data-vc-overflow-scale')));
+        if (scaler.getAttribute('data-vc-overflow-at-floor') === 'true') {
+          overflowAtFloor.push(card.textContent?.slice(0, 36));
+        }
+      }
       for (const zone of card.querySelectorAll('div')) {
         const style = getComputedStyle(zone);
         if (style.overflow !== 'hidden') continue;
@@ -167,19 +186,34 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
         for (const child of zone.children) childrenHeight += child.offsetHeight || 0;
         const contentHeight = Math.max(zone.scrollHeight, Math.ceil(childrenHeight + padding));
         if (contentHeight > zone.clientHeight + 2) {
+          const heading = zone.querySelector('h1');
+          const headingStyle = heading ? getComputedStyle(heading) : null;
           overflow.push({
             slide: card.textContent?.slice(0, 36),
+            field: zone.getAttribute('data-vc-movable'),
+            scale: zone.getAttribute('data-vc-overflow-scale'),
+            floor: zone.getAttribute('data-vc-overflow-at-floor'),
             contentHeight,
             clientHeight: zone.clientHeight,
+            contentWidth: zone.clientWidth,
+            headingHeight: heading?.offsetHeight,
+            headingWidth: heading?.offsetWidth,
+            fontSize: headingStyle?.fontSize,
+            lineHeight: headingStyle?.lineHeight,
+            paddingLeft: style.paddingLeft,
+            paddingRight: style.paddingRight,
           });
         }
       }
     }
-    return { cardCount: cards.size, overflow, widths };
+    return { cardCount: cards.size, overflow, widths, scales, overflowAtFloor };
   });
 
   expect(geometry.cardCount).toBe(6);
   expect(geometry.overflow).toEqual([]);
+  expect(geometry.overflowAtFloor).toEqual([]);
+  expect(geometry.scales.length).toBeGreaterThan(0);
+  expect(Math.min(...geometry.scales)).toBeGreaterThanOrEqual(0.7);
   expect(Math.min(...geometry.widths)).toBeGreaterThanOrEqual(700);
 
   // Voltar à Home não pode redefinir uma apresentação como carrossel.

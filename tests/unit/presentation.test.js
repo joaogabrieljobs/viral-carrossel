@@ -175,6 +175,7 @@ describe('modo Apresentação', () => {
     expect(app).toContain('setLibraryOpen, toast, setError, visualPresets,');
     expect(libraryHook).toContain('presentationPresetId,\n          visualPresets,\n          { initialize: true }');
     expect(libraryHook).toContain('carouselPresetId,\n              visualPresets,\n              { fmt: baseSeed.fmt }');
+    expect(libraryHook).toContain('doc: ensureDocShape(e.doc || {})');
     expect(app).toContain("isApresentacaoPreset(creativePreset) ? 'livre'");
     expect(app).toContain("fmt: fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'");
     expect(app).toContain('const refineNeedsBodyAfter = isPresentationRefine ||');

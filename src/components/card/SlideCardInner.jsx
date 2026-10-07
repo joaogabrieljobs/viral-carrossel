@@ -66,6 +66,137 @@ function effectiveBodyFontFamily(brand) {
     : brand.bodyFont;
 }
 
+function effectiveSubtitleFontFamily(brand) {
+  if (!brand?.subtitleFont) return effectiveBodyFontFamily(brand);
+  return brand.subtitleFont;
+}
+
+function subtitleTextTransform(brand) {
+  if (brand?.subtitleCase === 'upper') return 'uppercase';
+  if (brand?.subtitleCase === 'lower') return 'lowercase';
+  return 'none';
+}
+
+function finiteNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function presentationTypographyToken(slide, field) {
+  const composition = String(slide?.presentationComposition || '').trim();
+  const token = slide?.presentationTypographyByComposition?.[composition]?.[field];
+  return token && typeof token === 'object' ? token : null;
+}
+
+function presentationTitleMetric(slide, mapField, fallbackField, fallback) {
+  const composition = String(slide?.presentationComposition || '').trim();
+  const mapped = finiteNumber(slide?.[mapField]?.[composition]);
+  if (mapped != null && mapped > 0) return mapped;
+  const direct = finiteNumber(slide?.[fallbackField]);
+  return direct != null && direct > 0 ? direct : fallback;
+}
+
+function presentationTitleSizePercent(slide) {
+  const mapped = finiteNumber(presentationTypographyToken(slide, 'title')?.sizePercent);
+  if (mapped != null && mapped > 0) return mapped;
+  return presentationTitleMetric(
+    slide,
+    'presentationTitleSizeByComposition',
+    'titleSize',
+    100,
+  );
+}
+
+function presentationTitleLeadingPercent(slide) {
+  const mapped = finiteNumber(presentationTypographyToken(slide, 'title')?.leadingPercent);
+  if (mapped != null && mapped > 0) return mapped;
+  return presentationTitleMetric(
+    slide,
+    'presentationTitleLeadingByComposition',
+    'titleLeading',
+    105,
+  );
+}
+
+function presentationSubtitleMetric(slide, field, fallback) {
+  const mapped = finiteNumber(presentationTypographyToken(slide, 'subtitle')?.[field]);
+  return mapped != null ? mapped : fallback;
+}
+
+function presentationCaseTransform(value, fallback = 'none') {
+  if (value === 'upper') return 'uppercase';
+  if (value === 'lower') return 'lowercase';
+  return value === 'normal' ? 'none' : fallback;
+}
+
+function bodyAfterSizePercent(slide, brand) {
+  return finiteNumber(slide?.bodyAfterSize)
+    ?? finiteNumber(brand?.textBodyAfterSize)
+    ?? finiteNumber(slide?.subSize)
+    ?? 100;
+}
+
+function bodyAfterLeading(slide, brand, fallback) {
+  const value = finiteNumber(slide?.bodyLeading) ?? finiteNumber(brand?.textBodyLeading);
+  return value != null ? value / 100 : fallback;
+}
+
+function bodyAfterWeight(slide, brand, fallback) {
+  return finiteNumber(slide?.bodyWeight) ?? finiteNumber(brand?.bodyWeight) ?? fallback;
+}
+
+function bodyAfterLetterSpacing(slide, brand, fallback) {
+  const control = finiteNumber(slide?.bodyTracking) ?? finiteNumber(brand?.textBodyTracking);
+  return control == null ? fallback : `${(-0.4 + control) / 100}em`;
+}
+
+/** Tokens glass importados pertencem à superfície de evidência do padrão
+ * Premium. Eles não reutilizam `textBg`, que é uma preferência do usuário
+ * para subtítulo/corpo e nunca deve transformar o título em painel. */
+function vcPresentationEvidenceGlassStyle(slide, f) {
+  const glass = slide?.presentationGlass;
+  if (!glass?.enabled) return {};
+  const composition = String(slide?.presentationComposition || '').trim();
+  if (!Array.isArray(glass.applyTo) || !glass.applyTo.includes(composition)) return {};
+  const blur = Math.max(0, Math.min(80, finiteNumber(glass.backdropBlur) ?? 0));
+  const radius = Math.max(0, Math.min(96, finiteNumber(glass.radius) ?? 0));
+  const shadows = [glass.boxShadow, glass.innerShadow].filter(Boolean).join(', ');
+  return {
+    background: glass.background || 'rgba(255,255,255,0.05)',
+    backdropFilter: `blur(${blur}px)`,
+    WebkitBackdropFilter: `blur(${blur}px)`,
+    border: glass.border || '1px solid rgba(255,255,255,0.12)',
+    borderRadius: radius * (f.w / 1920),
+    ...(shadows ? { boxShadow: shadows } : {}),
+  };
+}
+
+function presentationEvidenceGlassActive(slide) {
+  const composition = String(slide?.presentationComposition || '').trim();
+  return slide?.presentationGlass?.enabled === true
+    && Array.isArray(slide.presentationGlass.applyTo)
+    && slide.presentationGlass.applyTo.includes(composition);
+}
+
+/**
+ * O design system de apresentação fornece um piso editorial (normalmente
+ * 0.70–0.90). O renderer o trata como limite rígido; conteúdo maior precisa ser
+ * sintetizado na revisão editorial em vez de virar texto ilegível.
+ */
+function presentationAutofitSoftFloor(slide, fallback) {
+  if (slide?.presentationAutofit?.enabled === false) return fallback;
+  const value = Number(slide?.presentationAutofit?.minScale);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0.28, Math.min(1, value));
+}
+
+function strictPresentationAutofit(slide) {
+  return slide?.presentationAutofit?.enabled === true
+    && String(slide?.presentationPatternId || '').startsWith('pds.')
+    && String(slide?.presentationCompositionId || '').startsWith('presentation_')
+    && slide?.canvas?.source === 'presentation-preset';
+}
+
 const LAYOUT_POS_LAB_ROWS = [
   ['SUP.', 'ESQ.'], ['SUP.', 'CENTRO'], ['SUP.', 'DIR.'],
   ['MEIO', 'ESQ.'], ['MEIO', 'CENTRO'], ['MEIO', 'DIR.'],
@@ -294,17 +425,28 @@ function vcFooterOrnamentReservePx(brand, f) {
 }
 
 /** Reforço de padding lateral em zonas texto canvas — tracking negativo + fontes grandes “comem” a margem antes do padding nominal. */
+function usesImportedPresentationGeometry(slide) {
+  return slide?.canvas?.source === 'presentation-preset'
+    && slide?.canvas?.preserveZones !== false;
+}
+
 function canvasClassicTitlePaddingXPx(f, slide) {
+  // As caixas importadas do PDS já são caixas de conteúdo, com margens e
+  // safe-area embutidas nas coordenadas. Reaplicar o `textInset` do editor
+  // dentro delas removia até 208 px da largura e transformava títulos de duas
+  // linhas em três ou quatro linhas.
+  if (usesImportedPresentationGeometry(slide)) return f.w * 0.006;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.34;
   const lsEm = ((-3 + (slide.titleTracking ?? 0)) / 100);
-  const fsPx = f.w * 0.084 * ((slide.titleSize ?? 100) / 100);
+  const fsPx = f.w * 0.084 * (presentationTitleSizePercent(slide) / 100);
   const bleed = lsEm < 0 ? (-lsEm) * fsPx * 1.75 : fsPx * 0.048;
   return Math.max(base, gutter + base * 0.12, base + bleed, f.w * 0.024);
 }
 
 function canvasClassicSubtitlePaddingXPx(f, slide) {
+  if (usesImportedPresentationGeometry(slide)) return f.w * 0.006;
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const gutter = (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.3;
@@ -314,11 +456,17 @@ function canvasClassicSubtitlePaddingXPx(f, slide) {
   return Math.max(base, gutter + base * 0.1, base + bleed, f.w * 0.021);
 }
 
+function canvasClassicTextPaddingYPx(f, slide) {
+  if (usesImportedPresentationGeometry(slide)) return f.h * 0.006;
+  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
+  return f.h * (0.006 + insetZn * 0.002);
+}
+
 function canvasCultureSandwichPaddingXPx(f, slide) {
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const tLs = ((-2.4 + (slide.titleTracking ?? 0)) / 100);
-  const tFs = f.w * 0.036 * ((slide.titleSize ?? 100) / 100);
+  const tFs = f.w * 0.036 * (presentationTitleSizePercent(slide) / 100);
   const sLs = ((-1 + (slide.subTracking ?? 0)) / 100);
   const sFs = f.w * 0.031 * ((slide.subSize ?? 100) / 100);
   const bT = tLs < 0 ? (-tLs) * tFs * 1.55 + tFs * 0.05 : tFs * 0.048;
@@ -330,7 +478,7 @@ function canvasCultureSandwichBottomPaddingXPx(f, slide) {
   const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const base = f.w * (0.012 + insetZn * 0.004);
   const ls = ((-1 + (slide.subTracking ?? 0)) / 100);
-  const fsPx = f.w * 0.029 * (((slide.bodyAfterSize ?? slide.subSize) ?? 100) / 100);
+  const fsPx = f.w * 0.029 * (bodyAfterSizePercent(slide) / 100);
   const bleed = ls < 0 ? (-ls) * fsPx * 1.45 : fsPx * 0.055;
   return Math.max(base, (f.w * CANVAS_AUTO_EDGE_PCT) / 100 * 0.28, base + bleed, f.w * 0.021);
 }
@@ -347,6 +495,7 @@ const ClassicCanvasInner = React.forwardRef(({
   bg,
   titleFF,
   bodyFF,
+  subtitleFF,
   isBebas,
   culture,
   cultureAccentCol,
@@ -386,10 +535,31 @@ const ClassicCanvasInner = React.forwardRef(({
   );
   const zcv = slide.canvas.zones;
   const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || DEFAULT_LAYOUT;
-  const insetZn = slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET;
   const padTitleXp = canvasClassicTitlePaddingXPx(f, slide);
   const padSubtitleXp = canvasClassicSubtitlePaddingXPx(f, slide);
-  const padYZn = f.h * (0.006 + insetZn * 0.002);
+  const padYZn = canvasClassicTextPaddingYPx(f, slide);
+  const titleTypography = presentationTypographyToken(slide, 'title');
+  const subtitleTypography = presentationTypographyToken(slide, 'subtitle');
+  const resolvedTitleFF = titleTypography?.fontFamily || titleFF;
+  const resolvedSubtitleFF = subtitleTypography?.fontFamily || subtitleFF;
+  const resolvedTitleWeight = finiteNumber(titleTypography?.weight) ?? slide.titleWeight ?? 800;
+  const resolvedSubtitleWeight = finiteNumber(subtitleTypography?.weight) ?? brand.subtitleWeight ?? 400;
+  const resolvedTitleTracking = finiteNumber(titleTypography?.tracking) ?? slide.titleTracking ?? 0;
+  const resolvedSubtitleTracking = finiteNumber(subtitleTypography?.tracking) ?? slide.subTracking ?? 0;
+  const resolvedSubtitleSize = presentationSubtitleMetric(slide, 'sizePercent', slide.subSize ?? 100);
+  const resolvedSubtitleLeading = presentationSubtitleMetric(slide, 'leadingPercent', slide.subLeading ?? 150);
+  const resolvedTitleTransform = presentationCaseTransform(
+    titleTypography?.case,
+    slide.titleCase === 'upper' ? 'uppercase' : slide.titleCase === 'lower' ? 'lowercase' : 'none',
+  );
+  const resolvedSubtitleTransform = presentationCaseTransform(
+    subtitleTypography?.case,
+    subtitleTextTransform(brand),
+  );
+  const resolvedTitleItalic = titleTypography?.italic === true;
+  const resolvedSubtitleItalic = subtitleTypography
+    ? subtitleTypography.italic === true
+    : brand.subtitleItalic === true;
   const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
   const tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
   const sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
@@ -408,7 +578,14 @@ const ClassicCanvasInner = React.forwardRef(({
   const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
-  const photoZoneBoxStyle = { ...pctBox(pr, f), zIndex: 2, overflow: 'hidden', position: 'relative' };
+  const evidenceGlassActive = presentationEvidenceGlassActive(slide);
+  const photoZoneBoxStyle = {
+    ...pctBox(pr, f),
+    zIndex: 2,
+    overflow: 'hidden',
+    position: 'relative',
+    ...vcPresentationEvidenceGlassStyle(slide, f),
+  };
   const photoZoneChildren = (
     <>
         {slide.bgImage && imgReady && !imgErr && (
@@ -481,6 +658,7 @@ const ClassicCanvasInner = React.forwardRef(({
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <div
         {...movOu('photo', photoZoneBoxStyle)}
+        data-vc-presentation-glass={evidenceGlassActive ? 'evidence' : undefined}
         onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
         role={photoZoneInteractive && !photoZoneNativeHit ? 'button' : undefined}
       >
@@ -513,8 +691,14 @@ const ClassicCanvasInner = React.forwardRef(({
           background: 'transparent',
           padding: `${padYZn}px ${padTitleXp}px`,
         }}
-        deps={[slide.title, slide.titleSize, tr.w, tr.h, f.w, f.h, slide.titleLeading]}
-        minScale={0.45}
+        deps={[
+          slide.title, presentationTitleSizePercent(slide), tr.w, tr.h, f.w, f.h,
+          presentationTitleLeadingPercent(slide), resolvedTitleFF, resolvedTitleWeight,
+          resolvedTitleTracking, resolvedTitleTransform, resolvedTitleItalic,
+          slide.presentationAutofit?.minScale,
+        ]}
+        minScale={presentationAutofitSoftFloor(slide, 0.45)}
+        strictMinScale={strictPresentationAutofit(slide)}
         hardMinScale={showSupportingText ? 0.32 : 0.45}
       >
         {(titleScale) => (
@@ -531,23 +715,25 @@ const ClassicCanvasInner = React.forwardRef(({
         >
         <InlineEditableText as="h1" value={slide.title} onCommit={(text) => onInlineTextChange?.('title', text)} elementProps={{ style: {
           color: titleInk,
-          fontFamily: titleFF,
-          fontSize: f.w * 0.084 * (slide.titleSize / 100) * titleScale,
-          lineHeight: (slide.titleLeading ?? 105) / 100,
+          fontFamily: resolvedTitleFF,
+          fontSize: f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
+          lineHeight: presentationTitleLeadingPercent(slide) / 100,
           position: 'relative',
-          paddingTop: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100) * titleScale, slide.titleLeading),
+          paddingTop: vcTitleOvershootShift(
+            f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
+            presentationTitleLeadingPercent(slide),
+          ),
           boxSizing: 'content-box',
-          fontWeight: slide.titleWeight ?? 800,
-          letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
+          fontWeight: resolvedTitleWeight,
+          letterSpacing: `${(-3 + resolvedTitleTracking) / 100}em`,
           margin: 0,
           overflowWrap: 'break-word',
           wordBreak: 'normal',
+          textWrap: 'balance',
           maxWidth: '100%',
           width: '100%',
-          textTransform:
-            slide.titleCase === 'upper' ? 'uppercase' :
-            slide.titleCase === 'lower' ? 'lowercase' :
-            isBebas ? 'uppercase' : 'none',
+          textTransform: titleTypography ? resolvedTitleTransform : (isBebas ? 'uppercase' : resolvedTitleTransform),
+          fontStyle: resolvedTitleItalic ? 'italic' : 'normal',
           textShadow: shadow,
         } }}>{culture ? (
           <CultureInlineRich
@@ -555,11 +741,11 @@ const ClassicCanvasInner = React.forwardRef(({
             destaqueSpans={slide.destaqueSpans?.title}
             baseColor={titleInk}
             accentColor={cultureAccentCol}
-            fontFamily={titleFF}
-            fontSize={f.w * 0.084 * (slide.titleSize / 100) * titleScale}
-            lineHeight={(slide.titleLeading ?? 105) / 100}
-            fontWeight={slide.titleWeight ?? 800}
-            letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
+            fontFamily={resolvedTitleFF}
+            fontSize={f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale}
+            lineHeight={presentationTitleLeadingPercent(slide) / 100}
+            fontWeight={resolvedTitleWeight}
+            letterSpacing={`${(-3 + resolvedTitleTracking) / 100}em`}
           />
         ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</InlineEditableText>
         </div>
@@ -591,8 +777,17 @@ const ClassicCanvasInner = React.forwardRef(({
           f.w,
           f.h,
           slide.subLeading,
+          resolvedSubtitleFF,
+          resolvedSubtitleSize,
+          resolvedSubtitleLeading,
+          resolvedSubtitleWeight,
+          resolvedSubtitleTracking,
+          resolvedSubtitleTransform,
+          resolvedSubtitleItalic,
+          slide.presentationAutofit?.minScale,
         ]}
-        minScale={0.62}
+        minScale={presentationAutofitSoftFloor(slide, 0.62)}
+        strictMinScale={strictPresentationAutofit(slide)}
         hardMinScale={showSupportingText ? 0.45 : 0.62}
       >
         {(subScale) => (
@@ -612,35 +807,43 @@ const ClassicCanvasInner = React.forwardRef(({
         >
         {slide.subtitle && brand.subtitleVisible !== false && (
           culture ? (
-            <div style={{ letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`, textShadow: shadow, width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
+            <div style={{
+              letterSpacing: `${(-1 + resolvedSubtitleTracking) / 100}em`,
+              textShadow: shadow,
+              textTransform: resolvedSubtitleTransform,
+              fontStyle: resolvedSubtitleItalic ? 'italic' : 'normal',
+              width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
+            }}>
               <CultureRichParagraphs
                 text={slide.subtitle}
                 destaqueSpans={slide.destaqueSpans?.subtitle}
                 ink={bodyInk}
                 accentColor={cultureAccentCol}
-                fontFamily={bodyFF}
-                fontSize={f.w * 0.028 * (slide.subSize / 100) * subScale}
-                lineHeight={(slide.subLeading ?? 150) / 100}
-                fontWeight={400}
-                letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+                fontFamily={resolvedSubtitleFF}
+                fontSize={f.w * 0.028 * (resolvedSubtitleSize / 100) * subScale}
+                lineHeight={resolvedSubtitleLeading / 100}
+                fontWeight={resolvedSubtitleWeight}
+                letterSpacing={`${(-1 + resolvedSubtitleTracking) / 100}em`}
                 paraGap={f.h * 0.010 * subScale}
               />
             </div>
           ) : (
             <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => onInlineTextChange?.('subtitle', text)} elementProps={{ style: {
               color: bodyInk,
-              fontFamily: bodyFF,
-              fontSize: f.w * 0.028 * (slide.subSize / 100) * subScale,
-              lineHeight: (slide.subLeading ?? 150) / 100,
-              fontWeight: 400,
+              fontFamily: resolvedSubtitleFF,
+              fontSize: f.w * 0.028 * (resolvedSubtitleSize / 100) * subScale,
+              lineHeight: resolvedSubtitleLeading / 100,
+              fontWeight: resolvedSubtitleWeight,
               margin: 0,
               overflowWrap: 'break-word',
               wordBreak: 'normal',
               maxWidth: '100%',
               width: '100%',
               boxSizing: 'border-box',
-              letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+              letterSpacing: `${(-1 + resolvedSubtitleTracking) / 100}em`,
               textShadow: shadow,
+              textTransform: resolvedSubtitleTransform,
+              fontStyle: resolvedSubtitleItalic ? 'italic' : 'normal',
             } }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
           )
         )}
@@ -652,9 +855,9 @@ const ClassicCanvasInner = React.forwardRef(({
             elementProps={movOu('bodyAfterImage', {
               color: bodyInk,
               fontFamily: bodyFF,
-              fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * subScale,
-              lineHeight: 1.35,
-              fontWeight: 500,
+              fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100) * subScale,
+              lineHeight: bodyAfterLeading(slide, brand, 1.35),
+              fontWeight: bodyAfterWeight(slide, brand, 500),
               margin: slide.subtitle && brand.subtitleVisible !== false
                 ? `${f.h * 0.018 * subScale}px 0 0`
                 : 0,
@@ -663,7 +866,11 @@ const ClassicCanvasInner = React.forwardRef(({
               maxWidth: '100%',
               width: '100%',
               boxSizing: 'border-box',
-              letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+              letterSpacing: bodyAfterLetterSpacing(
+                slide,
+                brand,
+                `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+              ),
               opacity: 0.82,
               textShadow: shadow,
             })}
@@ -807,6 +1014,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   isBebas,
   titleFF,
   bodyFF,
+  subtitleFF,
   displayTitleInk,
   displayBodyInk,
   cultureRichText,
@@ -873,10 +1081,13 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   const titleEl = (
     <h1 style={{
       color: displayTitleInk, fontFamily: titleFF,
-      fontSize: f.w * 0.084 * (slide.titleSize / 100),
-      lineHeight: (slide.titleLeading ?? 105) / 100,
+      fontSize: f.w * 0.084 * (presentationTitleSizePercent(slide) / 100),
+      lineHeight: presentationTitleLeadingPercent(slide) / 100,
       position: 'relative',
-      paddingTop: vcTitleOvershootShift(f.w * 0.084 * (slide.titleSize / 100), slide.titleLeading),
+      paddingTop: vcTitleOvershootShift(
+        f.w * 0.084 * (presentationTitleSizePercent(slide) / 100),
+        presentationTitleLeadingPercent(slide),
+      ),
       boxSizing: 'content-box',
       fontWeight: slide.titleWeight ?? 800,
       letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,
@@ -893,8 +1104,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         baseColor={displayTitleInk}
         accentColor={cultureAccentCol}
         fontFamily={titleFF}
-        fontSize={f.w * 0.084 * (slide.titleSize / 100)}
-        lineHeight={(slide.titleLeading ?? 105) / 100}
+        fontSize={f.w * 0.084 * (presentationTitleSizePercent(slide) / 100)}
+        lineHeight={presentationTitleLeadingPercent(slide) / 100}
         fontWeight={slide.titleWeight ?? 800}
         letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
       />
@@ -912,28 +1123,32 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         maxWidth: '100%',
         letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
         textShadow: shadow,
+        textTransform: subtitleTextTransform(brand),
+        fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
       }}>
         <CultureRichParagraphs
           text={slide.subtitle}
           destaqueSpans={slide.destaqueSpans?.subtitle}
           ink={displayBodyInk}
           accentColor={cultureAccentCol}
-          fontFamily={bodyFF}
+          fontFamily={subtitleFF}
           fontSize={f.w * 0.028 * (slide.subSize / 100)}
           lineHeight={(slide.subLeading ?? 150) / 100}
-          fontWeight={400}
+          fontWeight={brand.subtitleWeight ?? 400}
           letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
           paraGap={f.h * 0.010}
         />
       </div>
     ) : (
       <p style={{
-        color: displayBodyInk, fontFamily: bodyFF,
+        color: displayBodyInk, fontFamily: subtitleFF,
         fontSize: f.w * 0.028 * (slide.subSize / 100),
         lineHeight: (slide.subLeading ?? 150) / 100,
-        fontWeight: 400, margin: 0,
+        fontWeight: brand.subtitleWeight ?? 400, margin: 0,
         letterSpacing: `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
         textShadow: shadow,
+        textTransform: subtitleTextTransform(brand),
+        fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
       }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
     )
   ) : null;
@@ -947,11 +1162,15 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       elementProps={movOu('bodyAfterImage', {
         color: displayBodyInk,
         fontFamily: bodyFF,
-        fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100),
-        lineHeight: 1.35,
-        fontWeight: 500,
+        fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100),
+        lineHeight: bodyAfterLeading(slide, brand, 1.35),
+        fontWeight: bodyAfterWeight(slide, brand, 500),
         margin: 0,
-        letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+        letterSpacing: bodyAfterLetterSpacing(
+          slide,
+          brand,
+          `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+        ),
         opacity: 0.82,
         textShadow: shadow,
         maxWidth: '100%',
@@ -1416,6 +1635,7 @@ const SlideCardInner = React.forwardRef(({
 
   const titleFF = effectiveTitleFontFamily(brand);
   const bodyFF = effectiveBodyFontFamily(brand);
+  const subtitleFF = effectiveSubtitleFontFamily(brand);
 
   const culturePack = creativePreset === 'tendencia_cultura';
   const sandwichSkin = culturePack || !!slide.useCultureLayout;
@@ -1738,8 +1958,14 @@ const SlideCardInner = React.forwardRef(({
             alignItems: Lzn.ai,
             textAlign: slide.align === 'justify' ? 'left' : slide.align,
           }}
-          deps={[slide.title, slide.subtitle, slide.titleSize, slide.subSize, topR.w, topR.h, f.w, f.h, elementsUnlocked]}
-          minScale={AUTOFIT_MIN_SCALE}
+          deps={[
+            slide.title, slide.subtitle, presentationTitleSizePercent(slide), slide.subSize,
+            topR.w, topR.h, f.w, f.h, elementsUnlocked,
+            slide.presentationAutofit?.minScale,
+          ]}
+          minScale={presentationAutofitSoftFloor(slide, AUTOFIT_MIN_SCALE)}
+          strictMinScale={strictPresentationAutofit(slide)}
+          hardMinScale={AUTOFIT_MIN_SCALE}
         >
           {(topScale) => (
           <div
@@ -1773,8 +1999,8 @@ const SlideCardInner = React.forwardRef(({
                 baseColor={cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
-                fontSize={f.w * 0.036 * (slide.titleSize / 100) * topScale}
-                lineHeight={(slide.titleLeading ?? 105) / 100}
+                fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * topScale}
+                lineHeight={presentationTitleLeadingPercent(slide) / 100}
                 fontWeight={slide.titleWeight ?? 600}
                 letterSpacing={`${(-2.4 + (slide.titleTracking ?? 0)) / 100}em`}
               />
@@ -1785,13 +2011,16 @@ const SlideCardInner = React.forwardRef(({
             destaqueSpans={slide.destaqueSpans?.subtitle}
             ink={cr.subtitleInk}
             accentColor={cr.accentInk}
-            fontFamily={bodyFF}
+            fontFamily={subtitleFF}
             fontSize={f.w * 0.031 * (slide.subSize / 100) * topScale}
-            lineHeight={(slide.subLeading ?? 142) / 100}
-            fontWeight={600}
+            lineHeight={(slide.subLeading ?? 150) / 100}
+            fontWeight={brand.subtitleWeight ?? 600}
             letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
             paraGap={f.h * 0.012 * topScale}
-            paragraphProps={elementsUnlocked ? mov('subtitle') : null}
+            paragraphProps={movSeparate('subtitle', {
+              textTransform: subtitleTextTransform(brand),
+              fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
+            })}
           />
           </div>
           )}
@@ -1892,8 +2121,13 @@ const SlideCardInner = React.forwardRef(({
             alignItems: Lzn.ai,
             textAlign: slide.align === 'justify' ? 'left' : slide.align,
           }}
-          deps={[bodyAfterCulture, slide.bodyAfterSize, slide.subSize, botR.w, botR.h, f.w, f.h]}
-          minScale={AUTOFIT_MIN_SCALE}
+          deps={[
+            bodyAfterCulture, slide.bodyAfterSize, slide.subSize,
+            botR.w, botR.h, f.w, f.h, slide.presentationAutofit?.minScale,
+          ]}
+          minScale={presentationAutofitSoftFloor(slide, AUTOFIT_MIN_SCALE)}
+          strictMinScale={strictPresentationAutofit(slide)}
+          hardMinScale={AUTOFIT_MIN_SCALE}
         >
           {(botScale) => (
           <CultureRichParagraphs
@@ -1902,10 +2136,14 @@ const SlideCardInner = React.forwardRef(({
             ink={cr.bodyInk}
             accentColor={cr.accentInk}
             fontFamily={bodyFF}
-            fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * botScale}
-            lineHeight={(slide.subLeading ?? 145) / 100}
-            fontWeight={600}
-            letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
+            fontSize={f.w * 0.029 * (bodyAfterSizePercent(slide, brand) / 100) * botScale}
+            lineHeight={bodyAfterLeading(slide, brand, (slide.subLeading ?? 145) / 100)}
+            fontWeight={bodyAfterWeight(slide, brand, 600)}
+            letterSpacing={bodyAfterLetterSpacing(
+              slide,
+              brand,
+              `${(-1 + (slide.subTracking ?? 0)) / 100}em`,
+            )}
             paraGap={f.h * 0.01 * botScale}
           />
           )}
@@ -2047,10 +2285,13 @@ const SlideCardInner = React.forwardRef(({
           }}
           deps={[
             slide.title, slide.subtitle, bodyAfterCulture,
-            f.w, f.h, slide.titleSize, slide.subSize, slide.bodyAfterSize,
+            f.w, f.h, presentationTitleSizePercent(slide), slide.subSize, slide.bodyAfterSize,
             sandwich, !!slide.bgImage, elementsUnlocked,
+            slide.presentationAutofit?.minScale,
           ]}
-          minScale={0.78}
+          minScale={presentationAutofitSoftFloor(slide, 0.78)}
+          strictMinScale={strictPresentationAutofit(slide)}
+          hardMinScale={0.78}
         >
           {(scale) => (<>
           {(slide.title || '').trim() ? (
@@ -2070,10 +2311,10 @@ const SlideCardInner = React.forwardRef(({
                 baseColor={cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
-                fontSize={f.w * 0.036 * ((slide.titleSize ?? 100) / 100) * scale}
-                lineHeight={1.14}
-                fontWeight={600}
-                letterSpacing="-0.024em"
+                fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * scale}
+                lineHeight={presentationTitleLeadingPercent(slide) / 100}
+                fontWeight={slide.titleWeight ?? 600}
+                letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
               />
             </InlineEditableText>
           ) : null}
@@ -2081,17 +2322,19 @@ const SlideCardInner = React.forwardRef(({
             ...vcTextGlassSurfaceStyle(slide, f),
             padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
             width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box',
+            textTransform: subtitleTextTransform(brand),
+            fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
           }}>
             <CultureRichParagraphs
               text={slide.subtitle}
               destaqueSpans={slide.destaqueSpans?.subtitle}
               ink={cr.subtitleInk}
               accentColor={cr.accentInk}
-              fontFamily={bodyFF}
+              fontFamily={subtitleFF}
               fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
-              lineHeight={1.42}
-              fontWeight={600}
-              letterSpacing="-0.018em"
+              lineHeight={(slide.subLeading ?? 150) / 100}
+              fontWeight={brand.subtitleWeight ?? 600}
+              letterSpacing={`${(-1 + (slide.subTracking ?? 0)) / 100}em`}
               paraGap={f.h*0.012}
               paragraphProps={elementsUnlocked ? mov('subtitle') : null}
             />
@@ -2229,10 +2472,10 @@ const SlideCardInner = React.forwardRef(({
               ink={cr.bodyInk}
               accentColor={cr.accentInk}
               fontFamily={bodyFF}
-              fontSize={f.w * 0.029 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100) * scale}
-              lineHeight={1.45}
-              fontWeight={600}
-              letterSpacing="-0.016em"
+              fontSize={f.w * 0.029 * (bodyAfterSizePercent(slide, brand) / 100) * scale}
+              lineHeight={bodyAfterLeading(slide, brand, 1.45)}
+              fontWeight={bodyAfterWeight(slide, brand, 600)}
+              letterSpacing={bodyAfterLetterSpacing(slide, brand, '-0.016em')}
               paraGap={f.h*0.01}
             />
           </div>
@@ -2306,6 +2549,7 @@ const SlideCardInner = React.forwardRef(({
         bg={bg}
         titleFF={titleFF}
         bodyFF={bodyFF}
+        subtitleFF={subtitleFF}
         isBebas={isBebas}
         culture={cultureRichText}
         cultureAccentCol={cultureAccentCol}
@@ -2352,6 +2596,7 @@ const SlideCardInner = React.forwardRef(({
         isBebas={isBebas}
         titleFF={titleFF}
         bodyFF={bodyFF}
+        subtitleFF={subtitleFF}
         displayTitleInk={displayTitleInk}
         displayBodyInk={displayBodyInk}
         cultureRichText={cultureRichText}
@@ -2659,11 +2904,14 @@ const SlideCardInner = React.forwardRef(({
               )}
               <InlineEditableText as="h1" value={slide.title} onCommit={(text) => commitInlineText('title', text)} elementProps={mov('title', {
                 color: displayTitleInk, fontFamily: titleFF,
-                fontSize:f.w*0.084*(slide.titleSize/100),
-                lineHeight:(slide.titleLeading ?? 105)/100,
+                fontSize:f.w*0.084*(presentationTitleSizePercent(slide)/100),
+                lineHeight:presentationTitleLeadingPercent(slide)/100,
                 position: 'relative',
                 // Preferir padding (html2canvas respeita) em vez de só `top`.
-                paddingTop: vcTitleOvershootShift(f.w*0.084*(slide.titleSize/100), slide.titleLeading),
+                paddingTop: vcTitleOvershootShift(
+                  f.w*0.084*(presentationTitleSizePercent(slide)/100),
+                  presentationTitleLeadingPercent(slide),
+                ),
                 boxSizing: 'content-box',
                 fontWeight:slide.titleWeight ?? 800,
                 // tracking em centi-em: default -3 (-0.03em). User pode ir de -10 a +30 → -0.13em a +0.27em
@@ -2681,8 +2929,8 @@ const SlideCardInner = React.forwardRef(({
                   baseColor={displayTitleInk}
                   accentColor={cultureAccentCol}
                   fontFamily={titleFF}
-                  fontSize={f.w*0.084*(slide.titleSize/100)}
-                  lineHeight={(slide.titleLeading ?? 105)/100}
+                  fontSize={f.w*0.084*(presentationTitleSizePercent(slide)/100)}
+                  lineHeight={presentationTitleLeadingPercent(slide)/100}
                   fontWeight={slide.titleWeight ?? 800}
                   letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
                 />
@@ -2697,6 +2945,8 @@ const SlideCardInner = React.forwardRef(({
                     maxWidth:'100%',
                     letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                     textShadow: shadow,
+                    textTransform: subtitleTextTransform(brand),
+                    fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
                     ...vcTextGlassSurfaceStyle(slide, f),
                     padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
                     width: 'fit-content',
@@ -2706,7 +2956,7 @@ const SlideCardInner = React.forwardRef(({
                       destaqueSpans={slide.destaqueSpans?.subtitle}
                       ink={displayBodyInk}
                       accentColor={cultureAccentCol}
-                      fontFamily={bodyFF}
+                      fontFamily={subtitleFF}
                       fontSize={f.w*0.028*(slide.subSize/100)}
                       lineHeight={(slide.subLeading ?? 150)/100}
                       fontWeight={brand.subtitleWeight ?? 400}
@@ -2716,15 +2966,14 @@ const SlideCardInner = React.forwardRef(({
                   </InlineEditableText>
                 ) : (
                 <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => commitInlineText('subtitle', text)} elementProps={mov('subtitle', {
-                  color: displayBodyInk, fontFamily: bodyFF,
+                  color: displayBodyInk, fontFamily: subtitleFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight: brand.subtitleWeight ?? 400,
                   margin:0,
                   letterSpacing:`${(-1 + (slide.subTracking ?? 0)) / 100}em`,
                   textShadow: shadow,
-                  textTransform: brand.subtitleCase === 'upper' ? 'uppercase'
-                    : brand.subtitleCase === 'lower' ? 'lowercase' : 'none',
+                  textTransform: subtitleTextTransform(brand),
                   fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
                   ...vcTextGlassSurfaceStyle(slide, f),
                   padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
@@ -2740,11 +2989,15 @@ const SlideCardInner = React.forwardRef(({
                   elementProps={mov('bodyAfterImage', {
                     color: displayBodyInk,
                     fontFamily: bodyFF,
-                    fontSize: f.w * 0.018 * ((slide.bodyAfterSize ?? slide.subSize ?? 100) / 100),
-                    lineHeight: 1.35,
-                    fontWeight: 500,
+                    fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100),
+                    lineHeight: bodyAfterLeading(slide, brand, 1.35),
+                    fontWeight: bodyAfterWeight(slide, brand, 500),
                     margin: 0,
-                    letterSpacing: `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+                    letterSpacing: bodyAfterLetterSpacing(
+                      slide,
+                      brand,
+                      `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
+                    ),
                     opacity: 0.82,
                     textShadow: shadow,
                     maxWidth: '100%',
@@ -2954,6 +3207,17 @@ export {
   cultureDarkBackdropFromBrand,
   vcCustomBodyFace,
   effectiveBodyFontFamily,
+  effectiveSubtitleFontFamily,
+  presentationTypographyToken,
+  presentationAutofitSoftFloor,
+  strictPresentationAutofit,
+  presentationTitleSizePercent,
+  presentationTitleLeadingPercent,
+  bodyAfterSizePercent,
+  bodyAfterLeading,
+  bodyAfterWeight,
+  bodyAfterLetterSpacing,
+  vcPresentationEvidenceGlassStyle,
   LAYOUT_POS_LAB_ROWS,
   LAYOUTS,
   DEFAULT_LAYOUT,
@@ -2966,6 +3230,7 @@ export {
   VC_TEXT_ZONE_STYLE,
   canvasClassicTitlePaddingXPx,
   canvasClassicSubtitlePaddingXPx,
+  canvasClassicTextPaddingYPx,
   canvasCultureSandwichPaddingXPx,
   canvasCultureSandwichBottomPaddingXPx,
   ClassicCanvasInner,

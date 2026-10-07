@@ -170,6 +170,7 @@ function CultureRichParagraphs({
 //     deps={[title, subtitle, body]}
 //     minScale={0.7}
 //     hardMinScale={0.48}
+//     strictMinScale
 //   >
 //     {(scale) => (<>... fontSize={baseSize * scale} ...</>)}
 //   </OverflowScaler>
@@ -212,14 +213,21 @@ function nextOverflowScale({
   minScale = AUTOFIT_MIN_SCALE,
   hardMinScale = minScale,
   absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+  strictMinScale = false,
 }) {
-  const current = overflowScaleFloor(currentScale, 1);
   const softFloor = overflowScaleFloor(minScale, AUTOFIT_MIN_SCALE);
-  const hardFloor = Math.min(softFloor, overflowScaleFloor(hardMinScale, softFloor));
-  const absoluteFloor = Math.min(
-    hardFloor,
-    overflowScaleFloor(absoluteMinScale, OVERFLOW_ABSOLUTE_MIN_SCALE),
-  );
+  const current = strictMinScale
+    ? Math.max(softFloor, overflowScaleFloor(currentScale, 1))
+    : overflowScaleFloor(currentScale, 1);
+  const hardFloor = strictMinScale
+    ? softFloor
+    : Math.min(softFloor, overflowScaleFloor(hardMinScale, softFloor));
+  const absoluteFloor = strictMinScale
+    ? softFloor
+    : Math.min(
+      hardFloor,
+      overflowScaleFloor(absoluteMinScale, OVERFLOW_ABSOLUTE_MIN_SCALE),
+    );
   const fixedPhoto = Math.max(0, Number(photoHeight) || 0);
   const parsedClientHeight = Number(clientHeight);
   const parsedContentHeight = Number(contentHeight);
@@ -247,6 +255,77 @@ function nextOverflowScale({
   return Math.min(current, Math.max(floor, desired));
 }
 
+/**
+ * Invalida a medição quando uma fonte ou o tamanho do contentor muda.
+ *
+ * A invalidação é separada da escala: gravar `1` sobre uma escala que já era
+ * `1` não provoca render no React, embora a fonte recém-aplicada possa ter
+ * alterado completamente as métricas do texto. O callback deve, portanto,
+ * incrementar uma revisão própria e forçar uma nova passagem de medição.
+ *
+ * `environment` existe para manter este observador testável sem DOM e também
+ * permite o fallback em navegadores que não oferecem FontFaceSet/ResizeObserver.
+ */
+function observeOverflowInvalidations(element, onInvalidate, environment = {}) {
+  const doc = typeof document !== 'undefined' ? document : null;
+  const win = typeof window !== 'undefined' ? window : null;
+  const fonts = environment.fonts === undefined ? doc?.fonts : environment.fonts;
+  const ResizeObserverImpl = environment.ResizeObserverImpl === undefined
+    ? (typeof ResizeObserver !== 'undefined' ? ResizeObserver : null)
+    : environment.ResizeObserverImpl;
+  const requestFrame = environment.requestFrame === undefined
+    ? (win?.requestAnimationFrame ? (callback) => win.requestAnimationFrame(callback) : null)
+    : environment.requestFrame;
+  const cancelFrame = environment.cancelFrame === undefined
+    ? (win?.cancelAnimationFrame ? (id) => win.cancelAnimationFrame(id) : null)
+    : environment.cancelFrame;
+  const setTimer = environment.setTimer || setTimeout;
+  const clearTimer = environment.clearTimer || clearTimeout;
+  const fallbackDelay = Number.isFinite(environment.fallbackDelay)
+    ? Math.max(0, environment.fallbackDelay)
+    : 600;
+
+  let disposed = false;
+  let frameId = null;
+  const invalidate = () => {
+    if (disposed || frameId !== null) return;
+    if (typeof requestFrame === 'function') {
+      // Agrupa FontFaceSet + ResizeObserver no mesmo frame para evitar medir
+      // duas vezes quando ambos notificam a aplicação da mesma fonte.
+      frameId = requestFrame(() => {
+        frameId = null;
+        if (!disposed) onInvalidate();
+      });
+      return;
+    }
+    onInvalidate();
+  };
+
+  const fallbackTimer = setTimer(invalidate, fallbackDelay);
+  const fontReady = fonts?.ready;
+  if (fontReady && typeof fontReady.then === 'function') {
+    fontReady.then(invalidate, () => {});
+  }
+  fonts?.addEventListener?.('loadingdone', invalidate);
+
+  let resizeObserver = null;
+  if (element && typeof ResizeObserverImpl === 'function') {
+    resizeObserver = new ResizeObserverImpl(invalidate);
+    resizeObserver.observe(element);
+  }
+
+  return () => {
+    disposed = true;
+    clearTimer(fallbackTimer);
+    fonts?.removeEventListener?.('loadingdone', invalidate);
+    resizeObserver?.disconnect?.();
+    if (frameId !== null && typeof cancelFrame === 'function') {
+      cancelFrame(frameId);
+    }
+    frameId = null;
+  };
+}
+
 function OverflowScaler({
   containerStyle,
   containerProps = null,
@@ -254,15 +333,44 @@ function OverflowScaler({
   minScale = AUTOFIT_MIN_SCALE,
   hardMinScale = minScale,
   absoluteMinScale = OVERFLOW_ABSOLUTE_MIN_SCALE,
+  strictMinScale = false,
+  onOverflowAtFloor = null,
   children,
 }) {
   const ref = React.useRef(null);
   const [scale, setScale] = React.useState(1);
+  const [overflowAtFloor, setOverflowAtFloor] = React.useState(false);
   const iterationsRef = React.useRef(0);
+  const [, setMeasurementRevision] = React.useState(0);
+  const callbackRef = React.useRef(onOverflowAtFloor);
+  const lastNotifiedOverflowRef = React.useRef(null);
+  callbackRef.current = onOverflowAtFloor;
+  const strictFloor = overflowScaleFloor(minScale, AUTOFIT_MIN_SCALE);
+  const effectiveScale = strictMinScale ? Math.max(strictFloor, scale) : scale;
+
+  React.useEffect(() => {
+    if (lastNotifiedOverflowRef.current === overflowAtFloor) return;
+    lastNotifiedOverflowRef.current = overflowAtFloor;
+    if (typeof callbackRef.current === 'function') {
+      callbackRef.current(overflowAtFloor);
+    }
+  }, [overflowAtFloor]);
+
+  const requestRemeasure = React.useCallback(() => {
+    iterationsRef.current = 0;
+    // Recomeça da escala natural para também permitir que o texto volte a
+    // crescer quando a fonte carregada é mais estreita ou a zona aumenta.
+    setScale(1);
+    // Esta revisão é deliberadamente independente de `scale`: mesmo quando a
+    // escala continua 1, uma fonte nova precisa disparar outro layout effect.
+    setMeasurementRevision((revision) => revision + 1);
+  }, []);
+
   // Reset ao trocar conteúdo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
     setScale(1);
+    setOverflowAtFloor(false);
     iterationsRef.current = 0;
   }, deps);
   // Mede e reduz se transbordou — converge em ≤6 frames
@@ -304,7 +412,10 @@ function OverflowScaler({
     const contentW = Math.max(el.scrollWidth, Math.ceil(filhoMaisLargo + padH));
     const overflowsVertically = clientH > 0 && contentH > clientH + 1;
     const overflowsHorizontally = clientW > 0 && contentW > clientW + 1;
-    if (!overflowsVertically && !overflowsHorizontally) return;
+    if (!overflowsVertically && !overflowsHorizontally) {
+      setOverflowAtFloor(false);
+      return;
+    }
     // Desconta photo zone (altura fixa, não escala)
     const photoEl = el.querySelector('[data-vc-photo-zone="1"]');
     const photoH = photoEl ? photoEl.offsetHeight || 0 : 0;
@@ -312,7 +423,7 @@ function OverflowScaler({
     // Safety factor 0.98: tira um pequeno respiro pra evitar ficar exatamente no limite,
     // mas suficientemente conservador pra não encolher demais.
     const target = nextOverflowScale({
-      currentScale: scale,
+      currentScale: effectiveScale,
       clientHeight: clientH,
       contentHeight: contentH,
       clientWidth: clientW,
@@ -321,27 +432,33 @@ function OverflowScaler({
       minScale,
       hardMinScale,
       absoluteMinScale,
+      strictMinScale,
     });
-    if (target < scale - 0.003) {
+    const isOverflowingAtStrictFloor = strictMinScale
+      && effectiveScale <= strictFloor + 0.003
+      && target <= strictFloor + 0.003;
+    setOverflowAtFloor(isOverflowingAtStrictFloor);
+    if (target < effectiveScale - 0.003) {
       setScale(target);
+    } else if (strictMinScale && scale < strictFloor - 0.003) {
+      setScale(strictFloor);
     }
   });
-  // Fallback: re-medir após fontes carregarem (1s) — corrige casos onde a primeira
-  // medida foi tirada antes de a fonte web aplicar
+  // Re-mede ao concluir o carregamento das fontes, em carregamentos posteriores
+  // e quando o contentor muda de tamanho. O timer cobre browsers antigos sem
+  // FontFaceSet/ResizeObserver.
   React.useEffect(() => {
-    let cancelled = false;
-    const id = setTimeout(() => {
-      if (cancelled) return;
-      iterationsRef.current = 0;
-      // Force uma re-medida resetando pra 1 (vai re-disparar o ciclo de encolhimento)
-      setScale((s) => (s < 1 ? 1 : s));
-    }, 600);
-    return () => { cancelled = true; clearTimeout(id); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+    return observeOverflowInvalidations(ref.current, requestRemeasure);
+  }, [requestRemeasure]);
   return (
-    <div ref={ref} {...(containerProps || {})} style={{ ...containerStyle, ...(containerProps?.style || {}) }}>
-      {children(scale)}
+    <div
+      ref={ref}
+      {...(containerProps || {})}
+      data-vc-overflow-at-floor={overflowAtFloor ? 'true' : 'false'}
+      data-vc-overflow-scale={String(Number(effectiveScale.toFixed(4)))}
+      style={{ ...containerStyle, ...(containerProps?.style || {}) }}
+    >
+      {children(effectiveScale)}
     </div>
   );
 }
@@ -355,5 +472,6 @@ export {
   CultureRichParagraphs,
   OVERFLOW_ABSOLUTE_MIN_SCALE,
   nextOverflowScale,
+  observeOverflowInvalidations,
   OverflowScaler,
 };

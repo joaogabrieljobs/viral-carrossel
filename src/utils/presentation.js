@@ -44,7 +44,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     intent: 'Descobrir o melhor arco para explicar, convencer ou orientar com clareza.',
     deliveryMode: 'hybrid',
     defaultSlideCount: 10,
-    suggestedVisualPreset: 'presentation_executive_light',
+    suggestedVisualPreset: 'presentation_executive_minimal',
     stages: [
       { label: 'CAPA', instruction: 'Título da apresentação e promessa ou contexto em uma linha.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'CONTEXTO OU MAPA', instruction: 'Mostre por que o assunto importa e, quando ajudar, o percurso do deck.', visualRole: 'diagram' },
@@ -62,7 +62,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     deliveryMode: 'leave-behind',
     density: 'medium',
     defaultSlideCount: 13,
-    suggestedVisualPreset: 'presentation_pitch_dark',
+    suggestedVisualPreset: 'presentation_premium_dark',
     stages: [
       { label: 'EMPRESA E PROPÓSITO', instruction: 'Defina em uma frase o que muda, para quem e por que a empresa existe.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'CLIENTE E PROBLEMA', instruction: 'Mostre o usuário, a dor concreta, o custo da dor e a alternativa atual.' },
@@ -88,7 +88,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     intent: 'Fazer o público compreender e aplicar um conceito ao final da sessão.',
     deliveryMode: 'live',
     defaultSlideCount: 12,
-    suggestedVisualPreset: 'presentation_workshop',
+    suggestedVisualPreset: 'presentation_modular_cards',
     stages: [
       { label: 'RELEVÂNCIA E DIAGNÓSTICO', instruction: 'Conecte o tema ao público e abra com uma pergunta curta que revele o ponto de partida.', visualRole: 'question' },
       { label: 'OBJETIVOS OBSERVÁVEIS', instruction: 'Diga o que o participante será capaz de explicar, decidir ou fazer ao final.', visualRole: 'objectives' },
@@ -113,7 +113,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     deliveryMode: 'leave-behind',
     density: 'medium',
     defaultSlideCount: 12,
-    suggestedVisualPreset: 'presentation_executive_light',
+    suggestedVisualPreset: 'presentation_executive_minimal',
     stages: [
       { label: 'CAPA PERSONALIZADA', instruction: 'Nomeie proposta, cliente e resultado central sem slogan genérico.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'RESUMO DE VALOR', instruction: 'Resuma situação, resultado desejado e proposta em linguagem do cliente.' },
@@ -138,7 +138,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     deliveryMode: 'leave-behind',
     density: 'medium',
     defaultSlideCount: 11,
-    suggestedVisualPreset: 'presentation_data',
+    suggestedVisualPreset: 'presentation_data_first',
     stages: [
       { label: 'ASSUNTO, PERÍODO E DECISÃO', instruction: 'Identifique recorte, período e a decisão que o relatório deve apoiar.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'RESUMO EXECUTIVO', instruction: 'Antecipe de três a cinco conclusões e a decisão requerida.', visualRole: 'summary' },
@@ -162,7 +162,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     deliveryMode: 'hybrid',
     density: 'medium',
     defaultSlideCount: 11,
-    suggestedVisualPreset: 'presentation_case_study',
+    suggestedVisualPreset: 'presentation_photo_essay',
     stages: [
       { label: 'RESULTADO COMPROVADO', instruction: 'Abra com a transformação central somente se houver evidência; caso contrário, nomeie o caso sem prometer resultado.', visualRole: 'result', evidenceRequired: true },
       { label: 'CONTEXTO E BASELINE', instruction: 'Explique cliente ou cenário, público, período e ponto de partida.', visualRole: 'context' },
@@ -186,7 +186,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     deliveryMode: 'live',
     density: 'minimal',
     defaultSlideCount: 12,
-    suggestedVisualPreset: 'presentation_keynote',
+    suggestedVisualPreset: 'presentation_cinematic',
     stages: [
       { label: 'BIG IDEA', instruction: 'Declare um ponto de vista memorável e o que está em jogo, sem clickbait.', headlineMode: 'topic', visualRole: 'statement' },
       { label: 'TERRENO COMUM', instruction: 'Comece em uma experiência ou verdade que o público reconhece.', visualRole: 'story' },

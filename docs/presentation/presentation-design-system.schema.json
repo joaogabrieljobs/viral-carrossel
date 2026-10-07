@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "presentation-design-system.schema.json",
+  "title": "Viral Carrossel Presentation Design System",
+  "description": "Fonte de design 16:9. Retângulos usam coordenadas absolutas no canvas 1920×1080. Grupos podem ser contêineres ou repetidores; `item` descreve o elemento repetido e `slots` descreve filhos internos.",
+  "type": "object",
+  "required": [
+    "name",
+    "productType",
+    "version",
+    "canvas",
+    "selection",
+    "patterns"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
+    "productType": { "const": "presentation" },
+    "version": { "type": "string", "minLength": 1 },
+    "locale": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "canvas": { "$ref": "#/$defs/canvas" },
+    "conventions": { "type": "object", "additionalProperties": true },
+    "selection": {
+      "type": "object",
+      "required": ["defaultId", "orderedIds"],
+      "properties": {
+        "defaultId": { "type": "string", "minLength": 1 },
+        "orderedIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "comparison": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "patterns": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/pattern" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "canvas": {
+      "type": "object",
+      "required": ["width", "height", "aspectRatio", "unit"],
+      "properties": {
+        "width": { "const": 1920 },
+        "height": { "const": 1080 },
+        "aspectRatio": { "const": "16:9" },
+        "unit": { "const": "px" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "coordinateSpace": {
+      "title": "Absolute 1920×1080 coordinate space",
+      "description": "x/y start at the top-left. Width and height are pixels and must remain within the canvas.",
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1920 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1080 },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1920 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1080 }
+      },
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "required": ["kind", "rect"],
+      "properties": {
+        "kind": {
+          "enum": ["text", "image", "chart", "table", "shape", "logo", "group", "icon", "svg"]
+        },
+        "rect": { "$ref": "#/$defs/coordinateSpace" },
+        "role": { "type": "string" },
+        "item": {
+          "description": "Template de um item repetido quando kind=group.",
+          "anyOf": [
+            { "$ref": "#/$defs/slot" },
+            { "type": "object", "additionalProperties": true }
+          ]
+        },
+        "slots": {
+          "description": "Filhos internos quando o grupo funciona como contêiner.",
+          "oneOf": [
+            { "type": "object", "additionalProperties": { "$ref": "#/$defs/slot" } },
+            { "type": "array", "items": { "$ref": "#/$defs/slot" } }
+          ]
+        },
+        "minItems": { "type": "integer", "minimum": 0 },
+        "maxItems": { "type": "integer", "minimum": 0 },
+        "direction": { "enum": ["row", "column", "grid"] }
+      },
+      "additionalProperties": true
+    },
+    "archetype": {
+      "type": "object",
+      "required": ["id", "role", "slots"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": {
+          "enum": ["cover", "content", "data", "comparison", "process", "image", "quote", "section", "closing"]
+        },
+        "slots": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/slot" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "pattern": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "category",
+        "description",
+        "palette",
+        "typography",
+        "archetypes",
+        "textLimits",
+        "autofit",
+        "canvas"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^pds\\.[a-z0-9-]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "useCases": { "type": "array", "items": { "type": "string" } },
+        "palette": { "type": "object", "additionalProperties": true },
+        "typography": { "type": "object", "additionalProperties": true },
+        "archetypes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/archetype" }
+        },
+        "textLimits": { "type": "object", "additionalProperties": true },
+        "autofit": { "type": "object", "additionalProperties": true },
+        "canvas": { "$ref": "#/$defs/canvas" },
+        "customization": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    }
+  }
+}

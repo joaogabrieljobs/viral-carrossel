@@ -143,6 +143,36 @@ export async function waitForExportReadiness({
   });
 }
 
+/**
+ * Um slide PDS que chegou ao piso tipográfico e ainda transborda precisa ser
+ * corrigido antes da captura; exportá-lo esconderia texto sem avisar.
+ */
+export function presentationOverflowAtFloor(roots) {
+  return (Array.isArray(roots) ? roots : [])
+    .filter(Boolean)
+    .flatMap((root) => Array.from(
+      root.querySelectorAll?.('[data-vc-overflow-at-floor="true"]') || [],
+    ));
+}
+
+/**
+ * Resolve o subconjunto que será preparado e validado para uma exportação.
+ * Ao baixar um único slide, outro card ainda em edição não pode bloquear a
+ * captura nem obrigar o preload de imagens que não pertencem a ela.
+ */
+export function exportRenderScope(slides, refs, slideIndexes = null) {
+  const source = Array.isArray(slides) ? slides : [];
+  const indexes = Array.isArray(slideIndexes)
+    ? slideIndexes.filter((index) => Number.isInteger(index) && index >= 0 && index < source.length)
+    : source.map((_, index) => index);
+  const scopedSlides = indexes.map((index) => source[index]).filter(Boolean);
+  const rootMap = refs && typeof refs === 'object' ? refs : {};
+  return {
+    slides: scopedSlides,
+    roots: scopedSlides.map((slide) => rootMap[slide.id]).filter(Boolean),
+  };
+}
+
 export function useExport({
   slides,
   fmt,
@@ -152,10 +182,17 @@ export function useExport({
   setError,
   toast,
 }) {
-  const waitForRender = async () => waitForExportReadiness({
-    slides,
-    roots: Object.values(slideRefs.current || {}),
-  });
+  const waitForRender = async (slideIndexes = null) => {
+    const scope = exportRenderScope(slides, slideRefs.current, slideIndexes);
+    await waitForExportReadiness(scope);
+    const { roots } = scope;
+    const overflow = presentationOverflowAtFloor(roots);
+    if (overflow.length) {
+      throw new Error(
+        `O texto excede a área segura em ${overflow.length} slide${overflow.length === 1 ? '' : 's'}. Use “Autoajustar todos” ou reduza o texto antes de baixar.`,
+      );
+    }
+  };
 
   const renderSlideToCanvas = async (slideObj) => {
     const h2c = await loadHtml2Canvas();
@@ -196,7 +233,7 @@ export function useExport({
         }
       }
       await loadHtml2Canvas();
-      await waitForRender();
+      await waitForRender([idx]);
       const canvas = await renderSlideToCanvas(slide);
       await downloadCanvasPng(canvas, `slide-${String(idx+1).padStart(2,'0')}.png`);
       toast(`Card ${idx+1} baixado`, 'success');

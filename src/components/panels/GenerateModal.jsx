@@ -20,6 +20,7 @@ import {
 import {
   DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
   PRESENTATION_VISUAL_PRESETS,
+  resolvePresentationVisualPresetDefinition,
 } from '../../styles/presentation-presets.jsx';
 
 function normalizeCardVisualStyle(v) {
@@ -68,8 +69,11 @@ function resolveInitialVisualPreset({
   presentationPath = DEFAULT_PRESENTATION_PATH_ID,
 }) {
   const available = filterVisualPresetsForProduct(presets, productKind);
-  if (defaultVisualPreset && available.some((preset) => preset.id === defaultVisualPreset)) {
-    return defaultVisualPreset;
+  const selected = defaultVisualPreset
+    ? resolvePresentationVisualPresetDefinition(defaultVisualPreset, available)
+    : null;
+  if (selected) {
+    return selected.id;
   }
   if (productKind !== 'apresentacao') return null;
 

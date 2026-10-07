@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  exportRenderScope,
   extractCssBackgroundUrls,
+  presentationOverflowAtFloor,
   slideImageUrls,
   waitForExportAssets,
   waitForExportReadiness,
@@ -152,5 +154,38 @@ describe('espera de imagens antes da exportação', () => {
       null,
       { bgImage: 'https://cdn.exemplo/b.jpg' },
     ])).toEqual(['blob:a', 'https://cdn.exemplo/b.jpg']);
+  });
+
+  it('identifica apenas slides PDS que ainda transbordam no piso legível', () => {
+    const overflowA = {};
+    const overflowB = {};
+    const roots = [
+      { querySelectorAll: vi.fn(() => [overflowA]) },
+      null,
+      { querySelectorAll: vi.fn(() => []) },
+      { querySelectorAll: vi.fn(() => [overflowB]) },
+    ];
+
+    expect(presentationOverflowAtFloor(roots)).toEqual([overflowA, overflowB]);
+    expect(roots[0].querySelectorAll)
+      .toHaveBeenCalledWith('[data-vc-overflow-at-floor="true"]');
+  });
+
+  it('isola o slide escolhido para que overflow em outro card não bloqueie sua exportação', () => {
+    const slides = [
+      { id: 'a', bgImage: 'blob:a' },
+      { id: 'b', bgImage: 'blob:b' },
+      { id: 'c', bgImage: 'blob:c' },
+    ];
+    const roots = { a: { id: 'ra' }, b: { id: 'rb' }, c: { id: 'rc' } };
+
+    expect(exportRenderScope(slides, roots, [1])).toEqual({
+      slides: [slides[1]],
+      roots: [roots.b],
+    });
+    expect(exportRenderScope(slides, roots)).toEqual({
+      slides,
+      roots: [roots.a, roots.b, roots.c],
+    });
   });
 });

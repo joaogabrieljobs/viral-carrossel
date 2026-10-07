@@ -6,7 +6,9 @@ import {
 import {
   DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
   PRESENTATION_VISUAL_PRESETS,
+  applyPresentationVisualPreset,
   getPresentationCompositionOverrides,
+  getPresentationVisualPreset,
 } from '../styles/presentation-presets.jsx';
 import {
   APRESENTACAO_PRESET_ID,
@@ -14,6 +16,10 @@ import {
   normalizePresentationPath,
   presentationDocPatch,
 } from './presentation.js';
+import {
+  sanitizeCustomVisualPresetBrand,
+  sanitizeCustomVisualPresetSlideDefaults,
+} from './custom-visual-presets.js';
 
 export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
 
@@ -23,8 +29,8 @@ function resolvePresentationPreset(presetId, presets) {
     preset?.id === presetId && preset.productKind === 'apresentacao'
   ));
   if (requested) return requested;
-  return catalog.find((preset) => preset?.id === DEFAULT_PRESENTATION_VISUAL_PRESET_ID)
-    || PRESENTATION_VISUAL_PRESETS.find((preset) => preset.id === DEFAULT_PRESENTATION_VISUAL_PRESET_ID)
+  return getPresentationVisualPreset(presetId)
+    || getPresentationVisualPreset(DEFAULT_PRESENTATION_VISUAL_PRESET_ID)
     || PRESENTATION_VISUAL_PRESETS[0];
 }
 
@@ -48,24 +54,68 @@ function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, i
   };
 
   if (preset?.isCustom) {
+    const referenceComposition = getPresentationCompositionOverrides(
+      DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
+      { slide, stage, index, count },
+    );
     const fallbackComposition = slide.canvas?.zones
       ? {}
-      : getPresentationCompositionOverrides(DEFAULT_PRESENTATION_VISUAL_PRESET_ID, {
-          slide,
-          stage,
-          index,
-          count,
-        });
+      : referenceComposition;
+    const customSlideDefaults = sanitizeCustomVisualPresetSlideDefaults(
+      preset.slideDefaults || {},
+    );
+    const customUsesProfileTokens = !!(
+      customSlideDefaults.presentationTypographyByComposition
+      || customSlideDefaults.presentationTitleSizeByComposition
+      || customSlideDefaults.presentationTitleLeadingByComposition
+      || customSlideDefaults.presentationGlass
+    );
+    const hasSavedCanvas = Object.prototype.hasOwnProperty.call(customSlideDefaults, 'canvas');
+    const hasSavedComposition = Object.prototype.hasOwnProperty.call(customSlideDefaults, 'composition');
+    const hasSavedOffsets = Object.prototype.hasOwnProperty.call(customSlideDefaults, 'elementOffsets');
     return {
       ...slide,
       ...fallbackComposition,
-      ...(preset.slideDefaults || {}),
+      // Limpa os metadados/tokens do padrão oficial antes de aplicar a
+      // assinatura salva pelo usuário. A geometria livre é restaurada abaixo.
+      presentationPatternId: null,
+      presentationPatternVersion: null,
+      presentationArchetypeId: null,
+      presentationEvidenceFallback: null,
+      presentationRequiresImage: false,
+      presentationTextLimits: null,
+      presentationAutofit: null,
+      presentationComposition: null,
+      presentationCompositionId: null,
+      presentationLayout: null,
+      titlePosition: null,
+      imagePosition: null,
+      presentationGlass: null,
+      presentationTitleSizeByComposition: null,
+      presentationTitleLeadingByComposition: null,
+      presentationTypographyByComposition: null,
+      bodyTracking: undefined,
+      bodyLeading: undefined,
+      bodyWeight: undefined,
+      ...customSlideDefaults,
       ...stageMeta,
+      // `presentationCompositionId` continua limpo (era identidade do PDS),
+      // mas padrões pessoais com tokens por perfil precisam do papel semântico
+      // recém-calculado para selecionar cover/content/data/etc.
+      presentationComposition: customUsesProfileTokens
+        ? referenceComposition.presentationComposition
+        : null,
       // Zonas existentes representam escolhas livres do usuário e continuam
       // sendo a fonte de verdade ao trocar somente a identidade visual.
-      canvas: slide.canvas || fallbackComposition.canvas,
-      composition: slide.composition || fallbackComposition.composition,
-      elementOffsets: slide.elementOffsets || fallbackComposition.elementOffsets,
+      canvas: hasSavedCanvas
+        ? customSlideDefaults.canvas
+        : (slide.canvas || fallbackComposition.canvas),
+      composition: hasSavedComposition
+        ? customSlideDefaults.composition
+        : (slide.composition || fallbackComposition.composition),
+      elementOffsets: hasSavedOffsets
+        ? customSlideDefaults.elementOffsets
+        : (slide.elementOffsets || fallbackComposition.elementOffsets),
     };
   }
 
@@ -152,7 +202,15 @@ export function applyPresentationVisualPresetToDoc(
     fmt: 'apresentacao',
     presentationPath,
     visualPreset: resolvedPresetId,
-    brand: applyVisualPreset(source.brand || {}, resolvedPresetId, presets),
+    presentationDesignSystemId: preset?.sourceId || null,
+    presentationDesignSystemVersion: preset?.sourceVersion || null,
+    brand: preset?.isCustom
+      ? applyVisualPreset(
+          source.brand || {},
+          resolvedPresetId,
+          [{ ...preset, brand: sanitizeCustomVisualPresetBrand(preset.brand || {}) }],
+        )
+      : applyPresentationVisualPreset(source.brand || {}, resolvedPresetId),
     slides: applyPresentationVisualPresetToSlides(
       source.slides,
       resolvedPresetId,
@@ -187,6 +245,8 @@ export function applyCarouselVisualPresetToDoc(
     creativePreset: preset?.creativePreset || 'livre',
     fmt: targetFmt,
     visualPreset: resolvedPresetId,
+    presentationDesignSystemId: undefined,
+    presentationDesignSystemVersion: undefined,
     brand: applyVisualPreset(source.brand || {}, resolvedPresetId, catalog),
     slides: (Array.isArray(source.slides) ? source.slides : []).map((slide) => ({
       ...slide,
@@ -196,9 +256,25 @@ export function applyCarouselVisualPresetToDoc(
       presentationStageLabel: undefined,
       presentationVisualRole: undefined,
       presentationPresetId: undefined,
+      presentationPatternId: undefined,
+      presentationPatternVersion: undefined,
+      presentationArchetypeId: undefined,
+      presentationEvidenceFallback: undefined,
+      presentationRequiresImage: undefined,
+      presentationTextLimits: undefined,
+      presentationAutofit: undefined,
       presentationComposition: undefined,
       presentationCompositionId: undefined,
       presentationLayout: undefined,
+      presentationGlass: undefined,
+      presentationTitleSizeByComposition: undefined,
+      presentationTitleLeadingByComposition: undefined,
+      presentationTypographyByComposition: undefined,
+      titlePosition: undefined,
+      imagePosition: undefined,
+      bodyTracking: undefined,
+      bodyLeading: undefined,
+      bodyWeight: undefined,
     })),
   };
 }

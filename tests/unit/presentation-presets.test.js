@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
   PRESENTATION_VISUAL_PRESETS,
+  LEGACY_PRESENTATION_VISUAL_PRESETS,
+  PRESENTATION_VISUAL_PRESET_CATALOG,
   PRESENTATION_VISUAL_PRESET_BY_ID,
   normalizePresentationVisualPreset,
   getPresentationVisualPreset,
@@ -9,14 +11,15 @@ import {
   getPresentationSlideOverrides,
   getPresentationCompositionOverrides,
   renderPresentationPresetPreview,
+  buildPresentationDesignSystemPromptBlock,
 } from '../../src/styles/presentation-presets.jsx';
 import { PRESENTATION_PATHS } from '../../src/utils/presentation.js';
 import { wcagContrast } from '../../src/utils/wcag.js';
 
 describe('padrões visuais de apresentação', () => {
-  it('oferece seis padrões exclusivos e horizontais', () => {
-    expect(PRESENTATION_VISUAL_PRESETS).toHaveLength(6);
-    expect(new Set(PRESENTATION_VISUAL_PRESETS.map((item) => item.id)).size).toBe(6);
+  it('oferece os dez padrões do design system, exclusivos e horizontais', () => {
+    expect(PRESENTATION_VISUAL_PRESETS).toHaveLength(10);
+    expect(new Set(PRESENTATION_VISUAL_PRESETS.map((item) => item.id)).size).toBe(10);
     for (const item of PRESENTATION_VISUAL_PRESETS) {
       expect(item).toMatchObject({
         productKind: 'apresentacao',
@@ -28,7 +31,13 @@ describe('padrões visuais de apresentação', () => {
       });
       expect(item.label.length).toBeGreaterThan(3);
       expect(item.desc.length).toBeGreaterThan(20);
+      expect(item.sourceId).toMatch(/^pds\./);
+      expect(item.sourceVersion).toBeTruthy();
+      expect(item.hidden).not.toBe(true);
     }
+    expect(LEGACY_PRESENTATION_VISUAL_PRESETS).toHaveLength(6);
+    expect(LEGACY_PRESENTATION_VISUAL_PRESETS.every((item) => item.hidden)).toBe(true);
+    expect(PRESENTATION_VISUAL_PRESET_CATALOG).toHaveLength(16);
   });
 
   it('todo caminho sugere um padrão existente', () => {
@@ -41,12 +50,14 @@ describe('padrões visuais de apresentação', () => {
   });
 
   it('normaliza aliases e sempre retorna um padrão válido', () => {
-    expect(DEFAULT_PRESENTATION_VISUAL_PRESET_ID).toBe('presentation_executive_light');
-    expect(normalizePresentationVisualPreset('Pitch')).toBe('presentation_pitch_dark');
-    expect(normalizePresentationVisualPreset('estudo de caso')).toBe('presentation_case_study');
-    expect(normalizePresentationVisualPreset({ id: 'manifesto' })).toBe('presentation_keynote');
+    expect(DEFAULT_PRESENTATION_VISUAL_PRESET_ID).toBe('presentation_executive_minimal');
+    expect(normalizePresentationVisualPreset('Pitch')).toBe('presentation_premium_dark');
+    expect(normalizePresentationVisualPreset('estudo de caso')).toBe('presentation_photo_essay');
+    expect(normalizePresentationVisualPreset({ id: 'manifesto' })).toBe('presentation_cinematic');
+    expect(normalizePresentationVisualPreset('pds.executive-minimal')).toBe('presentation_executive_minimal');
+    expect(normalizePresentationVisualPreset('presentation_pitch_dark')).toBe('presentation_pitch_dark');
     expect(normalizePresentationVisualPreset('nao-existe')).toBe(DEFAULT_PRESENTATION_VISUAL_PRESET_ID);
-    expect(getPresentationVisualPreset()).toBe(PRESENTATION_VISUAL_PRESET_BY_ID.presentation_executive_light);
+    expect(getPresentationVisualPreset()).toBe(PRESENTATION_VISUAL_PRESET_BY_ID.presentation_executive_minimal);
   });
 
   it('cores de texto e destaque mantêm contraste no fundo sólido', () => {
@@ -72,7 +83,6 @@ describe('padrões visuais de apresentação', () => {
     expect(brand).toMatchObject({
       name: 'Minha marca',
       logo: 'data:image/png;base64,abc',
-      bg: '#ecf4ff',
       subtitleVisible: true,
       visualIdentityLocked: true,
     });
@@ -102,7 +112,7 @@ describe('padrões visuais de apresentação', () => {
       })
     ));
 
-    expect(new Set(covers.map((item) => item.presentationCompositionId)).size).toBe(6);
+    expect(new Set(covers.map((item) => item.presentationCompositionId)).size).toBe(10);
     for (const item of covers) {
       expect(item).toMatchObject({
         presentationComposition: 'cover',
@@ -125,7 +135,7 @@ describe('padrões visuais de apresentação', () => {
 
   it('varia conteúdo, divisor, dados, demonstração e fecho pela função narrativa', () => {
     const make = (visualRole, index = 2, count = 8) => (
-      getPresentationCompositionOverrides('pitch', {
+      getPresentationCompositionOverrides('presentation_pitch_dark', {
         stage: { visualRole }, index, count,
       })
     );
@@ -169,11 +179,11 @@ describe('padrões visuais de apresentação', () => {
       }
     }
 
-    const first = getPresentationCompositionOverrides('data', {
+    const first = getPresentationCompositionOverrides('presentation_data', {
       stage: { visualRole: 'data' }, index: 3, count: 8,
     });
     first.canvas.zones.title.x = 99;
-    const second = getPresentationCompositionOverrides('data', {
+    const second = getPresentationCompositionOverrides('presentation_data', {
       stage: { visualRole: 'data' }, index: 3, count: 8,
     });
     expect(second.canvas.zones.title.x).toBe(6);
@@ -190,7 +200,7 @@ describe('padrões visuais de apresentação', () => {
     ];
 
     for (const [visualRole, index, compositionId, minTitleH, minSubtitleH] of cases) {
-      const result = getPresentationCompositionOverrides('pitch', {
+      const result = getPresentationCompositionOverrides('presentation_pitch_dark', {
         stage: { visualRole }, index, count: 8,
       });
       const { title, subtitle } = result.canvas.zones;
@@ -219,5 +229,60 @@ describe('padrões visuais de apresentação', () => {
     expect(result).not.toHaveProperty('imageQuery');
     expect(result).not.toHaveProperty('title');
     expect(result).not.toHaveProperty('subtitle');
+  });
+
+  it('leva limites compactos do padrão escolhido para a geração de texto', () => {
+    const block = buildPresentationDesignSystemPromptBlock('pds.cinematic');
+    expect(block).toMatch(/CINEMÁTICO/i);
+    expect(block).toMatch(/title: até \d+ caracteres/i);
+    expect(block).toMatch(/nunca comprima tudo em uma caixa/i);
+    expect(block).toMatch(/imageQuery/i);
+    expect(block).toMatch(/limites obrigatórios da composição escolhida/i);
+    expect(buildPresentationDesignSystemPromptBlock('presentation_keynote')).toBe('');
+  });
+
+  it('leva os limites reais de capa e conteúdo do Premium para o prompt', () => {
+    const block = buildPresentationDesignSystemPromptBlock('pds.premium-dark');
+    expect(block).toMatch(/capa: title ≤50 caracteres\/2 linhas; subtitle ≤40 caracteres\/1 linhas/i);
+    expect(block).toMatch(/conteúdo: title ≤60 caracteres\/1 linhas; subtitle ≤40 caracteres\/1 linhas/i);
+
+    const cover = getPresentationCompositionOverrides('presentation_premium_dark', {
+      stage: { visualRole: 'cover' }, index: 0, count: 6,
+    });
+    expect(cover.presentationTextLimits).toMatchObject({
+      title: { maxChars: 50, maxLines: 2, role: 'display' },
+      subtitle: { maxChars: 40, maxLines: 1, role: 'subtitle' },
+    });
+  });
+
+  it('não aplica o prompt Executivo como fallback em padrões customizados ou desconhecidos', () => {
+    const official = PRESENTATION_VISUAL_PRESET_BY_ID.presentation_cinematic;
+    expect(buildPresentationDesignSystemPromptBlock(official)).toMatch(/CINEMÁTICO/i);
+    expect(buildPresentationDesignSystemPromptBlock({
+      id: 'custom-deck',
+      productKind: 'apresentacao',
+      isCustom: true,
+      textLimits: official.textLimits,
+    })).toBe('');
+    expect(buildPresentationDesignSystemPromptBlock('custom-deck')).toBe('');
+    expect(buildPresentationDesignSystemPromptBlock('nao-existe')).toBe('');
+  });
+
+  it('expõe exigência de imagem e política de autofit da composição efetiva', () => {
+    for (const preset of PRESENTATION_VISUAL_PRESETS) {
+      const result = getPresentationCompositionOverrides(preset.id, {
+        stage: { visualRole: 'context' }, index: 0, count: 6,
+      });
+      expect(typeof result.presentationRequiresImage).toBe('boolean');
+      expect(result.presentationAutofit).toEqual(preset.autofit);
+      expect(result.presentationAutofit).not.toBe(preset.autofit);
+    }
+
+    expect(getPresentationCompositionOverrides('presentation_typographic_bold', {
+      stage: { visualRole: 'context' }, index: 0, count: 6,
+    }).presentationRequiresImage).toBe(false);
+    expect(getPresentationCompositionOverrides('presentation_photo_essay', {
+      stage: { visualRole: 'context' }, index: 0, count: 6,
+    }).presentationRequiresImage).toBe(true);
   });
 });
