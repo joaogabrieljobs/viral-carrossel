@@ -29,6 +29,7 @@ import {
   localDateKey,
   buildEditorialQueue,
 } from '../utils/library-organizer.js';
+import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
 
 const controlStyle = {
   minHeight: 36,
@@ -75,7 +76,7 @@ const folderChipStyle = (active) => ({
   cursor: 'pointer',
   fontFamily: 'var(--font-ui)',
   fontWeight: 600,
-  background: active ? 'rgba(255,77,46,0.12)' : 'var(--bg-elevated)',
+  background: active ? 'var(--accent-surface)' : 'var(--bg-elevated)',
   border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
   color: active ? 'var(--accent)' : 'var(--text-secondary)',
 });
@@ -104,21 +105,24 @@ const projectViews = [
 ];
 
 const CREATION_TYPES = [
-  { id: 'carrossel', label: 'Carrossel', icon: Layers },
-  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+  { ...MOONT_NARRATIVES.carrossel, label: MOONT_NARRATIVES.carrossel.family, icon: Layers },
+  { ...MOONT_NARRATIVES.apresentacao, label: MOONT_NARRATIVES.apresentacao.family, icon: Layout },
 ];
 
 const projectKindOf = (entry) => (
-  entry?.doc?.fmt === 'apresentacao' || entry?.doc?.creativePreset === 'apresentacao'
+  entry?.doc?.productKind === 'apresentacao'
+    || entry?.doc?.fmt === 'apresentacao'
+    || entry?.doc?.creativePreset === 'apresentacao'
     ? 'apresentacao'
     : 'carrossel'
 );
 
 const projectKindCopy = (entry) => {
   const kind = projectKindOf(entry);
+  const narrative = moontNarrative(kind);
   return kind === 'apresentacao'
-    ? { kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
-    : { kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+    ? { ...narrative, kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { ...narrative, kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
 };
 
 function useModalKeyboard(open, onClose) {
@@ -353,7 +357,7 @@ function FolderOrganizer({
               style={{
                 display: 'inline-flex', alignItems: 'center', borderRadius: 99,
                 border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                background: active ? 'rgba(255,77,46,0.12)' : 'var(--bg-elevated)',
+                background: active ? 'var(--accent-surface)' : 'var(--bg-elevated)',
               }}
             >
               <button
@@ -493,7 +497,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
                   aria-label={date ? `${date}: ${entries.length} projeto(s)` : undefined}
                   style={{
                     minHeight: 116, padding: 7, borderRadius: 8,
-                    background: date ? (isToday ? 'rgba(255,77,46,0.055)' : 'var(--bg-card)') : 'transparent',
+                    background: date ? (isToday ? 'var(--accent-surface)' : 'var(--bg-card)') : 'transparent',
                     border: date ? `1px solid ${isToday ? 'var(--accent)' : 'var(--border)'}` : '1px solid transparent',
                   }}
                 >
@@ -558,7 +562,7 @@ function LibraryCalendar({ library, folders, currentMonth, onMonthChange, onOpen
 function QueueSection({ title, hint, entries, emptyLabel, folders, onOpen, onSetStatus, accent }) {
   const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <section aria-label={title} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div>
         <div style={{
           fontSize: 12, fontWeight: 700, color: accent || 'var(--text-primary)',
@@ -621,7 +625,7 @@ function QueueSection({ title, hint, entries, emptyLabel, folders, onOpen, onSet
                     type="button"
                     className="vc-btn"
                     onClick={() => onSetStatus(entry.id, 'published')}
-                    title="Marcar como publicado (manual — fora do Viral)"
+                    title="Marcar como publicado (manual — fora da Moont)"
                     aria-label={`Marcar ${entry.name} como publicado`}
                     style={{
                       minHeight: 32, padding: '0 10px', borderRadius: 8, fontSize: 10, fontWeight: 600,
@@ -856,7 +860,7 @@ export default function LibraryModal({
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                 {counts.all === 0
                   ? 'Nenhum projeto salvo'
-                  : `${counts.all} projeto${counts.all === 1 ? '' : 's'} · ${counts.carrossel} ${counts.carrossel === 1 ? 'carrossel' : 'carrosséis'} · ${counts.apresentacao} ${counts.apresentacao === 1 ? 'apresentação' : 'apresentações'}`}
+                  : `${counts.all} projeto${counts.all === 1 ? '' : 's'} · ${counts.carrossel} Comunica · ${counts.apresentacao} Apresenta`}
               </div>
             </div>
           </div>
@@ -896,6 +900,7 @@ export default function LibraryModal({
         <div className="vc-library-toolbar" style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="vc-library-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <div
+              className="vc-library-product-picker"
               role="group"
               aria-label="Tipo de projeto para criar"
               style={{
@@ -904,26 +909,31 @@ export default function LibraryModal({
                 background: 'var(--bg-card)', flex: '1 1 260px',
               }}
             >
-              {CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+              {CREATION_TYPES.map(({ id, name, eyebrow, format, icon: Icon }) => {
                 const active = creationType === id;
                 return (
                   <button
                     key={id}
                     type="button"
                     aria-pressed={active}
+                    aria-label={id === 'apresentacao' ? 'Apresentação' : 'Carrossel'}
+                    title={`${name}: ${eyebrow}. ${format}.`}
                     onClick={() => setCreationType(id)}
                     style={{
-                      minHeight: 34, padding: '0 10px', borderRadius: 7,
+                      minHeight: 46, padding: '6px 10px', borderRadius: 7,
                       border: active ? '1px solid var(--accent)' : '1px solid transparent',
                       background: active ? 'var(--accent-surface)' : 'transparent',
                       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                       cursor: 'pointer', fontSize: 11, fontWeight: 650,
-                      fontFamily: 'var(--font-ui)', display: 'inline-flex',
-                      alignItems: 'center', justifyContent: 'center', gap: 6,
+                      fontFamily: 'var(--font-ui)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'flex-start', gap: 7, textAlign: 'left',
                     }}
                   >
                     <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
-                    {label}
+                    <span style={{ display: 'grid', gap: 1 }}>
+                      <span style={{ color: 'var(--text-primary)' }}>{name}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 9, fontWeight: 500 }}>{format}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -938,11 +948,11 @@ export default function LibraryModal({
                 background: 'var(--accent)', color: 'var(--text-on-accent)',
                 fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 14px rgba(255,77,46,0.25)',
+                boxShadow: '0 4px 14px var(--accent-glow)',
               }}
             >
               <Plus size={14}/>
-              {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
+              {creationType === 'apresentacao' ? 'Criar apresentação' : 'Criar comunicação'}
             </button>
             <button type="button" onClick={onExportAll} title="Exportar toda a biblioteca como JSON" style={{ ...controlStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Download size={13}/>Exportar
@@ -1037,7 +1047,7 @@ export default function LibraryModal({
                         Sua biblioteca está vazia
                       </div>
                       <div style={{ fontSize: 13, lineHeight: 1.55, maxWidth: 340, color: 'var(--text-muted)', letterSpacing: '-0.011em' }}>
-                        Escolha entre carrossel e apresentação. Depois organize o projeto em pastas e acompanhe seu planejamento.
+                        Escolha Moont Comunica para uma narrativa de comunicação ou Moont Apresenta para uma narrativa de apresentação. Depois organize o projeto e acompanhe seu planejamento.
                       </div>
                     </div>
                     <button
@@ -1051,7 +1061,7 @@ export default function LibraryModal({
                       }}
                     >
                       <Plus size={14}/>
-                      {creationType === 'apresentacao' ? 'Criar primeira apresentação' : 'Criar primeiro carrossel'}
+                      {creationType === 'apresentacao' ? 'Criar com Moont Apresenta' : 'Criar com Moont Comunica'}
                     </button>
                   </div>
                 );
@@ -1078,7 +1088,7 @@ export default function LibraryModal({
                 <article
                   key={entry.id}
                   style={{
-                    background: isActive ? 'rgba(255,77,46,0.06)' : 'var(--bg-card)',
+                    background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
                     border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
                     borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 11,
                     transition: 'all 0.12s',
@@ -1136,7 +1146,7 @@ export default function LibraryModal({
                         <span style={{ padding: '2px 7px', borderRadius: 99, background: status.bg, color: status.color, border: `1px solid ${status.border}`, fontWeight: 700 }}>
                           {status.label}
                         </span>
-                        <span>{product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}</span>
+                        <span>{product.name} · {product.format} · {product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}</span>
                         {entry.updatedAt ? <span style={{ opacity: 0.7 }}>{fmtDate(entry.updatedAt)}</span> : null}
                         {compactCards && !organizeOpen ? (
                           <span style={{ opacity: 0.75 }}>

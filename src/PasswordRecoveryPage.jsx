@@ -39,12 +39,12 @@ export default function PasswordRecoveryPage() {
   }
 
   return (
-    <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 20, background: '#0e0c14' }}>
+    <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 20, background: '#090a0f' }}>
       <style>{GLOBAL_STYLE}</style>
-      <section style={{ width: 'min(420px, 100%)', padding: 24, borderRadius: 24, background: '#211d2b', border: '1px solid #514a5d', display: 'grid', gap: 18 }}>
-        <p style={{ margin: 0, fontSize: 13, color: '#ff87bb' }}>VIRAL CARROSSEL STUDIO</p>
+      <section style={{ width: 'min(420px, 100%)', padding: 24, borderRadius: 24, background: '#11131b', border: '1px solid #303341', display: 'grid', gap: 18 }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#a9a5ff', letterSpacing: '0.08em' }}>MOONT</p>
         <h1 style={{ margin: 0, fontSize: 25 }}>{done ? 'Senha alterada' : token ? 'Defina sua nova senha' : 'Recuperar minha senha'}</h1>
-        <p style={{ margin: 0, fontSize: 14, color: '#d3cedb', lineHeight: 1.5 }}>
+        <p style={{ margin: 0, fontSize: 14, color: '#bbb9c7', lineHeight: 1.5 }}>
           {done ? 'Tudo pronto. Entre com sua nova senha para continuar. As sessões anteriores foram encerradas.'
             : token ? 'Use de 8 a 128 caracteres e confirme a senha abaixo.' : 'Informe o e-mail da sua conta para receber um novo link.'}
         </p>
@@ -57,13 +57,13 @@ export default function PasswordRecoveryPage() {
           </> : <label style={{ display: 'grid', gap: 8 }}>E-mail
             <input className="vc-input" type="email" autoComplete="email" required maxLength={254} disabled={loading} value={email} onChange={e => setEmail(e.target.value)} />
           </label>}
-          <button className="vc-btn" disabled={loading} type="submit" style={{ minHeight: 46, background: '#ff2d8d', color: '#150910', fontWeight: 700 }}>
+          <button className="vc-btn" disabled={loading} type="submit" style={{ minHeight: 46, background: '#5b53e8', color: '#fff', fontWeight: 700 }}>
             {loading ? 'Aguarde…' : token ? 'Salvar nova senha' : 'Enviar link de recuperação'}
           </button>
         </form>}
         {invalid && <button className="vc-btn" type="button" onClick={() => { setToken(''); setInvalid(false); setError(''); setPassword(''); setConfirmation(''); }}>Solicitar novo link</button>}
         {done ? <button className="vc-btn" type="button" onClick={() => setLoginOpen(true)}>Entrar com a nova senha</button>
-          : <a href="/?landing=1" style={{ color: '#ede5f5', textAlign: 'center', fontSize: 14 }}>Voltar ao início</a>}
+          : <a href="/?landing=1" style={{ color: '#f3f0e7', textAlign: 'center', fontSize: 14 }}>Voltar ao início</a>}
       </section>
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </main>

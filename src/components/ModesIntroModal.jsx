@@ -50,7 +50,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
       label: APP_MODE_UI.criador.label,
       tagline: APP_MODE_UI.criador.tagline,
       desc: APP_MODE_UI.criador.desc,
-      features: ['Contexto curto da marca', 'Geração com IA', 'Logo nos novos cards', 'Exportar PNG'],
+      features: ['Contexto curto da marca', 'Geração com Moont AI', 'Logo nos novos cards', 'Exportar PNG ou PDF'],
       recommended: true,
     },
     {
@@ -114,7 +114,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
               fontFamily: 'var(--font-display)',
             }}
           >
-            Bem-vindo
+            Bem-vindo à Moont
           </h2>
           <p style={{
             fontSize: 15, color: 'var(--text-secondary)',
@@ -144,14 +144,14 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                   borderRadius: 16,
                   border: `1px solid ${isCurrent ? 'var(--accent)' : 'var(--control-border)'}`,
                   background: isCurrent
-                    ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,45,141,0.03) 100%)'
+                    ? 'linear-gradient(135deg, rgba(91,83,232,0.14) 0%, rgba(91,83,232,0.04) 100%)'
                     : 'rgba(255, 255, 255, 0.04)',
                   backdropFilter: 'blur(18px)',
                   WebkitBackdropFilter: 'blur(18px)',
                   cursor: 'pointer',
                   display: 'flex', alignItems: 'flex-start', gap: 14,
                   boxShadow: isCurrent
-                    ? '0 0 24px rgba(255, 45, 141, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                    ? '0 0 24px rgba(91, 83, 232, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
                     : '0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
                   transition: 'all 0.22s cubic-bezier(0.22, 1, 0.36, 1)',
                   fontFamily: 'var(--font-ui)',
@@ -170,7 +170,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                 {/* Icon */}
                 <div style={{
                   width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: isCurrent ? 'rgba(255, 45, 141, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                  background: isCurrent ? 'rgba(91, 83, 232, 0.20)' : 'rgba(255, 255, 255, 0.06)',
                   color: isCurrent ? 'var(--accent)' : 'var(--text-secondary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -187,7 +187,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                     {m.recommended && (
                       <span style={{
                         fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
-                        background: 'rgba(255, 45, 141, 0.18)', color: 'var(--accent)',
+                        background: 'rgba(91, 83, 232, 0.20)', color: 'var(--accent)',
                         padding: '2px 8px', borderRadius: 9999,
                         letterSpacing: '0.06em', textTransform: 'uppercase',
                       }}>Recomendado</span>

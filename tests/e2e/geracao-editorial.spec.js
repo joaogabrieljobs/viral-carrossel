@@ -19,6 +19,11 @@ async function persistedDoc(page) {
   });
 }
 
+async function useProfessionalControls(page) {
+  await page.getByRole('button', { name: /Modo atual: Criar rápido/i }).click();
+  await page.getByRole('menuitem', { name: /Controle profissional/i }).click();
+}
+
 for (const fails of [false, true]) {
   test(`geração salva objetivo e ${fails ? 'preserva rascunho se revisão falhar' : 'aplica revisão pontual'}`, async ({ page }) => {
     test.setTimeout(60_000);
@@ -38,6 +43,7 @@ for (const fails of [false, true]) {
     } });
     await page.goto('/?app=1');
     await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await useProfessionalControls(page);
     await page.getByRole('button', { name: 'Gerar carrossel com IA', exact: true }).first().click();
     const modal = page.locator('.modal-panel');
     await modal.getByLabel('O que você quer com este conteúdo?').selectOption('saves');

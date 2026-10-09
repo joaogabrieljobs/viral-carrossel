@@ -11,6 +11,12 @@ import {
   getPresentationPath,
   normalizePresentationPath,
 } from '../../utils/presentation.js';
+import { MOONT_NARRATIVES } from '../../config/moont-brand.js';
+
+const QUICK_PRODUCTS = [
+  { ...MOONT_NARRATIVES.carrossel, flow: 'Faça uma ideia circular' },
+  { ...MOONT_NARRATIVES.apresentacao, flow: 'Faça uma ideia avançar' },
+];
 
 const BTN_CAPS = {
   textTransform: 'uppercase',
@@ -182,12 +188,9 @@ export function CriarRapidoHome({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label className="vc-label-sm">O que quer criar</label>
-        <div className="vc-seg" role="group" aria-label="Tipo de entrega" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          {[
-            { id: 'carrossel', label: 'Carrossel IG' },
-            { id: 'apresentacao', label: 'Apresentação' },
-          ].map(({ id, label }) => {
+        <label className="vc-label-sm">Escolha a narrativa</label>
+        <div className="vc-seg" role="group" aria-label="Narrativa para criar" style={{ gridTemplateColumns: '1fr 1fr', alignItems: 'stretch' }}>
+          {QUICK_PRODUCTS.map(({ id, name, eyebrow, format, flow }) => {
             const active = id === 'apresentacao' ? isPresentation : !isPresentation;
             return (
               <button
@@ -195,6 +198,7 @@ export function CriarRapidoHome({
                 type="button"
                 className={`vc-seg-item${active ? ' active' : ''}`}
                 aria-pressed={active}
+                aria-label={`${name}: ${eyebrow}. ${format}. ${flow}.`}
                 disabled={genBusy || !onCreativePresetChange}
                 onClick={() => {
                   if (!onCreativePresetChange) return;
@@ -204,17 +208,21 @@ export function CriarRapidoHome({
                   }
                   trackEvent('product_kind_switch', { to: id });
                 }}
-                style={{ minHeight: 40, fontSize: 12 }}
+                style={{ minHeight: 70, padding: '9px 8px', fontSize: 12, alignItems: 'flex-start', textAlign: 'left' }}
               >
-                {label}
+                <span style={{ display: 'grid', gap: 3, width: '100%' }}>
+                  <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>{name}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 9.5, lineHeight: 1.25, fontWeight: 500 }}>{eyebrow}</span>
+                  <span style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 9.5, lineHeight: 1.25 }}>{flow}</span>
+                </span>
               </button>
             );
           })}
         </div>
         <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
           {isPresentation
-            ? 'Apresentação 16:9 — pitch, aula, proposta, relatório, caso ou keynote. Exporta PDF paisagem.'
-            : 'Cards verticais para o feed do Instagram (4:5).'}
+            ? 'Moont Apresenta · Apresentação 16:9 para pitches, aulas, propostas, relatórios e keynotes. Exporta PDF paisagem.'
+            : 'Moont Comunica · Carrossel 4:5 com gancho, argumento, ritmo visual e fechamento para publicar.'}
         </p>
         {isPresentation ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 4 }}>
@@ -366,7 +374,7 @@ export function CriarRapidoHome({
       </> : null}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label className="vc-label-sm">{isPresentation ? 'Diga o tema da apresentação' : 'Diga o que quer publicar'}</label>
+        <label className="vc-label-sm">{isPresentation ? 'Qual ideia precisa avançar?' : 'Qual ideia precisa circular?'}</label>
         {!isPresentation ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {OBJECTIVE_TEMPLATES.map((t) => {
@@ -477,6 +485,7 @@ export function CriarRapidoHome({
         </p>
         <button
           type="button"
+          aria-label={isPresentation ? 'Gerar apresentação' : 'Gerar carrossel'}
           disabled={genBusy || !promptTrim}
           onClick={handleGenerate}
           style={{
@@ -490,7 +499,7 @@ export function CriarRapidoHome({
         >
           {genBusy
             ? <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> Criando o texto…</>
-            : <><Sparkles size={14} /> {isPresentation ? 'Gerar apresentação' : 'Gerar carrossel'}</>}
+            : <><Sparkles size={14} /> {isPresentation ? 'Gerar com Moont Apresenta' : 'Gerar com Moont Comunica'}</>}
         </button>
       </section>
 
@@ -542,8 +551,8 @@ export function CriarRapidoHome({
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
         <span>{isPresentation
-          ? 'O Viral prepara os slides. Exporte PDF 16:9 e apresente onde quiser.'
-          : 'O Viral prepara os arquivos. A publicação é feita por você no Instagram.'}</span>
+          ? 'A Moont prepara os slides. Exporte PDF 16:9 e apresente onde quiser.'
+          : 'A Moont prepara os arquivos. A publicação é feita por você no Instagram.'}</span>
         <span>Seus projetos ficam neste navegador. Faça um backup para não perder o trabalho.</span>
         {onExportBackup ? (
           <button

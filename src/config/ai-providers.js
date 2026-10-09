@@ -28,13 +28,13 @@ export const TEXT_PROVIDERS = {
   zai: {
     id: 'zai',
     // Nome de produto: o fornecedor por trás do texto incluso não aparece na UI.
-    name: 'Viral AI',
-    short: 'IA do Viral',
+    name: 'Moont AI',
+    short: 'IA da Moont',
     platform: true,
     models: [
-      { id: 'glm-4.7-flashx', name: 'Viral AI Rápido', note: 'Mais econômico', tier: 'economy' },
-      { id: 'glm-4.7', name: 'Viral AI', note: 'Melhor equilíbrio', tier: 'balanced' },
-      { id: 'glm-5.2', name: 'Viral AI Pro', note: 'Máxima qualidade', tier: 'quality' },
+      { id: 'glm-4.7-flashx', name: 'Moont AI Rápido', note: 'Mais econômico', tier: 'economy' },
+      { id: 'glm-4.7', name: 'Moont AI', note: 'Melhor equilíbrio', tier: 'balanced' },
+      { id: 'glm-5.2', name: 'Moont AI Pro', note: 'Máxima qualidade', tier: 'quality' },
     ],
   },
   kimi: {

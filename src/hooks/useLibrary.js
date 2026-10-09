@@ -147,7 +147,7 @@ export function useLibrary({
     setLibraryOpen(false);
     setShellView('project');
   }, []);
-  const newDoc = useCallback((seedDoc = null, name = 'Novo carrossel') => {
+  const newDoc = useCallback((seedDoc = null, name = 'Nova comunicação') => {
     // Aplica brand ativo no doc novo
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
     // Projeto novo = contexto próprio vazio, salvo quando o seed traz contexto.
@@ -256,7 +256,7 @@ export function useLibrary({
     toast?.(
       productKind === 'apresentacao'
         ? 'Nova apresentação com o mesmo contexto. Slides em branco.'
-        : 'Novo carrossel com o mesmo contexto. Cards em branco.',
+        : 'Nova narrativa de comunicação com o mesmo contexto. Cards em branco.',
       'success',
       4000,
     );
@@ -393,7 +393,7 @@ export function useLibrary({
       activeBrandId,
       docs,
     }, null, 2)], { type: 'application/json' });
-    const fname = `viral-carrossel-backup-${new Date().toISOString().slice(0,10)}.json`;
+    const fname = `moont-backup-${new Date().toISOString().slice(0,10)}.json`;
     await downloadBlob(blob, fname);
     if (missingBg > 0) {
       toast(`Backup completo "${fname}" — ${library.length} projeto(s), ${missingBg} slide(s) sem imagem.`, 'warning', 6500);
@@ -551,7 +551,7 @@ export function useLibrary({
         setShellView('project');
       } catch {
         window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-          detail: 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pelo Viral Carrossel.',
+          detail: 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pela Moont.',
         }));
       }
     };

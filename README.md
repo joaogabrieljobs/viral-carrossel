@@ -1,10 +1,10 @@
-# Viral. Carrossel Studio
+# Moont
 
-Studio para criar, editar e exportar carrosséis para Instagram com IA, contexto por projeto e controle sobre texto e imagem.
+Studio de narrativas visuais com IA. **Moont Comunica** transforma conteúdo em carrosséis e formatos sociais; **Moont Apresenta** organiza pitches, aulas, propostas, relatórios e keynotes em slides 16:9.
 
 **Produção:** [viralcarrossel.com.br](https://viralcarrossel.com.br) · Vite + React 18 · API serverless na Vercel.
 
-## Criar no studio
+## Criar com a Moont
 
 1. Abra um projeto e vá a **Narrativa → Usar contexto da marca**. Salve um nome para o contexto, brief, estilo visual, até quatro referências e, se quiser, uma logo PNG transparente.
 2. Em **Prompt para gerar**, diga o que criar e quantos cards deseja. Escolha **Só texto** ou **Texto e imagens** e um modo narrativo, incluindo **Nenhum**.
@@ -20,7 +20,8 @@ Guia completo: [Projetos, contexto e geração](docs/product/guia-projetos-gerac
 
 - Brief separado da matéria-prima do post, estilo e referências por projeto; aviso **Contexto ON** no topo.
 - Oito modos narrativos e opção **Nenhum**; presets criativos e densidade de texto.
-- Geração de slides e legenda, revisão editorial, cinco variações de gancho e refinamento de um ou de todos os cards.
+- Geração de cards, slides e legenda, revisão editorial, variações de gancho e refinamento individual ou em lote.
+- Caminhos próprios para comunicação social e apresentações, com estruturas narrativas e padrões visuais diferentes.
 - Oito tons de remix: Analítico, Provocador, Leve, Didático, Inspirador, Acolhedor, Técnico e Comercial.
 - Pesquisa de nicho: web ao vivo com chave Anthropic; sem essa chave, hipóteses de pauta identificadas como tal.
 - Identidade de marca, padrões visuais, layout, fontes, paleta e logo PNG reutilizável por card.
@@ -81,11 +82,13 @@ Base publicada em 28/09/2026: `d2043b6`, **343 testes de código + 66 testes de 
 | Feed 4:5 | 1080 × 1350 |
 | Quadrado | 1080 × 1080 |
 | Stories | 1080 × 1920 |
+| Apresentação 16:9 | 1920 × 1080 |
 
 `⌘/Ctrl+S` salva o projeto; `⌘/Ctrl+E` exporta o card; `⌘/Ctrl+Z` desfaz; `⌘/Ctrl+⇧Z` refaz. Setas navegam, `N` adiciona card e `?` abre a ajuda quando o foco não está em um campo de texto.
 
 ## Documentação
 
+- [Identidade e arquitetura de produtos da Moont](docs/brand/moont-identity.md)
 - [Guia de projetos e geração](docs/product/guia-projetos-geracao.md)
 - [Organização por pastas e calendário editorial](docs/product/organizacao-calendario.md)
 - [Controles de geração e logo: contratos e testes](docs/engineering/controles-geracao-projeto.md)

@@ -36,7 +36,7 @@ test.describe('Assinatura da marca no card', () => {
   test('barra editorial, selo e rodapé aparecem em todos os cards, com e sem composição', async ({ page }) => {
     test.setTimeout(90_000);
     await abrirEditorComTemplate(page);
-    const totalCards = await page.getByRole('button', { name: /^Slide \d+ de \d+$/ }).count();
+    const totalCards = await page.getByRole('button', { name: /^Card \d+ de \d+$/ }).count();
     expect(totalCards).toBeGreaterThan(2);
 
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });

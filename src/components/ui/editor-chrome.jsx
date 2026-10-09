@@ -199,7 +199,7 @@ function ModeSwitcher({ value, onChange, compact = false }) {
             WebkitBackdropFilter: 'blur(32px) saturate(180%)',
             border: '1px solid var(--glass-border-strong)',
             borderRadius: 14,
-            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.42), 0 0 40px rgba(255, 45, 141, 0.10)',
+            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.42), 0 0 40px rgba(91, 83, 232, 0.10)',
             padding: 4, zIndex: 100,
             animation: 'fadeUp 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
@@ -217,7 +217,7 @@ function ModeSwitcher({ value, onChange, compact = false }) {
                 style={{
                   width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '10px 12px', borderRadius: 10, border: 'none',
-                  background: active ? 'rgba(255, 45, 141, 0.10)' : 'transparent',
+                  background: active ? 'rgba(91, 83, 232, 0.10)' : 'transparent',
                   cursor: 'pointer', textAlign: 'left',
                   fontFamily: 'var(--font-ui)',
                   transition: 'background 0.15s var(--ease-smooth)',
@@ -227,7 +227,7 @@ function ModeSwitcher({ value, onChange, compact = false }) {
               >
                 <span style={{
                   width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                  background: active ? 'rgba(255, 45, 141, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                  background: active ? 'rgba(91, 83, 232, 0.18)' : 'rgba(255, 255, 255, 0.06)',
                   color: active ? 'var(--accent)' : 'var(--text-muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>

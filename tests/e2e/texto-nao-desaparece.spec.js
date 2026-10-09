@@ -52,7 +52,7 @@ async function prepararCardComSubtituloLongo(page) {
   await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeAttached({ timeout: 10_000 });
   await page.waitForTimeout(900);
 
-  await page.getByRole('button', { name: /^Slide 2 de / }).click({ force: true });
+  await page.getByRole('button', { name: /^Card 2 de / }).click({ force: true });
   await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });
   await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
   await page.getByText('Subtítulo', { exact: true }).first().locator('xpath=following::textarea[1]').fill(SUBTITULO_LONGO);

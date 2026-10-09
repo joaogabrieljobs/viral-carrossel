@@ -2,24 +2,35 @@
 // ─── GLOBAL STYLES ────────────────────────────────────────────────────────────
 
 export const GLOBAL_STYLE = `
-  /* Figma Design System — pastéis marketing + magenta CTA (+ Inter / JetBrains Mono). */
+  /* Moont Design System — midnight editorial + orbit blue + aurora. */
 
   :root {
-    /* — NARRATIVE OS Design System (Sessão A: Foundation Dark + Glass) — */
+    /* — MOONT Narrative Studio: Foundation Dark + Lunar Glass — */
 
-    /* Magenta core (mantém identidade) */
-    --accent-primary: #ff2d8d;
-    --accent-hover: #ff4fa1;
-    --accent-blue: #7ba7ff;
-    --accent-violet: #8f7dff;
-    --accent-amber: #ffb86a;
+    /* Orbit blue conduz ações; aurora distingue apresentações. */
+    --accent-primary: #5b53e8;
+    --accent-hover: #4d46d4;
+    --accent-rgb: 91, 83, 232;
+    --accent-gradient-start: #5b53e8;
+    --accent-gradient-end: #9a94ff;
+    --accent-blue: #86b6ff;
+    --accent-violet: #9a94ff;
+    --accent-amber: #ffc56f;
+    --aurora: #d7ff5a;
+    --aurora-hover: #c5ed45;
+    --aurora-surface: rgba(215, 255, 90, 0.11);
+    --aurora-surface-strong: rgba(215, 255, 90, 0.18);
+    /* As cores do símbolo não mudam quando o produto ativo muda. */
+    --moont-orbit: #5b53e8;
+    --moont-aurora: var(--aurora);
+    --moont-wordmark: #f3f0e7;
 
     /* Spec Narrative OS: bg light, mas mock é dark — interpolação:
        app fica DARK por default, surfaces com glass; texto on-dark.
        Tons charcoal/midnight em vez de preto puro. */
-    --bg-primary: #0e0c14;
-    --bg-secondary: #15131c;
-    --bg-tertiary: #1c1925;
+    --bg-primary: #090a0f;
+    --bg-secondary: #11131b;
+    --bg-tertiary: #181b25;
 
     /* Surfaces compat (mapeia tokens legacy do app pra equivalentes dark) */
     --bg-base: var(--bg-primary);
@@ -29,9 +40,9 @@ export const GLOBAL_STYLE = `
     --bg-elevated: var(--bg-tertiary);
     --bg-card: var(--bg-tertiary);
 
-    --bg-tile-1: #1c1925;
-    --bg-tile-2: #221f2c;
-    --bg-tile-3: #1a1722;
+    --bg-tile-1: #181b25;
+    --bg-tile-2: #202432;
+    --bg-tile-3: #151821;
     --bg-black: #000000;
 
     /* Glass system — multi-layer com blur. White/dark variants. */
@@ -58,14 +69,13 @@ export const GLOBAL_STYLE = `
     --border-on-dark: rgba(255, 255, 255, 0.18);
 
     /* Text on dark */
-    --text-primary: #f3f0eb;
-    --text-secondary: #b8b3a8;
-    --text-muted: rgba(243, 240, 235, 0.55);
+    --text-primary: #f3f0e7;
+    --text-secondary: #bbb9c7;
+    --text-muted: rgba(243, 240, 231, 0.56);
     --text-on-dark: #ffffff;
     --text-on-dark-muted: rgba(255, 255, 255, 0.72);
-    /* Texto escuro sobre magenta passa WCAG AA também no hover #ff4fa1. */
-    --text-on-accent: #160810;
-    /* Limite visível dos campos contra #1c1925: 3.45:1 (WCAG 1.4.11). */
+    --text-on-accent: #ffffff;
+    /* Limite visível dos campos contra o Graphite (WCAG 1.4.11). */
     --control-border: #736d7a;
 
     /* Accent system (legacy aliases pra compat) */
@@ -73,10 +83,10 @@ export const GLOBAL_STYLE = `
     --accent-focus: var(--accent-primary);
     --accent-secondary: var(--accent-violet);
     --accent-on-dark: #ffffff;
-    --accent-surface:        rgba(255, 45, 141, 0.10);
-    --accent-surface-strong: rgba(255, 45, 141, 0.18);
-    --accent-magenta-surface: rgba(255, 45, 141, 0.10);
-    --accent-glow: rgba(255, 45, 141, 0.32);
+    --accent-surface:        rgba(var(--accent-rgb), 0.12);
+    --accent-surface-strong: rgba(var(--accent-rgb), 0.22);
+    --accent-magenta-surface: var(--accent-surface);
+    --accent-glow: rgba(var(--accent-rgb), 0.34);
 
     --logo-mark-bg: var(--accent-surface);
     --logo-mark-fg: var(--accent-primary);
@@ -137,7 +147,8 @@ export const GLOBAL_STYLE = `
     --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.48);
 
     /* Ambient colored glows */
-    --shadow-pink:   0 0 40px rgba(255, 45, 141, 0.22);
+    --shadow-orbit:  0 0 44px rgba(var(--accent-rgb), 0.26);
+    --shadow-pink:   var(--shadow-orbit);
     --shadow-blue:   0 0 48px rgba(123, 167, 255, 0.18);
     --shadow-violet: 0 0 56px rgba(143, 125, 255, 0.18);
 
@@ -148,15 +159,15 @@ export const GLOBAL_STYLE = `
       0 1px 2px rgba(0, 0, 0, 0.12);
     --shadow-card-hover:
       0 16px 40px rgba(0, 0, 0, 0.36),
-      0 0 40px rgba(255, 45, 141, 0.12);
+      0 0 40px rgba(var(--accent-rgb), 0.12);
     --shadow-elevated:
       0 8px 32px rgba(0, 0, 0, 0.32),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
 
     /* Surface gradients — dark glass */
     --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
-    --gradient-accent: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
-    --gradient-bg: linear-gradient(180deg, #0e0c14 0%, #15131c 100%);
+    --gradient-accent: linear-gradient(135deg, var(--accent-gradient-start) 0%, var(--accent-gradient-end) 100%);
+    --gradient-bg: linear-gradient(180deg, #090a0f 0%, #11131b 100%);
 
     --safe-top:    env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -167,10 +178,10 @@ export const GLOBAL_STYLE = `
   * { box-sizing: border-box; }
 
   body {
-    /* Dark gradient + ambient glow magenta no canto (Vision OS-like) */
+    /* Night canvas com órbita azul e uma aurora discreta. */
     background:
-      radial-gradient(ellipse at top right, rgba(255, 45, 141, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at bottom left, rgba(143, 125, 255, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at top right, rgba(var(--accent-rgb), 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(215, 255, 90, 0.045) 0%, transparent 60%),
       var(--gradient-bg);
     background-attachment: fixed;
     color: var(--text-primary);
@@ -226,8 +237,8 @@ export const GLOBAL_STYLE = `
     to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes accentGlow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 61, 139, 0.40); }
-    50%      { box-shadow: 0 0 0 8px rgba(255, 61, 139, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.40); }
+    50%      { box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0); }
   }
   @keyframes shimmer {
     0%   { background-position: -200% 0; }
@@ -268,7 +279,7 @@ export const GLOBAL_STYLE = `
     border-color: var(--glass-border-strong);
     box-shadow:
       0 24px 64px rgba(0, 0, 0, 0.42),
-      0 0 40px rgba(255, 45, 141, 0.16),
+      0 0 40px rgba(var(--accent-rgb), 0.16),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
   .vc-glass-card {
@@ -450,15 +461,15 @@ export const GLOBAL_STYLE = `
   }
   button:not(:disabled):active { transform: scale(0.96); }
 
-  /* Botão accent magenta — gradient 135deg + sombra magenta + glow no hover */
+  /* Botão de ação Orbital Blue — gradiente, sombra e brilho no hover */
   button[style*="background:var(--accent)"]:not(:disabled),
   button[style*="background: var(--accent)"]:not(:disabled),
   button[style*="background:'var(--accent)'"]:not(:disabled) {
-    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
+    background: var(--gradient-accent) !important;
     color: var(--text-on-accent) !important;
     border: 1px solid rgba(255, 255, 255, 0.10) !important;
     box-shadow:
-      0 8px 24px rgba(255, 45, 141, 0.24),
+      0 8px 24px rgba(var(--accent-rgb), 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
   }
   button[style*="background:var(--accent)"]:not(:disabled):hover,
@@ -466,8 +477,8 @@ export const GLOBAL_STYLE = `
   button[style*="background:'var(--accent)'"]:not(:disabled):hover {
     transform: translateY(-2px);
     box-shadow:
-      0 16px 40px rgba(255, 45, 141, 0.32),
-      0 0 24px rgba(255, 45, 141, 0.18),
+      0 16px 40px rgba(var(--accent-rgb), 0.32),
+      0 0 24px rgba(var(--accent-rgb), 0.18),
       inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
   }
 
@@ -491,10 +502,10 @@ export const GLOBAL_STYLE = `
   textarea:focus,
   select:focus {
     outline: none;
-    border-color: rgba(255, 45, 141, 0.42) !important;
+    border-color: rgba(var(--accent-rgb), 0.42) !important;
     box-shadow:
-      0 0 0 4px rgba(255, 45, 141, 0.08),
-      0 8px 24px rgba(255, 45, 141, 0.12) !important;
+      0 0 0 4px rgba(var(--accent-rgb), 0.08),
+      0 8px 24px rgba(var(--accent-rgb), 0.12) !important;
   }
 
   /* — REGRESSION FIXES Sessão C — atinge inline-styled patterns globais
@@ -505,11 +516,11 @@ export const GLOBAL_STYLE = `
      ficariam BRANCOS em dark — visualmente errado). Viram accent gradient. */
   button[style*="background:var(--text-primary)"]:not(.vc-btn-primary):not(:disabled),
   button[style*="background: var(--text-primary)"]:not(.vc-btn-primary):not(:disabled) {
-    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%) !important;
+    background: var(--gradient-accent) !important;
     color: var(--text-on-accent) !important;
     border-color: transparent !important;
     box-shadow:
-      0 8px 24px rgba(255, 45, 141, 0.24),
+      0 8px 24px rgba(var(--accent-rgb), 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
   }
 
@@ -571,8 +582,7 @@ export const GLOBAL_STYLE = `
     color: var(--text-primary) !important;
   }
 
-  /* — Buttons — modernizados: micro-interactions, glass ghost, glow primary,
-     transitions cubic-bezier suaves. Mantém identidade magenta. — */
+  /* — Buttons — micro-interactions, glass ghost e brilho Orbital Blue. — */
   .vc-btn {
     display: inline-flex; align-items: center; justify-content: center;
     gap: 8px; font-family: var(--font-ui); font-weight: 600;
@@ -604,27 +614,27 @@ export const GLOBAL_STYLE = `
   .vc-btn:focus-visible { outline: 2px solid var(--accent-focus); outline-offset: 3px; }
   .vc-btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
 
-  /* Primary pill — gradient 135deg magenta + sombra colored + glow no hover */
+  /* Primary pill — gradiente Orbital Blue e brilho no hover */
   .vc-btn-primary {
     color: var(--text-on-accent);
     padding: 0 22px; height: 40px; font-size: 14px; font-weight: 600;
-    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
+    background: var(--gradient-accent);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
-      0 8px 24px rgba(255, 45, 141, 0.24),
+      0 8px 24px rgba(var(--accent-rgb), 0.24),
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
   .vc-btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow:
-      0 16px 40px rgba(255, 45, 141, 0.32),
-      0 0 24px rgba(255, 45, 141, 0.18),
+      0 16px 40px rgba(var(--accent-rgb), 0.32),
+      0 0 24px rgba(var(--accent-rgb), 0.18),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
   .vc-btn-primary:active:not(:disabled) {
     transform: scale(0.97);
     box-shadow:
-      0 4px 12px rgba(255, 45, 141, 0.32),
+      0 4px 12px rgba(var(--accent-rgb), 0.32),
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
 
@@ -666,7 +676,7 @@ export const GLOBAL_STYLE = `
   .vc-icon-btn:active { transform: scale(0.92); }
   .vc-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* Inputs glass — surface translúcida sobre dark + focus halo magenta */
+  /* Inputs glass — superfície translúcida e foco Orbital Blue */
   /* Camada de toque da zona da foto: o input tem de existir e ser clicável, mas o
      controlo nativo (botão + "Nenhum arquivo escolhido") não pode aparecer no card. */
   .vc-photo-hit { color: transparent !important; font-size: 0 !important; }
@@ -693,11 +703,11 @@ export const GLOBAL_STYLE = `
     background: rgba(255, 255, 255, 0.08);
   }
   .vc-input:focus {
-    border-color: rgba(255, 45, 141, 0.52);
+    border-color: rgba(var(--accent-rgb), 0.52);
     background: rgba(255, 255, 255, 0.08);
     box-shadow:
-      0 0 0 4px rgba(255, 45, 141, 0.10),
-      0 8px 24px rgba(255, 45, 141, 0.18);
+      0 0 0 4px rgba(var(--accent-rgb), 0.10),
+      0 8px 24px rgba(var(--accent-rgb), 0.18);
   }
   @media (max-width: 767px) {
     .vc-input { font-size: 16px; padding: 12px 18px; }
@@ -725,8 +735,8 @@ export const GLOBAL_STYLE = `
     content: ''; display: block; width: 18px; height: 2px;
     background: var(--accent); border-radius: 2px;
     flex-shrink: 0;
-    /* Ambient glow magenta sutil */
-    box-shadow: 0 0 8px rgba(255, 45, 141, 0.5);
+    /* Brilho Orbital Blue sutil */
+    box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
   }
 
   /* Tab bar — grelha 3 col. Linhas via gap (última linha incompleta não
@@ -750,16 +760,16 @@ export const GLOBAL_STYLE = `
   }
   .tab-bar-item.active {
     color: #fff; font-weight: 600;
-    background: linear-gradient(135deg, rgba(255,45,141,0.22) 0%, rgba(255,45,141,0.08) 100%);
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22) 0%, rgba(var(--accent-rgb), 0.08) 100%);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 45, 141, 0.45),
-      inset 0 0 24px rgba(255, 45, 141, 0.12),
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.45),
+      inset 0 0 24px rgba(var(--accent-rgb), 0.12),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
   .tab-bar-item.active::after {
     content: ''; position: absolute; bottom: 0; left: 10px; right: 10px;
     height: 2px; background: var(--accent); border-radius: 99px;
-    box-shadow: 0 0 12px rgba(255, 45, 141, 0.6);
+    box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6);
   }
   .tab-bar-item:hover:not(.active) {
     color: var(--text-primary);
@@ -800,10 +810,10 @@ export const GLOBAL_STYLE = `
   }
   .vc-seg-item[aria-pressed="true"],
   .vc-seg-item.active {
-    background: linear-gradient(135deg, #ff2d8d 0%, #ff4fa1 100%);
+    background: var(--gradient-accent);
     border-color: rgba(255, 255, 255, 0.18);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(255, 45, 141, 0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+    box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.28), inset 0 1px 0 rgba(255,255,255,0.16);
   }
 
   /* Slide thumbs — foco com anel de primário (--accent-focus) */
@@ -894,11 +904,11 @@ export const GLOBAL_STYLE = `
     border-top-left-radius: 24px; border-top-right-radius: 24px;
     padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px));
     color: var(--text-primary);
-    /* Sombra multi-layer + ambient glow magenta */
+    /* Sombra em camadas com brilho Orbital Blue */
     box-shadow:
       0 -1px 0 rgba(255, 255, 255, 0.10) inset,
       0 -12px 40px rgba(0, 0, 0, 0.42),
-      0 -32px 80px rgba(255, 45, 141, 0.12);
+      0 -32px 80px rgba(var(--accent-rgb), 0.12);
   }
   @supports (height: 100svh) {
     .modal-panel {
@@ -912,11 +922,11 @@ export const GLOBAL_STYLE = `
       max-width: 480px; max-height: min(90vh, 900px);
       padding-bottom: 12px;
       animation: modalIn 0.28s var(--ease-smooth);
-      /* Float dark com glow magenta multi-layer */
+      /* Float escuro com brilho Orbital Blue em camadas */
       box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.10) inset,
         0 24px 60px rgba(0, 0, 0, 0.48),
-        0 48px 120px rgba(255, 45, 141, 0.14);
+        0 48px 120px rgba(var(--accent-rgb), 0.14);
     }
   }
   /* Modal alto (ex.: Gerar): cabeçalho fixo + corpo com scroll — evita CTA escondido no mobile */
@@ -966,6 +976,15 @@ export const GLOBAL_STYLE = `
     .vc-library-actions {
       display: grid !important;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .vc-library-actions > .vc-library-product-picker {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-width: 0;
+    }
+    .vc-library-product-picker > button,
+    .vc-library-product-picker > button > span {
+      min-width: 0;
     }
     .vc-library-actions > button {
       min-width: 0;

@@ -9,7 +9,7 @@ export const APP_MODE_UI = {
   criador: {
     label: 'Criar rápido',
     tagline: 'Pra começar agora',
-    desc: 'Ideia → carrossel com a sua identidade → revisar → baixar',
+    desc: 'Ideia → narrativa de comunicação ou apresentação → revisar → exportar',
     shortDesc: 'Poucas decisões — gerar e exportar',
   },
   diretor: {

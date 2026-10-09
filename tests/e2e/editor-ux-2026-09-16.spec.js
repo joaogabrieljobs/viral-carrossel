@@ -1,4 +1,4 @@
-// Itens da revisão de UX do editor (docs/ux-audit-editor-2026-09-16.md) e marca Viral AI.
+// Itens da revisão de UX do editor (docs/ux-audit-editor-2026-09-16.md) e marca Moont AI.
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -34,11 +34,11 @@ test.describe('Editor — revisão de UX', () => {
     await expect(page.getByRole('button', { name: /sair da conta/i })).toHaveCount(0);
   });
 
-  test('Configurar IA não menciona o fornecedor — só Viral AI', async ({ page }) => {
+  test('Configurar IA não menciona o fornecedor — só Moont AI', async ({ page }) => {
     await entrarNoEditor(page);
     await page.getByRole('button', { name: /configurar ia/i }).first().click({ force: true });
     const modal = page.getByRole('dialog').first();
-    await expect(modal).toContainText('Viral AI', { timeout: 5000 });
+    await expect(modal).toContainText('Moont AI', { timeout: 5000 });
     await expect(modal).not.toContainText(/z\.ai|glm/i);
   });
 });

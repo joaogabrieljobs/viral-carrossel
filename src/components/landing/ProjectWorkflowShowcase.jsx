@@ -9,6 +9,12 @@ const FEATURES = [
   { icon: Square, title: 'Pode parar quando precisar', body: 'O botão Cancelar geração continua disponível ao trocar de aba. O que já ficou pronto é mantido.' },
 ];
 
+const DEMO_CARD_BACKGROUNDS = [
+  'linear-gradient(125deg, #5b53e8, #211e53 55%, #9a94ff)',
+  'linear-gradient(170deg, #202432, #3b3694 52%, #718127)',
+  'linear-gradient(215deg, #6c65ef, #181b25 58%, #4e5b1f)',
+];
+
 /** Demonstração local: não chama IA, não altera projetos e não consome créditos. */
 export default function ProjectWorkflowShowcase({ onEnter, isMobile }) {
   const [scope, setScope] = useState('text');
@@ -30,7 +36,7 @@ export default function ProjectWorkflowShowcase({ onEnter, isMobile }) {
             </div>
           ))}
         </div>
-        <div aria-label="Demonstração do projeto" style={{ minWidth: 0, padding: isMobile ? 16 : 24, border: '1px solid var(--glass-border-strong)', borderRadius: 20, background: 'linear-gradient(145deg, rgba(255,45,141,0.1), var(--bg-secondary) 55%)' }}>
+        <div aria-label="Demonstração do projeto" style={{ minWidth: 0, padding: isMobile ? 16 : 24, border: '1px solid var(--glass-border-strong)', borderRadius: 20, background: 'linear-gradient(145deg, rgba(91,83,232,0.1), var(--bg-secondary) 55%)' }}>
           <p style={{ margin: '0 0 16px', fontSize: 11, color: 'var(--text-muted)' }}>PRÉVIA ILUSTRATIVA · SEM CONSUMO DE CRÉDITOS</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'var(--accent-surface)', fontSize: 13, marginBottom: 18 }}><BookOpen size={16} aria-hidden="true" /><strong>Sua marca — Contexto ON</strong></div>
           <fieldset style={{ padding: 0, border: 0, margin: '0 0 16px', minWidth: 0 }}>
@@ -46,7 +52,7 @@ export default function ProjectWorkflowShowcase({ onEnter, isMobile }) {
           <p role="status" style={{ minHeight: 40, margin: '0 0 12px', fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{scope === 'text' ? 'O texto ganha forma. Você pode adicionar as imagens depois.' : 'Texto e direção visual juntos. No studio, gerar imagens usa o saldo do plano ou a sua chave.'}</p>
           <div role="group" aria-label="Cards da demonstração" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
             {['Uma ideia.', 'Uma direção.', 'Sua assinatura.'].map((title, index) => (
-              <button key={title} type="button" aria-label={`Selecionar card ${index + 1} da demonstração`} aria-pressed={selected === index} onClick={() => setSelected(index)} style={{ position: 'relative', aspectRatio: '4 / 5', minWidth: 0, overflow: 'hidden', padding: 10, borderRadius: 10, border: `2px solid ${selected === index ? 'var(--accent)' : 'transparent'}`, background: scope === 'images' ? `linear-gradient(${125 + index * 45}deg, #69204c, #271527 55%, #ad395b)` : '#211c29', color: '#fff', textAlign: 'left', cursor: 'pointer' }}>
+              <button key={title} type="button" aria-label={`Selecionar card ${index + 1} da demonstração`} aria-pressed={selected === index} onClick={() => setSelected(index)} style={{ position: 'relative', aspectRatio: '4 / 5', minWidth: 0, overflow: 'hidden', padding: 10, borderRadius: 10, border: `2px solid ${selected === index ? 'var(--accent)' : 'transparent'}`, background: scope === 'images' ? DEMO_CARD_BACKGROUNDS[index] : '#181b25', color: '#fff', textAlign: 'left', cursor: 'pointer' }}>
                 {scope === 'images' && <Image size={24} aria-hidden="true" style={{ position: 'absolute', top: 12, right: 10, opacity: 0.5 }} />}
                 <span style={{ display: 'block', position: 'relative', fontSize: isMobile ? 13 : 15, fontWeight: 700, lineHeight: 1.2 }}>{title}</span>
                 {logos.includes(index) && <span aria-label={`Logo aplicada no card ${index + 1}`} style={{ position: 'absolute', bottom: 8, left: 8, padding: '3px 5px', border: '1px solid #ffffff70', borderRadius: 4, fontSize: 8, fontWeight: 700 }}>SUA MARCA</span>}

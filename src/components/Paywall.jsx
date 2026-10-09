@@ -61,7 +61,7 @@ export default function Paywall({
         alignItems: 'center',
         justifyContent: 'center',
         padding: isMobile ? '24px 16px' : '48px 24px',
-        background: 'var(--bg-primary, #0e0c14)',
+        background: 'var(--bg-primary, #090a0f)',
         color: 'var(--text-primary, #fff)',
         fontFamily: 'var(--font-ui, Inter, system-ui, sans-serif)',
       }}
@@ -72,9 +72,9 @@ export default function Paywall({
           maxWidth: 520,
           padding: isMobile ? 28 : 36,
           borderRadius: 'var(--radius-xl, 24px)',
-          border: '1px solid rgba(255, 45, 141, 0.28)',
-          background: 'linear-gradient(165deg, rgba(255,45,141,0.08) 0%, rgba(14,12,20,0.95) 40%)',
-          boxShadow: '0 8px 32px rgba(255, 45, 141, 0.12)',
+          border: '1px solid rgba(91, 83, 232, 0.32)',
+          background: 'linear-gradient(165deg, rgba(91,83,232,0.12) 0%, rgba(9,10,15,0.96) 40%)',
+          boxShadow: '0 8px 32px rgba(91, 83, 232, 0.16)',
         }}
       >
         <div style={{ marginBottom: 16 }}>
@@ -86,7 +86,7 @@ export default function Paywall({
           fontSize: 11,
           letterSpacing: '0.12em',
           textTransform: 'uppercase',
-          color: 'var(--accent, #ff2d8d)',
+          color: 'var(--accent, #5b53e8)',
           fontWeight: 600,
         }}>
           Escolha o plano
@@ -107,7 +107,7 @@ export default function Paywall({
           lineHeight: 1.5,
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
-          Texto (Viral AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.
+          Texto (Moont AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.
         </p>
 
         <div style={{
@@ -128,8 +128,8 @@ export default function Paywall({
                   textAlign: 'left',
                   padding: '12px 14px',
                   borderRadius: 12,
-                  border: selected ? '1.5px solid var(--accent, #ff2d8d)' : '1px solid rgba(255,255,255,0.12)',
-                  background: selected ? 'rgba(255,45,141,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: selected ? '1.5px solid var(--accent, #5b53e8)' : '1px solid rgba(255,255,255,0.12)',
+                  background: selected ? 'rgba(91,83,232,0.14)' : 'rgba(255,255,255,0.03)',
                   color: 'inherit',
                   cursor: 'pointer',
                   fontFamily: 'inherit',

@@ -18,24 +18,24 @@ export function getOnboardingSteps(isMobile, empty) {
   if (!isMobile) panelSel = '[data-vc-tour="sidebar-tabs"]';
   else if (!empty) panelSel = '[data-vc-tour="mobile-bar"]';
   const panelBody = !isMobile
-    ? 'Na sidebar: peça o carrossel, revise o texto e baixe os PNGs. Nos modos Controle profissional e Studio aparecem mais abas de ajuste fino.'
+    ? 'Na sidebar: peça sua narrativa visual, revise o conteúdo e exporte. Nos modos Controle profissional e Studio aparecem mais abas de ajuste fino.'
     : empty
-      ? 'Depois do primeiro carrossel, a barra de baixo dá acesso à edição.'
+      ? 'Depois da primeira criação, a barra de baixo dá acesso à edição.'
       : 'Toque nos ícones da barra de baixo para abrir cada painel.';
 
   return [
     {
       id: 'welcome',
-      title: 'Bem-vindo ao Viral Carrossel',
+      title: 'Bem-vindo à Moont',
       body:
-        'Três passos: pedir o carrossel à IA, rever os cards e baixar. Pode pular agora e rever depois na ajuda.',
+        'Três passos: peça uma narrativa à IA, revise os cards ou slides e exporte. Pode pular agora e rever depois na ajuda.',
       selector: null,
     },
     {
       id: 'generate',
       title: 'Gerar com IA',
       body:
-        'No Criar rápido, escreva o pedido na sidebar e toque em Gerar carrossel. No header, Gerar abre o assistente completo.',
+        'No Criar rápido, escreva o pedido na sidebar e toque em Gerar. No header, Gerar abre o assistente completo para comunicação ou apresentação.',
       selector: '[data-vc-tour="generate"]',
     },
     {

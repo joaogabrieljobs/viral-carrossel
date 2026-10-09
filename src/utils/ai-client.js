@@ -241,15 +241,15 @@ function translateProviderError(provider, status, data, raw) {
   const msg = String(data?.error?.message || data?.message || '').trim();
   const code = String(data?.error?.code || data?.code || '');
   if (code === '1305' || /overloaded|try again later/i.test(msg)) {
-    return 'A Viral AI está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
+    return 'A Moont AI está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
   }
   if (status === 401 || /token expired|incorrect|unauthorized/i.test(msg)) {
     return 'A IA incluída no plano está indisponível neste momento. Tente de novo em instantes — se persistir, fale com o suporte.';
   }
   if (status === 429) {
-    return 'Muitos pedidos à Viral AI. Espera um momento e tenta de novo.';
+    return 'Muitos pedidos à Moont AI. Espera um momento e tenta de novo.';
   }
-  return msg || `${provider === 'zai' ? 'Viral AI' : 'Kimi'} HTTP ${status}`;
+  return msg || `${provider === 'zai' ? 'Moont AI' : 'Kimi'} HTTP ${status}`;
 }
 
 const callCompatibleChat = async (
@@ -298,7 +298,7 @@ const callCompatibleChat = async (
         signal,
       });
     } catch (error) {
-      throw enhanceNetworkError(error, provider === 'zai' ? 'Viral AI' : 'Kimi');
+      throw enhanceNetworkError(error, provider === 'zai' ? 'Moont AI' : 'Kimi');
     }
 
     // 429 do rate-limiter do PROXY (traz Retry-After) — não é overload da Z.ai; cascatear
@@ -315,7 +315,7 @@ const callCompatibleChat = async (
     let data;
     try { data = JSON.parse(raw); }
     catch {
-      lastError = new Error(`${provider === 'zai' ? 'Viral AI' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
+      lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
       continue;
     }
 
@@ -334,14 +334,14 @@ const callCompatibleChat = async (
 
     const text = data.choices?.[0]?.message?.content || '';
     if (!text.trim()) {
-      lastError = new Error(`${provider === 'zai' ? 'Viral AI' : 'Kimi'} retornou conteúdo vazio.`);
+      lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'} retornou conteúdo vazio.`);
       if (i < modelCandidates.length - 1) continue;
       throw lastError;
     }
     return parseStructuredText(text, json, jsonParser);
   }
 
-  throw lastError || new Error('Viral AI indisponível. Tenta de novo.');
+  throw lastError || new Error('Moont AI indisponível. Tenta de novo.');
 };
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro

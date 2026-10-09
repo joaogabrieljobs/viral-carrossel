@@ -34,10 +34,10 @@ function AccordionHeader({
         padding: '12px 14px',
         minHeight: 56,
         borderRadius: open && connectBody ? '12px 12px 0 0' : 12,
-        border: `1px solid ${open ? 'rgba(255, 45, 141, 0.45)' : 'var(--glass-border-strong)'}`,
+        border: `1px solid ${open ? 'rgba(91, 83, 232, 0.45)' : 'var(--glass-border-strong)'}`,
         borderBottom: open && connectBody ? '1px solid var(--glass-border)' : undefined,
         background: open
-          ? 'linear-gradient(135deg, rgba(255,45,141,0.10) 0%, rgba(255,255,255,0.04) 100%)'
+          ? 'linear-gradient(135deg, rgba(91,83,232,0.10) 0%, rgba(255,255,255,0.04) 100%)'
           : 'rgba(255, 255, 255, 0.04)',
         cursor: 'pointer',
         textAlign: 'left',
@@ -93,7 +93,7 @@ function AccordionPanel({ open, children, flushBottom = false }) {
   return (
     <div style={{
       padding: 14,
-      border: '1px solid rgba(255, 45, 141, 0.28)',
+      border: '1px solid rgba(91, 83, 232, 0.28)',
       borderTop: 'none',
       borderRadius: flushBottom ? 0 : '0 0 12px 12px',
       background: 'rgba(255, 255, 255, 0.03)',

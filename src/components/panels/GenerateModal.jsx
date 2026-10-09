@@ -22,6 +22,7 @@ import {
   PRESENTATION_VISUAL_PRESETS,
   resolvePresentationVisualPresetDefinition,
 } from '../../styles/presentation-presets.jsx';
+import { moontNarrative } from '../../config/moont-brand.js';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -121,6 +122,8 @@ function GenerateModal({
   hookLibrary = [],
 }) {
   const isPresentation = productKind === 'apresentacao';
+  const productNarrative = moontNarrative(productKind);
+  const productFlow = isPresentation ? 'Faça uma ideia avançar' : 'Faça uma ideia circular';
   const initialPresentationPath = normalizePresentationPath(defaultPresentationPath);
   const availableVisualPresets = useMemo(
     () => filterVisualPresetsForProduct(visualPresets, productKind),
@@ -193,8 +196,8 @@ function GenerateModal({
   const [step, setStep] = useState(1);
   useEffect(() => { if (open) setStep(1); }, [open]);
   const STEPS = useMemo(() => ([
-    { id: 1, label: isPresentation ? 'Tema' : 'Ideia' },
-    { id: 2, label: isPresentation ? 'Estrutura' : 'Formato' },
+    { id: 1, label: isPresentation ? 'Intenção' : 'Ideia' },
+    { id: 2, label: isPresentation ? 'Caminho' : 'Formato' },
     { id: 3, label: 'Imagens' },
     { id: 4, label: 'Revisão' },
   ]), [isPresentation]);
@@ -366,6 +369,7 @@ function GenerateModal({
         className="modal-panel vc-modal-scroll"
         role="dialog"
         aria-modal="true"
+        aria-label={isPresentation ? 'Configurar apresentação' : 'Configurar carrossel'}
         aria-labelledby="generate-modal-title"
         tabIndex={-1}
         onKeyDown={onDialogKeyDown}
@@ -386,9 +390,12 @@ function GenerateModal({
             </div>
             <div>
               <div id="generate-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>
-                {isPresentation ? 'Configurar apresentação' : 'Configurar carrossel'}
+                {productNarrative.name}
               </div>
-              <div className="vc-eyebrow">Passo {step} de {STEPS.length} · {STEPS[step-1].label}</div>
+              <div className="vc-eyebrow">
+                <span>{isPresentation ? 'Configurar apresentação' : 'Configurar carrossel'}</span>
+                <span> · {productNarrative.eyebrow} · Passo {step} de {STEPS.length} · {STEPS[step-1].label}</span>
+              </div>
             </div>
           </div>
           <button onClick={requestClose} className="vc-icon-btn" aria-label={busy ? 'Cancelar geração' : 'Fechar'}>
@@ -495,7 +502,7 @@ function GenerateModal({
                       </>
                     ) : (
                       <>
-                        Vai gerar só pelo tema abaixo? Para basear {isPresentation ? 'a apresentação' : 'o carrossel'} em{' '}
+                        {productFlow}. Para basear {isPresentation ? 'a apresentação' : 'o carrossel'} em{' '}
                         <span style={{ fontWeight:600 }}>texto, links ou notas</span>, preencha primeiro a aba{' '}
                         <span style={{ fontWeight:600 }}>Conteúdo</span> — assim a IA não inventa em cima de um ponto genérico.
                       </>
@@ -524,10 +531,11 @@ function GenerateModal({
                   cognitiva, especialmente em telas pequenas. */}
               <div>
                 <label className="vc-label" htmlFor="generation-topic">
-                  {isPresentation ? 'Qual é o tema da apresentação?' : 'Sobre o que é o conteúdo?'}
+                  {isPresentation ? 'Qual ideia precisa avançar?' : 'Qual ideia precisa circular?'}
                 </label>
                 <textarea
                   id="generation-topic"
+                  aria-label={isPresentation ? 'Qual é o tema da apresentação?' : 'Sobre o que é o conteúdo?'}
                   value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
                   placeholder={isPresentation
                     ? 'Ex: proposta de expansão para o mercado brasileiro em 2027'
@@ -805,7 +813,7 @@ function GenerateModal({
                 value={visualPreset}
                 onChange={setVisualPresetLocal}
                 presets={availableVisualPresets}
-                title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha o padrão visual'}
+                title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha um padrão de comunicação 4:5'}
                 suggestedId={isPresentation ? selectedPresentationPath.suggestedVisualPreset : null}
                 aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}
               />
@@ -1039,6 +1047,9 @@ function GenerateModal({
                   Pronto para gerar
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'minmax(0,auto) 1fr', columnGap:14, rowGap:8, fontSize:13, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', alignItems:'center' }}>
+                  <span style={{ color:'var(--text-muted)' }}>Produto</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:600 }}>{productNarrative.name} · {productNarrative.format}</span>
+
                   <span style={{ color:'var(--text-muted)' }}>Tema</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
                     {resolvedGenerationTopic.length > 100
@@ -1191,6 +1202,9 @@ function GenerateModal({
               {/* A ação final respeita a única escolha feita na etapa 3. */}
               <button
                 type="button"
+                aria-label={hasOpenAI && wantImages
+                  ? (isPresentation ? 'Gerar apresentação com imagens' : 'Gerar texto e imagens')
+                  : (isPresentation ? 'Gerar apresentação' : 'Gerar só texto')}
                 onClick={() => run({ withImages: !!(hasOpenAI && wantImages) })}
                 disabled={busy || !resolvedGenerationTopic || (wantImages && !hasOpenAI)}
                 title={
@@ -1213,8 +1227,8 @@ function GenerateModal({
                 {busy
                   ? <><Loader2 size={15} style={{animation:'spin 0.8s linear infinite'}}/>Gerando…</>
                   : hasOpenAI && wantImages
-                    ? <><Sparkles size={15}/>{isPresentation ? 'Gerar apresentação com imagens' : 'Gerar texto e imagens'}</>
-                    : <><Sparkles size={15}/>{isPresentation ? 'Gerar apresentação' : 'Gerar só texto'}</>
+                    ? <><Sparkles size={15}/>{isPresentation ? 'Gerar com Moont Apresenta + imagens' : 'Gerar com Moont Comunica + imagens'}</>
+                    : <><Sparkles size={15}/>{isPresentation ? 'Gerar com Moont Apresenta' : 'Gerar com Moont Comunica'}</>
                 }
               </button>
             </div>

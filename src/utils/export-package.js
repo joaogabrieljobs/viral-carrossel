@@ -6,7 +6,7 @@
 export const PUBLISH_CHECKLIST = [
   { id: 'pngs', label: 'PNGs baixados' },
   { id: 'caption', label: 'Legenda copiada' },
-  { id: 'instagram', label: 'Publicar no Instagram (fora do Viral)' },
+  { id: 'instagram', label: 'Publicar no Instagram (fora da Moont)' },
   { id: 'mark', label: 'Marcar o projeto como Publicado na biblioteca' },
 ];
 

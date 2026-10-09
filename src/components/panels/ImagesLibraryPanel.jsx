@@ -99,7 +99,7 @@ export default function ImagesLibraryPanel({
         if (img.blob) zip.file(img.nome, img.blob);
       });
       const out = await zip.generateAsync({ type: 'blob' });
-      await downloadBlob(out, 'imagens-viral-carrossel.zip');
+      await downloadBlob(out, 'imagens-moont.zip');
     } finally {
       setBaixandoTudo(false);
     }

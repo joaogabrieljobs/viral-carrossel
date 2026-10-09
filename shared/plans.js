@@ -1,5 +1,5 @@
 /**
- * Planos Viral. — fonte de verdade para tier, preço e quota de imagem SJinn.
+ * Planos Moont — fonte de verdade para tier, preço e quota de imagem SJinn.
  * Usado no servidor (api/) e no client (src/). Manter em sync com
  * docs/product/PRD-planos-imagem-sjinn.md
  */

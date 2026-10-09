@@ -6,11 +6,11 @@ import { wcagContrast } from '../../src/utils/wcag.js';
 const source = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 describe('contratos críticos de acessibilidade da interface', () => {
-  it('mantém contraste AA do texto sobre o magenta normal e hover', () => {
+  it('mantém contraste AA do texto sobre o azul orbital normal e hover', () => {
     const textOnAccent = /--text-on-accent:\s*(#[0-9a-f]{6})/i.exec(GLOBAL_STYLE)?.[1];
     expect(textOnAccent).toBeTruthy();
-    expect(wcagContrast(textOnAccent, '#ff2d8d')).toBeGreaterThanOrEqual(4.5);
-    expect(wcagContrast(textOnAccent, '#ff4fa1')).toBeGreaterThanOrEqual(4.5);
+    expect(wcagContrast(textOnAccent, '#5b53e8')).toBeGreaterThanOrEqual(4.5);
+    expect(wcagContrast(textOnAccent, '#4d46d4')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('mantém todos os tipos de toast com contraste AA', () => {

@@ -14,7 +14,7 @@ const PRESETS = [
   {
     id: 'economy',
     name: 'Economizar',
-    note: 'Viral AI Rápido — texto incluso no plano',
+    note: 'Moont AI Rápido — texto incluso no plano',
     textProvider: 'zai',
     textModel: 'glm-4.7-flashx',
     imageProvider: 'openai',
@@ -23,7 +23,7 @@ const PRESETS = [
   {
     id: 'balanced',
     name: 'Equilíbrio',
-    note: 'Viral AI — texto incluso no plano',
+    note: 'Moont AI — texto incluso no plano',
     textProvider: 'zai',
     textModel: 'glm-4.7',
     imageProvider: 'openai',
@@ -32,7 +32,7 @@ const PRESETS = [
   {
     id: 'quality',
     name: 'Qualidade',
-    note: 'Viral AI Pro — texto incluso no plano',
+    note: 'Moont AI Pro — texto incluso no plano',
     textProvider: 'zai',
     textModel: 'glm-5.2',
     imageProvider: 'openai',
@@ -168,7 +168,7 @@ export default function KeysModal({
 
   const requiredKeys = useMemo(() => {
     const ids = new Set();
-    // Viral AI (zai) = texto incluso (chave no servidor). Outros provedores exigem BYOK.
+    // Moont AI (zai) = texto incluso (chave no servidor). Outros provedores exigem BYOK.
     if (draft.textProvider && draft.textProvider !== 'zai') {
       ids.add(draft.textProvider);
     }
@@ -253,7 +253,7 @@ export default function KeysModal({
                 Configurar IA
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                Texto e imagens inclusos no plano com a Viral AI. Chave própria é opcional.
+                Texto e imagens inclusos no plano com a Moont AI. Chave própria é opcional.
               </p>
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Viral AI) — sem chave.
+                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Moont AI) — sem chave.
                       </p>
                     ) : (
                       <>

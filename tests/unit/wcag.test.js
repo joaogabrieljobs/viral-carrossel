@@ -25,7 +25,7 @@ describe('wcagContrast', () => {
   });
 
   it('cor sobre ela mesma = 1 (mínimo)', () => {
-    expect(wcagContrast('#ff2d8d', '#ff2d8d')).toBeCloseTo(1, 5);
+    expect(wcagContrast('#5b53e8', '#5b53e8')).toBeCloseTo(1, 5);
   });
 
   it('é simétrico (fg/bg trocados dão o mesmo ratio)', () => {

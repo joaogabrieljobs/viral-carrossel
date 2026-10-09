@@ -51,13 +51,13 @@ test.describe('Tour de onboarding', () => {
         expect(box.width, `passo ${passo}: realce demasiado estreito`).toBeGreaterThan(16);
         expect(box.height, `passo ${passo}: realce demasiado baixo`).toBeGreaterThan(16);
       }
-      const avancar = page.getByRole('button', { name: /avançar|concluir|terminar/i }).first();
+      const avancar = card.getByRole('button', { name: /avançar|concluir|terminar/i }).first();
       await avancar.click();
       await page.waitForTimeout(450);
     }
 
     // Fim do tour: nada de error boundary, nada de loop de render.
-    await expect(page.getByText(/Erro ao carregar o Viral Carrossel/i)).toHaveCount(0);
+    await expect(page.getByText(/Erro ao carregar a Moont/i)).toHaveCount(0);
     expect(
       erros.filter((e) => /Maximum update depth|#185|Minified React error/i.test(e)),
       `Erros de render no tour:\n${erros.join('\n')}`,
@@ -77,7 +77,7 @@ test.describe('Copy do tour', () => {
     for (let passo = 1; passo <= TOTAL_PASSOS; passo += 1) {
       const texto = await card.innerText();
       expect(texto, `passo ${passo} com linguagem de dev: ${texto}`).not.toMatch(proibido);
-      await page.getByRole('button', { name: /avançar|concluir|terminar/i }).first().click();
+      await card.getByRole('button', { name: /avançar|concluir|terminar/i }).first().click();
       await page.waitForTimeout(400);
     }
   });

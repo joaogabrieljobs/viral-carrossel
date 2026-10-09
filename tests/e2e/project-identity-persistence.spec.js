@@ -47,13 +47,13 @@ test('pedido rápido pertence ao projeto e volta após trocar de projeto', async
   })).toBe('Pedido editado e salvo em A');
 
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
-  await page.getByRole('dialog', { name: /biblioteca de carrosséis/i })
+  await page.getByRole('dialog', { name: /biblioteca de projetos/i })
     .getByRole('button', { name: 'Abrir Projeto B', exact: true }).click();
   await page.getByRole('tab', { name: /^Home$/i }).first().click();
   await expect(prompt).toHaveValue('Pedido inicial B');
 
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
-  await page.getByRole('dialog', { name: /biblioteca de carrosséis/i })
+  await page.getByRole('dialog', { name: /biblioteca de projetos/i })
     .getByRole('button', { name: 'Abrir Projeto A', exact: true }).click();
   await page.getByRole('tab', { name: /^Home$/i }).first().click();
   await expect(prompt).toHaveValue('Pedido editado e salvo em A');
@@ -163,7 +163,7 @@ test('apagar links e legendas do DNA persiste o estado vazio', async ({ page }) 
   await expect(samples).toHaveValue('Legenda antiga que precisa poder ser removida.');
   await links.fill('');
   await samples.fill('');
-  await page.getByText(/Ideia → carrossel da sua marca/i).click();
+  await page.getByRole('button', { name: /^Moont Comunica:/i }).click();
 
   await expect.poll(async () => page.evaluate(() => {
     const project = JSON.parse(localStorage.getItem('vc_library') || '[]')[0];

@@ -33,6 +33,7 @@ import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch, unlockGro
 import { suggestVisualPresetForCreative } from '../utils/slide-design-system.js';
 import { FontPairingPicker, FontPicker } from './ui/font-pickers.jsx';
 import { LayoutMiniIcon, ImageFocalMiniIcon, PhotoRegionMiniIcon } from './ui/mini-icons.jsx';
+import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
 import { Slider, Toggle, ColorRow } from './ui/primitives.jsx';
 import { brandMatchesPalette, BODY_FONTS } from '../utils/brand-visuals.js';
 import { slideAutoAdjustPatch, slideHasPendingPhotoIntent } from '../utils/canvas-zones.js';
@@ -164,8 +165,8 @@ function editorTabGridSpan(total, index) {
 }
 
 const HOME_CREATION_TYPES = [
-  { id: 'carrossel', label: 'Carrossel', icon: Layers },
-  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+  { ...MOONT_NARRATIVES.carrossel, label: MOONT_NARRATIVES.carrossel.family, flow: 'Faça uma ideia circular', icon: Layers },
+  { ...MOONT_NARRATIVES.apresentacao, label: MOONT_NARRATIVES.apresentacao.family, flow: 'Faça uma ideia avançar', icon: Layout },
 ];
 
 const projectKindOf = (entry) => (
@@ -400,7 +401,7 @@ function SidebarContent({
       if (projectId && setDocStatus && activeEntry?.status !== 'published') {
         // Checklist pós-pacote: não marca sozinho — pergunta.
         const mark = window.confirm(
-          'Pacote pronto.\n\n1) PNGs baixados\n2) Legenda' + (result.captionCopied ? ' copiada' : ' a gerar') + '\n3) Publicar no Instagram (fora do Viral)\n\nJá publicou? Marcar este projeto como Publicado?',
+          'Pacote pronto.\n\n1) PNGs baixados\n2) Legenda' + (result.captionCopied ? ' copiada' : ' a gerar') + '\n3) Publicar no Instagram (fora da Moont)\n\nJá publicou? Marcar este projeto como Publicado?',
         );
         if (mark) {
           setDocStatus(projectId, 'published');
@@ -2768,7 +2769,7 @@ function SidebarContent({
               </S>
             )}
 
-            {tab==='brand' && (<S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais preciso, mais consistente o carrossel fica.">
+            {tab==='brand' && (<S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais precisos, mais consistente a narrativa fica.">
               <div>
                 <label className="vc-label-sm">Bio / o que faço</label>
                 <textarea
@@ -3239,26 +3240,31 @@ function SidebarContent({
                   border: '1px solid var(--glass-border-strong)', background: 'var(--bg-card)',
                 }}
               >
-                {HOME_CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+                {HOME_CREATION_TYPES.map(({ id, label, name, eyebrow, format, flow, icon: Icon }) => {
                   const active = homeCreationType === id;
                   return (
                     <button
                       key={id}
                       type="button"
                       aria-pressed={active}
+                      aria-label={id === 'apresentacao' ? 'Apresentação' : 'Carrossel'}
+                      title={`${name}: ${eyebrow}. ${format}. ${flow}.`}
                       onClick={() => setHomeCreationType(id)}
                       style={{
-                        minHeight: 40, padding: '0 8px', borderRadius: 8,
+                        minHeight: 58, padding: '8px 7px', borderRadius: 8,
                         border: active ? '1px solid var(--accent)' : '1px solid transparent',
                         background: active ? 'var(--accent-surface)' : 'transparent',
                         color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                         cursor: 'pointer', fontSize: 11, fontWeight: 650,
-                        fontFamily: 'var(--font-ui)', display: 'inline-flex',
-                        alignItems: 'center', justifyContent: 'center', gap: 6,
+                        fontFamily: 'var(--font-ui)', display: 'flex',
+                        alignItems: 'flex-start', justifyContent: 'flex-start', gap: 6, textAlign: 'left',
                       }}
                     >
-                      <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
-                      {label}
+                      <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+                        <span style={{ color: 'var(--text-primary)', lineHeight: 1.2 }}>{label}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 8.5, lineHeight: 1.25, fontWeight: 500 }}>{format}</span>
+                      </span>
                     </button>
                   );
                 })}
@@ -3285,7 +3291,8 @@ function SidebarContent({
                     const label = (entry.name || 'Sem título').trim() || 'Sem título';
                     const projectKind = projectKindOf(entry);
                     const isPresentation = projectKind === 'apresentacao';
-                    const productLabel = isPresentation ? 'Apresentação' : 'Carrossel';
+                    const product = moontNarrative(projectKind);
+                    const productLabel = product.name;
                     const itemLabel = isPresentation
                       ? `${slidesOf.length} slide${slidesOf.length === 1 ? '' : 's'}`
                       : `${slidesOf.length} card${slidesOf.length === 1 ? '' : 's'}`;
@@ -3295,7 +3302,7 @@ function SidebarContent({
                         type="button"
                         role="listitem"
                         aria-current={isActive ? 'true' : undefined}
-                        aria-label={`Abrir ${productLabel.toLowerCase()} ${label}`}
+                        aria-label={`Abrir ${product.eyebrow.toLowerCase()} ${label}`}
                         title={label}
                         onClick={() => {
                           if (isActive) return;
@@ -3369,7 +3376,7 @@ function SidebarContent({
                           fontFamily: 'var(--font-mono)', letterSpacing: '0.035em',
                           textTransform: 'uppercase', lineHeight: 1.25,
                         }}>
-                          {productLabel} · {itemLabel}
+                          {productLabel} · {itemLabel} · {product.format}
                         </span>
                         {isActive ? (
                           <span style={{
@@ -3386,7 +3393,7 @@ function SidebarContent({
                 {onNewProject ? (
                   <button
                     type="button"
-                    aria-label={`Criar ${homeCreationType === 'apresentacao' ? 'nova apresentação' : 'novo carrossel'}`}
+                    aria-label={`Criar ${homeCreationType === 'apresentacao' ? 'nova apresentação' : 'nova comunicação'}`}
                     onClick={() => onNewProject(homeCreationType)}
                     style={{
                       display: 'flex',
@@ -3409,7 +3416,7 @@ function SidebarContent({
                   >
                     <FolderPlus size={20} strokeWidth={2} />
                     <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.011em' }}>
-                      {homeCreationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
+                      {homeCreationType === 'apresentacao' ? 'Nova apresentação' : 'Nova comunicação'}
                     </span>
                   </button>
                 ) : null}
@@ -3434,7 +3441,7 @@ function SidebarContent({
                   style={{ flex: 1, minHeight: 40, fontSize: 12 }}
                 >
                   <Sparkles size={13} />
-                  {homeCreationType === 'apresentacao' ? 'Gerar apresentação' : 'Gerar carrossel'}
+                  {homeCreationType === 'apresentacao' ? 'Gerar com Apresenta' : 'Gerar com Comunica'}
                 </button>
                 )}
               </div>
@@ -3444,8 +3451,8 @@ function SidebarContent({
               title={appMode === 'criador' ? 'Criar rápido' : 'Contexto'}
               hint={appMode === 'criador'
                 ? (creativePreset === 'apresentacao'
-                  ? 'Tema → deck 16:9 → revisar → PDF'
-                  : 'Ideia → carrossel da sua marca → revisar → baixar')
+                  ? 'Faça uma ideia avançar · contexto → argumento → decisão → PDF'
+                  : 'Faça uma ideia circular · gancho → argumento → ação → publicar')
                 : `${activeEntry?.name || 'Projeto'} · ${slides.length} ${creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'slides' : 'cards'} · brief e referências só deste projeto`}
             >
               {appMode === 'criador' ? (
@@ -3558,7 +3565,7 @@ function SidebarContent({
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: 8, borderRadius: 12, minHeight: 60,
-                        border: `1px solid ${isActive ? 'rgba(255, 45, 141, 0.45)' : isSelected ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
+                        border: `1px solid ${isActive ? 'rgba(91, 83, 232, 0.45)' : isSelected ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
                         background: isActive ? 'var(--accent-surface)' : 'rgba(255, 255, 255, 0.04)',
                       }}
                     >
@@ -3732,7 +3739,7 @@ function SidebarContent({
               onMouseDown={e=>e.currentTarget.style.transform='scale(0.98)'}
               onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
               >
-                <Sparkles size={14}/>{isPresentationProject ? 'Nova apresentação com IA' : 'Novo carrossel com IA'}
+                <Sparkles size={14}/>{isPresentationProject ? 'Criar com Moont Apresenta' : 'Criar com Moont Comunica'}
               </button>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {!isPresentationProject && <button onClick={()=>setTemplatesOpen?.(true)} style={{
@@ -3866,7 +3873,7 @@ function SidebarContent({
           } : null}
         />
         <span
-          title="O Viral prepara os arquivos. A publicação é no Instagram."
+          title="A Moont prepara os arquivos. A publicação é no Instagram."
           style={{
             display: 'none',
           }}

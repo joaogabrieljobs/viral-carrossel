@@ -14,10 +14,12 @@ test.describe('Landing (RF-01)', () => {
     await mockApi(page);
     await page.goto('/?landing=1');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Carrosséis com a sua voz.');
-    // CTA principal e secundário conforme docs/LANDING-COPY.md §hero.
-    await expect(page.getByRole('button', { name: /criar meu primeiro carrossel/i }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Ideias que ganham forma.');
+    await expect(page.getByRole('button', { name: /começar a criar/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /ver como funciona/i }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /cada formato pede uma narrativa própria/i })).toBeVisible();
+    await expect(page.getByText('Moont Comunica', { exact: true })).toBeVisible();
+    await expect(page.getByText('Moont Apresenta', { exact: true })).toBeVisible();
 
     expect(errosConsole, `Erros de console na landing:\n${errosConsole.join('\n')}`).toEqual([]);
   });

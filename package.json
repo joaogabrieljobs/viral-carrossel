@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Gerador de carrosséis virais para Instagram com IA",
+  "description": "Moont — studio de narrativas visuais com IA para comunicação e apresentações",
   "scripts": {
     "dev": "vite",
     "build:presentation-design-system": "node scripts/build-presentation-design-system.mjs",

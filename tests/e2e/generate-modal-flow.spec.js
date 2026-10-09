@@ -100,7 +100,7 @@ test('apresentação abre um fluxo próprio com caminhos e padrões 16:9', async
     exact: true,
   });
   await expect(presentationStyles).toBeVisible();
-  await expect(presentationStyles.getByRole('button')).toHaveCount(6);
+  await expect(presentationStyles.getByRole('button')).toHaveCount(10);
 
   const slideCount = modal.getByRole('group', { name: 'Número de slides', exact: true });
   await expect(slideCount.getByRole('button', { name: '6', exact: true })).toBeVisible();

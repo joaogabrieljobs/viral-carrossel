@@ -7,10 +7,11 @@ import BrandLogo from './BrandLogo.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
+import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
 
 const CREATION_TYPES = [
-  { id: 'carrossel', label: 'Carrossel', icon: Layers },
-  { id: 'apresentacao', label: 'Apresentação', icon: Layout },
+  { ...MOONT_NARRATIVES.carrossel, label: MOONT_NARRATIVES.carrossel.family, flow: 'Faça uma ideia circular', icon: Layers },
+  { ...MOONT_NARRATIVES.apresentacao, label: MOONT_NARRATIVES.apresentacao.family, flow: 'Faça uma ideia avançar', icon: Layout },
 ];
 
 const projectKindOf = (entry) => (
@@ -23,9 +24,10 @@ const projectKindOf = (entry) => (
 
 const projectKindCopy = (entry) => {
   const kind = projectKindOf(entry);
+  const narrative = moontNarrative(kind);
   return kind === 'apresentacao'
-    ? { kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
-    : { kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+    ? { ...narrative, kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { ...narrative, kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
 };
 
 // ─── ACCOUNT HOME — visão da conta + lista de projetos (antes do editor) ─────
@@ -120,33 +122,43 @@ function AccountHomeShell({
       role="group"
       aria-label="Tipo de projeto para criar"
       style={{
-        display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: 3,
-        padding: 3, borderRadius: 9999, border: '1px solid var(--border)',
+        display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 3 : 8,
+        padding: compact ? 3 : 0, borderRadius: compact ? 9999 : 14,
+        border: compact ? '1px solid var(--border)' : 'none',
         background: 'var(--bg-card)', width: compact ? 'auto' : '100%',
       }}
     >
-      {CREATION_TYPES.map(({ id, label, icon: Icon }) => {
+      {CREATION_TYPES.map(({ id, label, name, eyebrow, format, flow, icon: Icon }) => {
         const active = creationType === id;
         return (
           <button
             key={id}
             type="button"
             aria-pressed={active}
+            aria-label={id === 'apresentacao' ? 'Apresentação' : 'Carrossel'}
+            title={`${name}: ${eyebrow}. ${format}. ${flow}.`}
             onClick={() => setCreationType(id)}
             style={{
-              minHeight: compact ? 34 : 40,
-              padding: compact ? '0 10px' : '0 14px',
-              borderRadius: 9999,
-              border: active ? '1px solid var(--accent)' : '1px solid transparent',
+              minHeight: compact ? 34 : 76,
+              padding: compact ? '0 10px' : '12px 14px',
+              borderRadius: compact ? 9999 : 12,
+              border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
               background: active ? 'var(--accent-surface)' : 'transparent',
               color: active ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer', fontSize: compact ? 11 : 12, fontWeight: 650,
-              fontFamily: 'var(--font-ui)', display: 'inline-flex',
-              alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-ui)', display: 'flex',
+              alignItems: compact ? 'center' : 'flex-start', justifyContent: compact ? 'center' : 'flex-start',
+              gap: compact ? 6 : 9, whiteSpace: compact ? 'nowrap' : 'normal', textAlign: 'left',
             }}
           >
-            <Icon size={13} color={active ? 'var(--accent)' : 'currentColor'} />
-            {label}
+            <Icon size={compact ? 13 : 16} color={active ? 'var(--accent)' : 'currentColor'} style={{ flexShrink: 0, marginTop: compact ? 0 : 2 }} />
+            {compact ? label : (
+              <span style={{ display: 'grid', gap: 3, minWidth: 0 }}>
+                <span style={{ color: 'var(--text-primary)', fontSize: 13 }}>{name}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10.5, lineHeight: 1.35, fontWeight: 500 }}>{eyebrow} · {format}</span>
+                <span style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 11, lineHeight: 1.35 }}>{flow}</span>
+              </span>
+            )}
           </button>
         );
       })}
@@ -179,13 +191,13 @@ function AccountHomeShell({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        boxShadow: '0 0 0 1px rgba(255,45,141,0.25)',
+        boxShadow: '0 0 0 1px rgba(91,83,232,0.25)',
       }}
       onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
       <Sparkles size={fullWidth ? 15 : 14} />
-      {creationType === 'apresentacao' ? 'Gerar apresentação' : 'Gerar carrossel'}
+      {creationType === 'apresentacao' ? 'Gerar com Moont Apresenta' : 'Gerar com Moont Comunica'}
     </button>
   );
 
@@ -353,7 +365,7 @@ function AccountHomeShell({
             <>
               <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
                 <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
-                  <Layout size={13} /> Templates de carrossel
+                  <Layout size={13} /> Padrões visuais
                 </button>
                 <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
                   <TrendingUp size={13} /> Pesquisa
@@ -491,9 +503,12 @@ function AccountHomeShell({
                 {projectName}
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>{activeProjectCopy.singular}</strong>{' · '}
+                <strong style={{ color: 'var(--text-secondary)' }}>{activeProjectCopy.name}</strong>{' · '}
+                {activeProjectCopy.format}{' · '}
                 {appMode === 'criador'
-                  ? 'Contexto → Pedido → Gerar → Baixar'
+                  ? (activeProjectCopy.kind === 'apresentacao'
+                    ? 'Faça uma ideia avançar: contexto → argumento → decisão'
+                    : 'Faça uma ideia circular: gancho → argumento → ação')
                   : 'No editor: Contexto → Narrativa → Visual → Exportar'}
               </p>
             </div>
@@ -524,7 +539,7 @@ function AccountHomeShell({
                 }}
               >
                 <Plus size={14} />
-                {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
+                {creationType === 'apresentacao' ? 'Criar apresentação' : 'Criar comunicação'}
               </button>
               </div>
             </div>
@@ -609,7 +624,7 @@ function AccountHomeShell({
                   }}
                 >
                   <Plus size={13} />
-                  {creationType === 'apresentacao' ? 'Nova apresentação' : 'Novo carrossel'}
+                  {creationType === 'apresentacao' ? 'Nova apresentação' : 'Nova comunicação'}
                 </button>
               </div>
             </div>
@@ -768,7 +783,7 @@ function AccountHomeShell({
                     color: 'var(--text-muted)',
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}
+                    {product.name} · {product.format} · {product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}
                     {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
                 </div>

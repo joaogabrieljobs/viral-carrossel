@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
 import ProjectWorkflowShowcase from './landing/ProjectWorkflowShowcase.jsx';
+import ProductNarrativesShowcase from './landing/ProductNarrativesShowcase.jsx';
 import LandingPlans from './landing/LandingPlans.jsx';
 import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import { useLandingGsapEffects } from '../hooks/useLandingGsapEffects.js';
@@ -13,7 +14,6 @@ import { APP_MODE_UI } from '../utils/ui-depth-labels.js';
 
 /** Assets em public/landing/ — samples otimizados WebP (slides editoriais) */
 const IMG = {
-  logo: '/landing/logo-viral-carrossel-studio.png',
   problem: '/landing/section-problem.png',
   steps: ['/landing/step-01-imersao.webp', '/landing/step-02-refine.webp', '/landing/step-03-publicar.webp'],
   cta: '/landing/analytics-screen.png',
@@ -21,7 +21,6 @@ const IMG = {
   heroPhoto: '/landing/hero-creator-photo.jpg',
   showcaseWindowPhone: '/landing/showcase-window-phone.jpg',
   showcasePhoneNike: '/landing/showcase-phone-rosa.webp',
-  modosPlatform: '/landing/modos-platform.png',
   carouselSamples: [
     '/landing/sample-01.webp',
     '/landing/sample-02.webp',
@@ -170,7 +169,7 @@ const GENERATION_LAYERS = [
 
 const FAQ = [
   {
-    q: 'Quanto custa o Viral.?',
+    q: 'Quanto custa a Moont?',
     a: `${PLAN_ORDER.map(id => `${PLAN_TIERS[id].name}: ${PLAN_TIERS[id].priceLabel}/mês`).join(' · ')}. Todos incluem o editor completo e geração de texto com IA. As imagens inclusas variam por plano.`,
   },
   {
@@ -461,7 +460,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
         }
         .vc-landing-cta:hover {
           background: var(--accent-hover) !important;
-          box-shadow: 0 8px 32px rgba(255, 45, 141, 0.35);
+          box-shadow: 0 8px 32px rgba(91, 83, 232, 0.35);
         }
         /* Botões do topo sobre fotografia: fundo opaco o bastante para AA
            mesmo em zonas claras da foto (WEB-010). */
@@ -471,7 +470,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
         }
         .vc-landing-navbtn:hover {
           border-color: var(--accent) !important;
-          background: rgba(255, 45, 141, 0.28) !important;
+          background: rgba(91, 83, 232, 0.28) !important;
         }
         .vc-landing-navbtn:focus-visible,
         .vc-landing-cta:focus-visible {
@@ -483,7 +482,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           background: var(--bg-glass-strong);
         }
         .vc-landing-gen-layer:hover {
-          border-color: rgba(255, 45, 141, 0.35);
+          border-color: rgba(91, 83, 232, 0.35);
           background: var(--bg-glass-strong);
         }
       `}</style>
@@ -557,8 +556,8 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               padding: '0 18px',
               borderRadius: 'var(--radius-pill)',
               border: '1.5px solid var(--accent)',
-              background: 'rgba(255, 45, 141, 0.16)',
-              boxShadow: '0 0 0 3px rgba(255, 45, 141, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
+              background: 'rgba(91, 83, 232, 0.16)',
+              boxShadow: '0 0 0 3px rgba(91, 83, 232, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
               color: 'var(--text-primary)',
               fontSize: 13,
               fontWeight: 600,
@@ -579,7 +578,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
         pointerEvents: 'none',
         zIndex: 0,
         background: `
-          radial-gradient(ellipse 80% 60% at 85% 15%, rgba(255, 45, 141, 0.14) 0%, transparent 55%),
+          radial-gradient(ellipse 80% 60% at 85% 15%, rgba(91, 83, 232, 0.14) 0%, transparent 55%),
           radial-gradient(ellipse 70% 50% at 10% 85%, rgba(143, 125, 255, 0.10) 0%, transparent 50%),
           var(--gradient-bg)
         `,
@@ -701,10 +700,10 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
                 padding: '0 20px',
                 borderRadius: 'var(--radius-pill)',
                 border: '1.5px solid var(--accent)',
-                background: 'rgba(255, 45, 141, 0.16)',
+                background: 'rgba(91, 83, 232, 0.16)',
                 backdropFilter: 'blur(18px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-                boxShadow: '0 0 0 3px rgba(255, 45, 141, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
+                boxShadow: '0 0 0 3px rgba(91, 83, 232, 0.14), 0 2px 12px rgba(0, 0, 0, 0.30)',
                 color: 'var(--text-primary)',
                 fontSize: 13,
                 fontWeight: 600,
@@ -740,14 +739,14 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             fontSize: 11,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: 'var(--accent)',
+            color: 'var(--accent-violet)',
             fontWeight: 600,
           }}>
-            Viral. · Studio editorial com IA
+            MOONT · STUDIO DE NARRATIVAS VISUAIS COM IA
           </p>
           <h1
             ref={heroTitleRef}
-            aria-label="Carrosséis com a sua voz. E a cara da sua marca."
+            aria-label="Ideias que ganham forma. Histórias que movem."
             style={{
               margin: 0,
               maxWidth: isMobile ? '17ch' : 'none',
@@ -759,10 +758,10 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             }}
           >
             <span style={{ display: 'block', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
-              Carrosséis com a sua voz.
+              Ideias que ganham forma.
             </span>
-            <span style={{ display: 'block', color: 'var(--accent)', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
-              E a cara da sua marca.
+            <span style={{ display: 'block', color: 'var(--accent-violet)', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+              Histórias que movem.
             </span>
           </h1>
           <p style={{
@@ -773,7 +772,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             color: 'var(--text-secondary)',
             maxWidth: isMobile ? '34ch' : '38ch',
           }}>
-            Reúna brief, referências e logo em um projeto. Gere só texto ou texto e imagens, refine o tom e exporte tudo no mesmo studio.
+            Transforme conteúdo bruto em narrativas de comunicação e apresentações com estrutura, identidade visual e arquivos prontos para usar.
           </p>
           <div style={{
             display: 'flex',
@@ -805,7 +804,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               }}
             >
               <Sparkles size={16} />
-              Criar meu primeiro carrossel
+              Começar a criar
               <ArrowRight size={14} />
             </button>
             {onEnterProfessional ? (
@@ -875,7 +874,9 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
         </div>
       </header>
 
-      {/* ── SHOWCASE criador + mobile (logo após o hero) ── */}
+      <ProductNarrativesShowcase isMobile={isMobile} onEnter={onEnter} />
+
+      {/* ── MOONT COMUNICA: demonstração editorial ── */}
       <RevealSection
         variant="scale"
         style={{
@@ -1110,7 +1111,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           lineHeight: 1.18,
           maxWidth: isMobile ? '22em' : '18ch',
         }}>
-          O Viral. não começa pela caixa&nbsp;de&nbsp;texto.
+          A Moont não começa pela caixa&nbsp;de&nbsp;texto.
           <br />
           Começa pelo que você quer fazer alguém perceber.
         </h2>
@@ -1344,8 +1345,8 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           <div style={{
             padding: isMobile ? 22 : 28,
             borderRadius: 'var(--radius-xl)',
-            border: '1px solid rgba(255, 45, 141, 0.35)',
-            background: 'linear-gradient(160deg, rgba(255,45,141,0.1) 0%, rgba(14,12,20,0.4) 100%)',
+            border: '1px solid rgba(91, 83, 232, 0.35)',
+            background: 'linear-gradient(160deg, rgba(91, 83, 232,0.1) 0%, rgba(14,12,20,0.4) 100%)',
           }}>
             <p style={{
               margin: '0 0 20px',
@@ -1355,7 +1356,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               textTransform: 'uppercase',
               color: 'var(--accent)',
               fontWeight: 600,
-            }}>No Viral.</p>
+            }}>Na Moont.</p>
             <ul style={{
               margin: 0,
               padding: 0,
@@ -1401,7 +1402,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               }}
             >
               <Sparkles size={16} />
-              Criar meu primeiro carrossel
+              Criar comunicação
               <ArrowRight size={14} />
             </button>
           </div>
@@ -1449,26 +1450,58 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           maxWidth: '54ch',
         }}>
           Há dias em que você só quer publicar uma boa ideia. Em outros, quer ajustar cada pausa,
-          cada imagem e cada palavra. O Viral. acompanha os dois ritmos sem obrigar você a virar designer.
+          cada imagem e cada palavra. A Moont acompanha os dois ritmos sem obrigar você a virar designer.
         </p>
 
-        <LandingImage
+        <div
           ref={modosImageRef}
-          src={IMG.modosPlatform}
-          alt="Plataforma Viral Carrossel — editor com geração de narrativa, slides e imagens por IA"
-          rounded="var(--radius-xl)"
+          aria-label="Três níveis de controle da Moont"
           style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '0.82fr 1.18fr',
+            gap: 12,
             marginBottom: isMobile ? 24 : 32,
+            padding: isMobile ? 16 : 20,
+            borderRadius: 'var(--radius-xl)',
             border: '1px solid var(--glass-border-strong)',
+            background: 'linear-gradient(145deg, rgba(91,83,232,0.14), rgba(215,255,90,0.05) 70%)',
             boxShadow: 'var(--shadow-xl), var(--shadow-pink)',
           }}
-        />
+        >
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ padding: 18, borderRadius: 18, background: 'var(--accent-surface-strong)', border: '1px solid rgba(91,83,232,0.42)' }}>
+              <span className="section-label" style={{ color: 'var(--accent)' }}>Criar rápido</span>
+              <h3 style={{ margin: '8px 0 6px', fontSize: 20 }}>Da intenção ao primeiro rascunho.</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.45 }}>A Moont escolhe a estrutura inicial para você revisar.</p>
+            </div>
+            <div style={{ padding: 18, borderRadius: 18, background: 'var(--bg-glass)', border: '1px solid var(--hairline)' }}>
+              <span className="section-label" style={{ color: 'var(--aurora)' }}>Studio</span>
+              <h3 style={{ margin: '8px 0 6px', fontSize: 20 }}>Controle de cada decisão.</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.45 }}>Narrativa, texto, imagem, marca, layout e exportação no mesmo fluxo.</p>
+            </div>
+          </div>
+          <div style={{ minHeight: isMobile ? 190 : 260, padding: isMobile ? 18 : 28, borderRadius: 20, background: '#090a0f', border: '1px solid var(--hairline)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <BrandLogo variant="mark" height={36} alt="" />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>MOONT STUDIO</span>
+            </div>
+            <div>
+              <span style={{ display: 'block', width: '64%', height: 9, borderRadius: 99, background: 'var(--text-primary)', marginBottom: 10 }} />
+              <span style={{ display: 'block', width: '82%', height: 7, borderRadius: 99, background: 'var(--text-secondary)', marginBottom: 8 }} />
+              <span style={{ display: 'block', width: '48%', height: 7, borderRadius: 99, background: 'var(--text-muted)' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ width: 78, height: 28, borderRadius: 99, background: 'var(--accent)' }} />
+              <span style={{ width: 52, height: 28, borderRadius: 99, border: '1px solid var(--hairline)' }} />
+            </div>
+          </div>
+        </div>
 
         <div style={{
           padding: isMobile ? 20 : 28,
           borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--glass-border)',
-          background: 'linear-gradient(135deg, rgba(255,45,141,0.06) 0%, rgba(143,125,255,0.04) 100%)',
+          background: 'linear-gradient(135deg, rgba(91, 83, 232,0.06) 0%, rgba(143,125,255,0.04) 100%)',
         }}>
           <div style={{
             display: 'grid',
@@ -1481,7 +1514,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
                 style={{
                   padding: '16px 18px',
                   borderRadius: 'var(--radius-md)',
-                  border: `1px solid ${id === 'criador' ? 'rgba(255,45,141,0.4)' : 'var(--hairline)'}`,
+                  border: `1px solid ${id === 'criador' ? 'rgba(91, 83, 232,0.4)' : 'var(--hairline)'}`,
                   background: id === 'criador' ? 'var(--accent-surface)' : 'var(--bg-glass)',
                 }}
               >
@@ -1649,7 +1682,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               boxShadow: 'var(--shadow-pink)',
             }}
           >
-            Quero transformar uma ideia em carrossel
+            Começar a criar
             <ArrowRight size={16} />
           </button>
         </div>
@@ -1821,7 +1854,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
           margin: '0 auto',
           padding: isMobile ? '40px 24px' : '56px 48px',
           borderRadius: 'var(--radius-xl)',
-          border: '1px solid rgba(255, 45, 141, 0.28)',
+          border: '1px solid rgba(91, 83, 232, 0.28)',
           overflow: 'hidden',
           boxShadow: 'var(--shadow-pink)',
         }}>
@@ -1873,8 +1906,8 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             color: 'var(--text-secondary)',
             lineHeight: 1.47,
           }}>
-            Entre no studio, escolha uma direção e transforme seu tema em um carrossel completo.
-            O Viral. organiza o caminho. Você decide a versão final.
+            Entre no studio, escolha o movimento da sua ideia e transforme conteúdo em uma narrativa pronta para circular ou apresentar.
+            A Moont organiza o caminho. Você decide a versão final.
           </p>
           <button
             type="button"
@@ -1898,7 +1931,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             }}
           >
             <Sparkles size={20} />
-            Criar meu primeiro carrossel
+            Começar a criar com a Moont
           </button>
           <p style={{
             margin: '20px 0 0',
@@ -1941,7 +1974,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             color: 'var(--text-muted)',
             maxWidth: '36ch',
           }}>
-            Da ideia ao post — com argumento, identidade e direção.
+            Da ideia à comunicação ou apresentação — com narrativa, identidade e direção.
           </p>
         </div>
         <div style={{
@@ -1967,7 +2000,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
               fontFamily: 'var(--font-ui)',
             }}
           >
-            Criar meu primeiro carrossel
+            Começar a criar
           </button>
           <p style={{
             margin: 0,
@@ -1977,7 +2010,7 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
           }}>
-            © {new Date().getFullYear()} Viral. Todos os direitos reservados.
+            © {new Date().getFullYear()} Moont. Todos os direitos reservados.
           </p>
         </div>
       </footer>

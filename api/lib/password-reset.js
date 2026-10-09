@@ -76,8 +76,8 @@ export async function sendPasswordReset(email) {
   if (!record) return 'no_account';
   const token = createPasswordResetToken(record);
   return sendMail({
-    to: record.email, subject: 'Redefina sua senha — Viral Carrossel',
-    text: `Recebemos um pedido para redefinir sua senha no Viral Carrossel.\n\nAbra o link abaixo para criar uma nova senha. Ele vale por 30 minutos e só pode ser usado uma vez:\n\n${passwordResetUrl(token)}\n\nSe você não fez este pedido, ignore este e-mail. Sua senha continua a mesma.`,
+    to: record.email, subject: 'Redefina sua senha — Moont',
+    text: `Recebemos um pedido para redefinir sua senha na Moont.\n\nAbra o link abaixo para criar uma nova senha. Ele vale por 30 minutos e só pode ser usado uma vez:\n\n${passwordResetUrl(token)}\n\nSe você não fez este pedido, ignore este e-mail. Sua senha continua a mesma.`,
     idempotencyKey: `reset-mail-${digest(record.email)}-${Math.floor(Date.now() / MAIL_WINDOW_MS)}`,
     allowDuplicate: true,
   });
@@ -112,8 +112,8 @@ export async function resetPassword(token, password) {
 }
 
 export function sendPasswordChanged({ email, notificationKey }) {
-  return sendMail({ to: email, subject: 'Sua senha foi alterada — Viral Carrossel',
-    text: 'Sua senha do Viral Carrossel foi alterada. As sessões anteriores foram encerradas.\n\nSe não foi você, solicite uma nova recuperação de senha em https://viralcarrossel.com.br/redefinir-senha.',
+  return sendMail({ to: email, subject: 'Sua senha foi alterada — Moont',
+    text: 'Sua senha da Moont foi alterada. As sessões anteriores foram encerradas.\n\nSe não foi você, solicite uma nova recuperação de senha em https://viralcarrossel.com.br/redefinir-senha.',
     idempotencyKey: notificationKey,
   });
 }

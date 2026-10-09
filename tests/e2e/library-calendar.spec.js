@@ -36,14 +36,14 @@ test('organiza projeto em pasta e conserva a pauta no calendário após reload',
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
-  let dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  let dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Nome da nova pasta').fill('Campanha Outubro');
   await dialog.getByRole('button', { name: 'Criar pasta' }).click();
 
   await expandOrganize(dialog);
   const folderSelect = dialog.locator('select[aria-label^="Pasta de "]').first();
-  const projectName = (await folderSelect.getAttribute('aria-label'))?.replace(/^Pasta de /, '') || 'Carrossel';
+  const projectName = (await folderSelect.getAttribute('aria-label'))?.replace(/^Pasta de /, '') || 'Projeto';
   await folderSelect.selectOption({ label: 'Campanha Outubro' });
   const today = localDateKey();
   await dialog.getByLabel(new RegExp(`Data de publicação de ${projectName}`, 'i')).fill(today);
@@ -52,11 +52,11 @@ test('organiza projeto em pasta e conserva a pauta no calendário após reload',
   await dialog.getByRole('tab', { name: 'Calendário' }).click();
   const eventName = new RegExp(`^${escapeRegExp(projectName)}\\. Data: .+\\. Status: .+\\. Pasta: Campanha Outubro\\.$`, 'i');
   await expect(dialog.getByRole('button', { name: eventName })).toBeVisible();
-  await expect(dialog.getByText(/não publica automaticamente no Instagram/i)).toBeVisible();
+  await expect(dialog.getByText(/não publica nem apresenta automaticamente em plataformas externas/i)).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
-  dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await expect(dialog.getByRole('button', { name: /^Campanha Outubro \(\d+\)$/ })).toBeVisible();
   await expandOrganize(dialog);
   await expect(dialog.getByLabel(new RegExp(`Data de publicação de ${projectName}`, 'i'))).toHaveValue(today);
@@ -68,12 +68,12 @@ test('fila editorial mostra atrasados e permite marcar publicado', async ({ page
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
-  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await expect(dialog).toBeVisible();
 
   await expandOrganize(dialog);
   const folderSelect = dialog.locator('select[aria-label^="Pasta de "]').first();
-  const projectName = (await folderSelect.getAttribute('aria-label'))?.replace(/^Pasta de /, '') || 'Carrossel';
+  const projectName = (await folderSelect.getAttribute('aria-label'))?.replace(/^Pasta de /, '') || 'Projeto';
   const overdue = shiftDays(localDateKey(), -3);
   await dialog.getByLabel(new RegExp(`Data de publicação de ${projectName}`, 'i')).fill(overdue);
   await expect(dialog.getByLabel(new RegExp(`Estado de ${projectName}`, 'i'))).toHaveValue('scheduled');
@@ -81,7 +81,8 @@ test('fila editorial mostra atrasados e permite marcar publicado', async ({ page
   await dialog.getByRole('tab', { name: 'Fila' }).click();
   await expect(dialog.getByText(/fila editorial local/i)).toBeVisible();
   await expect(dialog.getByText('Atrasados')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: new RegExp(`^${projectName}\\b`) })).toBeVisible();
+  const overdueSection = dialog.getByRole('region', { name: 'Atrasados' });
+  await expect(overdueSection.getByRole('button', { name: new RegExp(`^${escapeRegExp(projectName)}\\b`) })).toBeVisible();
 
   await dialog.getByRole('button', { name: new RegExp(`Marcar ${projectName} como publicado`, 'i') }).click();
   await expect(dialog.getByText('Nada atrasado.')).toBeVisible();
@@ -97,10 +98,10 @@ test('limpa filtros da Biblioteca antes de abrir Calendário ou Fila', async ({ 
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
-  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
-  const search = dialog.getByRole('searchbox', { name: /buscar carrosséis/i });
+  const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
+  const search = dialog.getByRole('searchbox', { name: /buscar projetos/i });
   await search.fill('projeto que não existe');
-  await expect(dialog.getByText(/nenhum carrossel corresponde/i)).toBeVisible();
+  await expect(dialog.getByText(/nenhum projeto corresponde/i)).toBeVisible();
 
   await dialog.getByRole('tab', { name: 'Calendário' }).click();
   await expect(dialog.getByText(/projeto.*ainda sem data/i)).toBeVisible();
@@ -116,9 +117,9 @@ test('Escape fecha a Biblioteca e devolve o foco ao botão que a abriu', async (
   const trigger = page.getByRole('button', { name: /abrir biblioteca/i }).first();
   await trigger.focus();
   await trigger.click({ force: true });
-  await expect(page.getByRole('dialog', { name: /biblioteca de carrosséis/i })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /biblioteca de projetos/i })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: /biblioteca de carrosséis/i })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: /biblioteca de projetos/i })).toHaveCount(0);
   await expect(trigger).toBeFocused();
 });
 
@@ -128,7 +129,7 @@ test('confirmações recebem foco, Escape devolve ao gatilho e abrir projeto foc
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
-  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await dialog.getByLabel('Nome da nova pasta').fill('Pasta temporária');
   await dialog.getByRole('button', { name: 'Criar pasta' }).click();
 
@@ -156,9 +157,14 @@ test('cabeçalho e ações da Biblioteca cabem em celular sem rolagem horizontal
   await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
-  const dialog = page.getByRole('dialog', { name: /biblioteca de carrosséis/i });
+  const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await expect(dialog.getByRole('tab', { name: 'Calendário' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: /novo carrossel/i })).toBeVisible();
+  const productPicker = dialog.getByRole('group', { name: /tipo de projeto para criar/i });
+  await expect(productPicker.getByRole('button', { name: 'Carrossel', exact: true })).toBeVisible();
+  await expect(productPicker.getByRole('button', { name: 'Apresentação', exact: true })).toBeVisible();
+  await expect(productPicker.getByText('Moont Comunica', { exact: true })).toBeVisible();
+  await expect(productPicker.getByText('Moont Apresenta', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /criar comunicação/i })).toBeVisible();
   const hasOverflow = await dialog.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
   expect(hasOverflow).toBe(false);
 });

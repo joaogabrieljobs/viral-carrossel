@@ -15,7 +15,7 @@ class RootErrorBoundary extends React.Component {
   }
 
   componentDidCatch(err, info) {
-    console.error('[Viral Carrossel]', err, info?.componentStack);
+    console.error('[Moont]', err, info?.componentStack);
   }
 
   render() {
@@ -29,20 +29,23 @@ class RootErrorBoundary extends React.Component {
           maxWidth: 560,
           margin: '48px auto',
           lineHeight: 1.47,
-          color: '#1d1d1f',
+          color: '#f3f0e7',
+          background: '#11131b',
+          border: '1px solid rgba(255,255,255,0.14)',
+          borderRadius: 20,
         }}>
           <h1 style={{ fontSize: 17, fontWeight: 600, marginBottom: 12 }}>
-            Erro ao carregar o Viral Carrossel
+            Erro ao carregar a Moont
           </h1>
           <pre style={{
             whiteSpace: 'pre-wrap',
-            background: '#f5f5f7',
+            background: '#181b25',
             padding: 16,
             borderRadius: 11,
             fontSize: 13,
-            border: '1px solid #e0e0e0',
+            border: '1px solid rgba(255,255,255,0.12)',
           }}>{msg}</pre>
-          <p style={{ fontSize: 15, color: '#333', marginTop: 16 }}>
+          <p style={{ fontSize: 15, color: '#bbb9c7', marginTop: 16 }}>
             Tenta: janela anónima, outro navegador, ou em DevTools → Application → Local Storage
             apaga as chaves que começam por <code style={{ fontFamily: 'monospace' }}>vc_</code> e recarrega.
           </p>
@@ -66,15 +69,15 @@ function BootScreen() {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 20,
-        background: '#0e0c14',
-        color: '#8a8696',
+        background: '#090a0f',
+        color: '#bbb9c7',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         fontSize: 14,
       }}
     >
       <style>{GLOBAL_STYLE}</style>
       <img
-        src="/favicon.png"
+        src="/moont-mark.svg"
         alt=""
         width={56}
         height={56}
@@ -84,8 +87,8 @@ function BootScreen() {
           width: 56,
           height: 56,
           borderRadius: 14,
-          objectFit: 'cover',
-          boxShadow: '0 0 28px rgba(255, 45, 141, 0.22)',
+          objectFit: 'contain',
+          boxShadow: '0 0 28px rgba(91, 83, 232, 0.28)',
         }}
       />
       <div
@@ -103,7 +106,7 @@ function BootScreen() {
             width: '40%',
             height: '100%',
             borderRadius: 99,
-            background: 'rgba(255, 45, 141, 0.85)',
+            background: 'rgba(91, 83, 232, 0.92)',
             animation: 'vc-boot-bar 1.1s ease-in-out infinite',
           }}
         />
@@ -115,7 +118,7 @@ function BootScreen() {
 }
 
 // Landing first paint sem o monólito do studio; quem já passou pela intro
-// vai direto ao ViralCarrossel.
+// vai direto ao editor principal.
 const App = lazy(() => (
   window.location.pathname === '/redefinir-senha'
     ? import('./PasswordRecoveryPage.jsx')

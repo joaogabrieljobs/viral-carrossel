@@ -503,7 +503,7 @@ export default function AccountProfile({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Assinatura</div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Studio Viral. · mensal</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Moont Studio · mensal</h3>
             </div>
             <CreditCard size={18} color="var(--text-muted)" />
           </div>

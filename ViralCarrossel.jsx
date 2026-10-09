@@ -1200,17 +1200,17 @@ export default function App() {
       : null;
     newDoc(
       presentationSeed,
-      isPresentation ? 'Nova apresentação' : 'Novo carrossel',
+      isPresentation ? 'Nova apresentação' : 'Nova comunicação',
     );
   }, [brand, newDoc]);
 
   useEffect(() => {
     if (!activeEntry?.id) return;
     const currentName = String(activeEntry.name || '').trim();
-    if (activeProductKind === 'apresentacao' && currentName === 'Novo carrossel') {
+    if (activeProductKind === 'apresentacao' && ['Novo carrossel', 'Nova comunicação'].includes(currentName)) {
       renameDoc(activeEntry.id, 'Nova apresentação');
     } else if (activeProductKind === 'carrossel' && currentName === 'Nova apresentação') {
-      renameDoc(activeEntry.id, 'Novo carrossel');
+      renameDoc(activeEntry.id, 'Nova comunicação');
     }
   }, [activeEntry?.id, activeEntry?.name, activeProductKind, renameDoc]);
 
@@ -2206,10 +2206,17 @@ export default function App() {
     </button>
   );
 
-  /** Conta no extremo direito — padrão SaaS (avatar/conta à direita). */
+  /** Conta no extremo direito — padrão SaaS (avatar/conta à direita).
+      Em tablets, mantém apenas o ícone para reservar espaço ao CTA central. */
   const editorAccountNav = !isMobile && (
     <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
-      {editorPillBtn(() => goAccount('profile'), 'Perfil', User)}
+      {headerVeryTight
+        ? editorIconBtn({
+            onClick: () => goAccount('profile'),
+            title: 'Perfil',
+            children: <User size={13} />,
+          })
+        : editorPillBtn(() => goAccount('profile'), 'Perfil', User)}
     </nav>
   );
 
@@ -2234,7 +2241,7 @@ export default function App() {
         : `Gerar ${activeProductKind === 'apresentacao' ? 'apresentação' : 'carrossel'} com IA`}
       style={{
         height: isMobile ? 40 : 40,
-        padding: isMobile ? '0 14px' : '0 20px',
+        padding: isMobile || headerVeryTight ? '0 14px' : '0 20px',
         borderRadius: 9999,
         border: appMode === 'criador' ? '1px solid var(--border)' : 'none',
         cursor: 'pointer',
@@ -2302,7 +2309,7 @@ export default function App() {
 
   const editorHeaderActions = (
     <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flexShrink: 0 }}>
-      <ModeSwitcher value={appMode} onChange={setAppMode} compact={isMobile} />
+      <ModeSwitcher value={appMode} onChange={setAppMode} compact={isMobile || headerVeryTight} />
       {!isMobile && activeProductKind !== 'apresentacao' && editorIconBtn({
         onClick: () => setTemplatesOpen(true),
         title: 'Templates prontos',
@@ -2310,7 +2317,7 @@ export default function App() {
       })}
       {editorIconBtn({
         onClick: () => setLibraryOpen(true),
-        title: `Biblioteca · ${library.length} carrosséis`,
+        title: `Biblioteca · ${library.length} projetos`,
         ariaLabel: 'Abrir biblioteca',
         tour: 'library',
         children: (
@@ -4562,6 +4569,20 @@ Retorne APENAS JSON: ${refineAllWantsBody
     <div style={{
       width:'100%', height:'100vh', background:'var(--bg-base)', color:'var(--text-primary)',
       display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'var(--font-ui)',
+      ...(activeProductKind === 'apresentacao' ? {
+        '--accent-primary': '#d7ff5a',
+        '--accent-hover': '#c5ed45',
+        '--accent-rgb': '215, 255, 90',
+        '--accent-gradient-start': '#d7ff5a',
+        '--accent-gradient-end': '#a8d43d',
+        '--accent': '#d7ff5a',
+        '--accent-focus': '#d7ff5a',
+        '--accent-secondary': '#e8ff9b',
+        '--accent-surface': 'rgba(215, 255, 90, 0.11)',
+        '--accent-surface-strong': 'rgba(215, 255, 90, 0.18)',
+        '--accent-glow': 'rgba(215, 255, 90, 0.28)',
+        '--text-on-accent': '#090a0f',
+      } : {}),
     }}>
 
       {shellView === 'home' ? (
@@ -4716,7 +4737,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
           <>
         {/* Esquerda — marca + Projetos */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
-          <BrandLogo height={26} style={{ maxWidth: 220 }} />
+          <BrandLogo
+            variant={headerVeryTight ? 'mark' : 'wordmark'}
+            height={26}
+            style={{ maxWidth: headerVeryTight ? 26 : 220 }}
+          />
           <div style={{ minWidth: 0 }}>
             {activeEntry && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'nowrap', minWidth: 0 }}>
@@ -4728,7 +4753,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       title: 'Renomear projeto',
                       label: 'Nome',
                       defaultValue: current,
-                      placeholder: 'Ex: Meu carrossel viral',
+                      placeholder: 'Ex: Campanha de lançamento',
                       cta: 'Renomear',
                     });
                     if (next && next.trim() && next !== current) renameDoc(activeEntry.id, next.trim());
@@ -4736,7 +4761,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   style={{
                     fontSize: 11, color: 'var(--text-muted)', letterSpacing: '-0.011em',
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    maxWidth: headerTight ? 96 : 160, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    maxWidth: headerVeryTight ? 68 : (headerTight ? 96 : 160), minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textAlign: 'left',
                   }}
                   title="Clique para renomear"
@@ -4750,14 +4775,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   title="Salvar projeto agora (⌘S)"
                   aria-label="Salvar projeto agora"
                   style={{
-                    height: 24, padding: '0 10px', borderRadius: 9999,
+                    width: headerVeryTight ? 30 : 'auto', height: headerVeryTight ? 30 : 24,
+                    padding: headerVeryTight ? 0 : '0 10px', borderRadius: 9999,
                     border: '1px solid var(--border)', background: 'var(--bg-card)',
                     color: 'var(--text-primary)', fontSize: 11, fontWeight: 600,
                     fontFamily: 'var(--font-ui)', cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
-                  <Save size={11} aria-hidden/> Salvar
+                  <Save size={11} aria-hidden/>
+                  {!headerVeryTight && 'Salvar'}
                 </button>
               </div>
             )}
@@ -4969,7 +4996,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     borderRadius: 18,
                     margin: '0 auto 24px',
                     overflow: 'hidden',
-                    boxShadow: '0 0 28px rgba(255, 45, 141, 0.28)',
+                    boxShadow: '0 0 28px rgba(91, 83, 232, 0.28)',
                   }}>
                     <BrandLogo variant="mark" height={isMobile ? 64 : 72} style={{ borderRadius: 18 }} />
                   </div>
@@ -4982,11 +5009,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     marginBottom:12,
                     lineHeight:1.07,
                   }}>
-                    {appMode === 'criador' ? (
-                      <>Escreva o pedido<br/><span style={{ color:'var(--accent)' }}>e gere.</span></>
-                    ) : (
-                      <>Carrossel ou<br/><span style={{ color:'var(--accent)' }}>apresentação.</span></>
-                    )}
+                    Escolha como sua ideia<br/><span style={{ color:'var(--accent)' }}>vai avançar.</span>
                   </div>
                   <p style={{
                     fontSize:17,
@@ -4996,13 +5019,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     letterSpacing:'-0.011em',
                     fontWeight:400,
                   }}>
-                    {appMode === 'criador'
-                      ? (isMobile
-                        ? 'Na barra lateral: escolha Carrossel ou Apresentação → pedido → Gerar.'
-                        : <>Na sidebar: Carrossel IG ou Apresentação → pedido → Gerar.<br/>PNG do feed ou PDF 16:9.</>)
-                      : (isMobile
-                        ? 'Feed Instagram ou apresentação 16:9 — cada formato usa estrutura própria.'
-                        : <>Feed Instagram ou apresentação profissional 16:9.<br/>Cada formato usa narrativas e padrões próprios.</>)}
+                    Comunicação transforma uma ideia em sequência de cards.<br/>
+                    Apresentação organiza contexto, argumento e evidência em slides.
                   </p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     <button
@@ -5040,7 +5058,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                     }}>
                       <Sparkles size={16}/>
-                      {appMode === 'criador' ? 'Escrever o pedido' : 'Gerar carrossel com IA'}
+                      <span style={{ display:'grid', gap:2, textAlign:'left' }}>
+                        <strong style={{ fontSize:15, lineHeight:1.1 }}>Moont Comunica</strong>
+                        <span style={{ fontSize:11, lineHeight:1.2, opacity:0.82, fontWeight:500 }}>Ideia → sequência de cards</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -5079,7 +5100,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
                       <Layers size={16}/>
-                      Gerar apresentação
+                      <span style={{ display:'grid', gap:2, textAlign:'left' }}>
+                        <strong style={{ fontSize:15, lineHeight:1.1 }}>Moont Apresenta</strong>
+                        <span style={{ fontSize:11, lineHeight:1.2, color:'var(--text-muted)', fontWeight:500 }}>Contexto → argumento → evidência</span>
+                      </span>
                     </button>
                     <div style={{
                       display:'grid',
@@ -5228,12 +5252,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         <div style={{ opacity:0.85, fontSize:10, lineHeight:1.6 }}>
                           {appMode === 'criador' ? (
                             <>→ Escreva o pedido na <strong style={{ color:'#fff' }}>sidebar</strong><br/>
-                            → Toque em <strong style={{ color:'#fff' }}>Gerar carrossel</strong><br/>
-                            → Revise e baixe os PNGs</>
+                            → Toque em <strong style={{ color:'#fff' }}>{activeProductKind === 'apresentacao' ? 'Gerar apresentação' : 'Moont Comunica'}</strong><br/>
+                            → Revise e baixe {activeProductKind === 'apresentacao' ? 'o PDF' : 'os PNGs'}</>
+                          ) : activeProductKind === 'apresentacao' ? (
+                            <>→ Clique em <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
+                            → Escolha a <strong style={{ color:'#fff' }}>estrutura da apresentação</strong><br/>
+                            → Ou edite o slide aqui mesmo</>
                           ) : (
-                            <>→ Click <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
+                            <>→ Clique em <strong style={{ color:'#fff' }}>Gerar com IA</strong> no canto<br/>
                             → Escolha um <strong style={{ color:'#fff' }}>Template pronto</strong><br/>
-                            → Ou edite o título e copy aqui mesmo</>
+                            → Ou edite o card aqui mesmo</>
                           )}
                         </div>
                       </div>
@@ -5588,7 +5616,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           </div>
 
           {/* Mobile bottom bar — tabs sempre visíveis (também no empty) + Exportar
-              compacto. Chrome claro alinhado ao DS Figma (sem glow magenta). */}
+              compacto. Chrome claro alinhado ao DS Figma (sem glow saturado). */}
           {isMobile && !drawerOpen && (
             <nav
               data-vc-tour="mobile-bar"

@@ -1,11 +1,11 @@
-// O fornecedor do texto incluso não aparece na UI: tudo o que o utilizador lê é "Viral AI".
+// O fornecedor do texto incluso não aparece na UI: tudo o que o utilizador lê é "Moont AI".
 import { describe, it, expect } from 'vitest';
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS, normalizeAISettings } from '../../src/config/ai-providers.js';
 
-describe('Viral AI no lugar do fornecedor', () => {
-  it('provedor de texto incluso chama-se Viral AI e nenhum modelo expõe o fornecedor', () => {
+describe('Moont AI no lugar do fornecedor', () => {
+  it('provedor de texto incluso chama-se Moont AI e nenhum modelo expõe o fornecedor', () => {
     const p = TEXT_PROVIDERS.zai;
-    expect(p.name).toBe('Viral AI');
+    expect(p.name).toBe('Moont AI');
     expect(p.platform).toBe(true);
     for (const m of p.models) expect(m.name).not.toMatch(/glm|z\.ai/i);
     expect(JSON.stringify(p)).not.toMatch(/z\.ai/i);

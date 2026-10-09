@@ -192,7 +192,7 @@ function addLocalDays(dateKey, days) {
 
 /**
  * Fila editorial: atrasados · próximos 7 dias · sem data.
- * Publicados ficam fora da fila ativa (já concluídos fora do Viral).
+ * Publicados ficam fora da fila ativa (já concluídos fora da Moont).
  */
 export function buildEditorialQueue(library = [], { today = localDateKey() } = {}) {
   const todayKey = normalizePublicationDate(today) || localDateKey();

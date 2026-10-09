@@ -391,7 +391,7 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   await openPanel(page, /EDITAR CARD/i);
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
   await expect(page.getByLabel('Posição da logo neste card')).toHaveValue('bl');
-  await page.getByRole('button', { name: /^Slide 2 de / }).click();
+  await page.getByRole('button', { name: /^Card 2 de / }).click();
   await expect(page.getByRole('button', { name: 'Importar logo PNG neste card', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Aplicar logo do projeto neste card', exact: true }).click();
@@ -411,6 +411,6 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   await expect.poll(async () => (await doc(page))?.slides[0].logoImageId).not.toBe(saved.slides[0].logoImageId);
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /EDITAR CARD/i);
-  await page.getByRole('button', { name: /^Slide 1 de / }).click();
+  await page.getByRole('button', { name: /^Card 1 de / }).click();
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
 });
