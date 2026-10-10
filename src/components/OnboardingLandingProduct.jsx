@@ -146,6 +146,11 @@ function ActionButton({ children, onClick, tone = 'primary', className = '' }) {
   );
 }
 
+function scrollToSection(id) {
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+}
+
 function ProductImage({ src, alt, className = '', eager = false }) {
   const [width, height] = IMAGE_DIMENSIONS[src] || (src.includes('/moont-users/') ? [1440, 960] : []);
   return (
@@ -210,7 +215,7 @@ function WorkflowDemo({ onEnter }) {
             ].map((item) => <li key={item}><Check aria-hidden="true" />{item}</li>)}
           </ul>
           <ActionButton onClick={onEnter}>
-            Criar já com a minha direção <ArrowRight aria-hidden="true" />
+            Criar com minha direção <ArrowRight aria-hidden="true" />
           </ActionButton>
         </div>
 
@@ -276,7 +281,8 @@ function Plans({ onEnter }) {
           <h2 id="moont-plans-title">Escolha pelo seu ritmo de criação.</h2>
           <p>Texto com IA em todos os planos. Imagens inclusas para quem quer produzir mais.</p>
         </div>
-        <div className="moont-lp-plans__grid">
+        <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para comparar os planos <ArrowRight /></p>
+        <div className="moont-lp-plans__grid" role="region" aria-label="Comparação dos planos da Moont" tabIndex={0}>
           {PLAN_ORDER.map((id) => {
             const plan = PLAN_TIERS[id];
             return (
@@ -341,7 +347,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
               <button
                 type="button"
                 className="moont-lp-button moont-lp-button--secondary"
-                onClick={() => document.getElementById('como-funciona')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => scrollToSection('como-funciona')}
               >
                 Ver como funciona
               </button>
@@ -373,7 +379,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             <h2 id="moont-results-title">Uma ideia não precisa sair com a mesma roupa.</h2>
             <p>Quatro carrosséis. Três apresentações. Sete direções criativas construídas para assuntos, públicos e momentos diferentes.</p>
           </div>
-          <div className="moont-lp-results__grid">
+          <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para explorar as direções <ArrowRight /></p>
+          <div className="moont-lp-results__grid" role="region" aria-label="Exemplos de carrosséis e apresentações" tabIndex={0}>
             {OUTPUTS.map((item, index) => (
               <figure key={item.image} className={`moont-lp-result moont-lp-result--${index + 1}`}>
                 <ProductImage src={item.image} alt={`Exemplo de ${item.mode.toLowerCase()}: ${item.title}`} />
@@ -397,7 +404,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             <p>A Moont muda estrutura, ritmo, hierarquia e proporção. Cada formato nasce para o gesto que precisa provocar.</p>
           </div>
 
-          <div className="moont-lp-formats__grid">
+          <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para comparar os formatos <ArrowRight /></p>
+          <div className="moont-lp-formats__grid" role="region" aria-label="Comparação entre carrossel e apresentação" tabIndex={0}>
             <article className="moont-lp-format moont-lp-format--comunica">
               <div className="moont-lp-format__copy">
                 <span>Feed · 4:5</span>
@@ -454,7 +462,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             <h2 id="moont-users-title">Da aprovação no WhatsApp à reunião com o cliente.</h2>
             <p>A Moont entra onde o trabalho realmente acontece: na pauta atrasada, no ajuste de última hora e na ideia que precisa ficar clara hoje.</p>
           </div>
-          <div className="moont-lp-users__grid">
+          <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para conhecer as rotinas <ArrowRight /></p>
+          <div className="moont-lp-users__grid" role="region" aria-label="Perfis que usam a Moont" tabIndex={0}>
             {USERS.map((item) => (
               <article key={item.role}>
                 <div className="moont-lp-users__media">
