@@ -448,7 +448,7 @@ import {
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 
-const OnboardingLanding = lazy(() => import('./src/components/OnboardingLanding.jsx'));
+const OnboardingLanding = lazy(() => import('./src/components/OnboardingLandingProduct.jsx'));
 const Paywall = lazy(() => import('./src/components/Paywall.jsx'));
 const LoginModal = lazy(() => import('./src/components/LoginModal.jsx'));
 const ModesIntroModal = lazy(() => import('./src/components/ModesIntroModal.jsx'));

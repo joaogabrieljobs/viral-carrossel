@@ -4,7 +4,7 @@ import { dismissOnboardingLanding } from './utils/landing-gate.js';
 import { fetchAccessSession } from './lib/billing.js';
 import BrandLogo from './components/BrandLogo.jsx';
 
-const OnboardingLanding = lazy(() => import('./components/OnboardingLanding.jsx'));
+const OnboardingLanding = lazy(() => import('./components/OnboardingLandingProduct.jsx'));
 const LoginModal = lazy(() => import('./components/LoginModal.jsx'));
 const StudioApp = lazy(() => import('../ViralCarrossel.jsx'));
 
