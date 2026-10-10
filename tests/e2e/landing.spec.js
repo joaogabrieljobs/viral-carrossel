@@ -14,10 +14,11 @@ test.describe('Landing (RF-01)', () => {
     await mockApi(page);
     await page.goto('/?landing=1');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Ideias que ganham forma.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Do briefing ao carrossel.');
     await expect(page.getByRole('button', { name: /começar a criar/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /ver como funciona/i }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: /cada formato pede uma narrativa própria/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /um carrossel precisa parar o scroll/i })).toBeVisible();
+    await expect(page.locator('#resultados')).toContainText('Quatro carrosséis. Três apresentações.');
     await expect(page.getByText('Moont Comunica', { exact: true })).toBeVisible();
     await expect(page.getByText('Moont Apresenta', { exact: true })).toBeVisible();
 
@@ -52,9 +53,11 @@ test.describe('Landing (RF-01)', () => {
       await page.screenshot({ path: `/tmp/viral-landing-hero-${device}.png` });
       const demo = page.getByLabel('Demonstração do projeto', { exact: true });
       await demo.scrollIntoViewIfNeeded();
-      await expect(demo.getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
+      await expect(demo.getByRole('radio', { name: 'Texto e imagens', exact: true })).toBeChecked();
+      await demo.getByRole('radio', { name: 'Só texto', exact: true }).check();
+      await expect(demo.getByRole('status')).toContainText('A narrativa ganha forma primeiro');
       await demo.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
-      await expect(demo.getByRole('status')).toContainText('saldo do plano');
+      await expect(demo.getByRole('status')).toContainText('Texto e direção visual juntos');
       await demo.getByRole('button', { name: 'Aplicar logo salva no card 1', exact: true }).click();
       await expect(demo.getByLabel('Logo aplicada no card 1', { exact: true })).toBeVisible();
       await expect(demo.getByLabel('Logo aplicada no card 2', { exact: true })).toHaveCount(0);
@@ -74,7 +77,7 @@ test.describe('Landing (RF-01)', () => {
         await page.locator(`#${id}`).evaluate(el => el.scrollIntoView({ block: 'start' }));
         await page.screenshot({ path: `/tmp/viral-landing-${name}-${device}.png` });
       }
-      await page.getByRole('button', { name: 'Criar com o contexto da minha marca', exact: true }).click();
+      await page.getByRole('button', { name: 'Criar já com a minha direção', exact: true }).click();
       await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas nos planos pagos/i })).toBeVisible();
     });
   }

@@ -20,61 +20,116 @@ const PRODUCT = {
   presentation: '/landing/moont-product/05-presentation-output.webp',
 };
 
+const OUTPUTS = [
+  {
+    image: '/landing/moont-v2/outputs/carousel-editorial.webp',
+    mode: 'Carrossel · cultura',
+    title: 'Um conceito em cinco batidas.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/carousel-health.webp',
+    mode: 'Carrossel · saúde',
+    title: 'Complexo sem ser confuso.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/carousel-b2b.webp',
+    mode: 'Carrossel · dados',
+    title: 'Um dado que vira argumento.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/carousel-launch.webp',
+    mode: 'Carrossel · produto',
+    title: 'Desejo primeiro. Detalhe depois.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/presentation-pitch.webp',
+    mode: 'Apresentação · pitch',
+    title: 'Uma tese que cabe numa sala de decisão.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/presentation-medical.webp',
+    mode: 'Apresentação · aula',
+    title: 'Ciência que a plateia consegue acompanhar.',
+  },
+  {
+    image: '/landing/moont-v2/outputs/presentation-brand.webp',
+    mode: 'Apresentação · estratégia',
+    title: 'Posicionamento com uma ideia central.',
+  },
+];
+
 const IMAGE_DIMENSIONS = {
   [PRODUCT.comunica]: [1600, 1000],
   [PRODUCT.apresenta]: [1600, 1000],
   [PRODUCT.mobile]: [390, 844],
   [PRODUCT.carousel]: [360, 450],
   [PRODUCT.presentation]: [877, 494],
+  ...Object.fromEntries(OUTPUTS.map(({ image }) => [image, [1600, 1000]])),
+  '/landing/moont-v2/portraits/01-social-strategist.webp': [1536, 1024],
+  '/landing/moont-v2/portraits/02-designer-overhead.webp': [1536, 1024],
+  '/landing/moont-v2/portraits/03-brand-founder-beauty.webp': [1536, 1024],
+  '/landing/moont-v2/portraits/04-doctor-profile.webp': [1536, 1024],
+  '/landing/moont-v2/portraits/05-creator-low-angle.webp': [1122, 1402],
+  '/landing/moont-v2/portraits/06-creative-director-urban.webp': [1122, 1402],
+  '/landing/moont-v2/portraits/07-team-critique.webp': [1672, 941],
+  '/landing/moont-v2/portraits/08-founder-coffee.webp': [1536, 1024],
 };
 
 const USERS = [
   {
-    image: '/landing/moont-users/01-social-media.webp',
-    product: PRODUCT.comunica,
-    screen: { left: '49.2%', top: '21.2%', width: '42.1%', height: '40.8%', clipPath: 'polygon(2% 3%, 100% 0, 98% 100%, 0 92%)' },
+    image: '/landing/moont-v2/portraits/01-social-strategist.webp',
     role: 'Social media',
-    title: 'Uma pauta vira uma semana de conteúdo.',
-    copy: 'Planeje a sequência, refine os cards e publique sem remontar tudo em outra ferramenta.',
+    title: 'Da pauta vazia ao calendário que parece pensado.',
+    copy: 'Transforme um assunto em sequência, ritmo e próximos passos sem preencher o feed no automático.',
   },
   {
-    image: '/landing/moont-users/02-brand-owner.webp',
-    product: PRODUCT.comunica,
-    screen: { left: '47.9%', top: '41.2%', width: '28.3%', height: '28.9%', clipPath: 'polygon(6% 1%, 100% 0, 95% 91%, 0 100%)' },
-    role: 'Quem cuida da própria marca',
-    title: 'A identidade continua reconhecível.',
-    copy: 'Paleta, voz, logo e referências acompanham cada novo projeto.',
+    image: '/landing/moont-v2/portraits/02-designer-overhead.webp',
+    role: 'Designers',
+    title: 'Direção primeiro. Variação depois.',
+    copy: 'Comece por um sistema visual e explore versões sem perder hierarquia, ritmo ou intenção.',
   },
   {
-    image: '/landing/moont-users/03-doctor.webp',
-    product: PRODUCT.apresenta,
-    screen: { left: '45.7%', top: '20.1%', width: '43.3%', height: '37.4%', clipPath: 'polygon(2% 2%, 100% 0, 97% 100%, 0 94%)' },
+    image: '/landing/moont-v2/portraits/03-brand-founder-beauty.webp',
+    role: 'Donos de marca',
+    title: 'A identidade entra antes do primeiro card.',
+    copy: 'Sua voz, seus códigos e sua oferta continuam reconhecíveis quando o volume de criação aumenta.',
+  },
+  {
+    image: '/landing/moont-v2/portraits/04-doctor-profile.webp',
     role: 'Especialistas',
-    title: 'Conhecimento técnico ganha clareza.',
-    copy: 'Organize um tema complexo em uma narrativa que o público consegue acompanhar.',
+    title: 'A complexidade fica. A confusão sai.',
+    copy: 'Organize conhecimento técnico em uma história clara sem simplificar o que realmente importa.',
   },
   {
-    image: '/landing/moont-users/04-advertising.webp',
-    product: PRODUCT.apresenta,
-    screen: { left: '42.7%', top: '19.9%', width: '49.3%', height: '37%', clipPath: 'polygon(2% 2%, 100% 0, 98% 100%, 0 95%)' },
-    role: 'Times criativos',
-    title: 'Do rascunho à revisão com menos retrabalho.',
-    copy: 'Texto, direção visual e apresentação convivem no mesmo espaço de trabalho.',
-  },
-  {
-    image: '/landing/moont-users/05-creator.webp',
-    product: PRODUCT.comunica,
-    screen: { left: '48.1%', top: '18.1%', width: '46%', height: '45.2%', clipPath: 'polygon(7% 0, 96% 5%, 100% 95%, 0 100%)' },
+    image: '/landing/moont-v2/portraits/05-creator-low-angle.webp',
     role: 'Creators',
-    title: 'Crie no computador. Ajuste onde estiver.',
-    copy: 'A interface acompanha o seu ritmo no desktop e no celular.',
+    title: 'Mais tempo no conceito. Menos tempo remontando.',
+    copy: 'Leve a mesma ideia do roteiro ao post, com espaço para ajustar cada detalhe antes de publicar.',
+  },
+  {
+    image: '/landing/moont-v2/portraits/06-creative-director-urban.webp',
+    role: 'Direção criativa',
+    title: 'A primeira versão já chega com uma posição.',
+    copy: 'Use a IA para abrir caminhos visuais, comparar direções e decidir com repertório.',
+  },
+  {
+    image: '/landing/moont-v2/portraits/07-team-critique.webp',
+    role: 'Times criativos',
+    title: 'Todo mundo revisa a mesma história.',
+    copy: 'Texto, visual e sequência convivem no mesmo projeto para a conversa avançar sem retrabalho.',
+  },
+  {
+    image: '/landing/moont-v2/portraits/08-founder-coffee.webp',
+    role: 'Negócios independentes',
+    title: 'A operação muda. A marca continua sua.',
+    copy: 'Crie lançamentos, argumentos e apresentações sem diluir o que torna seu negócio reconhecível.',
   },
 ];
 
 const STEPS = [
-  ['01', 'Traga o contexto', 'Cole a ideia, o brief, as referências ou o material que já existe.'],
-  ['02', 'Escolha o formato', 'Carrossel para circular. Apresentação para explicar, convencer e avançar.'],
-  ['03', 'Edite e publique', 'Ajuste texto, imagens e marca no studio antes de exportar.'],
+  ['01', 'Comece com o que já existe', 'Cole a ideia, o link, o brief ou a referência que está espalhada pela sua rotina.'],
+  ['02', 'Transforme informação em percurso', 'A Moont organiza a ordem, encontra o gancho e propõe uma direção visual para cada formato.'],
+  ['03', 'Dê o último olhar humano', 'Mude texto, imagem, ritmo e marca até a peça soar como sua — então exporte.'],
 ];
 
 const FAQ = [
@@ -120,13 +175,13 @@ function ProductWindow({ src, alt, className = '', eager = false }) {
 }
 
 function WorkflowDemo({ onEnter }) {
-  const [scope, setScope] = useState('text');
+  const [scope, setScope] = useState('images');
   const [selected, setSelected] = useState(0);
   const [logos, setLogos] = useState([]);
   const cards = [
-    ['Uma ideia merece direção.', '/landing/sample-01.webp'],
-    ['O contexto muda o resultado.', '/landing/sample-06.webp'],
-    ['A identidade fecha a história.', '/landing/sample-10.webp'],
+    ['Sua ideia não está fraca. Está sem direção.', '/landing/sample-01.webp'],
+    ['O detalhe que muda o resultado.', '/landing/sample-06.webp'],
+    ['Da pauta à campanha sem recomeçar.', '/landing/sample-10.webp'],
   ];
 
   const toggleLogo = () => {
@@ -141,10 +196,10 @@ function WorkflowDemo({ onEnter }) {
     <section id="contexto-projeto" className="moont-lp-section moont-lp-context" aria-labelledby="moont-context-title">
       <div className="moont-lp-container moont-lp-context__grid">
         <div className="moont-lp-context__copy">
-          <p className="moont-lp-kicker">Contexto de marca</p>
-          <h2 id="moont-context-title">A Moont aprende a direção antes de criar.</h2>
+          <p className="moont-lp-kicker">Sua marca chega primeiro</p>
+          <h2 id="moont-context-title">Sua marca entra antes do primeiro card.</h2>
           <p className="moont-lp-lead">
-            Brief, voz, logo e referências vivem dentro do projeto. Assim, cada nova peça começa mais perto da sua identidade.
+            Brief, voz, paleta, logo e referências vivem dentro do projeto. A primeira versão já começa mais perto do que torna seu trabalho reconhecível.
           </p>
           <ul className="moont-lp-checklist">
             {[
@@ -155,7 +210,7 @@ function WorkflowDemo({ onEnter }) {
             ].map((item) => <li key={item}><Check aria-hidden="true" />{item}</li>)}
           </ul>
           <ActionButton onClick={onEnter}>
-            Criar com o contexto da minha marca <ArrowRight aria-hidden="true" />
+            Criar já com a minha direção <ArrowRight aria-hidden="true" />
           </ActionButton>
         </div>
 
@@ -163,7 +218,7 @@ function WorkflowDemo({ onEnter }) {
           <div className="moont-lp-demo__header">
             <div>
               <span className="moont-lp-demo__eyebrow">Projeto</span>
-              <strong>Campanha de lançamento</strong>
+              <strong>Lançamento · coleção N01</strong>
             </div>
             <span className="moont-lp-demo__state"><i /> Contexto ON</span>
           </div>
@@ -182,8 +237,8 @@ function WorkflowDemo({ onEnter }) {
 
           <p className="moont-lp-demo__status" role="status">
             {scope === 'text'
-              ? 'A narrativa ganha forma. Você adiciona ou gera as imagens quando quiser.'
-              : 'Texto e direção visual juntos. Gerar imagens usa o saldo do plano ou a sua chave.'}
+              ? 'A narrativa ganha forma primeiro. As imagens entram quando você decidir.'
+              : 'Texto e direção visual juntos. Tudo continua editável antes de publicar.'}
           </p>
 
           <div className="moont-lp-demo__cards" role="group" aria-label="Cards da demonstração">
@@ -261,6 +316,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             <BrandLogo height={31} />
           </a>
           <nav aria-label="Navegação principal">
+            <a href="#resultados">Resultados</a>
             <a href="#modos">Produto</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#planos">Planos</a>
@@ -275,10 +331,10 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
       <section id="topo" className="moont-lp-hero">
         <div id="conteudo-principal" className="moont-lp-container moont-lp-hero__inner">
           <div className="moont-lp-hero__copy">
-            <p className="moont-lp-kicker">Narrativa de comunicação e apresentação</p>
-            <h1>Ideias que ganham forma.<br /><span>E seguem em frente.</span></h1>
+            <p className="moont-lp-kicker">O studio para quem cria todos os dias</p>
+            <h1>Do briefing ao carrossel.<br /><span>Da ideia à apresentação.</span></h1>
             <p className="moont-lp-hero__lead">
-              Transforme uma ideia, um brief ou um conteúdo existente em carrosséis e apresentações com narrativa, design e identidade de marca.
+              A Moont transforma texto, links e referências em sequências visuais editáveis — com narrativa, design e identidade de marca no mesmo studio.
             </p>
             <div className="moont-lp-hero__actions">
               <ActionButton onClick={onEnter}>Começar a criar <ArrowRight aria-hidden="true" /></ActionButton>
@@ -291,9 +347,9 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
               </button>
             </div>
             <div className="moont-lp-hero__proof" aria-label="Recursos principais">
-              <span><Check aria-hidden="true" /> Carrossel e apresentação</span>
-              <span><Check aria-hidden="true" /> Identidade por projeto</span>
-              <span><Check aria-hidden="true" /> Edição completa</span>
+              <span><Check aria-hidden="true" /> Pare o scroll</span>
+              <span><Check aria-hidden="true" /> Conduza a sala</span>
+              <span><Check aria-hidden="true" /> Edite tudo</span>
             </div>
           </div>
 
@@ -310,12 +366,35 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
         </div>
       </section>
 
+      <section id="resultados" className="moont-lp-section moont-lp-results" aria-labelledby="moont-results-title">
+        <div className="moont-lp-container">
+          <p className="moont-lp-kicker">Resultado antes da ferramenta</p>
+          <div className="moont-lp-section-heading moont-lp-section-heading--split">
+            <h2 id="moont-results-title">Uma ideia não precisa sair com a mesma roupa.</h2>
+            <p>Quatro carrosséis. Três apresentações. Sete direções criativas construídas para assuntos, públicos e momentos diferentes.</p>
+          </div>
+          <div className="moont-lp-results__grid">
+            {OUTPUTS.map((item, index) => (
+              <figure key={item.image} className={`moont-lp-result moont-lp-result--${index + 1}`}>
+                <ProductImage src={item.image} alt={`Exemplo de ${item.mode.toLowerCase()}: ${item.title}`} />
+                <figcaption>
+                  <span>{item.mode}</span>
+                  <strong>{item.title}</strong>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <WorkflowDemo onEnter={onEnter} />
+
       <section id="modos" className="moont-lp-section moont-lp-formats" aria-labelledby="moont-formats-title">
         <div className="moont-lp-container">
-          <p className="moont-lp-kicker">Um studio. Dois formatos.</p>
+          <p className="moont-lp-kicker">Duas cadências</p>
           <div className="moont-lp-section-heading">
-            <h2 id="moont-formats-title">Cada formato pede uma narrativa própria.</h2>
-            <p>A Moont muda estrutura, ritmo e proporção. Você não recebe a mesma peça apenas redimensionada.</p>
+            <h2 id="moont-formats-title">Um carrossel precisa parar o scroll. Uma apresentação precisa conduzir a sala.</h2>
+            <p>A Moont muda estrutura, ritmo, hierarquia e proporção. Cada formato nasce para o gesto que precisa provocar.</p>
           </div>
 
           <div className="moont-lp-formats__grid">
@@ -323,7 +402,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
               <div className="moont-lp-format__copy">
                 <span>Feed · 4:5</span>
                 <h3>Moont Comunica</h3>
-                <p>Gancho, argumento, ritmo visual e fechamento para uma ideia circular nas redes.</p>
+                <p>Gancho que abre tensão, sequência que entrega valor e fechamento que pede o próximo gesto.</p>
                 <ul><li>Carrosséis</li><li>Posts</li><li>Stories</li></ul>
               </div>
               <div className="moont-lp-format__visual moont-lp-format__visual--portrait">
@@ -335,7 +414,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
               <div className="moont-lp-format__copy">
                 <span>Deck · 16:9</span>
                 <h3>Moont Apresenta</h3>
-                <p>Contexto, desenvolvimento e conclusão para explicar uma ideia e conduzir uma decisão.</p>
+                <p>Abertura que enquadra, desenvolvimento que organiza e conclusão que move uma decisão.</p>
                 <ul><li>Propostas</li><li>Aulas</li><li>Apresentações</li></ul>
               </div>
               <div className="moont-lp-format__visual moont-lp-format__visual--landscape">
@@ -350,10 +429,10 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
         <div className="moont-lp-container">
           <div className="moont-lp-section-heading moont-lp-section-heading--split">
             <div>
-              <p className="moont-lp-kicker">Fluxo direto</p>
-              <h2 id="moont-process-title">Da matéria-prima à peça pronta.</h2>
+              <p className="moont-lp-kicker">Sem folha em branco</p>
+              <h2 id="moont-process-title">Cole a pauta. Escolha o ritmo. Ajuste antes de publicar.</h2>
             </div>
-            <p>Você traz o conteúdo. A Moont organiza a narrativa, propõe a direção visual e deixa cada escolha ao seu alcance.</p>
+            <p>A primeira versão chega pronta para ser julgada, mexida e melhorada. O trabalho começa em um ponto mais interessante.</p>
           </div>
           <ol className="moont-lp-process__steps">
             {STEPS.map(([number, title, copy]) => (
@@ -370,19 +449,16 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
 
       <section className="moont-lp-section moont-lp-users" aria-labelledby="moont-users-title">
         <div className="moont-lp-container">
-          <p className="moont-lp-kicker">Feita para o trabalho real</p>
+          <p className="moont-lp-kicker">Do outro lado da pauta</p>
           <div className="moont-lp-section-heading moont-lp-section-heading--split">
-            <h2 id="moont-users-title">A ferramenta entra na rotina de quem cria.</h2>
-            <p>Do planejamento à última revisão, a Moont acompanha quem transforma conhecimento e estratégia em comunicação.</p>
+            <h2 id="moont-users-title">Da aprovação no WhatsApp à reunião com o cliente.</h2>
+            <p>A Moont entra onde o trabalho realmente acontece: na pauta atrasada, no ajuste de última hora e na ideia que precisa ficar clara hoje.</p>
           </div>
           <div className="moont-lp-users__grid">
             {USERS.map((item) => (
               <article key={item.role}>
                 <div className="moont-lp-users__media">
-                  <ProductImage src={item.image} alt={`${item.role} usando a Moont no trabalho`} />
-                  <span className="moont-lp-users__screen" style={item.screen} aria-hidden="true">
-                    <ProductImage src={item.product} alt="" />
-                  </span>
+                  <ProductImage src={item.image} alt={`Retrato de ${item.role.toLowerCase()} em uma rotina criativa`} />
                 </div>
                 <div>
                   <span>{item.role}</span>
@@ -395,19 +471,17 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
         </div>
       </section>
 
-      <WorkflowDemo onEnter={onEnter} />
-
       <section className="moont-lp-section moont-lp-responsive" aria-labelledby="moont-responsive-title">
         <div className="moont-lp-container moont-lp-responsive__grid">
           <div className="moont-lp-responsive__copy">
-            <p className="moont-lp-kicker">Onde o trabalho acontece</p>
-            <h2 id="moont-responsive-title">Uma visão ampla no desktop. Controle no celular.</h2>
-            <p>Revise o conjunto, entre em cada card e faça ajustes sem perder a noção do projeto inteiro.</p>
+            <p className="moont-lp-kicker">Controle sem desmontar a ideia</p>
+            <h2 id="moont-responsive-title">Abra o detalhe sem perder o conjunto.</h2>
+            <p>Revise a sequência inteira, entre em cada card e ajuste o que importa. Texto, imagem, layout e marca continuam no mesmo fluxo.</p>
             <div className="moont-lp-responsive__features">
-              <span><MonitorSmartphone aria-hidden="true" /> Interface responsiva</span>
-              <span><Layers3 aria-hidden="true" /> Visão do projeto completo</span>
-              <span><ImageIcon aria-hidden="true" /> Imagens e texto no mesmo fluxo</span>
-              <span><Presentation aria-hidden="true" /> Saídas para social e apresentação</span>
+              <span><MonitorSmartphone aria-hidden="true" /> Revise no desktop ou no celular</span>
+              <span><Layers3 aria-hidden="true" /> Compare a sequência completa</span>
+              <span><ImageIcon aria-hidden="true" /> Troque texto e imagem por bloco</span>
+              <span><Presentation aria-hidden="true" /> Aplique a marca sem travar a composição</span>
             </div>
           </div>
           <div className="moont-lp-responsive__visual">
@@ -439,8 +513,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
       <section className="moont-lp-closing" aria-labelledby="moont-closing-title">
         <div className="moont-lp-container moont-lp-closing__inner">
           <span className="moont-lp-closing__mark" aria-hidden="true" />
-          <h2 id="moont-closing-title">Uma boa ideia merece mais do que um template.</h2>
-          <p>Dê contexto. Escolha o formato. Construa uma narrativa que leva alguém até o próximo passo.</p>
+          <h2 id="moont-closing-title">A próxima pauta não precisa começar do zero.</h2>
+          <p>Comece do contexto. Termine com algo que parece pensado até o último card.</p>
           <ActionButton onClick={onEnter}>Começar a criar <ArrowRight aria-hidden="true" /></ActionButton>
         </div>
       </section>
