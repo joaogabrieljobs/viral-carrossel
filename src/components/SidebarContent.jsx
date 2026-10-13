@@ -963,7 +963,14 @@ function SidebarContent({
                 const onLeave = e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; };
                 return (
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    <button type="button" onClick={() => batchPhotoInputRef.current?.click()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                    <button type="button" onClick={() => {
+                      const el = batchPhotoInputRef?.current;
+                      if (!el) {
+                        toast?.('Seletor de ficheiros indisponível. Recarregue a página (Cmd+R).', 'error', 5000);
+                        return;
+                      }
+                      el.click();
+                    }} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
                       <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar em lote</span>
