@@ -88,18 +88,24 @@ export async function videoDelete(id) {
 export async function videoWipeDatabase() {
   try {
     if (_dbPromise) {
-      const db = await _dbPromise.catch(() => null);
+      const db = await Promise.race([
+        _dbPromise.catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), 1_200)),
+      ]);
       try { db?.close(); } catch { /* */ }
       _dbPromise = null;
     }
   } catch { /* */ }
   if (typeof indexedDB === 'undefined') return;
-  await new Promise((resolve) => {
-    const req = indexedDB.deleteDatabase(DB_NAME);
-    req.onsuccess = () => resolve();
-    req.onerror = () => resolve();
-    req.onblocked = () => resolve();
-  });
+  await Promise.race([
+    new Promise((resolve) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    }),
+    new Promise((r) => setTimeout(r, 2_500)),
+  ]);
 }
 
 /** Lista todos os ids guardados — útil pra cleanup de orphans. */

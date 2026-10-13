@@ -36,13 +36,18 @@ function removeKnownKeys(store) {
 
 /**
  * Best-effort: nunca lança. Chamar antes de redirecionar no logout.
+ * Tem teto de tempo — IndexedDB bloqueado não pode impedir o «Sair da conta».
  */
-export async function clearAccountLocalData() {
+export async function clearAccountLocalData({ timeoutMs = 3_000 } = {}) {
   try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
   try { removeKnownKeys(typeof sessionStorage !== 'undefined' ? sessionStorage : null); } catch { /* */ }
   try { setVideoUrlMap({}); } catch { /* */ }
-  await Promise.all([
+  const wipe = Promise.all([
     imageWipeDatabase().catch(() => {}),
     videoWipeDatabase().catch(() => {}),
+  ]);
+  await Promise.race([
+    wipe,
+    new Promise((r) => setTimeout(r, Math.max(500, Number(timeoutMs) || 3_000))),
   ]);
 }

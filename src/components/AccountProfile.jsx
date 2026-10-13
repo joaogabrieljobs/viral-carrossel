@@ -539,7 +539,19 @@ export default function AccountProfile({
           {onLogout && (
             <button
               type="button"
-              onClick={onLogout}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  const ret = onLogout();
+                  if (ret && typeof ret.then === 'function') {
+                    ret.catch((err) => console.warn('[logout]', err));
+                  }
+                } catch (err) {
+                  console.warn('[logout]', err);
+                  try { window.location.assign('/'); } catch { /* */ }
+                }
+              }}
               style={{
                 height: 38,
                 borderRadius: 9999,

@@ -1696,8 +1696,21 @@ const SlideCardInner = React.forwardRef(({
   // overlay bloqueia o input de import.
   const photoAwaitingHydrate = !!(slide.bgImageId && !slide.bgImage && !slide.bgImageFailed);
   const imgLoading = !!(slide.bgImage && !imgReady);
-  const showPhotoSpinner = imgLoading || photoAwaitingHydrate;
-  const hasRuntimePhoto = !!(slide.bgImage || slide.bgImageId);
+  // Teto local: se a hidratação do pai falhar em silêncio, não girar forever.
+  const [hydrateStale, setHydrateStale] = React.useState(false);
+  React.useEffect(() => {
+    if (!photoAwaitingHydrate) {
+      setHydrateStale(false);
+      return undefined;
+    }
+    const t = setTimeout(() => setHydrateStale(true), 10_000);
+    return () => clearTimeout(t);
+  }, [photoAwaitingHydrate, slide.bgImageId]);
+  const showPhotoSpinner = (imgLoading || photoAwaitingHydrate) && !hydrateStale;
+  const hasRuntimePhoto = !!(
+    slide.bgImage
+    || (slide.bgImageId && !slide.bgImageFailed && !hydrateStale)
+  );
   const showAiGeneratingOverlay = !!generateImageBusy;
 
   const derivedStoredPresentationFilter = slideStoredPresentationCssFilter(slide);

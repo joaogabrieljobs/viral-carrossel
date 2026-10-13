@@ -1762,7 +1762,10 @@ export default function App() {
           continue;
         }
         try {
-          const entry = await imageGet(sl.bgImageId);
+          const entry = await Promise.race([
+            imageGet(sl.bgImageId),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('hydrate timeout')), 8_000)),
+          ]);
           if (entry?.blob) {
             const url = URL.createObjectURL(entry.blob);
             imagemUrlsRef.current.set(sl.bgImageId, url);
@@ -1783,8 +1786,15 @@ export default function App() {
           }
         } catch (e) {
           console.warn('[imagem] leitura falhou:', e?.message || e);
-          // Falha de transação/abertura pode ser temporária. Preservar o ID é
-          // essencial: os bytes podem continuar íntegros no IndexedDB.
+          // Timeout/bloqueio: tirar do spinner eterno. O utilizador reimporta.
+          patches.push({
+            id,
+            expectedImageId: sl.bgImageId,
+            patch: {
+              bgImageFailed: true,
+              bgImageError: e?.message?.includes('timeout') ? 'hydrate_timeout' : 'stored_image_unavailable',
+            },
+          });
         }
       }
       if (cancelado || !patches.length) return;
@@ -4906,7 +4916,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onOpenSettings={() => setKeysOpen(true)}
           onContinueEditor={() => setShellView('project')}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
-          onLogout={access.billingDisabled ? undefined : handleLogout}
+          onLogout={handleLogout}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}

@@ -25,12 +25,23 @@
 const DB_NAME = 'viral-carrossel-img';
 const STORE_NAME = 'images';
 const DB_VERSION = 1;
+/** open/wipe nunca podem pendurar o logout nem o spinner do card. */
+const IDB_OPEN_TIMEOUT_MS = 8_000;
+const IDB_WIPE_TIMEOUT_MS = 2_500;
 
 let _dbPromise = null;
 
+function withTimeout(promise, ms, label = 'IndexedDB') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function openDB() {
   if (_dbPromise) return _dbPromise;
-  _dbPromise = new Promise((resolve, reject) => {
+  _dbPromise = withTimeout(new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB não disponível neste ambiente.'));
       return;
@@ -44,7 +55,9 @@ function openDB() {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     };
-  }).catch((err) => {
+    // Alguns browsers nunca disparam success/error se a origem está em limbo.
+    req.onblocked = () => reject(new Error('IndexedDB bloqueado (outra aba).'));
+  }), IDB_OPEN_TIMEOUT_MS, 'openDB').catch((err) => {
     // Falha temporária (ex.: deleteDatabase a meio) não pode deixar o módulo
     // preso num Promise rejeitado para sempre nesta aba.
     _dbPromise = null;
@@ -103,19 +116,25 @@ export async function imageDelete(id) {
 export async function imageWipeDatabase() {
   try {
     if (_dbPromise) {
-      const db = await _dbPromise.catch(() => null);
+      const db = await Promise.race([
+        _dbPromise.catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), 1_200)),
+      ]);
       try { db?.close(); } catch { /* */ }
     }
   } catch { /* */ }
   _dbPromise = null;
   if (typeof indexedDB === 'undefined') return;
-  await new Promise((resolve) => {
-    const req = indexedDB.deleteDatabase(DB_NAME);
-    req.onsuccess = () => resolve();
-    req.onerror = () => resolve();
-    // blocked: outra aba ainda tem a DB — não ficar à espera eternamente
-    req.onblocked = () => resolve();
-  });
+  await Promise.race([
+    new Promise((resolve) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      // blocked: outra aba ainda tem a DB — não ficar à espera eternamente
+      req.onblocked = () => resolve();
+    }),
+    new Promise((r) => setTimeout(r, IDB_WIPE_TIMEOUT_MS)),
+  ]);
   _dbPromise = null;
 }
 
