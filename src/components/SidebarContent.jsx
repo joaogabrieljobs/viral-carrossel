@@ -20,6 +20,8 @@ import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
 import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
 import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
 import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
+import { ImportTextModal } from './panels/ImportTextModal.jsx';
+import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
 import { appModeLabel } from '../utils/ui-depth-labels.js';
@@ -291,6 +293,10 @@ function SidebarContent({
   setDocPublicationDate = null,
   createFolder = null,
   setDocStatus = null,
+  onImportTextApply = null,
+  onTeamShareLinked = null,
+  onTeamDocPulled = null,
+  historyDoc = null,
 }) {
   const imageTargetRef = useRef(null);
   imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
@@ -300,6 +306,8 @@ function SidebarContent({
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
   const [customPresetName, setCustomPresetName] = React.useState('');
+  const [importTextOpen, setImportTextOpen] = React.useState(false);
+  const [importTextBusy, setImportTextBusy] = React.useState(false);
   const [homeCreationType, setHomeCreationType] = React.useState(() => (
     activeEntry?.doc?.productKind === 'apresentacao'
     || creativePreset === 'apresentacao'
@@ -949,7 +957,7 @@ function SidebarContent({
                       <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar em lote</span>
-                        <span style={importSub}>Distribui um arquivo por {itemLabel} na ordem (1 → N)</span>
+                        <span style={importSub}>1 arquivo = 1 {itemLabel}; cria {itemLabel}s novos se faltar</span>
                       </span>
                     </button>
                     <button type="button" onClick={() => openPhotoZoneImport?.(activeIdx)} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
@@ -3135,6 +3143,14 @@ function SidebarContent({
               title="Conteúdo base"
               hint={`Texto, anotação ou rascunho que a IA usará como matéria-prima ao gerar/refinar ${itemsLabel}. Pode ser longo.`}
             >
+              <button
+                type="button"
+                className="vc-btn vc-btn-ghost"
+                onClick={() => setImportTextOpen(true)}
+                style={{ width: '100%', minHeight: 44, marginBottom: 8, justifyContent: 'flex-start', gap: 8 }}
+              >
+                <FileText size={14} /> Importar texto (1 página = 1 {itemLabel})
+              </button>
               <textarea
                 value={material.content || ''}
                 onChange={e => setMaterial({ ...material, content: e.target.value })}
@@ -3313,15 +3329,18 @@ function SidebarContent({
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          gap: 8,
-                          padding: 10,
-                          minHeight: 112,
+                          gap: 6,
+                          padding: '10px 8px 12px',
+                          minHeight: 132,
                           borderRadius: 12,
                           border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
                           background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
                           cursor: isActive ? 'default' : 'pointer',
                           textAlign: 'center',
                           minWidth: 0,
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          overflow: 'hidden',
                           transition: 'border-color 0.15s, background-color 0.15s, transform 0.1s',
                         }}
                         onMouseDown={(e) => {
@@ -3359,7 +3378,7 @@ function SidebarContent({
                           </span>
                         </div>
                         <span style={{
-                          fontSize: 12, fontWeight: 600, lineHeight: 1.3,
+                          fontSize: 11, fontWeight: 600, lineHeight: 1.25,
                           color: isActive ? 'var(--accent)' : 'var(--text-primary)',
                           letterSpacing: '-0.011em',
                           display: '-webkit-box',
@@ -3367,22 +3386,32 @@ function SidebarContent({
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                           width: '100%',
+                          maxWidth: '100%',
                           wordBreak: 'break-word',
+                          minWidth: 0,
                         }}>
                           {label}
                         </span>
                         <span style={{
-                          fontSize: 8.5, fontWeight: 650, color: 'var(--text-muted)',
-                          fontFamily: 'var(--font-mono)', letterSpacing: '0.035em',
-                          textTransform: 'uppercase', lineHeight: 1.25,
+                          display: 'grid',
+                          gap: 1,
+                          width: '100%',
+                          maxWidth: '100%',
+                          minWidth: 0,
+                          fontSize: 8, fontWeight: 650, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
+                          textTransform: 'uppercase', lineHeight: 1.2,
                         }}>
-                          {productLabel} · {itemLabel} · {product.format}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{productLabel}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.format}</span>
                         </span>
                         {isActive ? (
                           <span style={{
                             fontSize: 9, fontWeight: 700, color: 'var(--accent)',
                             fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
                             textTransform: 'uppercase',
+                            flexShrink: 0,
                           }}>
                             Aberto
                           </span>
@@ -3401,8 +3430,10 @@ function SidebarContent({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      padding: 10,
-                      minHeight: 112,
+                      padding: '10px 8px 12px',
+                      minHeight: 132,
+                      width: '100%',
+                      boxSizing: 'border-box',
                       borderRadius: 12,
                       border: '1.5px dashed var(--glass-border-strong)',
                       background: 'rgba(255,255,255,0.03)',
@@ -3532,6 +3563,29 @@ function SidebarContent({
                   </button>
                 </>
               )}
+            </S>
+
+            <S
+              title="Equipa"
+              hint="Partilhe um código para várias contas trabalharem no mesmo projeto."
+            >
+              <TeamSharePanel
+                doc={historyDoc}
+                projectName={activeEntry?.name || 'Projeto'}
+                shareCode={historyDoc?.shareCode || ''}
+                shareRevision={historyDoc?.shareRevision || 0}
+                onShareLinked={onTeamShareLinked}
+                onDocPulled={onTeamDocPulled}
+                toast={toast}
+              />
+              <button
+                type="button"
+                className="vc-btn vc-btn-ghost"
+                onClick={() => setImportTextOpen(true)}
+                style={{ width: '100%', minHeight: 40, marginTop: 8, justifyContent: 'flex-start', gap: 8 }}
+              >
+                <FileText size={14} /> Importar texto para os {itemsLabel}
+              </button>
             </S>
 
             <S title={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Slides' : 'Cards'} hint={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Ordem do deck. Marca a caixa para ações em massa (logo).' : 'Ordem da narrativa. Marca a caixa para ações em massa (logo).'}>
@@ -3913,6 +3967,23 @@ function SidebarContent({
           Salvo
         </span>
       </div>
+
+      <ImportTextModal
+        open={importTextOpen}
+        onClose={() => { if (!importTextBusy) setImportTextOpen(false); }}
+        busy={importTextBusy}
+        itemLabel={itemLabel}
+        onApply={async (parsed) => {
+          if (!onImportTextApply) return;
+          setImportTextBusy(true);
+          try {
+            await onImportTextApply(parsed);
+            setImportTextOpen(false);
+          } finally {
+            setImportTextBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

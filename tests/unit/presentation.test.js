@@ -55,9 +55,9 @@ describe('modo Apresentação', () => {
     expect(block).toContain('10');
   });
 
-  it('clamp do N de slides no pack (5–16)', () => {
+  it('clamp do N de slides no pack (5–24)', () => {
     expect(buildApresentacaoPackBlock(2)).toContain('5');
-    expect(buildApresentacaoPackBlock(99)).toContain('16');
+    expect(buildApresentacaoPackBlock(99)).toContain('24');
   });
 
   it('intro e refine hints batem com geração', () => {
@@ -107,7 +107,7 @@ describe('modo Apresentação', () => {
       quickCardCount: '7',
     });
     expect(clampPresentationSlideCount(2)).toBe(5);
-    expect(clampPresentationSlideCount(99)).toBe(16);
+    expect(clampPresentationSlideCount(99)).toBe(24);
     expect(clampPresentationSlideCount('ruim', 9)).toBe(9);
   });
 

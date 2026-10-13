@@ -157,6 +157,11 @@ import {
   clampPresentationSlideCount,
 } from './src/utils/presentation.js';
 import {
+  applyBatchPhotosToSlides,
+  summarizeBatchPhotoImport,
+} from './src/utils/batch-photos.js';
+import { applyImportedTextToSlides } from './src/utils/import-text.js';
+import {
   DEFAULT_CAROUSEL_VISUAL_PRESET_ID,
   applyCarouselVisualPresetToDoc,
   applyPresentationVisualPresetToSlide,
@@ -2616,6 +2621,58 @@ export default function App() {
     }
   }, [activeIdx, slides, updateSlide, toast]);
 
+  const handleImportTextApply = useCallback((parsed) => {
+    const isPresentation = activeProductKind === 'apresentacao';
+    const { slides: next, created, updated } = applyImportedTextToSlides(
+      slidesLiveRef.current,
+      parsed,
+      mkSlide,
+      brand,
+      { isPresentation },
+    );
+    setSlides(next);
+    if (parsed?.caption) {
+      setCaption(parsed.caption);
+    }
+    setActiveIdx(0);
+    toast(
+      `Texto importado: ${updated} ${isPresentation ? 'slide' : 'card'}${updated === 1 ? '' : 's'} atualizado${updated === 1 ? '' : 's'}${created ? ` · ${created} novo${created === 1 ? '' : 's'}` : ''}${parsed?.caption ? ' · legenda aplicada' : ''}.`,
+      'success',
+      5000,
+    );
+    trackEvent('import_text_apply', {
+      cards: String(parsed?.cards?.length || 0),
+      created: String(created),
+    });
+  }, [activeProductKind, brand, setCaption, setSlides, toast]);
+
+  const handleTeamShareLinked = useCallback((meta) => {
+    history.set((d) => ({
+      ...d,
+      shareCode: meta?.code || d.shareCode || '',
+      shareRevision: meta?.revision ?? d.shareRevision ?? 0,
+      shareUpdatedAt: meta?.updatedAt ?? Date.now(),
+    }));
+  }, [history]);
+
+  const handleTeamDocPulled = useCallback(async (payload) => {
+    if (!payload?.doc || typeof payload.doc !== 'object') return;
+    const { hydrateSharedDocImages } = await import('./src/utils/project-share.js');
+    const hydrated = await hydrateSharedDocImages(payload.doc);
+    const shaped = ensureDocShape({
+      ...hydrated,
+      shareCode: payload.code || hydrated.shareCode || '',
+      shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
+      shareUpdatedAt: payload.updatedAt ?? Date.now(),
+    });
+    history.reset(shaped);
+    setActiveIdx(0);
+    const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
+    if (withPhoto) {
+      toast(`${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'} aberta${withPhoto === 1 ? '' : 's'} da equipa.`, 'success', 4000);
+    }
+  }, [history, toast]);
+
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
@@ -2631,38 +2688,31 @@ export default function App() {
       // Cada foto vai para o IndexedDB antes de entrar no documento: o patch traz
       // `bgImageId` (persistido) e `bgImage` (object URL de runtime).
       const urls = await Promise.all(lidas.map((u) => (u ? guardarImagemDoSlide(u) : null)));
-      const slideCount = slidesLiveRef.current.length;
-      const n = Math.min(urls.length, slideCount);
+      const beforeCount = slidesLiveRef.current.length;
+      const isPresentation = activeProductKind === 'apresentacao';
+      const validCount = urls.filter(Boolean).length;
 
-      setSlides((prev) => {
-        const cap = Math.min(urls.length, prev.length);
-        return prev.map((sl, j) => {
-          if (j >= cap) return sl;
-          const data = urls[j];
-          return data ? {
-            ...sl,
-            ...data,
-            bgImageSource: 'imported',
-            bgImageFailed: false,
-            bgImageError: null,
-          } : sl;
-        });
+      setSlides((prev) => applyBatchPhotosToSlides(
+        prev,
+        urls,
+        mkSlide,
+        brand,
+        { isPresentation },
+      ));
+
+      const created = Math.max(0, validCount - beforeCount);
+      const leftoverSlides = Math.max(0, beforeCount - validCount);
+      const skippedNulls = urls.length - validCount;
+      const summary = summarizeBatchPhotoImport({
+        applied: validCount,
+        created,
+        leftoverSlides,
+        skippedNulls,
       });
-
-      const extraFiles = urls.length > slideCount;
-      const leftoverSlides = slideCount > urls.length;
-      if (extraFiles || leftoverSlides) {
-        toast(
-          extraFiles
-            ? `Foram aplicadas ${n} fotos (até o card ${n}). Mais ${urls.length - n} arquivos extras foram ignorados.`
-            : `Foram aplicadas ${n} fotos aos primeiros slides; ${slideCount - n} cards ficaram sem ficheiro novo.`,
-          'info',
-        );
-      } else {
-        toast(`${n} fotos aplicadas (slide 1 a ${n}).`, 'success');
-      }
+      toast(summary.message, summary.tone);
+      if (validCount > 0) setActiveIdx(0);
     })();
-  }, [setSlides, toast]);
+  }, [activeProductKind, brand, setSlides, toast]);
 
   const enableCanvasLayout = useCallback(() => {
     // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
@@ -3858,15 +3908,17 @@ ${isPresentationSummary
         : isApresentacaoPreset(creativePreset);
       const selectedPresentationPath = normalizePresentationPath(quickPresentationPath ?? presentationPath);
       const presentationRoute = getPresentationPath(selectedPresentationPath);
+      const maxSlides = 24;
       const resolved = resolveQuickGenerationRequest(
         topic,
         wantPresentation ? presentationRoute.defaultSlideCount : 6,
-        wantPresentation ? 16 : 12,
+        maxSlides,
       );
       const preferredCount = cardCount === 'auto' ? resolved.count : Number(cardCount);
-      const maxSlides = wantPresentation ? 16 : 12;
       const count = wantPresentation
-        ? clampPresentationSlideCount(preferredCount, presentationRoute.defaultSlideCount)
+        ? (Number.isInteger(preferredCount) && preferredCount >= 1 && preferredCount <= maxSlides
+            ? preferredCount
+            : clampPresentationSlideCount(preferredCount, presentationRoute.defaultSlideCount))
         : (Number.isInteger(preferredCount) && preferredCount >= 1 && preferredCount <= maxSlides
             ? preferredCount
             : resolved.count);
@@ -4359,6 +4411,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
     analyzeBrandTone,
     setAppMode,
     exportDoc,
+    onImportTextApply: handleImportTextApply,
+    onTeamShareLinked: handleTeamShareLinked,
+    onTeamDocPulled: handleTeamDocPulled,
+    historyDoc: doc,
     generateMissingImages: async (targetSlideIds = null) => {
       const targetSet = Array.isArray(targetSlideIds) && targetSlideIds.length
         ? new Set(targetSlideIds)
@@ -4986,8 +5042,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
               }}>
                 <div style={{
                   textAlign:'center',
-                  maxWidth: isMobile ? 'min(100%, 360px)' : 340,
+                  maxWidth: isMobile ? 'min(100%, 360px)' : 360,
                   width: '100%',
+                  padding: '0 12px',
+                  boxSizing: 'border-box',
                   animation:'fadeUp 0.3s var(--ease-smooth)',
                 }}>
                   <div style={{
@@ -5001,28 +5059,32 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     <BrandLogo variant="mark" height={isMobile ? 64 : 72} style={{ borderRadius: 18 }} />
                   </div>
                   <div style={{
-                    fontSize: isMobile ? 28 : 40,
+                    fontSize: isMobile ? 26 : 36,
                     fontWeight:600,
                     fontFamily:'var(--font-display)',
                     color:'var(--text-primary)',
                     letterSpacing:'-0.022em',
                     marginBottom:12,
-                    lineHeight:1.07,
+                    lineHeight:1.1,
+                    padding: '0 4px',
+                    wordBreak: 'break-word',
                   }}>
                     Escolha como sua ideia<br/><span style={{ color:'var(--accent)' }}>vai avançar.</span>
                   </div>
                   <p style={{
-                    fontSize:17,
+                    fontSize:15,
                     color:'var(--text-secondary)',
                     marginBottom: isMobile ? 24 : 32,
-                    lineHeight:1.47,
+                    lineHeight:1.45,
                     letterSpacing:'-0.011em',
                     fontWeight:400,
+                    padding: '0 4px',
+                    wordBreak: 'break-word',
                   }}>
                     Comunicação transforma uma ideia em sequência de cards.<br/>
                     Apresentação organiza contexto, argumento e evidência em slides.
                   </p>
-                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10, width: '100%' }}>
                     <button
                       type="button"
                       onClick={() => {
@@ -5040,7 +5102,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       }}
                       aria-label={appMode === 'criador' ? 'Escrever o pedido na sidebar' : 'Gerar carrossel com IA'}
                       style={{
-                      minHeight:48,
+                      minHeight:56,
+                      width: '100%',
+                      boxSizing: 'border-box',
                       borderRadius:9999,
                       border:'none',
                       cursor:'pointer',
@@ -5054,11 +5118,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       alignItems:'center',
                       justifyContent:'center',
                       gap:10,
-                      padding: '0 20px',
+                      padding: '10px 18px',
+                      overflow: 'hidden',
                       transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                     }}>
-                      <Sparkles size={16}/>
-                      <span style={{ display:'grid', gap:2, textAlign:'left' }}>
+                      <Sparkles size={16} style={{ flexShrink: 0 }}/>
+                      <span style={{ display:'grid', gap:2, textAlign:'left', minWidth: 0 }}>
                         <strong style={{ fontSize:15, lineHeight:1.1 }}>Moont Comunica</strong>
                         <span style={{ fontSize:11, lineHeight:1.2, opacity:0.82, fontWeight:500 }}>Ideia → sequência de cards</span>
                       </span>
@@ -5079,7 +5144,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       }}
                       aria-label="Gerar apresentação com IA"
                       style={{
-                        minHeight:48,
+                        minHeight:56,
+                        width: '100%',
+                        boxSizing: 'border-box',
                         borderRadius:9999,
                         border:'1px solid var(--border)',
                         cursor:'pointer',
@@ -5093,14 +5160,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         alignItems:'center',
                         justifyContent:'center',
                         gap:10,
-                        padding: '0 20px',
+                        padding: '10px 18px',
+                        overflow: 'hidden',
                         transition:'border-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                       }}
                       onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
                       onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
-                      <Layers size={16}/>
-                      <span style={{ display:'grid', gap:2, textAlign:'left' }}>
+                      <Layers size={16} style={{ flexShrink: 0 }}/>
+                      <span style={{ display:'grid', gap:2, textAlign:'left', minWidth: 0 }}>
                         <strong style={{ fontSize:15, lineHeight:1.1 }}>Moont Apresenta</strong>
                         <span style={{ fontSize:11, lineHeight:1.2, color:'var(--text-muted)', fontWeight:500 }}>Contexto → argumento → evidência</span>
                       </span>

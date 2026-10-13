@@ -9,7 +9,7 @@
 export const APRESENTACAO_PRESET_ID = 'apresentacao';
 export const PRESENTATION_PRODUCT_KIND = 'apresentacao';
 export const DEFAULT_PRESENTATION_PATH_ID = 'auto';
-export const PRESENTATION_SLIDE_LIMITS = Object.freeze({ min: 5, max: 16 });
+export const PRESENTATION_SLIDE_LIMITS = Object.freeze({ min: 5, max: 24 });
 
 export function isApresentacaoPreset(presetId) {
   return presetId === APRESENTACAO_PRESET_ID;

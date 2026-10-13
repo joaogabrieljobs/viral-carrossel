@@ -234,6 +234,10 @@ const DEFAULT_DOC = {
   quickCardCount: 'auto',
   /** Mantém todo texto e toda foto dentro das áreas ao terminar uma geração. */
   autoAdjustOnGenerate: true,
+  /** Código de partilha com a equipa (sync servidor). */
+  shareCode: '',
+  shareRevision: 0,
+  shareUpdatedAt: 0,
 };
 
 /** URLs de demo que ficaram presas em docs persistidos — removidas de «Fontes & referências» ao hidratar. */
@@ -333,10 +337,14 @@ function ensureDocShape(d) {
   if (!CARD_VISUAL_STYLE_IDS.has(out.cardVisualStyle)) out.cardVisualStyle = 'full';
   if (out.quickCardCount !== 'auto') {
     const quickCount = Number(out.quickCardCount);
-    out.quickCardCount = Number.isInteger(quickCount) && quickCount >= 1 && quickCount <= 16 ? quickCount : 'auto';
+    out.quickCardCount = Number.isInteger(quickCount) && quickCount >= 1 && quickCount <= 24 ? quickCount : 'auto';
   }
   out.autoAdjustOnGenerate = out.autoAdjustOnGenerate !== false;
   if (typeof out.caption !== 'string') out.caption = '';
+  if (typeof out.shareCode !== 'string') out.shareCode = '';
+  else out.shareCode = out.shareCode.trim().toUpperCase().slice(0, 12);
+  out.shareRevision = Number.isFinite(Number(out.shareRevision)) ? Number(out.shareRevision) : 0;
+  out.shareUpdatedAt = Number.isFinite(Number(out.shareUpdatedAt)) ? Number(out.shareUpdatedAt) : 0;
   return out;
 }
 

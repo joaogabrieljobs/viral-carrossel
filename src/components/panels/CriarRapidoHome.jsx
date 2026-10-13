@@ -87,6 +87,8 @@ export function CriarRapidoHome({
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
   const [objectiveId, setObjectiveId] = useState(null);
+  const [customCountOpen, setCustomCountOpen] = useState(false);
+  const [customCountDraft, setCustomCountDraft] = useState('');
   const checklist = buildIdentityChecklist({ brand, styleKit });
   const identityItems = checklist.items.filter((item) => ['brief', 'tone', 'logo'].includes(item.id));
   const identityComplete = identityItems.every((item) => item.ready);
@@ -95,6 +97,13 @@ export function CriarRapidoHome({
   const hasResult = projectHasCarouselContent(slides);
   const promptTrim = String(quickPrompt || '').trim();
   const shortBio = String(brand?.bio || '').trim();
+  const countPresets = isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10];
+  const maxCustomCount = isPresentation ? 24 : 24;
+  const numericQuickCount = quickCardCount === 'auto' ? null : Number(quickCardCount);
+  const isCustomCount = numericQuickCount != null
+    && Number.isInteger(numericQuickCount)
+    && !countPresets.includes(numericQuickCount);
+  const showCustomCount = customCountOpen || isCustomCount;
 
   useEffect(() => {
     setUploadingLogo(false);
@@ -430,9 +439,17 @@ export function CriarRapidoHome({
         />
         <div>
           <div className="vc-label-sm" style={{ marginBottom: 7 }}>{isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'}</div>
-          <div className="vc-seg" role="group" aria-label={isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'} style={{ gridTemplateColumns: `repeat(${isPresentation ? 7 : 6}, minmax(0, 1fr))` }}>
-            {(isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10]).map((value) => {
-              const active = quickCardCount === value;
+          <div
+            className="vc-seg"
+            role="group"
+            aria-label={isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'}
+            style={{ gridTemplateColumns: `repeat(${countPresets.length + 1}, minmax(0, 1fr))` }}
+          >
+            {countPresets.map((value) => {
+              const active = !showCustomCount && (
+                quickCardCount === value
+                || (value !== 'auto' && Number(quickCardCount) === value)
+              );
               return (
                 <button
                   key={value}
@@ -440,18 +457,76 @@ export function CriarRapidoHome({
                   className={`vc-seg-item${active ? ' active' : ''}`}
                   aria-pressed={active}
                   disabled={genBusy}
-                  onClick={() => onQuickCardCountChange(value)}
+                  onClick={() => {
+                    setCustomCountOpen(false);
+                    setCustomCountDraft('');
+                    onQuickCardCountChange(value);
+                  }}
                   style={{ minHeight: 38, padding: '0 4px', fontSize: 11 }}
                 >
                   {value === 'auto' ? 'Auto' : value}
                 </button>
               );
             })}
+            <button
+              type="button"
+              className={`vc-seg-item${showCustomCount ? ' active' : ''}`}
+              aria-pressed={showCustomCount}
+              disabled={genBusy}
+              onClick={() => {
+                setCustomCountOpen(true);
+                setCustomCountDraft(
+                  Number.isInteger(numericQuickCount) ? String(numericQuickCount) : '',
+                );
+              }}
+              style={{ minHeight: 38, padding: '0 4px', fontSize: 10 }}
+              title={`Número personalizado (1–${maxCustomCount})`}
+            >
+              Outro
+            </button>
           </div>
+          {showCustomCount ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <input
+                type="number"
+                min={1}
+                max={maxCustomCount}
+                inputMode="numeric"
+                aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
+                placeholder={`1–${maxCustomCount}`}
+                value={customCountDraft}
+                disabled={genBusy}
+                onChange={(e) => setCustomCountDraft(e.target.value.replace(/[^\d]/g, ''))}
+                onBlur={() => {
+                  const n = Number(customCountDraft);
+                  if (Number.isInteger(n) && n >= 1 && n <= maxCustomCount) {
+                    onQuickCardCountChange(n);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  const n = Number(customCountDraft);
+                  if (Number.isInteger(n) && n >= 1 && n <= maxCustomCount) {
+                    onQuickCardCountChange(n);
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="vc-input"
+                style={{
+                  width: 96, minHeight: 38, padding: '0 10px',
+                  fontSize: 13, fontVariantNumeric: 'tabular-nums',
+                }}
+              />
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                Digite de 1 a {maxCustomCount} e confirme.
+              </span>
+            </div>
+          ) : null}
           <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {isPresentation
               ? `Auto usa cerca de ${getPresentationPath(normalizedPresentationPath).defaultSlideCount} slides e adapta o arco de ${getPresentationPath(normalizedPresentationPath).shortLabel}.`
-              : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards.'}
+              : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards. Outro deixa escolher qualquer número.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

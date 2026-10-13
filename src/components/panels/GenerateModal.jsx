@@ -823,7 +823,7 @@ function GenerateModal({
                 <div className="vc-label" id="generation-card-count-label">
                   {isPresentation ? 'Número de slides' : 'Número de cards'}
                 </div>
-                <div role="group" aria-labelledby="generation-card-count-label" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <div role="group" aria-labelledby="generation-card-count-label" style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                   {(isPresentation
                     ? Array.from({ length: 11 }, (_, index) => index + 6)
                     : [3,4,5,6,7,8,9,10]
@@ -838,7 +838,41 @@ function GenerateModal({
                       color: count===n ? 'var(--text-on-accent)' : 'var(--text-primary)',
                     }}>{n}</button>
                   ))}
+                  <label style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    minHeight: 44, padding: '0 10px', borderRadius: 11,
+                    border: `1px solid ${(
+                      isPresentation ? (count < 6 || count > 16) : (count < 3 || count > 10)
+                    ) ? 'var(--accent)' : 'var(--hairline)'}`,
+                    background: (
+                      isPresentation ? (count < 6 || count > 16) : (count < 3 || count > 10)
+                    ) ? 'var(--accent-surface)' : 'var(--bg-pearl)',
+                    color: 'var(--text-primary)', fontSize: 12, fontWeight: 600,
+                  }}>
+                    Outro
+                    <input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={count}
+                      aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (Number.isInteger(n) && n >= 1 && n <= 24) setCount(n);
+                      }}
+                      style={{
+                        width: 52, height: 32, borderRadius: 8,
+                        border: '1px solid var(--hairline)', background: 'var(--bg-base)',
+                        color: 'var(--text-primary)', textAlign: 'center',
+                        fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 14,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    />
+                  </label>
                 </div>
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Use Outro para qualquer quantidade entre 1 e 24.
+                </p>
               </div>
 
               {/* Densidade de texto com rótulos amigáveis. O identificador interno
