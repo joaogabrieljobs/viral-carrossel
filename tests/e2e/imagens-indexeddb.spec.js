@@ -90,7 +90,8 @@ test.describe('Imagens no IndexedDB', () => {
     test.setTimeout(90_000);
     await abrirEditor(page);
 
-    await page.getByRole('button', { name: /^Imagem$/i }).click({ force: true });
+    // Tabs do editor usam role="tab", não button.
+    await page.getByRole('tab', { name: /^Imagem$/i }).click({ force: true });
     const batch = page.locator('input.vc-batch-photo-input').first();
     await expect(batch).toBeAttached({ timeout: 10_000 });
 

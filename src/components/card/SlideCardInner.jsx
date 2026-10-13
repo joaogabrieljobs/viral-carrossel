@@ -631,7 +631,7 @@ const ClassicCanvasInner = React.forwardRef(({
     slide.align === 'center' ? 'center' :
     slide.align === 'right' ? 'flex-end' :
     slide.align === 'justify' ? 'stretch' : 'flex-start';
-  const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage;
+  const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage && !slide.bgImageId;
   const photoFailed = slide.bgImageFailed === true || (!!slide.bgImage && imgReady && imgErr);
   const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
@@ -1681,7 +1681,11 @@ const SlideCardInner = React.forwardRef(({
     return () => { img.onload = null; img.onerror = null; };
   }, [slide.bgImage]);
 
-  const imgLoading = !!slide.bgImage && !imgReady;
+  // Só há bgImageId (bytes no IndexedDB) — blob ainda a hidratar. Não mostrar
+  // «Toque para inserir foto» como se o import tivesse falhado.
+  const photoAwaitingHydrate = !!(slide.bgImageId && !slide.bgImage && !slide.bgImageFailed);
+  const imgLoading = (!!slide.bgImage && !imgReady) || photoAwaitingHydrate;
+  const hasRuntimePhoto = !!(slide.bgImage || slide.bgImageId);
 
   const derivedStoredPresentationFilter = slideStoredPresentationCssFilter(slide);
 
@@ -2266,12 +2270,14 @@ const SlideCardInner = React.forwardRef(({
                 <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
               </>
             )}
-            {sandwich && !slide.videoId && !slide.bgImage && !forExport && (
+            {sandwich && !slide.videoId && !hasRuntimePhoto && !forExport && (
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
                 color:cr.inkMuted, fontSize:f.w*0.024, fontWeight:600, textAlign:'center', padding:f.w*0.04,
               }}>
-                {slideHasPendingPhotoIntent(slide) ? 'Toque para inserir foto' : 'Área da imagem'}
+                {slide.bgImageFailed
+                  ? 'Imagem indisponível — toque para substituir'
+                  : (slideHasPendingPhotoIntent(slide) ? 'Toque para inserir foto' : 'Área da imagem')}
               </div>
             )}
             {sandwichPhotoNativeHit ? (
@@ -2375,7 +2381,7 @@ const SlideCardInner = React.forwardRef(({
     const hasBar = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
     const flatPhotoNativeHit = !!(
       sandwich &&
-      !slide.bgImage &&
+      !hasRuntimePhoto &&
       slideHasPendingPhotoIntent(slide) &&
       onPhotoZoneClick &&
       onPhotoZoneNativeFile
@@ -2524,7 +2530,27 @@ const SlideCardInner = React.forwardRef(({
               paragraphProps={elementsUnlocked ? mov('subtitle') : null}
             />
           </div>
-          {sandwich && !slide.bgImage && slideHasPendingPhotoIntent(slide) && (
+          {sandwich && imgLoading && !slide.videoId && (
+            <div
+              data-vc-photo-zone="1"
+              {...movSeparate('photo', {
+                ...flatPhotoPlaceholderStyle,
+                position: 'relative',
+                borderStyle: 'solid',
+              })}
+              aria-busy="true"
+              aria-label="A carregar foto"
+            >
+              {!forExport ? (
+                <div style={{
+                  width: f.w * 0.065, height: f.w * 0.065, borderRadius: '50%',
+                  border: `${f.w * 0.005}px solid rgba(0,0,0,0.12)`,
+                  borderTopColor: cr.accentInk, animation: 'spin 0.9s linear infinite',
+                }}/>
+              ) : null}
+            </div>
+          )}
+          {sandwich && !hasRuntimePhoto && !imgLoading && slideHasPendingPhotoIntent(slide) && (
             <div
               data-vc-photo-zone="1"
               {...movSeparate('photo', {
@@ -2812,7 +2838,7 @@ const SlideCardInner = React.forwardRef(({
     );
   } else {
     const fullBleedNativeHit = !!(
-      !slide.bgImage
+      !hasRuntimePhoto
       && slideHasPendingPhotoIntent(slide)
       && onPhotoZoneClick
       && onPhotoZoneNativeFile
@@ -2848,7 +2874,33 @@ const SlideCardInner = React.forwardRef(({
       {/* Sem foto ainda: convite ao toque numa MOLDURA delimitada, acima do bloco
           de texto. Ocupar o card inteiro roubava o ponteiro — clicar em qualquer
           sítio abria o seletor de ficheiros e não se conseguia arrastar o texto. */}
-      {!slide.bgImage && !slide.videoId && slideHasPendingPhotoIntent(slide) && !forExport && (
+      {imgLoading && !slide.videoId && !forExport && (
+        <div
+          aria-busy="true"
+          aria-label="A carregar foto"
+          style={{
+            position: 'absolute',
+            left: '8%',
+            right: '8%',
+            top: '18%',
+            height: '38%',
+            zIndex: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: f.w * 0.02,
+            background: 'rgba(0,0,0,0.12)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            width: f.w * 0.065, height: f.w * 0.065, borderRadius: '50%',
+            border: `${f.w * 0.005}px solid rgba(255,255,255,0.25)`,
+            borderTopColor: '#fff', animation: 'spin 0.9s linear infinite',
+          }}/>
+        </div>
+      )}
+      {!hasRuntimePhoto && !slide.videoId && slideHasPendingPhotoIntent(slide) && !forExport && (
         <div
           role={onPhotoZoneClick && !fullBleedNativeHit ? 'button' : undefined}
           tabIndex={onPhotoZoneClick && !fullBleedNativeHit ? 0 : undefined}

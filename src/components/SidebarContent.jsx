@@ -963,6 +963,8 @@ function SidebarContent({
                 const importSub = { fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em', lineHeight:1.35 };
                 const onEnter = e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='var(--accent-surface)'; };
                 const onLeave = e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; };
+                // opacity:0 faz o WebKit/Safari ignorar o <input type=file> no toque.
+                // Alinhar ao card (VC_PHOTO_ZONE_HIT_LAYER_STYLE): quase invisível, clicável.
                 const fileHitStyle = {
                   position: 'absolute',
                   inset: 0,
@@ -970,11 +972,15 @@ function SidebarContent({
                   height: '100%',
                   margin: 0,
                   padding: 0,
-                  opacity: 0,
+                  opacity: 0.002,
+                  color: 'transparent',
                   cursor: 'pointer',
                   border: 'none',
                   fontSize: 16,
                   zIndex: 5,
+                  pointerEvents: 'auto',
+                  display: 'block',
+                  boxSizing: 'border-box',
                 };
                 return (
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>

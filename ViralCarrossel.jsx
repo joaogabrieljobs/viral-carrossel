@@ -2497,6 +2497,9 @@ export default function App() {
           toast('Não foi possível guardar a imagem.', 'error', 4500);
           return;
         }
+        if (patch.bgImageId && patch.bgImage) {
+          imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
+        }
         updateSlideAt(sIdx, {
           ...patch,
           bgImageSource: 'imported',
@@ -2853,6 +2856,9 @@ export default function App() {
           try {
             const patch = await guardarImagemDoSlide(dataUrl);
             if (patch?.bgImage || patch?.bgImageId) {
+              if (patch.bgImageId && patch.bgImage) {
+                imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
+              }
               urls.push({ ...patch, bgImageFailed: false, bgImageError: null });
             } else {
               urls.push({ bgImage: dataUrl, bgImageId: null, bgImageFailed: false, bgImageError: null });
@@ -4050,12 +4056,21 @@ ${isPresentationSummary
         toast('Não foi possível processar a imagem.', 'error', 4500);
         return;
       }
-      void guardarImagemDoSlide(url).then((patch) => updateSlide({
-        ...patch,
-        bgImageSource: 'imported',
-        bgImageFailed: false,
-        bgImageError: null,
-      }));
+      void guardarImagemDoSlide(url).then((patch) => {
+        if (patch?.bgImageId && patch?.bgImage) {
+          imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
+        }
+        updateSlide({
+          ...patch,
+          bgImageSource: 'imported',
+          bgImageFailed: false,
+          bgImageError: null,
+        });
+        toast('Foto importada.', 'success', 2500);
+      }).catch((err) => {
+        console.warn('[foto] upload legado falhou', err);
+        toast('Não foi possível guardar a imagem.', 'error', 4500);
+      });
     });
     e.target.value = '';
   };
