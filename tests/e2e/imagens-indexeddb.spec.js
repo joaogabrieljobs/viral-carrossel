@@ -84,4 +84,24 @@ test.describe('Imagens no IndexedDB', () => {
     });
     expect(hidratado, 'o card deveria voltar a mostrar a foto vinda do IndexedDB').toBe(true);
   });
+
+  // Discriminante enxame UI: onChange da sidebar → handleBatchPhotos (toast + IDB).
+  test('Importar em lote na sidebar aplica foto e grava no IndexedDB', async ({ page }) => {
+    test.setTimeout(90_000);
+    await abrirEditor(page);
+
+    await page.getByRole('button', { name: /^Imagem$/i }).click({ force: true });
+    const batch = page.locator('input.vc-batch-photo-input').first();
+    await expect(batch).toBeAttached({ timeout: 10_000 });
+
+    await batch.setInputFiles({
+      name: 'lote.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(PNG_1x1, 'base64'),
+    });
+
+    await expect(page.getByText(/a importar|foto|fotos aplicadas/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect.poll(async () => (await idsNoIndexedDB(page)).length, { timeout: 20_000 }).toBeGreaterThan(0);
+    await expect.poll(async () => (await estadoGravado(page)).temId, { timeout: 20_000 }).toBe(true);
+  });
 });

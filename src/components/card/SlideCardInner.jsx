@@ -2830,7 +2830,7 @@ const SlideCardInner = React.forwardRef(({
             backgroundImage:`url(${slide.bgImage})`,
             backgroundPosition:bgPos,
             backgroundRepeat:'no-repeat',
-            opacity:slide.bgOpacity/100,
+            opacity:(slide.bgOpacity ?? 100) / 100,
             ...(bgFit === 'custom'
               ? {
                   backgroundSize:`${slide.bgZoom}%`,
