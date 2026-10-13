@@ -381,6 +381,13 @@ async function shareRequest(payload, { method = 'POST', code } = {}) {
     if (res.status === 401) {
       throw new Error(typeof data?.error === 'string' ? data.error : 'Faça login pela assinatura para partilhar.');
     }
+    if (res.status === 503) {
+      throw new Error(
+        typeof data?.error === 'string'
+          ? data.error
+          : 'Partilha indisponível no servidor (armazenamento). Tente de novo em instantes.',
+      );
+    }
     const errMsg = typeof data?.error === 'string'
       ? data.error
       : (data?.error?.message || (rawText && rawText.length < 180 ? rawText.trim() : null) || `Falha na partilha (${res.status})`);

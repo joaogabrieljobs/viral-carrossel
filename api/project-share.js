@@ -133,8 +133,10 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     const msg = e?.message || 'Falha na partilha.';
-    const status = e?.code === 'share_too_large' ? 413 : 500;
-    console.error('[project-share]', msg);
+    const status = e?.code === 'share_too_large' || e?.code === 'share_storage_unconfigured'
+      ? (e?.code === 'share_too_large' ? 413 : 503)
+      : 500;
+    console.error('[project-share]', msg, e?.code || '', e?.stack?.slice?.(0, 200) || '');
     return res.status(status).json({ error: msg });
   }
 }

@@ -293,26 +293,24 @@ function BrandLogoLayer({
   elementProps = null,
   movable = false,
 }) {
+  const box = Math.max(1, Math.round(sizePx));
   const style = {
     position: 'absolute',
-    width: sizePx,
-    height: sizePx,
+    width: box,
+    height: box,
     opacity,
     zIndex,
-    backfaceVisibility: 'hidden',
-    WebkitBackfaceVisibility: 'hidden',
     pointerEvents: movable ? 'auto' : 'none',
   };
-  vcApplyLogoPosition(style, pos, margin, sizePx, topOffset ?? margin);
+  vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin);
   if (elementProps?.style) {
     Object.assign(style, elementProps.style);
-    // Geometria da logo prevalece; o arrasto fica só no transform.
-    style.width = sizePx;
-    style.height = sizePx;
+    style.width = box;
+    style.height = box;
     style.position = 'absolute';
     style.opacity = opacity;
     style.zIndex = zIndex;
-    vcApplyLogoPosition(style, pos, margin, sizePx, topOffset ?? margin);
+    vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin);
     if (elementProps.style.transform) style.transform = elementProps.style.transform;
   }
   const { style: _ignored, ...handlers } = elementProps || {};
@@ -3285,6 +3283,12 @@ const SlideCardInner = React.forwardRef(({
     && getComposition(slide.composition)?.showSwipeCue !== false;
   const showEdgePeek = !!(slide.edgePeek || getComposition(slide.composition)?.edgePeek);
 
+  // `zoom` (Chromium/WebKit) mantém logos/PNG nítidos na miniatura; `transform:
+  // scale` reamostra bitmaps e deixava a marca borrosa. Firefox cai no fallback.
+  const previewUsesZoom = typeof CSS !== 'undefined'
+    && typeof CSS.supports === 'function'
+    && CSS.supports('zoom', '1');
+
   return (
     <div style={{
       width:f.w*scale, height:f.h*scale,
@@ -3292,7 +3296,18 @@ const SlideCardInner = React.forwardRef(({
       borderRadius: scale < 0.9 ? 10 : 0,
       flexShrink:0, background: outerBg,
     }}>
-      <div style={{ transform:`scale(${scale})`, transformOrigin:'top left', width:f.w, height:f.h, position:'relative' }}>
+      <div style={previewUsesZoom ? {
+        zoom: scale,
+        width: f.w,
+        height: f.h,
+        position: 'relative',
+      } : {
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+        width: f.w,
+        height: f.h,
+        position: 'relative',
+      }}>
         {inner}
         {showEdgePeek && (
           <div
