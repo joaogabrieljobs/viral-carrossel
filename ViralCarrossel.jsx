@@ -1326,12 +1326,29 @@ export default function App() {
   }, [doc, activeDocId, brandRoster, activeBrandId]);
   flushPersistRef.current = flushPersistNow;
 
-  /** Botão «Salvar»: o autosave já corre sozinho, mas o utilizador precisa de um
-   *  gesto explícito e de confirmação visível antes de fechar o navegador. */
-  const salvarProjeto = useCallback(() => {
+  /** Botão «Salvar»: flush local + push na nuvem da conta (quando a sessão estiver activa). */
+  const salvarProjeto = useCallback(async () => {
     const lib = flushPersistNow();
     setLibrary(lib);
-    toast('Projeto salvo neste navegador.', 'success', 2200);
+    try {
+      const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
+      const result = await pushLibraryToCloud({ force: true });
+      if (result?.skipped || result?.empty) {
+        toast('Projeto salvo neste navegador.', 'success', 2200);
+        return;
+      }
+      toast('Projeto salvo na sua conta (nuvem).', 'success', 3200);
+      trackEvent('library_cloud_push', {
+        project_count: String(result.projectCount || 0),
+        source: 'salvar',
+      });
+    } catch {
+      toast(
+        'Salvo neste navegador. A nuvem falhou — use «Sync na nuvem» na home.',
+        'warning',
+        5000,
+      );
+    }
   }, [flushPersistNow, setLibrary, toast]);
 
   // Autosave: salva o doc atual na entrada da biblioteca (debounced)
@@ -4016,7 +4033,7 @@ ${jsonShapeLine}`;
           // A imagem acabou de entrar por `setSlides`; esperar o próximo tick
           // evita gravar o snapshot anterior sem os blobs/IDs recém-gerados.
           window.setTimeout(() => flushPersistRef.current?.(), 0);
-          toast('Projeto salvo neste navegador. Em Exportar → Backup JSON cria uma cópia portátil.', 'info', 7500);
+          toast('Projeto na sua conta e neste navegador. «Salvar» ou Sync na nuvem actualizam a cópia remota.', 'info', 7500);
         }
       } catch { /* */ }
       return { cancelled: false };

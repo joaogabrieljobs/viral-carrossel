@@ -47,7 +47,7 @@ test.describe('Salvar projeto', () => {
     // Clique real: se o header voltar a recortar/sobrepor o botão, o teste deve
     // falhar no hit target em vez de disparar acidentalmente “Projetos”.
     await salvar.click();
-    await expect(page.getByText(/projeto salvo neste navegador/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/projeto salvo (neste navegador|na sua conta)/i)).toBeVisible({ timeout: 8_000 });
 
     // O que foi gravado sobrevive ao reload.
     const antes = await page.evaluate(() => localStorage.getItem('vc_library')?.length || 0);
