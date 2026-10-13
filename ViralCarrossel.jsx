@@ -1627,18 +1627,28 @@ export default function App() {
       return nextRoster;
     });
   }, [appMode, activeBrandId, activeEntry?.id, creatorIdentitySnapshot]);
-  // Modal de boas-vindas dos 3 modos — primeira visita só.
+  // Modal de boas-vindas dos 3 modos — só na 1.ª visita da conta (nunca a cada geração).
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
+  const modesIntroScheduledRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined' || landingOpen) return undefined;
+    // Conta com projetos = já passou do onboarding inicial.
+    if (library.length > 0) {
+      try {
+        localStorage.setItem(SK.modesIntro, '1');
+        localStorage.setItem(SK.onboarding, '1');
+      } catch { /* */ }
+      return undefined;
+    }
     try {
-      if (!localStorage.getItem(SK.modesIntro)) {
+      if (!localStorage.getItem(SK.modesIntro) && !modesIntroScheduledRef.current) {
+        modesIntroScheduledRef.current = true;
         const t = window.setTimeout(() => setModesIntroOpen(true), 600);
         return () => window.clearTimeout(t);
       }
     } catch { /* */ }
     return undefined;
-  }, [landingOpen]);
+  }, [landingOpen, library.length]);
   // Identidade estável: como props inline, entravam nas deps do layout effect do
   // tour e realimentavam o ciclo render → effect → setState → render (React #185).
   const tourEnterEditor = useCallback(() => setShellView('project'), [setShellView]);
@@ -2066,20 +2076,25 @@ export default function App() {
     setNiche(String(activeEntry?.doc?.editorialContext?.niche || ''));
   }, [activeEntry?.id]);
 
-  // Tour guiado — só após a 1.ª geração (ou conteúdo real), para não tapar
-  // a Home / Criar rápido. Pode repetir pela ajuda.
+  // Tour guiado — uma única vez por conta (1.ª geração). Depois só pela Ajuda.
+  const tourScheduledRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined' || landingOpen || modesIntroOpen) return undefined;
     if (isDefault(slides)) return undefined;
     try {
-      if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
-      if (!localStorage.getItem(SK.onboarding)) {
-        const t = window.setTimeout(() => setTourOpen(true), 850);
-        return () => window.clearTimeout(t);
+      // Já tem histórico nesta conta → nunca reabrir automaticamente.
+      if (library.length > 1 || localStorage.getItem(SK.onboarding)) {
+        try { localStorage.setItem(SK.onboarding, '1'); } catch { /* */ }
+        return undefined;
       }
+      if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
+      if (tourScheduledRef.current || tourOpen) return undefined;
+      tourScheduledRef.current = true;
+      const t = window.setTimeout(() => setTourOpen(true), 850);
+      return () => window.clearTimeout(t);
     } catch { /* ignore */ }
     return undefined;
-  }, [landingOpen, modesIntroOpen, slides]);
+  }, [landingOpen, modesIntroOpen, slides, library.length, tourOpen]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -6381,7 +6396,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <OnboardingTour
         open={tourOpen}
         onDismiss={() => {
-          try { localStorage.setItem(SK.onboarding, '1'); } catch {}
+          try {
+            localStorage.setItem(SK.onboarding, '1');
+            localStorage.setItem(SK.modesIntro, '1');
+          } catch { /* */ }
+          tourScheduledRef.current = true;
           setTourOpen(false);
         }}
         isMobile={isMobile}

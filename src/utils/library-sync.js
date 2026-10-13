@@ -214,6 +214,12 @@ export async function packLibraryForCloud() {
   }
 
   const assetIds = [...assets.keys()];
+  let onboardingDone = null;
+  let modesIntroDone = null;
+  try {
+    onboardingDone = localStorage.getItem(SK.onboarding);
+    modesIntroDone = localStorage.getItem(SK.modesIntro);
+  } catch { /* */ }
   const manifest = {
     vcVersion: 3,
     folders,
@@ -223,6 +229,8 @@ export async function packLibraryForCloud() {
     docs,
     assetIds,
     userProfile: userProfile && typeof userProfile === 'object' ? stripRuntime(userProfile) : null,
+    onboardingDone: onboardingDone || null,
+    modesIntroDone: modesIntroDone || null,
   };
 
   return { manifest, assets, projectCount: docs.length };
@@ -468,6 +476,13 @@ export async function applyCloudManifest(manifest) {
     try {
       localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(manifest.userProfile));
     } catch { /* */ }
+  }
+  // Conta que já usou a app: não reabrir tour/modes intro.
+  if (manifest.onboardingDone || docs.length > 0) {
+    try { localStorage.setItem(SK.onboarding, '1'); } catch { /* */ }
+  }
+  if (manifest.modesIntroDone || docs.length > 0) {
+    try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
   }
 
   writeCloudMeta({

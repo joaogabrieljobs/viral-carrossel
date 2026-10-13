@@ -17,6 +17,9 @@ const SNAPSHOT_KEYS = [
   SK.activeBrandId,
   USER_PROFILE_KEY,
   SK.libraryCloudMeta,
+  /** Tour / intro — só na 1.ª vez da conta, não a cada geração de cards. */
+  SK.onboarding,
+  SK.modesIntro,
 ];
 
 function readJson(store, key) {
