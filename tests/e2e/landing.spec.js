@@ -14,11 +14,11 @@ test.describe('Landing (RF-01)', () => {
     await mockApi(page);
     await page.goto('/?landing=1');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Do briefing ao carrossel.');
-    await expect(page.getByRole('button', { name: /começar a criar/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /ver como funciona/i }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: /um carrossel precisa parar o scroll/i })).toBeVisible();
-    await expect(page.locator('#resultados')).toContainText('Do post à apresentação sem começar de novo.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('A pauta chegou.');
+    await expect(page.getByRole('button', { name: /criar meu primeiro projeto/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /ver a moont em ação/i }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /no feed, cada card precisa dar vontade/i })).toBeVisible();
+    await expect(page.locator('#resultados')).toContainText('A mesma ideia pode virar carrossel hoje e apresentação amanhã.');
     await expect(page.getByText('Moont Comunica', { exact: true })).toBeVisible();
     await expect(page.getByText('Moont Apresenta', { exact: true })).toBeVisible();
 
@@ -77,7 +77,7 @@ test.describe('Landing (RF-01)', () => {
         await page.locator(`#${id}`).evaluate(el => el.scrollIntoView({ block: 'start' }));
         await page.screenshot({ path: `/tmp/viral-landing-${name}-${device}.png` });
       }
-      await page.getByRole('button', { name: 'Criar com minha direção', exact: true }).click();
+      await page.getByRole('button', { name: 'Criar com minha marca', exact: true }).click();
       await expect(page.getByRole('heading', { name: /Studio completo. Imagens inclusas nos planos pagos/i })).toBeVisible();
     });
   }
@@ -147,7 +147,7 @@ test.describe('Landing (RF-01)', () => {
 
       for (const label of [
         'Comparação entre carrossel e apresentação',
-        'Perfis que usam a Moont',
+        'Jornada da pauta à publicação',
         'Comparação dos planos da Moont',
       ]) {
         const rail = page.getByRole('region', { name: label, exact: true });
@@ -177,7 +177,7 @@ test.describe('Landing (RF-01)', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mockApi(page);
     await page.goto('/?landing=1');
-    await page.getByRole('button', { name: 'Ver como funciona', exact: true }).click();
+    await page.getByRole('button', { name: 'Ver a Moont em ação', exact: true }).click();
     const positionAfterClick = await page.evaluate(() => window.scrollY);
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => window.scrollY)).toBe(positionAfterClick);
@@ -203,6 +203,14 @@ test.describe('Landing (RF-01)', () => {
     const expectedOutputs = [
       '/landing/moont-v3/gallery-source/01-editorial-discovery.webp',
       '/landing/moont-v3/gallery-source/02-editorial-choice.webp',
+    ];
+    const expectedStory = [
+      ['/landing/moont-v4/story/01-pauta-no-dia-a-dia.webp', 1122, 1402],
+      ['/landing/moont-v4/story/03-revisao-em-equipe.webp', 1508, 806],
+      ['/landing/moont-v4/story/04-direcao-cultura.webp', 1122, 1402],
+      ['/landing/moont-v4/story/05-direcao-creator.webp', 1122, 1402],
+      ['/landing/moont-v4/story/06-direcao-educacao.webp', 1122, 1402],
+      ['/landing/moont-v4/story/07-versao-final.webp', 1122, 1402],
     ];
 
     const panels = page.locator('.moont-lp-format__panel');
@@ -230,6 +238,17 @@ test.describe('Landing (RF-01)', () => {
       await expect.poll(() => image.evaluate((element) => (
         element.complete && element.naturalWidth === 1122 && element.naturalHeight === 1402
       ))).toBe(true);
+    }
+
+    for (const [src, width, height] of expectedStory) {
+      const image = page.locator(`img[src="${src}"]`);
+      await expect(image).toHaveCount(1);
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate((element, dimensions) => (
+        element.complete
+        && element.naturalWidth === dimensions.width
+        && element.naturalHeight === dimensions.height
+      ), { width, height })).toBe(true);
     }
 
     for (const src of [
