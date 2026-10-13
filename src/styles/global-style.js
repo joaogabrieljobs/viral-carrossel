@@ -679,15 +679,18 @@ export const GLOBAL_STYLE = `
   /* Inputs glass — superfície translúcida e foco Orbital Blue */
   /* Camada de toque da zona da foto: o input tem de existir e ser clicável, mas o
      controlo nativo (botão + "Nenhum arquivo escolhido") não pode aparecer no card. */
-  .vc-photo-hit,
-  .vc-batch-photo-input,
-  .vc-single-photo-input { color: transparent !important; font-size: 0 !important; }
+  .vc-photo-hit { color: transparent !important; font-size: 0 !important; }
   .vc-photo-hit::-webkit-file-upload-button,
   .vc-batch-photo-input::-webkit-file-upload-button,
   .vc-single-photo-input::-webkit-file-upload-button { display: none !important; }
   .vc-photo-hit::file-selector-button,
   .vc-batch-photo-input::file-selector-button,
   .vc-single-photo-input::file-selector-button { display: none !important; }
+  .vc-batch-photo-input,
+  .vc-single-photo-input {
+    color: transparent !important;
+    /* font-size:0 + opacity~0 fazia o WebKit ignorar o input no clique */
+  }
 
   .vc-input {
     width: 100%;

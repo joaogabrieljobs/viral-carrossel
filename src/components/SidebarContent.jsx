@@ -970,26 +970,32 @@ function SidebarContent({
                   height: '100%',
                   margin: 0,
                   padding: 0,
-                  opacity: 0.01,
+                  opacity: 0,
                   cursor: 'pointer',
                   border: 'none',
-                  fontSize: 0,
-                  color: 'transparent',
+                  fontSize: 16,
+                  zIndex: 5,
                 };
                 return (
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {/*
-                      Input nativo DENTRO do botão — não depende de .click() em
-                      input off-screen (Safari/Chrome/Electron bloqueiam com frequência).
+                      Input por cima do label (z-index) — recebe o clique directo.
+                      Não usar .click() em input off-screen nem opacity minúscula
+                      com font-size:0 (WebKit ignora o controlo).
                     */}
                     <label
                       style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
                       onMouseEnter={onEnter}
                       onMouseLeave={onLeave}
                     >
+                      <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
+                      <span style={importTextWrap}>
+                        <span style={importTitle}>Importar em lote</span>
+                        <span style={importSub}>1 arquivo = 1 {itemLabel}; cria {itemLabel}s novos se faltar</span>
+                      </span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
                         multiple
                         className="vc-batch-photo-input"
                         aria-label="Importar imagens em lote"
@@ -998,20 +1004,20 @@ function SidebarContent({
                         }}
                         style={fileHitStyle}
                       />
-                      <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
-                      <span style={importTextWrap}>
-                        <span style={importTitle}>Importar em lote</span>
-                        <span style={importSub}>1 arquivo = 1 {itemLabel}; cria {itemLabel}s novos se faltar</span>
-                      </span>
                     </label>
                     <label
                       style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
                       onMouseEnter={onEnter}
                       onMouseLeave={onLeave}
                     >
+                      <span style={importIconWrap} aria-hidden><ImageIcon size={14} strokeWidth={2.25}/></span>
+                      <span style={importTextWrap}>
+                        <span style={importTitle}>Importar foto neste {itemLabel}</span>
+                        <span style={importSub}>Substitui só a zona de imagem do {itemLabel} {activeIdx + 1}</span>
+                      </span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
                         className="vc-single-photo-input"
                         aria-label={`Importar foto no ${itemLabel} ${activeIdx + 1}`}
                         onChange={(e) => {
@@ -1026,11 +1032,6 @@ function SidebarContent({
                         }}
                         style={fileHitStyle}
                       />
-                      <span style={importIconWrap} aria-hidden><ImageIcon size={14} strokeWidth={2.25}/></span>
-                      <span style={importTextWrap}>
-                        <span style={importTitle}>Importar foto neste {itemLabel}</span>
-                        <span style={importSub}>Substitui só a zona de imagem do {itemLabel} {activeIdx + 1}</span>
-                      </span>
                     </label>
                     <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} aria-label="MP4 / MOV / WebM até 60 MB. Substitui foto se houver." title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
                       <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>

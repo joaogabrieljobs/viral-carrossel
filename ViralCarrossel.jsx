@@ -2840,21 +2840,28 @@ export default function App() {
     };
 
     void (async () => {
-      toast(`A importar ${files.length} imagem${files.length === 1 ? '' : 'ns'}…`, 'info', 2500);
+      toast(`A importar ${files.length} imagem${files.length === 1 ? '' : 'ns'}…`, 'info', 4000);
       try {
-        const lidas = await Promise.all(files.map(readOne));
-        // Cada foto vai para o IndexedDB; fallback em memória se a DB falhar.
-        const urls = await Promise.all(lidas.map(async (u) => {
-          if (!u) return null;
+        // Sequencial: evita saturar canvas/IDB e falhas silenciosas em lote grande.
+        const urls = [];
+        for (const file of files) {
+          const dataUrl = await readOne(file);
+          if (!dataUrl) {
+            urls.push(null);
+            continue;
+          }
           try {
-            const patch = await guardarImagemDoSlide(u);
-            if (patch?.bgImage || patch?.bgImageId) return patch;
-            return null;
+            const patch = await guardarImagemDoSlide(dataUrl);
+            if (patch?.bgImage || patch?.bgImageId) {
+              urls.push({ ...patch, bgImageFailed: false, bgImageError: null });
+            } else {
+              urls.push({ bgImage: dataUrl, bgImageId: null, bgImageFailed: false, bgImageError: null });
+            }
           } catch (err) {
             console.warn('[batch-photos] guardar falhou', err);
-            return { bgImage: u, bgImageId: null };
+            urls.push({ bgImage: dataUrl, bgImageId: null, bgImageFailed: false, bgImageError: null });
           }
-        }));
+        }
         const beforeCount = slidesLiveRef.current.length;
         const isPresentation = activeProductKind === 'apresentacao';
         const validCount = urls.filter((p) => p && (p.bgImage || p.bgImageId)).length;
@@ -2878,11 +2885,11 @@ export default function App() {
           leftoverSlides,
           skippedNulls,
         });
-        toast(summary.message, summary.tone);
+        toast(summary.message, summary.tone, 5000);
         if (validCount > 0) setActiveIdx(0);
       } catch (err) {
         console.error('[batch-photos]', err);
-        toast(err?.message || 'Falha ao importar imagens. Tente JPEG ou PNG e recarregue a página.', 'error', 6000);
+        toast(err?.message || 'Falha ao importar imagens. Use JPEG ou PNG e recarregue (Cmd+Shift+R).', 'error', 7000);
       }
     })();
   }, [activeProductKind, brand, setSlides, toast]);

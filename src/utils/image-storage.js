@@ -4,6 +4,8 @@ const VC_BG_SAVE_MAX_PX = 1536;
 const VC_BG_SAVE_JPEG_Q = 0.88;
 /** Só comprime fotos base64 «pesadas» — HEIC do iPhone passa quase sempre. */
 const VC_BG_COMPRESS_MIN_CHARS = 380_000;
+/** createImageBitmap/HEIC pode nunca resolver — não deixar o import pendurado. */
+const VC_FILE_DECODE_TIMEOUT_MS = 12_000;
 
 /** Redimensiona/recomprime data URLs de fundo antes de meter no localStorage (alivia quota). */
 function vcShrinkDataUrlForStorage(dataUrl) {
@@ -51,8 +53,8 @@ function vcShrinkDataUrlForStorage(dataUrl) {
 
 /**
  * Importação de ficheiro → JPEG (~max VC_BG_SAVE_MAX_PX).
- * Ordem: createImageBitmap (melhor com Blob/File) → Image + object URL → FileReader + shrink.
- * Evita depender só de data URLs gigantes no Image (Safari/iOS) e cobre browsers sem createObjectURL estável.
+ * Ordem: FileReader (fiável para uploads) → Image+objectURL → createImageBitmap.
+ * Timeout duro: createImageBitmap com HEIC/RAW pode nunca resolver nem rejeitar.
  */
 function vcImageFileToStorageDataUrl(file) {
   return new Promise((resolve) => {
@@ -68,23 +70,17 @@ function vcImageFileToStorageDataUrl(file) {
       resolve(typeof url === 'string' && url.length >= 32 ? url : '');
     };
 
-    const tryDataUrlFallback = () => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) =>
-          finish(url),
-        );
-      };
-      reader.onerror = () => finish('');
-      reader.readAsDataURL(file);
+    const watchdog = setTimeout(() => finish(''), VC_FILE_DECODE_TIMEOUT_MS);
+    const done = (url) => {
+      clearTimeout(watchdog);
+      finish(url);
     };
 
     const encodeFromWidthHeight = (drawable, w, h, closeFn) => {
       try {
         if (!w || !h) {
           closeFn?.();
-          tryDataUrlFallback();
-          return;
+          return false;
         }
         const fac = VC_BG_SAVE_MAX_PX / Math.max(w, h);
         const scale = fac < 1 ? fac : 1;
@@ -96,24 +92,19 @@ function vcImageFileToStorageDataUrl(file) {
         const ctx = c.getContext('2d');
         if (!ctx) {
           closeFn?.();
-          tryDataUrlFallback();
-          return;
+          return false;
         }
         ctx.drawImage(drawable, 0, 0, w, h, 0, 0, nw, nh);
         closeFn?.();
         const jpeg = c.toDataURL('image/jpeg', VC_BG_SAVE_JPEG_Q);
         if (typeof jpeg === 'string' && jpeg.startsWith('data:') && jpeg.length >= 32) {
-          finish(jpeg);
-          return;
+          done(jpeg);
+          return true;
         }
-        tryDataUrlFallback();
+        return false;
       } catch {
-        try {
-          closeFn?.();
-        } catch {
-          /* */
-        }
-        tryDataUrlFallback();
+        try { closeFn?.(); } catch { /* */ }
+        return false;
       }
     };
 
@@ -122,60 +113,62 @@ function vcImageFileToStorageDataUrl(file) {
       try {
         objUrl = URL.createObjectURL(file);
       } catch {
-        tryDataUrlFallback();
+        done('');
         return;
       }
       const img = new Image();
       const cleanup = () => {
         if (objUrl) {
-          try {
-            URL.revokeObjectURL(objUrl);
-          } catch {
-            /* */
-          }
+          try { URL.revokeObjectURL(objUrl); } catch { /* */ }
           objUrl = '';
         }
       };
-
-      const runDraw = () => {
-        encodeFromWidthHeight(img, img.naturalWidth, img.naturalHeight, cleanup);
-      };
-
       img.onload = () => {
-        if (typeof img.decode === 'function') {
-          img.decode().then(runDraw).catch(() => {
-            cleanup();
-            tryDataUrlFallback();
-          });
-        } else {
-          requestAnimationFrame(() => requestAnimationFrame(runDraw));
+        const ok = encodeFromWidthHeight(img, img.naturalWidth, img.naturalHeight, cleanup);
+        if (!ok) {
+          cleanup();
+          done('');
         }
       };
       img.onerror = () => {
         cleanup();
-        tryDataUrlFallback();
+        done('');
       };
       img.src = objUrl;
     };
 
-    if (typeof createImageBitmap === 'function') {
+    const tryBitmap = () => {
+      if (typeof createImageBitmap !== 'function') {
+        tryImageWithObjectUrl();
+        return;
+      }
       createImageBitmap(file)
         .then((bmp) => {
-          encodeFromWidthHeight(bmp, bmp.width, bmp.height, () => {
-            try {
-              bmp.close();
-            } catch {
-              /* */
-            }
+          const ok = encodeFromWidthHeight(bmp, bmp.width, bmp.height, () => {
+            try { bmp.close(); } catch { /* */ }
           });
+          if (!ok) tryImageWithObjectUrl();
         })
-        .catch(() => {
-          tryImageWithObjectUrl();
-        });
-      return;
-    }
+        .catch(() => tryImageWithObjectUrl());
+    };
 
-    tryImageWithObjectUrl();
+    // Primário: FileReader — não depende de decode bitmap (HEIC/RAW).
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
+          if (typeof url === 'string' && url.startsWith('data:') && url.length >= 32) {
+            done(url);
+            return;
+          }
+          tryBitmap();
+        });
+      };
+      reader.onerror = () => tryBitmap();
+      reader.readAsDataURL(file);
+    } catch {
+      tryBitmap();
+    }
   });
 }
 
@@ -214,6 +207,7 @@ export {
   VC_BG_SAVE_MAX_PX,
   VC_BG_SAVE_JPEG_Q,
   VC_BG_COMPRESS_MIN_CHARS,
+  VC_FILE_DECODE_TIMEOUT_MS,
   vcShrinkDataUrlForStorage,
   vcImageFileToStorageDataUrl,
   canvasToPngBlob,
