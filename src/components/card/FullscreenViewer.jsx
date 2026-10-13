@@ -71,6 +71,7 @@ function FullscreenViewer({
   creativePreset = 'livre',
   caption = '',
   setCaption = null,
+  captionLabel = 'Legenda deste card',
 }) {
   useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
@@ -321,7 +322,7 @@ function FullscreenViewer({
                 fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)',
               }}>
-                Legenda do post
+                {captionLabel}
               </div>
               <button
                 type="button"
@@ -337,14 +338,14 @@ function FullscreenViewer({
               </button>
             </div>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
-              Não aparece no card — só na publicação (Instagram / exportação de texto).
+              Não aparece no visual do card — só para publicar / copiar este card.
             </p>
             <textarea
-              aria-label="Editar legenda do post"
+              aria-label={captionLabel}
               value={caption || ''}
               onChange={(e) => setCaption?.(e.target.value)}
               rows={5}
-              placeholder="Escreva a legenda do post e as hashtags…"
+              placeholder="Escreva a legenda deste card e as hashtags…"
               style={{
                 width: '100%', minHeight: 110, resize: 'vertical', boxSizing: 'border-box',
                 borderRadius: 12, border: '1px solid rgba(255,255,255,0.18)',
@@ -366,7 +367,7 @@ function FullscreenViewer({
               setPhotoAdjustOpen(false);
               setCaptionOpen((v) => !v);
             }}
-            aria-label={captionOpen ? 'Fechar legenda' : 'Ver e editar legenda do post'}
+            aria-label={captionOpen ? 'Fechar legenda' : 'Ver e editar legenda deste card'}
             aria-pressed={captionOpen}
             style={{
               display: 'inline-flex',

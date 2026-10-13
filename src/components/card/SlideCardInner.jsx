@@ -17,6 +17,7 @@ import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } fro
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
+import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
@@ -1855,6 +1856,100 @@ const SlideCardInner = React.forwardRef(({
             </div>
           );
         })()}
+        {normalizeOverlays(slide.overlays).map((ov) => {
+          const chave = overlayMoveKey(ov.id);
+          if (ov.type === 'cta') {
+            const padY = f.h * 0.011;
+            const padX = f.w * 0.026;
+            const fontPx = f.w * 0.022;
+            const isOutline = ov.variant === 'outline';
+            const isGlass = ov.variant === 'glass';
+            return (
+              <div
+                key={ov.id}
+                {...mov(chave, {
+                  position: 'absolute',
+                  left: `${ov.x}%`,
+                  top: `${ov.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 28,
+                  pointerEvents: movableElements ? 'auto' : 'none',
+                })}
+              >
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: f.w * 0.014,
+                  padding: `${padY}px ${padX}px`,
+                  borderRadius: 9999,
+                  background: ov.bg,
+                  color: ov.fg,
+                  border: `1.5px solid ${ov.border}`,
+                  fontFamily: bodyFF,
+                  fontSize: fontPx,
+                  fontWeight: isOutline ? 500 : 600,
+                  letterSpacing: ov.uppercase ? '0.12em' : '0.04em',
+                  textTransform: ov.uppercase ? 'uppercase' : 'none',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1,
+                  backdropFilter: ov.blur || isGlass ? 'blur(10px)' : undefined,
+                  WebkitBackdropFilter: ov.blur || isGlass ? 'blur(10px)' : undefined,
+                }}>
+                  {ov.text}
+                  {ov.arrow ? (
+                    <span style={{
+                      fontSize: fontPx * 1.05,
+                      fontWeight: 400,
+                      lineHeight: 1,
+                      opacity: 0.95,
+                    }} aria-hidden>›</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          }
+          if (ov.type === 'rule') {
+            return (
+              <div
+                key={ov.id}
+                {...mov(chave, {
+                  position: 'absolute',
+                  left: `${ov.x}%`,
+                  top: `${ov.y}%`,
+                  width: `${ov.w}%`,
+                  height: ov.thickness,
+                  background: ov.color,
+                  borderRadius: 2,
+                  zIndex: 27,
+                  pointerEvents: movableElements ? 'auto' : 'none',
+                })}
+              />
+            );
+          }
+          return (
+            <div
+              key={ov.id}
+              {...mov(chave, {
+                position: 'absolute',
+                left: `${ov.x}%`,
+                top: `${ov.y}%`,
+                width: `${ov.w}%`,
+                zIndex: 27,
+                pointerEvents: movableElements ? 'auto' : 'none',
+                color: ov.color,
+                fontFamily: bodyFF,
+                fontSize: f.w * (ov.size / 100),
+                fontWeight: ov.weight,
+                letterSpacing: `${ov.tracking}em`,
+                lineHeight: ov.leading,
+                textAlign: ov.align,
+                whiteSpace: 'pre-line',
+              })}
+            >
+              {ov.text}
+            </div>
+          );
+        })}
     </>
   );
 

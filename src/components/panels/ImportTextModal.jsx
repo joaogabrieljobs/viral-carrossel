@@ -122,7 +122,10 @@ export function ImportTextModal({
           background: 'var(--bg-pearl)', fontSize: 12, color: 'var(--text-secondary)',
         }}>
           Prévia: <strong>{preview.cards.length}</strong> {itemLabel}{preview.cards.length === 1 ? '' : 's'}
-          {preview.caption ? ' · legenda detectada' : ' · sem legenda'}
+          {preview.cards.filter((c) => c.caption).length
+            ? ` · ${preview.cards.filter((c) => c.caption).length} legenda${preview.cards.filter((c) => c.caption).length === 1 ? '' : 's'} nos cards`
+            : ''}
+          {preview.caption ? ' · legenda global do post' : ''}
           {preview.cards[0]?.title ? (
             <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>
               1º {itemLabel}: «{preview.cards[0].title.slice(0, 80)}»

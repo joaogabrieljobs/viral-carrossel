@@ -23,6 +23,8 @@ import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.j
 import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
+import { ElementsPanel } from './panels/ElementsPanel.jsx';
+import { addOverlayToSlide, removeOverlayFromSlide } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
@@ -46,6 +48,7 @@ import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { generateDALLE } from '../utils/ai-client.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
+import { joinSlideCaptions } from '../utils/import-text.js';
 import { composeImgExtraPrompt } from '../utils/style-kit.js';
 import { resolveImageReferences } from '../utils/style-kit-storage.js';
 
@@ -374,7 +377,7 @@ function SidebarContent({
 
   const handleCopyCaption = React.useCallback(async () => {
     try {
-      let text = String(caption || '').trim();
+      let text = joinSlideCaptions(slides) || String(caption || '').trim();
       if (!text && generateCaption) {
         toast?.(isPresentationProject ? 'A gerar resumo…' : 'A gerar legenda…', 'info');
         text = String(await generateCaption() || '').trim();
@@ -385,12 +388,12 @@ function SidebarContent({
     } catch (e) {
       toast?.(e.message || `Não foi possível copiar ${isPresentationProject ? 'o resumo' : 'a legenda'}.`, 'error');
     }
-  }, [caption, generateCaption, isPresentationProject, toast]);
+  }, [caption, generateCaption, isPresentationProject, slides, toast]);
 
   const handleExportPackage = React.useCallback(async () => {
     try {
       trackEvent('export_package');
-      let text = String(caption || '').trim();
+      let text = joinSlideCaptions(slides) || String(caption || '').trim();
       if (!text && generateCaption) {
         toast?.(isPresentationProject ? 'A preparar resumo da apresentação…' : 'A preparar legenda do pacote…', 'info');
         text = String(await generateCaption() || '').trim();
@@ -428,7 +431,7 @@ function SidebarContent({
     } catch (e) {
       toast?.(e.message || 'Falha no pacote de exportação.', 'error');
     }
-  }, [caption, generateCaption, exportAll, isPresentationProject, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
+  }, [caption, generateCaption, exportAll, isPresentationProject, slides, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
 
   // remove unused ensureCaptionText if I left it - check
   /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
@@ -2178,6 +2181,23 @@ function SidebarContent({
                 </div>
               ) : null}
             </S>
+            <S title="Elementos" hint="CTAs, traços e frases premium — clique para inserir no card activo (estilo Canva).">
+              <ElementsPanel
+                slide={slide}
+                toast={toast}
+                onInsert={(overlay) => {
+                  const next = addOverlayToSlide(slide, overlay);
+                  updateSlide({
+                    overlays: next.overlays,
+                    elementsUnlocked: true,
+                  });
+                }}
+                onRemove={(overlayId) => {
+                  const next = removeOverlayFromSlide(slide, overlayId);
+                  updateSlide({ overlays: next.overlays });
+                }}
+              />
+            </S>
           </>
         )}
 
@@ -3871,53 +3891,40 @@ function SidebarContent({
               </S>
             ) : null}
 
-            <S title={isPresentationProject ? 'Resumo e notas da apresentação' : 'Legenda do post'}>
-              {caption ? (
+            <S
+              title={isPresentationProject ? 'Resumo e notas deste slide' : `Legenda do card ${String((activeIdx ?? 0) + 1).padStart(2, '0')}`}
+              hint={isPresentationProject
+                ? 'Notas deste slide — não entram no visual exportado.'
+                : 'Uma legenda por card. Use o ícone ao lado de tela cheia para maximizar. Copiar junta todas as legendas dos cards.'}
+            >
+              {(
                 <>
-                  <textarea value={caption} onChange={e=>setCaption(e.target.value)} rows={7}
+                  <textarea
+                    value={slide?.caption ?? ''}
+                    onChange={(e) => updateSlide({ caption: e.target.value })}
+                    rows={7}
                     className="vc-input vc-textarea"
+                    placeholder="Legenda deste card…"
                     style={{ fontSize:11, lineHeight:1.6, fontFamily:'var(--font-mono)', color:'var(--text-secondary)' }}
                   />
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                    <button onClick={()=>navigator.clipboard?.writeText(caption)} className="vc-btn vc-btn-ghost" style={{ height:34 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const joined = joinSlideCaptions(slides) || String(slide?.caption || caption || '').trim();
+                        if (joined) navigator.clipboard?.writeText(joined);
+                        toast?.(joined ? 'Legendas copiadas.' : 'Nada para copiar.', joined ? 'success' : 'info', 2500);
+                      }}
+                      className="vc-btn vc-btn-ghost"
+                      style={{ height:34 }}
+                    >
                       <Copy size={11}/>Copiar
                     </button>
-                    <button onClick={generateCaption} disabled={genCaption} className="vc-btn vc-btn-ghost" style={{ height:34, opacity:genCaption?0.5:1 }}>
+                    <button type="button" onClick={generateCaption} disabled={genCaption} className="vc-btn vc-btn-ghost" style={{ height:34, opacity:genCaption?0.5:1 }}>
                       {genCaption ? <Loader2 size={11} style={{animation:'spin 0.8s linear infinite'}}/> : <RefreshCw size={11}/>}Regerar
                     </button>
                   </div>
                 </>
-              ) : (
-                // Empty state da legenda: solid border + ícone num círculo
-                // accent, mesma estética dos uploads. Hover puxa fundo accent-surface.
-                <button onClick={generateCaption} disabled={genCaption} style={{
-                  width:'100%', minHeight:60, padding:'12px 16px', borderRadius:11,
-                  cursor:genCaption?'not-allowed':'pointer',
-                  background:'var(--bg-card)', border:'1px solid var(--hairline)',
-                  fontFamily:'var(--font-ui)',
-                  display:'flex', alignItems:'center', gap:12,
-                  opacity:genCaption?0.6:1,
-                  transition:'background-color 0.15s var(--ease-smooth), border-color 0.15s var(--ease-smooth)',
-                }}
-                onMouseEnter={e=>{if(!genCaption){e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.background='var(--accent-surface)';}}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--hairline)';e.currentTarget.style.background='var(--bg-card)';}}
-                >
-                  <span style={{
-                    width:32, height:32, borderRadius:'50%', flexShrink:0,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    background:'var(--accent-surface)', color:'var(--accent)',
-                  }} aria-hidden>
-                    {genCaption ? <Loader2 size={14} style={{animation:'spin 0.8s linear infinite'}}/> : <FileText size={14} strokeWidth={2.25}/>}
-                  </span>
-                  <span style={{ display:'flex', flexDirection:'column', gap:2, flex:1, minWidth:0, textAlign:'left' }}>
-                    <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', lineHeight:1.3 }}>
-                      {isPresentationProject ? 'Gerar resumo da apresentação' : 'Gerar legenda para o post'}
-                    </span>
-                    <span style={{ fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em' }}>
-                      {isPresentationProject ? 'IA sintetiza o deck e o próximo passo' : 'IA escreve com base no carrossel atual'}
-                    </span>
-                  </span>
-                </button>
               )}
             </S>
           </>
@@ -3941,7 +3948,7 @@ function SidebarContent({
           onExportPDF={exportPDF}
           onExportPhotosOnly={exportPhotosOnly}
           hideSlideOption={false}
-          caption={caption}
+          caption={joinSlideCaptions(slides) || caption}
           genCaption={genCaption}
           onCopyCaption={handleCopyCaption}
           onExportPackage={handleExportPackage}

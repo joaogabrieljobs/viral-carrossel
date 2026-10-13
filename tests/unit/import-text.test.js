@@ -3,6 +3,7 @@ import {
   parseImportedText,
   applyImportedTextToSlides,
   scrubLabelLeak,
+  joinSlideCaptions,
   IMPORT_TEXT_VISUAL,
 } from '../../src/utils/import-text.js';
 
@@ -12,6 +13,7 @@ const mkSlide = (n) => ({
   title: `Old ${n}`,
   subtitle: 'old sub',
   bodyAfterImage: '',
+  caption: '',
 });
 
 describe('parseImportedText', () => {
@@ -44,7 +46,7 @@ Legenda final #a #b
     expect(parsed.cards.every((c) => !/legenda/i.test(`${c.title} ${c.subtitle} ${c.bodyAfterImage}`))).toBe(true);
   });
 
-  it('interpreta rótulos inline sem dois-pontos e não põe legenda no card', () => {
+  it('interpreta rótulos inline e guarda legenda no card (não no visual)', () => {
     const raw = `Headline Seus traços orientam o planejamento.
 ÁCIDO HIALURÔNICO FACIAL Subtítulo Planejamento de volume e contorno. CTA Agende uma consulta para conhecer as possibilidades. Legenda O ácido hialurônico pode ser utilizado no preenchimento facial.`;
     const parsed = parseImportedText(raw);
@@ -53,8 +55,8 @@ Legenda final #a #b
     expect(parsed.cards[0].subtitle).toMatch(/Planejamento de volume/);
     expect(parsed.cards[0].subtitle).not.toMatch(/Subtítulo|CTA|Legenda/i);
     expect(parsed.cards[0].bodyAfterImage).toMatch(/Agende uma consulta/);
-    expect(parsed.cards[0].bodyAfterImage).not.toMatch(/Legenda/i);
-    expect(parsed.caption).toMatch(/ácido hialurônico/i);
+    expect(parsed.cards[0].caption).toMatch(/ácido hialurônico/i);
+    expect(parsed.caption).toBe('');
     expect(`${parsed.cards[0].title} ${parsed.cards[0].subtitle} ${parsed.cards[0].bodyAfterImage}`).not.toMatch(/Legenda/i);
   });
 
@@ -75,11 +77,12 @@ describe('scrubLabelLeak', () => {
 });
 
 describe('applyImportedTextToSlides', () => {
-  it('cria cards novos e aplica padrão visual', () => {
+  it('cria cards novos com visual premium e legenda por card', () => {
     const parsed = parseImportedText(`
 ---
 Headline: A
 Subtítulo: 1
+Legenda: Nota do card A
 ---
 Headline: B
 Subtítulo: 2
@@ -87,14 +90,20 @@ Subtítulo: 2
 Headline: C
 Subtítulo: 3
 CTA: Vá
+Legenda: Nota C #tag
 `);
     const { slides, created } = applyImportedTextToSlides([mkSlide(1)], parsed, mkSlide);
     expect(slides).toHaveLength(3);
     expect(created).toBe(2);
     expect(slides[2].title).toBe('C');
     expect(slides[0].photoRegion).toBe(IMPORT_TEXT_VISUAL.photoRegion);
-    expect(slides[0].textShadow).toBe(true);
+    expect(slides[0].textShadow).toBe(false);
+    expect(slides[0].titleCase).toBe('normal');
+    expect(slides[0].caption).toMatch(/Nota do card A/);
+    expect(slides[2].caption).toMatch(/Nota C/);
     expect(slides[2].bodyAfterImage).toMatch(/Vá/);
     expect(slides[2].showSwipeCue).toBe(false);
+    expect(joinSlideCaptions(slides)).toMatch(/Nota do card A/);
+    expect(joinSlideCaptions(slides)).toMatch(/Nota C/);
   });
 });

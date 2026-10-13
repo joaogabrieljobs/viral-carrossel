@@ -1,15 +1,19 @@
 /**
  * Importação de texto estruturado: 1 página/bloco = 1 card.
- * Interpreta rótulos (Título, Headline, Subtítulo, CTA, Legenda) — não os cola no card.
- * Legenda vai só para a caption do post, nunca para o slide.
+ * Interpreta rótulos (Título, Headline, Subtítulo, CTA, Legenda) — não os cola como texto cru.
+ * Legenda por página → `slide.caption` (não desenha no card). LEGENDA global no fim → caption do post.
  */
 
 import { mkSlide } from './doc-schema.js';
 
 const SEPARATOR_LINE_RE = /^(?:-{3,}|={3,}.*|página\s*\d+\b.*|page\s*\d+\b.*|(?:card|slide)\s*\d+\b.*)$/i;
 
-/** Tokens que abrem um campo (com ou sem `:`). Ordem: mais específicos primeiro. */
-const FIELD_TOKEN_RE = /\b(call[\s-]?to[\s-]?action|subt[ií]tulo|subtitle|t[ií]tulo|headline|gancho|hook|abertura|title|corpo|texto|cta|chamada|fecho|convite|legenda|caption)\b\s*:?\s*/gi;
+/**
+ * Rótulos de campo. Ambíguos (gancho/corpo/abertura/texto) SÓ com `:` —
+ * senão "Gancho forte" / "Abertura\nCorpo" viram campos por engano.
+ */
+const FIELD_TOKEN_RE =
+  /\b(?:(call[\s-]?to[\s-]?action|subt[ií]tulo|subtitle|t[ií]tulo|headline|title|cta|chamada|fecho|convite|legenda|caption)\b\s*:?\s*|(gancho|hook|abertura|corpo|texto)\s*:\s*)/gi;
 
 const TOKEN_TO_FIELD = Object.freeze({
   titulo: 'titulo',
@@ -33,16 +37,31 @@ const TOKEN_TO_FIELD = Object.freeze({
   caption: 'legenda',
 });
 
-/** Padrão visual ao importar texto → card editorial full-bleed legível. */
+/**
+ * Padrão visual premium ao importar: tipografia limpa, sem sombra/glow,
+ * sem caixa atrás do texto, overlay só o necessário para foto.
+ */
 export const IMPORT_TEXT_VISUAL = Object.freeze({
   photoRegion: 'full',
-  layout: 'ml',
-  align: 'left',
-  textShadow: true,
+  layout: 'mc',
+  align: 'center',
+  textShadow: false,
   textBg: false,
-  overlay: 52,
+  textBgOpacity: 0,
+  overlay: 28,
   elementsUnlocked: true,
   cultureTone: '',
+  useCultureLayout: false,
+  titleCase: 'normal',
+  titleWeight: 600,
+  titleLeading: 112,
+  subLeading: 148,
+  titleTracking: -0.5,
+  subTracking: 0,
+  titleSize: 100,
+  subSize: 92,
+  composition: '',
+  edgePeek: false,
 });
 
 function normalizeToken(raw) {
@@ -64,14 +83,13 @@ function fieldFromToken(raw) {
 export function scrubLabelLeak(text) {
   let out = String(text || '').trim();
   if (!out) return '';
-  // Prefixos repetidos no início
+  // Rótulos claros: `:` opcional. Ambíguos (gancho/corpo/abertura) SÓ com `:`.
   out = out.replace(
-    /^(?:t[ií]tulo|title|headline|gancho|hook|abertura|subt[ií]tulo|subtitle|corpo|texto|cta|chamada|fecho|convite|legenda|caption)\s*:?\s+/i,
+    /^(?:(?:t[ií]tulo|title|headline|subt[ií]tulo|subtitle|cta|chamada|fecho|convite|legenda|caption)\s*:?\s+|(?:gancho|hook|abertura|corpo|texto)\s*:\s+)/i,
     '',
   );
-  // Rótulos soltos no meio (não devem aparecer no card)
   out = out.replace(
-    /\s+\b(?:t[ií]tulo|title|headline|gancho|hook|subt[ií]tulo|subtitle|cta|chamada|legenda|caption)\b\s*:?\s+/gi,
+    /\s+\b(?:(?:t[ií]tulo|title|headline|subt[ií]tulo|subtitle|cta|chamada|legenda|caption)\b\s*:?\s+|(?:gancho|hook|abertura|corpo|texto)\s*:\s+)/gi,
     ' ',
   );
   return out.replace(/\s{2,}/g, ' ').trim();
@@ -84,7 +102,7 @@ function splitPages(raw) {
   let body = text;
   let trailingCaption = '';
 
-  // LEGENDA no fim do documento (bloco dedicado, após linha em branco ou rótulo sozinho)
+  // LEGENDA no fim do documento (bloco dedicado)
   const captionTail = text.match(/(?:\n|^)(?:legenda|caption)\s*:?\s*\n([\s\S]*)$/i);
   if (captionTail && captionTail.index != null) {
     trailingCaption = captionTail[1].trim();
@@ -113,9 +131,6 @@ function splitPages(raw) {
   return { pages: pages.length ? pages : (body ? [body] : []), trailingCaption };
 }
 
-/**
- * Interpreta rótulos com ou sem `:`, em linhas próprias ou inline no parágrafo.
- */
 function parseLabeledBlock(pageText) {
   const fields = {
     titulo: '',
@@ -139,7 +154,8 @@ function parseLabeledBlock(pageText) {
 
   for (let i = 0; i < matches.length; i += 1) {
     const m = matches[i];
-    const field = fieldFromToken(m[1]);
+    const token = m[1] || m[2];
+    const field = fieldFromToken(token);
     if (!field) continue;
     const start = m.index + m[0].length;
     const end = i + 1 < matches.length ? matches[i + 1].index : source.length;
@@ -154,14 +170,11 @@ function parseLabeledBlock(pageText) {
 /** Separa tema em MAIÚSCULAS colado ao fim do headline (ex.: "Frase. ÁCIDO HIALURÔNICO"). */
 function peelThemeFromHeadline(headline) {
   let h = String(headline || '').trim();
-  let theme = '';
   const lines = h.split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length >= 2) {
     const last = lines[lines.length - 1];
     if (last === last.toLocaleUpperCase('pt-BR') && last.length <= 64 && /[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(last)) {
-      theme = last;
-      h = lines.slice(0, -1).join('\n').trim();
-      return { headline: h, theme };
+      return { headline: lines.slice(0, -1).join('\n').trim(), theme: last };
     }
   }
   const inline = h.match(/^(.*[.!?])\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9\s/-]{2,60})$/);
@@ -176,7 +189,6 @@ function mapFieldsToSlide(fields, unlabeled) {
   let headline = scrubLabelLeak(fields.headline);
   const subtitulo = scrubLabelLeak(fields.subtitulo);
   const cta = scrubLabelLeak(fields.cta);
-  // Legenda NUNCA entra no card — só devolve para a caption do post.
   const legenda = scrubLabelLeak(fields.legenda);
 
   const unlabeledClean = unlabeled.map(scrubLabelLeak).filter(Boolean);
@@ -187,13 +199,13 @@ function mapFieldsToSlide(fields, unlabeled) {
     if (peeled.theme && !titulo) titulo = peeled.theme;
   }
 
-  // Headline = título visual do card; Título/tema reforça o subtítulo (não o headline).
   let title = headline || titulo || unlabeledClean[0] || '';
   title = scrubLabelLeak(title);
 
   let subtitle = '';
   if (headline && titulo && headline !== titulo) {
-    subtitle = [titulo, subtitulo].filter(Boolean).join('\n\n');
+    // Tema curto + subtítulo descritivo — tipografia limpa, sem amontoar labels
+    subtitle = [titulo, subtitulo].filter(Boolean).join('\n');
   } else if (subtitulo) {
     subtitle = subtitulo;
   } else {
@@ -201,49 +213,52 @@ function mapFieldsToSlide(fields, unlabeled) {
   }
   subtitle = scrubLabelLeak(subtitle);
 
-  // CTA só no corpo inferior — nunca misturado com subtítulo.
-  const bodyAfterImage = cta;
-
   return {
     title,
     subtitle,
-    bodyAfterImage,
-    legenda,
+    bodyAfterImage: cta,
+    caption: legenda,
   };
 }
 
 /**
- * Parseia texto bruto em cards + legenda do documento.
- * @returns {{ cards: Array<{title,subtitle,bodyAfterImage}>, caption: string, pageCount: number }}
+ * @returns {{ cards: Array<{title,subtitle,bodyAfterImage,caption}>, caption: string, pageCount: number }}
  */
 export function parseImportedText(raw) {
   const { pages, trailingCaption } = splitPages(raw);
   const cards = [];
-  const captionParts = [];
-  if (trailingCaption) captionParts.push(scrubLabelLeak(trailingCaption));
+  // Só a LEGENDA global do documento vai para a caption do post.
+  const docCaption = scrubLabelLeak(trailingCaption);
 
   for (const page of pages) {
     const { fields, unlabeled } = parseLabeledBlock(page);
     const mapped = mapFieldsToSlide(fields, unlabeled);
-    if (mapped.legenda) captionParts.push(mapped.legenda);
-    // Só cria card se houver conteúdo de slide (não só legenda)
-    if (!mapped.title && !mapped.subtitle && !mapped.bodyAfterImage) continue;
+    if (!mapped.title && !mapped.subtitle && !mapped.bodyAfterImage && !mapped.caption) continue;
     cards.push({
       title: mapped.title,
       subtitle: mapped.subtitle,
       bodyAfterImage: mapped.bodyAfterImage,
+      caption: mapped.caption,
     });
   }
 
   return {
     cards,
-    caption: captionParts.filter(Boolean).join('\n\n').trim(),
+    caption: docCaption,
     pageCount: pages.length,
   };
 }
 
+/** Junta legendas dos cards para copiar / exportar o post. */
+export function joinSlideCaptions(slides) {
+  return (Array.isArray(slides) ? slides : [])
+    .map((s) => String(s?.caption || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 /**
- * Aplica cards parseados aos slides + padrão visual de importação.
+ * Aplica cards parseados aos slides + padrão visual premium de importação.
  */
 export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, brand = null, opts = {}) {
   const list = Array.isArray(slides) ? slides : [];
@@ -263,9 +278,7 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
     const isClose = i === n - 1;
     let base = existing
       ? { ...existing, num: i + 1 }
-      : {
-          ...mkSlideFn(i + 1, brand),
-        };
+      : { ...mkSlideFn(i + 1, brand) };
     if (!existing) created += 1;
     else updated += 1;
 
@@ -274,13 +287,17 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
       num: i + 1,
       title: scrubLabelLeak(card.title || ''),
       subtitle: scrubLabelLeak(card.subtitle || ''),
-      // CTA no fecho; miolo pode ter CTA curto em bodyAfterImage
       bodyAfterImage: scrubLabelLeak(card.bodyAfterImage || ''),
+      caption: scrubLabelLeak(card.caption || ''),
       ...IMPORT_TEXT_VISUAL,
-      layout: isPresentation ? 'ml' : (isCover ? 'mc' : 'ml'),
-      align: isCover && !isPresentation ? 'center' : 'left',
+      layout: isPresentation ? 'ml' : 'mc',
+      align: 'center',
       showSwipeCue: isPresentation ? false : !isClose,
-      // Garante que nada de legenda ficou em campos do card
+      // Evita herdar sandwich cultura / tipografia gritada do card anterior
+      useCultureLayout: false,
+      textShadow: false,
+      textBg: false,
+      titleCase: 'normal',
     };
     next.push(base);
   }
@@ -299,12 +316,11 @@ Headline: Seus traços orientam o planejamento.
 Título: Ácido hialurônico facial
 Subtítulo: Planejamento de volume e contorno.
 CTA:
+Legenda: O ácido hialurônico pode ser utilizado no preenchimento facial. #estetica
 
 === Card 2 ===
 Headline: Segundo argumento
 Subtítulo: Continuidade da narrativa.
 CTA: Agende uma consulta para conhecer as possibilidades.
-
-LEGENDA:
-O ácido hialurônico pode ser utilizado no preenchimento facial. #estetica #hialuronico
+Legenda: Quer saber se faz sentido para você? Fale com a clínica.
 `;

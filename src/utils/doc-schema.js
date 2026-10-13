@@ -10,6 +10,7 @@ import { normalizeContentObjective } from './editorial-strategy.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
 import { unlockGroupedElementsPatch } from './card-elements.js';
+import { normalizeOverlays } from './card-overlays.js';
 import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
 
@@ -100,6 +101,13 @@ const mkSlide = (n = 1, brand = null) => {
   titleWeight: t.titleWeight,
   /** Bloco inferior (modo Tendência/Cultura — layout “sandwich”: texto · imagem inline · texto). */
   bodyAfterImage: '',
+  /**
+   * Legenda / notas deste card (não desenha no PNG).
+   * Importação e o botão «maximizar legenda» editam este campo.
+   */
+  caption: '',
+  /** Elementos inseridos (CTAs, traços, frases) — painel Elementos estilo Canva. */
+  overlays: [],
   /** '' = auto por índice do slide · 'light' | 'dark' | 'accent' força superfície no sandwich/stat. */
   cultureTone: '',
   /**
@@ -303,6 +311,8 @@ function ensureDocShape(d) {
       const normalized = {
         ...sl,
         bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none',
+        caption: typeof sl.caption === 'string' ? sl.caption : '',
+        overlays: normalizeOverlays(sl.overlays),
       };
       // Projetos anteriores à edição individual não tinham este campo. Migra
       // os offsets antes de ativar os alvos separados para a composição não

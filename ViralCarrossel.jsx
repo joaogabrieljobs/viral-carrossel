@@ -1468,6 +1468,8 @@ export default function App() {
   } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false), toast });
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  /** Índice do card cuja legenda está aberta no painel (null = fechado). */
+  const [captionEditorIdx, setCaptionEditorIdx] = useState(null);
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
   const [imageCropOpen, setImageCropOpen] = useState(false);
@@ -2671,12 +2673,12 @@ export default function App() {
       { isPresentation },
     );
     setSlides(next);
-    if (parsed?.caption) {
-      setCaption(parsed.caption);
-    }
+    // LEGENDA global do documento → caption do post; legendas por página ficam em slide.caption
+    if (parsed?.caption) setCaption(parsed.caption);
+    const perCard = (parsed?.cards || []).filter((c) => String(c.caption || '').trim()).length;
     setActiveIdx(0);
     toast(
-      `Texto importado: ${updated} ${isPresentation ? 'slide' : 'card'}${updated === 1 ? '' : 's'} atualizado${updated === 1 ? '' : 's'}${created ? ` · ${created} novo${created === 1 ? '' : 's'}` : ''}${parsed?.caption ? ' · legenda aplicada' : ''}.`,
+      `Texto importado: ${updated} ${isPresentation ? 'slide' : 'card'}${updated === 1 ? '' : 's'}${created ? ` · ${created} novo${created === 1 ? '' : 's'}` : ''}${perCard ? ` · ${perCard} legenda${perCard === 1 ? '' : 's'} nos cards` : ''}${parsed?.caption ? ' · legenda do post' : ''}.`,
       'success',
       5000,
     );
@@ -3864,7 +3866,11 @@ ${isPresentationSummary
         ? String(r?.summary ?? r?.caption ?? r ?? '').trim()
         : normalizeInstagramCaption(r);
 
-      if (activeProjectRef.current === projectId) setCaption(finalCaption);
+      if (activeProjectRef.current === projectId) {
+        setCaption(finalCaption);
+        // Legenda regenerada também preenche o card activo (modelo por card).
+        updateSlideAt(activeIdx, { caption: finalCaption });
+      }
       return finalCaption;
     } catch(e) {
       if (!isGenerationCancelled(e)) setError(e.message);
@@ -5437,6 +5443,28 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     </button>
                     <button
                       type="button"
+                      onClick={() => setCaptionEditorIdx(activeIdx)}
+                      title="Ver e editar legenda deste card"
+                      aria-label={`Legenda do card ${activeIdx + 1}`}
+                      style={{
+                        minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
+                        background: String(slide?.caption || '').trim() ? 'var(--accent-surface)' : 'transparent',
+                        border:'none',
+                        color: String(slide?.caption || '').trim() ? 'var(--accent)' : 'var(--text-secondary)',
+                        display:'inline-flex', alignItems:'center', justifyContent:'center',
+                        transition:'background 0.12s, color 0.12s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background='var(--bg-pearl)'; e.currentTarget.style.color='var(--text-primary)'; }}
+                      onMouseLeave={e => {
+                        const has = String(slide?.caption || '').trim();
+                        e.currentTarget.style.background = has ? 'var(--accent-surface)' : 'transparent';
+                        e.currentTarget.style.color = has ? 'var(--accent)' : 'var(--text-secondary)';
+                      }}
+                    >
+                      <AlignLeft size={15}/>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => deleteCardTarget(activeIdx)}
                       disabled={slides.length <= 1 && selectedCardElement?.slideId !== slide.id}
                       title={selectedCardElement?.slideId === slide.id ? 'Excluir elemento selecionado' : (slides.length <= 1 ? 'O projeto precisa manter pelo menos um card' : `Excluir card ${activeIdx + 1}`)}
@@ -5634,6 +5662,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}
                         ><Maximize2 size={11}/></button>
+                        <button
+                          onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setCaptionEditorIdx(i); }}
+                          title="Ver e editar legenda deste card"
+                          aria-label={`Legenda do card ${i+1}`}
+                          style={{
+                            background: String(s.caption || '').trim() ? 'var(--accent-surface)' : 'none',
+                            border:'none',
+                            color: String(s.caption || '').trim() ? 'var(--accent)' : 'var(--text-muted)',
+                            cursor:'pointer', padding:6, borderRadius:6, transition:'color 0.12s, background 0.12s',
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            minWidth:32, minHeight:32,
+                          }}
+                          onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
+                          onMouseLeave={e=>{
+                            const has = String(s.caption || '').trim();
+                            e.currentTarget.style.color = has ? 'var(--accent)' : 'var(--text-muted)';
+                          }}
+                        ><AlignLeft size={11}/></button>
                         <button
                           onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); deleteCardTarget(i); }}
                           disabled={slides.length <= 1 && selectedCardElement?.slideId !== s.id}
@@ -6037,9 +6083,89 @@ Retorne APENAS JSON: ${refineAllWantsBody
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
         creativePreset={creativePreset}
-        caption={caption}
-        setCaption={setCaption}
+        caption={slides[activeIdx]?.caption || ''}
+        setCaption={(value) => {
+          const next = typeof value === 'function'
+            ? value(slides[activeIdx]?.caption || '')
+            : value;
+          updateSlideAt(activeIdx, { caption: String(next ?? '') });
+        }}
+        captionLabel="Legenda deste card"
       />
+      {captionEditorIdx != null && slides[captionEditorIdx] ? (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Legenda do card ${captionEditorIdx + 1}`}
+          onClick={() => setCaptionEditorIdx(null)}
+          style={{ zIndex: 1200 }}
+        >
+          <div
+            className="modal-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 480, width: 'min(480px, calc(100% - 32px))', padding: 0 }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 16px', borderBottom: '1px solid var(--border)',
+            }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>
+                  Legenda · card {String(captionEditorIdx + 1).padStart(2, '0')}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Não aparece no visual do card — só para publicar / copiar.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="vc-icon-btn"
+                aria-label="Fechar"
+                onClick={() => setCaptionEditorIdx(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+              <textarea
+                className="vc-input vc-textarea"
+                autoFocus
+                rows={7}
+                value={slides[captionEditorIdx].caption || ''}
+                onChange={(e) => updateSlideAt(captionEditorIdx, { caption: e.target.value })}
+                placeholder="Escreva a legenda deste card e as hashtags…"
+                style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 140 }}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="vc-btn vc-btn-ghost"
+                  style={{ minHeight: 36, fontSize: 12 }}
+                  onClick={() => {
+                    const text = String(slides[captionEditorIdx]?.caption || '').trim();
+                    if (text) navigator.clipboard?.writeText(text);
+                    toast?.(text ? 'Legenda copiada.' : 'Legenda vazia.', text ? 'success' : 'info', 2500);
+                  }}
+                >
+                  <Copy size={13} /> Copiar
+                </button>
+                <button
+                  type="button"
+                  className="vc-btn"
+                  style={{
+                    minHeight: 36, fontSize: 12, borderRadius: 9999, border: 'none',
+                    background: 'var(--accent)', color: '#fff', fontWeight: 600, padding: '0 16px',
+                  }}
+                  onClick={() => setCaptionEditorIdx(null)}
+                >
+                  Feito
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LibraryModal
         open={libraryOpen}
         onClose={()=>setLibraryOpen(false)}
