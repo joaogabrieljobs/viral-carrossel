@@ -119,6 +119,15 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
       const ownerGate = await ensureAccountDataOwner(session, { explicitLogin });
       if (cancelled || ownerGate === 'reloading') return;
 
+      // Multiutilizador: biblioteca na nuvem por conta (após isolamento local).
+      if (session?.active) {
+        try {
+          const { reconcileLibraryCloud } = await import('../utils/library-sync.js');
+          const cloudGate = await reconcileLibraryCloud({ toast });
+          if (cancelled || cloudGate === 'reloading') return;
+        } catch { /* rede / Blob — cofre local continua */ }
+      }
+
       // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a
       // landing. NÃO retorna cedo: antes descartava silenciosamente qualquer
       // `login=*`/`billing=*` que viesse na mesma URL — quem voltasse do portal
@@ -213,8 +222,13 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
     }
   }, [toast]);
   const handleLogout = useCallback(async () => {
-    // 1) Snapshot da conta actual → cofre (projetos voltam ao reentrar).
-    // 2) Trava + limpa chaves activas (outro login neste browser não herda).
+    // 1) Empurra biblioteca para a nuvem (multiutilizador / outro browser).
+    // 2) Snapshot local → cofre (mesmo browser sem rede).
+    // 3) Trava + limpa chaves activas (outra conta neste browser não herda).
+    try {
+      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
+      await pushLibraryToCloudBestEffort(8_000);
+    } catch { /* best-effort */ }
     try {
       const { readDataOwner, normalizeDataOwnerId } = await import('../utils/account-data-owner.js');
       const { snapshotAccountVault } = await import('../utils/account-vault.js');

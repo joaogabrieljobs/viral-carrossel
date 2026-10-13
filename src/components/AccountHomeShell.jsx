@@ -57,6 +57,8 @@ function AccountHomeShell({
   askPrompt,
   onManageBilling,
   onLogout,
+  onSyncCloud = null,
+  cloudSyncBusy = false,
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
@@ -613,6 +615,25 @@ function AccountHomeShell({
                 >
                   Abrir biblioteca
                 </button>
+                {typeof onSyncCloud === 'function' ? (
+                  <button
+                    type="button"
+                    onClick={() => onSyncCloud()}
+                    disabled={cloudSyncBusy}
+                    data-vc-tour="cloud-sync"
+                    title="Guardar e restaurar os seus projetos nesta conta, em qualquer browser"
+                    style={{
+                      height: 36, padding: '0 14px', borderRadius: 9999,
+                      border: '1px solid var(--border)', background: 'var(--bg-base)',
+                      cursor: cloudSyncBusy ? 'wait' : 'pointer',
+                      color: 'var(--text-secondary)',
+                      fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                      opacity: cloudSyncBusy ? 0.7 : 1,
+                    }}
+                  >
+                    {cloudSyncBusy ? 'A sincronizar…' : 'Sync na nuvem'}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={createSelectedProject}

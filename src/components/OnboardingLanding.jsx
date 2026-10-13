@@ -194,7 +194,7 @@ const FAQ = [
   },
   {
     q: 'Os projetos ficam salvos na nuvem?',
-    a: 'Os projetos e suas imagens ficam salvos neste navegador. Use o backup JSON da biblioteca para guardar uma cópia ou transferir para outro navegador. Entrar na mesma conta em outro aparelho não sincroniza os projetos automaticamente.',
+    a: 'Com login activo, os projetos sincronizam na nuvem desta conta (botão «Sync na nuvem» ou ao sair). Noutro browser, entre com o mesmo e-mail para restaurar. O backup JSON continua disponível como cópia extra.',
   },
   {
     q: 'Existe limite de carrosséis?',

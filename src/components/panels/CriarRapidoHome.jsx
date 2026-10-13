@@ -634,7 +634,7 @@ export function CriarRapidoHome({
         <span>{isPresentation
           ? 'A Moont prepara os slides. Exporte PDF 16:9 e apresente onde quiser.'
           : 'A Moont prepara os arquivos. A publicação é feita por você no Instagram.'}</span>
-        <span>Seus projetos ficam neste navegador. Faça um backup para não perder o trabalho.</span>
+        <span>Projetos sincronizam na nuvem com a sua conta. Faça também um backup JSON se quiser uma cópia local.</span>
         {onExportBackup ? (
           <button
             type="button"

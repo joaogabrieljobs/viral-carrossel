@@ -1469,6 +1469,33 @@ export default function App() {
     openPortal,
     handleLogout,
   } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false), toast });
+  const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
+  const handleSyncCloud = useCallback(async () => {
+    if (cloudSyncBusy) return;
+    if (!access?.active) {
+      toast('Entre na conta com assinatura activa para sincronizar na nuvem.', 'warning', 4500);
+      return;
+    }
+    setCloudSyncBusy(true);
+    try {
+      const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
+      const result = await pushLibraryToCloud({ force: true });
+      if (result?.skipped || result?.empty) {
+        toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
+      } else {
+        toast(
+          `Nuvem actualizada: ${result.projectCount} projeto(s) nesta conta.`,
+          'success',
+          4500,
+        );
+        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
+      }
+    } catch (e) {
+      toast(e?.message || 'Não foi possível sincronizar na nuvem.', 'error', 5500);
+    } finally {
+      setCloudSyncBusy(false);
+    }
+  }, [access?.active, cloudSyncBusy, toast]);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
@@ -4962,6 +4989,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onContinueEditor={() => setShellView('project')}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
           onLogout={handleLogout}
+          onSyncCloud={access.active ? handleSyncCloud : null}
+          cloudSyncBusy={cloudSyncBusy}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}

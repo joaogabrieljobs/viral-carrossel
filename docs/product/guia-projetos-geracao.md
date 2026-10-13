@@ -67,7 +67,7 @@ O salvamento automático é local ao navegador. A biblioteca guarda cada projeto
 
 - **PNG/PDF**: arquivos finais para publicação, com a logo dos cards escolhidos.
 - **Backup JSON**: cópia editável do projeto com brief, estilo, referências e logos. Use a biblioteca para exportar e importar em outro navegador.
-- Entrar com a mesma conta em outro dispositivo não sincroniza projetos. Faça backup antes de limpar dados do navegador.
+- Com assinatura activa, a biblioteca sincroniza na nuvem por conta (login / «Sync na nuvem» / logout). Noutro dispositivo, entre com o mesmo e-mail. O backup JSON continua como cópia portátil offline.
 
 ## Acesso à conta
 
