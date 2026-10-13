@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Moont — 10 explorações de logo</title>
+  <style>
+    :root {
+      --ink: #111114;
+      --paper: #f4f0e7;
+      --paper-2: #fffdf8;
+      --violet: #5b53e8;
+      --acid: #d7ff5a;
+      --muted: #77736e;
+      --line: rgba(17,17,20,.14);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(17,17,20,.042) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17,17,20,.042) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      width: min(1480px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 72px 0 40px;
+      display: grid;
+      grid-template-columns: minmax(0,1.35fr) minmax(280px,.65fr);
+      gap: 64px;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow, .index, .tags, .size-label {
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .eyebrow { color: var(--violet); margin: 0 0 20px; }
+    h1 { margin: 0; max-width: 900px; font-size: clamp(44px, 6vw, 92px); line-height: .92; letter-spacing: -.068em; }
+    .intro { margin: 0; max-width: 520px; color: #55514c; font-size: 17px; line-height: 1.6; }
+    main { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding: 48px 0 96px; display: grid; gap: 32px; }
+    article {
+      overflow: hidden;
+      background: rgba(255,253,248,.8);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 18px 60px rgba(17,17,20,.06);
+    }
+    article.selected {
+      border: 2px solid var(--violet);
+      box-shadow: 0 22px 72px rgba(91,83,232,.18);
+    }
+    article.selected .index { background: var(--violet); }
+    .concept-head {
+      display: grid;
+      grid-template-columns: 54px minmax(0,1fr) minmax(240px,.6fr);
+      gap: 20px;
+      align-items: start;
+      padding: 24px 26px;
+      border-bottom: 1px solid var(--line);
+    }
+    .index { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); }
+    .concept-head h2 { margin: 2px 0 5px; font-size: 23px; line-height: 1.1; letter-spacing: -.03em; }
+    .concept-head p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .tags { color: var(--violet); text-align: right; line-height: 1.65; }
+    .previews { display: grid; grid-template-columns: 1fr 1fr; }
+    .preview { min-height: 226px; padding: 34px; display: flex; flex-direction: column; justify-content: space-between; }
+    .preview.light { color: var(--ink); background: var(--paper-2); }
+    .preview.dark { color: var(--paper); background: var(--ink); }
+    .lockup { width: min(100%, 520px); height: auto; overflow: visible; }
+    .lockup text { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .mini { display: flex; align-items: center; gap: 12px; min-height: 26px; }
+    .mini svg { height: 24px; width: auto; max-width: 160px; overflow: visible; }
+    .size-label { opacity: .46; }
+    .light .fg { fill: var(--ink); stroke: var(--ink); }
+    .dark .fg { fill: var(--paper); stroke: var(--paper); }
+    .light .paper { fill: var(--paper-2); stroke: var(--paper-2); }
+    .dark .paper { fill: var(--ink); stroke: var(--ink); }
+    .violet { fill: var(--violet); stroke: var(--violet); }
+    .acid { fill: var(--acid); stroke: var(--acid); }
+    .no-fill { fill: none !important; }
+    .round { stroke-linecap: round; stroke-linejoin: round; }
+    footer { width: min(1480px, calc(100% - 48px)); margin: 0 auto 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; display:flex; justify-content:space-between; gap:24px; }
+    @media (max-width: 760px) {
+      header { grid-template-columns: 1fr; gap: 24px; padding-top: 48px; }
+      .concept-head { grid-template-columns: 48px 1fr; }
+      .tags { grid-column: 2; text-align: left; }
+      .previews { grid-template-columns: 1fr; }
+      .preview { min-height: 190px; padding: 26px; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">Moont · identidade 2026</p>
+      <h1>Dez formas de dar presença a uma boa história.</h1>
+    </div>
+    <p class="intro">Explorações vetoriais para uma plataforma de narrativas visuais. Todas preservam a leitura de <strong>moont</strong> em 24 px, funcionam em fundos claros e escuros e evitam os atalhos visuais comuns de produtos de IA.</p>
+  </header>
+
+  <main>
+    <!-- 01 -->
+    <article>
+      <div class="concept-head"><span class="index">01</span><div><h2>Entrelinhas</h2><p>Dois planos que se encontram: contexto e forma visual.</p></div><div class="tags">Editorial · preciso · modular</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Entrelinhas">
+            <g transform="translate(8 18)"><path class="violet no-fill round" stroke-width="9" d="M8 62V20h27l15 16 15-16h27v42"/><path class="acid no-fill round" stroke-width="9" d="M50 36v26"/></g>
+            <text class="fg" x="128" y="82" font-size="76" font-weight="760" letter-spacing="-5">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 165 24" aria-label="moont em 24 pixels"><path class="violet no-fill round" stroke-width="3" d="M2 20V5h10l5 5 5-5h10v15"/><path class="acid no-fill round" stroke-width="3" d="M17 10v10"/><text class="fg" x="42" y="20" font-size="23" font-weight="760" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Entrelinhas em fundo escuro"><g transform="translate(8 18)"><path class="violet no-fill round" stroke-width="9" d="M8 62V20h27l15 16 15-16h27v42"/><path class="acid no-fill round" stroke-width="9" d="M50 36v26"/></g><text class="fg" x="128" y="82" font-size="76" font-weight="760" letter-spacing="-5">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 165 24"><path class="violet no-fill round" stroke-width="3" d="M2 20V5h10l5 5 5-5h10v15"/><path class="acid no-fill round" stroke-width="3" d="M17 10v10"/><text class="fg" x="42" y="20" font-size="23" font-weight="760" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 02 -->
+    <article class="selected">
+      <div class="concept-head"><span class="index">02</span><div><h2>Sequência</h2><p>Uma ideia se move por quadros até ganhar direção.</p></div><div class="tags">Ritmo · sistema · produto</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Sequência"><g transform="translate(8 20)"><rect class="fg" x="0" y="0" width="35" height="35" rx="7"/><rect class="violet" x="26" y="18" width="35" height="35" rx="7"/><rect class="acid" x="52" y="36" width="35" height="35" rx="7"/></g><text class="fg" x="124" y="82" font-size="76" font-weight="720" letter-spacing="-5">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 165 24"><rect class="fg" x="1" y="2" width="10" height="10" rx="2"/><rect class="violet" x="8" y="7" width="10" height="10" rx="2"/><rect class="acid" x="15" y="12" width="10" height="10" rx="2"/><text class="fg" x="35" y="20" font-size="23" font-weight="720" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Sequência em fundo escuro"><g transform="translate(8 20)"><rect class="fg" x="0" y="0" width="35" height="35" rx="7"/><rect class="violet" x="26" y="18" width="35" height="35" rx="7"/><rect class="acid" x="52" y="36" width="35" height="35" rx="7"/></g><text class="fg" x="124" y="82" font-size="76" font-weight="720" letter-spacing="-5">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 165 24"><rect class="fg" x="1" y="2" width="10" height="10" rx="2"/><rect class="violet" x="8" y="7" width="10" height="10" rx="2"/><rect class="acid" x="15" y="12" width="10" height="10" rx="2"/><text class="fg" x="35" y="20" font-size="23" font-weight="720" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 03 -->
+    <article>
+      <div class="concept-head"><span class="index">03</span><div><h2>Duplo enquadramento</h2><p>Feed 4:5 e apresentação 16:9 compartilham a mesma coluna de ideia.</p></div><div class="tags">Proporção · direção · sistema</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Duplo enquadramento">
+            <g transform="translate(8 18)"><rect class="violet no-fill round" stroke-width="8" x="3" y="3" width="56" height="70" rx="9"/><rect class="fg no-fill round" stroke-width="8" x="59" y="18" width="68" height="39" rx="8"/><path class="fg no-fill" stroke-width="8" d="M59 7v64"/><rect class="acid" x="52" y="31" width="14" height="14" rx="3" transform="rotate(45 59 38)"/></g>
+            <text class="fg" x="166" y="82" font-size="76" font-weight="760" letter-spacing="-5">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 180 24" aria-label="moont em 24 pixels"><rect class="violet no-fill round" stroke-width="2.4" x="1" y="1" width="17" height="22" rx="3"/><rect class="fg no-fill round" stroke-width="2.4" x="18" y="6" width="21" height="12" rx="2.5"/><path class="fg no-fill" stroke-width="2.4" d="M18 2v20"/><rect class="acid" x="15.5" y="9.5" width="5" height="5" rx="1" transform="rotate(45 18 12)"/><text class="fg" x="47" y="20" font-size="23" font-weight="760" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Duplo enquadramento em fundo escuro">
+            <g transform="translate(8 18)"><rect class="violet no-fill round" stroke-width="8" x="3" y="3" width="56" height="70" rx="9"/><rect class="fg no-fill round" stroke-width="8" x="59" y="18" width="68" height="39" rx="8"/><path class="fg no-fill" stroke-width="8" d="M59 7v64"/><rect class="acid" x="52" y="31" width="14" height="14" rx="3" transform="rotate(45 59 38)"/></g>
+            <text class="fg" x="166" y="82" font-size="76" font-weight="760" letter-spacing="-5">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 180 24"><rect class="violet no-fill round" stroke-width="2.4" x="1" y="1" width="17" height="22" rx="3"/><rect class="fg no-fill round" stroke-width="2.4" x="18" y="6" width="21" height="12" rx="2.5"/><path class="fg no-fill" stroke-width="2.4" d="M18 2v20"/><rect class="acid" x="15.5" y="9.5" width="5" height="5" rx="1" transform="rotate(45 18 12)"/><text class="fg" x="47" y="20" font-size="23" font-weight="760" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 04 -->
+    <article>
+      <div class="concept-head"><span class="index">04</span><div><h2>Continuidade</h2><p>Um traço contínuo conecta começo, meio e próximo passo.</p></div><div class="tags">Fluido · memorável · humano</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Continuidade"><path class="violet no-fill round" stroke-width="13" d="M16 72c0-40 45-40 45 0 0-40 45-40 45 0 0 22 30 22 30 0"/><circle class="acid" cx="136" cy="72" r="8"/><text class="fg" x="160" y="82" font-size="76" font-weight="680" letter-spacing="-5.2">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 175 24"><path class="violet no-fill round" stroke-width="3.5" d="M2 19c0-12 13-12 13 0 0-12 13-12 13 0 0 6 8 6 8 0"/><circle class="acid" cx="36" cy="19" r="2"/><text class="fg" x="44" y="20" font-size="23" font-weight="680" letter-spacing="-1.5">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Continuidade em fundo escuro"><path class="violet no-fill round" stroke-width="13" d="M16 72c0-40 45-40 45 0 0-40 45-40 45 0 0 22 30 22 30 0"/><circle class="acid" cx="136" cy="72" r="8"/><text class="fg" x="160" y="82" font-size="76" font-weight="680" letter-spacing="-5.2">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 175 24"><path class="violet no-fill round" stroke-width="3.5" d="M2 19c0-12 13-12 13 0 0-12 13-12 13 0 0 6 8 6 8 0"/><circle class="acid" cx="36" cy="19" r="2"/><text class="fg" x="44" y="20" font-size="23" font-weight="680" letter-spacing="-1.5">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 05 -->
+    <article>
+      <div class="concept-head"><span class="index">05</span><div><h2>A virada</h2><p>Dois planos se dobram e revelam um M no espaço entre eles.</p></div><div class="tags">Autoral · espacial · premium</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito A virada">
+            <g transform="translate(8 18)"><path class="violet" d="M0 12 52 0v76L0 65z"/><path class="fg" d="m52 0 52 12v53L52 76z"/><path class="paper no-fill round" stroke-width="13" d="M17 57V24l35 29 35-29v33"/><path class="acid no-fill round" stroke-width="5" d="M52 6v64"/></g>
+            <text class="fg" x="148" y="82" font-size="76" font-weight="720" letter-spacing="-5">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 175 24" aria-label="moont em 24 pixels"><path class="violet" d="M1 5 16 1v22L1 20z"/><path class="fg" d="m16 1 15 4v15l-15 3z"/><path class="paper no-fill round" stroke-width="3.8" d="M6 18V8l10 8 10-8v10"/><path class="acid no-fill" stroke-width="1.5" d="M16 3v18"/><text class="fg" x="39" y="20" font-size="23" font-weight="720" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito A virada em fundo escuro">
+            <g transform="translate(8 18)"><path class="violet" d="M0 12 52 0v76L0 65z"/><path class="fg" d="m52 0 52 12v53L52 76z"/><path class="paper no-fill round" stroke-width="13" d="M17 57V24l35 29 35-29v33"/><path class="acid no-fill round" stroke-width="5" d="M52 6v64"/></g>
+            <text class="fg" x="148" y="82" font-size="76" font-weight="720" letter-spacing="-5">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 175 24"><path class="violet" d="M1 5 16 1v22L1 20z"/><path class="fg" d="m16 1 15 4v15l-15 3z"/><path class="paper no-fill round" stroke-width="3.8" d="M6 18V8l10 8 10-8v10"/><path class="acid no-fill" stroke-width="1.5" d="M16 3v18"/><text class="fg" x="39" y="20" font-size="23" font-weight="720" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 06 -->
+    <article>
+      <div class="concept-head"><span class="index">06</span><div><h2>Ligatura</h2><p>O primeiro “o” concentra a ideia; o segundo abre espaço para ela crescer.</p></div><div class="tags">Tipográfico · proprietário · elástico</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Ligatura">
+            <text class="fg" x="8" y="82" font-size="78" font-weight="790" letter-spacing="-5">m</text>
+            <circle class="violet" cx="103" cy="57" r="27"/><circle class="paper" cx="103" cy="57" r="10" stroke="none"/>
+            <ellipse class="acid" cx="166" cy="57" rx="34" ry="28"/><ellipse class="paper" cx="166" cy="57" rx="20" ry="13" stroke="none"/>
+            <path class="violet no-fill round" stroke-width="6" d="M126 34c10-9 22-10 34-7"/>
+            <text class="fg" x="202" y="82" font-size="78" font-weight="790" letter-spacing="-5">nt</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 174 24" aria-label="moont em 24 pixels"><text class="fg" x="1" y="20" font-size="23" font-weight="790" letter-spacing="-1.4">m</text><circle class="violet" cx="29" cy="12" r="8"/><circle class="paper" cx="29" cy="12" r="3" stroke="none"/><ellipse class="acid" cx="47" cy="12" rx="10" ry="8"/><ellipse class="paper" cx="47" cy="12" rx="6" ry="3.8" stroke="none"/><path class="violet no-fill round" stroke-width="1.8" d="M36 5c3-3 7-3 10-2"/><text class="fg" x="58" y="20" font-size="23" font-weight="790" letter-spacing="-1.4">nt</text></svg><span class="size-label">24 px · oo mark</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Ligatura em fundo escuro">
+            <text class="fg" x="8" y="82" font-size="78" font-weight="790" letter-spacing="-5">m</text>
+            <circle class="violet" cx="103" cy="57" r="27"/><circle class="paper" cx="103" cy="57" r="10" stroke="none"/>
+            <ellipse class="acid" cx="166" cy="57" rx="34" ry="28"/><ellipse class="paper" cx="166" cy="57" rx="20" ry="13" stroke="none"/>
+            <path class="violet no-fill round" stroke-width="6" d="M126 34c10-9 22-10 34-7"/>
+            <text class="fg" x="202" y="82" font-size="78" font-weight="790" letter-spacing="-5">nt</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 174 24"><text class="fg" x="1" y="20" font-size="23" font-weight="790" letter-spacing="-1.4">m</text><circle class="violet" cx="29" cy="12" r="8"/><circle class="paper" cx="29" cy="12" r="3" stroke="none"/><ellipse class="acid" cx="47" cy="12" rx="10" ry="8"/><ellipse class="paper" cx="47" cy="12" rx="6" ry="3.8" stroke="none"/><path class="violet no-fill round" stroke-width="1.8" d="M36 5c3-3 7-3 10-2"/><text class="fg" x="58" y="20" font-size="23" font-weight="790" letter-spacing="-1.4">nt</text></svg><span class="size-label">24 px · oo mark</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 07 -->
+    <article>
+      <div class="concept-head"><span class="index">07</span><div><h2>Cadência</h2><p>Quatro quadros descem, encontram o ponto de virada e voltam a subir.</p></div><div class="tags">Narrativo · rítmico · modular</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Cadência">
+            <g transform="translate(8 17)"><rect class="violet no-fill round" stroke-width="7" x="1" y="1" width="39" height="30" rx="6"/><rect class="fg no-fill round" stroke-width="7" x="24" y="43" width="39" height="30" rx="6"/><rect class="violet no-fill round" stroke-width="7" x="52" y="43" width="39" height="30" rx="6"/><rect class="fg no-fill round" stroke-width="7" x="75" y="1" width="39" height="30" rx="6"/><path class="acid no-fill round" stroke-width="6" d="M20 20 44 59 71 59 95 20"/></g>
+            <text class="fg" x="156" y="82" font-size="76" font-weight="740" letter-spacing="-5.2">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 180 24" aria-label="moont em 24 pixels"><rect class="violet no-fill round" stroke-width="2" x="1" y="1" width="11" height="8" rx="2"/><rect class="fg no-fill round" stroke-width="2" x="8" y="14" width="11" height="8" rx="2"/><rect class="violet no-fill round" stroke-width="2" x="16" y="14" width="11" height="8" rx="2"/><rect class="fg no-fill round" stroke-width="2" x="23" y="1" width="11" height="8" rx="2"/><path class="acid no-fill round" stroke-width="1.8" d="m6 6 8 12h7L29 6"/><text class="fg" x="42" y="20" font-size="23" font-weight="740" letter-spacing="-1.45">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Cadência em fundo escuro">
+            <g transform="translate(8 17)"><rect class="violet no-fill round" stroke-width="7" x="1" y="1" width="39" height="30" rx="6"/><rect class="fg no-fill round" stroke-width="7" x="24" y="43" width="39" height="30" rx="6"/><rect class="violet no-fill round" stroke-width="7" x="52" y="43" width="39" height="30" rx="6"/><rect class="fg no-fill round" stroke-width="7" x="75" y="1" width="39" height="30" rx="6"/><path class="acid no-fill round" stroke-width="6" d="M20 20 44 59 71 59 95 20"/></g>
+            <text class="fg" x="156" y="82" font-size="76" font-weight="740" letter-spacing="-5.2">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 180 24"><rect class="violet no-fill round" stroke-width="2" x="1" y="1" width="11" height="8" rx="2"/><rect class="fg no-fill round" stroke-width="2" x="8" y="14" width="11" height="8" rx="2"/><rect class="violet no-fill round" stroke-width="2" x="16" y="14" width="11" height="8" rx="2"/><rect class="fg no-fill round" stroke-width="2" x="23" y="1" width="11" height="8" rx="2"/><path class="acid no-fill round" stroke-width="1.8" d="m6 6 8 12h7L29 6"/><text class="fg" x="42" y="20" font-size="23" font-weight="740" letter-spacing="-1.45">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 08 -->
+    <article>
+      <div class="concept-head"><span class="index">08</span><div><h2>Margem viva</h2><p>O espaço editorial participa da mensagem e orienta o olhar.</p></div><div class="tags">Cultural · sofisticado · silencioso</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Margem viva"><g transform="translate(7 17)"><rect class="fg" x="0" y="0" width="81" height="81" rx="3"/><rect class="paper" x="16" y="15" width="49" height="51" stroke="none"/><rect class="violet" x="0" y="0" width="11" height="81"/><rect class="acid" x="44" y="55" width="37" height="12"/></g><text class="fg" x="123" y="82" font-size="76" font-weight="620" letter-spacing="-5.1">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 165 24"><rect class="fg" x="1" y="1" width="23" height="23" rx="1"/><rect class="paper" x="6" y="5" width="14" height="14" stroke="none"/><rect class="violet" x="1" y="1" width="3" height="23"/><rect class="acid" x="13" y="16" width="11" height="4"/><text class="fg" x="32" y="20" font-size="23" font-weight="620" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Margem viva em fundo escuro"><g transform="translate(7 17)"><rect class="fg" x="0" y="0" width="81" height="81" rx="3"/><rect class="paper" x="16" y="15" width="49" height="51" stroke="none"/><rect class="violet" x="0" y="0" width="11" height="81"/><rect class="acid" x="44" y="55" width="37" height="12"/></g><text class="fg" x="123" y="82" font-size="76" font-weight="620" letter-spacing="-5.1">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 165 24"><rect class="fg" x="1" y="1" width="23" height="23" rx="1"/><rect class="paper" x="6" y="5" width="14" height="14" stroke="none"/><rect class="violet" x="1" y="1" width="3" height="23"/><rect class="acid" x="13" y="16" width="11" height="4"/><text class="fg" x="32" y="20" font-size="23" font-weight="620" letter-spacing="-1.4">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 09 -->
+    <article>
+      <div class="concept-head"><span class="index">09</span><div><h2>Assinatura</h2><p>Um fio editorial atravessa a palavra e transforma o “t” em ponto de chegada.</p></div><div class="tags">Contínuo · autoral · editorial</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Assinatura">
+            <path class="violet no-fill round" stroke-width="8" d="M14 88c42 15 82 11 116 2 42-11 74-11 104 0 18 7 30 3 35-7 5-10 5-27 5-45h38"/>
+            <rect class="acid" x="7" y="81" width="14" height="14" rx="3" transform="rotate(45 14 88)"/><rect class="acid" x="305" y="31" width="15" height="15" rx="3"/>
+            <text class="fg" x="13" y="80" font-size="78" font-weight="760" letter-spacing="-5.4">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 174 24" aria-label="moont em 24 pixels"><path class="violet no-fill round" stroke-width="2.2" d="M2 21c13 4 25 3 35 1 13-4 23-4 32 0 5 2 9 1 10-2 2-3 2-8 2-13h12"/><rect class="acid" x="0" y="19" width="4" height="4" rx="1" transform="rotate(45 2 21)"/><rect class="acid" x="91" y="5" width="4.5" height="4.5" rx="1"/><text class="fg" x="2" y="18" font-size="23" font-weight="760" letter-spacing="-1.45">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Assinatura em fundo escuro">
+            <path class="violet no-fill round" stroke-width="8" d="M14 88c42 15 82 11 116 2 42-11 74-11 104 0 18 7 30 3 35-7 5-10 5-27 5-45h38"/>
+            <rect class="acid" x="7" y="81" width="14" height="14" rx="3" transform="rotate(45 14 88)"/><rect class="acid" x="305" y="31" width="15" height="15" rx="3"/>
+            <text class="fg" x="13" y="80" font-size="78" font-weight="760" letter-spacing="-5.4">moont</text>
+          </svg>
+          <div class="mini"><svg viewBox="0 0 174 24"><path class="violet no-fill round" stroke-width="2.2" d="M2 21c13 4 25 3 35 1 13-4 23-4 32 0 5 2 9 1 10-2 2-3 2-8 2-13h12"/><rect class="acid" x="0" y="19" width="4" height="4" rx="1" transform="rotate(45 2 21)"/><rect class="acid" x="91" y="5" width="4.5" height="4.5" rx="1"/><text class="fg" x="2" y="18" font-size="23" font-weight="760" letter-spacing="-1.45">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 10 -->
+    <article>
+      <div class="concept-head"><span class="index">10</span><div><h2>Corte de edição</h2><p>Uma pausa deliberada muda o sentido e revela o essencial.</p></div><div class="tags">Contemporâneo · forte · movimento</div></div>
+      <div class="previews">
+        <div class="preview light">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Corte de edição"><g transform="translate(7 17)"><path class="fg" d="M0 11 93 0v23L0 34zM0 52l93-11v23L0 75z"/><path class="violet" d="m28 30 35-4-5 27-35 4z"/><circle class="acid" cx="88" cy="68" r="10"/></g><text class="fg" x="135" y="82" font-size="76" font-weight="850" font-style="italic" letter-spacing="-6.2">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 170 24"><path class="fg" d="M1 4 28 1v7L1 11zm0 12 27-4v7L1 23z"/><path class="violet" d="m9 10 10-1-2 8-10 1z"/><circle class="acid" cx="27" cy="21" r="3"/><text class="fg" x="37" y="20" font-size="23" font-weight="850" font-style="italic" letter-spacing="-1.8">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+        <div class="preview dark">
+          <svg class="lockup" viewBox="0 0 520 116" role="img" aria-label="Moont, conceito Corte de edição em fundo escuro"><g transform="translate(7 17)"><path class="fg" d="M0 11 93 0v23L0 34zM0 52l93-11v23L0 75z"/><path class="violet" d="m28 30 35-4-5 27-35 4z"/><circle class="acid" cx="88" cy="68" r="10"/></g><text class="fg" x="135" y="82" font-size="76" font-weight="850" font-style="italic" letter-spacing="-6.2">moont</text></svg>
+          <div class="mini"><svg viewBox="0 0 170 24"><path class="fg" d="M1 4 28 1v7L1 11zm0 12 27-4v7L1 23z"/><path class="violet" d="m9 10 10-1-2 8-10 1z"/><circle class="acid" cx="27" cy="21" r="3"/><text class="fg" x="37" y="20" font-size="23" font-weight="850" font-style="italic" letter-spacing="-1.8">moont</text></svg><span class="size-label">24 px</span></div>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <footer><span>Moont · prancha de exploração de identidade</span><span>Preto / creme · #5B53E8 · #D7FF5A</span></footer>
+</body>
+</html>

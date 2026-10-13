@@ -3,8 +3,8 @@
 ## Essência
 
 **Moont** é a plataforma que transforma contexto em narrativas visuais. O nome
-combina a ideia de órbita com movimento: conteúdo deixa de ser um bloco parado e
-passa a seguir uma direção, ganhar ritmo e chegar a um formato publicável.
+expressa movimento e continuidade: uma ideia avança por etapas, ganha direção e
+chega a um formato publicável.
 
 **Posicionamento:** plataforma de narrativas visuais para comunicação e
 apresentações.
@@ -20,30 +20,62 @@ No wordmark, a forma é minúscula. A pronúncia recomendada é curta, “munt�
 
 ## Símbolo e wordmark
 
-O símbolo de duas órbitas antecede o wordmark minúsculo. Ele representa dois quadros em movimento:
+O símbolo **Sequência** antecede o wordmark minúsculo. Três quadros arredondados,
+do mesmo tamanho, avançam em diagonal da esquerda para a direita e de cima para
+baixo. A construção mostra uma ideia que progride quadro a quadro até ganhar
+direção:
 
-- o quadro azul representa **Narrativa de comunicação**;
-- o quadro aurora representa **Apresentações**;
-- a interseção representa o contexto compartilhado que a Moont organiza;
-- a inclinação suave indica continuidade, sequência e movimento.
+- o primeiro quadro é o **contexto inicial**;
+- o segundo organiza o contexto em um **sistema narrativo**;
+- o terceiro sinaliza o **produto pronto para circular ou ser apresentado**;
+- a repetição cria ritmo; o deslocamento indica progresso sem depender de uma
+  seta ou de um ícone literal de tecnologia.
 
-O componente `BrandLogo` desenha a marca com SVG e a pilha tipográfica do produto,
-sem depender de uma imagem rasterizada. A variante `wordmark` é a assinatura principal. A variante
+A leitura conceitual da marca é **ritmo · sistema · produto**. Os três quadros
+formam uma única unidade e devem manter dimensões, raio, sobreposição e distância
+relativa fixos.
+
+Na versão institucional sobre fundo claro, o primeiro quadro usa Midnight
+`#090A0F`, o segundo usa Orbital Blue `#5B53E8` e o terceiro usa Aurora
+`#D7FF5A`. Sobre fundo escuro, apenas o primeiro muda para Moonlight `#F3F0E7`;
+azul e aurora permanecem inalterados. Em aplicações de uma cor, os três quadros
+e o wordmark usam a mesma cor sólida: Midnight em fundo claro, Moonlight em
+fundo escuro ou uma única tinta de produção com contraste equivalente. A versão
+monocromática não usa diferenças de opacidade para reconstruir a sequência.
+
+O componente `BrandLogo` desenha o símbolo e o wordmark como vetores SVG,
+com contornos tipográficos fixos para manter a mesma assinatura em todos os
+sistemas, sem depender de uma imagem rasterizada ou de uma fonte instalada. A
+variante `wordmark` é a assinatura principal. A variante
 `mark` é o símbolo compacto; `compact` e `symbol` são aliases aceitos.
 
 ### Regras de uso
 
 - Use o wordmark a partir de 88 px de largura.
-- Use o símbolo a partir de 20 px. Em 16 px, prefira uma versão de favicon
-  ajustada em pixel grid.
-- Preserve uma área livre equivalente à metade da altura de um “o”.
+- Use o símbolo a partir de 20 px de largura. Entre 16 e 19 px, use somente a
+  versão de favicon ajustada em pixel grid, com os três quadros ainda legíveis.
+- Abaixo de 16 px, não use a composição completa. Use o favicon simplificado e
+  valide a leitura no tamanho final.
+- Em reduções, preserve a sobreposição e o deslocamento entre os quadros. Se a
+  sequência perder definição, use uma versão otimizada para o tamanho em vez de
+  comprimir o desenho.
+- Preserve uma área livre ao redor da assinatura equivalente à altura de um dos
+  quadros do símbolo.
 - Sobre fundos escuros, use o wordmark Moonlight. Sobre fundos claros, use
   Midnight.
-- As duas órbitas mantêm suas cores institucionais. Elas não recebem gradiente,
-  sombra, brilho ou contorno adicional.
-- Não estique, comprima ou reorganize letras e símbolo.
+- Use sempre a versão clara, escura ou monocromática prevista. Não troque a
+  ordem das cores nem aplique cores distintas das institucionais em cada quadro.
+- Não gire, espelhe, estique, comprima, separe ou reorganize os três quadros.
+- Não altere o raio, a sobreposição, o espaçamento ou a direção descendente do
+  símbolo.
+- Símbolo e wordmark não recebem gradiente, sombra, brilho, textura ou contorno
+  adicional.
+- Não reorganize letras e símbolo nem substitua a tipografia da assinatura.
 - Não acrescente “AI” ou “Studio” dentro do logo. Descritores ficam ao lado ou
   abaixo, com distância mínima igual à altura de um “o”.
+- Favicons e ícones de aplicativo podem usar o símbolo sobre um quadrado
+  Midnight com cantos arredondados. Esse contêiner não integra a assinatura
+  horizontal e não deve ser acrescentado ao wordmark.
 
 ### Acessibilidade
 
@@ -63,8 +95,8 @@ sem depender de uma imagem rasterizada. A variante `wordmark` é a assinatura pr
 | Graphite | `#181B25` | painéis, cartões e superfícies elevadas |
 | Moonlight | `#F3F0E7` | wordmark, títulos e texto principal |
 | Mist | `#BBB9C7` | texto secundário, metadados e divisores |
-| Orbital Blue | `#5B53E8` | marca primária, foco e Narrativa de comunicação |
-| Aurora | `#D7FF5A` | Apresentações, progresso e momentos de conclusão |
+| Orbital Blue | `#5B53E8` | quadro intermediário da marca, foco e Narrativa de comunicação |
+| Aurora | `#D7FF5A` | quadro final da marca, Apresentações e momentos de conclusão |
 
 O sistema deixa de usar magenta como cor principal. Durante a migração, o
 magenta legado pode aparecer apenas em conteúdo antigo ou em presets criados
@@ -114,7 +146,7 @@ o nome da plataforma.
 **Cor de orientação:** Orbital Blue.
 
 Ao abrir um projeto Comunica, foco, seleção e ações principais usam Orbital
-Blue. O símbolo Moont continua bicolor.
+Blue. O símbolo Moont mantém a sequência institucional de três quadros.
 
 **Estrutura narrativa típica:** gancho → tensão → desenvolvimento → prova →
 síntese → convite. O conteúdo é curto, sequencial e pensado para leitura
@@ -142,8 +174,8 @@ evidências.
 **Cor de orientação:** Aurora.
 
 Ao abrir um projeto Apresenta, foco, seleção e ações principais usam Aurora,
-sempre com texto Midnight para manter contraste. O símbolo Moont continua
-bicolor.
+sempre com texto Midnight para manter contraste. O símbolo Moont mantém a
+sequência institucional de três quadros.
 
 **Estrutura narrativa típica:** promessa → contexto → problema → evidência →
 raciocínio → recomendação → próximos passos. A capa, as divisórias, os slides de
@@ -169,14 +201,16 @@ experiência está sem criar duas marcas independentes.
 
 ### Movimento
 
-O movimento segue trajetórias de órbita: entradas curtas, curvas suaves e
-continuidade entre estados. Use transições de 180–280 ms. Evite rotação literal
-contínua do símbolo e animações decorativas que distraiam da criação.
+O movimento segue uma progressão quadro a quadro: entradas curtas, intervalos
+regulares e continuidade entre estados. Use transições de 180–280 ms. Quando o
+símbolo for animado, revele os quadros na ordem Midnight/Moonlight → Orbital
+Blue → Aurora e encerre em estado estático. Evite loops e animações decorativas
+que distraiam da criação.
 
 ### Formas
 
-- quadros arredondados lembram os dois “o”;
-- linhas orbitais indicam relação ou sequência;
+- quadros arredondados organizam ideias em etapas legíveis;
+- sequências em diagonal indicam avanço e continuidade;
 - grades editoriais organizam informação;
 - a área de trabalho permanece discreta para o conteúdo ser protagonista.
 
