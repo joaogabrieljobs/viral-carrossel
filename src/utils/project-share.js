@@ -385,7 +385,14 @@ async function shareRequest(payload, { method = 'POST', code } = {}) {
       throw new Error(
         typeof data?.error === 'string'
           ? data.error
-          : 'Partilha indisponível no servidor (armazenamento). Tente de novo em instantes.',
+          : 'Partilha indisponível no servidor (Blob/Redis). Peça ao admin para configurar o armazenamento.',
+      );
+    }
+    if (res.status === 404) {
+      throw new Error(
+        typeof data?.error === 'string'
+          ? `${data.error} Crie um link novo em «Criar link para a equipa» (códigos antigos podem ter falhado ao gravar).`
+          : 'Código inválido ou expirado. Peça um link novo à equipa.',
       );
     }
     const errMsg = typeof data?.error === 'string'
@@ -418,7 +425,11 @@ export async function pushProjectShare({ code, doc, name }) {
 }
 
 export async function joinProjectShare(code) {
-  return shareRequest({ action: 'join', code: String(code || '').trim().toUpperCase() });
+  const normalized = normalizeShareCode(code);
+  if (!normalized) {
+    throw new Error('Código incompleto — use o código de 8 caracteres ou o link completo ?share=…');
+  }
+  return shareRequest({ action: 'join', code: normalized });
 }
 
 export async function pullProjectShare(code) {

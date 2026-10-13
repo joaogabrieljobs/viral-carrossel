@@ -32,6 +32,22 @@ describe('project-share-store', () => {
     expect(loaded?.doc?.slides?.[0]?.title).toBe('A');
   });
 
+  it('em produção sem Blob/Redis falha em vez de gravar só em memória', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+
+    const { putSharedProject } = await import('../../api/lib/project-share-store.js');
+    await expect(putSharedProject({
+      code: 'FAIL0001',
+      name: 'Sem store',
+      doc: { slides: [{ title: 'A' }] },
+      revision: 0,
+    })).rejects.toMatchObject({ code: 'share_storage_unconfigured' });
+  });
+
   it('usa Blob privado (não public) quando configurado e payload grande', async () => {
     vi.stubEnv('VITEST', 'false');
     vi.stubEnv('NODE_ENV', 'production');

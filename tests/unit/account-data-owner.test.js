@@ -67,16 +67,27 @@ describe('account-data-owner', () => {
     expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
-  it('login explícito sem dono NÃO apaga biblioteca (migração segura)', async () => {
+  it('login explícito sem dono COM biblioteca órfã limpa (anti-mistura entre contas)', async () => {
     local.setItem(SK.library, JSON.stringify([{ id: 'orphan' }]));
     const result = await ensureAccountDataOwner(
       { active: true, email: 'novo@z.com' },
       { explicitLogin: true },
     );
-    expect(result).toBe('ok');
-    expect(local.getItem(SK.library)).not.toBeNull();
+    expect(result).toBe('reloading');
+    expect(local.getItem(SK.library)).toBeNull();
     expect(readDataOwner()).toBe('email:novo@z.com');
-    expect(globalThis.location.replace).not.toHaveBeenCalled();
+    expect(globalThis.location.replace).toHaveBeenCalled();
+  });
+
+  it('boot silencioso sem dono reclama biblioteca sem apagar (migração)', async () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'legado' }]));
+    const result = await ensureAccountDataOwner(
+      { active: true, email: 'legado@z.com' },
+      { explicitLogin: false },
+    );
+    expect(result).toBe('ok');
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
+    expect(readDataOwner()).toBe('email:legado@z.com');
   });
 
   it('ao mudar de conta limpa biblioteca e recarrega', async () => {

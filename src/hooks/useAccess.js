@@ -213,19 +213,21 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
     }
   }, [toast]);
   const handleLogout = useCallback(async () => {
-    // Sempre sair: se logout/API ou IndexedDB pendurarem, o redirect não pode
-    // ficar à espera (utilizador reportava «Sair da conta» sem efeito).
+    // Trava + limpa ANTES do assign: pagehide reporia a biblioteca do React.
+    try {
+      const { lockAccountDataWrites } = await import('../utils/storage.js');
+      lockAccountDataWrites();
+    } catch { /* */ }
+    try {
+      // FE-001/002/003: limpa biblioteca, BYOK e IndexedDB neste browser.
+      await clearAccountLocalData({ timeoutMs: 2_500 });
+    } catch { /* best-effort */ }
     try {
       await Promise.race([
         logoutAccess(),
         new Promise((r) => setTimeout(r, 3_000)),
       ]);
     } catch { /* rede / offline */ }
-    try {
-      // FE-001/002/003: cookie já morreu; limpa biblioteca, BYOK e IndexedDB
-      // antes do reload para o próximo utilizador no mesmo browser não herdar.
-      await clearAccountLocalData({ timeoutMs: 2_500 });
-    } catch { /* best-effort */ }
     try { trackEvent('logout'); } catch { /* */ }
     // Sessão morta no servidor — recarrega pro shell reavaliar (paywall/landing).
     window.location.assign('/');

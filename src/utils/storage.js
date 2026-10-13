@@ -75,9 +75,41 @@ function readInitialShellView() {
 let VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
 let VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
 
+/**
+ * Trava gravações da conta (biblioteca/marcas/dono) durante logout ou troca.
+ * Sem isto, `pagehide`/`beforeunload` reescrevem `vc_library` DEPOIS do clear
+ * e o próximo login herda os projetos do utilizador anterior.
+ */
+let accountDataWriteLocked = false;
+
+export function lockAccountDataWrites() {
+  accountDataWriteLocked = true;
+}
+
+export function unlockAccountDataWrites() {
+  accountDataWriteLocked = false;
+}
+
+export function areAccountDataWritesLocked() {
+  return accountDataWriteLocked;
+}
+
+const ACCOUNT_WRITE_KEYS = new Set([
+  SK.library,
+  SK.libraryFolders,
+  SK.activeDocId,
+  SK.brands,
+  SK.activeBrandId,
+  SK.dataOwner,
+  SK.legacyDoc,
+]);
+
 // lsSet retorna true em sucesso, false em falha.
 // Em caso de QuotaExceededError dispara evento customizado que o App escuta para exibir toast.
 const lsSet = (key, value) => {
+  if (accountDataWriteLocked && ACCOUNT_WRITE_KEYS.has(key)) {
+    return false;
+  }
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;

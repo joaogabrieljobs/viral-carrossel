@@ -203,8 +203,12 @@ export async function putSharedProject(record) {
     }
   }
 
-  // 4) Memória só em dev/test.
-  if (!tooBigForRedis || process.env.NODE_ENV !== 'production') {
+  // 4) Memória só em dev/test — em produção serverless a memória morre entre
+  // invocações e o join devolve «Código inválido ou expirado».
+  const allowMemory = process.env.VITEST === 'true'
+    || process.env.NODE_ENV === 'test'
+    || process.env.NODE_ENV === 'development';
+  if (allowMemory) {
     memory.set(key, { value: serialized, expiresAt: Date.now() + SHARE_TTL_SEC * 1000 });
     return payload;
   }
@@ -212,8 +216,8 @@ export async function putSharedProject(record) {
   throw Object.assign(
     new Error(
       errors.length
-        ? `Não foi possível gravar a partilha (${errors.join(' · ')}). Verifique Blob/Redis.`
-        : 'Partilha exige Blob ou Redis configurado no servidor.',
+        ? `Não foi possível gravar a partilha (${errors.join(' · ')}). Verifique Blob/Redis no Vercel.`
+        : 'Partilha exige Blob ou Redis configurado no servidor (Vercel).',
     ),
     { code: 'share_storage_unconfigured' },
   );

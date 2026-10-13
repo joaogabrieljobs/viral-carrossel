@@ -4,9 +4,20 @@
  * o logout limpa, mas trocar de conta pelo Google/password não limpava.
  */
 import { clearAccountLocalData } from './clear-account-data.js';
-import { SK } from './storage.js';
+import { SK, lockAccountDataWrites } from './storage.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
+
+function libraryLooksOccupied() {
+  try {
+    const raw = localStorage.getItem(SK.library);
+    if (!raw) return false;
+    const lib = JSON.parse(raw);
+    return Array.isArray(lib) && lib.length > 0;
+  } catch {
+    return false;
+  }
+}
 
 /** Preferir email (estável). customerId só quando não há email. */
 export function normalizeDataOwnerId(email, customerId) {
@@ -61,7 +72,7 @@ export function writeDataOwner(ownerId) {
  * @param {{ explicitLogin?: boolean }} [opts] — reservado; wipe só em troca real de conta
  * @returns {Promise<'ok' | 'reloading'>}
  */
-export async function ensureAccountDataOwner(session, { explicitLogin: _explicitLogin = false } = {}) {
+export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
   if (typeof localStorage === 'undefined') return 'ok';
   if (!session?.active) return 'ok';
 
@@ -71,7 +82,25 @@ export async function ensureAccountDataOwner(session, { explicitLogin: _explicit
   const prev = readDataOwner();
 
   if (!prev) {
-    // 1.ª visita / migração: reclamar sem apagar (não destruir IndexedDB do dono legítimo).
+    // Login explícito + biblioteca órfã (logout limpou o dono mas o pagehide
+    // reporia projetos): limpar. Soft-migração só em boot silencioso.
+    if (explicitLogin && libraryLooksOccupied()) {
+      lockAccountDataWrites();
+      await clearAccountLocalData();
+      writeDataOwner(next);
+      const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
+      try {
+        const url = new URL(loc?.href || 'https://viralcarrossel.com.br/');
+        url.searchParams.delete('login');
+        url.searchParams.delete('email');
+        url.searchParams.set('app', '1');
+        url.searchParams.set('account_switch', '1');
+        loc?.replace?.(url.pathname + url.search + url.hash);
+      } catch {
+        loc?.replace?.('/?app=1&account_switch=1');
+      }
+      return 'reloading';
+    }
     writeDataOwner(next);
     return 'ok';
   }
@@ -83,6 +112,7 @@ export async function ensureAccountDataOwner(session, { explicitLogin: _explicit
   }
 
   // Conta diferente da que possui os dados locais → limpar.
+  lockAccountDataWrites();
   await clearAccountLocalData();
   writeDataOwner(next);
   const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;

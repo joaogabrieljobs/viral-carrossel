@@ -338,6 +338,7 @@ import {
   VC_QUOTA_SLIM_ALREADY_NOTIFIED,
   VC_QUOTA_HARD_ALREADY_NOTIFIED,
   lsSet,
+  areAccountDataWritesLocked,
 } from './src/utils/storage.js';
 import {
   vcHexToRgb,
@@ -926,6 +927,8 @@ export default function App() {
    */
   useEffect(() => {
     const flushLibrary = () => {
+      // Logout/troca de conta: não repor biblioteca no pagehide.
+      if (areAccountDataWritesLocked()) return;
       if (flushPersistRef.current) { flushPersistRef.current(); return; }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
       lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
@@ -4136,29 +4139,9 @@ ${isPresentationSummary
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    void vcImageFileToStorageDataUrl(file).then((url) => {
-      if (typeof url !== 'string' || url.length < 32) {
-        toast('Não foi possível processar a imagem.', 'error', 4500);
-        return;
-      }
-      void guardarImagemDoSlide(url).then((patch) => {
-        if (patch?.bgImageId && patch?.bgImage) {
-          imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
-        }
-        updateSlide({
-          ...patch,
-          bgImageSource: 'imported',
-          bgImageFailed: false,
-          bgImageError: null,
-        });
-        toast('Foto importada.', 'success', 2500);
-      }).catch((err) => {
-        console.warn('[foto] upload legado falhou', err);
-        toast('Não foi possível guardar a imagem.', 'error', 4500);
-      });
-    });
     e.target.value = '';
+    if (!file) return;
+    consumePhotoZoneFileForSlide(activeIdx, file);
   };
 
   // B1: Remix com tom alternativo — re-roda handleGenerate com os mesmos args mas

@@ -3,7 +3,7 @@
  * Cookie `vc_access` já morre no servidor; sem isto o próximo utilizador
  * no mesmo browser herda biblioteca, marcas, BYOK e IndexedDB.
  */
-import { SK } from './storage.js';
+import { SK, lockAccountDataWrites } from './storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from './custom-visual-presets.js';
 import { imageWipeDatabase } from './image-store.js';
@@ -39,6 +39,8 @@ function removeKnownKeys(store) {
  * Tem teto de tempo — IndexedDB bloqueado não pode impedir o «Sair da conta».
  */
 export async function clearAccountLocalData({ timeoutMs = 3_000 } = {}) {
+  // Trava ANTES de apagar — pagehide/beforeunload não podem repor a biblioteca.
+  try { lockAccountDataWrites(); } catch { /* */ }
   try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
   try { removeKnownKeys(typeof sessionStorage !== 'undefined' ? sessionStorage : null); } catch { /* */ }
   try { setVideoUrlMap({}); } catch { /* */ }
@@ -50,4 +52,6 @@ export async function clearAccountLocalData({ timeoutMs = 3_000 } = {}) {
     wipe,
     new Promise((r) => setTimeout(r, Math.max(500, Number(timeoutMs) || 3_000))),
   ]);
+  // Segunda passagem: se algum flush correu em paralelo antes do lock.
+  try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
 }
