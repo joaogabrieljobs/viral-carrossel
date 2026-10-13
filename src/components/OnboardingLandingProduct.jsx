@@ -23,43 +23,10 @@ const PRODUCT = {
   presentation: '/landing/moont-v3/formats/02-apresenta-panel.webp',
 };
 
-const OUTPUTS = [
-  {
-    image: '/landing/moont-v2/outputs/carousel-editorial.webp',
-    mode: 'Carrossel · cultura',
-    title: 'Do feed previsível à escolha deliberada.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/carousel-health.webp',
-    mode: 'Carrossel · saúde',
-    title: 'Do “normal” à pergunta certa.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/carousel-b2b.webp',
-    mode: 'Carrossel · dados',
-    title: 'Um número só vale quando muda a decisão.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/carousel-launch.webp',
-    mode: 'Carrossel · produto',
-    title: 'Desejo primeiro. Detalhe depois.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/presentation-pitch.webp',
-    mode: 'Apresentação · pitch',
-    title: 'Uma tese que cabe numa sala de decisão.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/presentation-medical.webp',
-    mode: 'Apresentação · aula',
-    title: 'Do mecanismo à conduta clínica.',
-  },
-  {
-    image: '/landing/moont-v2/outputs/presentation-brand.webp',
-    mode: 'Apresentação · estratégia',
-    title: 'Conhecimento que convida, não intimida.',
-  },
-];
+const RESULT_STORY = {
+  feed: '/landing/moont-v3/gallery-source/01-editorial-discovery.webp',
+  deck: '/landing/moont-v3/gallery-source/02-editorial-choice.webp',
+};
 
 const IMAGE_DIMENSIONS = {
   [PRODUCT.comunica]: [1600, 1000],
@@ -70,7 +37,8 @@ const IMAGE_DIMENSIONS = {
   [PRODUCT.hero]: [1140, 610],
   [PRODUCT.carousel]: [1600, 1000],
   [PRODUCT.presentation]: [1600, 1000],
-  ...Object.fromEntries(OUTPUTS.map(({ image }) => [image, [1600, 1000]])),
+  [RESULT_STORY.feed]: [1122, 1402],
+  [RESULT_STORY.deck]: [1122, 1402],
   '/landing/moont-v2/portraits/01-social-strategist.webp': [1536, 1024],
   '/landing/moont-v2/portraits/02-designer-overhead.webp': [1536, 1024],
   '/landing/moont-v2/portraits/03-brand-founder-beauty.webp': [1536, 1024],
@@ -388,25 +356,65 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
 
       <section id="resultados" className="moont-lp-section moont-lp-results" aria-labelledby="moont-results-title">
         <div className="moont-lp-container">
-          <p className="moont-lp-kicker">Resultado antes da ferramenta</p>
+          <p className="moont-lp-kicker">Um brief. Dois formatos.</p>
           <div className="moont-lp-section-heading moont-lp-section-heading--split">
-            <h2 id="moont-results-title">Uma ideia não precisa sair com a mesma roupa.</h2>
-            <p>Quatro carrosséis. Três apresentações. Sete direções criativas construídas para assuntos, públicos e momentos diferentes.</p>
+            <h2 id="moont-results-title">Do post à apresentação sem começar de novo.</h2>
+            <p>A Moont adapta estrutura, ritmo e proporção para o feed e para a sala. O contexto da marca e a direção visual continuam os mesmos.</p>
           </div>
-          <p className="moont-lp-swipe-hint" aria-hidden="true">Deslize para explorar as direções <ArrowRight /></p>
-          <div className="moont-lp-results__grid" role="region" aria-label="Exemplos de carrosséis e apresentações" tabIndex={0}>
-            {OUTPUTS.map((item, index) => (
-              <figure key={item.image} className={`moont-lp-result moont-lp-result--${index + 1}`}>
-                <ProductImage src={item.image} alt={`Exemplo demonstrativo de ${item.mode.toLowerCase()}: ${item.title}`} />
-                <figcaption>
-                  <div>
-                    <span>{item.mode}</span>
-                    <small>Conteúdo e dados ilustrativos</small>
-                  </div>
-                  <strong>{item.title}</strong>
-                </figcaption>
-              </figure>
-            ))}
+          <div className="moont-lp-results__proof" role="group" aria-label="A mesma campanha adaptada para carrossel e apresentação">
+            <div className="moont-lp-results__direction">
+              <div>
+                <span>Direção da campanha</span>
+                <strong>Repertório em movimento</strong>
+              </div>
+              <ul aria-label="Decisões preservadas nos dois formatos">
+                <li>Tom editorial</li>
+                <li>Contraste noturno</li>
+                <li>Pessoas reais</li>
+              </ul>
+            </div>
+
+            <div className="moont-lp-results__formats">
+              <article className="moont-lp-output moont-lp-output--feed" aria-label="Exemplo de carrossel para feed">
+                <ProductImage
+                  src={RESULT_STORY.feed}
+                  alt="Mulher saindo de uma livraria à noite, em uma rua molhada pela chuva"
+                />
+                <div className="moont-lp-output__topline" aria-hidden="true">
+                  <span>moont · comunica</span>
+                  <b>01 / 06</b>
+                </div>
+                <div className="moont-lp-output__message">
+                  <span>Carrossel · 4:5</span>
+                  <h3>Pare de salvar.<br />Comece a usar.</h3>
+                  <p>Referência só ganha valor quando orienta uma escolha.</p>
+                </div>
+              </article>
+
+              <article className="moont-lp-output moont-lp-output--deck" aria-label="Exemplo de apresentação em formato widescreen">
+                <div className="moont-lp-output__deck-copy">
+                  <span>Apresentação · 16:9</span>
+                  <h3>Da referência solta à direção aprovada.</h3>
+                  <p>Uma tese clara para alinhar, produzir e publicar.</p>
+                  <small>01 / 08</small>
+                </div>
+                <div className="moont-lp-output__deck-photo">
+                  <ProductImage
+                    src={RESULT_STORY.deck}
+                    alt="Mulher pesquisando livros e discos em uma loja de arte"
+                  />
+                  <span aria-hidden="true">Escolha → sistema</span>
+                </div>
+              </article>
+            </div>
+
+            <div className="moont-lp-results__continuity" aria-label="Fluxo de adaptação da Moont">
+              <span>Contexto</span>
+              <i aria-hidden="true" />
+              <span>Novo ritmo</span>
+              <i aria-hidden="true" />
+              <span>Mesma direção</span>
+            </div>
           </div>
         </div>
       </section>

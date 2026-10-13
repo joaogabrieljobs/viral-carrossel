@@ -18,7 +18,7 @@ test.describe('Landing (RF-01)', () => {
     await expect(page.getByRole('button', { name: /começar a criar/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /ver como funciona/i }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: /um carrossel precisa parar o scroll/i })).toBeVisible();
-    await expect(page.locator('#resultados')).toContainText('Quatro carrosséis. Três apresentações.');
+    await expect(page.locator('#resultados')).toContainText('Do post à apresentação sem começar de novo.');
     await expect(page.getByText('Moont Comunica', { exact: true })).toBeVisible();
     await expect(page.getByText('Moont Apresenta', { exact: true })).toBeVisible();
 
@@ -146,7 +146,6 @@ test.describe('Landing (RF-01)', () => {
       expect(primaryHeroCta.y + primaryHeroCta.height, `CTA principal deve aparecer inteiro na primeira dobra de ${width}px`).toBeLessThanOrEqual(height);
 
       for (const label of [
-        'Exemplos de carrosséis e apresentações',
         'Comparação entre carrossel e apresentação',
         'Perfis que usam a Moont',
         'Comparação dos planos da Moont',
@@ -165,6 +164,11 @@ test.describe('Landing (RF-01)', () => {
         await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
         expect(await rail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(before);
       }
+
+      const resultProof = page.getByRole('group', { name: 'A mesma campanha adaptada para carrossel e apresentação', exact: true });
+      await expect(resultProof).toBeVisible();
+      await expect(resultProof.getByRole('article', { name: 'Exemplo de carrossel para feed', exact: true })).toBeVisible();
+      await expect(resultProof.getByRole('article', { name: 'Exemplo de apresentação em formato widescreen', exact: true })).toBeVisible();
     });
   }
 
@@ -197,13 +201,8 @@ test.describe('Landing (RF-01)', () => {
       '/landing/moont-v3/product/06-interface-hero-desktop.webp',
     ];
     const expectedOutputs = [
-      '/landing/moont-v2/outputs/carousel-editorial.webp',
-      '/landing/moont-v2/outputs/carousel-health.webp',
-      '/landing/moont-v2/outputs/carousel-b2b.webp',
-      '/landing/moont-v2/outputs/carousel-launch.webp',
-      '/landing/moont-v2/outputs/presentation-pitch.webp',
-      '/landing/moont-v2/outputs/presentation-medical.webp',
-      '/landing/moont-v2/outputs/presentation-brand.webp',
+      '/landing/moont-v3/gallery-source/01-editorial-discovery.webp',
+      '/landing/moont-v3/gallery-source/02-editorial-choice.webp',
     ];
 
     const panels = page.locator('.moont-lp-format__panel');
@@ -229,7 +228,7 @@ test.describe('Landing (RF-01)', () => {
       await expect(image).toHaveCount(1);
       await image.scrollIntoViewIfNeeded();
       await expect.poll(() => image.evaluate((element) => (
-        element.complete && element.naturalWidth === 1600 && element.naturalHeight === 1000
+        element.complete && element.naturalWidth === 1122 && element.naturalHeight === 1402
       ))).toBe(true);
     }
 

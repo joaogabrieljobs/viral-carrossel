@@ -20,15 +20,15 @@ No wordmark, a forma é minúscula. A pronúncia recomendada é curta, “munt�
 
 ## Símbolo e wordmark
 
-Os dois “o” formam o símbolo da marca. São dois quadros em órbita:
+O símbolo de duas órbitas antecede o wordmark minúsculo. Ele representa dois quadros em movimento:
 
 - o quadro azul representa **Narrativa de comunicação**;
 - o quadro aurora representa **Apresentações**;
 - a interseção representa o contexto compartilhado que a Moont organiza;
-- os dois pontos nas órbitas indicam continuidade, sequência e movimento.
+- a inclinação suave indica continuidade, sequência e movimento.
 
-O componente `BrandLogo` desenha a marca com SVG e CSS, sem depender de uma
-imagem rasterizada. A variante `wordmark` é a assinatura principal. A variante
+O componente `BrandLogo` desenha a marca com SVG e a pilha tipográfica do produto,
+sem depender de uma imagem rasterizada. A variante `wordmark` é a assinatura principal. A variante
 `mark` é o símbolo compacto; `compact` e `symbol` são aliases aceitos.
 
 ### Regras de uso
@@ -41,7 +41,7 @@ imagem rasterizada. A variante `wordmark` é a assinatura principal. A variante
   Midnight.
 - As duas órbitas mantêm suas cores institucionais. Elas não recebem gradiente,
   sombra, brilho ou contorno adicional.
-- Não estique, incline, comprima ou reorganize letras e símbolo.
+- Não estique, comprima ou reorganize letras e símbolo.
 - Não acrescente “AI” ou “Studio” dentro do logo. Descritores ficam ao lado ou
   abaixo, com distância mínima igual à altura de um “o”.
 
@@ -82,7 +82,7 @@ tela inteira em Aurora perde o sentido de destaque.
 
 ## Tipografia
 
-O wordmark usa uma construção independente e não depende de fonte externa.
+O wordmark usa a pilha Display do produto, com peso 720 e espaçamento compacto.
 
 Para produto e comunicação:
 
