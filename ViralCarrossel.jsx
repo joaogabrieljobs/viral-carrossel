@@ -1356,17 +1356,23 @@ export default function App() {
     } catch { /* */ }
     try {
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      const result = await pushLibraryToCloud({ force: true, allowShrink: true });
-      if (result?.reason === 'cloud_has_more') {
-        toast(
-          `Mantidos ${result.projectCount} projeto(s) na nuvem (este browser tinha menos). Use Sync na home se quiser forçar.`,
-          'info',
-          5500,
-        );
-        return;
-      }
+      // Merge na nuvem (nunca allowShrink) — não apaga projetos doutros browsers.
+      const result = await pushLibraryToCloud({ force: true, allowShrink: false });
       if (result?.skipped || result?.empty) {
         toast('Projeto salvo neste navegador.', 'success', 2200);
+        return;
+      }
+      if (result?.needsReload) {
+        toast(`Nuvem com ${result.projectCount} projeto(s) — a actualizar…`, 'success', 2500);
+        window.setTimeout(() => {
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('app', '1');
+            window.location.replace(url.pathname + url.search + url.hash);
+          } catch {
+            window.location.reload();
+          }
+        }, 400);
         return;
       }
       if (result?.assetsFailed > 0) {
@@ -1376,7 +1382,7 @@ export default function App() {
           6500,
         );
       } else {
-        toast('Projeto salvo na sua conta (nuvem).', 'success', 3200);
+        toast(`Projeto salvo na conta · ${result.projectCount} na nuvem.`, 'success', 3200);
       }
       trackEvent('library_cloud_push', {
         project_count: String(result.projectCount || 0),
@@ -1543,10 +1549,30 @@ export default function App() {
     }
     setCloudSyncBusy(true);
     try {
+      flushPersistNow();
+      try {
+        const { readDataOwner } = await import('./src/utils/account-data-owner.js');
+        const { snapshotAccountVault } = await import('./src/utils/account-vault.js');
+        const owner = readDataOwner();
+        if (owner) snapshotAccountVault(owner);
+      } catch { /* */ }
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      const result = await pushLibraryToCloud({ force: true, allowShrink: true });
+      // Merge: une local + nuvem. Nunca substitui a nuvem por uma lista menor.
+      const result = await pushLibraryToCloud({ force: true, allowShrink: false });
       if (result?.skipped || result?.empty) {
         toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
+      } else if (result?.needsReload) {
+        toast(`Nuvem: ${result.projectCount} projeto(s) — a restaurar lista…`, 'success', 2500);
+        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
+        window.setTimeout(() => {
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('app', '1');
+            window.location.replace(url.pathname + url.search + url.hash);
+          } catch {
+            window.location.reload();
+          }
+        }, 400);
       } else if (result?.assetsFailed > 0) {
         toast(
           `Nuvem: ${result.projectCount} projeto(s). ${result.assetsUploaded || 0} foto(s) ok, ${result.assetsFailed} falharam${result.assetError ? ` — ${result.assetError.slice(0, 80)}` : ''}.`,
@@ -1567,7 +1593,7 @@ export default function App() {
     } finally {
       setCloudSyncBusy(false);
     }
-  }, [access?.active, cloudSyncBusy, toast]);
+  }, [access?.active, cloudSyncBusy, flushPersistNow, toast]);
   // Auto-push na nuvem ~4s após editar a biblioteca (não depende só do logout).
   const cloudAutoPushTimerRef = useRef(null);
   const cloudAutoPushSkipFirstRef = useRef(true);

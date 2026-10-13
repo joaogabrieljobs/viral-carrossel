@@ -80,4 +80,45 @@ describe('library-sync-store', () => {
     expect(resolveLibraryOwnerId({ email: 'A@B.com' })).toBe('em_a_b_com');
     expect(resolveLibraryOwnerId({ billingDisabled: true })).toBe('billing-disabled');
   });
+
+  it('merge por defeito não apaga projetos que só existem na nuvem', async () => {
+    await putLibraryManifest('cus_merge', {
+      docs: [
+        { id: 'a', name: 'Clínica', updatedAt: 100, doc: {} },
+        { id: 'b', name: 'Carrossel', updatedAt: 100, doc: {} },
+      ],
+      assetIds: [],
+    });
+    const merged = await putLibraryManifest('cus_merge', {
+      docs: [
+        { id: 'c', name: 'Novo', updatedAt: 200, doc: {} },
+      ],
+      assetIds: [],
+    }, { force: true });
+    const ids = merged.manifest.docs.map((d) => d.id).sort();
+    expect(ids).toEqual(['a', 'b', 'c']);
+    expect(merged.meta.projectCount).toBe(3);
+  });
+
+  it('replace=true pode encolher; deletedIds remove no merge', async () => {
+    await putLibraryManifest('cus_del', {
+      docs: [
+        { id: 'keep', name: 'Keep', updatedAt: 1, doc: {} },
+        { id: 'gone', name: 'Gone', updatedAt: 1, doc: {} },
+      ],
+      assetIds: [],
+    });
+    const afterDel = await putLibraryManifest('cus_del', {
+      docs: [{ id: 'keep', name: 'Keep', updatedAt: 2, doc: {} }],
+      deletedIds: ['gone'],
+      assetIds: [],
+    }, { force: true });
+    expect(afterDel.manifest.docs.map((d) => d.id)).toEqual(['keep']);
+
+    const replaced = await putLibraryManifest('cus_del', {
+      docs: [{ id: 'only', name: 'Only', updatedAt: 3, doc: {} }],
+      assetIds: [],
+    }, { force: true, replace: true });
+    expect(replaced.manifest.docs.map((d) => d.id)).toEqual(['only']);
+  });
 });

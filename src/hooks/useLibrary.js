@@ -306,6 +306,11 @@ export function useLibrary({
     return entries;
   }, [brandRoster, activeBrandId, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, snapshotEntries]);
   const deleteDoc = useCallback((docId) => {
+    if (docId) {
+      import('../utils/library-sync.js')
+        .then(({ rememberDeletedProjectIds }) => rememberDeletedProjectIds([docId]))
+        .catch(() => {});
+    }
     setLibrary(prev => {
       const next = prev.filter(e => e.id !== docId);
       if (next.length === 0) {

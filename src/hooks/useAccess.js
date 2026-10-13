@@ -241,13 +241,13 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, toast }
       snapshotAccountVaultForOwners(aliases);
       lockAccountDataWrites();
     } catch { /* */ }
-    // Nuvem: no máximo ~1,5s — não segurar o «Sair da conta».
+    // Nuvem: até ~5s (merge é rápido; fotos best-effort). Cofre já está gravado.
     try {
       const push = import('../utils/library-sync.js')
-        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(1_500));
+        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(5_000));
       await Promise.race([
         push,
-        new Promise((r) => setTimeout(r, 1_500)),
+        new Promise((r) => setTimeout(r, 5_000)),
       ]);
     } catch { /* best-effort */ }
     try {

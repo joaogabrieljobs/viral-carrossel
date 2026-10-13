@@ -16,6 +16,40 @@ const MAX_ASSET_CHARS = 1_600_000;
 const IMAGE_MAX_EDGE = 720;
 const IMAGE_MAX_CHARS = 160_000;
 
+function readDeletedProjectIds() {
+  try {
+    const raw = localStorage.getItem(SK.libraryDeletedIds);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return [...new Set(parsed.map((x) => String(x || '').trim()).filter(Boolean))].slice(0, 500);
+  } catch {
+    return [];
+  }
+}
+
+/** Marca projectos apagados para a nuvem os remover no merge. */
+export function rememberDeletedProjectIds(ids = []) {
+  const add = (Array.isArray(ids) ? ids : [ids])
+    .map((x) => String(x || '').trim())
+    .filter(Boolean);
+  if (!add.length) return;
+  try {
+    const next = [...new Set([...readDeletedProjectIds(), ...add])].slice(0, 500);
+    localStorage.setItem(SK.libraryDeletedIds, JSON.stringify(next));
+  } catch { /* quota */ }
+}
+
+function clearDeletedProjectIds(ids = []) {
+  const drop = new Set((Array.isArray(ids) ? ids : []).map((x) => String(x || '').trim()).filter(Boolean));
+  if (!drop.size) return;
+  try {
+    const next = readDeletedProjectIds().filter((id) => !drop.has(id));
+    if (next.length) localStorage.setItem(SK.libraryDeletedIds, JSON.stringify(next));
+    else localStorage.removeItem(SK.libraryDeletedIds);
+  } catch { /* */ }
+}
+
 function readCloudMeta() {
   try {
     const raw = localStorage.getItem(LIBRARY_CLOUD_META_KEY);
@@ -220,6 +254,7 @@ export async function packLibraryForCloud() {
     onboardingDone = localStorage.getItem(SK.onboarding);
     modesIntroDone = localStorage.getItem(SK.modesIntro);
   } catch { /* */ }
+  const deletedIds = readDeletedProjectIds();
   const manifest = {
     vcVersion: 3,
     folders,
@@ -228,6 +263,7 @@ export async function packLibraryForCloud() {
     activeDocId,
     docs,
     assetIds,
+    deletedIds,
     userProfile: userProfile && typeof userProfile === 'object' ? stripRuntime(userProfile) : null,
     onboardingDone: onboardingDone || null,
     modesIntroDone: modesIntroDone || null,
@@ -333,19 +369,22 @@ async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
 /**
  * Envia biblioteca local → nuvem.
  * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
+ * Por defeito a nuvem faz MERGE (união) — projectos noutros browsers não somem.
  * @param {{ force?: boolean, allowShrink?: boolean }} [opts]
+ *   allowShrink/replace: substitui a nuvem (só Sync manual consciente).
  */
 export async function pushLibraryToCloud(opts = {}) {
   const localMeta = readCloudMeta();
   const status = await fetchLibraryCloudStatus();
   const { manifest, assets, projectCount } = await packLibraryForCloud();
-  if (!projectCount && !(manifest.brands || []).length) {
+  if (!projectCount && !(manifest.brands || []).length && !(manifest.deletedIds || []).length) {
     return { ok: true, empty: true, skipped: true, revision: localMeta?.revision || 0 };
   }
 
+  const replace = opts.allowShrink === true;
   const cloudCount = Number(status?.meta?.projectCount || 0);
-  // Nunca apagar projetos na nuvem com um push mais pequeno (auto-sync / race).
-  if (!opts.allowShrink && cloudCount > projectCount) {
+  // Com merge, push mais pequeno é seguro. Com replace, bloquear auto-encolher.
+  if (replace && !opts.force && cloudCount > projectCount) {
     return {
       ok: true,
       skipped: true,
@@ -361,24 +400,32 @@ export async function pushLibraryToCloud(opts = {}) {
   const baseRevision = opts.force
     ? undefined
     : (localMeta?.revision ?? status?.meta?.revision);
+  const pushBody = {
+    action: 'push',
+    manifest,
+    baseRevision: status?.empty ? undefined : baseRevision,
+    force: opts.force === true,
+    replace,
+  };
   let result;
   try {
-    result = await syncRequest({
-      action: 'push',
-      manifest,
-      baseRevision: status?.empty ? undefined : baseRevision,
-      force: opts.force === true,
-    });
+    result = await syncRequest(pushBody);
   } catch (e) {
     if (e?.code === 'library_conflict') {
+      // Conflito: ainda MERGE (nunca replace cego) para não apagar a nuvem.
       result = await syncRequest({
         action: 'push',
         manifest,
         force: true,
+        replace: false,
       });
     } else {
       throw e;
     }
+  }
+
+  if (Array.isArray(manifest.deletedIds) && manifest.deletedIds.length) {
+    clearDeletedProjectIds(manifest.deletedIds);
   }
 
   // 2) Fotos depois (não falha o save).
@@ -393,6 +440,16 @@ export async function pushLibraryToCloud(opts = {}) {
     lastPushAt: Date.now(),
     lastPullAt: localMeta?.lastPullAt || null,
   });
+
+  // Se o merge na nuvem trouxe projetos que este browser não tinha, puxar.
+  let needsReload = false;
+  if (Number(result.projectCount || 0) > projectCount) {
+    try {
+      await pullLibraryFromCloud();
+      needsReload = true;
+    } catch { /* estrutura já está na nuvem */ }
+  }
+
   return {
     ok: true,
     revision: result.revision,
@@ -402,6 +459,7 @@ export async function pushLibraryToCloud(opts = {}) {
     assetsUploaded: assetStats.uploaded,
     assetsFailed: assetStats.failed,
     assetError: assetStats.lastError || '',
+    needsReload,
   };
 }
 

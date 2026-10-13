@@ -132,6 +132,8 @@ export default async function handler(req, res) {
         {
           baseRevision: body.baseRevision,
           force: body.force === true,
+          // replace=true só quando o cliente pede encolher de propósito
+          replace: body.replace === true || body.allowShrink === true,
         },
       );
       return res.status(200).json({

@@ -74,9 +74,9 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toContain('email:a@x.com');
   });
 
-  it('preserva meta de sync na nuvem', async () => {
+  it('não deixa meta de sync órfã sem biblioteca (vai no cofre)', async () => {
     local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 3, updatedAt: 99 }));
     await clearAccountLocalData();
-    expect(JSON.parse(local.getItem(SK.libraryCloudMeta))).toEqual({ revision: 3, updatedAt: 99 });
+    expect(local.getItem(SK.libraryCloudMeta)).toBeNull();
   });
 });

@@ -241,10 +241,32 @@ export async function getLibraryManifest(customerId) {
   return memoryManifest.get(id) || null;
 }
 
+function entryUpdatedAt(entry) {
+  return Number(entry?.updatedAt || entry?.createdAt || 0);
+}
+
+/** União por id — entrada mais recente ganha. Nunca descarta o lado em falta. */
+function mergeById(cloudList, localList) {
+  const map = new Map();
+  for (const entry of (cloudList || [])) {
+    if (!entry?.id) continue;
+    map.set(String(entry.id), entry);
+  }
+  for (const entry of (localList || [])) {
+    if (!entry?.id) continue;
+    const key = String(entry.id);
+    const prev = map.get(key);
+    if (!prev || entryUpdatedAt(entry) >= entryUpdatedAt(prev)) {
+      map.set(key, entry);
+    }
+  }
+  return [...map.values()];
+}
+
 /**
  * @param {string} customerId
  * @param {object} manifest
- * @param {{ baseRevision?: number, force?: boolean }} [opts]
+ * @param {{ baseRevision?: number, force?: boolean, replace?: boolean }} [opts]
  */
 export async function putLibraryManifest(customerId, manifest, opts = {}) {
   const id = sanitizeCustomerId(customerId);
@@ -275,17 +297,48 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
       : Number(existing.revision || 0) + 1)
     : 1;
 
-  const assetIds = Array.isArray(manifest.assetIds)
-    ? [...new Set(manifest.assetIds.map(sanitizeAssetId).filter(Boolean))].slice(0, MAX_ASSETS)
-    : [];
+  // Por defeito: MERGE com a nuvem (união). `replace: true` só quando o cliente
+  // quer mesmo encolher (apagar projectos que só existem na nuvem).
+  let docs = Array.isArray(manifest.docs) ? manifest.docs : [];
+  let folders = Array.isArray(manifest.folders) ? manifest.folders : [];
+  let brands = Array.isArray(manifest.brands) ? manifest.brands : [];
+  let assetIds = Array.isArray(manifest.assetIds) ? manifest.assetIds : [];
+
+  if (!opts.replace && existing) {
+    const cloudManifest = await getLibraryManifest(id);
+    if (cloudManifest) {
+      docs = mergeById(cloudManifest.docs, docs);
+      folders = mergeById(cloudManifest.folders, folders);
+      brands = mergeById(cloudManifest.brands, brands);
+      assetIds = [
+        ...(Array.isArray(cloudManifest.assetIds) ? cloudManifest.assetIds : []),
+        ...assetIds,
+      ];
+    }
+  }
+
+  const deletedIds = new Set(
+    (Array.isArray(manifest.deletedIds) ? manifest.deletedIds : [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean),
+  );
+  if (deletedIds.size) {
+    docs = docs.filter((d) => d?.id && !deletedIds.has(String(d.id)));
+  }
+
+  assetIds = [...new Set(assetIds.map(sanitizeAssetId).filter(Boolean))].slice(0, MAX_ASSETS);
 
   const payload = {
     vcVersion: 3,
     ...manifest,
+    docs,
+    folders,
+    brands,
     customerId: id,
     revision,
     updatedAt: Date.now(),
     assetIds,
+    deletedIds: [...deletedIds],
   };
   const serialized = JSON.stringify(payload);
   if (serialized.length > MAX_MANIFEST_CHARS) {

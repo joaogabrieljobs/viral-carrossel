@@ -13,10 +13,11 @@ import { ACCOUNT_VAULT_KEY } from './account-vault.js';
 
 const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
 /**
- * Convite ?share=, cofre e meta de sync sobrevivem à limpeza.
- * Tour/modesIntro NÃO ficam globais (conta B herdaria) — vão no cofre por owner.
+ * Convite ?share= e cofre sobrevivem à limpeza.
+ * Meta de sync NÃO fica órfã sem biblioteca (causava pull/push errado).
+ * Tour/modesIntro e meta vão no cofre por owner.
  */
-const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY, ACCOUNT_VAULT_KEY, SK.libraryCloudMeta]);
+const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY, ACCOUNT_VAULT_KEY]);
 
 function removeKnownKeys(store) {
   if (!store) return;
