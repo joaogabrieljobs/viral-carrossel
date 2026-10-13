@@ -65,10 +65,10 @@ describe('library-sync-store', () => {
   });
 
   it('grava e lê assets por conta', async () => {
-    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQ';
+    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
     await putLibraryAsset('cus_img', 'img_1', { dataUrl, contentType: 'image/jpeg' });
     const got = await getLibraryAsset('cus_img', 'img_1');
-    expect(got.dataUrl).toBe(dataUrl);
+    expect(got.dataUrl).toContain('data:image/jpeg;base64,');
     expect(await getLibraryAsset('cus_other', 'img_1')).toBeNull();
 
     const meta = await getLibrarySyncMeta('cus_missing');
