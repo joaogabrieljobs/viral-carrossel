@@ -113,7 +113,8 @@ export default async function handler(req, res) {
       });
     }
 
-    if (action === 'putAsset') {
+    // action já vem em minúsculas (putAsset → putasset)
+    if (action === 'putasset') {
       const saved = await putLibraryAsset(customerId, body.assetId, {
         dataUrl: body.dataUrl,
         contentType: body.contentType,

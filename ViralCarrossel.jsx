@@ -1197,8 +1197,27 @@ export default function App() {
     history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
     setLibraryOpen, toast, setError, visualPresets,
   });
-  const createProjectByKind = useCallback((kind = 'carrossel', projectName) => {
+  const askPromptRef = useRef(null);
+  const createProjectByKind = useCallback(async (kind = 'carrossel', projectName) => {
     const isPresentation = kind === 'apresentacao';
+    const fallback = isPresentation ? 'Nova apresentação' : 'Nova comunicação';
+    // Sem 2º argumento (Home / Biblioteca / Gerar): pede nome.
+    // Com nome explícito (já perguntado na conta): não pergunta de novo.
+    let name = projectName !== undefined ? String(projectName || '').trim() : '';
+    if (projectName === undefined) {
+      const ask = askPromptRef.current;
+      if (typeof ask === 'function') {
+        const answered = await ask({
+          title: isPresentation ? 'Nome da apresentação' : 'Nome da comunicação',
+          label: 'Como se chama este projeto?',
+          placeholder: isPresentation ? 'Ex.: Pitch clínica' : 'Ex.: Clínica Janine',
+          cta: 'Criar',
+          defaultValue: '',
+        });
+        if (answered === null || answered === undefined) return false;
+        name = String(answered).trim();
+      }
+    }
     const rosterBrand = brandRoster.find((b) => b.id === activeBrandId)
       || brandRoster[0]
       || brand;
@@ -1210,9 +1229,8 @@ export default function App() {
           slides: [mkSlide(1, identity)],
         }, DEFAULT_PRESENTATION_VISUAL_PRESET_ID, PRESENTATION_VISUAL_PRESETS, { initialize: true })
       : { brand: identity };
-    const fallback = isPresentation ? 'Nova apresentação' : 'Nova comunicação';
-    const name = String(projectName || '').trim() || fallback;
-    newDoc(presentationSeed, name);
+    newDoc(presentationSeed, name || fallback);
+    return true;
   }, [brand, brandRoster, activeBrandId, newDoc]);
 
   /** Selecciona marca para produção (Home) sem sobrescrever o projeto aberto. */
@@ -1472,12 +1490,15 @@ export default function App() {
     setSetupProductKind(normalizedKind);
     setSetupOpen(true);
   }, [activeProductKind]);
-  const generateProjectByKind = useCallback((kind = activeProductKind) => {
+  const generateProjectByKind = useCallback(async (kind = activeProductKind) => {
     const normalizedKind = kind === 'apresentacao' ? 'apresentacao' : 'carrossel';
     // A Home é também a porta de criação. Se o pedido troca o tipo de produto,
     // abre um destino próprio antes do wizard para não transformar/apagar o
     // projeto que estava aberto.
-    if (normalizedKind !== activeProductKind) createProjectByKind(normalizedKind);
+    if (normalizedKind !== activeProductKind) {
+      const created = await createProjectByKind(normalizedKind);
+      if (created === false) return;
+    }
     openGenerationSetup(normalizedKind);
   }, [activeProductKind, createProjectByKind, openGenerationSetup]);
   const setSetupOpenForSidebar = useCallback((open, kind = activeProductKind) => {
@@ -2292,6 +2313,7 @@ export default function App() {
     promptResolveRef.current = resolve;
     setImgPrompt({ open:true, ...opts });
   }), []);
+  askPromptRef.current = askPrompt;
   const closeImgPrompt = useCallback(() => {
     promptResolveRef.current?.(null);
     promptResolveRef.current = null;
