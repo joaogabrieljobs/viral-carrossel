@@ -117,8 +117,22 @@ test.describe('Landing (RF-01)', () => {
         expect(childBox.x + childBox.width, `${childSelector} deve terminar dentro de ${containerSelector}`).toBeLessThanOrEqual(containerBox.x + containerBox.width + 1);
       }
 
-      const presentationImage = await page.locator('.moont-lp-format__visual--landscape img').boundingBox();
-      expect(presentationImage.width / presentationImage.height).toBeCloseTo(877 / 494, 1);
+      const formatVisuals = page.locator('.moont-lp-format__visual');
+      for (let index = 0; index < await formatVisuals.count(); index += 1) {
+        const visual = formatVisuals.nth(index);
+        const image = visual.locator('.moont-lp-format__panel');
+        const [visualBox, imageBox] = await Promise.all([
+          visual.boundingBox(),
+          image.boundingBox(),
+        ]);
+        expect(imageBox.width / imageBox.height).toBeCloseTo(8 / 5, 1);
+        expect(imageBox.width).toBeGreaterThanOrEqual(220);
+        expect(imageBox.height).toBeGreaterThanOrEqual(135);
+        expect(imageBox.x).toBeGreaterThanOrEqual(visualBox.x - 1);
+        expect(imageBox.y).toBeGreaterThanOrEqual(visualBox.y - 1);
+        expect(imageBox.x + imageBox.width).toBeLessThanOrEqual(visualBox.x + visualBox.width + 1);
+        expect(imageBox.y + imageBox.height).toBeLessThanOrEqual(visualBox.y + visualBox.height + 1);
+      }
 
       for (const selector of ['.moont-lp-logo', '.moont-lp-login', '.moont-lp-hero__actions .moont-lp-button']) {
         const targets = page.locator(selector);
@@ -164,5 +178,73 @@ test.describe('Landing (RF-01)', () => {
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => window.scrollY)).toBe(positionAfterClick);
     await expect(page.locator('#como-funciona')).toBeInViewport();
+  });
+
+  test('comparação usa painéis exclusivos e as novas capturas reais do produto', async ({ page }) => {
+    await mockApi(page);
+    await page.goto('/?landing=1');
+    await page.locator('#modos').scrollIntoViewIfNeeded();
+
+    const expectedPanels = [
+      '/landing/moont-v3/formats/01-comunica-panel.webp',
+      '/landing/moont-v3/formats/02-apresenta-panel.webp',
+    ];
+    const expectedProduct = [
+      '/landing/moont-v3/product/01-interface-comunica-desktop.webp',
+      '/landing/moont-v3/product/03-interface-mobile.webp',
+      '/landing/moont-v3/product/04-interface-workflow-desktop.webp',
+      '/landing/moont-v3/product/05-interface-responsive-mobile.webp',
+      '/landing/moont-v3/product/06-interface-hero-desktop.webp',
+    ];
+    const expectedOutputs = [
+      '/landing/moont-v2/outputs/carousel-editorial.webp',
+      '/landing/moont-v2/outputs/carousel-health.webp',
+      '/landing/moont-v2/outputs/carousel-b2b.webp',
+      '/landing/moont-v2/outputs/carousel-launch.webp',
+      '/landing/moont-v2/outputs/presentation-pitch.webp',
+      '/landing/moont-v2/outputs/presentation-medical.webp',
+      '/landing/moont-v2/outputs/presentation-brand.webp',
+    ];
+
+    const panels = page.locator('.moont-lp-format__panel');
+    await expect(panels).toHaveCount(2);
+
+    for (const src of expectedPanels) {
+      const image = page.locator(`img[src="${src}"]`);
+      await expect(image).toHaveCount(1);
+      await expect.poll(() => image.evaluate((element) => (
+        element.complete && element.naturalWidth === 1600 && element.naturalHeight === 1000
+      ))).toBe(true);
+    }
+
+    for (const src of expectedProduct) {
+      const image = page.locator(`img[src="${src}"]`).first();
+      await expect(image).toBeAttached();
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
+    }
+
+    for (const src of expectedOutputs) {
+      const image = page.locator(`img[src="${src}"]`);
+      await expect(image).toHaveCount(1);
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate((element) => (
+        element.complete && element.naturalWidth === 1600 && element.naturalHeight === 1000
+      ))).toBe(true);
+    }
+
+    for (const src of [
+      '/landing/moont-v3/demo-source/01-direction.webp',
+      '/landing/moont-v3/demo-source/02-detail.webp',
+      '/landing/moont-v3/demo-source/03-campaign-system.webp',
+    ]) {
+      const image = page.locator(`img[src="${src}"]`);
+      await expect(image).toHaveCount(1);
+      await image.scrollIntoViewIfNeeded();
+      await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0)).toBe(true);
+    }
+
+    await expect(page.locator('img[src*="/landing/moont-product/"]')).toHaveCount(0);
+    await expect(page.locator('img[src*="/landing/sample-"]')).toHaveCount(0);
   });
 });

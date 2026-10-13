@@ -13,28 +13,31 @@ import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 import '../styles/landing-product.css';
 
 const PRODUCT = {
-  comunica: '/landing/moont-product/01-interface-comunica-desktop.webp',
-  apresenta: '/landing/moont-product/02-interface-apresenta-desktop.webp',
-  mobile: '/landing/moont-product/03-interface-mobile.webp',
-  carousel: '/landing/moont-product/04-carousel-output.webp',
-  presentation: '/landing/moont-product/05-presentation-output.webp',
+  comunica: '/landing/moont-v3/product/01-interface-comunica-desktop.webp',
+  apresenta: '/landing/moont-v3/product/02-interface-apresenta-desktop.webp',
+  mobile: '/landing/moont-v3/product/03-interface-mobile.webp',
+  workflow: '/landing/moont-v3/product/04-interface-workflow-desktop.webp',
+  responsiveMobile: '/landing/moont-v3/product/05-interface-responsive-mobile.webp',
+  hero: '/landing/moont-v3/product/06-interface-hero-desktop.webp',
+  carousel: '/landing/moont-v3/formats/01-comunica-panel.webp',
+  presentation: '/landing/moont-v3/formats/02-apresenta-panel.webp',
 };
 
 const OUTPUTS = [
   {
     image: '/landing/moont-v2/outputs/carousel-editorial.webp',
     mode: 'Carrossel · cultura',
-    title: 'Um conceito em cinco batidas.',
+    title: 'Do feed previsível à escolha deliberada.',
   },
   {
     image: '/landing/moont-v2/outputs/carousel-health.webp',
     mode: 'Carrossel · saúde',
-    title: 'Complexo sem ser confuso.',
+    title: 'Do “normal” à pergunta certa.',
   },
   {
     image: '/landing/moont-v2/outputs/carousel-b2b.webp',
     mode: 'Carrossel · dados',
-    title: 'Um dado que vira argumento.',
+    title: 'Um número só vale quando muda a decisão.',
   },
   {
     image: '/landing/moont-v2/outputs/carousel-launch.webp',
@@ -49,21 +52,24 @@ const OUTPUTS = [
   {
     image: '/landing/moont-v2/outputs/presentation-medical.webp',
     mode: 'Apresentação · aula',
-    title: 'Ciência que a plateia consegue acompanhar.',
+    title: 'Do mecanismo à conduta clínica.',
   },
   {
     image: '/landing/moont-v2/outputs/presentation-brand.webp',
     mode: 'Apresentação · estratégia',
-    title: 'Posicionamento com uma ideia central.',
+    title: 'Conhecimento que convida, não intimida.',
   },
 ];
 
 const IMAGE_DIMENSIONS = {
   [PRODUCT.comunica]: [1600, 1000],
   [PRODUCT.apresenta]: [1600, 1000],
-  [PRODUCT.mobile]: [390, 844],
-  [PRODUCT.carousel]: [360, 450],
-  [PRODUCT.presentation]: [877, 494],
+  [PRODUCT.mobile]: [780, 1688],
+  [PRODUCT.workflow]: [1600, 1000],
+  [PRODUCT.responsiveMobile]: [780, 1688],
+  [PRODUCT.hero]: [1140, 610],
+  [PRODUCT.carousel]: [1600, 1000],
+  [PRODUCT.presentation]: [1600, 1000],
   ...Object.fromEntries(OUTPUTS.map(({ image }) => [image, [1600, 1000]])),
   '/landing/moont-v2/portraits/01-social-strategist.webp': [1536, 1024],
   '/landing/moont-v2/portraits/02-designer-overhead.webp': [1536, 1024],
@@ -79,50 +85,58 @@ const USERS = [
   {
     image: '/landing/moont-v2/portraits/01-social-strategist.webp',
     role: 'Social media',
-    title: 'Da pauta vazia ao calendário que parece pensado.',
-    copy: 'Transforme um assunto em sequência, ritmo e próximos passos sem preencher o feed no automático.',
+    title: 'Referência boa merece virar direção.',
+    copy: 'Transforme repertório, pauta e intenção em uma sequência pronta para defender.',
+    alt: 'Social media diante de um mural de referências visuais em seu espaço de trabalho',
   },
   {
     image: '/landing/moont-v2/portraits/02-designer-overhead.webp',
     role: 'Designers',
     title: 'Direção primeiro. Variação depois.',
     copy: 'Comece por um sistema visual e explore versões sem perder hierarquia, ritmo ou intenção.',
+    alt: 'Designer trabalhando em uma composição visual vista de cima',
   },
   {
     image: '/landing/moont-v2/portraits/03-brand-founder-beauty.webp',
     role: 'Donos de marca',
-    title: 'A identidade entra antes do primeiro card.',
-    copy: 'Sua voz, seus códigos e sua oferta continuam reconhecíveis quando o volume de criação aumenta.',
+    title: 'Do produto à campanha sem perder a marca.',
+    copy: 'Repita voz, códigos e oferta mesmo quando o volume aumenta.',
+    alt: 'Fundadora de uma marca de beleza apresentando seus produtos',
   },
   {
     image: '/landing/moont-v2/portraits/04-doctor-profile.webp',
     role: 'Especialistas',
     title: 'A complexidade fica. A confusão sai.',
     copy: 'Organize conhecimento técnico em uma história clara sem simplificar o que realmente importa.',
+    alt: 'Profissional de saúde em seu consultório durante uma conversa profissional',
   },
   {
     image: '/landing/moont-v2/portraits/05-creator-low-angle.webp',
     role: 'Creators',
     title: 'Mais tempo no conceito. Menos tempo remontando.',
     copy: 'Leve a mesma ideia do roteiro ao post, com espaço para ajustar cada detalhe antes de publicar.',
+    alt: 'Creator em produção diante de uma câmera',
   },
   {
     image: '/landing/moont-v2/portraits/06-creative-director-urban.webp',
     role: 'Direção criativa',
-    title: 'A primeira versão já chega com uma posição.',
-    copy: 'Use a IA para abrir caminhos visuais, comparar direções e decidir com repertório.',
+    title: 'Uma direção clara entra na sala antes do layout.',
+    copy: 'Compare caminhos e leve uma posição visual pronta para a próxima conversa.',
+    alt: 'Diretora criativa a caminho de uma reunião com um caderno de trabalho',
   },
   {
     image: '/landing/moont-v2/portraits/07-team-critique.webp',
     role: 'Times criativos',
     title: 'Todo mundo revisa a mesma história.',
     copy: 'Texto, visual e sequência convivem no mesmo projeto para a conversa avançar sem retrabalho.',
+    alt: 'Time criativo revisando referências em conjunto',
   },
   {
     image: '/landing/moont-v2/portraits/08-founder-coffee.webp',
     role: 'Negócios independentes',
-    title: 'A operação muda. A marca continua sua.',
-    copy: 'Crie lançamentos, argumentos e apresentações sem diluir o que torna seu negócio reconhecível.',
+    title: 'Do balcão à apresentação, a mesma marca.',
+    copy: 'Transforme produto, operação e visão em peças que parecem do mesmo negócio.',
+    alt: 'Dono de cafeteria trabalhando no balcão de seu negócio',
   },
 ];
 
@@ -184,9 +198,9 @@ function WorkflowDemo({ onEnter }) {
   const [selected, setSelected] = useState(0);
   const [logos, setLogos] = useState([]);
   const cards = [
-    ['Sua ideia não está fraca. Está sem direção.', '/landing/sample-01.webp'],
-    ['O detalhe que muda o resultado.', '/landing/sample-06.webp'],
-    ['Da pauta à campanha sem recomeçar.', '/landing/sample-10.webp'],
+    ['Sua ideia não está fraca. Está sem direção.', '/landing/moont-v3/demo-source/01-direction.webp'],
+    ['O detalhe que muda o resultado.', '/landing/moont-v3/demo-source/02-detail.webp'],
+    ['Da pauta à campanha sem recomeçar.', '/landing/moont-v3/demo-source/03-campaign-system.webp'],
   ];
 
   const toggleLogo = () => {
@@ -361,8 +375,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
 
           <div className="moont-lp-hero__product">
             <ProductWindow
-              src={PRODUCT.comunica}
-              alt="Interface da Moont exibindo um projeto de carrossel no desktop"
+              src={PRODUCT.hero}
+              alt="Interface da Moont exibindo no desktop três cards da mesma campanha de beleza mostrada no celular"
               eager
             />
             <figure className="moont-lp-hero__mobile">
@@ -383,9 +397,12 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
           <div className="moont-lp-results__grid" role="region" aria-label="Exemplos de carrosséis e apresentações" tabIndex={0}>
             {OUTPUTS.map((item, index) => (
               <figure key={item.image} className={`moont-lp-result moont-lp-result--${index + 1}`}>
-                <ProductImage src={item.image} alt={`Exemplo de ${item.mode.toLowerCase()}: ${item.title}`} />
+                <ProductImage src={item.image} alt={`Exemplo demonstrativo de ${item.mode.toLowerCase()}: ${item.title}`} />
                 <figcaption>
-                  <span>{item.mode}</span>
+                  <div>
+                    <span>{item.mode}</span>
+                    <small>Conteúdo e dados ilustrativos</small>
+                  </div>
                   <strong>{item.title}</strong>
                 </figcaption>
               </figure>
@@ -413,8 +430,12 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
                 <p>Gancho que abre tensão, sequência que entrega valor e fechamento que pede o próximo gesto.</p>
                 <ul><li>Carrosséis</li><li>Posts</li><li>Stories</li></ul>
               </div>
-              <div className="moont-lp-format__visual moont-lp-format__visual--portrait">
-                <ProductImage src={PRODUCT.carousel} alt="Carrossel criado e editado na Moont" />
+              <div className="moont-lp-format__visual">
+                <ProductImage
+                  src={PRODUCT.carousel}
+                  className="moont-lp-format__panel"
+                  alt="Painel do Moont Comunica com quatro cards de uma campanha editorial"
+                />
               </div>
             </article>
 
@@ -425,8 +446,12 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
                 <p>Abertura que enquadra, desenvolvimento que organiza e conclusão que move uma decisão.</p>
                 <ul><li>Propostas</li><li>Aulas</li><li>Apresentações</li></ul>
               </div>
-              <div className="moont-lp-format__visual moont-lp-format__visual--landscape">
-                <ProductImage src={PRODUCT.presentation} alt="Slide de apresentação criado e editado na Moont" />
+              <div className="moont-lp-format__visual">
+                <ProductImage
+                  src={PRODUCT.presentation}
+                  className="moont-lp-format__panel"
+                  alt="Painel do Moont Apresenta com capa, dado e recomendação de um deck estratégico"
+                />
               </div>
             </article>
           </div>
@@ -448,7 +473,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             ))}
           </ol>
           <ProductWindow
-            src={PRODUCT.apresenta}
+            src={PRODUCT.workflow}
             alt="Interface da Moont com uma apresentação em edição no desktop"
             className="moont-lp-process__window"
           />
@@ -467,7 +492,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
             {USERS.map((item) => (
               <article key={item.role}>
                 <div className="moont-lp-users__media">
-                  <ProductImage src={item.image} alt={`Retrato de ${item.role.toLowerCase()} em uma rotina criativa`} />
+                  <ProductImage src={item.image} alt={item.alt} />
                 </div>
                 <div>
                   <span>{item.role}</span>
@@ -495,7 +520,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
           </div>
           <div className="moont-lp-responsive__visual">
             <ProductWindow src={PRODUCT.comunica} alt="Projeto de carrossel visto na interface desktop da Moont" />
-            <figure><ProductImage src={PRODUCT.mobile} alt="O mesmo studio adaptado a um celular" /></figure>
+            <figure><ProductImage src={PRODUCT.responsiveMobile} alt="O mesmo projeto de carrossel adaptado ao editor no celular" /></figure>
           </div>
         </div>
       </section>

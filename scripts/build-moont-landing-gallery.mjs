@@ -6,28 +6,26 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, '..');
-const portraitsDir = path.join(root, 'public/landing/moont-v2/portraits');
+const gallerySourceDir = path.join(root, 'public/landing/moont-v3/gallery-source');
 const outputDir = path.join(root, 'public/landing/moont-v2/outputs');
 const tempDir = path.join(root, '.tmp/moont-gallery');
 
 await mkdir(outputDir, { recursive: true });
 await mkdir(tempDir, { recursive: true });
 
-const portraitFiles = {
-  social: '01-social-strategist.webp',
-  designer: '02-designer-overhead.webp',
-  beauty: '03-brand-founder-beauty.webp',
-  doctor: '04-doctor-profile.webp',
-  creator: '05-creator-low-angle.webp',
-  director: '06-creative-director-urban.webp',
-  team: '07-team-critique.webp',
-  founder: '08-founder-coffee.webp',
+const imageFiles = {
+  editorialDiscovery: [gallerySourceDir, '01-editorial-discovery.webp'],
+  editorialChoice: [gallerySourceDir, '02-editorial-choice.webp'],
+  healthConsultation: [gallerySourceDir, '03-health-consultation.webp'],
+  beautyLaunch: [gallerySourceDir, '04-beauty-launch.webp'],
+  logisticsHub: [gallerySourceDir, '05-logistics-hub.webp'],
+  coffeeEducation: [gallerySourceDir, '06-coffee-education.webp'],
 };
 
 const photos = Object.fromEntries(
   await Promise.all(
-    Object.entries(portraitFiles).map(async ([key, filename]) => {
-      const file = await readFile(path.join(portraitsDir, filename));
+    Object.entries(imageFiles).map(async ([key, [directory, filename]]) => {
+      const file = await readFile(path.join(directory, filename));
       return [key, `data:image/webp;base64,${file.toString('base64')}`];
     }),
   ),
@@ -68,7 +66,7 @@ const carouselCulture = () => String.raw`
   <div class="board-kicker">Moont Comunica · Editorial / cultura</div>
   <h1 class="board-title">A timeline não é<br>um repertório.</h1>
   <div class="board-note">Uma narrativa em quatro movimentos: tensão, diagnóstico, virada e gesto prático.</div>
-  <article class="post featured culture-cover photo" ${photo('director', '52% 42%')}>
+  <article class="post featured culture-cover photo" ${photo('editorialDiscovery', '52% 42%')}>
     <div class="wash"></div><span class="post-no">01/04</span>
     <div class="culture-vertical">CADERNO 07 — ATENÇÃO</div>
     <div class="culture-cover-copy"><span>Você não perdeu<br>a curiosidade.</span><strong>A timeline<br>perdeu por você.</strong></div>
@@ -84,7 +82,7 @@ const carouselCulture = () => String.raw`
     <div class="loop"><span>você pausa</span><i>→</i><span>a rede repete</span><i>→</i><span>você reconhece</span><i>→</i><span>parece gosto</span></div>
     <p>Quanto mais previsível o feed,<br>menor o risco de encontrar<br>algo que mude você.</p>
   </article>
-  <article class="post p4 culture-end photo" ${photo('designer', '50% 52%')}><span class="post-no">04/04</span>
+  <article class="post p4 culture-end photo" ${photo('editorialChoice', '50% 52%')}><span class="post-no">04/04</span>
     <div class="end-panel"><div class="eyebrow">Um gesto simples</div><h2>Troque dez minutos de scroll por uma escolha deliberada.</h2><p>Um filme. Um ensaio. Um disco inteiro.</p><b>O repertório começa onde a recomendação termina.</b></div>
   </article>
   <div class="serial">MOONT / CASE 01</div>
@@ -107,7 +105,7 @@ const carouselHealth = () => String.raw`
     <h2>Seus exames deram <i>normais.</i><br>Seu corpo não recebeu o memo.</h2>
     <p>O laudo é um retrato. Sintomas contam o filme.</p><div class="health-arrow">↓</div>
   </article>
-  <article class="post p2 health-portrait photo" ${photo('doctor', '57% 50%')}><span class="post-no">02/04</span>
+  <article class="post p2 health-portrait photo" ${photo('healthConsultation', '57% 50%')}><span class="post-no">02/04</span>
     <div class="doctor-label"><span>“NORMAL”</span><b>é uma faixa estatística.<br>Não é o fim da conversa.</b></div>
   </article>
   <article class="post p3 health-list"><span class="post-no">03/04</span><div class="eyebrow">Antes do próximo exame</div>
@@ -137,7 +135,7 @@ const carouselB2B = () => String.raw`
   <article class="post featured b2b-cover"><span class="post-no">01/04</span><div class="eyebrow">MÉTRICA SOB SUSPEITA</div>
     <div class="warning">!</div><h2>Seu dashboard pode estar <em>mentindo</em><br>sem errar um número.</h2><p>O problema começa quando medir substitui decidir.</p>
   </article>
-  <article class="post p2 b2b-split"><span class="post-no">02/04</span><div class="eyebrow">O paradoxo do trimestre</div>
+  <article class="post p2 b2b-split"><span class="post-no">02/04</span><div class="eyebrow">Cenário ilustrativo</div>
     <div class="metric good"><strong>+18%</strong><span>receita</span></div><div class="metric bad"><strong>−9%</strong><span>margem</span></div>
     <p>O topo comemorou crescimento.<br>O caixa sentiu o custo.</p>
   </article>
@@ -163,13 +161,13 @@ const carouselLaunch = () => String.raw`
   <div class="board-kicker">Moont Comunica · Lançamento de produto</div>
   <h1 class="board-title">Desejo primeiro.<br>Detalhe depois.</h1>
   <div class="board-note">Uma campanha de lançamento com ritmo de revista: manifesto, produto, prova e convite.</div>
-  <article class="post featured launch-cover photo" ${photo('beauty', '42% 50%')}><span class="post-no">01/04</span><div class="launch-shade"></div>
+  <article class="post featured launch-cover photo" ${photo('beautyLaunch', '42% 50%')}><span class="post-no">01/04</span><div class="launch-shade"></div>
     <div class="wordmark">LUME/01</div><div class="cover-copy"><span>NOVO SÉRUM NOTURNO</span><h2>Sua pele não precisa de 12 passos.<br><i>Precisa do passo certo.</i></h2></div>
   </article>
   <article class="post p2 launch-product"><span class="post-no">02/04</span><div class="eyebrow">MENOS CAMADAS · MAIS INTENÇÃO</div>
     <div class="bottle"><b>L</b><i></i></div><h2>Três ativos.<br>Uma fórmula que sabe a hora de parar.</h2><p>Niacinamida 5% · ectoína · esqualano vegetal.</p>
   </article>
-  <article class="post p3 launch-proof"><span class="post-no">03/04</span><div class="eyebrow">28 NOITES</div><strong>91%</strong><h2>sentiram a pele mais estável, não apenas mais hidratada.</h2><p>Teste de percepção com 84 participantes. Resultados individuais variam.</p><div class="line-chart"><i></i><i></i><i></i><i></i></div>
+  <article class="post p3 launch-proof"><span class="post-no">03/04</span><div class="eyebrow">CENÁRIO ILUSTRATIVO · 28 NOITES</div><strong>91%</strong><h2>sentiram a pele mais estável, não apenas mais hidratada.</h2><p>Amostra fictícia para demonstração de layout. Resultados individuais variam.</p><div class="line-chart"><i></i><i></i><i></i><i></i></div>
   </article>
   <article class="post p4 launch-end"><span class="post-no">04/04</span><div class="moon"></div><div class="eyebrow">PRÉ-VENDA · 18 OUT</div>
     <h2>Menos ruído<br>na prateleira.<br>Mais calma<br>na pele.</h2><div class="cta">CONHECER LUME/01 <b>↗</b></div>
@@ -187,9 +185,9 @@ const carouselLaunch = () => String.raw`
 const presentationPitch = () => String.raw`
 <main class="board deck-board pitch">
   <div class="board-kicker">Moont Apresenta · Pitch deck</div><h1 class="board-title">Uma tese que cabe<br>numa sala de decisão.</h1><div class="board-note">Narrativa de investimento: problema visível, modelo claro e números que sustentam a ambição.</div>
-  <section class="slide main pitch-main"><div class="pitch-photo photo" ${photo('founder', '52% 48%')}></div><div class="pitch-block"><span class="eyebrow">ONDA · SEED ROUND 2026</span><h2>O último quilômetro<br>não precisa ser<br>o mais caro.</h2><p>Infraestrutura circular para entregas urbanas.</p></div><div class="slide-index">01 / 12</div></section>
-  <section class="slide s2 pitch-market"><div class="eyebrow">MERCADO</div><strong>R$ 4,8 bi</strong><h3>gastos por ano em entregas de até 5 km nas capitais.</h3><div class="market-line"><i></i><i></i><i></i><i></i><i></i></div><div class="slide-index">04 / 12</div></section>
-  <section class="slide s3 pitch-economics"><div class="eyebrow">ECONOMIA POR ROTA</div><div class="economics"><div><b>−31%</b><span>custo</span></div><div><b>+22%</b><span>entregas/h</span></div><div><b>0</b><span>emissão local</span></div></div><p>Hubs modulares + frota elétrica compartilhada.</p><div class="slide-index">08 / 12</div></section>
+  <section class="slide main pitch-main"><div class="pitch-photo photo" ${photo('logisticsHub', '43% 48%')}></div><div class="pitch-block"><span class="eyebrow">ONDA · SEED ROUND 2026</span><h2>O último quilômetro<br>não precisa ser<br>o mais caro.</h2><p>Infraestrutura circular para entregas urbanas.</p></div><div class="slide-index">01 / 12</div></section>
+  <section class="slide s2 pitch-market"><div class="eyebrow">MERCADO · DADO ILUSTRATIVO</div><strong>R$ 4,8 bi</strong><h3>gastos por ano em entregas de até 5 km nas capitais.</h3><div class="market-line"><i></i><i></i><i></i><i></i><i></i></div><div class="slide-index">04 / 12</div></section>
+  <section class="slide s3 pitch-economics"><div class="eyebrow">CENÁRIO ILUSTRATIVO</div><div class="economics"><div><b>−31%</b><span>custo</span></div><div><b>+22%</b><span>entregas/h</span></div><div><b>0</b><span>emissão local</span></div></div><p>Hubs modulares + frota elétrica compartilhada.</p><div class="slide-index">08 / 12</div></section>
   <div class="serial">DECK SYSTEM / ONDA</div>
 </main>
 <style>
@@ -200,7 +198,7 @@ const presentationPitch = () => String.raw`
 const presentationMedical = () => String.raw`
 <main class="board deck-board medical">
   <div class="board-kicker">Moont Apresenta · Médica / educacional</div><h1 class="board-title">Ciência que a plateia<br>consegue acompanhar.</h1><div class="board-note">Uma aula visual com hierarquia rigorosa: afirmação, mecanismo e aplicação clínica.</div>
-  <section class="slide main med-main"><div class="med-spine">AULA 03 · METABOLISMO</div><div class="med-content"><span class="eyebrow">O PONTO DE PARTIDA</span><h2>Antes de mudar a dieta,<br>observe o sono.</h2><p>Privação de sono altera sinais de fome, resposta à insulina e escolhas alimentares no dia seguinte.</p><div class="source">REVISÃO DE LITERATURA · OUT 2026</div></div><div class="cell"><i></i><i></i><i></i></div><div class="slide-index">01 / 18</div></section>
+  <section class="slide main med-main"><div class="med-spine">AULA 03 · METABOLISMO</div><div class="med-content"><span class="eyebrow">O PONTO DE PARTIDA</span><h2>Antes de mudar a dieta,<br>observe o sono.</h2><p>Privação de sono altera sinais de fome, resposta à insulina e escolhas alimentares no dia seguinte.</p><div class="source">EXEMPLO EDITORIAL · CONTEÚDO ILUSTRATIVO</div></div><div class="cell"><i></i><i></i><i></i></div><div class="slide-index">01 / 18</div></section>
   <section class="slide s2 med-cycle"><div class="eyebrow">O CICLO EM 24 HORAS</div><div class="cycle"><span>sono curto</span><i>→</i><span>mais fome</span><i>→</i><span>pior escolha</span><i>→</i><span>mais fadiga</span></div><div class="slide-index">07 / 18</div></section>
   <section class="slide s3 med-action"><div class="eyebrow">APLICAÇÃO CLÍNICA</div><h3>Uma semana de diário do sono antes da próxima mudança.</h3><div class="check"><b>✓</b><span>horário</span><b>✓</b><span>despertares</span><b>✓</b><span>energia ao acordar</span></div><div class="slide-index">14 / 18</div></section>
   <div class="serial">DECK SYSTEM / EDUCAÇÃO EM SAÚDE</div>
@@ -214,7 +212,7 @@ const presentationMedical = () => String.raw`
 const presentationBrand = () => String.raw`
 <main class="board deck-board brand">
   <div class="board-kicker">Moont Apresenta · Estratégia de marca</div><h1 class="board-title">Posicionamento com<br>uma ideia central.</h1><div class="board-note">Estratégia vira imagem, voz e decisão: cada slide avança a mesma tese sem repetir a forma.</div>
-  <section class="slide main brand-main"><div class="brand-photo photo" ${photo('team', '50% 48%')}></div><div class="brand-card"><span class="eyebrow">RUIDO · ESTRATÉGIA 2027</span><h2>Café especial<br>sem a prova<br>de admissão.</h2><p>Conhecimento que convida,<br>não intimida.</p></div><div class="slide-index">01 / 16</div></section>
+  <section class="slide main brand-main"><div class="brand-photo photo" ${photo('coffeeEducation', '62% 48%')}></div><div class="brand-card"><span class="eyebrow">RUIDO · ESTRATÉGIA 2027</span><h2>Café especial<br>sem a prova<br>de admissão.</h2><p>Conhecimento que convida,<br>não intimida.</p></div><div class="slide-index">01 / 16</div></section>
   <section class="slide s2 brand-tension"><div class="eyebrow">A TENSÃO</div><div class="versus"><strong>“Eu gosto de café.”</strong><span>vira</span><strong>“Mas não entendo o suficiente.”</strong></div><div class="slide-index">05 / 16</div></section>
   <section class="slide s3 brand-voice"><div class="eyebrow">NOSSA VOZ</div><div class="voice-grid"><div><b>CLARA</b><span>explica sem aula</span></div><div><b>CURIOSA</b><span>abre uma porta</span></div><div><b>PRECISA</b><span>não inventa regra</span></div></div><div class="brand-line">SABER MAIS DEVE AUMENTAR O PRAZER.</div><div class="slide-index">11 / 16</div></section>
   <div class="serial">DECK SYSTEM / RUIDO CAFÉ</div>

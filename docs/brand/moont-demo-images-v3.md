@@ -1,0 +1,27 @@
+# Imagens da demo Moont V3
+
+Três imagens exclusivas, sem texto legível, geradas com a ferramenta nativa `image_gen` para manter cada mensagem da demo ligada a uma ação visual concreta. Os arquivos finais usam WebP em 1122 × 1402 px.
+
+## 01 — Direção
+
+**Arquivo:** `public/landing/moont-v3/demo-source/01-direction.webp`
+
+**Prompt exato:**
+
+> Use case: ads-marketing. Asset type: premium 4:5 editorial photograph for a Brazilian creative-platform landing demo. Primary request: visualize the idea “Sua ideia não está fraca. Está sem direção.” without showing words: a Brazilian woman creative director in her early thirties pauses at a large physical review table, comparing two genuinely different visual routes for one campaign—one route built from saturated cobalt product photographs and geometric crops, the other from warm vermilion portrait photography and tactile paper compositions. Her hand hovers between the two routes in a clear moment of decision; she is actively directing work, not posing. Scene/backdrop: sophisticated but believable São Paulo independent studio, daylight, concrete and timber, practical tools and color proofs. Style/medium: high-end British editorial advertising photography, documentary realism, medium-format texture, exacting art direction, contemporary Brazilian casting. Composition/framing: vertical 4:5, three-quarter overhead/side angle, the two routes visibly diverge across the table, human face and decision gesture readable, clean focal hierarchy. Lighting/mood: directional late-afternoon window light, confident and thoughtful. Color palette: graphite, warm paper, cobalt, vermilion, restrained chartreuse accents. Constraints: all papers and screens must contain abstract imagery, shapes, swatches, and non-legible marks only; no readable text, no logo, no brand, no watermark, no fake UI, no floating objects, anatomically correct hands, no person holding a framed picture, no generic laptop-at-desk stock-photo composition.
+
+## 02 — Detalhe
+
+**Arquivo:** `public/landing/moont-v3/demo-source/02-detail.webp`
+
+**Prompt exato:**
+
+> Use case: ads-marketing. Asset type: premium 4:5 editorial photograph for a Brazilian creative-platform landing demo. Primary request: visualize “O detalhe que muda o resultado.” without words: an extreme close editorial view of a Brazilian art director’s hands making one precise final composition adjustment, rotating a small unbranded cobalt glass bottle by a few degrees while aligning a translucent vermilion acrylic element and a narrow chartreuse paper edge against a graphite grid. A metal ruler, a loupe, removable tape and tiny crop guides communicate exact craft; the decisive adjustment is visibly minute. Scene/backdrop: real tabletop in a sophisticated São Paulo photo studio, no computer needed. Style/medium: tactile macro product photography, British design-magazine restraint, medium-format realism, refined commercial art direction. Composition/framing: vertical 4:5, close crop, shallow but controlled depth of field, fingertips and alignment point in sharp focus, pleasing negative space, packaging fully blank. Lighting/mood: hard oblique studio beam with crisp shadows and subtle reflections, calm precision. Color palette: graphite, cobalt blue, vermilion, chartreuse, warm neutral skin. Materials/textures: matte paper, frosted glass, brushed metal, translucent acrylic. Constraints: anatomically correct hands; no readable text, no numbers, no letters, no logos, no brands, no watermark, no fake UI, no floating objects, no beauty-ad cliché, no excessive props.
+
+## 03 — Sistema de campanha
+
+**Arquivo:** `public/landing/moont-v3/demo-source/03-campaign-system.webp`
+
+**Prompt exato:**
+
+> Use case: ads-marketing. Asset type: premium 4:5 editorial photograph for a Brazilian creative-platform landing demo. Primary request: visualize “Da pauta à campanha sem recomeçar.” without words: a top-down three-quarter view of a real campaign review table showing one unmistakably coherent visual idea translated across three formats—a smartphone lying flat with a full-bleed cobalt-and-vermilion abstract image, a large printed poster using the same subject and crop language, and a tidy sequence of five social cards carrying the same colors, shapes and photographic motif. Two Brazilian creative professionals’ hands are actively reviewing and arranging the system; continuity across formats must be obvious, while every asset remains naturally distinct. Scene/backdrop: lived-in São Paulo agency meeting table with print proofs, one pencil and a small material swatch, sophisticated but practical. Style/medium: high-end British editorial advertising photography, documentary realism, contemporary Brazilian creative culture, medium-format detail. Composition/framing: vertical 4:5, elegant diagonal flow from phone to cards to poster, all three output formats fully readable as objects, no people’s faces required. Lighting/mood: soft northern-style daylight with one crisp shadow edge, focused collaborative energy. Color palette: deep cobalt, vermilion, graphite, warm cream, restrained chartreuse detail. Constraints: screens and prints show only coherent abstract photography, color fields and shapes; absolutely no readable text, no letters, no numbers, no logos, no brands, no watermark, no fake software UI, no floating devices, anatomically correct hands, realistic phone and paper perspective, no person holding a framed picture, no generic laptop scene.
