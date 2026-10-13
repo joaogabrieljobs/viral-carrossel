@@ -12,9 +12,9 @@ import { USER_PROFILE_KEY } from './user-profile.js';
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
 const SYNC_API = '/api/library-sync';
 const MAX_BODY_CHARS = 2_800_000;
-const MAX_ASSET_CHARS = 2_200_000;
-const IMAGE_MAX_EDGE = 960;
-const IMAGE_MAX_CHARS = 280_000;
+const MAX_ASSET_CHARS = 1_600_000;
+const IMAGE_MAX_EDGE = 720;
+const IMAGE_MAX_CHARS = 160_000;
 
 function readCloudMeta() {
   try {
@@ -285,43 +285,55 @@ export async function fetchLibraryCloudStatus() {
   return syncRequest({ action: 'status' });
 }
 
-/** Upload de fotos — best-effort. Nunca bloqueia o save da estrutura do projeto. */
+/** Upload de fotos — 1 a 1 com retry; nunca bloqueia o save da estrutura. */
 async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
   const remote = new Set(remoteAssetIds || []);
   let uploaded = 0;
   let skipped = 0;
   let failed = 0;
+  let lastError = '';
   const entries = [...assets.entries()];
-  // Paralelo limitado — evita timeout / rate-limit do serverless.
-  const concurrency = 3;
-  for (let i = 0; i < entries.length; i += concurrency) {
-    const chunk = entries.slice(i, i + concurrency);
-    // eslint-disable-next-line no-await-in-loop
-    await Promise.all(chunk.map(async ([assetId, dataUrl]) => {
-      if (remote.has(assetId)) {
-        skipped += 1;
-        return;
+
+  for (const [assetId, dataUrl] of entries) {
+    if (remote.has(assetId)) {
+      skipped += 1;
+      continue;
+    }
+    let ok = false;
+    for (let attempt = 0; attempt < 2 && !ok; attempt += 1) {
+      let payload = dataUrl;
+      if (attempt === 1) {
+        // Retry mais agressivo (menor).
+        // eslint-disable-next-line no-await-in-loop
+        payload = await compactDataUrl(dataUrl);
+        if (!payload) break;
       }
       try {
+        // eslint-disable-next-line no-await-in-loop
         await syncRequest({
           action: 'putAsset',
           assetId,
-          dataUrl,
-          contentType: dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+          dataUrl: payload,
+          contentType: payload.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
         });
         uploaded += 1;
-      } catch {
-        failed += 1;
+        ok = true;
+      } catch (e) {
+        lastError = String(e?.message || e || 'upload');
+        // Pausa curta entre retries / rate-limit.
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 280));
       }
-    }));
+    }
+    if (!ok) failed += 1;
   }
-  return { uploaded, skipped, failed };
+  return { uploaded, skipped, failed, lastError };
 }
 
 /**
  * Envia biblioteca local → nuvem.
  * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
- * @param {{ force?: boolean }} [opts]
+ * @param {{ force?: boolean, allowShrink?: boolean }} [opts]
  */
 export async function pushLibraryToCloud(opts = {}) {
   const localMeta = readCloudMeta();
@@ -329,6 +341,20 @@ export async function pushLibraryToCloud(opts = {}) {
   const { manifest, assets, projectCount } = await packLibraryForCloud();
   if (!projectCount && !(manifest.brands || []).length) {
     return { ok: true, empty: true, skipped: true, revision: localMeta?.revision || 0 };
+  }
+
+  const cloudCount = Number(status?.meta?.projectCount || 0);
+  // Nunca apagar projetos na nuvem com um push mais pequeno (auto-sync / race).
+  if (!opts.allowShrink && cloudCount > projectCount) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'cloud_has_more',
+      projectCount: cloudCount,
+      revision: status?.meta?.revision || localMeta?.revision || 0,
+      assetsUploaded: 0,
+      assetsFailed: 0,
+    };
   }
 
   // 1) Estrutura primeiro — garante que o projeto não «some» mesmo se fotos falharem.
@@ -358,7 +384,7 @@ export async function pushLibraryToCloud(opts = {}) {
   // 2) Fotos depois (não falha o save).
   const assetStats = assets.size
     ? await uploadAssetsBestEffort(assets, status?.meta?.assetIds || [])
-    : { uploaded: 0, skipped: 0, failed: 0 };
+    : { uploaded: 0, skipped: 0, failed: 0, lastError: '' };
 
   writeCloudMeta({
     revision: result.revision,
@@ -375,6 +401,7 @@ export async function pushLibraryToCloud(opts = {}) {
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
     assetsFailed: assetStats.failed,
+    assetError: assetStats.lastError || '',
   };
 }
 
@@ -664,11 +691,11 @@ export async function reconcileLibraryCloud({ toast, email, customerId } = {}) {
   }
 }
 
-/** Best-effort antes do logout (não bloqueia saída se falhar). */
+/** Best-effort (logout/auto) — nunca reduz o nº de projetos na nuvem. */
 export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000) {
   try {
     await Promise.race([
-      pushLibraryToCloud({ force: true }),
+      pushLibraryToCloud({ force: true, allowShrink: false }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
     ]);
     return true;

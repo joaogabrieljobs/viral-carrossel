@@ -95,8 +95,35 @@ function manifestPath(customerId) {
   return `${BLOB_PREFIX}${customerId}/manifest.json`;
 }
 
-function assetPath(customerId, assetId) {
-  return `${BLOB_PREFIX}${customerId}/assets/${assetId}`;
+function assetPath(customerId, assetId, ext = 'bin') {
+  const safeExt = String(ext || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
+  return `${BLOB_PREFIX}${customerId}/assets/${assetId}.${safeExt}`;
+}
+
+function extForMime(mime) {
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+function mimeFromPath(pathname) {
+  if (pathname.endsWith('.png')) return 'image/png';
+  if (pathname.endsWith('.webp')) return 'image/webp';
+  if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg';
+  return 'image/jpeg';
+}
+
+function parseDataUrl(dataUrl) {
+  const src = String(dataUrl || '');
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(src);
+  if (!m) return null;
+  try {
+    const bytes = Buffer.from(m[2], 'base64');
+    if (!bytes.length) return null;
+    return { mime: m[1], bytes };
+  } catch {
+    return null;
+  }
 }
 
 function blobAuthOpts() {
@@ -317,6 +344,7 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
 }
 
 /**
+ * Grava bytes da imagem (não JSON) — cabem mais e falham menos no Blob.
  * @param {string} customerId
  * @param {string} assetId
  * @param {{ dataUrl: string, contentType?: string }} body
@@ -328,26 +356,27 @@ export async function putLibraryAsset(customerId, assetId, body) {
     throw Object.assign(new Error('Asset inválido.'), { code: 'library_bad_asset' });
   }
   const dataUrl = String(body?.dataUrl || '');
-  if (!dataUrl.startsWith('data:image/')) {
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) {
     throw Object.assign(new Error('Asset deve ser data URL de imagem.'), { code: 'library_bad_asset' });
   }
-  if (dataUrl.length > MAX_ASSET_CHARS) {
+  if (dataUrl.length > MAX_ASSET_CHARS || parsed.bytes.length > 1_800_000) {
     throw Object.assign(new Error('Imagem grande demais para sync.'), { code: 'library_asset_too_large' });
   }
 
   const contentType = String(body?.contentType || '').startsWith('image/')
     ? body.contentType
-    : (dataUrl.slice(5, dataUrl.indexOf(';')) || 'image/jpeg');
+    : parsed.mime;
+  const ext = extForMime(contentType);
+  const pathname = assetPath(id, aid, ext);
   const record = { assetId: aid, dataUrl, contentType, updatedAt: Date.now() };
-  const serialized = JSON.stringify(record);
-  const pathname = assetPath(id, aid);
   const errors = [];
 
   if (hasBlob()) {
     try {
-      await putBlobPrivate(pathname, serialized, 'application/json');
+      await putBlobPrivate(pathname, parsed.bytes, contentType);
       if (allowMemory()) memoryAssets.set(`${id}:${aid}`, record);
-      return { assetId: aid, bytes: dataUrl.length };
+      return { assetId: aid, bytes: parsed.bytes.length, contentType };
     } catch (e) {
       errors.push(`blob: ${e?.message || e}`);
     }
@@ -355,7 +384,7 @@ export async function putLibraryAsset(customerId, assetId, body) {
 
   if (allowMemory()) {
     memoryAssets.set(`${id}:${aid}`, record);
-    return { assetId: aid, bytes: dataUrl.length };
+    return { assetId: aid, bytes: parsed.bytes.length, contentType };
   }
 
   throw storageUnconfiguredError(errors);
@@ -369,13 +398,29 @@ export async function getLibraryAsset(customerId, assetId) {
   const id = sanitizeCustomerId(customerId);
   const aid = sanitizeAssetId(assetId);
   if (!id || !aid) return null;
-  const pathname = assetPath(id, aid);
 
   if (hasBlob()) {
-    try {
-      const buf = await readBlobPrivate(pathname);
-      if (buf) return JSON.parse(buf.toString('utf8'));
-    } catch { /* ignore */ }
+    for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'bin']) {
+      try {
+        const pathname = assetPath(id, aid, ext);
+        const buf = await readBlobPrivate(pathname);
+        if (!buf?.length) continue;
+        // Compat: assets antigos eram JSON { dataUrl }.
+        if (ext === 'bin' || (buf[0] === 0x7b /* { */)) {
+          try {
+            const parsed = JSON.parse(buf.toString('utf8'));
+            if (parsed?.dataUrl) return parsed;
+          } catch { /* binário */ }
+        }
+        const contentType = mimeFromPath(pathname);
+        return {
+          assetId: aid,
+          contentType,
+          dataUrl: `data:${contentType};base64,${buf.toString('base64')}`,
+          updatedAt: Date.now(),
+        };
+      } catch { /* tenta outra extensão */ }
+    }
   }
 
   return memoryAssets.get(`${id}:${aid}`) || null;

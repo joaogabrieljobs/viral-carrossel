@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   }
 
   const limited = await consumeRateLimit(req, {
-    limit: 60,
+    limit: 180,
     windowMs: 60_000,
     keyPrefix: 'library-sync',
   });

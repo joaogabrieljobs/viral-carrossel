@@ -1338,16 +1338,24 @@ export default function App() {
     } catch { /* */ }
     try {
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      const result = await pushLibraryToCloud({ force: true });
+      const result = await pushLibraryToCloud({ force: true, allowShrink: true });
+      if (result?.reason === 'cloud_has_more') {
+        toast(
+          `Mantidos ${result.projectCount} projeto(s) na nuvem (este browser tinha menos). Use Sync na home se quiser forçar.`,
+          'info',
+          5500,
+        );
+        return;
+      }
       if (result?.skipped || result?.empty) {
         toast('Projeto salvo neste navegador.', 'success', 2200);
         return;
       }
       if (result?.assetsFailed > 0) {
         toast(
-          `Salvo na conta (${result.projectCount} projeto(s)). ${result.assetsFailed} foto(s) ainda só neste navegador.`,
+          `Salvo na conta (${result.projectCount} projeto(s)). A enviar fotos… ${result.assetsFailed} ainda locais${result.assetError ? ` (${result.assetError.slice(0, 60)})` : ''}.`,
           'warning',
-          5500,
+          6500,
         );
       } else {
         toast('Projeto salvo na sua conta (nuvem).', 'success', 3200);
@@ -1515,19 +1523,19 @@ export default function App() {
     setCloudSyncBusy(true);
     try {
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      const result = await pushLibraryToCloud({ force: true });
+      const result = await pushLibraryToCloud({ force: true, allowShrink: true });
       if (result?.skipped || result?.empty) {
         toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
       } else if (result?.assetsFailed > 0) {
         toast(
-          `Nuvem: ${result.projectCount} projeto(s). ${result.assetsFailed} foto(s) ficaram só no browser.`,
+          `Nuvem: ${result.projectCount} projeto(s). ${result.assetsUploaded || 0} foto(s) ok, ${result.assetsFailed} falharam${result.assetError ? ` — ${result.assetError.slice(0, 80)}` : ''}.`,
           'warning',
-          5500,
+          7000,
         );
         trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
       } else {
         toast(
-          `Nuvem actualizada: ${result.projectCount} projeto(s) nesta conta.`,
+          `Nuvem actualizada: ${result.projectCount} projeto(s)${result.assetsUploaded ? ` · ${result.assetsUploaded} foto(s)` : ''}.`,
           'success',
           4500,
         );
