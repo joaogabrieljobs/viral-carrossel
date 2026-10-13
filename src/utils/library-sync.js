@@ -9,7 +9,7 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 
-export const LIBRARY_CLOUD_META_KEY = 'vc_library_cloud_meta';
+export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
 const SYNC_API = '/api/library-sync';
 const MAX_BODY_CHARS = 2_800_000;
 const MAX_ASSET_CHARS = 2_200_000;
@@ -499,8 +499,36 @@ function libraryLooksOccupied() {
   }
 }
 
+/** Contagem + updatedAt mais recente da biblioteca local (anti-wipe no reconcile). */
+export function localLibraryFingerprint() {
+  try {
+    const lib = lsGet(SK.library, []) || [];
+    if (!Array.isArray(lib) || !lib.length) return { count: 0, maxUpdated: 0 };
+    let maxUpdated = 0;
+    for (const entry of lib) {
+      const t = Number(entry?.updatedAt || entry?.createdAt || 0);
+      if (t > maxUpdated) maxUpdated = t;
+    }
+    return { count: lib.length, maxUpdated };
+  } catch {
+    return { count: 0, maxUpdated: 0 };
+  }
+}
+
+function reloadAfterCloudPull() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('app', '1');
+    url.searchParams.delete('login');
+    window.location.replace(url.pathname + url.search + url.hash);
+  } catch {
+    window.location.replace('/?app=1');
+  }
+}
+
 /**
  * Reconcilia nuvem ↔ local após login.
+ * Nunca substitui biblioteca local ocupada por uma nuvem mais velha / sem meta local.
  * @returns {Promise<'ok'|'reloading'|'skipped'>}
  */
 export async function reconcileLibraryCloud({ toast } = {}) {
@@ -515,7 +543,8 @@ export async function reconcileLibraryCloud({ toast } = {}) {
     return 'skipped';
   }
 
-  const localOccupied = libraryLooksOccupied();
+  const local = localLibraryFingerprint();
+  const localOccupied = local.count > 0;
   const localMeta = readCloudMeta();
   const cloud = status?.meta;
 
@@ -530,36 +559,49 @@ export async function reconcileLibraryCloud({ toast } = {}) {
       return 'ok';
     }
 
-    const cloudNewer = !localMeta
-      || Number(cloud.revision || 0) > Number(localMeta.revision || 0)
-      || Number(cloud.updatedAt || 0) > Number(localMeta.updatedAt || 0);
-
-    if (!localOccupied || cloudNewer) {
+    // Local vazio → restaurar da nuvem.
+    if (!localOccupied) {
       await pullLibraryFromCloud();
       if (typeof toast === 'function') {
-        toast(
-          localOccupied
-            ? 'Projetos actualizados a partir da nuvem.'
-            : 'Projetos restaurados da nuvem nesta conta.',
-          'success',
-          5000,
-        );
+        toast('Projetos restaurados da nuvem nesta conta.', 'success', 5000);
       }
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('app', '1');
-        url.searchParams.delete('login');
-        window.location.replace(url.pathname + url.search + url.hash);
-      } catch {
-        window.location.replace('/?app=1');
-      }
+      reloadAfterCloudPull();
       return 'reloading';
     }
 
-    // Local igual ou mais recente → garantir push.
-    if (localOccupied) {
-      await pushLibraryToCloud({ force: false });
+    const cloudRev = Number(cloud.revision || 0);
+    const localRev = Number(localMeta?.revision || 0);
+    const cloudAt = Number(cloud.updatedAt || 0);
+    const cloudCount = Number(cloud.projectCount || 0);
+
+    // Local sem meta de sync: NÃO puxar (apagava projetos novos). Empurrar.
+    if (!localMeta) {
+      await pushLibraryToCloud({ force: true });
+      if (typeof toast === 'function') {
+        toast(`Biblioteca guardada na nuvem (${local.count} projeto(s)).`, 'success', 4500);
+      }
+      return 'ok';
     }
+
+    const localClearlyNewer = local.maxUpdated > cloudAt + 1_500
+      || local.count > cloudCount;
+
+    // Só puxar se a nuvem for claramente mais nova e não tiver menos projetos.
+    const cloudClearlyNewer = cloudRev > localRev
+      && cloudAt >= local.maxUpdated
+      && cloudCount >= local.count
+      && !localClearlyNewer;
+
+    if (cloudClearlyNewer) {
+      await pullLibraryFromCloud();
+      if (typeof toast === 'function') {
+        toast('Projetos actualizados a partir da nuvem.', 'success', 5000);
+      }
+      reloadAfterCloudPull();
+      return 'reloading';
+    }
+
+    await pushLibraryToCloud({ force: localClearlyNewer || cloudRev !== localRev });
     return 'ok';
   } catch (e) {
     if (typeof toast === 'function') {

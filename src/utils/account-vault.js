@@ -16,6 +16,7 @@ const SNAPSHOT_KEYS = [
   SK.brands,
   SK.activeBrandId,
   USER_PROFILE_KEY,
+  SK.libraryCloudMeta,
 ];
 
 function readJson(store, key) {

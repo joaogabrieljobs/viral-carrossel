@@ -1496,6 +1496,26 @@ export default function App() {
       setCloudSyncBusy(false);
     }
   }, [access?.active, cloudSyncBusy, toast]);
+  // Auto-push na nuvem ~4s após editar a biblioteca (não depende só do logout).
+  const cloudAutoPushTimerRef = useRef(null);
+  const cloudAutoPushSkipFirstRef = useRef(true);
+  useEffect(() => {
+    if (!access?.active) return undefined;
+    if (cloudAutoPushSkipFirstRef.current) {
+      cloudAutoPushSkipFirstRef.current = false;
+      return undefined;
+    }
+    if (areAccountDataWritesLocked()) return undefined;
+    if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    cloudAutoPushTimerRef.current = setTimeout(() => {
+      import('./src/utils/library-sync.js')
+        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(12_000))
+        .catch(() => {});
+    }, 4_000);
+    return () => {
+      if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    };
+  }, [library, access?.active]);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */

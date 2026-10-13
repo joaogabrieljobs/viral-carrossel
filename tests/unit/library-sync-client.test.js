@@ -50,4 +50,13 @@ describe('library-sync client pack', () => {
     expect(manifest.vcVersion).toBe(3);
     expect(assets.size).toBe(0);
   });
+
+  it('localLibraryFingerprint reflecte updatedAt e contagem', async () => {
+    local.setItem(SK.library, JSON.stringify([
+      { id: 'a', updatedAt: 100 },
+      { id: 'b', updatedAt: 500, createdAt: 1 },
+    ]));
+    const { localLibraryFingerprint } = await import('../../src/utils/library-sync.js');
+    expect(localLibraryFingerprint()).toEqual({ count: 2, maxUpdated: 500 });
+  });
 });

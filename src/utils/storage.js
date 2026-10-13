@@ -40,6 +40,8 @@ const SK = {
   backupNudgeDone: 'vc_backup_nudge_done',
   /** Conta dona dos dados locais (email/customerId) — isola biblioteca entre logins. */
   dataOwner: 'vc_data_owner',
+  /** Meta do último sync nuvem (revision/updatedAt) — não apagar no logout. */
+  libraryCloudMeta: 'vc_library_cloud_meta',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */

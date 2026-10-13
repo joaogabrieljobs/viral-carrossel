@@ -12,8 +12,8 @@ import { PENDING_SHARE_KEY } from './project-share.js';
 import { ACCOUNT_VAULT_KEY } from './account-vault.js';
 
 const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
-/** Convite ?share= e cofre por conta sobrevivem à limpeza das chaves activas. */
-const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY, ACCOUNT_VAULT_KEY]);
+/** Convite ?share=, cofre e meta de sync sobrevivem à limpeza das chaves activas. */
+const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY, ACCOUNT_VAULT_KEY, SK.libraryCloudMeta]);
 
 function removeKnownKeys(store) {
   if (!store) return;
