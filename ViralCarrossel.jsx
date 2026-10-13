@@ -1919,11 +1919,14 @@ export default function App() {
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
   const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
+  /** Cancela import de fotos em curso (lote / foto única). */
+  const importAbortRef = useRef(null);
   // O drawer mobile e a sidebar desktop desmontam ao mudar a largura da tela.
   // Mantém o pedido no editor para não perdê-lo ao girar o celular/cancelar.
   const [quickPrompt, setQuickPrompt] = useState('');
   const cancelGeneration = useCallback(() => {
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    if (importAbortRef.current) importAbortRef.current.cancelled = true;
     generationRef.current?.cancel();
     cancelAllAIGeneration();
     generationRef.current = null;
@@ -2491,9 +2494,15 @@ export default function App() {
     cancelAllAIGeneration();
     slideImgGenIdsRef.current.clear();
     setSlideImgGenBusy({});
+    const job = { cancelled: false };
+    importAbortRef.current = job;
+    setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A importar foto… 0/1' });
     void (async () => {
       try {
+        if (job.cancelled) return;
+        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A ler foto… 0/1' });
         const url = await vcImageFileToStorageDataUrl(file);
+        if (job.cancelled) return;
         if (typeof url !== 'string' || url.length < 32) {
           toast('Não foi possível processar a imagem. Tente JPEG ou PNG.', 'error', 4500);
           return;
@@ -2502,6 +2511,7 @@ export default function App() {
           toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
           return;
         }
+        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A guardar foto… 0/1' });
         let patch;
         try {
           patch = await guardarImagemDoSlide(url);
@@ -2509,6 +2519,7 @@ export default function App() {
           console.warn('[foto] IndexedDB falhou, usando memória', err);
           patch = { bgImage: url, bgImageId: null };
         }
+        if (job.cancelled) return;
         if (!patch?.bgImage && !patch?.bgImageId) {
           toast('Não foi possível guardar a imagem.', 'error', 4500);
           return;
@@ -2522,10 +2533,15 @@ export default function App() {
           bgImageFailed: false,
           bgImageError: null,
         });
+        setGenProgress({ phase: 'import', current: 1, total: 1, label: 'Foto importada · 1/1' });
         toast('Foto importada.', 'success', 2500);
       } catch (err) {
+        if (job.cancelled) return;
         console.error('[foto]', err);
         toast(err?.message || 'Falha ao importar a foto.', 'error', 5000);
+      } finally {
+        if (importAbortRef.current === job) importAbortRef.current = null;
+        setGenProgress((prev) => (prev?.phase === 'import' ? null : prev));
       }
     })();
   }, [updateSlideAt, toast]);
@@ -2855,7 +2871,16 @@ export default function App() {
     cancelAllAIGeneration();
     slideImgGenIdsRef.current.clear();
     setSlideImgGenBusy({});
-    setGenProgress(null);
+
+    const job = { cancelled: false };
+    importAbortRef.current = job;
+    const total = files.length;
+    setGenProgress({
+      phase: 'import',
+      current: 0,
+      total,
+      label: `A importar fotos… 0/${total}`,
+    });
 
     const readOne = async (file) => {
       try {
@@ -2867,14 +2892,28 @@ export default function App() {
     };
 
     void (async () => {
-      toast(`A importar ${files.length} imagem${files.length === 1 ? '' : 'ns'}…`, 'info', 4000);
       try {
         // Sequencial: evita saturar canvas/IDB e falhas silenciosas em lote grande.
         const urls = [];
-        for (const file of files) {
+        for (let i = 0; i < files.length; i += 1) {
+          if (job.cancelled) break;
+          const file = files[i];
+          setGenProgress({
+            phase: 'import',
+            current: i,
+            total,
+            label: `A importar fotos… ${i}/${total}`,
+          });
           const dataUrl = await readOne(file);
+          if (job.cancelled) break;
           if (!dataUrl) {
             urls.push(null);
+            setGenProgress({
+              phase: 'import',
+              current: i + 1,
+              total,
+              label: `A importar fotos… ${i + 1}/${total}`,
+            });
             continue;
           }
           try {
@@ -2891,7 +2930,26 @@ export default function App() {
             console.warn('[batch-photos] guardar falhou', err);
             urls.push({ bgImage: dataUrl, bgImageId: null, bgImageFailed: false, bgImageError: null });
           }
+          setGenProgress({
+            phase: 'import',
+            current: i + 1,
+            total,
+            label: `A importar fotos… ${i + 1}/${total}`,
+          });
         }
+
+        if (job.cancelled) {
+          // Aplica o que já foi lido antes do cancelamento.
+          const partial = urls.filter((p) => p && (p.bgImage || p.bgImageId));
+          if (partial.length) {
+            const isPresentation = activeProductKind === 'apresentacao';
+            setSlides((prev) => applyBatchPhotosToSlides(prev, urls, mkSlide, brand, { isPresentation }));
+            setActiveIdx(0);
+            toast(`${partial.length} foto${partial.length === 1 ? '' : 's'} aplicada${partial.length === 1 ? '' : 's'} antes do cancelamento.`, 'info', 4500);
+          }
+          return;
+        }
+
         const beforeCount = slidesLiveRef.current.length;
         const isPresentation = activeProductKind === 'apresentacao';
         const validCount = urls.filter((p) => p && (p.bgImage || p.bgImageId)).length;
@@ -2918,8 +2976,12 @@ export default function App() {
         toast(summary.message, summary.tone, 5000);
         if (validCount > 0) setActiveIdx(0);
       } catch (err) {
+        if (job.cancelled) return;
         console.error('[batch-photos]', err);
         toast(err?.message || 'Falha ao importar imagens. Use JPEG ou PNG e recarregue (Cmd+Shift+R).', 'error', 7000);
+      } finally {
+        if (importAbortRef.current === job) importAbortRef.current = null;
+        setGenProgress((prev) => (prev?.phase === 'import' ? null : prev));
       }
     })();
   }, [activeProductKind, brand, setSlides, toast]);
