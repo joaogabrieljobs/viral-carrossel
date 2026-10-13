@@ -38,6 +38,8 @@ const SK = {
   modesIntro:    'vc_modes_intro_done',
   /** Fatia 2: utilizador já viu o aviso de backup na 1ª sessão. */
   backupNudgeDone: 'vc_backup_nudge_done',
+  /** Conta dona dos dados locais (email/customerId) — isola biblioteca entre logins. */
+  dataOwner: 'vc_data_owner',
 };
 
 /** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */

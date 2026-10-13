@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link2, Loader2, RefreshCw, Users } from 'lucide-react';
 import {
+  buildTeamShareInviteUrl,
   createProjectShare,
   joinProjectShare,
   pullProjectShare,
@@ -8,7 +9,7 @@ import {
 } from '../../utils/project-share.js';
 
 /**
- * Partilha o projeto actual com a equipa (código de 8 caracteres).
+ * Partilha o projeto actual com a equipa (código + link ?share=).
  * Requer sessão activa. Publicar inclui fotos dos cards; ao entrar/puxar abrem no browser.
  */
 export function TeamSharePanel({
@@ -18,6 +19,8 @@ export function TeamSharePanel({
   shareRevision = 0,
   onShareLinked = () => {},
   onDocPulled = () => {},
+  /** Entrar / convite: cria ou reabre projeto na biblioteca (não sobrescreve outro). */
+  onShareJoined = null,
   toast,
 }) {
   const [busy, setBusy] = useState(false);
@@ -25,6 +28,8 @@ export function TeamSharePanel({
   const [localCode, setLocalCode] = useState(shareCode || '');
 
   const linked = Boolean(localCode || shareCode);
+  const activeCode = localCode || shareCode;
+  const inviteUrl = buildTeamShareInviteUrl(activeCode);
 
   const run = async (fn, okMsg) => {
     if (busy) return;
@@ -42,6 +47,32 @@ export function TeamSharePanel({
     }
   };
 
+  const copyInviteLink = async (code, { announce = true } = {}) => {
+    const url = buildTeamShareInviteUrl(code);
+    if (!url) return false;
+    try {
+      await navigator.clipboard.writeText(url);
+      if (announce) toast?.('Link de convite copiado. Envie à equipa.', 'success', 3500);
+      return true;
+    } catch {
+      if (announce) toast?.(url, 'info', 8000);
+      return false;
+    }
+  };
+
+  const applyJoined = async (res) => {
+    if (typeof onShareJoined === 'function') {
+      await onShareJoined(res);
+    } else {
+      await onDocPulled(res);
+    }
+    onShareLinked({
+      code: res.code,
+      revision: res.revision,
+      updatedAt: res.updatedAt,
+    });
+  };
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{
@@ -51,8 +82,8 @@ export function TeamSharePanel({
         Equipa · mesmo projeto
       </div>
       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Partilhe um código com a equipa. Ao <strong>Publicar</strong>, o Moont envia texto e fotos dos cards.
-        No outro computador: <strong>Entrar</strong> ou <strong>Puxar alterações</strong> — as imagens abrem sozinhas.
+        Envie o <strong>link</strong> à equipa. Quem abrir entra com a conta Moont e o projeto
+        aparece na biblioteca. Depois: <strong>Publicar</strong> / <strong>Puxar alterações</strong>.
       </p>
 
       {linked ? (
@@ -60,21 +91,28 @@ export function TeamSharePanel({
           padding: 12, borderRadius: 12, border: '1px solid var(--hairline)',
           background: 'var(--bg-pearl)', display: 'grid', gap: 8,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Users size={14} color="var(--accent)" />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Código: {localCode || shareCode}</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Código: {activeCode}</span>
             {shareRevision ? (
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>rev. {shareRevision}</span>
             ) : null}
           </div>
+          {inviteUrl ? (
+            <div style={{
+              fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all',
+              fontFamily: 'var(--font-mono)', lineHeight: 1.4,
+            }}>
+              {inviteUrl}
+            </div>
+          ) : null}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button
               type="button"
               className="vc-btn"
               disabled={busy}
               onClick={() => run(async () => {
-                const code = localCode || shareCode;
-                const res = await pushProjectShare({ code, doc, name: projectName });
+                const res = await pushProjectShare({ code: activeCode, doc, name: projectName });
                 onShareLinked({
                   code: res.code,
                   revision: res.revision,
@@ -100,8 +138,7 @@ export function TeamSharePanel({
               className="vc-btn vc-btn-ghost"
               disabled={busy}
               onClick={() => run(async () => {
-                const code = localCode || shareCode;
-                const res = await pullProjectShare(code);
+                const res = await pullProjectShare(activeCode);
                 await onDocPulled(res);
                 onShareLinked({
                   code: res.code,
@@ -118,18 +155,10 @@ export function TeamSharePanel({
               type="button"
               className="vc-btn vc-btn-ghost"
               disabled={busy}
-              onClick={async () => {
-                const code = localCode || shareCode;
-                try {
-                  await navigator.clipboard.writeText(code);
-                  toast?.('Código copiado.', 'success', 2500);
-                } catch {
-                  toast?.(code, 'info', 5000);
-                }
-              }}
+              onClick={() => copyInviteLink(activeCode)}
               style={{ minHeight: 40, fontSize: 12 }}
             >
-              <Link2 size={14} /> Copiar código
+              <Link2 size={14} /> Copiar link
             </button>
           </div>
         </div>
@@ -147,16 +176,16 @@ export function TeamSharePanel({
                 revision: res.revision,
                 updatedAt: res.updatedAt,
               });
-              try { await navigator.clipboard.writeText(res.code); } catch { /* ignore */ }
+              await copyInviteLink(res.code, { announce: false });
               return res;
             }, (res) => {
               if (res?.packedImages) {
-                return `Código copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}. Envie à equipa.`;
+                return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}. Envie à equipa.`;
               }
               if (res?.imagesOmitted) {
-                return 'Código criado (só texto — fotos grandes omitidas). Envie à equipa; pode Publicar depois com imagens mais leves.';
+                return 'Link copiado (só texto — fotos grandes omitidas). Envie à equipa; pode Publicar depois com imagens mais leves.';
               }
-              return 'Código criado e copiado. Envie à equipa.';
+              return 'Link de convite copiado. Envie à equipa.';
             })}
             style={{
               minHeight: 44, borderRadius: 9999, border: 'none',
@@ -165,7 +194,7 @@ export function TeamSharePanel({
             }}
           >
             {busy ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Users size={14} />}
-            Criar partilha com a equipa
+            Criar link para a equipa
           </button>
         </div>
       )}
@@ -174,7 +203,7 @@ export function TeamSharePanel({
         <input
           className="vc-input"
           aria-label="Código da equipa para entrar"
-          placeholder="Código (ex.: AB12CD34)"
+          placeholder="Ou cole o código (ex.: AB12CD34)"
           value={joinCode}
           disabled={busy}
           onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
@@ -187,15 +216,10 @@ export function TeamSharePanel({
           onClick={() => run(async () => {
             const res = await joinProjectShare(joinCode);
             setLocalCode(res.code);
-            await onDocPulled(res);
-            onShareLinked({
-              code: res.code,
-              revision: res.revision,
-              updatedAt: res.updatedAt,
-            });
+            await applyJoined(res);
             setJoinCode('');
             return res;
-          }, 'Entrou no projeto — imagens a abrir neste browser.')}
+          }, 'Entrou no projeto — está na sua biblioteca.')}
           style={{ minHeight: 40, fontSize: 12, whiteSpace: 'nowrap' }}
         >
           Entrar

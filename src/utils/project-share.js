@@ -424,3 +424,75 @@ export async function joinProjectShare(code) {
 export async function pullProjectShare(code) {
   return shareRequest(null, { method: 'GET', code: String(code || '').trim().toUpperCase() });
 }
+
+/** sessionStorage: sobrevive ao OAuth Google que devolve sem ?share= */
+export const PENDING_SHARE_KEY = 'vc_pending_share';
+
+export function normalizeShareCode(raw) {
+  const code = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return code.length >= 6 && code.length <= 12 ? code : '';
+}
+
+/** Link de convite: https://…/?share=AB12CD34&app=1 */
+export function buildTeamShareInviteUrl(code, origin) {
+  const normalized = normalizeShareCode(code);
+  if (!normalized) return '';
+  let base = origin;
+  if (!base && typeof globalThis !== 'undefined' && globalThis.location?.origin) {
+    base = globalThis.location.origin;
+  }
+  if (!base) base = 'https://viralcarrossel.com.br';
+  const url = new URL('/', base);
+  url.searchParams.set('share', normalized);
+  url.searchParams.set('app', '1');
+  return url.toString();
+}
+
+export function readShareCodeFromSearch(search) {
+  try {
+    const q = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+    return normalizeShareCode(q.get('share'));
+  } catch {
+    return '';
+  }
+}
+
+export function stashPendingShareCode(code) {
+  const normalized = normalizeShareCode(code);
+  if (!normalized || typeof sessionStorage === 'undefined') return '';
+  try { sessionStorage.setItem(PENDING_SHARE_KEY, normalized); } catch { /* */ }
+  return normalized;
+}
+
+export function peekPendingShareCode() {
+  if (typeof sessionStorage === 'undefined') return '';
+  try {
+    return normalizeShareCode(sessionStorage.getItem(PENDING_SHARE_KEY));
+  } catch {
+    return '';
+  }
+}
+
+export function consumePendingShareCode() {
+  const code = peekPendingShareCode();
+  if (!code || typeof sessionStorage === 'undefined') return code;
+  try { sessionStorage.removeItem(PENDING_SHARE_KEY); } catch { /* */ }
+  return code;
+}
+
+/** Grava ?share= no stash e remove da URL (OAuth / reload limpos). */
+export function captureShareInviteFromLocation() {
+  if (typeof globalThis === 'undefined' || !globalThis.location) return '';
+  const fromUrl = readShareCodeFromSearch(globalThis.location.search);
+  if (fromUrl) stashPendingShareCode(fromUrl);
+  const pending = peekPendingShareCode();
+  if (fromUrl) {
+    try {
+      const url = new URL(globalThis.location.href);
+      url.searchParams.delete('share');
+      const next = url.pathname + url.search + url.hash;
+      globalThis.history?.replaceState?.({}, '', next);
+    } catch { /* */ }
+  }
+  return pending;
+}

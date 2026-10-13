@@ -8,13 +8,17 @@ import { USER_PROFILE_KEY } from './user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from './custom-visual-presets.js';
 import { imageWipeDatabase } from './image-store.js';
 import { videoWipeDatabase, setVideoUrlMap } from './video-store.js';
+import { PENDING_SHARE_KEY } from './project-share.js';
 
 const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
+/** Convite ?share= tem de sobreviver à limpeza ao trocar de conta no mesmo browser. */
+const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY]);
 
 function removeKnownKeys(store) {
   if (!store) return;
   const known = new Set([...Object.values(SK), ...EXTRA_KEYS]);
   for (const key of known) {
+    if (PRESERVE_KEYS.has(key)) continue;
     try { store.removeItem(key); } catch { /* privado / bloqueado */ }
   }
   // Varredura: qualquer vc_* residual (legado ou chave nova esquecida em SK).
@@ -22,7 +26,7 @@ function removeKnownKeys(store) {
     const leftovers = [];
     for (let i = 0; i < store.length; i += 1) {
       const key = store.key(i);
-      if (key && key.startsWith('vc_')) leftovers.push(key);
+      if (key && key.startsWith('vc_') && !PRESERVE_KEYS.has(key)) leftovers.push(key);
     }
     leftovers.forEach((key) => {
       try { store.removeItem(key); } catch { /* */ }

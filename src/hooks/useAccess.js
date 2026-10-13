@@ -16,6 +16,8 @@ import { shouldShowOnboardingLanding, dismissOnboardingLanding } from '../utils/
 import { trackEvent } from '../utils/telemetry.js';
 import { SK } from '../utils/storage.js';
 import { clearAccountLocalData } from '../utils/clear-account-data.js';
+import { ensureAccountDataOwner } from '../utils/account-data-owner.js';
+import { captureShareInviteFromLocation } from '../utils/project-share.js';
 
 export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
@@ -51,6 +53,7 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
       status: session.billingDisabled ? 'disabled' : (session.active ? 'active' : 'inactive'),
       active: !!session.active,
       email: session.email || null,
+      customerId: session.customerId || null,
       billingDisabled: !!session.billingDisabled,
       currentPeriodEnd: session.currentPeriodEnd || null,
       currentPeriodStart: session.currentPeriodStart || null,
@@ -101,18 +104,37 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
         } catch { /* */ }
       }
 
+      // Convite ?share= → stash (OAuth devolve sem o param) antes de limpar URL.
+      const pendingShare = captureShareInviteFromLocation();
+
       const session = await refreshAccess();
       if (cancelled) return;
+
+      // Isolamento por conta: projetos vivem no localStorage deste browser.
+      // Trocar de Google/password sem logout deixava a biblioteca do outro.
+      const explicitLogin = loginStatus === 'google'
+        || loginStatus === 'password'
+        || billing === 'restored'
+        || billing === 'success';
+      const ownerGate = await ensureAccountDataOwner(session, { explicitLogin });
+      if (cancelled || ownerGate === 'reloading') return;
 
       // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a
       // landing. NÃO retorna cedo: antes descartava silenciosamente qualquer
       // `login=*`/`billing=*` que viesse na mesma URL — quem voltasse do portal
       // com um desses params perdia o tratamento correspondente.
-      const pulaLanding = q?.get('app') === '1' || q?.get('studio') === '1';
+      const pulaLanding = q?.get('app') === '1' || q?.get('studio') === '1' || !!pendingShare;
       if (pulaLanding) {
         dismissOnboardingLanding();
         setLandingOpen(false);
-        if (!session.active && !loginStatus && !billing) setPaywallOpen(true);
+        if (!session.active && !loginStatus && !billing && !pendingShare) setPaywallOpen(true);
+      }
+      // Link de equipa sem sessão: pede login (não paywall genérico).
+      if (pendingShare && !session.active) {
+        setLoginHint('Entre na sua conta Moont para abrir o projeto da equipa.');
+        setLoginOpen(true);
+        setPaywallOpen(false);
+        setLandingOpen(false);
       }
       if (!pulaLanding && (q?.get('landing') === '1' || q?.get('intro') === '1' || q?.get('welcome') === '1')) {
         setLandingOpen(true);
@@ -122,6 +144,17 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
       }
       if ((billing === 'restored' || loginStatus === 'google' || loginStatus === 'password') && session.active) {
         trackEvent(loginStatus === 'password' ? 'login_password_ok' : 'login_google_ok');
+        enterStudio();
+      }
+      if (q?.get('account_switch') === '1' && session.active) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('account_switch');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch { /* */ }
+        if (typeof toast === 'function') {
+          toast('Conta trocada: projetos locais anteriores foram limpos neste browser.', 'info', 6000);
+        }
         enterStudio();
       }
       if (billing === 'cancel') {

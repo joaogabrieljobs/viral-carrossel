@@ -40,4 +40,9 @@ describe('landingGateDecision', () => {
     expect(landingGateDecision('billing=cancel', false)).toBe(false);
     expect(landingGateDecision('?billing=', false)).toBe(false);
   });
+
+  it('convite ?share= carrega o studio (não a landing)', () => {
+    expect(landingGateDecision('?share=AB12CD34', false)).toBe(false);
+    expect(landingGateDecision('?share=AB12CD34&app=1', false)).toBe(false);
+  });
 });

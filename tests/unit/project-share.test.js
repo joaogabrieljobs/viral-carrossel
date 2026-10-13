@@ -1,5 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sanitizeDocForShare, packDocWithImagesForShare } from '../../src/utils/project-share.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  sanitizeDocForShare,
+  packDocWithImagesForShare,
+  normalizeShareCode,
+  buildTeamShareInviteUrl,
+  stashPendingShareCode,
+  peekPendingShareCode,
+  consumePendingShareCode,
+  readShareCodeFromSearch,
+  PENDING_SHARE_KEY,
+} from '../../src/utils/project-share.js';
 
 vi.mock('../../src/utils/image-store.js', () => ({
   imagemComoDataUrl: vi.fn(async (id) => (id === 'id1' ? 'data:image/png;base64,AAAA' : null)),
@@ -72,5 +82,36 @@ describe('packDocWithImagesForShare', () => {
     expect(imagesOmitted).toBeGreaterThan(0);
     expect(doc.slides.every((s) => !s.bgImage)).toBe(true);
     expect(JSON.stringify(doc).length).toBeLessThan(2_800_000);
+  });
+});
+
+describe('team share invite link', () => {
+  beforeEach(() => {
+    const session = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k) => (session.has(k) ? session.get(k) : null),
+      setItem: (k, v) => { session.set(String(k), String(v)); },
+      removeItem: (k) => { session.delete(k); },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('normaliza código e monta URL ?share=', () => {
+    expect(normalizeShareCode(' ab12-cd34 ')).toBe('AB12CD34');
+    expect(normalizeShareCode('xx')).toBe('');
+    expect(buildTeamShareInviteUrl('ab12cd34', 'https://viralcarrossel.com.br'))
+      .toBe('https://viralcarrossel.com.br/?share=AB12CD34&app=1');
+    expect(readShareCodeFromSearch('?share=zz99yy88&utm=1')).toBe('ZZ99YY88');
+  });
+
+  it('stash / peek / consume no sessionStorage', () => {
+    expect(stashPendingShareCode('hello12')).toBe('HELLO12');
+    expect(peekPendingShareCode()).toBe('HELLO12');
+    expect(sessionStorage.getItem(PENDING_SHARE_KEY)).toBe('HELLO12');
+    expect(consumePendingShareCode()).toBe('HELLO12');
+    expect(peekPendingShareCode()).toBe('');
   });
 });

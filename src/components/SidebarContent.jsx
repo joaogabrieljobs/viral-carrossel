@@ -305,6 +305,7 @@ function SidebarContent({
   onImportTextApply = null,
   onTeamShareLinked = null,
   onTeamDocPulled = null,
+  onTeamShareJoined = null,
   historyDoc = null,
 }) {
   const imageTargetRef = useRef(null);
@@ -3635,7 +3636,7 @@ function SidebarContent({
 
             <S
               title="Equipa"
-              hint="Partilhe um código para várias contas trabalharem no mesmo projeto."
+              hint="Envie o link de convite; a outra conta abre e o projeto entra na biblioteca."
             >
               <TeamSharePanel
                 doc={historyDoc}
@@ -3644,6 +3645,7 @@ function SidebarContent({
                 shareRevision={historyDoc?.shareRevision || 0}
                 onShareLinked={onTeamShareLinked}
                 onDocPulled={onTeamDocPulled}
+                onShareJoined={onTeamShareJoined}
                 toast={toast}
               />
               <button

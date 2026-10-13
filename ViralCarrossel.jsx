@@ -2715,6 +2715,100 @@ export default function App() {
     }
   }, [history, toast]);
 
+  /** Entrar / link ?share=: cria projeto na lib ou reabre o que já tem o mesmo código. */
+  const handleTeamShareJoined = useCallback(async (payload) => {
+    if (!payload?.doc || typeof payload.doc !== 'object') return;
+    const { hydrateSharedDocImages, normalizeShareCode } = await import('./src/utils/project-share.js');
+    const hydrated = await hydrateSharedDocImages(payload.doc);
+    const code = normalizeShareCode(payload.code || hydrated.shareCode || '');
+    const shaped = ensureDocShape({
+      ...hydrated,
+      shareCode: code || hydrated.shareCode || '',
+      shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
+      shareUpdatedAt: payload.updatedAt ?? Date.now(),
+    });
+    const name = String(payload.name || '').trim() || 'Projeto da equipa';
+    let targetId = null;
+    let created = false;
+    setLibrary((prev) => {
+      const flushed = prev.map((e) => (
+        e.id === activeDocId
+          ? { ...e, doc: history.state, updatedAt: Date.now() }
+          : e
+      ));
+      const existing = code
+        ? flushed.find((e) => normalizeShareCode(e.doc?.shareCode) === code)
+        : null;
+      if (existing) {
+        targetId = existing.id;
+        return flushed.map((e) => (
+          e.id === existing.id
+            ? {
+              ...e,
+              doc: shaped,
+              name: e.name || name,
+              updatedAt: Date.now(),
+            }
+            : e
+        ));
+      }
+      const entry = mkLibEntry(shaped, name);
+      targetId = entry.id;
+      created = true;
+      return [entry, ...flushed];
+    });
+    if (targetId) {
+      if (targetId === activeDocId) {
+        history.reset(shaped);
+      } else {
+        setActiveDocId(targetId);
+      }
+      setShellView('project');
+      setLibraryOpen(false);
+      setActiveIdx(0);
+    }
+    const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
+    toast(
+      created
+        ? `Projeto da equipa adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}.`
+        : `Projeto da equipa actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}.`,
+      'success',
+      5000,
+    );
+    trackEvent('team_share_joined', { created: created ? '1' : '0' });
+  }, [activeDocId, history, toast]);
+
+  // Link ?share=CÓDIGO (stash sobrevive ao login Google): entra e abre o projeto.
+  const shareInviteInFlight = useRef('');
+  useEffect(() => {
+    if (!accessActive) return undefined;
+    let cancelled = false;
+    (async () => {
+      const {
+        peekPendingShareCode,
+        consumePendingShareCode,
+        joinProjectShare,
+        normalizeShareCode,
+      } = await import('./src/utils/project-share.js');
+      const code = normalizeShareCode(peekPendingShareCode());
+      if (!code || shareInviteInFlight.current === code) return;
+      shareInviteInFlight.current = code;
+      try {
+        const res = await joinProjectShare(code);
+        if (cancelled) return;
+        consumePendingShareCode();
+        await handleTeamShareJoined(res);
+        enterStudio();
+      } catch (e) {
+        shareInviteInFlight.current = '';
+        if (!cancelled) {
+          toast(e?.message || 'Não foi possível abrir o link da equipa.', 'error', 6000);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accessActive, handleTeamShareJoined, enterStudio, toast]);
+
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
@@ -4490,6 +4584,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     onImportTextApply: handleImportTextApply,
     onTeamShareLinked: handleTeamShareLinked,
     onTeamDocPulled: handleTeamDocPulled,
+    onTeamShareJoined: handleTeamShareJoined,
     historyDoc: doc,
     generateMissingImages: async (targetSlideIds = null) => {
       const targetSet = Array.isArray(targetSlideIds) && targetSlideIds.length

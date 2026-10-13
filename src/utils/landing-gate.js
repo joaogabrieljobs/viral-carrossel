@@ -20,6 +20,8 @@ import { uid } from './doc-schema.js';
 function landingGateDecision(search, dismissed) {
   const q = new URLSearchParams(String(search || '').replace(/^\?/, ''));
   if (q.get('app') === '1' || q.get('studio') === '1') return false;
+  // Convite de equipa (?share=CÓDIGO): carrega o studio para pedir login e entrar.
+  if (q.has('share')) return false;
   // Retorno de checkout (success/cancel/restored) ou de login (qualquer estado,
   // incluindo no_subscription e denied): o studio trata e mostra o que falta.
   if (q.has('billing') || q.has('login')) return false;
