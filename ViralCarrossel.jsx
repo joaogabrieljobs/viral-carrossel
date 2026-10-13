@@ -339,7 +339,10 @@ import {
   VC_QUOTA_HARD_ALREADY_NOTIFIED,
   lsSet,
   areAccountDataWritesLocked,
+  lockAccountDataWrites,
+  unlockAccountDataWrites,
 } from './src/utils/storage.js';
+import { lsGet } from './src/utils/telemetry.js';
 import {
   vcHexToRgb,
   vcNormalizeHex,
@@ -919,6 +922,12 @@ export default function App() {
   /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
   const flushPersistRef = useRef(null);
 
+  // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
+  // React (stale) por cima da nuvem. O lock impede isso; aqui libertamos no boot.
+  useEffect(() => {
+    try { unlockAccountDataWrites(); } catch { /* */ }
+  }, []);
+
   /**
    * Evita perder fotos (base64) e as últimas edições ao puxar-para-atualizar no
    * telemóvel: a cadeia normal é doc → (400ms) → biblioteca → (100ms) →
@@ -1328,6 +1337,9 @@ export default function App() {
 
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
   const flushPersistNow = useCallback(() => {
+    if (areAccountDataWritesLocked()) {
+      return libraryPersistRef.current || [];
+    }
     const agora = Date.now();
     const lib = (libraryPersistRef.current || []).map((e) => (
       e.id === activeDocId ? { ...e, doc, updatedAt: agora } : e
@@ -1356,14 +1368,30 @@ export default function App() {
     } catch { /* */ }
     try {
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      // Merge na nuvem (nunca allowShrink) — não apaga projetos doutros browsers.
-      const result = await pushLibraryToCloud({ force: true, allowShrink: false });
+      // Merge + pull — a lista do ecrã tem de reflectir a nuvem.
+      const result = await pushLibraryToCloud({
+        force: true,
+        allowShrink: false,
+        pullAfter: true,
+      });
       if (result?.skipped || result?.empty) {
         toast('Projeto salvo neste navegador.', 'success', 2200);
         return;
       }
-      if (result?.needsReload) {
-        toast(`Nuvem com ${result.projectCount} projeto(s) — a actualizar…`, 'success', 2500);
+      trackEvent('library_cloud_push', {
+        project_count: String(result.projectCount || 0),
+        source: 'salvar',
+      });
+      if (result?.pullError) {
+        toast(
+          `Salvo na nuvem (${result.projectCount} projeto(s)), mas a lista local falhou: ${result.pullError.slice(0, 80)}`,
+          'warning',
+          7000,
+        );
+        return;
+      }
+      if (result?.needsReload || Number(result.projectCount) !== Number(lib?.length || 0)) {
+        toast(`Salvo · ${result.projectCount} projeto(s) na conta — a actualizar lista…`, 'success', 2500);
         window.setTimeout(() => {
           try {
             const url = new URL(window.location.href);
@@ -1372,7 +1400,7 @@ export default function App() {
           } catch {
             window.location.reload();
           }
-        }, 400);
+        }, 350);
         return;
       }
       if (result?.assetsFailed > 0) {
@@ -1384,10 +1412,6 @@ export default function App() {
       } else {
         toast(`Projeto salvo na conta · ${result.projectCount} na nuvem.`, 'success', 3200);
       }
-      trackEvent('library_cloud_push', {
-        project_count: String(result.projectCount || 0),
-        source: 'salvar',
-      });
     } catch (e) {
       toast(
         `Salvo neste navegador e no cofre. Nuvem: ${String(e?.message || 'falhou').slice(0, 120)}`,
@@ -1541,6 +1565,26 @@ export default function App() {
     toast,
   });
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
+  const reloadAfterCloudSync = useCallback(() => {
+    // Trava ANTES do navigate: pagehide/beforeunload chamam flush com a
+    // library React antiga e apagavam os 4 projectos que o pull acabou de gravar.
+    try { lockAccountDataWrites(); } catch { /* */ }
+    try {
+      const pulled = lsGet(SK.library, null);
+      if (Array.isArray(pulled) && pulled.length) {
+        libraryPersistRef.current = pulled;
+        setLibrary(pulled);
+      }
+    } catch { /* */ }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('app', '1');
+      window.location.replace(url.pathname + url.search + url.hash);
+    } catch {
+      window.location.reload();
+    }
+  }, [setLibrary]);
+
   const handleSyncCloud = useCallback(async () => {
     if (cloudSyncBusy) return;
     if (!access?.active) {
@@ -1556,44 +1600,46 @@ export default function App() {
         const owner = readDataOwner();
         if (owner) snapshotAccountVault(owner);
       } catch { /* */ }
-      const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      // Merge: une local + nuvem. Nunca substitui a nuvem por uma lista menor.
-      const result = await pushLibraryToCloud({ force: true, allowShrink: false });
+      const { pushLibraryToCloud, pullLibraryFromCloud } = await import('./src/utils/library-sync.js');
+      // Merge push + pull obrigatório — a lista do ecrã tem de bater com a nuvem.
+      const result = await pushLibraryToCloud({
+        force: true,
+        allowShrink: false,
+        pullAfter: true,
+      });
       if (result?.skipped || result?.empty) {
         toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
-      } else if (result?.needsReload) {
-        toast(`Nuvem: ${result.projectCount} projeto(s) — a restaurar lista…`, 'success', 2500);
-        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
-        window.setTimeout(() => {
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('app', '1');
-            window.location.replace(url.pathname + url.search + url.hash);
-          } catch {
-            window.location.reload();
-          }
-        }, 400);
-      } else if (result?.assetsFailed > 0) {
-        toast(
-          `Nuvem: ${result.projectCount} projeto(s). ${result.assetsUploaded || 0} foto(s) ok, ${result.assetsFailed} falharam${result.assetError ? ` — ${result.assetError.slice(0, 80)}` : ''}.`,
-          'warning',
-          7000,
-        );
-        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
-      } else {
-        toast(
-          `Nuvem actualizada: ${result.projectCount} projeto(s)${result.assetsUploaded ? ` · ${result.assetsUploaded} foto(s)` : ''}.`,
-          'success',
-          4500,
-        );
-        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
+        return;
       }
+      if (result?.pullError) {
+        // Push ok mas pull falhou: tenta pull isolado uma vez.
+        try {
+          await pullLibraryFromCloud();
+        } catch (e2) {
+          toast(
+            `Nuvem tem ${result.projectCount} projeto(s), mas não deu para mostrar aqui: ${String(result.pullError || e2?.message || '').slice(0, 100)}`,
+            'error',
+            8000,
+          );
+          return;
+        }
+      }
+      trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
+      const photoWarn = result?.assetsFailed > 0
+        ? ` · ${result.assetsFailed} foto(s) ainda locais`
+        : '';
+      toast(
+        `Lista restaurada: ${result.projectCount} projeto(s) na conta${photoWarn}.`,
+        result?.assetsFailed > 0 ? 'warning' : 'success',
+        2800,
+      );
+      window.setTimeout(() => reloadAfterCloudSync(), 350);
     } catch (e) {
       toast(e?.message || 'Não foi possível sincronizar na nuvem.', 'error', 5500);
     } finally {
       setCloudSyncBusy(false);
     }
-  }, [access?.active, cloudSyncBusy, flushPersistNow, toast]);
+  }, [access?.active, cloudSyncBusy, flushPersistNow, reloadAfterCloudSync, toast]);
   // Auto-push na nuvem ~4s após editar a biblioteca (não depende só do logout).
   const cloudAutoPushTimerRef = useRef(null);
   const cloudAutoPushSkipFirstRef = useRef(true);

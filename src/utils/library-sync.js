@@ -370,8 +370,9 @@ async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
  * Envia biblioteca local → nuvem.
  * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
  * Por defeito a nuvem faz MERGE (união) — projectos noutros browsers não somem.
- * @param {{ force?: boolean, allowShrink?: boolean }} [opts]
- *   allowShrink/replace: substitui a nuvem (só Sync manual consciente).
+ * @param {{ force?: boolean, allowShrink?: boolean, pullAfter?: boolean }} [opts]
+ *   allowShrink/replace: substitui a nuvem (raro).
+ *   pullAfter: após push, puxa manifesto completo → localStorage (Sync/Salvar).
  */
 export async function pushLibraryToCloud(opts = {}) {
   const localMeta = readCloudMeta();
@@ -441,13 +442,26 @@ export async function pushLibraryToCloud(opts = {}) {
     lastPullAt: localMeta?.lastPullAt || null,
   });
 
-  // Se o merge na nuvem trouxe projetos que este browser não tinha, puxar.
+  // Sync/Salvar: SEMPRE puxar a lista completa da nuvem para o browser.
+  // Sem isto a UI fica com 1 projecto enquanto o toast diz «4 na nuvem».
+  const cloudProjects = Number(result.projectCount || 0);
+  const mustPull = opts.pullAfter === true || cloudProjects > projectCount;
   let needsReload = false;
-  if (Number(result.projectCount || 0) > projectCount) {
+  let pullError = '';
+  if (mustPull) {
     try {
-      await pullLibraryFromCloud();
-      needsReload = true;
-    } catch { /* estrutura já está na nuvem */ }
+      const pulled = await pullLibraryFromCloud();
+      if (pulled?.empty || !Number(pulled?.projectCount || 0)) {
+        pullError = cloudProjects > 0
+          ? `Nuvem reportou ${cloudProjects} projeto(s) mas o download veio vazio.`
+          : 'Download da biblioteca veio vazio.';
+      } else {
+        needsReload = true;
+        result = { ...result, projectCount: pulled.projectCount };
+      }
+    } catch (e) {
+      pullError = String(e?.message || e || 'falha ao restaurar lista');
+    }
   }
 
   return {
@@ -455,11 +469,13 @@ export async function pushLibraryToCloud(opts = {}) {
     revision: result.revision,
     updatedAt: result.updatedAt,
     projectCount: result.projectCount,
+    localProjectCount: projectCount,
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
     assetsFailed: assetStats.failed,
     assetError: assetStats.lastError || '',
     needsReload,
+    pullError,
   };
 }
 
