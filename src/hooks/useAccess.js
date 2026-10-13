@@ -213,14 +213,19 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
     }
   }, [toast]);
   const handleLogout = useCallback(async () => {
-    // Trava + limpa ANTES do assign: pagehide reporia a biblioteca do React.
+    // 1) Snapshot da conta actual → cofre (projetos voltam ao reentrar).
+    // 2) Trava + limpa chaves activas (outro login neste browser não herda).
     try {
+      const { readDataOwner, normalizeDataOwnerId } = await import('../utils/account-data-owner.js');
+      const { snapshotAccountVault } = await import('../utils/account-vault.js');
       const { lockAccountDataWrites } = await import('../utils/storage.js');
+      const owner = readDataOwner()
+        || normalizeDataOwnerId(access.email, access.customerId);
+      if (owner) snapshotAccountVault(owner);
       lockAccountDataWrites();
     } catch { /* */ }
     try {
-      // FE-001/002/003: limpa biblioteca, BYOK e IndexedDB neste browser.
-      await clearAccountLocalData({ timeoutMs: 2_500 });
+      await clearAccountLocalData({ timeoutMs: 2_500, wipeMedia: false });
     } catch { /* best-effort */ }
     try {
       await Promise.race([
@@ -229,9 +234,8 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
       ]);
     } catch { /* rede / offline */ }
     try { trackEvent('logout'); } catch { /* */ }
-    // Sessão morta no servidor — recarrega pro shell reavaliar (paywall/landing).
     window.location.assign('/');
-  }, []);
+  }, [access.email, access.customerId]);
 
   return {
     landingOpen, setLandingOpen,

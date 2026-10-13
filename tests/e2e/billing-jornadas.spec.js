@@ -92,7 +92,14 @@ test.describe('Jornadas de billing', () => {
       library: localStorage.getItem('vc_library'),
       keys: localStorage.getItem('vc_ai_keys'),
       profile: localStorage.getItem('vc_user_profile'),
-    })), { timeout: 10_000 }).toEqual({ library: null, keys: null, profile: null });
+      // Cofre por conta deve existir para a mesma pessoa recuperar ao reentrar
+      vault: !!localStorage.getItem('vc_account_vault'),
+    })), { timeout: 10_000 }).toEqual({
+      library: null,
+      keys: null,
+      profile: null,
+      vault: true,
+    });
   });
 
   test('CA-05 ?app=1 combinado com login=no_subscription não descarta o param', async ({ page }) => {

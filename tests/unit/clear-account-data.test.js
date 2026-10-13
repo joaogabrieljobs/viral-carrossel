@@ -3,6 +3,7 @@ import { clearAccountLocalData } from '../../src/utils/clear-account-data.js';
 import { SK } from '../../src/utils/storage.js';
 import { USER_PROFILE_KEY } from '../../src/utils/user-profile.js';
 import { PENDING_SHARE_KEY } from '../../src/utils/project-share.js';
+import { ACCOUNT_VAULT_KEY } from '../../src/utils/account-vault.js';
 
 function makeMemoryStorage() {
   const map = new Map();
@@ -61,5 +62,15 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
     await clearAccountLocalData();
     expect(session.getItem(PENDING_SHARE_KEY)).toBe('AB12CD34');
     expect(local.getItem(SK.library)).toBeNull();
+  });
+
+  it('preserva o cofre por conta (vc_account_vault)', async () => {
+    local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify({
+      'email:a@x.com': { savedAt: 1, keys: { [SK.library]: '[]' } },
+    }));
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
+    await clearAccountLocalData();
+    expect(local.getItem(SK.library)).toBeNull();
+    expect(local.getItem(ACCOUNT_VAULT_KEY)).toContain('email:a@x.com');
   });
 });

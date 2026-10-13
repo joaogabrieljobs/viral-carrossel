@@ -1,10 +1,11 @@
 /**
- * Isola dados locais (biblioteca, marcas, IndexedDB) por conta autenticada.
- * Sem isto, login B no mesmo browser via cookie herda os projetos de A —
- * o logout limpa, mas trocar de conta pelo Google/password não limpava.
+ * Isola dados locais (biblioteca, marcas) por conta autenticada.
+ * Cada conta tem um slot no cofre (`account-vault`) — logout limpa as chaves
+ * activas mas a mesma conta recupera os projetos ao reentrar neste browser.
  */
 import { clearAccountLocalData } from './clear-account-data.js';
-import { SK, lockAccountDataWrites } from './storage.js';
+import { SK, lockAccountDataWrites, unlockAccountDataWrites } from './storage.js';
+import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
 
@@ -67,54 +68,7 @@ export function writeDataOwner(ownerId) {
   } catch { /* quota / privado */ }
 }
 
-/**
- * @param {object} session — resultado de /api/auth/session
- * @param {{ explicitLogin?: boolean }} [opts] — reservado; wipe só em troca real de conta
- * @returns {Promise<'ok' | 'reloading'>}
- */
-export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
-  if (typeof localStorage === 'undefined') return 'ok';
-  if (!session?.active) return 'ok';
-
-  const next = normalizeDataOwnerId(session.email, session.customerId);
-  if (!next) return 'ok';
-
-  const prev = readDataOwner();
-
-  if (!prev) {
-    // Login explícito + biblioteca órfã (logout limpou o dono mas o pagehide
-    // reporia projetos): limpar. Soft-migração só em boot silencioso.
-    if (explicitLogin && libraryLooksOccupied()) {
-      lockAccountDataWrites();
-      await clearAccountLocalData();
-      writeDataOwner(next);
-      const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
-      try {
-        const url = new URL(loc?.href || 'https://viralcarrossel.com.br/');
-        url.searchParams.delete('login');
-        url.searchParams.delete('email');
-        url.searchParams.set('app', '1');
-        url.searchParams.set('account_switch', '1');
-        loc?.replace?.(url.pathname + url.search + url.hash);
-      } catch {
-        loc?.replace?.('/?app=1&account_switch=1');
-      }
-      return 'reloading';
-    }
-    writeDataOwner(next);
-    return 'ok';
-  }
-
-  if (isSameDataOwner(prev, next, session)) {
-    // Migrar id:cus → email: se o formato preferido mudou.
-    if (prev !== next) writeDataOwner(next);
-    return 'ok';
-  }
-
-  // Conta diferente da que possui os dados locais → limpar.
-  lockAccountDataWrites();
-  await clearAccountLocalData();
-  writeDataOwner(next);
+function reloadAccountSwitch() {
   const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
   try {
     const href = loc?.href || 'https://viralcarrossel.com.br/';
@@ -127,5 +81,60 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
   } catch {
     loc?.replace?.('/?app=1&account_switch=1');
   }
+}
+
+/**
+ * @param {object} session — resultado de /api/auth/session
+ * @param {{ explicitLogin?: boolean }} [opts]
+ * @returns {Promise<'ok' | 'reloading'>}
+ */
+export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
+  if (typeof localStorage === 'undefined') return 'ok';
+  if (!session?.active) return 'ok';
+
+  const next = normalizeDataOwnerId(session.email, session.customerId);
+  if (!next) return 'ok';
+
+  const prev = readDataOwner();
+
+  if (!prev) {
+    if (explicitLogin) {
+      // Login fresco: limpar activo órfão (outra pessoa) e restaurar o cofre desta conta.
+      lockAccountDataWrites();
+      await clearAccountLocalData({ wipeMedia: false });
+      unlockAccountDataWrites();
+      writeDataOwner(next);
+      restoreAccountVault(next);
+      reloadAccountSwitch();
+      return 'reloading';
+    }
+    // Boot silencioso: reclamar biblioteca actual; se vazia, tentar cofre.
+    writeDataOwner(next);
+    if (!libraryLooksOccupied()) restoreAccountVault(next);
+    return 'ok';
+  }
+
+  if (isSameDataOwner(prev, next, session)) {
+    if (prev !== next) {
+      // Migrar id:cus → email: e mover snapshot se existir.
+      snapshotAccountVault(prev);
+      writeDataOwner(next);
+      snapshotAccountVault(next);
+    }
+    // Biblioteca vazia mas cofre tem dados (logout anterior) → restaurar.
+    if (!libraryLooksOccupied()) {
+      restoreAccountVault(next);
+    }
+    return 'ok';
+  }
+
+  // Conta diferente: guardar A, limpar activo, restaurar B.
+  lockAccountDataWrites();
+  snapshotAccountVault(prev);
+  await clearAccountLocalData({ wipeMedia: false });
+  unlockAccountDataWrites();
+  writeDataOwner(next);
+  restoreAccountVault(next);
+  reloadAccountSwitch();
   return 'reloading';
 }

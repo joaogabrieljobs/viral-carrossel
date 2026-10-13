@@ -8,6 +8,7 @@ import {
   writeDataOwner,
 } from '../../src/utils/account-data-owner.js';
 import { SK } from '../../src/utils/storage.js';
+import { ACCOUNT_VAULT_KEY, snapshotAccountVault } from '../../src/utils/account-vault.js';
 
 function makeMemoryStorage() {
   const map = new Map();
@@ -67,33 +68,36 @@ describe('account-data-owner', () => {
     expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
-  it('login explícito sem dono COM biblioteca órfã limpa (anti-mistura entre contas)', async () => {
-    local.setItem(SK.library, JSON.stringify([{ id: 'orphan' }]));
+  it('login explícito restaura cofre da conta e recarrega', async () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'meus' }]));
+    snapshotAccountVault('email:novo@z.com');
+    local.setItem(SK.library, JSON.stringify([{ id: 'orfao' }]));
+
     const result = await ensureAccountDataOwner(
       { active: true, email: 'novo@z.com' },
       { explicitLogin: true },
     );
     expect(result).toBe('reloading');
-    expect(local.getItem(SK.library)).toBeNull();
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('meus');
     expect(readDataOwner()).toBe('email:novo@z.com');
     expect(globalThis.location.replace).toHaveBeenCalled();
+    expect(local.getItem(ACCOUNT_VAULT_KEY)).toBeTruthy();
   });
 
-  it('boot silencioso sem dono reclama biblioteca sem apagar (migração)', async () => {
-    local.setItem(SK.library, JSON.stringify([{ id: 'legado' }]));
-    const result = await ensureAccountDataOwner(
-      { active: true, email: 'legado@z.com' },
-      { explicitLogin: false },
-    );
-    expect(result).toBe('ok');
-    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
-    expect(readDataOwner()).toBe('email:legado@z.com');
-  });
-
-  it('ao mudar de conta limpa biblioteca e recarrega', async () => {
+  it('ao mudar de conta guarda A no cofre e restaura B', async () => {
     writeDataOwner('email:a@x.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'secret-a' }]));
     local.setItem(SK.brands, JSON.stringify([{ id: 'brand-a' }]));
+    snapshotAccountVault('email:b@y.com');
+    local.setItem(SK.library, JSON.stringify([{ id: 'secret-a' }]));
+
+    // Slot B já tem projeto
+    const map = JSON.parse(local.getItem(ACCOUNT_VAULT_KEY));
+    map['email:b@y.com'] = {
+      savedAt: Date.now(),
+      keys: { [SK.library]: JSON.stringify([{ id: 'proj-b' }]) },
+    };
+    local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify(map));
 
     const result = await ensureAccountDataOwner(
       { active: true, email: 'b@y.com' },
@@ -101,10 +105,25 @@ describe('account-data-owner', () => {
     );
 
     expect(result).toBe('reloading');
-    expect(local.getItem(SK.library)).toBeNull();
-    expect(local.getItem(SK.brands)).toBeNull();
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('proj-b');
     expect(readDataOwner()).toBe('email:b@y.com');
-    expect(globalThis.location.replace).toHaveBeenCalled();
+    // Cofre de A preservado
+    const vault = JSON.parse(local.getItem(ACCOUNT_VAULT_KEY));
+    expect(JSON.parse(vault['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
+  });
+
+  it('mesma conta com biblioteca vazia restaura do cofre', async () => {
+    writeDataOwner('email:a@x.com');
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
+    snapshotAccountVault('email:a@x.com');
+    local.removeItem(SK.library);
+
+    const result = await ensureAccountDataOwner(
+      { active: true, email: 'a@x.com' },
+      { explicitLogin: false },
+    );
+    expect(result).toBe('ok');
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('p1');
   });
 
   it('migra id:cus → email: sem limpar dados', async () => {
