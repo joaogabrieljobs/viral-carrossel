@@ -2,6 +2,9 @@
  * Cliente de partilha de projeto entre contas da equipa.
  * Ao publicar: embute fotos (data URL) a partir do IndexedDB.
  * Ao entrar/puxar: grava essas fotos de volta no IndexedDB local.
+ *
+ * Limite: pedido serverless Vercel ~4,5 MB. Acima disso a plataforma devolve
+ * 413 sem CORS e o browser mascara como "fetch failed".
  */
 
 import { guardarImagemDoSlide, imagemComoDataUrl } from './image-store.js';
@@ -9,6 +12,10 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
 const SHARE_API = '/api/project-share';
+/** Folga abaixo do FUNCTION_PAYLOAD_TOO_LARGE (~4,5 MB). */
+const MAX_SHARE_BODY_CHARS = 3_200_000;
+const SHARE_IMAGE_MAX_EDGE = 960;
+const SHARE_IMAGE_MAX_CHARS = 420_000;
 
 function stripRuntimeBlobs(value, depth = 0) {
   if (depth > 8 || value == null) return value;
@@ -50,26 +57,114 @@ function cloneDocForPack(doc) {
   };
 }
 
+/** Reduz data URL para caber no pedido de partilha (JPEG). */
+async function compactDataUrlForShare(dataUrl) {
+  const src = String(dataUrl || '');
+  if (!src.startsWith('data:image/')) return null;
+  if (src.length <= SHARE_IMAGE_MAX_CHARS && src.startsWith('data:image/jpeg')) return src;
+
+  if (typeof document === 'undefined' || typeof Image === 'undefined') {
+    return src.length <= SHARE_IMAGE_MAX_CHARS ? src : null;
+  }
+
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('img'));
+      image.src = src;
+    });
+    if (!img.naturalWidth || !img.naturalHeight) return null;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return src.length <= SHARE_IMAGE_MAX_CHARS ? src : null;
+
+    for (const edge of [SHARE_IMAGE_MAX_EDGE, 720, 512]) {
+      const scale = Math.min(1, edge / Math.max(img.naturalWidth, img.naturalHeight));
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.72, 0.55, 0.4]) {
+        const out = canvas.toDataURL('image/jpeg', quality);
+        if (out.startsWith('data:image/jpeg') && out.length <= SHARE_IMAGE_MAX_CHARS) return out;
+      }
+    }
+  } catch { /* fallback abaixo */ }
+
+  return src.length <= SHARE_IMAGE_MAX_CHARS ? src : null;
+}
+
+function stripEmbeddedImages(doc) {
+  const slides = Array.isArray(doc?.slides)
+    ? doc.slides.map((s) => ({
+      ...s,
+      bgImage: typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:') ? null : s?.bgImage,
+    }))
+    : [];
+  const brand = doc?.brand && typeof doc.brand === 'object'
+    ? {
+      ...doc.brand,
+      logo: typeof doc.brand.logo === 'string' && doc.brand.logo.startsWith('data:')
+        ? null
+        : doc.brand.logo,
+    }
+    : doc?.brand;
+  let styleKit = doc?.styleKit;
+  if (styleKit && typeof styleKit === 'object') {
+    styleKit = {
+      ...styleKit,
+      refImages: Array.isArray(styleKit.refImages)
+        ? styleKit.refImages.map((r) => (
+          r && typeof r.dataUrl === 'string' && r.dataUrl.startsWith('data:')
+            ? { ...r, dataUrl: undefined }
+            : r
+        )).filter((r) => r && (r.imageId || r.dataUrl))
+        : [],
+      logo: styleKit.logo && typeof styleKit.logo.dataUrl === 'string'
+        ? { ...styleKit.logo, dataUrl: undefined, imageId: styleKit.logo.imageId }
+        : styleKit.logo,
+    };
+  }
+  return { ...doc, slides, brand, styleKit };
+}
+
+function countPackedDataImages(doc) {
+  let n = 0;
+  for (const s of doc?.slides || []) {
+    if (typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:')) n += 1;
+  }
+  return n;
+}
+
 /**
- * Prepara o documento para sync: texto + fotos embutidas em data URL.
+ * Prepara o documento para sync: texto + fotos embutidas em data URL compactas.
  */
 export async function packDocWithImagesForShare(doc) {
   const working = cloneDocForPack(doc && typeof doc === 'object' ? doc : {});
   let packedImages = 0;
+  let imagesOmitted = 0;
 
   working.slides = await Promise.all((working.slides || []).map(async (slide) => {
     let next = await exportSlideLogo(slide);
-    const hasData = typeof next.bgImage === 'string' && next.bgImage.startsWith('data:');
-    if (!hasData && next.bgImageId) {
+    let dataUrl = typeof next.bgImage === 'string' && next.bgImage.startsWith('data:')
+      ? next.bgImage
+      : null;
+    if (!dataUrl && next.bgImageId) {
       try {
-        const dataUrl = await imagemComoDataUrl(next.bgImageId);
-        if (dataUrl) {
-          next = { ...next, bgImage: dataUrl };
-          packedImages += 1;
-        }
+        dataUrl = await imagemComoDataUrl(next.bgImageId);
       } catch { /* mantém sem imagem */ }
-    } else if (hasData) {
-      packedImages += 1;
+    }
+    if (dataUrl) {
+      const compact = await compactDataUrlForShare(dataUrl);
+      if (compact) {
+        next = { ...next, bgImage: compact };
+        packedImages += 1;
+      } else {
+        next = { ...next, bgImage: null };
+        imagesOmitted += 1;
+      }
     }
     if (typeof next.bgImage === 'string' && next.bgImage.startsWith('blob:')) {
       next = { ...next, bgImage: null };
@@ -79,12 +174,25 @@ export async function packDocWithImagesForShare(doc) {
 
   try {
     working.brand = await exportBrandLogo(working.brand);
+    if (typeof working.brand?.logo === 'string' && working.brand.logo.startsWith('data:')) {
+      const logo = await compactDataUrlForShare(working.brand.logo);
+      working.brand = { ...working.brand, logo };
+    }
   } catch { /* ignore */ }
   try {
     working.styleKit = await exportProjectReferences(working.styleKit);
   } catch { /* ignore */ }
 
-  const clean = stripRuntimeBlobs(working);
+  let clean = stripRuntimeBlobs(working);
+  let serialized = JSON.stringify(clean);
+  if (serialized.length > MAX_SHARE_BODY_CHARS) {
+    const before = countPackedDataImages(clean);
+    clean = stripEmbeddedImages(clean);
+    imagesOmitted += before;
+    packedImages = 0;
+    serialized = JSON.stringify(clean);
+  }
+
   return {
     doc: {
       ...clean,
@@ -93,9 +201,13 @@ export async function packDocWithImagesForShare(doc) {
         syncedAt: Date.now(),
         packedImages,
         includesImages: packedImages > 0,
+        imagesOmitted,
+        payloadChars: serialized.length,
       },
     },
     packedImages,
+    imagesOmitted,
+    payloadChars: serialized.length,
   };
 }
 
@@ -187,52 +299,68 @@ async function shareRequest(payload, { method = 'POST', code } = {}) {
   const url = method === 'GET'
     ? `${SHARE_API}?code=${encodeURIComponent(code || '')}`
     : SHARE_API;
+  const body = method === 'GET' ? undefined : JSON.stringify(payload);
+  if (body && body.length > MAX_SHARE_BODY_CHARS) {
+    throw new Error(
+      'Projeto grande demais para partilhar de uma vez. Remova algumas fotos dos cards e tente de novo.',
+    );
+  }
   let res;
   try {
     res = await fetch(url, {
       method,
       credentials: 'include',
       headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
-      body: method === 'GET' ? undefined : JSON.stringify(payload),
+      body,
     });
   } catch (e) {
     const raw = String(e?.message || e || '');
     if (/failed to fetch|fetch failed|networkerror|load failed/i.test(raw)) {
       throw new Error(
-        'Não foi possível contactar o servidor de partilha. Em local, reinicie o Vite; em produção, confirme o deploy da API.',
+        'Não foi possível partilhar (rede ou projeto demasiado grande com fotos). Tente de novo; se falhar, remova fotos pesadas dos cards.',
       );
     }
     throw e instanceof Error ? e : new Error(raw || 'Falha na partilha.');
   }
-  const data = await res.json().catch(() => ({}));
+  const rawText = await res.text().catch(() => '');
+  let data = {};
+  try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = {}; }
   if (!res.ok) {
+    if (res.status === 413 || /PAYLOAD_TOO_LARGE|Entity Too Large/i.test(rawText)) {
+      throw new Error(
+        'Projeto grande demais para o servidor (fotos). Remova ou regenere imagens mais leves e tente de novo.',
+      );
+    }
+    if (res.status === 401) {
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Faça login pela assinatura para partilhar.');
+    }
     const errMsg = typeof data?.error === 'string'
       ? data.error
-      : (data?.error?.message || `Falha na partilha (${res.status})`);
+      : (data?.error?.message || (rawText && rawText.length < 180 ? rawText.trim() : null) || `Falha na partilha (${res.status})`);
     throw new Error(errMsg);
   }
   return data;
 }
 
 export async function createProjectShare({ doc, name }) {
-  const { doc: packed, packedImages } = await packDocWithImagesForShare(doc);
+  const { doc: packed, packedImages, imagesOmitted } = await packDocWithImagesForShare(doc);
   const res = await shareRequest({
     action: 'create',
     name,
     doc: packed,
   });
-  return { ...res, packedImages };
+  return { ...res, packedImages, imagesOmitted };
 }
 
 export async function pushProjectShare({ code, doc, name }) {
-  const { doc: packed, packedImages } = await packDocWithImagesForShare(doc);
+  const { doc: packed, packedImages, imagesOmitted } = await packDocWithImagesForShare(doc);
   const res = await shareRequest({
     action: 'push',
     code,
     name,
     doc: packed,
   });
-  return { ...res, packedImages };
+  return { ...res, packedImages, imagesOmitted };
 }
 
 export async function joinProjectShare(code) {

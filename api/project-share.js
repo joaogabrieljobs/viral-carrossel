@@ -7,6 +7,9 @@ import {
   makeCode,
 } from './lib/project-share-store.js';
 
+/** Partilhas com fotos embutidas podem demorar a gravar no Blob. */
+export const config = { maxDuration: 60 };
+
 function parseBody(req) {
   if (typeof req.body === 'string') {
     try { return JSON.parse(req.body); } catch { return {}; }

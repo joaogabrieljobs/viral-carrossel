@@ -58,4 +58,19 @@ describe('packDocWithImagesForShare', () => {
     expect(doc.slides[0].bgImage).toBe('data:image/png;base64,AAAA');
     expect(doc.shareMeta.includesImages).toBe(true);
   });
+
+  it('omite fotos se o payload ficar enorme (limite serverless)', async () => {
+    const huge = `data:image/png;base64,${'A'.repeat(2_000_000)}`;
+    const { doc, packedImages, imagesOmitted } = await packDocWithImagesForShare({
+      slides: [
+        { title: 'A', bgImage: huge },
+        { title: 'B', bgImage: huge },
+      ],
+      brand: { name: 'X' },
+    });
+    expect(packedImages).toBe(0);
+    expect(imagesOmitted).toBeGreaterThan(0);
+    expect(doc.slides.every((s) => !s.bgImage)).toBe(true);
+    expect(JSON.stringify(doc).length).toBeLessThan(3_200_000);
+  });
 });

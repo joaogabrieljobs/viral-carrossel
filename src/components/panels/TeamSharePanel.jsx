@@ -149,11 +149,15 @@ export function TeamSharePanel({
               });
               try { await navigator.clipboard.writeText(res.code); } catch { /* ignore */ }
               return res;
-            }, (res) => (
-              res?.packedImages
-                ? `Código copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}. Envie à equipa.`
-                : 'Código criado e copiado. Envie à equipa.'
-            ))}
+            }, (res) => {
+              if (res?.packedImages) {
+                return `Código copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}. Envie à equipa.`;
+              }
+              if (res?.imagesOmitted) {
+                return 'Código criado (só texto — fotos grandes omitidas). Envie à equipa; pode Publicar depois com imagens mais leves.';
+              }
+              return 'Código criado e copiado. Envie à equipa.';
+            })}
             style={{
               minHeight: 44, borderRadius: 9999, border: 'none',
               background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 12,
