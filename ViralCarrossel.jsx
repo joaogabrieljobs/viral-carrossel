@@ -1918,6 +1918,7 @@ export default function App() {
     cancelAllAIGeneration();
     generationRef.current = null;
     setGenProgress(null);
+    slideImgGenIdsRef.current.clear();
     setSlideImgGenBusy({});
     setAnalyzingBrandTone(false);
     setRefining(false);
@@ -2475,6 +2476,11 @@ export default function App() {
       toast('Não foi possível aplicar a foto a este slide.', 'error', 4000);
       return;
     }
+    // Import no card cancela job GPT desse lote (overlay falso bloqueava o toque).
+    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    cancelAllAIGeneration();
+    slideImgGenIdsRef.current.clear();
+    setSlideImgGenBusy({});
     void (async () => {
       try {
         const url = await vcImageFileToStorageDataUrl(file);
@@ -2832,6 +2838,14 @@ export default function App() {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (!files.length) return;
+
+    // Import manual ganha à geração GPT em curso — evita overlay «Gerando…»
+    // em todos os cards e corrida por quota enquanto o utilizador cola fotos.
+    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    cancelAllAIGeneration();
+    slideImgGenIdsRef.current.clear();
+    setSlideImgGenBusy({});
+    setGenProgress(null);
 
     const readOne = async (file) => {
       try {
@@ -5503,6 +5517,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     onCanvasZonePatch={patchCanvasZonesAt}
                     onPhotoZoneRequest={openPhotoZoneImport}
                     onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
+                    generateImageBusy={!!slideImgGenBusy[slide.id]}
                     enableZoneSwapDrag={canvasEditMode}
                     movableElements={!canvasEditMode}
                     onElementOffsetChange={patchElementOffsetAt}
@@ -5805,6 +5820,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         onCanvasZonePatch={patchCanvasZonesAt}
                         onPhotoZoneRequest={openPhotoZoneImport}
                         onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
+                        generateImageBusy={!!slideImgGenBusy[s.id]}
                         enableZoneSwapDrag={canvasEditMode}
                         movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}

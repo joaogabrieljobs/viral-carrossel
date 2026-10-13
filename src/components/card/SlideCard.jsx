@@ -18,6 +18,7 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.onCanvasZonePatch !== next.onCanvasZonePatch) return false;
   if (prev.onPhotoZoneRequest !== next.onPhotoZoneRequest) return false;
   if (prev.onPhotoZoneNativeFile !== next.onPhotoZoneNativeFile) return false;
+  if (prev.generateImageBusy !== next.generateImageBusy) return false;
   if (prev.movableElements !== next.movableElements) return false;
   if (prev.onElementOffsetChange !== next.onElementOffsetChange) return false;
   if (prev.onInlineTextChange !== next.onInlineTextChange) return false;

@@ -574,6 +574,7 @@ const ClassicCanvasInner = React.forwardRef(({
   imgReady,
   imgErr,
   imgLoading,
+  generateImageBusy = false,
   showCanvasChrome,
   onCanvasPatch,
   onPhotoZoneClick,
@@ -587,6 +588,7 @@ const ClassicCanvasInner = React.forwardRef(({
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
 }, ref) => {
+  void imgModeNorm;
   const movOu = React.useCallback(
     (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
     [mov],
@@ -677,11 +679,12 @@ const ClassicCanvasInner = React.forwardRef(({
           }}/>
         )}
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
-        {imgLoading && (
+        {(imgLoading || generateImageBusy) && (
           <div style={{
             position:'absolute', inset:0, zIndex:5,
             background:'rgba(10,9,8,0.92)',
             display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:f.h*0.018,
+            pointerEvents: generateImageBusy ? 'auto' : 'none',
           }}>
             <div style={{
               width:f.w*0.07, height:f.w*0.07,
@@ -691,11 +694,11 @@ const ClassicCanvasInner = React.forwardRef(({
               animation:'spin 0.9s linear infinite',
             }}/>
             <span role="status" style={{ color:'rgba(255,255,255,0.55)', fontSize:f.w*0.026, fontWeight:600, letterSpacing:'-0.011em' }}>
-              Carregando imagem…
+              {generateImageBusy ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
             </span>
           </div>
         )}
-        {(showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !forExport && (
+        {(showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !generateImageBusy && !forExport && (
           <div style={{
             position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
             color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
@@ -1087,6 +1090,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   imgReady,
   imgErr,
   imgLoading,
+  generateImageBusy = false,
   imgModeNorm,
   effectivePresentationFilter,
   bgFit,
@@ -1100,6 +1104,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   /** `(chave, estiloBase) => props` do arrasto livre; vem do SlideCardInner. */
   mov = null,
 }, ref) => {
+  void imgModeNorm;
   const movOu = React.useCallback(
     (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
     [mov],
@@ -1380,11 +1385,12 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
 
-      {imgLoading && (
+      {(generateImageBusy || imgLoading) && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 5,
           background: 'rgba(10,9,8,0.92)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: f.h * 0.018,
+          pointerEvents: generateImageBusy ? 'auto' : 'none',
         }}>
           <div style={{
             width: f.w * 0.07, height: f.w * 0.07,
@@ -1399,9 +1405,9 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             fontWeight: 600,
             letterSpacing: '-0.011em',
           }}>
-            {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
+            {generateImageBusy ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
           </span>
-          {imgModeNorm === 'dalle' && (
+          {generateImageBusy && (
             <span style={{
               color: 'rgba(255,255,255,0.32)',
               fontSize: f.w * 0.02,
@@ -1532,6 +1538,8 @@ const SlideCardInner = React.forwardRef(({
   onPhotoZoneRequest = null,
   /** `(slideIdx, ev) => void` — `<input type=file>` sobre a zona (WebKit/iOS). */
   onPhotoZoneNativeFile = null,
+  /** Job GPT Image a correr neste slide (não confundir com decode/hidratação). */
+  generateImageBusy = false,
   enableZoneSwapDrag = false,
   /** Arrastar elementos soltos (texto, ornamentos) com o ponteiro. */
   movableElements = false,
@@ -1683,9 +1691,14 @@ const SlideCardInner = React.forwardRef(({
 
   // Só há bgImageId (bytes no IndexedDB) — blob ainda a hidratar. Não mostrar
   // «Toque para inserir foto» como se o import tivesse falhado.
+  // NÃO misturar isto com imgLoading: senão todos os cards com ID pendente
+  // mostram «Gerando com GPT Image 2» (normalizeSlideImgMode força dalle) e o
+  // overlay bloqueia o input de import.
   const photoAwaitingHydrate = !!(slide.bgImageId && !slide.bgImage && !slide.bgImageFailed);
-  const imgLoading = (!!slide.bgImage && !imgReady) || photoAwaitingHydrate;
+  const imgLoading = !!(slide.bgImage && !imgReady);
+  const showPhotoSpinner = imgLoading || photoAwaitingHydrate;
   const hasRuntimePhoto = !!(slide.bgImage || slide.bgImageId);
+  const showAiGeneratingOverlay = !!generateImageBusy;
 
   const derivedStoredPresentationFilter = slideStoredPresentationCssFilter(slide);
 
@@ -2221,8 +2234,8 @@ const SlideCardInner = React.forwardRef(({
             onClick={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
             role={sandwichPhotoInteractive && !sandwichPhotoNativeHit ? 'button' : undefined}
           >
-            {sandwich && imgLoading && (
-              <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.2)' }}>
+            {sandwich && (showPhotoSpinner || showAiGeneratingOverlay) && (
+              <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.2)', pointerEvents:'none', zIndex:3 }}>
                 <div style={{
                   width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
                   border:`${f.w*0.005}px solid rgba(255,255,255,0.2)`,
@@ -2438,10 +2451,14 @@ const SlideCardInner = React.forwardRef(({
             fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
           })}>{num}/{total}</div>
         )}
-        {sandwich && imgLoading && (
-          <div style={{
+        {sandwich && (showPhotoSpinner || showAiGeneratingOverlay) && (
+          <div
+            aria-busy="true"
+            aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'A carregar foto'}
+            style={{
             position:'absolute', inset:0, zIndex:6, display:'flex', alignItems:'center', justifyContent:'center',
-            background: cr.solidBgIsLight ? 'rgba(250,250,252,0.92)' : 'rgba(10,10,12,0.88)',
+            background: cr.solidBgIsLight ? 'rgba(250,250,252,0.72)' : 'rgba(10,10,12,0.72)',
+            pointerEvents: 'none',
           }}>
             <div style={{
               width:f.w*0.065, height:f.w*0.065, borderRadius:'50%',
@@ -2530,7 +2547,7 @@ const SlideCardInner = React.forwardRef(({
               paragraphProps={elementsUnlocked ? mov('subtitle') : null}
             />
           </div>
-          {sandwich && imgLoading && !slide.videoId && (
+          {sandwich && showPhotoSpinner && !slide.videoId && (
             <div
               data-vc-photo-zone="1"
               {...movSeparate('photo', {
@@ -2550,7 +2567,7 @@ const SlideCardInner = React.forwardRef(({
               ) : null}
             </div>
           )}
-          {sandwich && !hasRuntimePhoto && !imgLoading && slideHasPendingPhotoIntent(slide) && (
+          {sandwich && !hasRuntimePhoto && !showPhotoSpinner && slideHasPendingPhotoIntent(slide) && (
             <div
               data-vc-photo-zone="1"
               {...movSeparate('photo', {
@@ -2781,7 +2798,8 @@ const SlideCardInner = React.forwardRef(({
         bgScale={bgScale}
         imgReady={imgReady}
         imgErr={imgErr}
-        imgLoading={imgLoading}
+        imgLoading={imgLoading || showPhotoSpinner}
+        generateImageBusy={showAiGeneratingOverlay}
         showCanvasChrome={showCanvasChrome}
         forExport={forExport}
         brandHeaderChrome={cultureRichText ? null : brandHeaderChrome}
@@ -2823,6 +2841,7 @@ const SlideCardInner = React.forwardRef(({
         imgReady={imgReady}
         imgErr={imgErr}
         imgLoading={imgLoading}
+        generateImageBusy={showAiGeneratingOverlay}
         imgModeNorm={imgModeNorm}
         effectivePresentationFilter={effectivePresentationFilter}
         bgFit={bgFit}
@@ -2874,10 +2893,10 @@ const SlideCardInner = React.forwardRef(({
       {/* Sem foto ainda: convite ao toque numa MOLDURA delimitada, acima do bloco
           de texto. Ocupar o card inteiro roubava o ponteiro — clicar em qualquer
           sítio abria o seletor de ficheiros e não se conseguia arrastar o texto. */}
-      {imgLoading && !slide.videoId && !forExport && (
+      {(showPhotoSpinner || showAiGeneratingOverlay) && !slide.videoId && !forExport && (
         <div
           aria-busy="true"
-          aria-label="A carregar foto"
+          aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'A carregar foto'}
           style={{
             position: 'absolute',
             left: '8%',
@@ -2948,12 +2967,13 @@ const SlideCardInner = React.forwardRef(({
 
       {brandHeaderChrome}
 
-      {/* Loading até a URL da imagem terminar de baixar */}
-      {imgLoading && (
+      {/* Só overlay «GPT» com job real; decode de foto não bloqueia o import. */}
+      {(showAiGeneratingOverlay || imgLoading) && (
         <div style={{
           position:'absolute', inset:0, zIndex:5,
           background:'rgba(10,9,8,0.92)',
           display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:f.h*0.018,
+          pointerEvents: showAiGeneratingOverlay ? 'auto' : 'none',
         }}>
           <div style={{
             width:f.w*0.07, height:f.w*0.07,
@@ -2968,9 +2988,9 @@ const SlideCardInner = React.forwardRef(({
             fontWeight:600,
             letterSpacing:'-0.011em',
           }}>
-            {imgModeNorm === 'dalle' ? 'Gerando com GPT Image 2…' : 'Carregando…'}
+            {showAiGeneratingOverlay ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
           </span>
-          {imgModeNorm === 'dalle' && (
+          {showAiGeneratingOverlay && (
           <span style={{
             color:'rgba(255,255,255,0.32)',
             fontSize:f.w*0.02,

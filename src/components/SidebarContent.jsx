@@ -963,34 +963,39 @@ function SidebarContent({
                 const importSub = { fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em', lineHeight:1.35 };
                 const onEnter = e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='var(--accent-surface)'; };
                 const onLeave = e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; };
-                // opacity:0 faz o WebKit/Safari ignorar o <input type=file> no toque.
-                // Alinhar ao card (VC_PHOTO_ZONE_HIT_LAYER_STYLE): quase invisível, clicável.
-                const fileHitStyle = {
+                // htmlFor + input clipado: Safari/WebKit abre o seletor de forma
+                // fiável. Overlay com opacity~0 continua a falhar em alguns iOS.
+                const batchInputId = 'vc-batch-photo-input';
+                const singleInputId = `vc-single-photo-input-${activeIdx}`;
+                const srFileStyle = {
                   position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  margin: 0,
+                  width: 1,
+                  height: 1,
                   padding: 0,
-                  opacity: 0.002,
-                  color: 'transparent',
-                  cursor: 'pointer',
-                  border: 'none',
-                  fontSize: 16,
-                  zIndex: 5,
-                  pointerEvents: 'auto',
-                  display: 'block',
-                  boxSizing: 'border-box',
+                  margin: -1,
+                  overflow: 'hidden',
+                  clip: 'rect(0, 0, 0, 0)',
+                  whiteSpace: 'nowrap',
+                  border: 0,
+                  opacity: 0.01,
                 };
                 return (
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {/*
-                      Input por cima do label (z-index) — recebe o clique directo.
-                      Não usar .click() em input off-screen nem opacity minúscula
-                      com font-size:0 (WebKit ignora o controlo).
-                    */}
+                    <input
+                      id={batchInputId}
+                      type="file"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
+                      multiple
+                      className="vc-batch-photo-input"
+                      aria-label="Importar imagens em lote"
+                      onChange={(e) => {
+                        handleBatchPhotos?.(e);
+                      }}
+                      style={srFileStyle}
+                    />
                     <label
-                      style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
+                      htmlFor={batchInputId}
+                      style={importBtnStyle}
                       onMouseEnter={onEnter}
                       onMouseLeave={onLeave}
                     >
@@ -999,20 +1004,28 @@ function SidebarContent({
                         <span style={importTitle}>Importar em lote</span>
                         <span style={importSub}>1 arquivo = 1 {itemLabel}; cria {itemLabel}s novos se faltar</span>
                       </span>
-                      <input
-                        type="file"
-                        accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
-                        multiple
-                        className="vc-batch-photo-input"
-                        aria-label="Importar imagens em lote"
-                        onChange={(e) => {
-                          handleBatchPhotos?.(e);
-                        }}
-                        style={fileHitStyle}
-                      />
                     </label>
+                    <input
+                      id={singleInputId}
+                      type="file"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
+                      className="vc-single-photo-input"
+                      aria-label={`Importar foto no ${itemLabel} ${activeIdx + 1}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        if (typeof onImportPhotoAt === 'function') {
+                          onImportPhotoAt(activeIdx, file);
+                          return;
+                        }
+                        openPhotoZoneImport?.(activeIdx);
+                      }}
+                      style={srFileStyle}
+                    />
                     <label
-                      style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
+                      htmlFor={singleInputId}
+                      style={importBtnStyle}
                       onMouseEnter={onEnter}
                       onMouseLeave={onLeave}
                     >
@@ -1021,23 +1034,6 @@ function SidebarContent({
                         <span style={importTitle}>Importar foto neste {itemLabel}</span>
                         <span style={importSub}>Substitui só a zona de imagem do {itemLabel} {activeIdx + 1}</span>
                       </span>
-                      <input
-                        type="file"
-                        accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
-                        className="vc-single-photo-input"
-                        aria-label={`Importar foto no ${itemLabel} ${activeIdx + 1}`}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = '';
-                          if (!file) return;
-                          if (typeof onImportPhotoAt === 'function') {
-                            onImportPhotoAt(activeIdx, file);
-                            return;
-                          }
-                          openPhotoZoneImport?.(activeIdx);
-                        }}
-                        style={fileHitStyle}
-                      />
                     </label>
                     <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} aria-label="MP4 / MOV / WebM até 60 MB. Substitui foto se houver." title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
                       <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>
