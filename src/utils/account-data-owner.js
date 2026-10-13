@@ -8,12 +8,30 @@ import { SK } from './storage.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
 
+/** Preferir email (estável). customerId só quando não há email. */
 export function normalizeDataOwnerId(email, customerId) {
-  const id = String(customerId || '').trim();
-  if (id) return `id:${id}`;
   const emailN = String(email || '').trim().toLowerCase();
   if (emailN) return `email:${emailN}`;
+  const id = String(customerId || '').trim();
+  if (id) return `id:${id}`;
   return null;
+}
+
+/** Aliases da mesma conta (id:cus ↔ email:) — evita wipe falso ao migrar formato. */
+export function dataOwnerAliases(email, customerId) {
+  const aliases = new Set();
+  const emailN = String(email || '').trim().toLowerCase();
+  const id = String(customerId || '').trim();
+  if (emailN) aliases.add(`email:${emailN}`);
+  if (id) aliases.add(`id:${id}`);
+  return aliases;
+}
+
+export function isSameDataOwner(prev, next, session = {}) {
+  if (!prev || !next) return false;
+  if (prev === next) return true;
+  const aliases = dataOwnerAliases(session.email, session.customerId);
+  return aliases.has(prev) && aliases.has(next);
 }
 
 export function readDataOwner() {
@@ -38,24 +56,12 @@ export function writeDataOwner(ownerId) {
   } catch { /* quota / privado */ }
 }
 
-function localLibraryLooksOccupied() {
-  try {
-    const raw = localStorage.getItem(SK.library);
-    if (!raw) return false;
-    const lib = JSON.parse(raw);
-    return Array.isArray(lib) && lib.length > 0;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * @param {object} session — resultado de /api/auth/session
- * @param {{ explicitLogin?: boolean }} [opts]
- *   explicitLogin: veio de ?login=google|password ou billing=restored
+ * @param {{ explicitLogin?: boolean }} [opts] — reservado; wipe só em troca real de conta
  * @returns {Promise<'ok' | 'reloading'>}
  */
-export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
+export async function ensureAccountDataOwner(session, { explicitLogin: _explicitLogin = false } = {}) {
   if (typeof localStorage === 'undefined') return 'ok';
   if (!session?.active) return 'ok';
 
@@ -64,34 +70,32 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
 
   const prev = readDataOwner();
 
-  if (prev === next) return 'ok';
-
-  // Conta diferente da que “possui” os dados locais → limpar sempre.
-  const switchedAccount = !!(prev && prev !== next);
-
-  // Login explícito sem dono gravado: os dados podem ser de outra pessoa
-  // (bug clássico ao mudar de Google no mesmo Chrome). Isolar por defeito.
-  const claimAfterBareLogin = explicitLogin && !prev && localLibraryLooksOccupied();
-
-  if (switchedAccount || claimAfterBareLogin) {
-    await clearAccountLocalData();
+  if (!prev) {
+    // 1.ª visita / migração: reclamar sem apagar (não destruir IndexedDB do dono legítimo).
     writeDataOwner(next);
-    const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
-    try {
-      const href = loc?.href || 'https://viralcarrossel.com.br/';
-      const url = new URL(href);
-      url.searchParams.delete('login');
-      url.searchParams.delete('email');
-      url.searchParams.set('app', '1');
-      url.searchParams.set('account_switch', '1');
-      loc?.replace?.(url.pathname + url.search + url.hash);
-    } catch {
-      loc?.replace?.('/?app=1&account_switch=1');
-    }
-    return 'reloading';
+    return 'ok';
   }
 
-  // Migração / 1.ª visita com cookie: reclamar sem apagar.
+  if (isSameDataOwner(prev, next, session)) {
+    // Migrar id:cus → email: se o formato preferido mudou.
+    if (prev !== next) writeDataOwner(next);
+    return 'ok';
+  }
+
+  // Conta diferente da que possui os dados locais → limpar.
+  await clearAccountLocalData();
   writeDataOwner(next);
-  return 'ok';
+  const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
+  try {
+    const href = loc?.href || 'https://viralcarrossel.com.br/';
+    const url = new URL(href);
+    url.searchParams.delete('login');
+    url.searchParams.delete('email');
+    url.searchParams.set('app', '1');
+    url.searchParams.set('account_switch', '1');
+    loc?.replace?.(url.pathname + url.search + url.hash);
+  } catch {
+    loc?.replace?.('/?app=1&account_switch=1');
+  }
+  return 'reloading';
 }

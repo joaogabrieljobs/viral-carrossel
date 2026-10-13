@@ -42,7 +42,9 @@ export function applyBatchPhotosToSlides(slides, imagePayloads, mkSlide, brand, 
               }),
         };
 
-    if (data && typeof data === 'object') {
+    // Só aplica patch com foto real — `{ bgImage: null }` não pode apagar o card.
+    const hasPhoto = !!(data && typeof data === 'object' && (data.bgImage || data.bgImageId));
+    if (hasPhoto) {
       base = {
         ...base,
         ...data,

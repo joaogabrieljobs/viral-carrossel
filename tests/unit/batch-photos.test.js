@@ -28,6 +28,15 @@ describe('applyBatchPhotosToSlides', () => {
   it('mantém slides sobrantes quando há menos fotos', () => {
     const slides = [mkSlide(1), mkSlide(2), mkSlide(3)];
     const next = applyBatchPhotosToSlides(slides, [{ bgImage: 'x', bgImageId: 'idx' }], mkSlide, null);
+    // patch vazio não apaga foto existente
+    const kept = applyBatchPhotosToSlides(
+      [{ title: 'A', bgImage: 'keep', bgImageId: 'k1' }],
+      [{ bgImage: null, bgImageId: null }],
+      mkSlide,
+      null,
+    );
+    expect(kept[0].bgImage).toBe('keep');
+    expect(kept[0].bgImageId).toBe('k1');
     expect(next).toHaveLength(3);
     expect(next[0].bgImage).toBe('x');
     expect(next[1].title).toBe('T2');

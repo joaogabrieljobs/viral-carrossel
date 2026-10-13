@@ -44,6 +44,11 @@ function openDB() {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     };
+  }).catch((err) => {
+    // Falha temporária (ex.: deleteDatabase a meio) não pode deixar o módulo
+    // preso num Promise rejeitado para sempre nesta aba.
+    _dbPromise = null;
+    throw err;
   });
   return _dbPromise;
 }
@@ -100,16 +105,18 @@ export async function imageWipeDatabase() {
     if (_dbPromise) {
       const db = await _dbPromise.catch(() => null);
       try { db?.close(); } catch { /* */ }
-      _dbPromise = null;
     }
   } catch { /* */ }
+  _dbPromise = null;
   if (typeof indexedDB === 'undefined') return;
   await new Promise((resolve) => {
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = () => resolve();
     req.onerror = () => resolve();
+    // blocked: outra aba ainda tem a DB — não ficar à espera eternamente
     req.onblocked = () => resolve();
   });
+  _dbPromise = null;
 }
 
 export async function imageListIds() {

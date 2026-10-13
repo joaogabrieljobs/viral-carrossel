@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DATA_OWNER_KEY,
   ensureAccountDataOwner,
+  isSameDataOwner,
   normalizeDataOwnerId,
   readDataOwner,
   writeDataOwner,
@@ -41,20 +42,40 @@ describe('account-data-owner', () => {
     vi.unstubAllGlobals();
   });
 
-  it('normaliza email e prefere customerId', () => {
+  it('normaliza preferindo email (estável)', () => {
     expect(normalizeDataOwnerId('A@B.com')).toBe('email:a@b.com');
-    expect(normalizeDataOwnerId('a@b.com', 'cus_1')).toBe('id:cus_1');
+    expect(normalizeDataOwnerId('a@b.com', 'cus_1')).toBe('email:a@b.com');
+    expect(normalizeDataOwnerId('', 'cus_1')).toBe('id:cus_1');
+  });
+
+  it('reconhece id:cus e email: da mesma sessão como o mesmo dono', () => {
+    expect(isSameDataOwner('id:cus_1', 'email:a@x.com', {
+      email: 'a@x.com',
+      customerId: 'cus_1',
+    })).toBe(true);
   });
 
   it('na 1ª visita com cookie só grava o dono (não apaga biblioteca)', async () => {
     local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
     const result = await ensureAccountDataOwner(
-      { active: true, email: 'a@x.com' },
+      { active: true, email: 'a@x.com', customerId: 'cus_1' },
       { explicitLogin: false },
     );
     expect(result).toBe('ok');
     expect(readDataOwner()).toBe('email:a@x.com');
     expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
+  });
+
+  it('login explícito sem dono NÃO apaga biblioteca (migração segura)', async () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'orphan' }]));
+    const result = await ensureAccountDataOwner(
+      { active: true, email: 'novo@z.com' },
+      { explicitLogin: true },
+    );
+    expect(result).toBe('ok');
+    expect(local.getItem(SK.library)).not.toBeNull();
+    expect(readDataOwner()).toBe('email:novo@z.com');
     expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
@@ -75,15 +96,16 @@ describe('account-data-owner', () => {
     expect(globalThis.location.replace).toHaveBeenCalled();
   });
 
-  it('login explícito sem dono + biblioteca ocupada isola (limpa)', async () => {
-    local.setItem(SK.library, JSON.stringify([{ id: 'orphan' }]));
+  it('migra id:cus → email: sem limpar dados', async () => {
+    writeDataOwner('id:cus_1');
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
     const result = await ensureAccountDataOwner(
-      { active: true, email: 'novo@z.com' },
-      { explicitLogin: true },
+      { active: true, email: 'a@x.com', customerId: 'cus_1' },
     );
-    expect(result).toBe('reloading');
-    expect(local.getItem(SK.library)).toBeNull();
-    expect(readDataOwner()).toBe('email:novo@z.com');
+    expect(result).toBe('ok');
+    expect(readDataOwner()).toBe('email:a@x.com');
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
   it('exporta a mesma chave que o clear remove', () => {

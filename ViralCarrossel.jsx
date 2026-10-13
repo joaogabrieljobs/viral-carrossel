@@ -2475,24 +2475,40 @@ export default function App() {
       toast('Não foi possível aplicar a foto a este slide.', 'error', 4000);
       return;
     }
-    void vcImageFileToStorageDataUrl(file).then((url) => {
-      if (typeof url !== 'string' || url.length < 32) {
-        toast('Não foi possível processar a imagem. Tente JPEG ou PNG.', 'error', 4500);
-        return;
-      }
-      if (!url.startsWith('data:')) {
-        toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
-        return;
-      }
-      void guardarImagemDoSlide(url).then((patch) => {
+    void (async () => {
+      try {
+        const url = await vcImageFileToStorageDataUrl(file);
+        if (typeof url !== 'string' || url.length < 32) {
+          toast('Não foi possível processar a imagem. Tente JPEG ou PNG.', 'error', 4500);
+          return;
+        }
+        if (!url.startsWith('data:')) {
+          toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
+          return;
+        }
+        let patch;
+        try {
+          patch = await guardarImagemDoSlide(url);
+        } catch (err) {
+          console.warn('[foto] IndexedDB falhou, usando memória', err);
+          patch = { bgImage: url, bgImageId: null };
+        }
+        if (!patch?.bgImage && !patch?.bgImageId) {
+          toast('Não foi possível guardar a imagem.', 'error', 4500);
+          return;
+        }
         updateSlideAt(sIdx, {
           ...patch,
           bgImageSource: 'imported',
           bgImageFailed: false,
           bgImageError: null,
         });
-      });
-    });
+        toast('Foto importada.', 'success', 2500);
+      } catch (err) {
+        console.error('[foto]', err);
+        toast(err?.message || 'Falha ao importar a foto.', 'error', 5000);
+      }
+    })();
   }, [updateSlideAt, toast]);
 
   const handlePhotoZoneNativeFile = useCallback((slideIdx, e) => {
@@ -2814,39 +2830,60 @@ export default function App() {
     e.target.value = '';
     if (!files.length) return;
 
-    const readOne = (file) =>
-      vcImageFileToStorageDataUrl(file).then((url) =>
-        typeof url === 'string' && url.length >= 32 ? url : null,
-      );
+    const readOne = async (file) => {
+      try {
+        const url = await vcImageFileToStorageDataUrl(file);
+        return typeof url === 'string' && url.length >= 32 ? url : null;
+      } catch {
+        return null;
+      }
+    };
 
     void (async () => {
-      const lidas = await Promise.all(files.map(readOne));
-      // Cada foto vai para o IndexedDB antes de entrar no documento: o patch traz
-      // `bgImageId` (persistido) e `bgImage` (object URL de runtime).
-      const urls = await Promise.all(lidas.map((u) => (u ? guardarImagemDoSlide(u) : null)));
-      const beforeCount = slidesLiveRef.current.length;
-      const isPresentation = activeProductKind === 'apresentacao';
-      const validCount = urls.filter(Boolean).length;
+      toast(`A importar ${files.length} imagem${files.length === 1 ? '' : 'ns'}…`, 'info', 2500);
+      try {
+        const lidas = await Promise.all(files.map(readOne));
+        // Cada foto vai para o IndexedDB; fallback em memória se a DB falhar.
+        const urls = await Promise.all(lidas.map(async (u) => {
+          if (!u) return null;
+          try {
+            const patch = await guardarImagemDoSlide(u);
+            if (patch?.bgImage || patch?.bgImageId) return patch;
+            return null;
+          } catch (err) {
+            console.warn('[batch-photos] guardar falhou', err);
+            return { bgImage: u, bgImageId: null };
+          }
+        }));
+        const beforeCount = slidesLiveRef.current.length;
+        const isPresentation = activeProductKind === 'apresentacao';
+        const validCount = urls.filter((p) => p && (p.bgImage || p.bgImageId)).length;
 
-      setSlides((prev) => applyBatchPhotosToSlides(
-        prev,
-        urls,
-        mkSlide,
-        brand,
-        { isPresentation },
-      ));
+        if (validCount > 0) {
+          setSlides((prev) => applyBatchPhotosToSlides(
+            prev,
+            urls,
+            mkSlide,
+            brand,
+            { isPresentation },
+          ));
+        }
 
-      const created = Math.max(0, validCount - beforeCount);
-      const leftoverSlides = Math.max(0, beforeCount - validCount);
-      const skippedNulls = urls.length - validCount;
-      const summary = summarizeBatchPhotoImport({
-        applied: validCount,
-        created,
-        leftoverSlides,
-        skippedNulls,
-      });
-      toast(summary.message, summary.tone);
-      if (validCount > 0) setActiveIdx(0);
+        const created = Math.max(0, validCount - beforeCount);
+        const leftoverSlides = Math.max(0, beforeCount - validCount);
+        const skippedNulls = urls.length - validCount;
+        const summary = summarizeBatchPhotoImport({
+          applied: validCount,
+          created,
+          leftoverSlides,
+          skippedNulls,
+        });
+        toast(summary.message, summary.tone);
+        if (validCount > 0) setActiveIdx(0);
+      } catch (err) {
+        console.error('[batch-photos]', err);
+        toast(err?.message || 'Falha ao importar imagens. Tente JPEG ou PNG e recarregue a página.', 'error', 6000);
+      }
     })();
   }, [activeProductKind, brand, setSlides, toast]);
 
