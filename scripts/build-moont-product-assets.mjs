@@ -274,7 +274,116 @@ try {
       presentationVisualRole: roles[index],
       bgImage: images[index],
     }));
-    return { carousel, presentation };
+
+    const workflowRoles = ['context', 'content', 'contrast', 'data', 'demo', 'decision'];
+    const workflowTitles = [
+      'A IDEIA.\nNÃO TERMINA\nNO POST.',
+      'O CÓDIGO\nCONTINUA.',
+      'MUDE A FORMA. SEGURE O CÓDIGO.',
+      '3 SINAIS. 1 MARCA.',
+      'PRODUTO, PESSOA, PROPÓSITO.',
+      'PARE DE RECOMEÇAR.',
+    ];
+    const workflowSubtitles = [
+      'DO POST AO DECK',
+      'COR · FORMA · CONTRASTE',
+      'Carrossel, apresentação e story variam sem perder a direção.',
+      'Contraste. Consistência. Presença.',
+      'O sistema visual liga cada ponto da campanha.',
+      'Transforme o próximo brief em uma direção que continua.',
+    ];
+    const workflowImages = [
+      '/landing/moont-v3/source/01-founder-editorial.webp',
+      '/landing/moont-v3/source/03-product-still-life.webp',
+      '/landing/moont-v3/carousel-source/01-product-codes.webp',
+      null,
+      '/landing/moont-v3/carousel-source/03-creator-campaign.webp',
+      '/landing/moont-v3/carousel-source/02-founder-presence.webp',
+    ];
+    const workflowRawSlides = workflowTitles.map((title, index) => ({
+      ...mkSlide(index + 1, DEFAULT_BRAND),
+      id: `capture-workflow-${index + 1}`,
+      title,
+      subtitle: workflowSubtitles[index],
+      bgImage: workflowImages[index],
+      imageQuery: workflowImages[index] ? `brand campaign system ${workflowRoles[index]}` : '',
+    }));
+    let workflowPresentation = applyPresentationVisualPresetToDoc({
+      ...DEFAULT_DOC,
+      presentationPath: 'pitch',
+      quickCardCount: 6,
+      slides: workflowRawSlides,
+      caption: 'Direção que continua — deck de campanha Moont.',
+    }, 'presentation_typographic_bold', undefined, { initialize: true });
+    workflowPresentation.brand = {
+      ...workflowPresentation.brand,
+      name: 'Moont',
+      bg: '#f4f1e9',
+      bgAlternate: '#173cbd',
+      interleaveBg: false,
+      titleColor: '#111118',
+      subtitleColor: '#5148dd',
+      textColor: '#47444d',
+      accent: '#d7ff5a',
+      titleFont: 'var(--font-display)',
+      subtitleFont: 'var(--font-ui)',
+      bodyFont: 'var(--font-ui)',
+      textTitleWeight: 820,
+      textTitleCase: 'upper',
+      textTitleTracking: -4,
+      subtitleWeight: 760,
+      subtitleCase: 'upper',
+      textSubTracking: 10,
+    };
+    workflowPresentation.slides = workflowPresentation.slides.map((slide, index) => {
+      const presetOverrides = getPresentationCompositionOverrides('presentation_typographic_bold', {
+        slide,
+        stage: { visualRole: workflowRoles[index] },
+        index,
+        count: 6,
+      });
+      const canvas = index <= 1
+        ? {
+            ...presetOverrides.canvas,
+            zones: {
+              photo: { x: 0, y: 0, w: 100, h: 100 },
+              title: { x: 5, y: 19, w: index === 0 ? 44 : 52, h: 68 },
+              subtitle: { x: 5, y: 8, w: 46, h: 8 },
+            },
+          }
+        : presetOverrides.canvas;
+      const titleAccent = index === 0 ? 'POST.' : index === 1 ? 'CONTINUA.' : '';
+      const accentStart = titleAccent ? workflowTitles[index].indexOf(titleAccent) : -1;
+      return {
+        ...slide,
+        ...presetOverrides,
+        canvas,
+        customBg: index <= 1 ? '#07152f' : '#f4f1e9',
+        presentationStageId: workflowRoles[index],
+        presentationStageLabel: workflowRoles[index].toUpperCase(),
+        presentationVisualRole: workflowRoles[index],
+        presentationTypographyByComposition: {},
+        presentationTitleSizeByComposition: {},
+        presentationTitleLeadingByComposition: {},
+        bgImage: workflowImages[index],
+        bgX: index === 0 ? 50 : 50,
+        bgY: index === 0 ? 10 : 50,
+        overlay: index <= 1 ? 42 : presetOverrides.overlay,
+        titleSize: index === 0 ? 144 : index === 1 ? 116 : 78,
+        titleWeight: 820,
+        titleTracking: -4,
+        titleLeading: index === 0 ? 86 : 94,
+        titleCase: 'upper',
+        subSize: index <= 1 ? 42 : 52,
+        subTracking: index <= 1 ? 10 : 1,
+        subLeading: 122,
+        textShadow: index > 1,
+        destaqueSpans: accentStart >= 0
+          ? { ...(slide.destaqueSpans || {}), title: [[accentStart, accentStart + titleAccent.length]] }
+          : slide.destaqueSpans,
+      };
+    });
+    return { carousel, presentation, workflowPresentation };
   });
   await setupPage.close();
 
@@ -353,12 +462,13 @@ try {
     filename: '03-interface-mobile',
   });
   await captureProduct({
-    doc: docs.presentation,
+    doc: docs.workflowPresentation,
     id: 'moont-workflow-demo',
-    name: 'Atlas da atenção',
+    name: 'Direção que continua',
     viewport: { width: 1600, height: 1000 },
     selectedIndex: 0,
-    filename: '04-interface-workflow-desktop',
+    clip: { x: 0, y: 0, width: 1420, height: 700 },
+    filename: '04-interface-workflow-desktop-v2',
   });
   await captureProduct({
     doc: docs.carousel,

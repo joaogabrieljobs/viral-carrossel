@@ -31,7 +31,7 @@ Esta direção fica preservada como alternativa de fotografia de produto no banc
 - `public/landing/moont-v3/product/01-interface-comunica-desktop.webp` — captura real do Studio com seis cards variados.
 - `public/landing/moont-v3/product/02-interface-apresenta-desktop.webp` — captura real do Studio com seis composições de apresentação.
 - `public/landing/moont-v3/product/03-interface-mobile.webp` — captura real do editor móvel em 780 × 1688, exibida em 390 × 844 CSS para telas Retina.
-- `public/landing/moont-v3/product/04-interface-workflow-desktop.webp` — captura real da abertura de um projeto de apresentação usada na seção de processo.
+- `public/landing/moont-v3/product/04-interface-workflow-desktop-v2.webp` — recorte 1420 × 700 do deck “Direção que continua”. A capa usa o retrato editorial em tela cheia, a área azul natural da fotografia como campo tipográfico e lettering grande com acento lima. O enquadramento privilegia o slide selecionado e mantém apenas uma faixa do próximo para comunicar sequência. O nome versionado evita a permanência da antiga capa escura em cache.
 - `public/landing/moont-v3/product/05-interface-responsive-mobile.webp` — o mesmo projeto de carrossel da captura desktop, aberto no editor móvel.
 - `public/landing/moont-v3/product/06-interface-hero-desktop.webp` — recorte 1140 × 610 do quadro da campanha de beleza, com três cards completos que complementam o detalhe exibido no mobile.
 

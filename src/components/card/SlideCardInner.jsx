@@ -729,6 +729,7 @@ const ClassicCanvasInner = React.forwardRef(({
           margin: 0,
           overflowWrap: 'break-word',
           wordBreak: 'normal',
+          whiteSpace: 'pre-line',
           textWrap: 'balance',
           maxWidth: '100%',
           width: '100%',

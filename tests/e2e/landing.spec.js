@@ -192,7 +192,7 @@ test.describe('Landing (RF-01)', () => {
     const expectedProduct = [
       '/landing/moont-v3/product/01-interface-comunica-desktop.webp',
       '/landing/moont-v3/product/03-interface-mobile.webp',
-      '/landing/moont-v3/product/04-interface-workflow-desktop.webp',
+      '/landing/moont-v3/product/04-interface-workflow-desktop-v2.webp',
       '/landing/moont-v3/product/05-interface-responsive-mobile.webp',
       '/landing/moont-v3/product/06-interface-hero-desktop.webp',
     ];

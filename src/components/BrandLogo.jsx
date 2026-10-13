@@ -101,7 +101,26 @@ export default function BrandLogo({
         m
       </text>
 
-      <g fill="none" strokeWidth="5.5" strokeLinecap="round">
+      <g fill="none" stroke="currentColor" strokeWidth="8.5" strokeLinecap="round" opacity="0.92">
+        <rect
+          x="58"
+          y="12.5"
+          width="38"
+          height="42"
+          rx="19"
+          transform="rotate(-7 77 33.5)"
+        />
+        <rect
+          x="93"
+          y="12.5"
+          width="38"
+          height="42"
+          rx="19"
+          transform="rotate(7 112 33.5)"
+        />
+      </g>
+
+      <g fill="none" strokeWidth="4.5" strokeLinecap="round">
         <rect
           x="58"
           y="12.5"

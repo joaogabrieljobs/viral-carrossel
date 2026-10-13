@@ -552,7 +552,7 @@
   .moont-lp-header__inner { min-height: 66px; }
   .moont-lp-header__cta { display: none; }
   .moont-lp-login { min-width: 56px; padding-right: 0; }
-  .moont-lp-logo svg { height: 27px !important; }
+  .moont-lp-logo svg { height: 31px !important; }
   .moont-lp-hero { padding: 52px 0 76px; background: var(--lp-paper); }
   .moont-lp-hero__inner { gap: 48px; }
   .moont-lp-hero__copy,
