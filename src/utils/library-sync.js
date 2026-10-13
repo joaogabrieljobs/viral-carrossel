@@ -285,28 +285,42 @@ export async function fetchLibraryCloudStatus() {
   return syncRequest({ action: 'status' });
 }
 
-async function uploadAssets(assets, remoteAssetIds = []) {
+/** Upload de fotos — best-effort. Nunca bloqueia o save da estrutura do projeto. */
+async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
   const remote = new Set(remoteAssetIds || []);
   let uploaded = 0;
   let skipped = 0;
-  for (const [assetId, dataUrl] of assets.entries()) {
-    if (remote.has(assetId)) {
-      skipped += 1;
-      continue;
-    }
-    await syncRequest({
-      action: 'putAsset',
-      assetId,
-      dataUrl,
-      contentType: dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-    });
-    uploaded += 1;
+  let failed = 0;
+  const entries = [...assets.entries()];
+  // Paralelo limitado — evita timeout / rate-limit do serverless.
+  const concurrency = 3;
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const chunk = entries.slice(i, i + concurrency);
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(chunk.map(async ([assetId, dataUrl]) => {
+      if (remote.has(assetId)) {
+        skipped += 1;
+        return;
+      }
+      try {
+        await syncRequest({
+          action: 'putAsset',
+          assetId,
+          dataUrl,
+          contentType: dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        });
+        uploaded += 1;
+      } catch {
+        failed += 1;
+      }
+    }));
   }
-  return { uploaded, skipped };
+  return { uploaded, skipped, failed };
 }
 
 /**
  * Envia biblioteca local → nuvem.
+ * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
  * @param {{ force?: boolean }} [opts]
  */
 export async function pushLibraryToCloud(opts = {}) {
@@ -317,8 +331,7 @@ export async function pushLibraryToCloud(opts = {}) {
     return { ok: true, empty: true, skipped: true, revision: localMeta?.revision || 0 };
   }
 
-  await uploadAssets(assets, status?.meta?.assetIds || []);
-
+  // 1) Estrutura primeiro — garante que o projeto não «some» mesmo se fotos falharem.
   const baseRevision = opts.force
     ? undefined
     : (localMeta?.revision ?? status?.meta?.revision);
@@ -331,7 +344,7 @@ export async function pushLibraryToCloud(opts = {}) {
       force: opts.force === true,
     });
   } catch (e) {
-    if (e?.code === 'library_conflict' && opts.force !== false) {
+    if (e?.code === 'library_conflict') {
       result = await syncRequest({
         action: 'push',
         manifest,
@@ -341,6 +354,11 @@ export async function pushLibraryToCloud(opts = {}) {
       throw e;
     }
   }
+
+  // 2) Fotos depois (não falha o save).
+  const assetStats = assets.size
+    ? await uploadAssetsBestEffort(assets, status?.meta?.assetIds || [])
+    : { uploaded: 0, skipped: 0, failed: 0 };
 
   writeCloudMeta({
     revision: result.revision,
@@ -355,6 +373,8 @@ export async function pushLibraryToCloud(opts = {}) {
     updatedAt: result.updatedAt,
     projectCount: result.projectCount,
     assetCount: assets.size,
+    assetsUploaded: assetStats.uploaded,
+    assetsFailed: assetStats.failed,
   };
 }
 

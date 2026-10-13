@@ -6,6 +6,7 @@ import {
   putLibraryAsset,
   getLibraryAsset,
   resetLibrarySyncStoreForTests,
+  resolveLibraryOwnerId,
 } from '../../api/lib/library-sync-store.js';
 
 describe('library-sync-store', () => {
@@ -72,5 +73,11 @@ describe('library-sync-store', () => {
 
     const meta = await getLibrarySyncMeta('cus_missing');
     expect(meta).toBeNull();
+  });
+
+  it('resolveLibraryOwnerId prefere customerId e cai para email', () => {
+    expect(resolveLibraryOwnerId({ customerId: 'cus_abc', email: 'a@b.com' })).toBe('cus_abc');
+    expect(resolveLibraryOwnerId({ email: 'A@B.com' })).toBe('em_a_b_com');
+    expect(resolveLibraryOwnerId({ billingDisabled: true })).toBe('billing-disabled');
   });
 });

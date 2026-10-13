@@ -66,8 +66,22 @@ async function upstash(command) {
 function sanitizeCustomerId(customerId) {
   const id = String(customerId || '').trim();
   if (!id || id.length > 80) return '';
-  if (!/^[a-zA-Z0-9_-]+$/.test(id)) return '';
+  // Stripe cus_… ou fallback em_email
+  if (!/^[a-zA-Z0-9_.-]+$/.test(id)) return '';
   return id;
+}
+
+/** Chave estável por conta: customerId Stripe, senão email sanitizado. */
+export function resolveLibraryOwnerId(access = {}) {
+  const cus = sanitizeCustomerId(access.customerId);
+  if (cus) return cus;
+  const email = String(access.email || '').trim().toLowerCase();
+  if (email) {
+    const slug = email.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').slice(0, 60);
+    if (slug) return sanitizeCustomerId(`em_${slug}`);
+  }
+  if (access.billingDisabled) return 'billing-disabled';
+  return '';
 }
 
 function sanitizeAssetId(assetId) {
@@ -85,6 +99,12 @@ function assetPath(customerId, assetId) {
   return `${BLOB_PREFIX}${customerId}/assets/${assetId}`;
 }
 
+function blobAuthOpts() {
+  // Token estático: fallback fiável quando OIDC do store falha ou não está ligado.
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  return token ? { token } : {};
+}
+
 async function putBlobPrivate(pathname, body, contentType = 'application/json') {
   const signal = AbortSignal.timeout(45_000);
   await put(pathname, body, {
@@ -94,11 +114,12 @@ async function putBlobPrivate(pathname, body, contentType = 'application/json') 
     contentType,
     cacheControlMaxAge: 60,
     abortSignal: signal,
+    ...blobAuthOpts(),
   });
 }
 
 async function readBlobPrivate(pathname) {
-  const result = await get(pathname, { access: 'private', useCache: false });
+  const result = await get(pathname, { access: 'private', useCache: false, ...blobAuthOpts() });
   if (!result?.stream) return null;
   const chunks = [];
   const reader = result.stream.getReader();

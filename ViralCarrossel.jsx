@@ -1330,6 +1330,13 @@ export default function App() {
   const salvarProjeto = useCallback(async () => {
     const lib = flushPersistNow();
     setLibrary(lib);
+    // Cofre local imediato — sobrevive a logout mesmo se a nuvem falhar.
+    try {
+      const { readDataOwner } = await import('./src/utils/account-data-owner.js');
+      const { snapshotAccountVault } = await import('./src/utils/account-vault.js');
+      const owner = readDataOwner();
+      if (owner) snapshotAccountVault(owner);
+    } catch { /* */ }
     try {
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
       const result = await pushLibraryToCloud({ force: true });
@@ -1337,16 +1344,24 @@ export default function App() {
         toast('Projeto salvo neste navegador.', 'success', 2200);
         return;
       }
-      toast('Projeto salvo na sua conta (nuvem).', 'success', 3200);
+      if (result?.assetsFailed > 0) {
+        toast(
+          `Salvo na conta (${result.projectCount} projeto(s)). ${result.assetsFailed} foto(s) ainda só neste navegador.`,
+          'warning',
+          5500,
+        );
+      } else {
+        toast('Projeto salvo na sua conta (nuvem).', 'success', 3200);
+      }
       trackEvent('library_cloud_push', {
         project_count: String(result.projectCount || 0),
         source: 'salvar',
       });
-    } catch {
+    } catch (e) {
       toast(
-        'Salvo neste navegador. A nuvem falhou — use «Sync na nuvem» na home.',
+        `Salvo neste navegador e no cofre. Nuvem: ${String(e?.message || 'falhou').slice(0, 120)}`,
         'warning',
-        5000,
+        6500,
       );
     }
   }, [flushPersistNow, setLibrary, toast]);
@@ -1630,25 +1645,28 @@ export default function App() {
   // Modal de boas-vindas dos 3 modos — só na 1.ª visita da conta (nunca a cada geração).
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
   const modesIntroScheduledRef = useRef(false);
+  const bootLibraryCountRef = useRef(null);
+  if (bootLibraryCountRef.current === null) {
+    bootLibraryCountRef.current = library.length;
+  }
   useEffect(() => {
     if (typeof window === 'undefined' || landingOpen) return undefined;
-    // Conta com projetos = já passou do onboarding inicial.
-    if (library.length > 0) {
-      try {
+    try {
+      if (localStorage.getItem(SK.modesIntro)) return undefined;
+      // Conta que já tinha projetos no boot (reentrada) — sem modal.
+      if ((bootLibraryCountRef.current || 0) > 0) {
         localStorage.setItem(SK.modesIntro, '1');
         localStorage.setItem(SK.onboarding, '1');
-      } catch { /* */ }
-      return undefined;
-    }
-    try {
-      if (!localStorage.getItem(SK.modesIntro) && !modesIntroScheduledRef.current) {
+        return undefined;
+      }
+      if (!modesIntroScheduledRef.current) {
         modesIntroScheduledRef.current = true;
         const t = window.setTimeout(() => setModesIntroOpen(true), 600);
         return () => window.clearTimeout(t);
       }
     } catch { /* */ }
     return undefined;
-  }, [landingOpen, library.length]);
+  }, [landingOpen]);
   // Identidade estável: como props inline, entravam nas deps do layout effect do
   // tour e realimentavam o ciclo render → effect → setState → render (React #185).
   const tourEnterEditor = useCallback(() => setShellView('project'), [setShellView]);
@@ -2082,9 +2100,11 @@ export default function App() {
     if (typeof window === 'undefined' || landingOpen || modesIntroOpen) return undefined;
     if (isDefault(slides)) return undefined;
     try {
-      // Já tem histórico nesta conta → nunca reabrir automaticamente.
-      if (library.length > 1 || localStorage.getItem(SK.onboarding)) {
-        try { localStorage.setItem(SK.onboarding, '1'); } catch { /* */ }
+      if (localStorage.getItem(SK.onboarding)) return undefined;
+      // Reentrada com biblioteca já existente no boot → não interromper.
+      if ((bootLibraryCountRef.current || 0) > 0) {
+        localStorage.setItem(SK.onboarding, '1');
+        localStorage.setItem(SK.modesIntro, '1');
         return undefined;
       }
       if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
@@ -2094,7 +2114,7 @@ export default function App() {
       return () => window.clearTimeout(t);
     } catch { /* ignore */ }
     return undefined;
-  }, [landingOpen, modesIntroOpen, slides, library.length, tourOpen]);
+  }, [landingOpen, modesIntroOpen, slides, tourOpen]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);

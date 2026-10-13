@@ -112,7 +112,7 @@ describe('account-data-owner', () => {
     expect(JSON.parse(vault['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
   });
 
-  it('mesma conta com biblioteca vazia restaura do cofre', async () => {
+  it('mesma conta com biblioteca vazia restaura do cofre e recarrega', async () => {
     writeDataOwner('email:a@x.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
     snapshotAccountVault('email:a@x.com');
@@ -122,8 +122,9 @@ describe('account-data-owner', () => {
       { active: true, email: 'a@x.com' },
       { explicitLogin: false },
     );
-    expect(result).toBe('ok');
+    expect(result).toBe('reloading');
     expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('p1');
+    expect(globalThis.location.replace).toHaveBeenCalled();
   });
 
   it('migra id:cus → email: sem limpar dados', async () => {

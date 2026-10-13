@@ -12,7 +12,7 @@ import {
   putLibraryManifest,
   putLibraryAsset,
   getLibraryAsset,
-  sanitizeCustomerId,
+  resolveLibraryOwnerId,
 } from './lib/library-sync-store.js';
 
 export const config = { maxDuration: 60 };
@@ -25,10 +25,7 @@ function parseBody(req) {
 }
 
 function ownerId(access) {
-  if (access?.billingDisabled) {
-    return sanitizeCustomerId(access.customerId) || 'billing-disabled';
-  }
-  return sanitizeCustomerId(access?.customerId);
+  return resolveLibraryOwnerId(access || {});
 }
 
 function mapStoreError(e) {

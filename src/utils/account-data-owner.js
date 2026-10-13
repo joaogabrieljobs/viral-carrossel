@@ -108,9 +108,13 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
       reloadAccountSwitch();
       return 'reloading';
     }
-    // Boot silencioso: reclamar biblioteca actual; se vazia, tentar cofre.
+    // Boot silencioso: reclamar biblioteca actual; se vazia, restaurar cofre + reload
+    // (senão o React fica com state vazio e a UI parece «apagada»).
     writeDataOwner(next);
-    if (!libraryLooksOccupied()) restoreAccountVault(next);
+    if (!libraryLooksOccupied() && restoreAccountVault(next)) {
+      reloadAccountSwitch();
+      return 'reloading';
+    }
     return 'ok';
   }
 
@@ -121,9 +125,10 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
       writeDataOwner(next);
       snapshotAccountVault(next);
     }
-    // Biblioteca vazia mas cofre tem dados (logout anterior) → restaurar.
-    if (!libraryLooksOccupied()) {
-      restoreAccountVault(next);
+    // Biblioteca vazia mas cofre tem dados (logout anterior) → restaurar + reload.
+    if (!libraryLooksOccupied() && restoreAccountVault(next)) {
+      reloadAccountSwitch();
+      return 'reloading';
     }
     return 'ok';
   }
