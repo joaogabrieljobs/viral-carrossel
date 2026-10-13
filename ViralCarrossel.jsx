@@ -4593,6 +4593,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     removeCanvasLayout,
     patchCanvasZonesAt,
     openPhotoZoneImport,
+    onImportPhotoAt: consumePhotoZoneFileForSlide,
     handleBatchPhotos,
     batchPhotoInputRef,
     enableCanvasLayout,

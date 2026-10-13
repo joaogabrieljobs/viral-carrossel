@@ -269,6 +269,8 @@ function SidebarContent({
   removeCanvasLayout = () => {},
   patchCanvasZonesAt = () => {},
   openPhotoZoneImport = () => {},
+  /** (slideIdx, File) — import directo sem .click() em input escondido */
+  onImportPhotoAt = null,
   handleBatchPhotos = () => {},
   batchPhotoInputRef = { current: null },
   enableCanvasLayout = () => {},
@@ -961,29 +963,75 @@ function SidebarContent({
                 const importSub = { fontSize:10, color:'var(--text-muted)', letterSpacing:'-0.005em', lineHeight:1.35 };
                 const onEnter = e => { e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='var(--accent-surface)'; };
                 const onLeave = e => { e.currentTarget.style.borderColor='var(--hairline)'; e.currentTarget.style.background='var(--bg-card)'; };
+                const fileHitStyle = {
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  margin: 0,
+                  padding: 0,
+                  opacity: 0.01,
+                  cursor: 'pointer',
+                  border: 'none',
+                  fontSize: 0,
+                  color: 'transparent',
+                };
                 return (
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    <button type="button" onClick={() => {
-                      const el = batchPhotoInputRef?.current;
-                      if (!el) {
-                        toast?.('Seletor de ficheiros indisponível. Recarregue a página (Cmd+R).', 'error', 5000);
-                        return;
-                      }
-                      el.click();
-                    }} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                    {/*
+                      Input nativo DENTRO do botão — não depende de .click() em
+                      input off-screen (Safari/Chrome/Electron bloqueiam com frequência).
+                    */}
+                    <label
+                      style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
+                      onMouseEnter={onEnter}
+                      onMouseLeave={onLeave}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="vc-batch-photo-input"
+                        aria-label="Importar imagens em lote"
+                        onChange={(e) => {
+                          handleBatchPhotos?.(e);
+                        }}
+                        style={fileHitStyle}
+                      />
                       <span style={importIconWrap} aria-hidden><Upload size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar em lote</span>
                         <span style={importSub}>1 arquivo = 1 {itemLabel}; cria {itemLabel}s novos se faltar</span>
                       </span>
-                    </button>
-                    <button type="button" onClick={() => openPhotoZoneImport?.(activeIdx)} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                    </label>
+                    <label
+                      style={{ ...importBtnStyle, position: 'relative', overflow: 'hidden' }}
+                      onMouseEnter={onEnter}
+                      onMouseLeave={onLeave}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="vc-single-photo-input"
+                        aria-label={`Importar foto no ${itemLabel} ${activeIdx + 1}`}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          if (typeof onImportPhotoAt === 'function') {
+                            onImportPhotoAt(activeIdx, file);
+                            return;
+                          }
+                          openPhotoZoneImport?.(activeIdx);
+                        }}
+                        style={fileHitStyle}
+                      />
                       <span style={importIconWrap} aria-hidden><ImageIcon size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>
                         <span style={importTitle}>Importar foto neste {itemLabel}</span>
                         <span style={importSub}>Substitui só a zona de imagem do {itemLabel} {activeIdx + 1}</span>
                       </span>
-                    </button>
+                    </label>
                     <button type="button" onClick={() => onPickVideo?.()} style={importBtnStyle} onMouseEnter={onEnter} onMouseLeave={onLeave} aria-label="MP4 / MOV / WebM até 60 MB. Substitui foto se houver." title="MP4 / MOV / WebM até 60 MB. Substitui foto se houver.">
                       <span style={importIconWrap} aria-hidden><Video size={14} strokeWidth={2.25}/></span>
                       <span style={importTextWrap}>

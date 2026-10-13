@@ -17,13 +17,7 @@
     <meta property="og:url" content="https://viralcarrossel.com.br/" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
-    <script>
-      if (window.location.pathname !== '/redefinir-senha') {
-        var tailwind = document.createElement('script');
-        tailwind.src = 'https://cdn.tailwindcss.com';
-        document.head.appendChild(tailwind);
-      }
-    </script>
+    <!-- Tailwind CDN removido: CSP bloqueia cdn.tailwindcss.com; a UI usa GLOBAL_STYLE. -->
     <!-- Analytics: Plausible (privacy-first, sem cookies, sem PII, sem consent banner) -->
     <script>
       // A página de recuperação não carrega analytics com o token na URL.

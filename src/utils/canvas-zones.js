@@ -117,6 +117,9 @@ function slideHasPendingPhotoIntent(slide) {
   // sem isso, sandwich layout (Cultura/Tendência) desativa a zona da foto
   // e o <video> nunca renderiza apesar de slide.videoId estar setado.
   if (slide?.videoId) return true;
+  // Foto sumiu do IndexedDB / falhou ao carregar — manter zona clicável para reimportar.
+  if (slide?.bgImageFailed) return true;
+  if (slide?.bgImageSource === 'imported' || slide?.bgImageSource === 'generated') return true;
   return !!(String(slide?.imageQuery ?? '').trim());
 }
 
