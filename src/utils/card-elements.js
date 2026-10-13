@@ -21,6 +21,7 @@ export const MOVABLE_ELEMENTS = [
   { key: 'text', label: 'Bloco de texto' },
   { key: 'title', label: 'Título' },
   { key: 'subtitle', label: 'Subtítulo' },
+  { key: 'eyebrow', label: 'Título de apoio' },
   { key: 'bodyAfterImage', label: 'Texto abaixo da imagem' },
   { key: 'offer', label: 'Preço / oferta' },
   { key: 'photo', label: 'Foto (enquadramento)' },

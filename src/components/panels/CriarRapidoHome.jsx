@@ -154,10 +154,16 @@ export function CriarRapidoHome({
         logo: stored.logoImage,
         logoImageId: stored.logoImageId,
         logoPosition: current?.logoPosition || 'tr',
-        logoSize: current?.logoSize ?? 120,
+        logoSize: 300,
         logoOpacity: current?.logoOpacity ?? 90,
       }));
-      toast?.(`Logo salva. Novos ${isPresentation ? 'slides' : 'cards'} deste projeto já saem com ela.`, 'success');
+      toast?.(
+        stored.logoLowRes
+          ? 'Logo salva, mas o PNG é pequeno (<600px). Para nitidez, use um ficheiro maior com fundo transparente.'
+          : `Logo salva. Novos ${isPresentation ? 'slides' : 'cards'} deste projeto já saem com ela.`,
+        stored.logoLowRes ? 'info' : 'success',
+        stored.logoLowRes ? 7000 : 4000,
+      );
       trackEvent('criar_rapido_logo');
     } catch (err) {
       if (projectRef.current === uploadProjectId) {

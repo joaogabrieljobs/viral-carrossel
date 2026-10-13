@@ -12,6 +12,10 @@ import {
   LOGO_SIZE_MIN,
   LOGO_SIZE_MAX,
   LOGO_SIZE_DEFAULT,
+  LOGO_SIZE_IMPORT,
+  logoImportControls,
+  clearLogoOffsetOnSlide,
+  clearLogoOffsetOnSlides,
 } from '../../utils/slide-logo.js';
 import { origemParaBlob } from '../../utils/image-store.js';
 import { Slider } from '../ui/primitives.jsx';
@@ -158,13 +162,17 @@ export function SlideLogoPanel({
         ...current,
         logo: stored.logoImage,
         logoImageId: stored.logoImageId,
-        logoSize: current.logoSize ?? LOGO_SIZE_DEFAULT,
-        logoOpacity: current.logoOpacity ?? 90,
-        logoPosition: current.logoPosition || 'tr',
+        ...logoImportControls(current),
       }));
-      setSlides?.((list) => stampLogoVisibleOnSlides(list));
+      setSlides?.((list) => clearLogoOffsetOnSlides(stampLogoVisibleOnSlides(list)));
       updateSlide({ ...clearSlideLogoLayout(), logoHidden: false });
-      toast?.('Logo da marca aplicada em todos os cards.', 'success');
+      toast?.(
+        stored.logoLowRes
+          ? `Logo aplicada, mas o PNG é pequeno (<600px). Use um ficheiro maior para ficar nítida.`
+          : `Logo da marca aplicada · tamanho ${LOGO_SIZE_IMPORT}px (ajuste no slider até ${LOGO_SIZE_MAX}).`,
+        stored.logoLowRes ? 'info' : 'success',
+        stored.logoLowRes ? 7000 : 4000,
+      );
     } catch (error) {
       if (alive.current) toast?.(error.message || 'Não foi possível salvar a logo.', 'error');
     } finally {
@@ -180,13 +188,28 @@ export function SlideLogoPanel({
     try {
       const patch = await storeSlideLogo(file);
       if (!alive.current) { URL.revokeObjectURL(patch.logoImage); return; }
-      updateSlide({
+      const next = clearLogoOffsetOnSlide({
+        ...slide,
         ...patch,
+        ...logoImportControls(brand),
         logoPosition: slide.logoPosition || brand?.logoPosition || 'tr',
-        logoSize: slide.logoSize ?? brand?.logoSize ?? LOGO_SIZE_DEFAULT,
-        logoOpacity: slide.logoOpacity ?? brand?.logoOpacity ?? 90,
       });
-      toast?.(`Logo só no card ${cardN}.`, 'success');
+      updateSlide({
+        logoImageId: next.logoImageId,
+        logoImage: next.logoImage,
+        logoHidden: false,
+        logoPosition: next.logoPosition,
+        logoSize: next.logoSize,
+        logoOpacity: next.logoOpacity,
+        elementOffsets: next.elementOffsets,
+      });
+      toast?.(
+        patch.logoLowRes
+          ? `Logo no card ${cardN}, mas o PNG é pequeno (<600px). Prefira um ficheiro maior.`
+          : `Logo só no card ${cardN} · tamanho ${LOGO_SIZE_IMPORT}px.`,
+        patch.logoLowRes ? 'info' : 'success',
+        5500,
+      );
     } catch (error) {
       if (alive.current) toast?.(error.message, 'error');
     } finally {

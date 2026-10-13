@@ -479,7 +479,9 @@ export const VISUAL_PRESETS = [
     slideDefaults: {
       layout: 'bc',  // bottom-center
       align: 'center',  // título centralizado
-      eyebrowText: 'O TÍTULO DE APOIO ENTRA AQUI',
+      // Vazio de propósito: o placeholder antigo agarrava-se ao bloco de texto
+      // e não seleccionava sozinho. O utilizador preenche em Cards → apoio.
+      eyebrowText: '',
     },
   },
 

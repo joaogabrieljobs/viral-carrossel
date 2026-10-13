@@ -278,6 +278,65 @@ function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin) {
   });
 }
 
+/**
+ * Logo como <img> (não background-image): html2canvas e o preview ficam mais
+ * nítidos; PNG com transparência não passa por reamostragem CSS estranha.
+ */
+function BrandLogoLayer({
+  src,
+  sizePx,
+  opacity = 1,
+  pos = 'tr',
+  margin,
+  topOffset,
+  zIndex = 23,
+  elementProps = null,
+  movable = false,
+}) {
+  const style = {
+    position: 'absolute',
+    width: sizePx,
+    height: sizePx,
+    opacity,
+    zIndex,
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden',
+    pointerEvents: movable ? 'auto' : 'none',
+  };
+  vcApplyLogoPosition(style, pos, margin, sizePx, topOffset ?? margin);
+  if (elementProps?.style) {
+    Object.assign(style, elementProps.style);
+    // Geometria da logo prevalece; o arrasto fica só no transform.
+    style.width = sizePx;
+    style.height = sizePx;
+    style.position = 'absolute';
+    style.opacity = opacity;
+    style.zIndex = zIndex;
+    vcApplyLogoPosition(style, pos, margin, sizePx, topOffset ?? margin);
+    if (elementProps.style.transform) style.transform = elementProps.style.transform;
+  }
+  const { style: _ignored, ...handlers } = elementProps || {};
+  return (
+    <div {...handlers} style={style} aria-hidden={movable ? undefined : true}>
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        decoding="async"
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          objectPosition: 'center',
+          display: 'block',
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      />
+    </div>
+  );
+}
+
 /** Texto editável no próprio card. Um clique continua selecionando/arrastando;
  * o segundo clique entra na edição e grava no histórico ao sair. */
 function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = {}, children }) {
@@ -972,16 +1031,17 @@ const ClassicCanvasInner = React.forwardRef(({
         const margin = f.w * 0.045;
         const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
-        const style = {
-          position:'absolute',
-          width: sizePx, height: sizePx,
-          opacity: (brand.logoOpacity ?? 90) / 100,
-          backgroundImage: `url(${brand.logo})`,
-          backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-          zIndex: 23,
-        };
-        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
-        return <div style={style} aria-hidden/>;
+        return (
+          <BrandLogoLayer
+            src={brand.logo}
+            sizePx={sizePx}
+            opacity={(brand.logoOpacity ?? 90) / 100}
+            pos={pos}
+            margin={margin}
+            topOffset={topOffset}
+            zIndex={23}
+          />
+        );
       })()}
 
       {/* Assinatura da marca por cima do layout composto (zIndex próprio). */}
@@ -1448,16 +1508,17 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         const margin = f.w * 0.045;
         const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
-        const style = {
-          position: 'absolute',
-          width: sizePx, height: sizePx,
-          opacity: (brand.logoOpacity ?? 90) / 100,
-          backgroundImage: `url(${brand.logo})`,
-          backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-          zIndex: 23,
-        };
-        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
-        return <div style={style} aria-hidden />;
+        return (
+          <BrandLogoLayer
+            src={brand.logo}
+            sizePx={sizePx}
+            opacity={(brand.logoOpacity ?? 90) / 100}
+            pos={pos}
+            margin={margin}
+            topOffset={topOffset}
+            zIndex={23}
+          />
+        );
       })()}
     </div>
   );
@@ -1859,11 +1920,11 @@ const SlideCardInner = React.forwardRef(({
         {normalizeOverlays(slide.overlays).map((ov) => {
           const chave = overlayMoveKey(ov.id);
           if (ov.type === 'cta') {
-            const padY = f.h * 0.011;
-            const padX = f.w * 0.026;
-            const fontPx = f.w * 0.022;
+            const padY = Math.round(f.h * 0.012);
+            const padX = Math.round(f.w * 0.028);
+            const fontPx = Math.max(14, Math.round(f.w * 0.024));
             const isOutline = ov.variant === 'outline';
-            const isGlass = ov.variant === 'glass';
+            const isGlass = ov.variant === 'glass' || ov.blur;
             return (
               <div
                 key={ov.id}
@@ -1874,36 +1935,63 @@ const SlideCardInner = React.forwardRef(({
                   transform: 'translate(-50%, -50%)',
                   zIndex: 28,
                   pointerEvents: movableElements ? 'auto' : 'none',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
                 })}
               >
                 <div style={{
+                  position: 'relative',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: f.w * 0.014,
+                  gap: Math.round(f.w * 0.014),
                   padding: `${padY}px ${padX}px`,
                   borderRadius: 9999,
-                  background: ov.bg,
+                  background: isGlass ? 'transparent' : ov.bg,
                   color: ov.fg,
-                  border: `1.5px solid ${ov.border}`,
-                  fontFamily: bodyFF,
-                  fontSize: fontPx,
-                  fontWeight: isOutline ? 500 : 600,
-                  letterSpacing: ov.uppercase ? '0.12em' : '0.04em',
-                  textTransform: ov.uppercase ? 'uppercase' : 'none',
-                  whiteSpace: 'nowrap',
-                  lineHeight: 1,
-                  backdropFilter: ov.blur || isGlass ? 'blur(10px)' : undefined,
-                  WebkitBackdropFilter: ov.blur || isGlass ? 'blur(10px)' : undefined,
+                  border: `2px solid ${ov.border}`,
+                  overflow: 'hidden',
+                  isolation: 'isolate',
                 }}>
-                  {ov.text}
-                  {ov.arrow ? (
-                    <span style={{
-                      fontSize: fontPx * 1.05,
-                      fontWeight: 400,
-                      lineHeight: 1,
-                      opacity: 0.95,
-                    }} aria-hidden>›</span>
+                  {isGlass ? (
+                    <span
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: 9999,
+                        background: ov.bg,
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        zIndex: 0,
+                      }}
+                    />
                   ) : null}
+                  <span style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: Math.round(f.w * 0.014),
+                    fontFamily: bodyFF,
+                    fontSize: fontPx,
+                    fontWeight: isOutline ? 600 : 700,
+                    letterSpacing: ov.uppercase ? '0.08em' : '0.02em',
+                    textTransform: ov.uppercase ? 'uppercase' : 'none',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.1,
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    textRendering: 'geometricPrecision',
+                  }}>
+                    {ov.text}
+                    {ov.arrow ? (
+                      <span style={{
+                        fontSize: Math.round(fontPx * 1.1),
+                        fontWeight: 500,
+                        lineHeight: 1,
+                      }} aria-hidden>›</span>
+                    ) : null}
+                  </span>
                 </div>
               </div>
             );
@@ -2265,16 +2353,19 @@ const SlideCardInner = React.forwardRef(({
           const margin = f.w * 0.045;
           const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
-          const st = {
-            position:'absolute',
-            width: sizePx, height: sizePx,
-            opacity: (brand.logoOpacity ?? 90) / 100,
-            backgroundImage: `url(${brand.logo})`,
-            backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-            zIndex: 20,
-          };
-          vcApplyLogoPosition(st, pos, margin, sizePx, topOffset);
-          return <div {...mov('logo', st)} aria-hidden={movableElements ? undefined : true}/>;
+          return (
+            <BrandLogoLayer
+              src={brand.logo}
+              sizePx={sizePx}
+              opacity={(brand.logoOpacity ?? 90) / 100}
+              pos={pos}
+              margin={margin}
+              topOffset={topOffset}
+              zIndex={20}
+              movable={!!movableElements}
+              elementProps={mov('logo', {})}
+            />
+          );
         })()}
       </div>
     );
@@ -2583,16 +2674,19 @@ const SlideCardInner = React.forwardRef(({
           const margin = f.w * 0.045;
           const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
-          const style = {
-            position:'absolute',
-            width: sizePx, height: sizePx,
-            opacity: (brand.logoOpacity ?? 90) / 100,
-            backgroundImage: `url(${brand.logo})`,
-            backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-            zIndex: 20,
-          };
-          vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
-          return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
+          return (
+            <BrandLogoLayer
+              src={brand.logo}
+              sizePx={sizePx}
+              opacity={(brand.logoOpacity ?? 90) / 100}
+              pos={pos}
+              margin={margin}
+              topOffset={topOffset}
+              zIndex={20}
+              movable={!!movableElements}
+              elementProps={mov('logo', {})}
+            />
+          );
         })()}
         {brand.showHandle && slide.showHandle && !hideInstaBadge && (brand.handle || '').trim() && (
           <div {...mov('handleBadge', {
@@ -2985,7 +3079,7 @@ const SlideCardInner = React.forwardRef(({
               {/* Eyebrow — texto MAIÚSCULAS pequeno acima do título.
                   Usado em refs editoriais (NBA, NMLSS, Cadore). */}
               {slide.eyebrowText && (
-                <span style={{
+                <span {...mov('eyebrow', {
                   fontSize: f.w*0.024,
                   fontFamily: bodyFF,
                   fontWeight: 600,
@@ -2996,7 +3090,10 @@ const SlideCardInner = React.forwardRef(({
                   margin: 0,
                   alignSelf: brand.showStarOrnament ? 'center' : 'auto',
                   textShadow: shadow,
-                }}>{slide.eyebrowText}</span>
+                  display: 'inline-block',
+                  cursor: movableElements ? 'grab' : undefined,
+                  pointerEvents: movableElements ? 'auto' : 'none',
+                })}>{slide.eyebrowText}</span>
               )}
               <InlineEditableText as="h1" value={slide.title} onCommit={(text) => commitInlineText('title', text)} elementProps={mov('title', {
                 color: displayTitleInk, fontFamily: titleFF,
@@ -3155,18 +3252,21 @@ const SlideCardInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080); // proporção em relação ao slide
-        // Quando o handle está no topo direito e a logo no topo direito, desloca a logo pra baixo do handle
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
-        const style = {
-          position:'absolute',
-          width: sizePx, height: sizePx,
-          opacity: (brand.logoOpacity ?? 90) / 100,
-          backgroundImage: `url(${brand.logo})`,
-          backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-        };
-        vcApplyLogoPosition(style, pos, margin, sizePx, topOffset);
-        return <div {...mov('logo', style)} aria-hidden={movableElements ? undefined : true}/>;
+        return (
+          <BrandLogoLayer
+            src={brand.logo}
+            sizePx={sizePx}
+            opacity={(brand.logoOpacity ?? 90) / 100}
+            pos={pos}
+            margin={margin}
+            topOffset={topOffset}
+            zIndex={23}
+            movable={!!movableElements}
+            elementProps={mov('logo', {})}
+          />
+        );
       })()}
     </div>
   );

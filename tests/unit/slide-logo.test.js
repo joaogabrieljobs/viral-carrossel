@@ -13,6 +13,11 @@ import {
   applyLogoAssetToSlides,
   applyLogoLayoutToSlides,
   applyGenerationLogoPolicy,
+  brandLogoInsertPatch,
+  logoImportControls,
+  LOGO_SIZE_IMPORT,
+  LOGO_SIZE_MAX,
+  clearLogoOffsetOnSlide,
 } from '../../src/utils/slide-logo.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 
@@ -23,7 +28,7 @@ describe('logo por card', () => {
     expect(imagePut).toHaveBeenLastCalledWith(result.logoImageId, file);
     expect(await imagePut.mock.calls.at(-1)[1].arrayBuffer()).toEqual(await file.arrayBuffer());
     URL.revokeObjectURL(result.logoImage);
-    await expect(storeSlideLogo(new Blob(['jpeg'], { type: 'image/jpeg' }))).rejects.toThrow('PNG');
+    await expect(storeSlideLogo(new Blob(['jpeg'], { type: 'image/jpeg' }))).rejects.toThrow(/PNG/i);
     await expect(storeSlideLogo(new Blob(['fake'], { type: 'image/png' }))).rejects.toThrow('válido');
   });
   it('troca a logo somente quando há override no card; permite esconder e herdar marca', () => {
@@ -112,5 +117,15 @@ describe('logo por card', () => {
     expect(restored.logoImageId).not.toBe('logo-local');
     expect(restored.logo).toMatch(/^blob:/);
     URL.revokeObjectURL(restored.logo);
+  });
+  it('import força tamanho legível e não herda logoSize minúsculo', () => {
+    expect(logoImportControls({ logoSize: 40 }).logoSize).toBe(LOGO_SIZE_IMPORT);
+    expect(brandLogoInsertPatch('blob:x', { logoSize: 80 }).logoSize).toBe(LOGO_SIZE_IMPORT);
+    expect(LOGO_SIZE_MAX).toBeGreaterThanOrEqual(900);
+    const cleared = clearLogoOffsetOnSlide({
+      elementOffsets: { logo: { x: -40, y: 10 }, title: { x: 1, y: 0 } },
+    });
+    expect(cleared.elementOffsets.logo).toBeUndefined();
+    expect(cleared.elementOffsets.title).toEqual({ x: 1, y: 0 });
   });
 });

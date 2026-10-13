@@ -24,7 +24,7 @@ import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
 import { ElementsPanel } from './panels/ElementsPanel.jsx';
-import { addOverlayToSlide, removeOverlayFromSlide } from '../utils/card-overlays.js';
+import { addOverlayToSlide, removeOverlayFromSlide, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
@@ -250,7 +250,9 @@ function SidebarContent({
   activeDocId = null,
   onOpenProject = null,
   onNewProject = null,
+  onDeleteProject = null,
   onGenerateProject = null,
+  selectedCardElement = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
@@ -2181,10 +2183,15 @@ function SidebarContent({
                 </div>
               ) : null}
             </S>
-            <S title="Elementos" hint="CTAs, traços e frases premium — clique para inserir no card activo (estilo Canva).">
+            <S title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do seleccionado.">
               <ElementsPanel
                 slide={slide}
                 toast={toast}
+                selectedOverlayId={
+                  selectedCardElement?.slideId === slide?.id
+                    ? parseOverlayMoveKey(selectedCardElement.key)
+                    : null
+                }
                 onInsert={(overlay) => {
                   const next = addOverlayToSlide(slide, overlay);
                   updateSlide({
@@ -2194,8 +2201,11 @@ function SidebarContent({
                 }}
                 onRemove={(overlayId) => {
                   const next = removeOverlayFromSlide(slide, overlayId);
-                  updateSlide({ overlays: next.overlays });
+                  const elementOffsets = { ...(slide.elementOffsets || {}) };
+                  delete elementOffsets[`ov_${overlayId}`];
+                  updateSlide({ overlays: next.overlays, elementOffsets });
                 }}
+                onUpdate={(overlays) => updateSlide({ overlays })}
               />
             </S>
           </>
@@ -3497,7 +3507,7 @@ function SidebarContent({
                   </button>
                 ) : null}
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="vc-btn vc-btn-ghost"
@@ -3520,6 +3530,19 @@ function SidebarContent({
                   {homeCreationType === 'apresentacao' ? 'Gerar com Apresenta' : 'Gerar com Comunica'}
                 </button>
                 )}
+                {onDeleteProject && (activeDocId || activeEntry?.id) ? (
+                  <button
+                    type="button"
+                    className="vc-btn vc-btn-ghost"
+                    onClick={() => onDeleteProject(activeDocId || activeEntry?.id)}
+                    style={{
+                      flex: '1 1 100%', minHeight: 40, fontSize: 12, fontWeight: 600,
+                      color: '#f87171', borderColor: 'rgba(248,113,113,0.35)',
+                    }}
+                  >
+                    <Trash2 size={13} /> Apagar projeto inteiro
+                  </button>
+                ) : null}
               </div>
             </S>
 

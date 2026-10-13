@@ -1,9 +1,13 @@
 import { imagePut, newImageId, imagemComoDataUrl, dataUrlParaBlob } from './image-store.js';
 
-/** Tamanho em px na escala 1080. */
-export const LOGO_SIZE_MIN = 40;
-export const LOGO_SIZE_MAX = 480;
-export const LOGO_SIZE_DEFAULT = 120;
+/** Tamanho em px na escala 1080 (caixa da logo no card). */
+export const LOGO_SIZE_MIN = 48;
+/** Quase a largura do card — logos com muito padding no PNG ainda ficam legíveis. */
+export const LOGO_SIZE_MAX = 900;
+/** Default antigo (120) saía minúsculo no preview Stories / Feed. */
+export const LOGO_SIZE_DEFAULT = 260;
+/** Tamanho forçado em todo import novo (não herda valor antigo minúsculo). */
+export const LOGO_SIZE_IMPORT = 300;
 
 /**
  * Resolve a URL da logo a inserir em todos os cards. A logo específica do
@@ -17,13 +21,37 @@ export async function resolveLogoDataUrl(brand = {}, styleKit = {}) {
   return null;
 }
 
+/**
+ * Controles seguros após importar um ficheiro: tamanho legível + posição estável.
+ * Não reutiliza logoSize antigo (ex.: 40–120) que fazia a marca “sumir” do card.
+ */
+export function logoImportControls(brand = {}) {
+  return {
+    logoSize: LOGO_SIZE_IMPORT,
+    logoOpacity: brand.logoOpacity ?? 90,
+    logoPosition: brand.logoPosition || 'tr',
+  };
+}
+
+/** Remove arrasto da logo (evita ficar fora da área após import). */
+export function clearLogoOffsetOnSlide(slide = {}) {
+  if (!slide?.elementOffsets || !Object.prototype.hasOwnProperty.call(slide.elementOffsets, 'logo')) {
+    return slide;
+  }
+  const elementOffsets = { ...slide.elementOffsets };
+  delete elementOffsets.logo;
+  return { ...slide, elementOffsets };
+}
+
+export function clearLogoOffsetOnSlides(slides = []) {
+  return (slides || []).map(clearLogoOffsetOnSlide);
+}
+
 /** Patch de marca para logo visível em todos os cards (overlay). */
 export function brandLogoInsertPatch(logoDataUrl, brand = {}) {
   return {
     logo: logoDataUrl,
-    logoSize: brand.logoSize ?? LOGO_SIZE_DEFAULT,
-    logoOpacity: brand.logoOpacity ?? 90,
-    logoPosition: brand.logoPosition || 'tr',
+    ...logoImportControls(brand),
   };
 }
 
@@ -133,13 +161,26 @@ export function applyLogoVisibilityOnSlides(slides = [], { ids = null, hidden = 
 }
 
 export async function storeSlideLogo(file) {
-  if (file.type !== 'image/png') throw new Error('Escolha uma logo em PNG para preservar a transparência.');
-  if (file.size > 2 * 1024 * 1024) throw new Error('A logo deve ter no máximo 2 MB.');
+  if (file.type !== 'image/png') throw new Error('Escolha uma logo em PNG (fundo transparente) para máxima qualidade.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('A logo deve ter no máximo 5 MB.');
   const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
   if ([137, 80, 78, 71, 13, 10, 26, 10].some((value, i) => signature[i] !== value)) throw new Error('Este arquivo não é um PNG válido.');
+  let logoLowRes = false;
+  try {
+    if (typeof createImageBitmap === 'function') {
+      const bmp = await createImageBitmap(file);
+      logoLowRes = Math.max(bmp.width, bmp.height) < 600;
+      bmp.close?.();
+    }
+  } catch { /* ignore */ }
   const logoImageId = newImageId();
   await imagePut(logoImageId, file);
-  return { logoImageId, logoImage: URL.createObjectURL(file), logoHidden: false };
+  return {
+    logoImageId,
+    logoImage: URL.createObjectURL(file),
+    logoHidden: false,
+    logoLowRes,
+  };
 }
 
 /** Controles efetivos (card override → marca → default). */

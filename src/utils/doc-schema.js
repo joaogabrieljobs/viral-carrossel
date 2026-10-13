@@ -11,8 +11,17 @@ import { DEFAULT_SLIDE_TEXT_INSET } from './canvas-layout.js';
 import { DEFAULT_STYLE_KIT, normalizeStyleKit } from './style-kit.js';
 import { unlockGroupedElementsPatch } from './card-elements.js';
 import { normalizeOverlays } from './card-overlays.js';
+import { LOGO_SIZE_DEFAULT, LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
+
+/** Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview. */
+function coerceReadableLogoSize(size) {
+  const n = Number(size);
+  if (!Number.isFinite(n)) return LOGO_SIZE_DEFAULT;
+  if (n < 140) return LOGO_SIZE_DEFAULT;
+  return Math.max(LOGO_SIZE_MIN, Math.min(LOGO_SIZE_MAX, n));
+}
 
 /** Preferência ao gerar / novo slide: só 4 modos clássicos (sem faixa fina). */
 const CARD_VISUAL_STYLE_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom']);
@@ -186,7 +195,7 @@ const DEFAULT_BRAND = {
   customTitleFont: null,
   /** Fonte própria (corpo / subtítulo) */
   customBodyFont: null,
-  logoSize: 120,          // px na escala 1080 (slider marca/card: 40–480)
+  logoSize: 260,          // px na escala 1080 (slider marca/card: 48–900)
   logoPosition: 'tr',     // posição: 'tl' | 'tr' | 'c' | 'bl' | 'br'
   logoOpacity: 90,        // 0-100
   /** Barra editorial fina no topo dos cards (modo Tendência/Cultura) — opcional. */
@@ -293,6 +302,7 @@ function ensureDocShape(d) {
         ...b,
         brandTone: normalizeBrandTone(b.brandTone),
         useBrandVoice: b.useBrandVoice === false ? false : true,
+        logoSize: coerceReadableLogoSize(b.logoSize),
       };
     })(),
     material: { ...DEFAULT_DOC.material, ...(migrated.material && typeof migrated.material === 'object' ? migrated.material : {}) },
@@ -313,6 +323,7 @@ function ensureDocShape(d) {
         bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none',
         caption: typeof sl.caption === 'string' ? sl.caption : '',
         overlays: normalizeOverlays(sl.overlays),
+        ...(sl.logoSize != null ? { logoSize: coerceReadableLogoSize(sl.logoSize) } : {}),
       };
       // Projetos anteriores à edição individual não tinham este campo. Migra
       // os offsets antes de ativar os alvos separados para a composição não

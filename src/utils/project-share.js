@@ -12,10 +12,15 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
 const SHARE_API = '/api/project-share';
-/** Folga abaixo do FUNCTION_PAYLOAD_TOO_LARGE (~4,5 MB). */
-const MAX_SHARE_BODY_CHARS = 3_200_000;
-const SHARE_IMAGE_MAX_EDGE = 960;
-const SHARE_IMAGE_MAX_CHARS = 420_000;
+/**
+ * Folga abaixo do FUNCTION_PAYLOAD_TOO_LARGE (~4,5 MB).
+ * O envelope JSON ({action,name,doc}) também conta — por isso o tecto do doc
+ * fica mais baixo que o do pedido.
+ */
+const MAX_SHARE_BODY_CHARS = 2_800_000;
+const MAX_SHARE_DOC_CHARS = 2_500_000;
+const SHARE_IMAGE_MAX_EDGE = 720;
+const SHARE_IMAGE_MAX_CHARS = 220_000;
 
 function stripRuntimeBlobs(value, depth = 0) {
   if (depth > 8 || value == null) return value;
@@ -179,17 +184,59 @@ export async function packDocWithImagesForShare(doc) {
       working.brand = { ...working.brand, logo };
     }
   } catch { /* ignore */ }
-  try {
-    working.styleKit = await exportProjectReferences(working.styleKit);
-  } catch { /* ignore */ }
+  // Moodboard / refs de estilo incham o pedido — partilha leva só o brief em texto.
+  if (working.styleKit && typeof working.styleKit === 'object') {
+    working.styleKit = {
+      ...working.styleKit,
+      refImages: [],
+      logo: working.styleKit.logo
+        ? { imageId: working.styleKit.logo.imageId, name: working.styleKit.logo.name }
+        : working.styleKit.logo,
+    };
+  }
 
   let clean = stripRuntimeBlobs(working);
   let serialized = JSON.stringify(clean);
-  if (serialized.length > MAX_SHARE_BODY_CHARS) {
+
+  // Remove fotos uma a uma até caber (em vez de tirar todas de uma vez).
+  while (serialized.length > MAX_SHARE_DOC_CHARS && countPackedDataImages(clean) > 0) {
+    let dropped = false;
+    clean = {
+      ...clean,
+      slides: (clean.slides || []).map((s) => {
+        if (dropped) return s;
+        if (typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:')) {
+          dropped = true;
+          imagesOmitted += 1;
+          packedImages = Math.max(0, packedImages - 1);
+          return { ...s, bgImage: null };
+        }
+        return s;
+      }),
+    };
+    if (!dropped) break;
+    serialized = JSON.stringify(clean);
+  }
+
+  if (serialized.length > MAX_SHARE_DOC_CHARS) {
     const before = countPackedDataImages(clean);
     clean = stripEmbeddedImages(clean);
     imagesOmitted += before;
     packedImages = 0;
+    serialized = JSON.stringify(clean);
+  }
+
+  // Último recurso: material/referências longas.
+  if (serialized.length > MAX_SHARE_DOC_CHARS && clean.material) {
+    clean = {
+      ...clean,
+      material: {
+        ...(clean.material || {}),
+        content: String(clean.material.content || '').slice(0, 12_000),
+        sources: String(clean.material.sources || '').slice(0, 4_000),
+        context: String(clean.material.context || '').slice(0, 4_000),
+      },
+    };
     serialized = JSON.stringify(clean);
   }
 

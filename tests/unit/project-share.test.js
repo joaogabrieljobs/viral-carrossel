@@ -71,6 +71,6 @@ describe('packDocWithImagesForShare', () => {
     expect(packedImages).toBe(0);
     expect(imagesOmitted).toBeGreaterThan(0);
     expect(doc.slides.every((s) => !s.bgImage)).toBe(true);
-    expect(JSON.stringify(doc).length).toBeLessThan(3_200_000);
+    expect(JSON.stringify(doc).length).toBeLessThan(2_800_000);
   });
 });

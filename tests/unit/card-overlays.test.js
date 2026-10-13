@@ -10,13 +10,15 @@ import {
 } from '../../src/utils/card-overlays.js';
 
 describe('card-overlays', () => {
-  it('catálogo tem CTAs filled/outline/glass + linhas + texto', () => {
+  it('catálogo tem CTAs variados + linhas (sem bloco de texto solto)', () => {
     const ids = ELEMENT_CATALOG.map((e) => e.id);
     expect(ids).toContain('cta_filled');
     expect(ids).toContain('cta_outline');
     expect(ids).toContain('cta_glass');
+    expect(ids).toContain('cta_gold_edge');
     expect(ids).toContain('rule_thin');
-    expect(ids).toContain('text_soft');
+    expect(ids).not.toContain('text_soft');
+    expect(ELEMENT_CATALOG.every((e) => e.group !== 'Texto')).toBe(true);
     for (const item of ELEMENT_CATALOG) {
       const ov = item.factory();
       expect(normalizeOverlay(ov)).toBeTruthy();

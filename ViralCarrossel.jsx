@@ -3083,7 +3083,13 @@ export default function App() {
   const deleteCardTarget = useCallback((i) => {
     if (selectedCardElement?.slideId === slides[i]?.id && selectedCardElement.key) {
       const key = selectedCardElement.key;
-      if (key === 'photo') {
+      if (key.startsWith('ov_')) {
+        const overlayId = key.slice(3);
+        const overlays = (slides[i]?.overlays || []).filter((o) => o?.id !== overlayId);
+        const elementOffsets = { ...(slides[i]?.elementOffsets || {}) };
+        delete elementOffsets[key];
+        updateSlideAt(i, { overlays, elementOffsets });
+      } else if (key === 'photo') {
         updateSlideAt(i, {
           bgImage: null,
           bgImageId: null,
@@ -3094,6 +3100,10 @@ export default function App() {
         });
       } else if (key === 'logo') {
         updateSlideAt(i, { logoHidden: true });
+      } else if (key === 'eyebrow') {
+        updateSlideAt(i, { eyebrowText: '' });
+      } else if (key === 'pill') {
+        setBrand((b) => ({ ...b, footerPillText: '' }));
       } else {
         const hiddenElements = Array.from(new Set([...(slides[i]?.hiddenElements || []), key]));
         updateSlideAt(i, { hiddenElements });
@@ -3103,7 +3113,7 @@ export default function App() {
       return;
     }
     deleteSlide(i);
-  }, [deleteSlide, selectedCardElement, slides, toast, updateSlideAt]);
+  }, [deleteSlide, selectedCardElement, slides, toast, updateSlideAt, setBrand]);
   const duplicateSlide = useCallback((i) => {
     const dup = {...slides[i], id:uid(), num:slides.length+1};
     const next = [...slides]; next.splice(i+1,0,dup);
@@ -4377,14 +4387,22 @@ Retorne APENAS JSON: ${refineAllWantsBody
       if (isEditable(e.target) || anyModalOpen) return;
       if (k === 'ArrowLeft')  { e.preventDefault(); setActiveIdx(i => Math.max(0, i-1)); return; }
       if (k === 'ArrowRight') { e.preventDefault(); setActiveIdx(i => Math.min(slides.length-1, i+1)); return; }
-      if (k === 'Delete' || k === 'Backspace') { if (slides.length > 1) { e.preventDefault(); deleteSlide(activeIdx); } return; }
+      if (k === 'Delete' || k === 'Backspace') {
+        // Com elemento seleccionado: apaga só esse (CTA, texto, logo…).
+        // Sem selecção: não apaga o card inteiro — use o ícone do lixo.
+        if (selectedCardElement?.slideId === slides[activeIdx]?.id && selectedCardElement.key) {
+          e.preventDefault();
+          deleteCardTarget(activeIdx);
+        }
+        return;
+      }
       if (k === 'n' || k === 'N') { e.preventDefault(); addSlide(); return; }
       if (k === 'f' || k === 'F') { e.preventDefault(); setFullscreenOpen(o=>!o); return; }
       if (k === '?') { e.preventDefault(); setHelpOpen(o=>!o); return; }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides.length, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
 
   const sidebarProps = {
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
@@ -4416,6 +4434,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
     activeDocId,
     onOpenProject: openDoc,
     onNewProject: createProjectByKind,
+    onDeleteProject: (docId) => {
+      const id = docId || activeDocId;
+      if (!id) return;
+      const entry = library.find((e) => e.id === id);
+      const name = (entry?.name || 'este projeto').trim() || 'este projeto';
+      if (!window.confirm(`Apagar o projeto «${name}» por completo?\n\nTodos os cards serão removidos da biblioteca deste navegador.`)) return;
+      deleteDoc(id);
+      toast('Projeto apagado.', 'success', 3000);
+    },
+    selectedCardElement,
     onGenerateProject: generateProjectByKind,
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,

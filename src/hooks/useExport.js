@@ -3,7 +3,7 @@
  * Extraído do App: era ~215 linhas de handlers no corpo do componente.
  *
  * Renderiza a partir dos refs OFFSCREEN (`slideRefs`), nunca do preview escalado,
- * então o resultado sai sempre nas dimensões reais do formato × 2 (retina).
+ * então o resultado sai sempre nas dimensões reais do formato × 3 (retina).
  */
 import { useCallback } from 'react';
 import { FORMATS } from '../utils/formats.js';
@@ -202,7 +202,7 @@ export function useExport({
     const w = Math.max(1, Math.round(el.offsetWidth || el.scrollWidth || f.w));
     const h = Math.max(1, Math.round(el.offsetHeight || el.scrollHeight || f.h));
     return h2c(el, {
-      scale: 2,                 // 2× resolução final pra ficar nítido
+      scale: 3,                 // 3× — logos finas e CTAs saem nítidos no PNG
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -211,6 +211,7 @@ export function useExport({
       height: h,
       windowWidth: w,
       windowHeight: h,
+      imageTimeout: 15000,
       onclone: (clonedDoc, clonedEl) => {
         vcPrepareHtml2CanvasClone(clonedDoc, clonedEl);
       },
@@ -375,9 +376,10 @@ export function useExport({
       for (let i=0; i<slides.length; i++) {
         setExportProgress({current:i+1,total:slides.length});
         const canvas = await renderSlideToCanvas(slides[i]);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        // PNG no PDF: JPEG a 0.92 esborratava logo branca e CTAs.
+        const dataUrl = canvas.toDataURL('image/png');
         if (i > 0) pdf.addPage([f.w, f.h], f.h > f.w ? 'portrait' : 'landscape');
-        pdf.addImage(dataUrl, 'JPEG', 0, 0, f.w, f.h);
+        pdf.addImage(dataUrl, 'PNG', 0, 0, f.w, f.h);
       }
       const pdfStem = fmt === 'apresentacao' ? 'apresentacao' : 'carrossel';
       pdf.save(`${pdfStem}-${Date.now()}.pdf`);

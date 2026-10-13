@@ -1,5 +1,5 @@
 /**
- * Elementos inseríveis no card (estilo Canva) — CTAs, linhas, blocos.
+ * Elementos inseríveis no card (estilo Canva) — CTAs e linhas.
  * Vivem em `slide.overlays[]` e renderizam por cima da composição.
  */
 
@@ -10,8 +10,8 @@ export const ELEMENT_CATALOG = Object.freeze([
   {
     id: 'cta_filled',
     group: 'CTA',
-    label: 'Pílula preenchida',
-    hint: 'Mocha · seta',
+    label: 'Pílula mocha',
+    hint: 'Preenchida · seta',
     preview: 'filled',
     factory: () => makeCtaOverlay({
       variant: 'filled',
@@ -52,6 +52,77 @@ export const ELEMENT_CATALOG = Object.freeze([
     }),
   },
   {
+    id: 'cta_ink',
+    group: 'CTA',
+    label: 'Pílula tinta',
+    hint: 'Preto · seta',
+    preview: 'ink',
+    factory: () => makeCtaOverlay({
+      variant: 'filled',
+      text: 'SAIBA MAIS',
+      bg: '#0A0A0A',
+      fg: '#FFFFFF',
+      border: 'rgba(255,255,255,0.35)',
+    }),
+  },
+  {
+    id: 'cta_cream',
+    group: 'CTA',
+    label: 'Pílula cream',
+    hint: 'Clara · tipografia',
+    preview: 'cream',
+    factory: () => makeCtaOverlay({
+      variant: 'filled',
+      text: 'CONHEÇA O MÉTODO',
+      bg: '#F5F0E8',
+      fg: '#2C2420',
+      border: 'rgba(44,36,32,0.2)',
+    }),
+  },
+  {
+    id: 'cta_gold_edge',
+    group: 'CTA',
+    label: 'Pílula ouro',
+    hint: 'Borda dourada',
+    preview: 'gold',
+    factory: () => makeCtaOverlay({
+      variant: 'filled',
+      text: 'AGENDE SUA AVALIAÇÃO',
+      bg: '#4A3A32',
+      fg: '#F7F1E6',
+      border: '#C4A574',
+    }),
+  },
+  {
+    id: 'cta_soft_white',
+    group: 'CTA',
+    label: 'Pílula branca',
+    hint: 'Sobre foto escura',
+    preview: 'white',
+    factory: () => makeCtaOverlay({
+      variant: 'filled',
+      text: 'QUERO COMEÇAR',
+      bg: 'rgba(255,255,255,0.94)',
+      fg: '#1A1410',
+      border: 'rgba(255,255,255,0.5)',
+    }),
+  },
+  {
+    id: 'cta_outline_light',
+    group: 'CTA',
+    label: 'Contorno claro',
+    hint: 'Branco · foto',
+    preview: 'outline_light',
+    factory: () => makeCtaOverlay({
+      variant: 'outline',
+      text: 'Agende sua avaliação',
+      bg: 'transparent',
+      fg: '#F5F0E8',
+      border: 'rgba(245,240,232,0.9)',
+      uppercase: false,
+    }),
+  },
+  {
     id: 'rule_thin',
     group: 'Linhas',
     label: 'Traço fino',
@@ -84,24 +155,35 @@ export const ELEMENT_CATALOG = Object.freeze([
     }),
   },
   {
-    id: 'text_soft',
-    group: 'Texto',
-    label: 'Frase curta',
-    hint: 'Sans limpa',
-    preview: 'text',
+    id: 'rule_light',
+    group: 'Linhas',
+    label: 'Traço claro',
+    hint: 'Sobre foto',
+    preview: 'rule_light',
     factory: () => ({
       id: uid(),
-      type: 'text',
-      x: 10,
-      y: 32,
-      w: 48,
-      text: 'Você tem o direito\nde cuidar do seu corpo.',
-      color: '#3A322C',
-      align: 'left',
-      size: 3.4,
-      weight: 500,
-      tracking: -0.02,
-      leading: 1.25,
+      type: 'rule',
+      x: 12,
+      y: 22,
+      w: 22,
+      color: 'rgba(245,240,232,0.85)',
+      thickness: 1.25,
+    }),
+  },
+  {
+    id: 'rule_accent',
+    group: 'Linhas',
+    label: 'Traço accent',
+    hint: 'Marca · fino',
+    preview: 'rule_accent',
+    factory: () => ({
+      id: uid(),
+      type: 'rule',
+      x: 12,
+      y: 30,
+      w: 18,
+      color: '#C4A574',
+      thickness: 2,
     }),
   },
 ]);
@@ -134,6 +216,7 @@ function makeCtaOverlay({
 export function normalizeOverlay(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const type = String(raw.type || '');
+  // `text` legado: ainda normaliza se existir no doc; novo catálogo não cria mais.
   if (!['cta', 'rule', 'text'].includes(type)) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id : uid();
   const base = {
@@ -209,4 +292,10 @@ export function updateOverlayOnSlide(slide, overlayId, patch) {
 /** Chave de arrasto em elementOffsets. */
 export function overlayMoveKey(overlayId) {
   return `ov_${overlayId}`;
+}
+
+export function parseOverlayMoveKey(chave) {
+  const key = String(chave || '');
+  if (!key.startsWith('ov_')) return null;
+  return key.slice(3) || null;
 }
