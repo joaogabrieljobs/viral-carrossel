@@ -41,10 +41,13 @@ import {
   setEntryFolder,
   setEntryPublicationDate,
 } from '../utils/library-organizer.js';
+import { cloneBrandStyleKit } from '../utils/brand-context.js';
+import { normalizeStyleKit, styleKitHasContent } from '../utils/style-kit.js';
 
 /**
  * Monta um documento novo sem perder a identidade que veio no seed.
  * Mantida pura e exportada para cobrir a herança de séries por teste unitário.
+ * Sem styleKit no seed → herda o contexto da marca (fallbackBrand.styleKit).
  */
 export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BRAND) {
   const seeded = seedDoc && typeof seedDoc === 'object' ? seedDoc : {};
@@ -57,13 +60,21 @@ export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BR
   });
   hydratedBrand.brandTone = normalizeBrandTone(hydratedBrand.brandTone);
   hydratedBrand.useBrandVoice = hydratedBrand.useBrandVoice !== false;
+  // Preserva styleKit da marca no perfil embutido no doc (para reaplicar / sync).
+  if (!hydratedBrand.styleKit && fallbackBrand?.styleKit) {
+    hydratedBrand.styleKit = cloneBrandStyleKit(fallbackBrand);
+  } else if (hydratedBrand.styleKit) {
+    hydratedBrand.styleKit = normalizeStyleKit(hydratedBrand.styleKit);
+  }
+  const seedHasKit = seeded.styleKit && styleKitHasContent(seeded.styleKit);
+  const inheritedKit = seedHasKit
+    ? normalizeStyleKit(seeded.styleKit)
+    : cloneBrandStyleKit(fallbackBrand?.styleKit ? fallbackBrand : hydratedBrand);
   return {
     ...DEFAULT_DOC,
     ...seeded,
     brand: hydratedBrand,
-    styleKit: seeded.styleKit
-      ? seeded.styleKit
-      : { stylePrompt: '', contextMd: '', refImages: [] },
+    styleKit: inheritedKit,
     slides: Array.isArray(seeded.slides) && seeded.slides.length
       ? seeded.slides
       : [mkSlide(1, hydratedBrand)],

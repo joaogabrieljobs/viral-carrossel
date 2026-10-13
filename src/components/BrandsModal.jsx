@@ -21,8 +21,8 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
               <Palette size={14} color="var(--text-secondary)"/>
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Perfis de marca</div>
-              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{brands.length} {brands.length === 1 ? 'perfil' : 'perfis'} salvos</div>
+              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Marcas</div>
+              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{brands.length} {brands.length === 1 ? 'marca' : 'marcas'} · contexto herdado por projetos novos</div>
             </div>
           </div>
           <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
@@ -37,7 +37,7 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
             borderRadius:10, padding:12, display:'flex', flexDirection:'column', gap:8,
           }}>
             <div style={{ fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
-              Salvar a marca <b>atual</b> ({currentBrand?.handle || '@perfil'}) como perfil reutilizável:
+              Guardar a marca <b>atual</b> ({currentBrand?.handle || '@perfil'}) com identidade e contexto do projeto (brief/estilo) para herdar em projetos novos:
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <input
@@ -91,7 +91,11 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
                       {b.name || 'Sem nome'}
                     </div>
                     <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em' }}>
-                      {b.handle}{b.bio ? ` · ${b.bio.slice(0, 50)}${b.bio.length > 50 ? '…' : ''}` : ''}
+                      {b.handle || 'sem @'}
+                      {b.styleKit?.contextMd?.trim() || b.styleKit?.stylePrompt?.trim()
+                        ? ' · contexto ON'
+                        : ''}
+                      {b.bio ? ` · ${b.bio.slice(0, 36)}${b.bio.length > 36 ? '…' : ''}` : ''}
                     </div>
                   </div>
                   {!on && (
@@ -141,7 +145,7 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
             })}
           </div>
           <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)', lineHeight:1.5 }}>
-            Aplicar um perfil sobrescreve a marca do carrossel atual com cores, fontes, logo, bio e tom desse perfil. Use em agências/freelance pra alternar entre clientes em segundos.
+            Aplicar troca a identidade do projeto aberto (cores, fontes, logo, bio). O brief/estilo default da marca aplica-se ao <b>criar</b> um projeto novo nessa marca — edite o contexto na Home → Marcas.
           </div>
         </div>
       </div>

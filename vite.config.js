@@ -6,6 +6,40 @@ import { serverFetchUrlPlainText, assertPublicHttpUrl } from './urlSourceFetch.j
 // - /api/anthropic/*  → https://api.anthropic.com/* (header x-api-key vem do .env)
 // - /api/openai/*     → https://api.openai.com/*    (header Authorization vem do
 //                       header `x-openai-key` da request, ou do .env como fallback)
+// - /api/project-share → handler Vercel local (memória se não houver Redis/Blob)
+
+function makeVercelFakeRes(res) {
+  return {
+    statusCode: 200,
+    headers: {},
+    setHeader(k, v) { this.headers[k] = v; },
+    status(code) { this.statusCode = code; return this; },
+    json(payload) {
+      res.statusCode = this.statusCode;
+      Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify(payload));
+    },
+    send(payload) {
+      res.statusCode = this.statusCode;
+      Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
+      res.end(typeof payload === 'string' ? payload : JSON.stringify(payload));
+    },
+    end(...args) { res.end(...args); },
+  };
+}
+
+async function readJsonBody(req) {
+  try {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const rawBody = Buffer.concat(chunks).toString('utf8');
+    return rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
@@ -22,9 +56,7 @@ export default defineConfig(({ mode }) => {
                 const urlObj = new URL(req.url || '', 'http://localhost');
                 let raw = urlObj.searchParams.get('url') || '';
                 if (req.method === 'POST') {
-                  const chunks = [];
-                  for await (const chunk of req) chunks.push(chunk);
-                  const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+                  const payload = await readJsonBody(req);
                   raw = payload.url || '';
                 }
                 assertPublicHttpUrl(raw);
@@ -42,31 +74,11 @@ export default defineConfig(({ mode }) => {
               return;
             }
             if (pathOnly === '/api/ai/ocr') {
-              try {
-                const chunks = [];
-                for await (const chunk of req) chunks.push(chunk);
-                const rawBody = Buffer.concat(chunks).toString('utf8');
-                req.body = rawBody ? JSON.parse(rawBody) : {};
-              } catch {
-                req.body = {};
-              }
+              req.body = await readJsonBody(req);
               if (env.ZAI_API_KEY) process.env.ZAI_API_KEY = env.ZAI_API_KEY;
-              const fakeRes = {
-                statusCode: 200,
-                headers: {},
-                setHeader(k, v) { this.headers[k] = v; },
-                status(code) { this.statusCode = code; return this; },
-                json(payload) {
-                  res.statusCode = this.statusCode;
-                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
-                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                  res.end(JSON.stringify(payload));
-                },
-                end(...args) { res.end(...args); },
-              };
               process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
               const { default: ocrHandler } = await import('./api/ai/ocr.js');
-              await ocrHandler(req, fakeRes);
+              await ocrHandler(req, makeVercelFakeRes(res));
               return;
             }
             if (pathOnly === '/api/ai/sjinn-image') {
@@ -74,64 +86,47 @@ export default defineConfig(({ mode }) => {
               for (const key of ['SJINN_API_KEY', 'BLOB_READ_WRITE_TOKEN', 'BLOB_STORE_ID', 'VERCEL_OIDC_TOKEN']) {
                 if (env[key]) process.env[key] = env[key];
               }
-              try {
-                const chunks = [];
-                for await (const chunk of req) chunks.push(chunk);
-                const rawBody = Buffer.concat(chunks).toString('utf8');
-                req.body = rawBody ? JSON.parse(rawBody) : {};
-              } catch {
-                req.body = {};
-              }
-              const fakeRes = {
-                statusCode: 200,
-                headers: {},
-                setHeader(k, v) { this.headers[k] = v; },
-                status(code) { this.statusCode = code; return this; },
-                json(payload) {
-                  res.statusCode = this.statusCode;
-                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
-                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                  res.end(JSON.stringify(payload));
-                },
-                end(...args) { res.end(...args); },
-              };
+              req.body = await readJsonBody(req);
               process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
               const { default: sjinnHandler } = await import('./api/ai/sjinn-image.js');
-              await sjinnHandler(req, fakeRes);
+              await sjinnHandler(req, makeVercelFakeRes(res));
               return;
             }
             if (pathOnly === '/api/ai/compatible') {
-              try {
-                const chunks = [];
-                for await (const chunk of req) chunks.push(chunk);
-                const rawBody = Buffer.concat(chunks).toString('utf8');
-                req.body = rawBody ? JSON.parse(rawBody) : {};
-              } catch {
-                req.body = {};
-              }
+              req.body = await readJsonBody(req);
               if (env.ZAI_API_KEY) process.env.ZAI_API_KEY = env.ZAI_API_KEY;
               if (env.KIMI_API_KEY) process.env.KIMI_API_KEY = env.KIMI_API_KEY;
-              const fakeRes = {
-                statusCode: 200,
-                headers: {},
-                setHeader(k, v) { this.headers[k] = v; },
-                status(code) { this.statusCode = code; return this; },
-                json(payload) {
-                  res.statusCode = this.statusCode;
-                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
-                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                  res.end(JSON.stringify(payload));
-                },
-                send(payload) {
-                  res.statusCode = this.statusCode;
-                  Object.entries(this.headers).forEach(([k, v]) => res.setHeader(k, v));
-                  res.end(typeof payload === 'string' ? payload : JSON.stringify(payload));
-                },
-                end(...args) { res.end(...args); },
-              };
               process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
               const { default: compatibleHandler } = await import('./api/ai/compatible.js');
-              await compatibleHandler(req, fakeRes);
+              await compatibleHandler(req, makeVercelFakeRes(res));
+              return;
+            }
+            if (pathOnly === '/api/project-share') {
+              for (const key of [
+                'UPSTASH_REDIS_REST_URL',
+                'UPSTASH_REDIS_REST_TOKEN',
+                'BLOB_READ_WRITE_TOKEN',
+                'BLOB_STORE_ID',
+                'VERCEL_OIDC_TOKEN',
+              ]) {
+                if (env[key]) process.env[key] = env[key];
+              }
+              // GET usa query string; POST precisa do body JSON.
+              if (req.method === 'POST' || req.method === 'PUT') {
+                req.body = await readJsonBody(req);
+              } else {
+                const urlObj = new URL(req.url || '', 'http://localhost');
+                req.query = Object.fromEntries(urlObj.searchParams.entries());
+              }
+              process.env.BILLING_DISABLED = process.env.BILLING_DISABLED || 'true';
+              try {
+                const { default: shareHandler } = await import('./api/project-share.js');
+                await shareHandler(req, makeVercelFakeRes(res));
+              } catch (e) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: e?.message || 'Falha na partilha (dev).' }));
+              }
               return;
             }
             return next();

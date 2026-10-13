@@ -1,6 +1,6 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useRef } from 'react';
-import { X, SlidersHorizontal } from 'lucide-react';
+import { X, SlidersHorizontal, AlignLeft } from 'lucide-react';
 import { useScrollLock } from '../../hooks/useScrollLock.js';
 import { FORMATS } from '../../utils/formats.js';
 import { FULLSCREEN_IMG_ADJ_ROWS, FullscreenImageAdjustBar } from './FullscreenImageAdjustBar.jsx';
@@ -59,7 +59,19 @@ function presentationImgAdjustEquivalent(a, b) {
   return PRESENTATION_IMG_ADJ_KEYS.every((k) => na[k] === nb[k]);
 }
 
-function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setActiveIdx, onSavePresentationAdjust, creativePreset = 'livre' }) {
+function FullscreenViewer({
+  open,
+  onClose,
+  slides,
+  fmt,
+  brand,
+  activeIdx,
+  setActiveIdx,
+  onSavePresentationAdjust,
+  creativePreset = 'livre',
+  caption = '',
+  setCaption = null,
+}) {
   useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
   // Medida inicial real: com {w:0,h:0} o primeiro frame usava scale 0.8 e o card
@@ -69,12 +81,14 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
     h: typeof window !== 'undefined' ? window.innerHeight : 0,
   }));
   const [photoAdjustOpen, setPhotoAdjustOpen] = useState(false);
+  const [captionOpen, setCaptionOpen] = useState(false);
   /** Rascunho da tela cheia: apenas slides com entrada explícita; ausente = usar `slide.presentationImgAdjust`. */
   const [imgAdjBySlide, setImgAdjBySlide] = useState({});
 
   useEffect(() => {
     if (!open) {
       setPhotoAdjustOpen(false);
+      setCaptionOpen(false);
       return;
     }
     const upd = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -88,15 +102,16 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (photoAdjustOpen) setPhotoAdjustOpen(false);
+        if (captionOpen) setCaptionOpen(false);
+        else if (photoAdjustOpen) setPhotoAdjustOpen(false);
         else onClose();
       }
-      else if (e.key === 'ArrowLeft')  { e.preventDefault(); setActiveIdx(Math.max(0, activeIdx - 1)); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); setActiveIdx(Math.min(slides.length - 1, activeIdx + 1)); }
+      else if (e.key === 'ArrowLeft' && !captionOpen)  { e.preventDefault(); setActiveIdx(Math.max(0, activeIdx - 1)); }
+      else if (e.key === 'ArrowRight' && !captionOpen) { e.preventDefault(); setActiveIdx(Math.min(slides.length - 1, activeIdx + 1)); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, activeIdx, slides.length, setActiveIdx, onClose, photoAdjustOpen]);
+  }, [open, activeIdx, slides.length, setActiveIdx, onClose, photoAdjustOpen, captionOpen]);
 
   if (!open || !slides[activeIdx]) return null;
 
@@ -268,7 +283,7 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
         >›</button>
       )}
 
-      {/* Ajustes de imagem — abre sob demanda (botão ou tecla já documentada na barra) */}
+      {/* Legenda do post (não vai no card) + ajustes de imagem */}
       <div
         style={{
           position: 'absolute',
@@ -279,15 +294,110 @@ function FullscreenViewer({ open, onClose, slides, fmt, brand, activeIdx, setAct
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          gap: 10,
           pointerEvents: 'none',
         }}
       >
-        <div style={{ pointerEvents: 'auto', width: '100%', display: 'flex', justifyContent: 'center', paddingLeft: 20, paddingRight: 20, boxSizing: 'border-box' }}>
+        {captionOpen ? (
+          <div
+            style={{
+              pointerEvents: 'auto',
+              width: 'min(520px, calc(100% - 40px))',
+              padding: 14,
+              borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: 'rgba(12,12,16,0.92)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            }}>
+              <div style={{
+                fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)',
+              }}>
+                Legenda do post
+              </div>
+              <button
+                type="button"
+                onClick={() => setCaptionOpen(false)}
+                aria-label="Fechar legenda"
+                style={{
+                  width: 32, height: 32, borderRadius: 9999, border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'transparent', color: '#fff', cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
+              Não aparece no card — só na publicação (Instagram / exportação de texto).
+            </p>
+            <textarea
+              aria-label="Editar legenda do post"
+              value={caption || ''}
+              onChange={(e) => setCaption?.(e.target.value)}
+              rows={5}
+              placeholder="Escreva a legenda do post e as hashtags…"
+              style={{
+                width: '100%', minHeight: 110, resize: 'vertical', boxSizing: 'border-box',
+                borderRadius: 12, border: '1px solid rgba(255,255,255,0.18)',
+                background: 'rgba(255,255,255,0.06)', color: '#fff',
+                padding: '10px 12px', fontSize: 13, lineHeight: 1.45,
+                fontFamily: 'var(--font-ui)',
+              }}
+            />
+          </div>
+        ) : null}
+
+        <div style={{
+          pointerEvents: 'auto', width: '100%', display: 'flex', justifyContent: 'center',
+          gap: 8, flexWrap: 'wrap', paddingLeft: 20, paddingRight: 20, boxSizing: 'border-box',
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              setPhotoAdjustOpen(false);
+              setCaptionOpen((v) => !v);
+            }}
+            aria-label={captionOpen ? 'Fechar legenda' : 'Ver e editar legenda do post'}
+            aria-pressed={captionOpen}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 18px',
+              borderRadius: 9999,
+              border: `1px solid ${captionOpen ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)'}`,
+              background: captionOpen ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'var(--font-ui)',
+              letterSpacing: '-0.022em',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+            }}
+          >
+            <AlignLeft size={14} aria-hidden strokeWidth={2.25} />
+            Legenda{caption?.trim() ? '' : ' (vazia)'}
+          </button>
+
           {!photoAdjustOpen ? (
             <button
               type="button"
               disabled={!hasBgImageFs}
-              onClick={() => setPhotoAdjustOpen(true)}
+              onClick={() => {
+                setCaptionOpen(false);
+                setPhotoAdjustOpen(true);
+              }}
               aria-label={
                 hasBgImageFs ? 'Abrir ajustes da foto' : 'Ajustes da foto indisponíveis sem imagem de fundo'
               }

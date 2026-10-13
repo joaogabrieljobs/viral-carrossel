@@ -1196,18 +1196,44 @@ export default function App() {
   });
   const createProjectByKind = useCallback((kind = 'carrossel') => {
     const isPresentation = kind === 'apresentacao';
+    const rosterBrand = brandRoster.find((b) => b.id === activeBrandId)
+      || brandRoster[0]
+      || brand;
+    const identity = hydrateBrandTextColors({ ...rosterBrand });
     const presentationSeed = isPresentation
       ? applyPresentationVisualPresetToDoc({
           ...presentationDocPatch(),
-          brand,
-          slides: [mkSlide(1, brand)],
+          brand: identity,
+          slides: [mkSlide(1, identity)],
         }, DEFAULT_PRESENTATION_VISUAL_PRESET_ID, PRESENTATION_VISUAL_PRESETS, { initialize: true })
-      : null;
+      : { brand: identity };
     newDoc(
       presentationSeed,
       isPresentation ? 'Nova apresentação' : 'Nova comunicação',
     );
-  }, [brand, newDoc]);
+  }, [brand, brandRoster, activeBrandId, newDoc]);
+
+  /** Selecciona marca para produção (Home) sem sobrescrever o projeto aberto. */
+  const selectBrandForProduction = useCallback((brandId) => {
+    if (!brandId || !brandRoster.some((b) => b.id === brandId)) return;
+    setActiveBrandId(brandId);
+  }, [brandRoster]);
+
+  /** Actualiza o contexto default (brief/estilo) de um perfil de marca. */
+  const saveBrandContext = useCallback((brandId, styleKit) => {
+    setBrandRoster((prev) => prev.map((b) => (
+      b.id === brandId
+        ? { ...b, styleKit: {
+          stylePrompt: String(styleKit?.stylePrompt || '').slice(0, 4000),
+          contextMd: String(styleKit?.contextMd || '').slice(0, 48000),
+          refImages: Array.isArray(styleKit?.refImages) ? styleKit.refImages : (b.styleKit?.refImages || []),
+          logoOnGenerate: styleKit?.logoOnGenerate === false ? false : true,
+          ...(styleKit?.logo ? { logo: styleKit.logo } : (b.styleKit?.logo ? { logo: b.styleKit.logo } : {})),
+          ...(styleKit?.name ? { name: String(styleKit.name).slice(0, 60) } : {}),
+        } }
+        : b
+    )));
+  }, []);
 
   useEffect(() => {
     if (!activeEntry?.id) return;
@@ -1256,7 +1282,21 @@ export default function App() {
   }, [activeBrandId, brandRoster, doc.brand?.id, history, setLibrary]);
   // Salva o brand do doc atual como um perfil novo na "estante"
   const saveCurrentBrandAsProfile = useCallback((name) => {
-    const newBrand = { ...doc.brand, id: uid(), name: name || `Perfil ${brandRoster.length + 1}` };
+    const kit = doc.styleKit && typeof doc.styleKit === 'object' ? doc.styleKit : null;
+    const newBrand = {
+      ...doc.brand,
+      id: uid(),
+      name: name || `Perfil ${brandRoster.length + 1}`,
+      // Contexto do projeto actual vira o default da marca (herdado em projetos novos).
+      ...(kit ? { styleKit: {
+        stylePrompt: String(kit.stylePrompt || ''),
+        contextMd: String(kit.contextMd || ''),
+        refImages: Array.isArray(kit.refImages) ? kit.refImages : [],
+        logoOnGenerate: kit.logoOnGenerate !== false,
+        ...(kit.logo ? { logo: kit.logo } : {}),
+        ...(kit.name ? { name: kit.name } : {}),
+      } } : {}),
+    };
     upsertBrand(newBrand);
     // O perfil selecionado e o perfil gravado no projeto precisam mudar na
     // mesma ação. Caso contrário, o sincronizador por projeto restaura o ID
@@ -1264,7 +1304,7 @@ export default function App() {
     history.set((current) => ({ ...current, brand: hydrateBrandTextColors(newBrand) }));
     setActiveBrandId(newBrand.id);
     return newBrand;
-  }, [doc.brand, brandRoster.length, history, upsertBrand]);
+  }, [doc.brand, doc.styleKit, brandRoster.length, history, upsertBrand]);
 
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
   const flushPersistNow = useCallback(() => {
@@ -4363,6 +4403,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     genBusy: !!genProgress,
     imgParams, setImgParams,
     setBrandsOpen, brandRoster, activeBrandId,
+    onSelectBrand: selectBrandForProduction,
+    onSaveBrandContext: saveBrandContext,
     setLibraryOpen, libraryCount: library.length,
     library,
     activeDocId,
@@ -5995,6 +6037,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
         creativePreset={creativePreset}
+        caption={caption}
+        setCaption={setCaption}
       />
       <LibraryModal
         open={libraryOpen}

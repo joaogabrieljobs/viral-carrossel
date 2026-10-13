@@ -1,55 +1,97 @@
 /**
  * Importação de texto estruturado: 1 página/bloco = 1 card.
- * Separa título, headline, subtítulo, CTA e legenda do post.
+ * Interpreta rótulos (Título, Headline, Subtítulo, CTA, Legenda) — não os cola no card.
+ * Legenda vai só para a caption do post, nunca para o slide.
  */
 
 import { mkSlide } from './doc-schema.js';
 
 const SEPARATOR_LINE_RE = /^(?:-{3,}|={3,}.*|página\s*\d+\b.*|page\s*\d+\b.*|(?:card|slide)\s*\d+\b.*)$/i;
 
-const FIELD_ALIASES = Object.freeze({
-  titulo: ['titulo', 'título', 'title', 'tit'],
-  headline: ['headline', 'gancho', 'hook', 'abertura'],
-  subtitulo: ['subtitulo', 'subtítulo', 'subtitle', 'sub', 'corpo', 'texto'],
-  cta: ['cta', 'chamada', 'call to action', 'call-to-action', 'fecho', 'convite'],
-  legenda: ['legenda', 'caption', 'legenda do post', 'caption do post', 'hashtags'],
+/** Tokens que abrem um campo (com ou sem `:`). Ordem: mais específicos primeiro. */
+const FIELD_TOKEN_RE = /\b(call[\s-]?to[\s-]?action|subt[ií]tulo|subtitle|t[ií]tulo|headline|gancho|hook|abertura|title|corpo|texto|cta|chamada|fecho|convite|legenda|caption)\b\s*:?\s*/gi;
+
+const TOKEN_TO_FIELD = Object.freeze({
+  titulo: 'titulo',
+  title: 'titulo',
+  headline: 'headline',
+  gancho: 'headline',
+  hook: 'headline',
+  abertura: 'headline',
+  subtitulo: 'subtitulo',
+  subtitle: 'subtitulo',
+  corpo: 'subtitulo',
+  texto: 'subtitulo',
+  cta: 'cta',
+  chamada: 'cta',
+  'call to action': 'cta',
+  'call-to-action': 'cta',
+  'calltoaction': 'cta',
+  fecho: 'cta',
+  convite: 'cta',
+  legenda: 'legenda',
+  caption: 'legenda',
 });
 
-function normalizeKey(raw) {
+/** Padrão visual ao importar texto → card editorial full-bleed legível. */
+export const IMPORT_TEXT_VISUAL = Object.freeze({
+  photoRegion: 'full',
+  layout: 'ml',
+  align: 'left',
+  textShadow: true,
+  textBg: false,
+  overlay: 52,
+  elementsUnlocked: true,
+  cultureTone: '',
+});
+
+function normalizeToken(raw) {
   return String(raw || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[_:]+$/g, '')
+    .replace(/[\s_-]+/g, ' ')
     .trim();
 }
 
-function matchField(key) {
-  const k = normalizeKey(key);
-  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-    if (aliases.some((alias) => normalizeKey(alias) === k)) return field;
-  }
-  return null;
+function fieldFromToken(raw) {
+  const key = normalizeToken(raw).replace(/\s+/g, ' ');
+  const compact = key.replace(/\s+/g, '');
+  return TOKEN_TO_FIELD[key] || TOKEN_TO_FIELD[compact] || null;
+}
+
+/** Remove vazamentos tipo "Headline Foo" / "Subtítulo: Foo" do valor já mapeado. */
+export function scrubLabelLeak(text) {
+  let out = String(text || '').trim();
+  if (!out) return '';
+  // Prefixos repetidos no início
+  out = out.replace(
+    /^(?:t[ií]tulo|title|headline|gancho|hook|abertura|subt[ií]tulo|subtitle|corpo|texto|cta|chamada|fecho|convite|legenda|caption)\s*:?\s+/i,
+    '',
+  );
+  // Rótulos soltos no meio (não devem aparecer no card)
+  out = out.replace(
+    /\s+\b(?:t[ií]tulo|title|headline|gancho|hook|subt[ií]tulo|subtitle|cta|chamada|legenda|caption)\b\s*:?\s+/gi,
+    ' ',
+  );
+  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 function splitPages(raw) {
   const text = String(raw || '').replace(/\r\n/g, '\n').trim();
   if (!text) return { pages: [], trailingCaption: '' };
 
-  // Bloco final de legenda separado do resto (fora das páginas).
   let body = text;
   let trailingCaption = '';
-  const captionSplit = text.split(/\n(?=(?:legenda|caption)\s*:)/i);
-  if (captionSplit.length > 1) {
-    const last = captionSplit[captionSplit.length - 1];
-    if (/^(?:legenda|caption)\s*:/i.test(last.trim())) {
-      trailingCaption = last.replace(/^(?:legenda|caption)\s*:/i, '').trim();
-      body = captionSplit.slice(0, -1).join('\n').trim();
-    }
+
+  // LEGENDA no fim do documento (bloco dedicado, após linha em branco ou rótulo sozinho)
+  const captionTail = text.match(/(?:\n|^)(?:legenda|caption)\s*:?\s*\n([\s\S]*)$/i);
+  if (captionTail && captionTail.index != null) {
+    trailingCaption = captionTail[1].trim();
+    body = text.slice(0, captionTail.index).trim();
   }
 
   const pages = [];
-  // Form-feed = quebra de página (Word/PDF colado).
   for (const formPart of body.split('\f')) {
     const lines = formPart.split('\n');
     let buf = [];
@@ -71,8 +113,10 @@ function splitPages(raw) {
   return { pages: pages.length ? pages : (body ? [body] : []), trailingCaption };
 }
 
+/**
+ * Interpreta rótulos com ou sem `:`, em linhas próprias ou inline no parágrafo.
+ */
 function parseLabeledBlock(pageText) {
-  const lines = String(pageText || '').split('\n');
   const fields = {
     titulo: '',
     headline: '',
@@ -80,61 +124,91 @@ function parseLabeledBlock(pageText) {
     cta: '',
     legenda: '',
   };
-  let current = null;
-  const unlabeled = [];
+  const source = String(pageText || '').replace(/\r\n/g, '\n').trim();
+  if (!source) return { fields, unlabeled: [] };
 
-  for (const line of lines) {
-    const labeled = line.match(/^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 /_-]{0,40})\s*:\s*(.*)$/);
-    if (labeled) {
-      const field = matchField(labeled[1]);
-      if (field) {
-        current = field;
-        const rest = labeled[2].trim();
-        fields[field] = fields[field]
-          ? `${fields[field]}\n${rest}`.trim()
-          : rest;
-        continue;
-      }
-    }
-    if (current) {
-      fields[current] = fields[current]
-        ? `${fields[current]}\n${line}`.trim()
-        : line.trim();
-    } else if (line.trim()) {
-      unlabeled.push(line.trim());
-    }
+  const matches = [...source.matchAll(FIELD_TOKEN_RE)];
+  if (!matches.length) {
+    const lines = source.split('\n').map((l) => l.trim()).filter(Boolean);
+    return { fields, unlabeled: lines };
+  }
+
+  const unlabeled = [];
+  const before = source.slice(0, matches[0].index).trim();
+  if (before) unlabeled.push(...before.split('\n').map((l) => l.trim()).filter(Boolean));
+
+  for (let i = 0; i < matches.length; i += 1) {
+    const m = matches[i];
+    const field = fieldFromToken(m[1]);
+    if (!field) continue;
+    const start = m.index + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index : source.length;
+    const value = source.slice(start, end).trim();
+    if (!value) continue;
+    fields[field] = fields[field] ? `${fields[field]}\n${value}`.trim() : value;
   }
 
   return { fields, unlabeled };
 }
 
+/** Separa tema em MAIÚSCULAS colado ao fim do headline (ex.: "Frase. ÁCIDO HIALURÔNICO"). */
+function peelThemeFromHeadline(headline) {
+  let h = String(headline || '').trim();
+  let theme = '';
+  const lines = h.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length >= 2) {
+    const last = lines[lines.length - 1];
+    if (last === last.toLocaleUpperCase('pt-BR') && last.length <= 64 && /[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(last)) {
+      theme = last;
+      h = lines.slice(0, -1).join('\n').trim();
+      return { headline: h, theme };
+    }
+  }
+  const inline = h.match(/^(.*[.!?])\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9\s/-]{2,60})$/);
+  if (inline && inline[2] === inline[2].toLocaleUpperCase('pt-BR')) {
+    return { headline: inline[1].trim(), theme: inline[2].trim() };
+  }
+  return { headline: h, theme: '' };
+}
+
 function mapFieldsToSlide(fields, unlabeled) {
-  const titulo = (fields.titulo || '').trim();
-  const headline = (fields.headline || '').trim();
-  const subtitulo = (fields.subtitulo || '').trim();
-  const cta = (fields.cta || '').trim();
-  const legenda = (fields.legenda || '').trim();
+  let titulo = scrubLabelLeak(fields.titulo);
+  let headline = scrubLabelLeak(fields.headline);
+  const subtitulo = scrubLabelLeak(fields.subtitulo);
+  const cta = scrubLabelLeak(fields.cta);
+  // Legenda NUNCA entra no card — só devolve para a caption do post.
+  const legenda = scrubLabelLeak(fields.legenda);
 
-  let title = '';
-  let subtitle = '';
-  let bodyAfterImage = '';
+  const unlabeledClean = unlabeled.map(scrubLabelLeak).filter(Boolean);
 
-  if (headline && titulo && headline !== titulo) {
-    title = headline;
-    subtitle = [titulo, subtitulo].filter(Boolean).join('\n\n');
-  } else {
-    title = headline || titulo || unlabeled[0] || '';
-    const restUnlabeled = headline || titulo ? unlabeled : unlabeled.slice(1);
-    subtitle = subtitulo || restUnlabeled.join('\n');
+  if (headline) {
+    const peeled = peelThemeFromHeadline(headline);
+    headline = peeled.headline;
+    if (peeled.theme && !titulo) titulo = peeled.theme;
   }
 
-  if (cta) bodyAfterImage = cta;
+  // Headline = título visual do card; Título/tema reforça o subtítulo (não o headline).
+  let title = headline || titulo || unlabeledClean[0] || '';
+  title = scrubLabelLeak(title);
+
+  let subtitle = '';
+  if (headline && titulo && headline !== titulo) {
+    subtitle = [titulo, subtitulo].filter(Boolean).join('\n\n');
+  } else if (subtitulo) {
+    subtitle = subtitulo;
+  } else {
+    subtitle = unlabeledClean.slice(1).join('\n');
+  }
+  subtitle = scrubLabelLeak(subtitle);
+
+  // CTA só no corpo inferior — nunca misturado com subtítulo.
+  const bodyAfterImage = cta;
 
   return {
-    title: title.trim(),
-    subtitle: subtitle.trim(),
-    bodyAfterImage: bodyAfterImage.trim(),
-    legenda: legenda.trim(),
+    title,
+    subtitle,
+    bodyAfterImage,
+    legenda,
   };
 }
 
@@ -145,14 +219,14 @@ function mapFieldsToSlide(fields, unlabeled) {
 export function parseImportedText(raw) {
   const { pages, trailingCaption } = splitPages(raw);
   const cards = [];
-  let caption = trailingCaption || '';
+  const captionParts = [];
+  if (trailingCaption) captionParts.push(scrubLabelLeak(trailingCaption));
 
   for (const page of pages) {
     const { fields, unlabeled } = parseLabeledBlock(page);
     const mapped = mapFieldsToSlide(fields, unlabeled);
-    if (mapped.legenda) {
-      caption = caption ? `${caption}\n${mapped.legenda}` : mapped.legenda;
-    }
+    if (mapped.legenda) captionParts.push(mapped.legenda);
+    // Só cria card se houver conteúdo de slide (não só legenda)
     if (!mapped.title && !mapped.subtitle && !mapped.bodyAfterImage) continue;
     cards.push({
       title: mapped.title,
@@ -161,11 +235,15 @@ export function parseImportedText(raw) {
     });
   }
 
-  return { cards, caption: caption.trim(), pageCount: pages.length };
+  return {
+    cards,
+    caption: captionParts.filter(Boolean).join('\n\n').trim(),
+    pageCount: pages.length,
+  };
 }
 
 /**
- * Aplica cards parseados aos slides: cria slides novos se faltar (sem teto).
+ * Aplica cards parseados aos slides + padrão visual de importação.
  */
 export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, brand = null, opts = {}) {
   const list = Array.isArray(slides) ? slides : [];
@@ -176,17 +254,17 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
   const next = [];
   let created = 0;
   let updated = 0;
+  const n = cards.length;
 
-  for (let i = 0; i < cards.length; i += 1) {
+  for (let i = 0; i < n; i += 1) {
     const card = cards[i];
     const existing = i < list.length ? list[i] : null;
+    const isCover = i === 0;
+    const isClose = i === n - 1;
     let base = existing
       ? { ...existing, num: i + 1 }
       : {
           ...mkSlideFn(i + 1, brand),
-          ...(isPresentation
-            ? { layout: 'ml', align: 'left', photoRegion: 'full', showSwipeCue: false }
-            : { layout: 'bl', align: 'left', photoRegion: 'full' }),
         };
     if (!existing) created += 1;
     else updated += 1;
@@ -194,10 +272,15 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
     base = {
       ...base,
       num: i + 1,
-      title: card.title || '',
-      subtitle: card.subtitle || '',
-      bodyAfterImage: card.bodyAfterImage || '',
-      showSwipeCue: isPresentation ? false : (i < cards.length - 1),
+      title: scrubLabelLeak(card.title || ''),
+      subtitle: scrubLabelLeak(card.subtitle || ''),
+      // CTA no fecho; miolo pode ter CTA curto em bodyAfterImage
+      bodyAfterImage: scrubLabelLeak(card.bodyAfterImage || ''),
+      ...IMPORT_TEXT_VISUAL,
+      layout: isPresentation ? 'ml' : (isCover ? 'mc' : 'ml'),
+      align: isCover && !isPresentation ? 'center' : 'left',
+      showSwipeCue: isPresentation ? false : !isClose,
+      // Garante que nada de legenda ficou em campos do card
     };
     next.push(base);
   }
@@ -212,23 +295,16 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
 }
 
 export const IMPORT_TEXT_TEMPLATE = `=== Card 1 ===
-Título: Nome curto do card
-Headline: Gancho que prende em 1 linha
-Subtítulo: Desenvolvimento do argumento em 2–4 frases.
+Headline: Seus traços orientam o planejamento.
+Título: Ácido hialurônico facial
+Subtítulo: Planejamento de volume e contorno.
 CTA:
 
 === Card 2 ===
-Título:
 Headline: Segundo argumento
 Subtítulo: Continuidade da narrativa.
-CTA:
-
-=== Card 3 ===
-Título:
-Headline: Fecho
-Subtítulo: Síntese do que ficou claro.
-CTA: Próximo passo concreto para o leitor.
+CTA: Agende uma consulta para conhecer as possibilidades.
 
 LEGENDA:
-Texto da legenda do post (fora dos cards). #hashtag1 #hashtag2
+O ácido hialurônico pode ser utilizado no preenchimento facial. #estetica #hialuronico
 `;

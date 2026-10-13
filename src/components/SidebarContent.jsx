@@ -22,6 +22,8 @@ import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.
 import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
 import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
+import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
+import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
 import { appModeLabel } from '../utils/ui-depth-labels.js';
@@ -238,6 +240,8 @@ function SidebarContent({
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
   setImgParams = () => {},
   setBrandsOpen, brandRoster = [], activeBrandId,
+  onSelectBrand = null,
+  onSaveBrandContext = null,
   setLibraryOpen = () => {}, libraryCount = 0,
   library = [],
   activeDocId = null,
@@ -2183,7 +2187,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Perfis de marca" hint="Combinações salvas (cores, fontes, logo, bio). Troca entre clientes com 1 clique.">
+              <S title="Marcas" hint="Identidade + contexto. Projetos novos nesta marca herdam o brief/estilo guardado na Home.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{
@@ -2206,15 +2210,29 @@ function SidebarContent({
                     </div>
                     <div style={{ textAlign:'left', minWidth:0, flex:1 }}>
                       <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.011em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                        {brandRoster.find(b => b.id === activeBrandId)?.name || 'Perfil personalizado'}
+                        {brandRoster.find(b => b.id === activeBrandId)?.name || 'Marca personalizada'}
                       </div>
                       <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em' }}>
-                        {brandRoster.length} {brandRoster.length === 1 ? 'perfil salvo' : 'perfis salvos'}
+                        {brandRoster.length} {brandRoster.length === 1 ? 'marca' : 'marcas'}
+                        {brandRoster.find(b => b.id === activeBrandId)?.styleKit?.contextMd?.trim() ? ' · contexto ON' : ''}
                       </div>
                     </div>
                   </div>
                   <ChevronRight size={13} color="var(--text-muted)"/>
                 </button>
+                {onSaveBrandContext && activeBrandId ? (
+                  <button
+                    type="button"
+                    className="vc-btn vc-btn-ghost"
+                    onClick={() => {
+                      onSaveBrandContext(activeBrandId, styleKit);
+                      toast?.('Contexto deste projeto guardado na marca. Novos projetos herdam.', 'success', 4000);
+                    }}
+                    style={{ width: '100%', minHeight: 36, fontSize: 12, marginTop: 8 }}
+                  >
+                    Usar contexto deste projeto na marca
+                  </button>
+                ) : null}
               </S>
             )}
 
@@ -3245,8 +3263,17 @@ function SidebarContent({
           <>
             <S
               title="Projetos"
-              hint="Escolha o projeto ou defina o que deseja criar. Cada um mantém seu próprio contexto."
+              hint="Escolha a marca, defina o contexto dela e crie projetos que já herdam esse brief."
             >
+              <BrandWorkspacePanel
+                brandRoster={brandRoster}
+                activeBrandId={activeBrandId}
+                onSelectBrand={onSelectBrand || (() => {})}
+                onSaveBrandContext={onSaveBrandContext}
+                onOpenBrands={setBrandsOpen ? () => setBrandsOpen(true) : null}
+                projectCount={projectsForBrand(library, activeBrandId).length}
+                toast={toast}
+              />
               <div
                 role="group"
                 aria-label="Tipo de projeto para criar"
@@ -3287,7 +3314,7 @@ function SidebarContent({
               </div>
               <div
                 role="list"
-                aria-label="Projetos salvos"
+                aria-label="Projetos da marca"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -3297,7 +3324,21 @@ function SidebarContent({
                   paddingRight: 2,
                 }}
               >
-                {[...library]
+                {projectsForBrand(library, activeBrandId).length === 0 ? (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    padding: '14px 12px',
+                    borderRadius: 12,
+                    border: '1px dashed var(--glass-border-strong)',
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.45,
+                    textAlign: 'center',
+                  }}>
+                    Nenhum projeto nesta marca ainda. Crie Comunica ou Apresenta — o contexto acima já entra no projeto.
+                  </div>
+                ) : null}
+                {[...projectsForBrand(library, activeBrandId)]
                   .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   .map((entry) => {
                     const isActive = entry.id === (activeDocId || activeEntry?.id);
@@ -3308,10 +3349,7 @@ function SidebarContent({
                     const projectKind = projectKindOf(entry);
                     const isPresentation = projectKind === 'apresentacao';
                     const product = moontNarrative(projectKind);
-                    const productLabel = product.name;
-                    const itemLabel = isPresentation
-                      ? `${slidesOf.length} slide${slidesOf.length === 1 ? '' : 's'}`
-                      : `${slidesOf.length} card${slidesOf.length === 1 ? '' : 's'}`;
+                    const typeLabel = product.format;
                     return (
                       <button
                         key={entry.id}
@@ -3330,8 +3368,8 @@ function SidebarContent({
                           flexDirection: 'column',
                           alignItems: 'center',
                           gap: 6,
-                          padding: '10px 8px 12px',
-                          minHeight: 132,
+                          padding: '10px 8px 10px',
+                          minHeight: 108,
                           borderRadius: 12,
                           border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--glass-border-strong)'}`,
                           background: isActive ? 'var(--accent-surface)' : 'var(--bg-card)',
@@ -3393,29 +3431,16 @@ function SidebarContent({
                           {label}
                         </span>
                         <span style={{
-                          display: 'grid',
-                          gap: 1,
                           width: '100%',
                           maxWidth: '100%',
                           minWidth: 0,
                           fontSize: 8, fontWeight: 650, color: 'var(--text-muted)',
                           fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
                           textTransform: 'uppercase', lineHeight: 1.2,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{productLabel}</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemLabel}</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.format}</span>
+                          {typeLabel}
                         </span>
-                        {isActive ? (
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, color: 'var(--accent)',
-                            fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                            textTransform: 'uppercase',
-                            flexShrink: 0,
-                          }}>
-                            Aberto
-                          </span>
-                        ) : null}
                       </button>
                     );
                   })}
@@ -3430,8 +3455,8 @@ function SidebarContent({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      padding: '10px 8px 12px',
-                      minHeight: 132,
+                      padding: '10px 8px 10px',
+                      minHeight: 108,
                       width: '100%',
                       boxSizing: 'border-box',
                       borderRadius: 12,

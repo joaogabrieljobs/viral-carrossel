@@ -187,15 +187,29 @@ async function shareRequest(payload, { method = 'POST', code } = {}) {
   const url = method === 'GET'
     ? `${SHARE_API}?code=${encodeURIComponent(code || '')}`
     : SHARE_API;
-  const res = await fetch(url, {
-    method,
-    credentials: 'include',
-    headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
-    body: method === 'GET' ? undefined : JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      credentials: 'include',
+      headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
+      body: method === 'GET' ? undefined : JSON.stringify(payload),
+    });
+  } catch (e) {
+    const raw = String(e?.message || e || '');
+    if (/failed to fetch|fetch failed|networkerror|load failed/i.test(raw)) {
+      throw new Error(
+        'Não foi possível contactar o servidor de partilha. Em local, reinicie o Vite; em produção, confirme o deploy da API.',
+      );
+    }
+    throw e instanceof Error ? e : new Error(raw || 'Falha na partilha.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.error || `Falha na partilha (${res.status})`);
+    const errMsg = typeof data?.error === 'string'
+      ? data.error
+      : (data?.error?.message || `Falha na partilha (${res.status})`);
+    throw new Error(errMsg);
   }
   return data;
 }
