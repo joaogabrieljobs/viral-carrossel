@@ -167,7 +167,22 @@ function AccountHomeShell({
     </div>
   );
 
-  const createSelectedProject = () => newDoc?.(creationType);
+  const createSelectedProject = async () => {
+    const isPresentation = creationType === 'apresentacao';
+    let name = '';
+    if (typeof askPrompt === 'function') {
+      const answered = await askPrompt({
+        title: isPresentation ? 'Nome da apresentação' : 'Nome da comunicação',
+        label: 'Como se chama este projeto?',
+        placeholder: isPresentation ? 'Ex.: Pitch clínica' : 'Ex.: Clínica Janine',
+        cta: 'Criar',
+        defaultValue: '',
+      });
+      if (answered === null || answered === undefined) return;
+      name = String(answered).trim();
+    }
+    newDoc?.(creationType, name);
+  };
 
   const generateBtn = (fullWidth = false) => (
     <button

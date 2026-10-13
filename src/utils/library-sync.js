@@ -566,7 +566,7 @@ function reloadAfterCloudPull() {
  * Nunca substitui biblioteca local ocupada por uma nuvem mais velha / sem meta local.
  * @returns {Promise<'ok'|'reloading'|'skipped'>}
  */
-export async function reconcileLibraryCloud({ toast } = {}) {
+export async function reconcileLibraryCloud({ toast, email, customerId } = {}) {
   if (typeof window === 'undefined') return 'skipped';
   let status;
   try {
@@ -594,9 +594,27 @@ export async function reconcileLibraryCloud({ toast } = {}) {
       return 'ok';
     }
 
-    // Local vazio → restaurar da nuvem.
+    // Local vazio → cofre por aliases primeiro; só depois nuvem.
     if (!localOccupied) {
-      await pullLibraryFromCloud();
+      try {
+        const { restoreAccountVault, accountVaultHasProjects } = await import('./account-vault.js');
+        const { normalizeDataOwnerId, dataOwnerAliases, readDataOwner } = await import('./account-data-owner.js');
+        const owner = readDataOwner() || normalizeDataOwnerId(email, customerId);
+        const aliases = [...dataOwnerAliases(email, customerId)];
+        if (owner && !aliases.includes(owner)) aliases.unshift(owner);
+        if (accountVaultHasProjects(owner, aliases) && restoreAccountVault(owner, aliases)) {
+          if (typeof toast === 'function') {
+            toast('Projetos restaurados do cofre desta conta.', 'success', 4500);
+          }
+          reloadAfterCloudPull();
+          return 'reloading';
+        }
+      } catch { /* tenta nuvem */ }
+
+      const pulled = await pullLibraryFromCloud();
+      if (pulled?.empty || !pulled?.projectCount) {
+        return 'ok';
+      }
       if (typeof toast === 'function') {
         toast('Projetos restaurados da nuvem nesta conta.', 'success', 5000);
       }

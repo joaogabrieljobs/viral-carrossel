@@ -42,7 +42,7 @@ Legenda final #a #b
     expect(parsed.cards[0].title).not.toMatch(/Headline/i);
     expect(parsed.cards[0].subtitle).toMatch(/Corpo do primeiro/);
     expect(parsed.cards[1].bodyAfterImage).toMatch(/Comenta/);
-    expect(parsed.caption).toMatch(/Legenda final/);
+    expect(parsed.caption).toMatch(/final #a #b/);
     expect(parsed.cards.every((c) => !/legenda/i.test(`${c.title} ${c.subtitle} ${c.bodyAfterImage}`))).toBe(true);
   });
 

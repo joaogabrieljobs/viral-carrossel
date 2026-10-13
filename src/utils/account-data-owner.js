@@ -97,6 +97,8 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
 
   const prev = readDataOwner();
 
+  const aliases = [...dataOwnerAliases(session.email, session.customerId)];
+
   if (!prev) {
     if (explicitLogin) {
       // Login fresco: limpar activo órfão (outra pessoa) e restaurar o cofre desta conta.
@@ -104,14 +106,14 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
       await clearAccountLocalData({ wipeMedia: false });
       unlockAccountDataWrites();
       writeDataOwner(next);
-      restoreAccountVault(next);
+      restoreAccountVault(next, aliases);
       reloadAccountSwitch();
       return 'reloading';
     }
     // Boot silencioso: reclamar biblioteca actual; se vazia, restaurar cofre + reload
     // (senão o React fica com state vazio e a UI parece «apagada»).
     writeDataOwner(next);
-    if (!libraryLooksOccupied() && restoreAccountVault(next)) {
+    if (!libraryLooksOccupied() && restoreAccountVault(next, aliases)) {
       reloadAccountSwitch();
       return 'reloading';
     }
@@ -126,7 +128,7 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
       snapshotAccountVault(next);
     }
     // Biblioteca vazia mas cofre tem dados (logout anterior) → restaurar + reload.
-    if (!libraryLooksOccupied() && restoreAccountVault(next)) {
+    if (!libraryLooksOccupied() && restoreAccountVault(next, aliases)) {
       reloadAccountSwitch();
       return 'reloading';
     }
@@ -139,7 +141,7 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
   await clearAccountLocalData({ wipeMedia: false });
   unlockAccountDataWrites();
   writeDataOwner(next);
-  restoreAccountVault(next);
+  restoreAccountVault(next, aliases);
   reloadAccountSwitch();
   return 'reloading';
 }

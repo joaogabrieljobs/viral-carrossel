@@ -22,28 +22,6 @@ const SNAPSHOT_KEYS = [
   SK.modesIntro,
 ];
 
-function readJson(store, key) {
-  if (!store) return null;
-  try {
-    const raw = store.getItem(key);
-    if (raw == null || raw === '') return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(store, key, value) {
-  if (!store || value === undefined) return;
-  try {
-    if (value === null) {
-      store.removeItem(key);
-      return;
-    }
-    store.setItem(key, JSON.stringify(value));
-  } catch { /* quota */ }
-}
-
 function readVaultMap() {
   try {
     const raw = localStorage.getItem(ACCOUNT_VAULT_KEY);
@@ -58,29 +36,28 @@ function readVaultMap() {
 function writeVaultMap(map) {
   try {
     localStorage.setItem(ACCOUNT_VAULT_KEY, JSON.stringify(map));
-  } catch { /* quota — cofre pode falhar; active keys ainda existem até o clear */ }
+  } catch { /* quota */ }
 }
 
-/**
- * Guarda o estado activo da conta no slot do owner (antes do logout/troca).
- * @param {string} ownerId — ex.: email:a@b.com
- * @returns {boolean} true se gravou algo útil
- */
-export function snapshotAccountVault(ownerId) {
-  if (!ownerId || typeof localStorage === 'undefined') return false;
+function libraryCountFromBag(raw) {
+  if (typeof raw !== 'string' || !raw) return 0;
+  try {
+    const lib = JSON.parse(raw);
+    return Array.isArray(lib) ? lib.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function collectBag() {
   const bag = {};
   let useful = false;
   for (const key of SNAPSHOT_KEYS) {
     try {
       const raw = localStorage.getItem(key);
       if (raw == null || raw === '') continue;
-      bag[key] = raw; // string JSON já serializada — evita double-encode
-      if (key === SK.library) {
-        try {
-          const lib = JSON.parse(raw);
-          if (Array.isArray(lib) && lib.length) useful = true;
-        } catch { /* */ }
-      }
+      bag[key] = raw;
+      if (key === SK.library && libraryCountFromBag(raw) > 0) useful = true;
       if (key === SK.brands) {
         try {
           const brands = JSON.parse(raw);
@@ -89,21 +66,41 @@ export function snapshotAccountVault(ownerId) {
       }
     } catch { /* */ }
   }
+  return { bag, useful, projectCount: libraryCountFromBag(bag[SK.library]) };
+}
+
+/**
+ * Guarda o estado activo no slot do owner.
+ * Nunca sobrescreve um cofre com mais projetos por um snapshot vazio/stale.
+ */
+export function snapshotAccountVault(ownerId) {
+  if (!ownerId || typeof localStorage === 'undefined') return false;
+  const { bag, useful, projectCount } = collectBag();
   if (!useful && !Object.keys(bag).length) return false;
+
   const map = readVaultMap();
+  const prevCount = libraryCountFromBag(map[ownerId]?.keys?.[SK.library]);
+  if (projectCount < prevCount) {
+    // Evita apagar «Clínica Janine» com um snapshot vazio no logout.
+    return false;
+  }
+
   map[ownerId] = { savedAt: Date.now(), keys: bag };
   writeVaultMap(map);
   return true;
 }
 
-/**
- * Restaura o slot do owner para as chaves activas (vc_library, etc.).
- * @returns {boolean} true se restaurou biblioteca ou marcas
- */
-export function restoreAccountVault(ownerId) {
-  if (!ownerId || typeof localStorage === 'undefined') return false;
-  const map = readVaultMap();
-  const slot = map[ownerId];
+/** Snapshot nos aliases email: e id:cus da mesma conta. */
+export function snapshotAccountVaultForOwners(ownerIds = []) {
+  const ids = [...new Set((ownerIds || []).filter(Boolean))];
+  let any = false;
+  for (const id of ids) {
+    if (snapshotAccountVault(id)) any = true;
+  }
+  return any;
+}
+
+function applySlot(slot) {
   if (!slot?.keys || typeof slot.keys !== 'object') return false;
   let restored = false;
   for (const key of SNAPSHOT_KEYS) {
@@ -117,18 +114,35 @@ export function restoreAccountVault(ownerId) {
   return restored;
 }
 
-/** Há snapshot com projetos para este owner? */
-export function accountVaultHasProjects(ownerId) {
-  if (!ownerId || typeof localStorage === 'undefined') return false;
-  const slot = readVaultMap()[ownerId];
-  const raw = slot?.keys?.[SK.library];
-  if (typeof raw !== 'string') return false;
-  try {
-    const lib = JSON.parse(raw);
-    return Array.isArray(lib) && lib.length > 0;
-  } catch {
-    return false;
+/**
+ * Restaura o melhor slot entre ownerId e aliases (email: ↔ id:cus).
+ */
+export function restoreAccountVault(ownerId, aliases = []) {
+  if (typeof localStorage === 'undefined') return false;
+  const map = readVaultMap();
+  const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
+  let best = null;
+  let bestCount = -1;
+  for (const id of candidates) {
+    const slot = map[id];
+    const count = libraryCountFromBag(slot?.keys?.[SK.library]);
+    if (count > bestCount) {
+      bestCount = count;
+      best = slot;
+    }
   }
+  if (!best && ownerId && map[ownerId]) best = map[ownerId];
+  return applySlot(best);
 }
 
-export { SNAPSHOT_KEYS, readJson, writeJson };
+export function accountVaultHasProjects(ownerId, aliases = []) {
+  if (typeof localStorage === 'undefined') return false;
+  const map = readVaultMap();
+  const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
+  for (const id of candidates) {
+    if (libraryCountFromBag(map[id]?.keys?.[SK.library]) > 0) return true;
+  }
+  return false;
+}
+
+export { SNAPSHOT_KEYS };

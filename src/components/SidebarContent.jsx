@@ -3706,17 +3706,31 @@ function SidebarContent({
                 onShareJoined={onTeamShareJoined}
                 toast={toast}
               />
-              <button
-                type="button"
-                className="vc-btn vc-btn-ghost"
-                onClick={() => setImportTextOpen(true)}
-                style={{ width: '100%', minHeight: 40, marginTop: 8, justifyContent: 'flex-start', gap: 8 }}
-              >
-                <FileText size={14} /> Importar texto para os {itemsLabel}
-              </button>
             </S>
 
-            <S title={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Slides' : 'Cards'} hint={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Ordem do deck. Marca a caixa para ações em massa (logo).' : 'Ordem da narrativa. Marca a caixa para ações em massa (logo).'}>
+            <div style={{ margin: '4px 0 12px' }}>
+              <button
+                type="button"
+                onClick={() => setImportTextOpen(true)}
+                style={{
+                  width: '100%', minHeight: 48, borderRadius: 12, border: '1.5px solid var(--accent)',
+                  background: 'var(--accent-surface)', color: 'var(--text-primary)',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <FileText size={16} color="var(--accent)" />
+                Importar texto para os {itemsLabel}
+              </button>
+              <p style={{
+                margin: '8px 0 0', fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                Título · Headline · Subtítulo · CTA · Legenda
+              </p>
+            </div>
+
+            <S title={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Slides' : 'Cards'} hint={creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'Ordem do deck. Marca a caixa para ações em massa (logo).' : 'Ordem dos cards. Marca a caixa para ações em massa (logo).'}>
               {selectedSlideIds.length > 0 ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,

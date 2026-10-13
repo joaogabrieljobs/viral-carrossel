@@ -311,16 +311,18 @@ export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, b
   return { slides: next, created, updated };
 }
 
+/** Modelo técnico vazio — só rótulos (Headline, Título, Subtítulo, CTA, Legenda). */
 export const IMPORT_TEXT_TEMPLATE = `=== Card 1 ===
-Headline: Seus traços orientam o planejamento.
-Título: Ácido hialurônico facial
-Subtítulo: Planejamento de volume e contorno.
-CTA:
-Legenda: O ácido hialurônico pode ser utilizado no preenchimento facial. #estetica
+Headline: 
+Título: 
+Subtítulo: 
+CTA: 
+Legenda: 
 
 === Card 2 ===
-Headline: Segundo argumento
-Subtítulo: Continuidade da narrativa.
-CTA: Agende uma consulta para conhecer as possibilidades.
-Legenda: Quer saber se faz sentido para você? Fale com a clínica.
+Headline: 
+Título: 
+Subtítulo: 
+CTA: 
+Legenda: 
 `;

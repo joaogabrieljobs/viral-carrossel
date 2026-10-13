@@ -57,4 +57,22 @@ describe('account-vault', () => {
     expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('b');
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toContain('email:a@x.com');
   });
+
+  it('não sobrescreve cofre cheio com snapshot vazio', () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'keep' }, { id: 'two' }]));
+    snapshotAccountVault('email:a@x.com');
+    local.setItem(SK.library, JSON.stringify([]));
+    expect(snapshotAccountVault('email:a@x.com')).toBe(false);
+    local.removeItem(SK.library);
+    restoreAccountVault('email:a@x.com');
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(2);
+  });
+
+  it('restaura pelo alias id:cus quando o login pede email:', () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'janine', name: 'Clinica Janine' }]));
+    snapshotAccountVault('id:cus_1');
+    local.removeItem(SK.library);
+    expect(restoreAccountVault('email:a@x.com', ['email:a@x.com', 'id:cus_1'])).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))[0].name).toBe('Clinica Janine');
+  });
 });

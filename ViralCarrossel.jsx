@@ -1197,7 +1197,7 @@ export default function App() {
     history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
     setLibraryOpen, toast, setError, visualPresets,
   });
-  const createProjectByKind = useCallback((kind = 'carrossel') => {
+  const createProjectByKind = useCallback((kind = 'carrossel', projectName) => {
     const isPresentation = kind === 'apresentacao';
     const rosterBrand = brandRoster.find((b) => b.id === activeBrandId)
       || brandRoster[0]
@@ -1210,10 +1210,9 @@ export default function App() {
           slides: [mkSlide(1, identity)],
         }, DEFAULT_PRESENTATION_VISUAL_PRESET_ID, PRESENTATION_VISUAL_PRESETS, { initialize: true })
       : { brand: identity };
-    newDoc(
-      presentationSeed,
-      isPresentation ? 'Nova apresentação' : 'Nova comunicação',
-    );
+    const fallback = isPresentation ? 'Nova apresentação' : 'Nova comunicação';
+    const name = String(projectName || '').trim() || fallback;
+    newDoc(presentationSeed, name);
   }, [brand, brandRoster, activeBrandId, newDoc]);
 
   /** Selecciona marca para produção (Home) sem sobrescrever o projeto aberto. */
@@ -1500,7 +1499,12 @@ export default function App() {
     reopenLanding,
     openPortal,
     handleLogout,
-  } = useAccess({ setShellView, onLeaveEditor: () => setDrawerOpen(false), toast });
+  } = useAccess({
+    setShellView,
+    onLeaveEditor: () => setDrawerOpen(false),
+    onBeforeLogout: () => { try { flushPersistRef.current?.(); } catch { /* */ } },
+    toast,
+  });
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
   const handleSyncCloud = useCallback(async () => {
     if (cloudSyncBusy) return;
@@ -1514,6 +1518,13 @@ export default function App() {
       const result = await pushLibraryToCloud({ force: true });
       if (result?.skipped || result?.empty) {
         toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
+      } else if (result?.assetsFailed > 0) {
+        toast(
+          `Nuvem: ${result.projectCount} projeto(s). ${result.assetsFailed} foto(s) ficaram só no browser.`,
+          'warning',
+          5500,
+        );
+        trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
       } else {
         toast(
           `Nuvem actualizada: ${result.projectCount} projeto(s) nesta conta.`,

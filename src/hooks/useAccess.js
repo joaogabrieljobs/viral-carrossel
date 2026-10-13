@@ -19,7 +19,7 @@ import { clearAccountLocalData } from '../utils/clear-account-data.js';
 import { ensureAccountDataOwner } from '../utils/account-data-owner.js';
 import { captureShareInviteFromLocation } from '../utils/project-share.js';
 
-export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
+export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, toast } = {}) {
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -123,7 +123,11 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
       if (session?.active) {
         try {
           const { reconcileLibraryCloud } = await import('../utils/library-sync.js');
-          const cloudGate = await reconcileLibraryCloud({ toast });
+          const cloudGate = await reconcileLibraryCloud({
+            toast,
+            email: session?.email,
+            customerId: session?.customerId,
+          });
           if (cancelled || cloudGate === 'reloading') return;
         } catch { /* rede / Blob — cofre local continua */ }
       }
@@ -222,34 +226,42 @@ export function useAccess({ setShellView, onLeaveEditor, toast } = {}) {
     }
   }, [toast]);
   const handleLogout = useCallback(async () => {
-    // 1) Empurra biblioteca para a nuvem (multiutilizador / outro browser).
-    // 2) Snapshot local → cofre (mesmo browser sem rede).
-    // 3) Trava + limpa chaves activas (outra conta neste browser não herda).
+    // Ordem crítica: flush React→LS → cofre (rápido) → nuvem curto → limpar → sair.
+    try { onBeforeLogout?.(); } catch { /* */ }
     try {
-      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
-      await pushLibraryToCloudBestEffort(8_000);
-    } catch { /* best-effort */ }
-    try {
-      const { readDataOwner, normalizeDataOwnerId } = await import('../utils/account-data-owner.js');
-      const { snapshotAccountVault } = await import('../utils/account-vault.js');
+      const {
+        readDataOwner, normalizeDataOwnerId, dataOwnerAliases,
+      } = await import('../utils/account-data-owner.js');
+      const { snapshotAccountVaultForOwners } = await import('../utils/account-vault.js');
       const { lockAccountDataWrites } = await import('../utils/storage.js');
       const owner = readDataOwner()
         || normalizeDataOwnerId(access.email, access.customerId);
-      if (owner) snapshotAccountVault(owner);
+      const aliases = [...dataOwnerAliases(access.email, access.customerId)];
+      if (owner && !aliases.includes(owner)) aliases.unshift(owner);
+      snapshotAccountVaultForOwners(aliases);
       lockAccountDataWrites();
     } catch { /* */ }
+    // Nuvem: no máximo ~1,5s — não segurar o «Sair da conta».
     try {
-      await clearAccountLocalData({ timeoutMs: 2_500, wipeMedia: false });
+      const push = import('../utils/library-sync.js')
+        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(1_500));
+      await Promise.race([
+        push,
+        new Promise((r) => setTimeout(r, 1_500)),
+      ]);
+    } catch { /* best-effort */ }
+    try {
+      await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
     } catch { /* best-effort */ }
     try {
       await Promise.race([
         logoutAccess(),
-        new Promise((r) => setTimeout(r, 3_000)),
+        new Promise((r) => setTimeout(r, 1_500)),
       ]);
     } catch { /* rede / offline */ }
     try { trackEvent('logout'); } catch { /* */ }
     window.location.assign('/');
-  }, [access.email, access.customerId]);
+  }, [access.email, access.customerId, onBeforeLogout]);
 
   return {
     landingOpen, setLandingOpen,
