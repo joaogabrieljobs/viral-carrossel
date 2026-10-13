@@ -342,7 +342,6 @@ import {
   lockAccountDataWrites,
   unlockAccountDataWrites,
 } from './src/utils/storage.js';
-import { lsGet } from './src/utils/telemetry.js';
 import {
   vcHexToRgb,
   vcNormalizeHex,
