@@ -1354,6 +1354,26 @@ export default function App() {
   }, [doc, activeDocId, brandRoster, activeBrandId]);
   flushPersistRef.current = flushPersistNow;
 
+  const reloadAfterCloudSync = useCallback(() => {
+    // Trava ANTES do navigate: pagehide/beforeunload chamam flush com a
+    // library React antiga e apagavam os projectos que o pull acabou de gravar.
+    try { lockAccountDataWrites(); } catch { /* */ }
+    try {
+      const pulled = lsGet(SK.library, null);
+      if (Array.isArray(pulled) && pulled.length) {
+        libraryPersistRef.current = pulled;
+        setLibrary(pulled);
+      }
+    } catch { /* */ }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('app', '1');
+      window.location.replace(url.pathname + url.search + url.hash);
+    } catch {
+      window.location.reload();
+    }
+  }, [setLibrary]);
+
   /** Botão «Salvar»: flush local + push na nuvem da conta (quando a sessão estiver activa). */
   const salvarProjeto = useCallback(async () => {
     const lib = flushPersistNow();
@@ -1383,7 +1403,7 @@ export default function App() {
       });
       if (result?.pullError) {
         toast(
-          `Salvo na nuvem (${result.projectCount} projeto(s)), mas a lista local falhou: ${result.pullError.slice(0, 80)}`,
+          `Salvo na nuvem (${result.projectCount} projeto(s)), mas a lista local falhou: ${result.pullError.slice(0, 80)}. Tenta Sync na nuvem.`,
           'warning',
           7000,
         );
@@ -1391,15 +1411,7 @@ export default function App() {
       }
       if (result?.needsReload || Number(result.projectCount) !== Number(lib?.length || 0)) {
         toast(`Salvo · ${result.projectCount} projeto(s) na conta — a actualizar lista…`, 'success', 2500);
-        window.setTimeout(() => {
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('app', '1');
-            window.location.replace(url.pathname + url.search + url.hash);
-          } catch {
-            window.location.reload();
-          }
-        }, 350);
+        window.setTimeout(() => reloadAfterCloudSync(), 350);
         return;
       }
       if (result?.assetsFailed > 0) {
@@ -1418,7 +1430,7 @@ export default function App() {
         6500,
       );
     }
-  }, [flushPersistNow, setLibrary, toast]);
+  }, [flushPersistNow, reloadAfterCloudSync, setLibrary, toast]);
 
   // Autosave: salva o doc atual na entrada da biblioteca (debounced)
   useEffect(() => {

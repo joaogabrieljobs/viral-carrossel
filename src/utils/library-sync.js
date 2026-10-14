@@ -479,80 +479,97 @@ export async function pushLibraryToCloud(opts = {}) {
   };
 }
 
+/** Foto em falta NÃO pode derrubar o restore da lista de projetos. */
 async function fetchAssetDataUrl(assetId) {
-  const data = await syncRequest(null, { method: 'GET', query: `asset=${encodeURIComponent(assetId)}` });
-  return data?.asset?.dataUrl || null;
+  if (!assetId) return null;
+  try {
+    const data = await syncRequest(null, {
+      method: 'GET',
+      query: `asset=${encodeURIComponent(assetId)}`,
+    });
+    return data?.asset?.dataUrl || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveCachedAsset(assetId, assetCache) {
+  if (!assetId) return null;
+  if (assetCache.has(assetId)) return assetCache.get(assetId);
+  const dataUrl = await fetchAssetDataUrl(assetId);
+  assetCache.set(assetId, dataUrl || null);
+  return dataUrl || null;
 }
 
 async function hydrateSlideFromCloud(slide, assetCache) {
-  let sl = { ...slide };
-  const bgAsset = sl.bgImageAssetId;
-  if (bgAsset) {
-    let dataUrl = assetCache.get(bgAsset);
-    if (!dataUrl) {
-      dataUrl = await fetchAssetDataUrl(bgAsset);
-      if (dataUrl) assetCache.set(bgAsset, dataUrl);
+  try {
+    let sl = { ...slide };
+    const bgAsset = sl.bgImageAssetId;
+    if (bgAsset) {
+      const dataUrl = await resolveCachedAsset(bgAsset, assetCache);
+      if (dataUrl) {
+        try {
+          const packed = await guardarImagemDoSlide(dataUrl);
+          sl = { ...sl, ...packed, bgImageFailed: false, bgImageError: null };
+        } catch { /* */ }
+      }
+      delete sl.bgImageAssetId;
     }
-    if (dataUrl) {
-      try {
-        const packed = await guardarImagemDoSlide(dataUrl);
-        sl = { ...sl, ...packed, bgImageFailed: false, bgImageError: null };
-      } catch { /* */ }
+    const logoAsset = sl.logoImageAssetId;
+    if (logoAsset) {
+      const dataUrl = await resolveCachedAsset(logoAsset, assetCache);
+      if (dataUrl) sl = { ...sl, logoImage: dataUrl };
+      delete sl.logoImageAssetId;
     }
-    delete sl.bgImageAssetId;
+    try { sl = await importSlideLogo(sl); } catch { /* */ }
+    return sl;
+  } catch {
+    const fallback = { ...slide };
+    delete fallback.bgImageAssetId;
+    delete fallback.logoImageAssetId;
+    return fallback;
   }
-  const logoAsset = sl.logoImageAssetId;
-  if (logoAsset) {
-    let dataUrl = assetCache.get(logoAsset);
-    if (!dataUrl) {
-      dataUrl = await fetchAssetDataUrl(logoAsset);
-      if (dataUrl) assetCache.set(logoAsset, dataUrl);
-    }
-    if (dataUrl) sl = { ...sl, logoImage: dataUrl };
-    delete sl.logoImageAssetId;
-  }
-  try { sl = await importSlideLogo(sl); } catch { /* */ }
-  return sl;
 }
 
 async function hydrateBrandFromCloud(brand, assetCache) {
-  let next = { ...brand };
-  if (next.logoAssetId) {
-    let dataUrl = assetCache.get(next.logoAssetId);
-    if (!dataUrl) {
-      dataUrl = await fetchAssetDataUrl(next.logoAssetId);
-      if (dataUrl) assetCache.set(next.logoAssetId, dataUrl);
+  try {
+    let next = { ...(brand || {}) };
+    if (next.logoAssetId) {
+      const dataUrl = await resolveCachedAsset(next.logoAssetId, assetCache);
+      if (dataUrl) next = { ...next, logo: dataUrl };
+      delete next.logoAssetId;
     }
-    if (dataUrl) next = { ...next, logo: dataUrl };
-    delete next.logoAssetId;
+    try { next = await importBrandLogo(next); } catch { /* */ }
+    return next;
+  } catch {
+    const fallback = { ...(brand || {}) };
+    delete fallback.logoAssetId;
+    return fallback;
   }
-  try { next = await importBrandLogo(next); } catch { /* */ }
-  return next;
 }
 
 async function hydrateStyleKitFromCloud(styleKit, assetCache) {
-  let kit = { ...(styleKit || {}) };
-  const refs = [];
-  for (const ref of (kit.refImages || [])) {
-    if (!ref?.assetId) continue;
-    let dataUrl = assetCache.get(ref.assetId);
-    if (!dataUrl) {
-      dataUrl = await fetchAssetDataUrl(ref.assetId);
-      if (dataUrl) assetCache.set(ref.assetId, dataUrl);
+  try {
+    let kit = { ...(styleKit || {}) };
+    const refs = [];
+    for (const ref of (kit.refImages || [])) {
+      if (!ref?.assetId) continue;
+      try {
+        const dataUrl = await resolveCachedAsset(ref.assetId, assetCache);
+        if (dataUrl) refs.push({ name: ref.name, dataUrl });
+      } catch { /* foto em falta */ }
     }
-    if (dataUrl) refs.push({ name: ref.name, dataUrl });
-  }
-  kit.refImages = refs;
-  if (kit.logo?.assetId) {
-    let dataUrl = assetCache.get(kit.logo.assetId);
-    if (!dataUrl) {
-      dataUrl = await fetchAssetDataUrl(kit.logo.assetId);
-      if (dataUrl) assetCache.set(kit.logo.assetId, dataUrl);
+    kit.refImages = refs;
+    if (kit.logo?.assetId) {
+      const dataUrl = await resolveCachedAsset(kit.logo.assetId, assetCache);
+      if (dataUrl) kit.logo = { ...kit.logo, dataUrl, assetId: undefined };
+      else kit.logo = { ...kit.logo, assetId: undefined };
     }
-    if (dataUrl) kit.logo = { ...kit.logo, dataUrl, assetId: undefined };
+    try { kit = await migrateProjectReferences(kit); } catch { /* */ }
+    return kit;
+  } catch {
+    return { ...(styleKit || {}), refImages: [] };
   }
-  try { kit = await migrateProjectReferences(kit); } catch { /* */ }
-  return kit;
 }
 
 /**
@@ -569,23 +586,45 @@ export async function applyCloudManifest(manifest) {
       docs.push(entry);
       continue;
     }
-    const slides = Array.isArray(entry.doc.slides)
-      ? await Promise.all(entry.doc.slides.map((s) => hydrateSlideFromCloud(s, assetCache)))
-      : [];
-    docs.push({
-      ...entry,
-      doc: {
-        ...entry.doc,
-        slides,
-        brand: await hydrateBrandFromCloud(entry.doc.brand, assetCache),
-        styleKit: await hydrateStyleKitFromCloud(entry.doc.styleKit, assetCache),
-      },
-    });
+    try {
+      const slides = Array.isArray(entry.doc.slides)
+        ? await Promise.all(entry.doc.slides.map((s) => hydrateSlideFromCloud(s, assetCache)))
+        : [];
+      docs.push({
+        ...entry,
+        doc: {
+          ...entry.doc,
+          slides,
+          brand: await hydrateBrandFromCloud(entry.doc.brand, assetCache),
+          styleKit: await hydrateStyleKitFromCloud(entry.doc.styleKit, assetCache),
+        },
+      });
+    } catch {
+      // Estrutura do projeto > fotos: guarda o entry sem hidratar assets.
+      docs.push({
+        ...entry,
+        doc: {
+          ...entry.doc,
+          slides: Array.isArray(entry.doc.slides)
+            ? entry.doc.slides.map((s) => {
+              const clean = { ...s };
+              delete clean.bgImageAssetId;
+              delete clean.logoImageAssetId;
+              return clean;
+            })
+            : [],
+        },
+      });
+    }
   }
 
   const brands = [];
   for (const profile of (manifest.brands || [])) {
-    brands.push(await hydrateBrandFromCloud(profile, assetCache));
+    try {
+      brands.push(await hydrateBrandFromCloud(profile, assetCache));
+    } catch {
+      brands.push(profile);
+    }
   }
 
   lsSet(SK.library, docs);
