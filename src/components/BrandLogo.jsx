@@ -1,6 +1,12 @@
 import React from 'react';
 
-const WORDMARK_ASPECT = 240 / 64;
+// The artwork itself occupies x=4..224.4 and y=7..58. The former 240x64
+// viewport made a requested 26px logo render the letters at only ~16.6px,
+// which looked soft and undersized beside the editor navigation. This optical
+// viewport keeps a small antialiasing guard around the paths while allowing the
+// mark and wordmark to use the height callers already reserve for them.
+const WORDMARK_VIEWBOX = '2 5 225 55';
+const WORDMARK_ASPECT = 225 / 55;
 
 const ORBIT_BLUE = 'var(--moont-sequence, var(--moont-orbit, #5B53E8))';
 const AURORA = 'var(--moont-aurora, #D7FF5A)';
@@ -91,11 +97,12 @@ export default function BrandLogo({
       {...props}
       {...accessibility}
       className={className}
-      viewBox="0 0 240 64"
-      width={Math.round(height * WORDMARK_ASPECT)}
+      viewBox={WORDMARK_VIEWBOX}
+      width={height * WORDMARK_ASPECT}
       height={height}
       focusable="false"
       preserveAspectRatio="xMinYMid meet"
+      shapeRendering="geometricPrecision"
       style={{
         ...sharedStyle,
         width: 'auto',
