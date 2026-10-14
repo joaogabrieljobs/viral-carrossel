@@ -18,15 +18,59 @@ Auth: `requireActiveSubscription` (cookie `vc_access`).
 ## Storage
 
 - Blob: `library-sync/{customerId}/manifest.json` e `.../assets/{assetId}`
-- Redis: meta `vc:library-sync:meta:{customerId}`
+- Redis: manifesto de fallback `vc:library-sync:meta:{customerId}:full` e meta `vc:library-sync:meta:{customerId}`
 - Memória só em test/dev
+
+Status e download escolhem o mesmo manifesto completo, pela maior revisão e data, entre Blob e Redis. Metadados isolados não comprovam que a biblioteca está disponível. Se uma leitura falhar ou a meta indicar uma versão posterior ao manifesto disponível, a API responde 503 e impede um push de sobrescrever projetos com uma lista incompleta.
 
 ## Cliente
 
 `src/utils/library-sync.js` — pack (compacta imagens), upload de assets, push/pull, `reconcileLibraryCloud` no boot (`useAccess`).
 
+## Fluxo de Salvar e Sync
+
+1. Grava a edição atual no navegador, cancelando o autosave pendente; salva o cofre da conta.
+2. Envia a estrutura. O servidor une projetos por `id`; vence o `updatedAt` mais recente. Exclusões usam `deletedIds` explícitos.
+3. Envia as imagens disponíveis, com tentativa adicional. `assetIds` são referências, não recibos de upload: uma referência órfã não deve impedir o reenvio.
+4. Baixa o manifesto completo e confirma sua revisão/contagem contra a resposta do push. Uma resposta mais antiga ou com contagem incompatível não substitui a lista local.
+5. Hidrata fotos quando disponíveis. Erro de imagem, inclusive 404, preserva textos, projetos e referências para uma tentativa futura.
+6. Verifica se a conta e o conteúdo local continuam iguais. Uma edição durante a requisição é preservada e pede um novo Salvar.
+7. Grava a biblioteca e confere os IDs efetivamente persistidos. Falha de armazenamento local não gera sucesso; tenta reverter as chaves alteradas.
+8. Trava a persistência e devolve um `snapshot` para o React. O aplicativo atualiza lista, pastas, marcas e documento aberto com `flushSync`, libera a trava e só então informa a contagem exibida.
+
+Não há reload atrasado no fluxo manual. `pagehide` e autosave respeitam a trava. O boot só libera edição/persistência depois de isolar a conta e concluir a tentativa de restauração; o documento de exemplo inicial não é enviado antes disso.
+
+Login pelo formulário passa pela mesma reconciliação do login Google. Logout faz flush, salva o cofre, trava as gravações, tenta um push com cancelamento em até 5 segundos e limpa o navegador. Esse push não executa pull nem regrava metadados locais enquanto a conta está sendo encerrada.
+
+## Diagnóstico da falha de outubro de 2026
+
+- O pull alterava `localStorage`, mas o estado React ainda continha 1–2 projetos. Autosave e `pagehide` podiam sobrescrever a lista restaurada antes do reload atrasado.
+- Havia caminhos de login que não aplicavam a biblioteca restaurada à interface.
+- A resposta de status podia usar meta do Redis mais recente que o manifesto lido do Blob, produzindo contagens diferentes.
+- Falha de leitura no servidor podia ser interpretada como biblioteca vazia, tornando o merge inseguro.
+- A gravação local não era conferida antes de informar sucesso.
+- A tentativa de deploy `80bac9f` falhou por duas declarações de `reloadAfterCloudSync`. A produção permaneceu em `6144f17`, sem a correção posterior para fotos ausentes.
+
+## Validação manual
+
+Use uma conta de teste com cinco projetos na nuvem, incluindo um que tenha uma foto indisponível.
+
+1. Faça hard refresh e abra a Home. A lista deve exibir os cinco nomes; a foto ausente não deve esconder seu projeto.
+2. Clique **Sync na nuvem**. Conte os cinco cards da Home/biblioteca e confira a mesma contagem na mensagem. A página não deve precisar recarregar.
+3. Abra um projeto, altere um título e clique **Salvar** imediatamente. Volte à Home e confirme cinco projetos. Recarregue e confira o título.
+4. Saia da conta e entre novamente. Os cinco projetos e textos devem voltar.
+5. Entre na mesma conta em outro navegador, sem cofre/localStorage prévio. Confira os cinco projetos e abra o projeto cuja foto está ausente.
+6. Com o navegador offline ou armazenamento recusado, confirme que não há mensagem de sincronização concluída e que os projetos locais continuam disponíveis.
+
+## Testes de regressão
+
+- Unitários: `library-sync-client`, `library-sync-store`, `account-data-owner`, `account-vault`, `clear-account-data` e `library-organizer`.
+- Navegador: `tests/e2e/library-cloud-sync.spec.js` usa o build real com API simulada e cinco projetos; cobre boot, Sync, Salvar imediato, refresh/pagehide, imagem 404, logout/login, login pelo formulário e falha de armazenamento.
+- A simulação não valida credenciais nem a disponibilidade do Blob/Redis de produção. Confirmar o deploy **Ready** do commit publicado antes da validação na conta real.
+
 ## Fora de escopo (v1)
 
 - Colaboração em tempo real
 - Sync de chaves BYOK
-- Merge slide-a-slide (LWW por revision)
+- Merge slide-a-slide (a versão do projeto com maior `updatedAt` vence)
+- Edição simultânea em vários dispositivos com transação/CAS entre escritores
