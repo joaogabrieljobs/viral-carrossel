@@ -4,7 +4,7 @@
  * Sem TTL — projetos da conta persistem enquanto a assinatura existir.
  */
 
-import { put, get } from '@vercel/blob';
+import { put, get, BlobPreconditionFailedError } from '@vercel/blob';
 import { createHash } from 'node:crypto';
 
 const META_PREFIX = 'vc:library-sync:meta:';
@@ -150,7 +150,7 @@ function blobAuthOpts() {
   return token ? { token } : {};
 }
 
-async function putBlobPrivate(pathname, body, contentType = 'application/json') {
+async function putBlobPrivate(pathname, body, contentType = 'application/json', writeOptions = {}) {
   const signal = AbortSignal.timeout(45_000);
   await put(pathname, body, {
     access: 'private',
@@ -160,10 +160,11 @@ async function putBlobPrivate(pathname, body, contentType = 'application/json') 
     cacheControlMaxAge: 60,
     abortSignal: signal,
     ...blobAuthOpts(),
+    ...writeOptions,
   });
 }
 
-async function readBlobPrivate(pathname) {
+async function readBlobPrivate(pathname, { withVersion = false } = {}) {
   let stage = 'blob_get';
   try {
     const result = await get(pathname, { access: 'private', useCache: false, ...blobAuthOpts() });
@@ -177,7 +178,8 @@ async function readBlobPrivate(pathname) {
       chunks.push(value);
     }
     stage = 'blob_decode';
-    return Buffer.concat(chunks.map((c) => Buffer.from(c)));
+    const buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)));
+    return withVersion ? { buffer, etag: result.blob?.etag } : buffer;
   } catch (error) {
     error.libraryReadStage = stage;
     throw error;
@@ -222,6 +224,11 @@ function compareManifestVersion(a, b) {
     || Number(a?.updatedAt || 0) - Number(b?.updatedAt || 0);
 }
 
+function deletedProjectIds(...lists) {
+  return new Set(lists.flatMap((list) => (Array.isArray(list) ? list : []))
+    .map((value) => String(value || '').trim()).filter(Boolean));
+}
+
 function libraryReadError(diagnostics = []) {
   return Object.assign(
     new Error('Não foi possível confirmar a biblioteca mais recente na nuvem. Tente sincronizar novamente.'),
@@ -247,8 +254,13 @@ function readFailureDiagnostic(source, error) {
  * @returns {Promise<object|null>}
  */
 export async function getLibraryManifest(customerId) {
+  return (await readLibraryState(customerId)).manifest;
+}
+
+async function readLibraryState(customerId) {
   const id = sanitizeCustomerId(customerId);
-  if (!id) return null;
+  const state = { manifest: null, blobExists: false, blobEtag: null, redisRaw: null, redisMetaRaw: null, memoryValue: null };
+  if (!id) return state;
   if (usesBlobOnly(id) && !hasBlob() && !allowMemory()) {
     throw storageUnconfiguredError(['Blob não configurado para a biblioteca']);
   }
@@ -264,8 +276,12 @@ export async function getLibraryManifest(customerId) {
 
   if (hasBlob()) {
     try {
-      const buf = await readBlobPrivate(pathname);
-      if (buf) addCandidate(JSON.parse(buf.toString('utf8')));
+      const result = await readBlobPrivate(pathname, { withVersion: true });
+      if (result) {
+        state.blobExists = true;
+        state.blobEtag = result.etag;
+        addCandidate(JSON.parse(result.buffer.toString('utf8')));
+      }
     } catch (error) {
       readFailed = true;
       diagnostics.push(readFailureDiagnostic('blob', error));
@@ -278,6 +294,8 @@ export async function getLibraryManifest(customerId) {
         upstash(['GET', `${META_PREFIX}${id}:full`]),
         upstash(['GET', `${META_PREFIX}${id}`]),
       ]);
+      state.redisRaw = raw || null;
+      state.redisMetaRaw = rawMeta || null;
       if (raw) addCandidate(JSON.parse(raw));
       if (rawMeta) cachedMeta = JSON.parse(rawMeta);
     } catch (error) {
@@ -288,6 +306,7 @@ export async function getLibraryManifest(customerId) {
 
   if (allowMemory()) {
     const local = memoryManifest.get(id);
+    state.memoryValue = local || null;
     if (local) addCandidate(local);
     cachedMeta ||= memoryMeta.get(`${META_PREFIX}${id}`) || null;
   }
@@ -300,7 +319,16 @@ export async function getLibraryManifest(customerId) {
   if (readFailed || (cachedMeta && (!latest || compareManifestVersion(cachedMeta, latest) > 0))) {
     throw libraryReadError(diagnostics.length ? diagnostics : [{ source: 'metadata', stage: 'manifest_behind' }]);
   }
-  return latest;
+  if (!latest) return state;
+  // Exclusões são permanentes para este ID. Uma réplica antiga pode guardar
+  // tombstones que versões do cliente anteriores deixaram de reenviar.
+  const deletedIds = deletedProjectIds(...candidates.map((candidate) => candidate.deletedIds));
+  state.manifest = {
+    ...latest,
+    docs: latest.docs.filter((doc) => !deletedIds.has(String(doc?.id))),
+    deletedIds: [...deletedIds],
+  };
+  return state;
 }
 
 function entryUpdatedAt(entry) {
@@ -339,11 +367,50 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
     throw Object.assign(new Error('Manifesto inválido.'), { code: 'library_bad_manifest' });
   }
 
-  const cloudManifest = await getLibraryManifest(id);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await putLibraryManifestAttempt(id, manifest, opts, attempt > 0);
+    } catch (error) {
+      if (error?.code !== 'library_write_conflict') throw error;
+      if (attempt === 2) {
+        throw Object.assign(new Error('A biblioteca mudou durante o envio. Sincronize novamente.'), {
+          code: 'library_conflict',
+        });
+      }
+    }
+  }
+}
+
+function writeConflict() {
+  return Object.assign(new Error('A biblioteca mudou durante a gravação.'), { code: 'library_write_conflict' });
+}
+
+function blobWriteConflict(error, wasMissing) {
+  return error instanceof BlobPreconditionFailedError
+    || error?.name === 'BlobPreconditionFailedError' || error?.code === 'precondition_failed'
+    || error?.status === 412 || error?.statusCode === 412
+    || (wasMissing && /already exists/i.test(error?.message || ''));
+}
+
+// Redis confirma a mesma leitura e publica manifesto + meta numa operação.
+// Um conflito não pode virar fallback e sobrescrever uma exclusão mais nova.
+const REDIS_MANIFEST_CAS = `
+local full = redis.call('GET', KEYS[1]) or ''
+local meta = redis.call('GET', KEYS[2]) or ''
+if full ~= ARGV[1] or meta ~= ARGV[2] then return 0 end
+redis.call('SET', KEYS[1], ARGV[3])
+redis.call('SET', KEYS[2], ARGV[4])
+return 1
+`;
+
+async function putLibraryManifestAttempt(id, manifest, opts, retrying) {
+  const state = await readLibraryState(id);
+  const cloudManifest = state.manifest;
   const existing = cloudManifest ? metaForManifest(id, cloudManifest) : null;
   const baseRevision = Number(opts.baseRevision);
   if (
     existing
+    && !retrying
     && !opts.force
     && Number.isFinite(baseRevision)
     && Number(existing.revision) !== baseRevision
@@ -367,6 +434,16 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
   let brands = Array.isArray(manifest.brands) ? manifest.brands : [];
   let assetIds = Array.isArray(manifest.assetIds) ? manifest.assetIds : [];
 
+  const deletedIds = deletedProjectIds(cloudManifest?.deletedIds, manifest.deletedIds);
+  if (opts.replace && cloudManifest) {
+    // Substituição explícita também é uma exclusão: sem tombstone, o próximo
+    // push de um navegador antigo traria os projetos omitidos de volta.
+    const retainedIds = new Set(docs.map((doc) => String(doc?.id)));
+    for (const doc of cloudManifest.docs) {
+      if (doc?.id && !retainedIds.has(String(doc.id))) deletedIds.add(String(doc.id));
+    }
+  }
+
   if (!opts.replace && cloudManifest) {
     docs = mergeById(cloudManifest.docs, docs);
     folders = mergeById(cloudManifest.folders, folders);
@@ -377,11 +454,6 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
     ];
   }
 
-  const deletedIds = new Set(
-    (Array.isArray(manifest.deletedIds) ? manifest.deletedIds : [])
-      .map((x) => String(x || '').trim())
-      .filter(Boolean),
-  );
   if (deletedIds.size) {
     docs = docs.filter((d) => d?.id && !deletedIds.has(String(d.id)));
   }
@@ -420,8 +492,13 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
   const errors = [];
 
   if (hasBlob()) {
+    if (state.blobExists && !state.blobEtag) {
+      throw libraryReadError([{ source: 'blob', stage: 'missing_etag' }]);
+    }
     try {
-      await putBlobPrivate(pathname, serialized, 'application/json');
+      await putBlobPrivate(pathname, serialized, 'application/json', state.blobExists
+        ? { ifMatch: state.blobEtag, allowOverwrite: true }
+        : { allowOverwrite: false });
       if (hasUpstash(id)) {
         try {
           await upstash(['SET', `${META_PREFIX}${id}`, JSON.stringify(meta)]);
@@ -433,21 +510,26 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
       }
       return { manifest: payload, meta };
     } catch (e) {
+      if (blobWriteConflict(e, !state.blobExists)) throw writeConflict();
       errors.push(`blob: ${e?.message || e}`);
     }
   }
 
   if (hasUpstash(id) && serialized.length <= 450_000) {
     try {
-      await upstash(['SET', `${META_PREFIX}${id}:full`, serialized]);
-      await upstash(['SET', `${META_PREFIX}${id}`, JSON.stringify(meta)]);
+      const accepted = await upstash(['EVAL', REDIS_MANIFEST_CAS, 2,
+        `${META_PREFIX}${id}:full`, `${META_PREFIX}${id}`,
+        state.redisRaw || '', state.redisMetaRaw || '', serialized, JSON.stringify(meta)]);
+      if (Number(accepted) !== 1) throw writeConflict();
       return { manifest: payload, meta };
     } catch (e) {
+      if (e?.code === 'library_write_conflict') throw e;
       errors.push(`redis: ${e?.message || e}`);
     }
   }
 
   if (allowMemory()) {
+    if ((memoryManifest.get(id) || null) !== state.memoryValue) throw writeConflict();
     memoryMeta.set(`${META_PREFIX}${id}`, meta);
     memoryManifest.set(id, payload);
     return { manifest: payload, meta };
