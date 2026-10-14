@@ -78,6 +78,53 @@ function libraryCountFromBag(raw) {
   }
 }
 
+/** Exclusões são intenção durável, não uma fila descartável após o push. */
+function deletedIdsFromBag(bag) {
+  try {
+    const parsed = JSON.parse(bag?.[SK.libraryDeletedIds] || '[]');
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.map((id) => String(id || '').trim()).filter(Boolean))] : [];
+  } catch { return []; }
+}
+
+function applyDeletedProjects(bag, ...previousBags) {
+  const deletedIds = new Set([bag, ...previousBags].flatMap(deletedIdsFromBag));
+  if (!deletedIds.size) return bag;
+  const next = { ...bag, [SK.libraryDeletedIds]: JSON.stringify([...deletedIds]) };
+  try {
+    const library = JSON.parse(next[SK.library] || 'null');
+    if (Array.isArray(library)) {
+      const kept = library.filter((entry) => !deletedIds.has(String(entry?.id)));
+      next[SK.library] = JSON.stringify(kept);
+      const activeId = JSON.parse(next[SK.activeDocId] || 'null');
+      if (deletedIds.has(String(activeId))) next[SK.activeDocId] = JSON.stringify(kept[0]?.id || null);
+    }
+  } catch { /* conteúdo inválido continua intacto para recuperação */ }
+  return next;
+}
+
+/** Tombstones activos só pertencem a esta conta se o owner foi confirmado. */
+function activeDeletionBagForOwners(ownerIds) {
+  try {
+    const rawOwner = localStorage.getItem(SK.dataOwner);
+    let owner;
+    try { owner = JSON.parse(rawOwner); } catch { owner = rawOwner; }
+    if (!ownerIds.includes(owner)) return {};
+    return { [SK.libraryDeletedIds]: localStorage.getItem(SK.libraryDeletedIds) || '[]' };
+  } catch { return {}; }
+}
+
+/** Históricos nunca restauram projetos; exclusões antigas continuam valendo. */
+function historicalDeletionBags(map, ownerIds) {
+  const owners = new Set(ownerIds);
+  for (const ownerId of ownerIds) {
+    const canonical = resolveSlot(map, ownerId)?.ownerId;
+    if (canonical) owners.add(canonical);
+  }
+  return Object.entries(map).filter(([key]) => [...owners].some((id) => key.startsWith(`${id}#preserved:`)))
+    .map(([, slot]) => ({ [SK.libraryDeletedIds]: slot?.keys?.[SK.libraryDeletedIds] || '[]' }));
+}
+
 function collectBag() {
   const bag = {};
   let useful = false;
@@ -195,7 +242,7 @@ async function durableMedia(value, context = { externalize: true, imageStoreUnav
 }
 
 async function snapshotBag(snapshot) {
-  const { bag } = collectBag();
+  let { bag } = collectBag();
   if (snapshot !== undefined) {
     if (!snapshot || !Array.isArray(snapshot.library)) throw new Error('Snapshot de edição inválido.');
     const fields = { library: SK.library, brandRoster: SK.brands, libraryFolders: SK.libraryFolders,
@@ -203,7 +250,11 @@ async function snapshotBag(snapshot) {
     for (const [field, key] of Object.entries(fields)) {
       if (Object.prototype.hasOwnProperty.call(snapshot, field)) bag[key] = JSON.stringify(snapshot[field]);
     }
+    if (Array.isArray(snapshot.deletedIds)) {
+      bag = applyDeletedProjects(bag, { [SK.libraryDeletedIds]: JSON.stringify(snapshot.deletedIds) });
+    }
   }
+  bag = applyDeletedProjects(bag);
   const mediaContext = { externalize: true, imageStoreUnavailable: false };
   for (const key of [SK.library, SK.brands]) {
     if (bag[key]) bag[key] = JSON.stringify(await durableMedia(JSON.parse(bag[key]), mediaContext));
@@ -213,21 +264,18 @@ async function snapshotBag(snapshot) {
 
 /** A edição React atual prevalece, mas uma biblioteca parcial não apaga o cofre. */
 function mergeExplicitLibrary(bag, previousKeys) {
-  if (!previousKeys?.[SK.library]) return bag;
+  const mergedBag = applyDeletedProjects(bag, previousKeys);
+  if (!previousKeys?.[SK.library]) return mergedBag;
   let previous;
   let incoming;
-  let deleted;
   try {
     previous = JSON.parse(previousKeys[SK.library]);
-    incoming = JSON.parse(bag[SK.library]);
-    deleted = JSON.parse(bag[SK.libraryDeletedIds] || '[]');
-  } catch { return bag; }
-  if (!Array.isArray(previous) || !Array.isArray(incoming)) return bag;
-  const deletedIds = new Set(Array.isArray(deleted) ? deleted.map(String) : []);
+    incoming = JSON.parse(mergedBag[SK.library]);
+  } catch { return mergedBag; }
+  if (!Array.isArray(previous) || !Array.isArray(incoming)) return mergedBag;
   const ids = new Set(incoming.map((item) => item?.id).filter(Boolean));
-  const merged = [...incoming, ...previous.filter((item) => !item?.id || !ids.has(item.id))]
-    .filter((item) => !deletedIds.has(String(item?.id)));
-  return { ...bag, [SK.library]: JSON.stringify(merged) };
+  const merged = [...incoming, ...previous.filter((item) => !item?.id || !ids.has(item.id))];
+  return applyDeletedProjects({ ...mergedBag, [SK.library]: JSON.stringify(merged) });
 }
 
 /** Guarda a edição atual; não confirma uma cópia stale do localStorage. */
@@ -241,15 +289,25 @@ export async function snapshotAccountVaultForOwners(ownerIds = [], { snapshot } 
   const ids = [...new Set((ownerIds || []).filter((id) => typeof id === 'string' && id))];
   if (!ids.length) return false;
   try {
-    const { bag, projectCount } = await snapshotBag(snapshot);
+    const { bag } = await snapshotBag(snapshot);
     if (!Object.keys(bag).length) return false;
     return await accessVault((map) => {
       const primary = ids.find((id) => id.startsWith('email:')) || ids[0];
       const previous = resolveSlot(map, primary);
-      if (snapshot === undefined && projectCount < libraryCountFromBag(previous?.slot.keys[SK.library])) return { map, result: false };
-      let savedBag = bag;
       const previousAliases = ids.map((id) => ({ id, resolved: resolveSlot(map, id) }))
         .filter((entry) => entry.resolved);
+      let savedBag = applyDeletedProjects(bag, ...previousAliases.map((entry) => entry.resolved.slot.keys),
+        ...historicalDeletionBags(map, ids));
+      const previousAlive = applyDeletedProjects(previous?.slot.keys || {}, savedBag);
+      if (snapshot === undefined && libraryCountFromBag(savedBag[SK.library]) < libraryCountFromBag(previousAlive[SK.library])) {
+        // A trava anti-wipe protege projetos ausentes, mas não pode descartar
+        // exclusões já confirmadas enquanto recusa um snapshot incompleto.
+        for (const entry of previousAliases) {
+          const { ownerId, slot } = entry.resolved;
+          map[ownerId] = { ...slot, keys: applyDeletedProjects(slot.keys, savedBag) };
+        }
+        return { map, result: false };
+      }
       if (snapshot !== undefined) {
         // Os aliases autenticados são uma só conta. Um slot antigo maior não
         // pode vencer o snapshot recém-salvo apenas por ter mais projetos.
@@ -292,9 +350,10 @@ function assertRestoreCurrent(isCurrent) {
 async function applySlot(slot, { onRestored, isCurrent } = {}) {
   assertRestoreCurrent(isCurrent);
   if (!slot?.keys || typeof slot.keys !== 'object') return false;
-  // O caller recarrega quando devolvemos true. Marcas sozinhas, ou biblioteca
-  // vazia/inválida, fariam o próximo boot restaurar e recarregar sem fim.
-  if (!libraryCountFromBag(slot.keys[SK.library])) return false;
+  // Uma lista esvaziada por exclusões ainda tem intenção a restaurar.
+  // Slots apenas de marcas permanecem sem provocar reload.
+  const emptyWithDeletes = slot.keys[SK.library] === '[]' && deletedIdsFromBag(slot.keys).length > 0;
+  if (!libraryCountFromBag(slot.keys[SK.library]) && !emptyWithDeletes) return false;
   let keys;
   try {
     keys = { ...slot.keys };
@@ -347,12 +406,12 @@ async function applySlot(slot, { onRestored, isCurrent } = {}) {
     }
   }
   assertRestoreCurrent(isCurrent);
-  if (typeof onRestored !== 'function') return localPersisted;
+  if (typeof onRestored !== 'function') return localPersisted && !emptyWithDeletes;
   try {
     const read = (key, fallback) => keys[key] ? JSON.parse(keys[key]) : fallback;
     const snapshot = { library: read(SK.library, []), brandRoster: read(SK.brands, []),
       libraryFolders: read(SK.libraryFolders, []), activeDocId: read(SK.activeDocId, null),
-      activeBrandId: read(SK.activeBrandId, null) };
+      activeBrandId: read(SK.activeBrandId, null), deletedIds: deletedIdsFromBag(keys) };
     assertRestoreCurrent(isCurrent);
     await onRestored(snapshot, { projectCount: snapshot.library.length, localPersisted });
     assertRestoreCurrent(isCurrent);
@@ -373,14 +432,17 @@ export async function restoreAccountVault(ownerId, aliases = [], { onRestored, i
   try { map = await accessVault(); } catch { map = readLegacyVaultMap(); }
   assertRestoreCurrent(isCurrent);
   const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
+  const slots = candidates.map((id) => resolveSlot(map, id)?.slot).filter(Boolean);
+  const deletionBags = [...slots.map((slot) => slot.keys), activeDeletionBagForOwners(candidates),
+    ...historicalDeletionBags(map, candidates)];
   let best = null;
   let bestCount = -1;
-  for (const id of candidates) {
-    const slot = resolveSlot(map, id)?.slot;
-    const count = libraryCountFromBag(slot?.keys?.[SK.library]);
-    if (slot && (count > bestCount || (count === bestCount && Number(slot.savedAt || 0) > Number(best?.savedAt || 0)))) {
+  for (const slot of slots) {
+    const keys = applyDeletedProjects(slot.keys, ...deletionBags);
+    const count = libraryCountFromBag(keys[SK.library]);
+    if (count > bestCount || (count === bestCount && Number(slot.savedAt || 0) > Number(best?.savedAt || 0))) {
       bestCount = count;
-      best = slot;
+      best = { ...slot, keys };
     }
   }
   return applySlot(best, { onRestored, isCurrent });
@@ -391,10 +453,10 @@ export async function accountVaultHasProjects(ownerId, aliases = []) {
   let map;
   try { map = await accessVault(); } catch { map = readLegacyVaultMap(); }
   const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
-  for (const id of candidates) {
-    if (libraryCountFromBag(resolveSlot(map, id)?.slot.keys[SK.library]) > 0) return true;
-  }
-  return false;
+  const slots = candidates.map((id) => resolveSlot(map, id)?.slot).filter(Boolean);
+  const deletionBags = [...slots.map((slot) => slot.keys), activeDeletionBagForOwners(candidates),
+    ...historicalDeletionBags(map, candidates)];
+  return slots.some((slot) => libraryCountFromBag(applyDeletedProjects(slot.keys, ...deletionBags)[SK.library]) > 0);
 }
 
 /** Imagens do cofre também estão em uso, mesmo com outra conta aberta. */

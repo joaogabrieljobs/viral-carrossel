@@ -288,6 +288,120 @@ describe('cofre durável com cache cheio', () => {
     expect(local.getItem(SK.brands)).toBeNull();
   });
 
+  it('mantém exclusão durável após o push limpar LS, sem perder Janine com 23 cards', async () => {
+    const janine = { id: 'janine', name: 'CLINICA JANINE ARAUJO', doc: {
+      slides: Array.from({ length: 23 }, (_, index) => ({ id: `card-${index}`, subtitle: `Texto ${index}`, bgImageId: `imagem-${index}` })),
+    } };
+    database = { 'email:a@x.com': { ...slot([janine]), keys: {
+      ...slot([janine]).keys, [SK.libraryDeletedIds]: '["apagado"]',
+    } } };
+    local.removeItem(SK.libraryDeletedIds); // versão antiga limpava depois de push bem-sucedido
+    expect(await snapshotAccountVaultForOwners(['email:a@x.com'], { snapshot: {
+      library: [janine, { id: 'apagado', name: 'Versão stale de outra aba' }],
+    } })).toBe(true);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.library])).toEqual([janine]);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.libraryDeletedIds])).toEqual(['apagado']);
+    const onRestored = vi.fn();
+    expect(await restoreAccountVault('email:a@x.com', [], { onRestored })).toBe(true);
+    expect(onRestored.mock.calls[0][0]).toMatchObject({ library: [janine], deletedIds: ['apagado'] });
+  });
+
+  it('snapshot.deletedIds protege a intenção mesmo com armazenamento local cheio', async () => {
+    database = { 'email:a@x.com': slot([{ id: 'janine' }, { id: 'apagado' }]) };
+    vi.spyOn(local, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
+    expect(await snapshotAccountVaultForOwners(['email:a@x.com'], { snapshot: {
+      library: [{ id: 'janine' }], deletedIds: ['apagado'],
+    } })).toBe(true);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.library])).toEqual([{ id: 'janine' }]);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.libraryDeletedIds])).toEqual(['apagado']);
+    const onRestored = vi.fn();
+    expect(await restoreAccountVault('email:a@x.com', [], { onRestored })).toBe(true);
+    expect(onRestored.mock.calls[0][0].deletedIds).toEqual(['apagado']);
+    expect(onRestored.mock.calls[0][1].localPersisted).toBe(false);
+  });
+
+  it('filtra exclusões de todos os aliases antes de escolher o slot por contagem', async () => {
+    const janine = { id: 'janine', name: 'Atual', doc: { slides: Array.from({ length: 23 }, (_, id) => ({ id })) } };
+    database = {
+      'email:a@x.com': { ...slot([janine], 50), keys: { ...slot([janine]).keys, [SK.libraryDeletedIds]: '["apagado"]' } },
+      'id:cus_1': slot([{ id: 'janine', name: 'Antigo' }, { id: 'apagado' }], 10),
+    };
+    expect(await restoreAccountVault('email:a@x.com', ['id:cus_1'])).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual([janine]);
+    expect(JSON.parse(local.getItem(SK.libraryDeletedIds))).toEqual(['apagado']);
+  });
+
+  it('migração de um legado stale mais recente mantém tombstones do cofre durável', async () => {
+    database = { 'email:a@x.com': { ...slot([{ id: 'janine' }], 10), keys: {
+      ...slot([{ id: 'janine' }]).keys, [SK.libraryDeletedIds]: '["apagado"]',
+    } } };
+    local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify({
+      'email:a@x.com': slot([{ id: 'janine' }, { id: 'apagado' }], 20),
+    }));
+    expect(await restoreAccountVault('email:a@x.com')).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'janine' }]);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.libraryDeletedIds])).toEqual(['apagado']);
+  });
+
+  it('snapshot sem React aceita redução explicada por exclusões e mantém o anti-wipe', async () => {
+    database = { 'email:a@x.com': slot([{ id: 'janine' }, { id: 'apagado' }, { id: 'outro' }]) };
+    local.setItem(SK.library, '[{"id":"janine"}]');
+    local.setItem(SK.libraryDeletedIds, '["apagado","outro"]');
+    expect(await snapshotAccountVaultForOwners(['email:a@x.com'])).toBe(true);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.library])).toEqual([{ id: 'janine' }]);
+    local.setItem(SK.library, '[]');
+    local.removeItem(SK.libraryDeletedIds);
+    expect(await snapshotAccountVaultForOwners(['email:a@x.com'])).toBe(false);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.library])).toEqual([{ id: 'janine' }]);
+    expect(JSON.parse(database['email:a@x.com'].keys[SK.libraryDeletedIds])).toEqual(['apagado', 'outro']);
+  });
+
+  it('exclusões em histórico preservado valem sem restaurar projetos desse histórico', async () => {
+    database = {
+      'email:a@x.com': slot([{ id: 'janine' }, { id: 'apagado' }]),
+      'email:a@x.com#preserved:1': { ...slot([{ id: 'historico-nao-restaurar' }]), keys: {
+        ...slot([{ id: 'historico-nao-restaurar' }]).keys, [SK.libraryDeletedIds]: '["apagado"]',
+      } },
+    };
+    expect(await restoreAccountVault('email:a@x.com')).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'janine' }]);
+    expect(JSON.parse(local.getItem(SK.libraryDeletedIds))).toEqual(['apagado']);
+  });
+
+  it('tombstones de outra conta não removem um ID coincidente da conta restaurada', async () => {
+    database = {
+      'email:a@x.com': slot([{ id: 'janine' }]),
+      'email:b@x.com': { ...slot([]), keys: { ...slot([]).keys, [SK.libraryDeletedIds]: '["janine"]' } },
+      'email:b@x.com#preserved:1': { keys: { [SK.libraryDeletedIds]: '["janine"]' } },
+    };
+    local.setItem(SK.dataOwner, '"email:b@x.com"');
+    local.setItem(SK.libraryDeletedIds, '["janine"]');
+    expect(await restoreAccountVault('email:a@x.com')).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'janine' }]);
+  });
+
+  it('restore respeita exclusão ativa da própria conta que ainda não chegou ao cofre', async () => {
+    database = { 'email:a@x.com': slot([{ id: 'janine' }, { id: 'apagado' }]) };
+    local.setItem(SK.dataOwner, '"email:a@x.com"');
+    local.setItem(SK.libraryDeletedIds, '["apagado"]');
+    expect(await restoreAccountVault('email:a@x.com')).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'janine' }]);
+  });
+
+  it('todos os projetos excluídos restauram intenção e lista vazia sem loop de reload', async () => {
+    database = { 'email:a@x.com': { ...slot([{ id: 'apagado' }]), keys: {
+      ...slot([{ id: 'apagado' }]).keys, [SK.libraryDeletedIds]: '["apagado"]',
+    } } };
+    expect(await accountVaultHasProjects('email:a@x.com')).toBe(false);
+    expect(await restoreAccountVault('email:a@x.com')).toBe(false);
+    expect(local.getItem(SK.library)).toBe('[]');
+    expect(JSON.parse(local.getItem(SK.libraryDeletedIds))).toEqual(['apagado']);
+    const onRestored = vi.fn();
+    expect(await restoreAccountVault('email:a@x.com', [], { onRestored })).toBe(true);
+    expect(onRestored.mock.calls[0][0]).toMatchObject({ library: [], deletedIds: ['apagado'] });
+    expect(onRestored.mock.calls[0][1].projectCount).toBe(0);
+  });
+
   it('falha de restore mantém o cofre atual e reverte as chaves anteriores', async () => {
     database = { 'email:a@x.com': { ...slot([{ id: 'novo' }]), keys: {
       [SK.library]: '[{"id":"novo"}]', [SK.brands]: '[{"id":"marca-nova"}]',
