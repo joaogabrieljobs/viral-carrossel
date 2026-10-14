@@ -9,6 +9,7 @@ import {
 } from '../../src/utils/account-data-owner.js';
 import { SK, areAccountDataWritesLocked, lsSet, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { ACCOUNT_VAULT_KEY, snapshotAccountVault } from '../../src/utils/account-vault.js';
+import * as accountVault from '../../src/utils/account-vault.js';
 
 function makeMemoryStorage() {
   const map = new Map();
@@ -46,13 +47,13 @@ describe('account-data-owner', () => {
     vi.unstubAllGlobals();
   });
 
-  it('normaliza preferindo email (estável)', () => {
+  it('normaliza preferindo email (estável)', async () => {
     expect(normalizeDataOwnerId('A@B.com')).toBe('email:a@b.com');
     expect(normalizeDataOwnerId('a@b.com', 'cus_1')).toBe('email:a@b.com');
     expect(normalizeDataOwnerId('', 'cus_1')).toBe('id:cus_1');
   });
 
-  it('reconhece id:cus e email: da mesma sessão como o mesmo dono', () => {
+  it('reconhece id:cus e email: da mesma sessão como o mesmo dono', async () => {
     expect(isSameDataOwner('id:cus_1', 'email:a@x.com', {
       email: 'a@x.com',
       customerId: 'cus_1',
@@ -71,30 +72,37 @@ describe('account-data-owner', () => {
     expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
-  it('login explícito restaura cofre da conta e recarrega', async () => {
+  it('login explícito sem owner desmonta estado órfão antes de restaurar o cofre', async () => {
     local.setItem(SK.library, JSON.stringify([{ id: 'meus' }]));
-    snapshotAccountVault('email:novo@z.com');
+    await snapshotAccountVault('email:novo@z.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'orfao' }]));
+    local.setItem(SK.openaiKey, 'chave-da-sessao-orfa');
+    const onRestored = vi.fn();
 
     const result = await ensureAccountDataOwner(
       { active: true, email: 'novo@z.com' },
-      { explicitLogin: true },
+      { explicitLogin: true, onRestored },
     );
     expect(result).toBe('reloading');
-    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('meus');
+    expect(local.getItem(SK.library)).toBeNull();
+    expect(local.getItem(SK.openaiKey)).toBeNull();
+    expect(onRestored).not.toHaveBeenCalled();
     expect(readDataOwner()).toBe('email:novo@z.com');
     expect(globalThis.location.replace).toHaveBeenCalled();
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toBeTruthy();
     expect(areAccountDataWritesLocked()).toBe(true);
     expect(lsSet(SK.library, [{ id: 'orfao' }])).toBe(false);
-    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('meus');
+    unlockAccountDataWrites();
+    expect(await ensureAccountDataOwner({ active: true, email: 'novo@z.com' }, { onRestored })).toBe('restored');
+    expect(onRestored).toHaveBeenCalledWith(expect.objectContaining({ library: [{ id: 'meus' }] }),
+      { projectCount: 1, localPersisted: true });
   });
 
-  it('ao mudar de conta guarda A no cofre e restaura B', async () => {
+  it('troca de conta recarrega antes de restaurar B e descarta o estado React/BYOK de A', async () => {
     writeDataOwner('email:a@x.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'secret-a' }]));
     local.setItem(SK.brands, JSON.stringify([{ id: 'brand-a' }]));
-    snapshotAccountVault('email:b@y.com');
+    await snapshotAccountVault('email:b@y.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'secret-a' }]));
 
     // Slot B já tem projeto
@@ -105,26 +113,33 @@ describe('account-data-owner', () => {
     };
     local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify(map));
 
+    const onRestored = vi.fn();
     const result = await ensureAccountDataOwner(
       { active: true, email: 'b@y.com' },
-      { explicitLogin: false },
+      { explicitLogin: false, onRestored },
     );
 
     expect(result).toBe('reloading');
-    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('proj-b');
+    expect(local.getItem(SK.library)).toBeNull();
+    expect(onRestored).not.toHaveBeenCalled();
     expect(readDataOwner()).toBe('email:b@y.com');
     // Cofre de A preservado
     const vault = JSON.parse(local.getItem(ACCOUNT_VAULT_KEY));
     expect(JSON.parse(vault['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
     expect(areAccountDataWritesLocked()).toBe(true);
     expect(lsSet(SK.library, [{ id: 'secret-a' }])).toBe(false);
-    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('proj-b');
+    expect(local.getItem(SK.library)).toBeNull();
+    // Novo boot: os estados antigos já foram desmontados, B pode usar restore em memória.
+    unlockAccountDataWrites();
+    expect(await ensureAccountDataOwner({ active: true, email: 'b@y.com' }, { onRestored })).toBe('restored');
+    expect(onRestored).toHaveBeenCalledWith(expect.objectContaining({ library: [{ id: 'proj-b' }] }),
+      { projectCount: 1, localPersisted: true });
   });
 
   it('mesma conta com biblioteca vazia restaura do cofre e recarrega', async () => {
     writeDataOwner('email:a@x.com');
     local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
-    snapshotAccountVault('email:a@x.com');
+    await snapshotAccountVault('email:a@x.com');
     local.removeItem(SK.library);
 
     const result = await ensureAccountDataOwner(
@@ -176,13 +191,77 @@ describe('account-data-owner', () => {
 
   it('boot com cookie restaura cofre sem dono activo e bloqueia persistência antiga', async () => {
     local.setItem(SK.library, JSON.stringify([{ id: 'p1' }, { id: 'p2' }]));
-    snapshotAccountVault('email:a@x.com');
+    await snapshotAccountVault('email:a@x.com');
     local.removeItem(SK.library);
 
     expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com' })).toBe('reloading');
     expect(areAccountDataWritesLocked()).toBe(true);
     expect(lsSet(SK.library, [])).toBe(false);
     expect(JSON.parse(local.getItem(SK.library)).map((entry) => entry.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('trava a persistência React enquanto aguarda o restore assíncrono', async () => {
+    writeDataOwner('email:a@x.com');
+    let complete;
+    vi.spyOn(accountVault, 'restoreAccountVault').mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const pending = ensureAccountDataOwner({ active: true, email: 'a@x.com' });
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [{ id: 'estado-stale-do-react' }])).toBe(false);
+    complete(true);
+    expect(await pending).toBe('reloading');
+    expect(areAccountDataWritesLocked()).toBe(true);
+  });
+
+  it('libera a trava criada no boot quando não há nada para restaurar', async () => {
+    writeDataOwner('email:a@x.com');
+    expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com' })).toBe('ok');
+    expect(areAccountDataWritesLocked()).toBe(false);
+  });
+
+  it('aplica o cofre à UI no login da mesma conta sem recarregar', async () => {
+    writeDataOwner('email:a@x.com');
+    local.setItem(SK.library, '[{"id":"a","name":"Salvo no cofre"}]');
+    await snapshotAccountVault('email:a@x.com');
+    local.removeItem(SK.library);
+    const onRestored = vi.fn(() => {
+      expect(areAccountDataWritesLocked()).toBe(true);
+    });
+    expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com' }, { explicitLogin: true, onRestored })).toBe('restored');
+    expect(onRestored).toHaveBeenCalledWith(expect.objectContaining({ library: [{ id: 'a', name: 'Salvo no cofre' }] }),
+      { projectCount: 1, localPersisted: true });
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
+    expect(areAccountDataWritesLocked()).toBe(false);
+  });
+
+  it.each([false, true])('bloqueia troca em outra aba durante restore, sem fallback reload (login explícito: %s)', async (explicitLogin) => {
+    writeDataOwner('email:a@x.com');
+    let complete;
+    const started = vi.fn();
+    vi.spyOn(accountVault, 'restoreAccountVault').mockImplementationOnce((_id, _aliases, options) => {
+      started(options);
+      return new Promise((resolve) => { complete = resolve; });
+    });
+    const onRestored = vi.fn();
+    const pending = ensureAccountDataOwner({ active: true, email: 'a@x.com' }, { explicitLogin, onRestored });
+    await vi.waitFor(() => expect(started).toHaveBeenCalled());
+    writeDataOwner('email:b@y.com');
+    local.setItem(SK.library, '[{"id":"projeto-b"}]');
+    expect(started.mock.calls[0][0].isCurrent()).toBe(false);
+    complete(false);
+    expect(await pending).toBe('blocked');
+    expect(readDataOwner()).toBe('email:b@y.com');
+    expect(local.getItem(SK.library)).toBe('[{"id":"projeto-b"}]');
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
+    expect(onRestored).not.toHaveBeenCalled();
+    expect(areAccountDataWritesLocked()).toBe(true);
+  });
+
+  it('aceita invalidação externa da sessão antes de continuar o boot', async () => {
+    writeDataOwner('email:a@x.com');
+    local.setItem(SK.library, '[{"id":"a"}]');
+    expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com' }, { isCurrent: () => false })).toBe('blocked');
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
+    expect(areAccountDataWritesLocked()).toBe(true);
   });
 
   it('migra id:cus → email: sem limpar dados', async () => {
@@ -197,7 +276,7 @@ describe('account-data-owner', () => {
     expect(globalThis.location.replace).not.toHaveBeenCalled();
   });
 
-  it('exporta a mesma chave que o clear remove', () => {
+  it('exporta a mesma chave que o clear remove', async () => {
     expect(DATA_OWNER_KEY).toBe('vc_data_owner');
     expect(SK.dataOwner).toBe(DATA_OWNER_KEY);
   });

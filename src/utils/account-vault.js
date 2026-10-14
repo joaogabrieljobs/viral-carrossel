@@ -6,6 +6,8 @@
  */
 import { SK } from './storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
+import { updateDurableVault } from './account-vault-store.js';
+import { imageGet, imagePut, newImageId, origemParaBlob, blobParaDataUrl } from './image-store.js';
 
 export const ACCOUNT_VAULT_KEY = 'vc_account_vault';
 
@@ -23,7 +25,7 @@ const SNAPSHOT_KEYS = [
   SK.modesIntro,
 ];
 
-function readVaultMap() {
+function readLegacyVaultMap() {
   try {
     const raw = localStorage.getItem(ACCOUNT_VAULT_KEY);
     if (!raw) return {};
@@ -96,75 +98,245 @@ function collectBag() {
   return { bag, useful, projectCount: libraryCountFromBag(bag[SK.library]) };
 }
 
-/**
- * Guarda o estado activo no slot do owner.
- * Nunca sobrescreve um cofre com mais projetos por um snapshot vazio/stale.
- */
-export function snapshotAccountVault(ownerId) {
-  if (!ownerId || typeof localStorage === 'undefined') return false;
-  const { bag, useful, projectCount } = collectBag();
-  if (!useful && !Object.keys(bag).length) return false;
-
-  const map = readVaultMap();
-  const previous = resolveSlot(map, ownerId);
-  const prevCount = libraryCountFromBag(previous?.slot.keys[SK.library]);
-  if (projectCount < prevCount) {
-    // Evita apagar «Clínica Janine» com um snapshot vazio no logout.
-    return false;
+/** Preserva conflitos de migração sem apagar o slot antigo de outra aba. */
+function mergeLegacyMap(current, legacy) {
+  const map = { ...current };
+  for (const [id, slot] of Object.entries(legacy)) {
+    if (!Object.prototype.hasOwnProperty.call(map, id)) { map[id] = slot; continue; }
+    if (JSON.stringify(map[id]) === JSON.stringify(slot)) continue;
+    const keepLegacy = Number(slot?.savedAt || 0) > Number(map[id]?.savedAt || 0);
+    const displaced = keepLegacy ? map[id] : slot;
+    let suffix = 0;
+    let backup = `${id}#preserved:${displaced?.savedAt || 0}`;
+    while (map[backup] && JSON.stringify(map[backup]) !== JSON.stringify(displaced)) {
+      suffix += 1;
+      backup = `${id}#preserved:${displaced?.savedAt || 0}:${suffix}`;
+    }
+    map[backup] = displaced;
+    const preferred = keepLegacy ? slot : map[id];
+    const older = keepLegacy ? map[id] : slot;
+    map[id] = preferred?.keys && older?.keys
+      ? { ...preferred, keys: mergeExplicitLibrary(preferred.keys, older.keys) } : preferred;
   }
+  return map;
+}
 
-  // Se este owner já é alias, atualizar o mesmo slot sem duplicar os bytes.
-  map[previous?.ownerId || ownerId] = { savedAt: Date.now(), keys: bag };
-  return writeVaultMap(map);
+async function accessVault(change = (map) => ({ map, result: map }), { allowFallback = true } = {}) {
+  let legacyRaw = null;
+  try { legacyRaw = localStorage.getItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
+  const legacy = readLegacyVaultMap();
+  try {
+    const result = await updateDurableVault((current) => change(mergeLegacyMap(current, legacy)));
+    // Nunca apagar uma versão que outra aba atualizou durante a transação.
+    if (legacyRaw != null) {
+      try {
+        if (localStorage.getItem(ACCOUNT_VAULT_KEY) === legacyRaw) localStorage.removeItem(ACCOUNT_VAULT_KEY);
+      } catch { /* a cópia extra pode permanecer, sem perder dados */ }
+    }
+    return result;
+  } catch (error) {
+    // Uma transação abortada não autoriza sucesso pelo cache antigo.
+    if (!error?.vaultUnavailable || !allowFallback) throw error;
+    const next = change(readLegacyVaultMap());
+    if (next.map && !writeVaultMap(next.map)) throw error;
+    return next.result;
+  }
+}
+
+/**
+ * Não guardar object URLs: deixam de existir quando a aba fecha. Para campos
+ * conhecidos, confirmar os bytes no image-store antes de remover a origem.
+ * Se esse store estiver indisponível, os bytes inline ainda cabem no cofre IDB.
+ */
+async function durableMedia(value, context = { externalize: true, imageStoreUnavailable: false }) {
+  const { externalize } = context;
+  if (Array.isArray(value)) return Promise.all(value.map((item) => durableMedia(item, context)));
+  if (!value || typeof value !== 'object') return value;
+  const next = {};
+  for (const [key, child] of Object.entries(value)) next[key] = await durableMedia(child, context);
+  const pairs = [['bgImage', 'bgImageId'], ['logoImage', 'logoImageId'], ['refImage', 'refImageId'], ['logo', 'logoImageId'], ['dataUrl', 'imageId']];
+  for (const [sourceKey, idKey] of pairs) {
+    const source = next[sourceKey];
+    if (typeof source !== 'string' || (!source.startsWith('blob:') && !source.startsWith('data:image/'))) continue;
+    // IDs de imagens em runtime já confirmados evitam duplicar originais grandes.
+    if (source.startsWith('blob:') && next[idKey] && !context.imageStoreUnavailable) {
+      try {
+        if ((await imageGet(next[idKey]))?.blob) { delete next[sourceKey]; continue; }
+      } catch { context.imageStoreUnavailable = true; }
+    }
+    const blob = await origemParaBlob(source);
+    if (!blob) throw new Error('Não foi possível preservar uma imagem em edição.');
+    if (sourceKey === 'dataUrl' && !String(blob.type).startsWith('image/')) {
+      next[sourceKey] = source.startsWith('blob:') ? await blobParaDataUrl(blob) : source;
+      continue; // customTitleFont/customBodyFont precisam continuar com dataUrl.
+    }
+    if (externalize && !context.imageStoreUnavailable) {
+      try {
+        const id = newImageId();
+        await imagePut(id, blob);
+        next[idKey] = id;
+        delete next[sourceKey];
+        continue;
+      } catch { context.imageStoreUnavailable = true; }
+    }
+    next[sourceKey] = source.startsWith('blob:') ? await blobParaDataUrl(blob) : source;
+    // Não deixar um ID antigo vencer os bytes mais recentes na hidratação.
+    delete next[idKey];
+  }
+  // Fontes e outros blobs também precisam sobreviver ao encerramento da aba.
+  for (const [key, child] of Object.entries(next)) {
+    if (typeof child === 'string' && child.startsWith('blob:')) {
+      const blob = await origemParaBlob(child);
+      if (!blob) throw new Error('Não foi possível preservar um arquivo em edição.');
+      next[key] = await blobParaDataUrl(blob);
+    }
+  }
+  return next;
+}
+
+async function snapshotBag(snapshot) {
+  const { bag } = collectBag();
+  if (snapshot !== undefined) {
+    if (!snapshot || !Array.isArray(snapshot.library)) throw new Error('Snapshot de edição inválido.');
+    const fields = { library: SK.library, brandRoster: SK.brands, libraryFolders: SK.libraryFolders,
+      activeDocId: SK.activeDocId, activeBrandId: SK.activeBrandId };
+    for (const [field, key] of Object.entries(fields)) {
+      if (Object.prototype.hasOwnProperty.call(snapshot, field)) bag[key] = JSON.stringify(snapshot[field]);
+    }
+  }
+  const mediaContext = { externalize: true, imageStoreUnavailable: false };
+  for (const key of [SK.library, SK.brands]) {
+    if (bag[key]) bag[key] = JSON.stringify(await durableMedia(JSON.parse(bag[key]), mediaContext));
+  }
+  return { bag, projectCount: libraryCountFromBag(bag[SK.library]) };
+}
+
+/** A edição React atual prevalece, mas uma biblioteca parcial não apaga o cofre. */
+function mergeExplicitLibrary(bag, previousKeys) {
+  if (!previousKeys?.[SK.library]) return bag;
+  let previous;
+  let incoming;
+  let deleted;
+  try {
+    previous = JSON.parse(previousKeys[SK.library]);
+    incoming = JSON.parse(bag[SK.library]);
+    deleted = JSON.parse(bag[SK.libraryDeletedIds] || '[]');
+  } catch { return bag; }
+  if (!Array.isArray(previous) || !Array.isArray(incoming)) return bag;
+  const deletedIds = new Set(Array.isArray(deleted) ? deleted.map(String) : []);
+  const ids = new Set(incoming.map((item) => item?.id).filter(Boolean));
+  const merged = [...incoming, ...previous.filter((item) => !item?.id || !ids.has(item.id))]
+    .filter((item) => !deletedIds.has(String(item?.id)));
+  return { ...bag, [SK.library]: JSON.stringify(merged) };
+}
+
+/** Guarda a edição atual; não confirma uma cópia stale do localStorage. */
+export async function snapshotAccountVault(ownerId, options = {}) {
+  return snapshotAccountVaultForOwners([ownerId], options);
 }
 
 /** Um snapshot por conta; aliases legados divergentes nunca são descartados. */
-export function snapshotAccountVaultForOwners(ownerIds = []) {
+export async function snapshotAccountVaultForOwners(ownerIds = [], { snapshot } = {}) {
   if (typeof localStorage === 'undefined') return false;
   const ids = [...new Set((ownerIds || []).filter((id) => typeof id === 'string' && id))];
   if (!ids.length) return false;
-  const { bag, useful, projectCount } = collectBag();
-  if (!useful && !Object.keys(bag).length) return false;
-  const map = readVaultMap();
-  const primary = ids.find((id) => id.startsWith('email:')) || ids[0];
-  const previous = resolveSlot(map, primary);
-  if (projectCount < libraryCountFromBag(previous?.slot.keys[SK.library])) return false;
-
-  // Manter um slot canônico existente preserva os pointers de aliases que
-  // podem não estar presentes nesta sessão (ex.: login sem customerId).
-  const canonical = previous?.ownerId || primary;
-  map[canonical] = { savedAt: Date.now(), keys: bag };
-  for (const id of ids) {
-    if (id === canonical) continue;
-    const existing = resolveSlot(map, id);
-    if (!existing || sameBag(existing.slot.keys, bag)
-      || (previous && sameBag(existing.slot.keys, previous.slot.keys))) {
-      map[id] = { aliasOf: canonical };
-    }
-  }
-  return writeVaultMap(map);
+  try {
+    const { bag, projectCount } = await snapshotBag(snapshot);
+    if (!Object.keys(bag).length) return false;
+    return await accessVault((map) => {
+      const primary = ids.find((id) => id.startsWith('email:')) || ids[0];
+      const previous = resolveSlot(map, primary);
+      if (snapshot === undefined && projectCount < libraryCountFromBag(previous?.slot.keys[SK.library])) return { map, result: false };
+      let savedBag = bag;
+      const previousAliases = ids.map((id) => ({ id, resolved: resolveSlot(map, id) }))
+        .filter((entry) => entry.resolved);
+      if (snapshot !== undefined) {
+        // Os aliases autenticados são uma só conta. Um slot antigo maior não
+        // pode vencer o snapshot recém-salvo apenas por ter mais projetos.
+        const ordered = [...previousAliases].sort((a, b) => Number(b.resolved.slot.savedAt || 0) - Number(a.resolved.slot.savedAt || 0));
+        for (const entry of ordered) savedBag = mergeExplicitLibrary(savedBag, entry.resolved.slot.keys);
+      }
+      const canonical = previous?.ownerId || primary;
+      map[canonical] = { savedAt: Date.now(), keys: savedBag };
+      for (const id of ids) {
+        if (id === canonical) continue;
+        if (snapshot !== undefined) {
+          const old = previousAliases.find((entry) => entry.id === id)?.resolved;
+          if (old && old.ownerId !== canonical && !sameBag(old.slot.keys, savedBag)) {
+            let backup = `${id}#preserved:${old.slot.savedAt || 0}`;
+            let suffix = 0;
+            while (map[backup] && JSON.stringify(map[backup]) !== JSON.stringify(old.slot)) {
+              suffix += 1; backup = `${id}#preserved:${old.slot.savedAt || 0}:${suffix}`;
+            }
+            map[backup] = old.slot;
+          }
+          map[id] = { aliasOf: canonical };
+          continue;
+        }
+        const existing = resolveSlot(map, id);
+        if (!existing || sameBag(existing.slot.keys, bag)
+          || (previous && sameBag(existing.slot.keys, previous.slot.keys))) map[id] = { aliasOf: canonical };
+      }
+      return { map, result: true };
+    });
+  } catch { return false; }
 }
 
-function applySlot(slot) {
+function assertRestoreCurrent(isCurrent) {
+  if (typeof isCurrent !== 'function' || isCurrent()) return;
+  throw Object.assign(new Error('A conta mudou durante a restauração. Entre novamente para continuar.'), {
+    code: 'ACCOUNT_VAULT_OWNER_CHANGED',
+  });
+}
+
+async function applySlot(slot, { onRestored, isCurrent } = {}) {
+  assertRestoreCurrent(isCurrent);
   if (!slot?.keys || typeof slot.keys !== 'object') return false;
   // O caller recarrega quando devolvemos true. Marcas sozinhas, ou biblioteca
   // vazia/inválida, fariam o próximo boot restaurar e recarregar sem fim.
   if (!libraryCountFromBag(slot.keys[SK.library])) return false;
-  const writes = SNAPSHOT_KEYS.map((key) => [key, slot.keys[key]])
+  let keys;
+  try {
+    keys = { ...slot.keys };
+    const mediaContext = { externalize: true, imageStoreUnavailable: false };
+    for (const key of [SK.library, SK.brands]) {
+      if (keys[key]) keys[key] = JSON.stringify(await durableMedia(JSON.parse(keys[key]), mediaContext));
+      assertRestoreCurrent(isCurrent);
+    }
+    if (keys[SK.libraryCloudMeta]) {
+      const meta = JSON.parse(keys[SK.libraryCloudMeta]);
+      if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+        // Só será confirmado após TODAS as chaves terem sido restauradas.
+        // Manter false faria o boot importar a nuvem antiga sobre esta edição.
+        keys[SK.libraryCloudMeta] = JSON.stringify({ ...meta, localPersisted: true });
+      }
+    }
+  } catch (error) {
+    if (error?.code === 'ACCOUNT_VAULT_OWNER_CHANGED') throw error;
+    return false;
+  }
+  assertRestoreCurrent(isCurrent);
+  const writes = SNAPSHOT_KEYS.map((key) => [key, keys[key]])
     .filter(([, raw]) => typeof raw === 'string' && raw !== '');
   const changed = [];
+  let localPersisted = false;
   try {
     for (const [key, raw] of writes) {
+      assertRestoreCurrent(isCurrent);
       const previous = localStorage.getItem(key);
       if (previous === raw) continue;
       localStorage.setItem(key, raw);
       changed.push([key, previous]);
     }
+    assertRestoreCurrent(isCurrent);
     if (!writes.every(([key, raw]) => localStorage.getItem(key) === raw)) {
       throw new Error('Restauração local incompleta.');
     }
-    return true;
-  } catch {
+    localPersisted = true;
+  } catch (error) {
+    // Outra aba já pode estar gravando B. Não reverter chaves de B com A.
+    if (error?.code === 'ACCOUNT_VAULT_OWNER_CHANGED') throw error;
+    assertRestoreCurrent(isCurrent);
     // O slot original fica intacto. Não deixar uma restauração parcial parecer
     // a biblioteca completa; restaurar as chaves anteriores em ordem inversa.
     for (const [key, raw] of changed.reverse()) {
@@ -173,6 +345,20 @@ function applySlot(slot) {
         else localStorage.setItem(key, raw);
       } catch { /* cofre original preservado para nova tentativa */ }
     }
+  }
+  assertRestoreCurrent(isCurrent);
+  if (typeof onRestored !== 'function') return localPersisted;
+  try {
+    const read = (key, fallback) => keys[key] ? JSON.parse(keys[key]) : fallback;
+    const snapshot = { library: read(SK.library, []), brandRoster: read(SK.brands, []),
+      libraryFolders: read(SK.libraryFolders, []), activeDocId: read(SK.activeDocId, null),
+      activeBrandId: read(SK.activeBrandId, null) };
+    assertRestoreCurrent(isCurrent);
+    await onRestored(snapshot, { projectCount: snapshot.library.length, localPersisted });
+    assertRestoreCurrent(isCurrent);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ACCOUNT_VAULT_OWNER_CHANGED') throw error;
     return false;
   }
 }
@@ -180,9 +366,12 @@ function applySlot(slot) {
 /**
  * Restaura o melhor slot entre ownerId e aliases (email: ↔ id:cus).
  */
-export function restoreAccountVault(ownerId, aliases = []) {
+export async function restoreAccountVault(ownerId, aliases = [], { onRestored, isCurrent } = {}) {
+  assertRestoreCurrent(isCurrent);
   if (typeof localStorage === 'undefined') return false;
-  const map = readVaultMap();
+  let map;
+  try { map = await accessVault(); } catch { map = readLegacyVaultMap(); }
+  assertRestoreCurrent(isCurrent);
   const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
   let best = null;
   let bestCount = -1;
@@ -194,12 +383,13 @@ export function restoreAccountVault(ownerId, aliases = []) {
       best = slot;
     }
   }
-  return applySlot(best);
+  return applySlot(best, { onRestored, isCurrent });
 }
 
-export function accountVaultHasProjects(ownerId, aliases = []) {
+export async function accountVaultHasProjects(ownerId, aliases = []) {
   if (typeof localStorage === 'undefined') return false;
-  const map = readVaultMap();
+  let map;
+  try { map = await accessVault(); } catch { map = readLegacyVaultMap(); }
   const candidates = [...new Set([ownerId, ...(aliases || [])].filter(Boolean))];
   for (const id of candidates) {
     if (libraryCountFromBag(resolveSlot(map, id)?.slot.keys[SK.library]) > 0) return true;
@@ -208,12 +398,14 @@ export function accountVaultHasProjects(ownerId, aliases = []) {
 }
 
 /** Imagens do cofre também estão em uso, mesmo com outra conta aberta. */
-export function getAccountVaultImageIds() {
+export async function getAccountVaultImageIds() {
   const ids = new Set();
   if (typeof localStorage === 'undefined') return ids;
-  const map = readVaultMap();
+  // Se o cofre durável não puder ser lido, abortar o GC é mais seguro do que
+  // tratar imagens de outra conta como órfãs. Sem IDB, só existe o legado.
+  const map = await accessVault(undefined, { allowFallback: typeof indexedDB === 'undefined' });
   const visited = new Set();
-  const imageKeys = new Set(['bgImageId', 'logoImageId', 'refImageId', 'imageId']);
+  const imageKeys = new Set(['bgImageId', 'logoImageId', 'refImageId', 'imageId', 'refImageAssetId', 'assetId']);
   for (const ownerId of Object.keys(map)) {
     const resolved = resolveSlot(map, ownerId);
     if (!resolved || visited.has(resolved.ownerId)) continue;

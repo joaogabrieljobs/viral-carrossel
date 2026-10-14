@@ -4,7 +4,7 @@
  * activas mas a mesma conta recupera os projetos ao reentrar neste browser.
  */
 import { clearAccountLocalData } from './clear-account-data.js';
-import { SK, lockAccountDataWrites } from './storage.js';
+import { SK, areAccountDataWritesLocked, lockAccountDataWrites, unlockAccountDataWrites } from './storage.js';
 import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
@@ -68,6 +68,27 @@ export function writeDataOwner(ownerId) {
   } catch { /* quota / privado */ }
 }
 
+/** O restore agora aguarda IndexedDB; o React antigo não pode gravar nesse intervalo. */
+async function restoreForBoot(ownerId, aliases, onRestored, isCurrent) {
+  const wasLocked = areAccountDataWritesLocked();
+  const expectedOwner = readDataOwner();
+  const isRestoreCurrent = () => expectedOwner === ownerId && readDataOwner() === expectedOwner
+    && (typeof isCurrent !== 'function' || isCurrent());
+  lockAccountDataWrites();
+  let restored = false;
+  try {
+    restored = await restoreAccountVault(ownerId, aliases, { onRestored, isCurrent: isRestoreCurrent });
+    if (!isRestoreCurrent()) restored = 'blocked';
+    return restored;
+  } catch (error) {
+    if (error?.code !== 'ACCOUNT_VAULT_OWNER_CHANGED') throw error;
+    restored = 'blocked';
+    return restored;
+  } finally {
+    if (restored === false && !wasLocked) unlockAccountDataWrites();
+  }
+}
+
 function reloadAccountSwitch() {
   // O React ainda contém o estado anterior até ao novo boot. Um flush de
   // pagehide não pode substituir o cofre que acabámos de restaurar.
@@ -89,9 +110,9 @@ function reloadAccountSwitch() {
 /**
  * @param {object} session — resultado de /api/auth/session
  * @param {{ explicitLogin?: boolean }} [opts]
- * @returns {Promise<'ok' | 'reloading' | 'blocked'>}
+ * @returns {Promise<'ok' | 'restored' | 'reloading' | 'blocked'>}
  */
-export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
+export async function ensureAccountDataOwner(session, { explicitLogin = false, onRestored, isCurrent } = {}) {
   if (typeof localStorage === 'undefined') return 'ok';
   if (!session?.active) return 'ok';
 
@@ -101,52 +122,73 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
   const prev = readDataOwner();
 
   const aliases = [...dataOwnerAliases(session.email, session.customerId)];
+  const ownerUnchanged = (expected) => readDataOwner() === expected
+    && (typeof isCurrent !== 'function' || isCurrent());
+  const block = () => { lockAccountDataWrites(); return 'blocked'; };
+  const resumeFromVault = async () => {
+    const restored = await restoreForBoot(next, aliases, onRestored, isCurrent);
+    if (restored === 'blocked') return block();
+    if (restored !== true) return null;
+    if (!ownerUnchanged(next)) return block();
+    if (typeof onRestored === 'function') {
+      unlockAccountDataWrites();
+      return 'restored';
+    }
+    reloadAccountSwitch();
+    return 'reloading';
+  };
+  if (!ownerUnchanged(prev)) return block();
 
   if (!prev) {
     if (explicitLogin) {
-      // Login fresco: limpar activo órfão (outra pessoa) e restaurar o cofre desta conta.
+      // Login fresco: estados React/BYOK órfãos podem ser de outra pessoa.
+      // O cofre desta conta só entra depois de desmontar este contexto.
       lockAccountDataWrites();
       await clearAccountLocalData({ wipeMedia: false });
+      if (!ownerUnchanged(null)) return block();
       writeDataOwner(next);
-      restoreAccountVault(next, aliases);
+      if (!ownerUnchanged(next)) return block();
       reloadAccountSwitch();
       return 'reloading';
     }
-    // Boot silencioso: reclamar biblioteca actual; se vazia, restaurar cofre + reload
-    // (senão o React fica com state vazio e a UI parece «apagada»).
+    // Boot silencioso: reclamar biblioteca actual; se vazia, restaurar cofre.
     writeDataOwner(next);
-    if (!libraryLooksOccupied() && restoreAccountVault(next, aliases)) {
-      reloadAccountSwitch();
-      return 'reloading';
+    if (!ownerUnchanged(next)) return block();
+    if (!libraryLooksOccupied()) {
+      const restored = await resumeFromVault();
+      if (restored) return restored;
     }
-    return 'ok';
+    return ownerUnchanged(next) ? 'ok' : block();
   }
 
   if (isSameDataOwner(prev, next, session)) {
     if (prev !== next) {
       // Migrar id:cus → email: e mover snapshot se existir.
-      snapshotAccountVault(prev);
+      await snapshotAccountVault(prev);
+      if (!ownerUnchanged(prev)) return block();
       writeDataOwner(next);
-      snapshotAccountVault(next);
+      if (!ownerUnchanged(next)) return block();
+      await snapshotAccountVault(next);
+      if (!ownerUnchanged(next)) return block();
     }
-    // Biblioteca vazia mas cofre tem dados (logout anterior) → restaurar + reload.
-    if (!libraryLooksOccupied() && restoreAccountVault(next, aliases)) {
-      reloadAccountSwitch();
-      return 'reloading';
+    if (!libraryLooksOccupied()) {
+      const restored = await resumeFromVault();
+      if (restored) return restored;
     }
-    return 'ok';
+    return ownerUnchanged(next) ? 'ok' : block();
   }
 
-  // Conta diferente: guardar A, limpar activo, restaurar B.
+  // Conta diferente: guardar A e desmontar TODOS os estados da sessão anterior,
+  // incluindo chaves de IA/BYOK. B restaura seu cofre no próximo boot limpo.
   const hasLocalProjects = libraryLooksOccupied();
   lockAccountDataWrites();
-  const preserved = snapshotAccountVault(prev);
-  // A sessão já pode ser de B, mas a biblioteca continua sendo de A. Nunca
-  // apagar a única cópia nem liberá-la para escrita pela conta seguinte.
+  const preserved = await snapshotAccountVault(prev);
+  if (!ownerUnchanged(prev)) return block();
   if (hasLocalProjects && !preserved) return 'blocked';
   await clearAccountLocalData({ wipeMedia: false });
+  if (!ownerUnchanged(null)) return block();
   writeDataOwner(next);
-  restoreAccountVault(next, aliases);
+  if (!ownerUnchanged(next)) return block();
   reloadAccountSwitch();
   return 'reloading';
 }
