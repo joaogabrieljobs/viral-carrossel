@@ -100,6 +100,7 @@ async function extractSourceVectors() {
   return {
     rects,
     paths,
+    wordmarkViewBox: source.match(/const WORDMARK_VIEWBOX = '([^']+)'/)?.[1] || '0 0 240 64',
     sourceHash: sha256(JSON.stringify({ rects, paths })),
   };
 }
@@ -134,12 +135,13 @@ function wordmarkPathsMarkup(paths, color, indent = '  ') {
   ].join('\n');
 }
 
-function createWordmarkSvg(vectors, variantName, width = 240, height = 64) {
+function createWordmarkSvg(vectors, variantName, width, height) {
   const colors = VARIANTS[variantName];
+  const bounds = vectors.wordmarkViewBox.split(' ').map(Number);
   return svgDocument({
-    width,
-    height,
-    viewBox: '0 0 240 64',
+    width: width ?? bounds[2],
+    height: height ?? bounds[3],
+    viewBox: vectors.wordmarkViewBox,
     title: `Moont Sequence — ${colors.label}`,
     body: [
       sequenceMarkup(vectors.rects, colors),
@@ -164,6 +166,8 @@ function createPresentationSvg(vectors, surface) {
   const variantName = isDark ? 'color-on-dark' : 'color-on-light';
   const colors = VARIANTS[variantName];
   const background = isDark ? COLORS.midnight : COLORS.moonlight;
+  const [minX, , wordmarkWidth] = vectors.wordmarkViewBox.split(' ').map(Number);
+  const offsetX = 800 - (minX + wordmarkWidth / 2) * 4;
   return svgDocument({
     width: 1600,
     height: 600,
@@ -171,7 +175,7 @@ function createPresentationSvg(vectors, surface) {
     title: `Moont Sequence sobre fundo ${isDark ? 'Midnight' : 'Moonlight'}`,
     body: [
       `<rect width="1600" height="600" fill="${background}"/>`,
-      '<g transform="translate(320 172) scale(4)">',
+      `<g transform="translate(${offsetX} 172) scale(4)">`,
       sequenceMarkup(vectors.rects, colors, '  '),
       wordmarkPathsMarkup(vectors.paths, colors.wordmark, '  '),
       '</g>',
@@ -236,7 +240,7 @@ function createManifest(vectors, exportedFiles) {
     source: 'src/components/BrandLogo.jsx',
     sourceGeometrySha256: vectors.sourceHash,
     viewBoxes: {
-      wordmark: '0 0 240 64',
+      wordmark: vectors.wordmarkViewBox,
       symbol: '0 0 64 64',
     },
     colors: Object.fromEntries(Object.entries(COLORS).map(([key, value]) => [key, normalizeHex(value)])),

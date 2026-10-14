@@ -114,7 +114,7 @@ tela inteira em Aurora perde o sentido de destaque.
 
 ## Tipografia
 
-O wordmark usa a pilha Display do produto, com peso 720 e espaçamento compacto.
+O wordmark usa contornos vetoriais de Manrope ExtraBold (800), com escala uniforme nos dois eixos e espaçamento óptico compacto. Os contornos são independentes das fontes instaladas. A versão de interface reserva 272 × 55 unidades; nunca comprima as letras para caber em uma largura fixa.
 
 Para produto e comunicação:
 

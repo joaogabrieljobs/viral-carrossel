@@ -2463,9 +2463,9 @@ export default function App() {
   }, []);
 
   const isMobile = vw < 768;
-  /* Desktop estreito: header de 1 linha não cabe (grupo direito = 730px).
-     Em 1280px o nome + Salvar chegavam a ficar recortados sobre Projetos. */
-  const headerTight = !isMobile && vw < 1400;
+  /* A assinatura tem proporção natural: as ferramentas descem antes de
+     comprimir a marca ou sobrepor Salvar e Projetos. */
+  const headerTight = !isMobile && vw < 1536;
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;

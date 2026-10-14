@@ -1,9 +1,9 @@
 {
   "identity": "Moont Sequence",
   "source": "src/components/BrandLogo.jsx",
-  "sourceGeometrySha256": "c213d5a06c1e44d3c4cdd2f196f2babb02594b96be6f51d197a50e48570120a0",
+  "sourceGeometrySha256": "8b3358915b4270cd3e715e7e22e0d30cd5a3ff53d599f0c1c5b2a5f39482f8ad",
   "viewBoxes": {
-    "wordmark": "0 0 240 64",
+    "wordmark": "2 5 272 55",
     "symbol": "0 0 64 64"
   },
   "colors": {
