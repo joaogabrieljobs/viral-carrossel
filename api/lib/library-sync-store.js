@@ -5,15 +5,20 @@
  */
 
 import { put, get } from '@vercel/blob';
+import { createHash } from 'node:crypto';
 
 const META_PREFIX = 'vc:library-sync:meta:';
 const BLOB_PREFIX = 'library-sync/';
 const MAX_MANIFEST_CHARS = 3_500_000;
 const MAX_ASSET_CHARS = 2_400_000;
+const ASSET_CHUNK_CHARS = 2_000_000;
+const MAX_ORIGINAL_ASSET_CHARS = 48_000_000;
+const MAX_ASSET_CHUNKS = 24;
 const MAX_ASSETS = 800;
 const memoryMeta = new Map();
 const memoryManifest = new Map();
 const memoryAssets = new Map();
+const memoryOriginals = new Map();
 
 function usesBlobOnly(customerId) {
   if (process.env.LIBRARY_SYNC_STORAGE?.trim() !== 'blob') return false;
@@ -112,12 +117,16 @@ function assetPath(customerId, assetId, ext = 'bin') {
 function extForMime(mime) {
   if (mime === 'image/png') return 'png';
   if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/gif') return 'gif';
+  if (mime === 'image/avif') return 'avif';
   return 'jpg';
 }
 
 function mimeFromPath(pathname) {
   if (pathname.endsWith('.png')) return 'image/png';
   if (pathname.endsWith('.webp')) return 'image/webp';
+  if (pathname.endsWith('.gif')) return 'image/gif';
+  if (pathname.endsWith('.avif')) return 'image/avif';
   if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg';
   return 'image/jpeg';
 }
@@ -447,8 +456,142 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
   throw storageUnconfiguredError(errors);
 }
 
+function assetError(message, code = 'library_bad_asset') {
+  return Object.assign(new Error(message), { code });
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function originalAssetPath(id, aid, suffix) {
+  return `${BLOB_PREFIX}${id}/original-assets/${aid}/${suffix}`;
+}
+
+async function writeOriginalObject(pathname, value) {
+  const serialized = JSON.stringify(value);
+  if (hasBlob()) {
+    try {
+      await putBlobPrivate(pathname, serialized);
+      return;
+    } catch (error) {
+      if (!allowMemory()) throw storageUnconfiguredError(['Falha ao gravar a imagem original no Blob']);
+    }
+  }
+  if (!allowMemory()) throw storageUnconfiguredError();
+  memoryOriginals.set(pathname, serialized);
+}
+
+async function readOriginalObject(pathname) {
+  if (hasBlob()) {
+    try {
+      const buffer = await readBlobPrivate(pathname);
+      if (buffer) return JSON.parse(buffer.toString('utf8'));
+    } catch (error) {
+      // Ausência é diferente de indisponibilidade; nunca confirma um upload
+      // com base numa leitura que falhou.
+      if (error?.status !== 404 && error?.statusCode !== 404
+        && error?.name !== 'BlobNotFoundError') {
+        throw assetError('Não foi possível ler a imagem original na nuvem.', 'library_storage_unavailable');
+      }
+    }
+  }
+  const serialized = allowMemory() ? memoryOriginals.get(pathname) : null;
+  return serialized ? JSON.parse(serialized) : null;
+}
+
+function originalHash(aid, chunked = false) {
+  return new RegExp(`^original_${chunked ? 'chunks_' : ''}([a-f0-9]{64})$`).exec(aid)?.[1] || '';
+}
+
+function validateChunkShape(total, totalChars) {
+  return Number.isInteger(total) && total >= 2 && total <= MAX_ASSET_CHUNKS
+    && Number.isInteger(totalChars) && totalChars > ASSET_CHUNK_CHARS
+    && totalChars <= MAX_ORIGINAL_ASSET_CHARS
+    && total === Math.ceil(totalChars / ASSET_CHUNK_CHARS);
+}
+
+function chunkLength(index, total, totalChars) {
+  return index === total - 1 ? totalChars - index * ASSET_CHUNK_CHARS : ASSET_CHUNK_CHARS;
+}
+
+async function readOriginalDescriptor(id, aid) {
+  const descriptor = await readOriginalObject(originalAssetPath(id, aid, 'complete.json'));
+  if (!descriptor) return null;
+  if (descriptor.assetId !== aid || descriptor.chunked !== true
+    || !validateChunkShape(descriptor.total, descriptor.totalChars)
+    || !Array.isArray(descriptor.hashes) || descriptor.hashes.length !== descriptor.total
+    || !descriptor.hashes.every((hash) => /^[a-f0-9]{64}$/.test(hash))) {
+    throw assetError('A imagem original na nuvem está incompleta.', 'library_asset_incomplete');
+  }
+  return descriptor;
+}
+
 /**
- * Grava bytes da imagem (não JSON) — cabem mais e falham menos no Blob.
+ * Partes endereçadas pelo conteúdo ficam imutáveis após a publicação. Os
+ * apontadores temporários podem ser reenviados; o descriptor só é publicado
+ * depois de verificar todos os bytes e o hash da imagem completa.
+ */
+export async function putLibraryAssetChunk(customerId, assetId, body) {
+  const id = sanitizeCustomerId(customerId);
+  const aid = sanitizeAssetId(assetId);
+  const hash = originalHash(aid, true);
+  const { index, total, totalChars, data } = body || {};
+  if (!id || !hash || !validateChunkShape(total, totalChars)
+    || !Number.isInteger(index) || index < 0 || index >= total
+    || typeof data !== 'string' || data.length !== chunkLength(index, total, totalChars)
+    || /[^\x20-\x7e]/.test(data)) {
+    throw assetError('Parte da imagem inválida.');
+  }
+  const partHash = sha256(data);
+  const partPath = originalAssetPath(id, aid, `parts/${index}-${partHash}.json`);
+  const existing = await readOriginalDescriptor(id, aid);
+  if (existing) {
+    if (existing.total !== total || existing.totalChars !== totalChars || existing.hashes[index] !== partHash) {
+      throw assetError('Esta parte não corresponde à imagem original.');
+    }
+    // Também permite recuperar uma parte removida/interrompida sem mudar o
+    // descriptor publicado. O hash já confirmou que os bytes são os mesmos.
+    const stored = await readOriginalObject(partPath);
+    if (stored?.index !== index || stored.data !== data) {
+      await writeOriginalObject(partPath, { index, data });
+    }
+    return { assetId: aid, index, total, complete: true };
+  }
+
+  await writeOriginalObject(partPath, { index, data });
+  await writeOriginalObject(originalAssetPath(id, aid, `pending/${index}.json`), {
+    index, total, totalChars, hash: partHash,
+  });
+  if (index !== total - 1) return { assetId: aid, index, total, complete: false };
+
+  const parts = await Promise.all(Array.from({ length: total }, async (_, partIndex) => {
+    const pointer = await readOriginalObject(originalAssetPath(id, aid, `pending/${partIndex}.json`));
+    if (pointer?.index !== partIndex || pointer.total !== total || pointer.totalChars !== totalChars
+      || !/^[a-f0-9]{64}$/.test(pointer.hash || '')) return null;
+    const part = await readOriginalObject(originalAssetPath(id, aid, `parts/${partIndex}-${pointer.hash}.json`));
+    if (part?.index !== partIndex || typeof part.data !== 'string'
+      || part.data.length !== chunkLength(partIndex, total, totalChars)
+      || sha256(part.data) !== pointer.hash) return null;
+    return { data: part.data, hash: pointer.hash };
+  }));
+  if (parts.some((part) => !part)) {
+    throw assetError('O envio da imagem ainda não terminou. Reenvie as partes em falta.', 'library_asset_incomplete');
+  }
+  const dataUrl = parts.map((part) => part.data).join('');
+  if (sha256(dataUrl) !== hash || !parseDataUrl(dataUrl)) {
+    throw assetError('As partes recebidas não correspondem à imagem original.');
+  }
+  await writeOriginalObject(originalAssetPath(id, aid, 'complete.json'), {
+    assetId: aid, chunked: true, total, totalChars,
+    hashes: parts.map((part) => part.hash), updatedAt: Date.now(),
+  });
+  return { assetId: aid, index, total, complete: true };
+}
+
+/**
+ * Assets legados são binários. Originais pequenos guardam o data URL exato,
+ * inclusive MIME e padding base64, para preservar o hash durante o round-trip.
  * @param {string} customerId
  * @param {string} assetId
  * @param {{ dataUrl: string, contentType?: string }} body
@@ -460,6 +603,12 @@ export async function putLibraryAsset(customerId, assetId, body) {
     throw Object.assign(new Error('Asset inválido.'), { code: 'library_bad_asset' });
   }
   const dataUrl = String(body?.dataUrl || '');
+  const hash = originalHash(aid);
+  if (aid.startsWith('original_') && !hash) throw assetError('Identificador de imagem original inválido.');
+  if (dataUrl.length > (hash ? ASSET_CHUNK_CHARS : MAX_ASSET_CHARS)) {
+    throw assetError('Imagem grande demais para envio numa única parte.', 'library_asset_too_large');
+  }
+  if (hash && sha256(dataUrl) !== hash) throw assetError('A imagem recebida não corresponde ao original.');
   const parsed = parseDataUrl(dataUrl);
   if (!parsed) {
     throw Object.assign(new Error('Asset deve ser data URL de imagem.'), { code: 'library_bad_asset' });
@@ -468,12 +617,15 @@ export async function putLibraryAsset(customerId, assetId, body) {
     throw Object.assign(new Error('Imagem grande demais para sync.'), { code: 'library_asset_too_large' });
   }
 
-  const contentType = String(body?.contentType || '').startsWith('image/')
-    ? body.contentType
-    : parsed.mime;
+  // O conteúdo recebido, e não um rótulo externo, define o formato.
+  const contentType = parsed.mime;
   const ext = extForMime(contentType);
   const pathname = assetPath(id, aid, ext);
   const record = { assetId: aid, dataUrl, contentType, updatedAt: Date.now() };
+  if (hash) {
+    await writeOriginalObject(originalAssetPath(id, aid, 'original.json'), record);
+    return { assetId: aid, bytes: parsed.bytes.length, contentType };
+  }
   const errors = [];
 
   if (hasBlob()) {
@@ -498,13 +650,38 @@ export async function putLibraryAsset(customerId, assetId, body) {
  * @param {string} customerId
  * @param {string} assetId
  */
-export async function getLibraryAsset(customerId, assetId) {
+export async function getLibraryAsset(customerId, assetId, { part } = {}) {
   const id = sanitizeCustomerId(customerId);
   const aid = sanitizeAssetId(assetId);
   if (!id || !aid) return null;
 
+  if (originalHash(aid, true)) {
+    if (part !== undefined && (!Number.isInteger(part) || part < 0 || part >= MAX_ASSET_CHUNKS)) {
+      throw assetError('Índice da parte inválido.');
+    }
+    const descriptor = await readOriginalDescriptor(id, aid);
+    if (!descriptor) return null;
+    if (part === undefined) {
+      return { assetId: aid, chunked: true, total: descriptor.total, totalChars: descriptor.totalChars };
+    }
+    if (part >= descriptor.total) throw assetError('Índice da parte inválido.');
+    const stored = await readOriginalObject(originalAssetPath(id, aid, `parts/${part}-${descriptor.hashes[part]}.json`));
+    if (stored?.index !== part || typeof stored.data !== 'string'
+      || stored.data.length !== chunkLength(part, descriptor.total, descriptor.totalChars)
+      || sha256(stored.data) !== descriptor.hashes[part]) return null;
+    return { index: part, data: stored.data };
+  }
+
+  if (part !== undefined) throw assetError('Esta imagem não tem partes.');
+  if (originalHash(aid)) {
+    const original = await readOriginalObject(originalAssetPath(id, aid, 'original.json'));
+    if (!original || typeof original.dataUrl !== 'string' || sha256(original.dataUrl) !== originalHash(aid)) return null;
+    return original;
+  }
+  if (aid.startsWith('original_')) return null;
+
   if (hasBlob()) {
-    for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'bin']) {
+    for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'bin']) {
       try {
         const pathname = assetPath(id, aid, ext);
         const buf = await readBlobPrivate(pathname);
@@ -535,11 +712,15 @@ export function resetLibrarySyncStoreForTests() {
   memoryMeta.clear();
   memoryManifest.clear();
   memoryAssets.clear();
+  memoryOriginals.clear();
 }
 
 export {
   MAX_MANIFEST_CHARS,
   MAX_ASSET_CHARS,
+  ASSET_CHUNK_CHARS,
+  MAX_ORIGINAL_ASSET_CHARS,
+  MAX_ASSET_CHUNKS,
   MAX_ASSETS,
   sanitizeCustomerId,
   sanitizeAssetId,

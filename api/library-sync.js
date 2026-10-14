@@ -1,7 +1,7 @@
 /**
  * Sync da biblioteca por conta autenticada (multiutilizador).
  * GET  → meta ou manifesto completo (?full=1) ou asset (?asset=id)
- * POST → action: push | putAsset | status
+ * POST → action: push | putAsset | putAssetChunk | status
  */
 import { applyCors } from './lib/cors.js';
 import { requireActiveSubscription } from './lib/require-access.js';
@@ -11,6 +11,7 @@ import {
   getLibraryManifest,
   putLibraryManifest,
   putLibraryAsset,
+  putLibraryAssetChunk,
   getLibraryAsset,
   resolveLibraryOwnerId,
 } from './lib/library-sync-store.js';
@@ -30,6 +31,9 @@ function ownerId(access) {
 
 function mapStoreError(e) {
   const code = e?.code || '';
+  if (code === 'library_asset_incomplete') {
+    return { status: 409, body: { error: e.message, code } };
+  }
   if (code === 'library_conflict') {
     return {
       status: 409,
@@ -80,7 +84,13 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const assetId = req.query?.asset || req.query?.a || '';
       if (assetId) {
-        const asset = await getLibraryAsset(customerId, assetId);
+        const rawPart = req.query?.part;
+        if (rawPart !== undefined && (typeof rawPart !== 'string' || !/^\d{1,2}$/.test(rawPart))) {
+          return res.status(400).json({ error: 'Índice da parte inválido.', code: 'library_bad_asset' });
+        }
+        const asset = await getLibraryAsset(customerId, assetId, {
+          part: rawPart === undefined ? undefined : Number(rawPart),
+        });
         if (!asset) return res.status(404).json({ error: 'Asset não encontrado.' });
         return res.status(200).json({ ok: true, asset });
       }
@@ -114,6 +124,13 @@ export default async function handler(req, res) {
     }
 
     // action já vem em minúsculas (putAsset → putasset)
+    if (action === 'putassetchunk') {
+      const saved = await putLibraryAssetChunk(customerId, body.assetId, {
+        index: body.index, total: body.total, totalChars: body.totalChars, data: body.data,
+      });
+      return res.status(200).json({ ok: true, ...saved });
+    }
+
     if (action === 'putasset') {
       const saved = await putLibraryAsset(customerId, body.assetId, {
         dataUrl: body.dataUrl,
@@ -146,7 +163,7 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(400).json({ error: 'Ação inválida. Use status, putAsset ou push.' });
+    return res.status(400).json({ error: 'Ação inválida. Use status, putAsset, putAssetChunk ou push.' });
   } catch (e) {
     const mapped = mapStoreError(e);
     if (mapped.status >= 500) {

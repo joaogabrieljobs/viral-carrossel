@@ -11,15 +11,13 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { importSlideReference } from './slide-reference.js';
 import { migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
+import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, isOriginalImageAsset, imageContentType } from './cloud-image-assets.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
 export const LIBRARY_CLOUD_META_FALLBACK_KEY = 'vc_library_cloud_meta_fallback';
 export const CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE = 'Não foi possível restaurar a versão mais recente dos seus projetos. A cópia deste navegador está desatualizada. Verifique sua conexão e tente novamente.';
 const SYNC_API = '/api/library-sync';
 const MAX_BODY_CHARS = 2_800_000;
-const MAX_ASSET_CHARS = 1_600_000;
-const IMAGE_MAX_EDGE = 720;
-const IMAGE_MAX_CHARS = 160_000;
 
 function captureSyncContext() {
   return {
@@ -121,50 +119,6 @@ function writeCloudMeta(meta) {
   return false;
 }
 
-async function compactDataUrl(dataUrl, { preserveAlpha = false } = {}) {
-  const src = String(dataUrl || '');
-  if (!src.startsWith('data:image/')) return null;
-  // Logos precisam manter os bytes/alpha do PNG. O fundo branco usado para
-  // compactar fotos apagava completamente marcas brancas na volta da nuvem.
-  if (preserveAlpha && src.length <= MAX_ASSET_CHARS) return src;
-  if (src.length <= IMAGE_MAX_CHARS && src.startsWith('data:image/jpeg')) return src;
-  if (typeof document === 'undefined' || typeof Image === 'undefined') {
-    return src.length <= MAX_ASSET_CHARS ? src : null;
-  }
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('img'));
-      image.src = src;
-    });
-    if (!img.naturalWidth || !img.naturalHeight) return null;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return src.length <= IMAGE_MAX_CHARS ? src : null;
-    for (const edge of (preserveAlpha ? [2048, 1440, 1080, 720, 512] : [IMAGE_MAX_EDGE, 720, 512])) {
-      const scale = Math.min(1, edge / Math.max(img.naturalWidth, img.naturalHeight));
-      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      if (!preserveAlpha) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      if (preserveAlpha) {
-        const out = canvas.toDataURL('image/png');
-        if (out.startsWith('data:image/png') && out.length <= MAX_ASSET_CHARS) return out;
-        continue;
-      }
-      for (const quality of [0.78, 0.6, 0.45]) {
-        const out = canvas.toDataURL('image/jpeg', quality);
-        if (out.startsWith('data:image/jpeg') && out.length <= IMAGE_MAX_CHARS) return out;
-      }
-    }
-  } catch { /* */ }
-  return src.length <= MAX_ASSET_CHARS ? src : null;
-}
-
 function stripRuntime(value, depth = 0) {
   if (depth > 10 || value == null) return value;
   if (typeof value === 'string') {
@@ -181,25 +135,16 @@ function stripRuntime(value, depth = 0) {
   return value;
 }
 
-async function collectAsset(dataUrl, preferredId, bag, { preserveAlpha = false } = {}) {
+async function collectAsset(dataUrl, bag) {
   if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null;
-  const compact = await compactDataUrl(dataUrl, { preserveAlpha });
-  if (!compact) {
+  if (!imageContentType(dataUrl) || dataUrl.length > CLOUD_IMAGE_MAX_CHARS) {
     bag.packingFailed = (bag.packingFailed || 0) + 1;
     return null;
   }
-  const sourceId = String(preferredId || newImageId()).replace(/[^a-zA-Z0-9._-]/g, '_');
-  // A store legada procura .jpg antes de .png no mesmo ID. Use outra chave
-  // para que um JPEG já publicado nunca esconda a logo transparente corrigida.
-  const assetId = preserveAlpha && compact.startsWith('data:image/png;')
-    ? `${sourceId.slice(0, 71)}-logo-png`
-    : sourceId.slice(0, 80);
-  // Um arquivo também usado como foto deve manter a versão com transparência.
-  if (!bag.has(assetId) || preserveAlpha) bag.set(assetId, compact);
-  if (preserveAlpha) {
-    bag.logoAssetIds ||= new Set();
-    bag.logoAssetIds.add(assetId);
-  }
+  // O hash separa o original das cópias JPEG/720px já existentes na nuvem e
+  // identifica os mesmos bytes mesmo quando o IndexedDB muda de ID no restore.
+  const assetId = await originalImageAssetId(dataUrl);
+  bag.set(assetId, dataUrl);
   return assetId;
 }
 
@@ -211,15 +156,15 @@ async function packSlideForCloud(slide, assets) {
   if (!dataUrl && sl.bgImageId) {
     try { dataUrl = await imagemComoDataUrl(sl.bgImageId); } catch { /* */ }
   }
-  if (dataUrl) bgAssetId = await collectAsset(dataUrl, sl.bgImageId, assets);
+  if (dataUrl) bgAssetId = await collectAsset(dataUrl, assets);
 
   let logoAssetId = null;
   if (typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:')) {
-    logoAssetId = await collectAsset(sl.logoImage, slide.logoImageId, assets, { preserveAlpha: true });
+    logoAssetId = await collectAsset(sl.logoImage, assets);
   } else if (sl.logoImageId) {
     try {
       const logoUrl = await imagemComoDataUrl(sl.logoImageId);
-      logoAssetId = await collectAsset(logoUrl, sl.logoImageId, assets, { preserveAlpha: true });
+      logoAssetId = await collectAsset(logoUrl, assets);
     } catch { /* */ }
   }
 
@@ -230,7 +175,7 @@ async function packSlideForCloud(slide, assets) {
   if (!refDataUrl && sl.refImageId) {
     try { refDataUrl = await imagemComoDataUrl(sl.refImageId); } catch { /* mantém a referência ausente identificada */ }
   }
-  const refAssetId = await collectAsset(refDataUrl, sl.refImageId || sl.refImageAssetId, assets);
+  const refAssetId = await collectAsset(refDataUrl, assets);
   const refIdentity = refAssetId || sl.refImageAssetId || sl.refImageId
     || (refDataUrl ? newImageId() : undefined);
 
@@ -251,11 +196,11 @@ async function packBrandForCloud(brand, assets) {
   try { packed = await exportBrandLogo(brand); } catch { /* */ }
   let logoAssetId = null;
   if (typeof packed?.logo === 'string' && packed.logo.startsWith('data:')) {
-    logoAssetId = await collectAsset(packed.logo, brand?.logoImageId, assets, { preserveAlpha: true });
+    logoAssetId = await collectAsset(packed.logo, assets);
   } else if (packed?.logoImageId) {
     try {
       const url = await imagemComoDataUrl(packed.logoImageId);
-      logoAssetId = await collectAsset(url, packed.logoImageId, assets, { preserveAlpha: true });
+      logoAssetId = await collectAsset(url, assets);
     } catch { /* */ }
   }
   return stripRuntime({
@@ -275,16 +220,16 @@ async function packStyleKitForCloud(styleKit, assets) {
     if (!dataUrl && ref?.imageId) {
       try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* */ }
     }
-    const assetId = await collectAsset(dataUrl, ref?.imageId, assets);
+    const assetId = await collectAsset(dataUrl, assets);
     if (assetId || ref?.assetId) refs.push({ name: ref?.name, assetId: assetId || ref.assetId });
   }
   let logoAssetId = null;
   if (kit?.logo?.dataUrl) {
-    logoAssetId = await collectAsset(kit.logo.dataUrl, kit.logo.imageId, assets, { preserveAlpha: true });
+    logoAssetId = await collectAsset(kit.logo.dataUrl, assets);
   } else if (kit?.logo?.imageId) {
     try {
       const url = await imagemComoDataUrl(kit.logo.imageId);
-      logoAssetId = await collectAsset(url, kit.logo.imageId, assets, { preserveAlpha: true });
+      logoAssetId = await collectAsset(url, assets);
     } catch { /* */ }
   }
   return stripRuntime({
@@ -370,8 +315,18 @@ export async function packLibraryForCloud(snapshot) {
   return { manifest, assets, projectCount: docs.length, packingFailed: assets.packingFailed || 0 };
 }
 
-async function syncRequest(payload, { method = 'POST', query = '', signal } = {}) {
+function waitForSyncRetry(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('Sincronização cancelada.')); return; }
+    const abort = () => { clearTimeout(timer); reject(new Error('Sincronização cancelada.')); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+async function syncRequest(payload, { method = 'POST', query = '', signal, rateLimitRetry = true } = {}) {
   if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  const owner = localStorage.getItem(SK.dataOwner);
   const url = query ? `${SYNC_API}?${query}` : SYNC_API;
   const body = method === 'GET' ? undefined : JSON.stringify(payload);
   if (body && body.length > MAX_BODY_CHARS) {
@@ -392,6 +347,16 @@ async function syncRequest(payload, { method = 'POST', query = '', signal } = {}
       throw new Error('Não foi possível sincronizar (rede). Verifique a ligação e tente de novo.');
     }
     throw e instanceof Error ? e : new Error(raw);
+  }
+  if (res.status === 429 && rateLimitRetry) {
+    // Originais grandes usam mais pedidos. Respeitar a janela do servidor
+    // evita confundir limite transitório com foto ausente; logout pode cancelar.
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 60) : 1;
+    await res.text().catch(() => '');
+    await waitForSyncRetry(delay * 1000, signal);
+    if (localStorage.getItem(SK.dataOwner) !== owner) throw new Error('A conta mudou durante a sincronização.');
+    return syncRequest(payload, { method, query, signal, rateLimitRetry: false });
   }
   const rawText = await res.text().catch(() => '');
   let data = {};
@@ -437,21 +402,20 @@ async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
     let ok = false;
     for (let attempt = 0; attempt < 2 && !ok; attempt += 1) {
       assertCurrent?.();
-      let payload = dataUrl;
-      if (attempt === 1) {
-        // Retry mais agressivo (menor).
-        // eslint-disable-next-line no-await-in-loop
-        payload = await compactDataUrl(dataUrl, { preserveAlpha: assets.logoAssetIds?.has(assetId) });
-        if (!payload) break;
-      }
       try {
         // eslint-disable-next-line no-await-in-loop
-        await syncRequest({
-          action: 'putAsset',
-          assetId,
-          dataUrl: payload,
-          contentType: payload.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-        }, { signal });
+        if (dataUrl.length <= CLOUD_IMAGE_PART_CHARS) {
+          await syncRequest({ action: 'putAsset', assetId, dataUrl, contentType: imageContentType(dataUrl) }, { signal });
+        } else {
+          const total = Math.ceil(dataUrl.length / CLOUD_IMAGE_PART_CHARS);
+          for (let index = 0; index < total; index += 1) {
+            assertCurrent?.();
+            await syncRequest({
+              action: 'putAssetChunk', assetId, index, total, totalChars: dataUrl.length,
+              data: dataUrl.slice(index * CLOUD_IMAGE_PART_CHARS, (index + 1) * CLOUD_IMAGE_PART_CHARS),
+            }, { signal });
+          }
+        }
         uploaded += 1;
         ok = true;
       } catch (e) {
@@ -487,6 +451,11 @@ export async function pushLibraryToCloud(opts = {}) {
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   const { manifest, assets, projectCount, packingFailed } = await packLibraryForCloud(opts.snapshot);
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
+  // Uma substituição grande demais ainda pode carregar o ID remoto da foto
+  // anterior. Publicá-lo e dar pull apagaria a nova edição. Não publicar nada.
+  if (packingFailed) {
+    throw new Error(`Não foi possível preparar ${packingFailed} imagem(ns) para a nuvem. Os originais continuam neste navegador. O limite de envio é 36 MB por imagem.`);
+  }
   if (!projectCount && !(manifest.brands || []).length && !(manifest.deletedIds || []).length) {
     if (opts.pullAfter === true && !status?.empty) {
       const pulled = await pullLibraryFromCloud({
@@ -610,11 +579,8 @@ export async function pushLibraryToCloud(opts = {}) {
     localProjectCount: snapshot ? snapshot.library.length : localLibraryFingerprint().count,
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
-    assetsFailed: assetStats.failed + packingFailed,
-    assetError: [
-      assetStats.lastError,
-      packingFailed ? `${packingFailed} imagem(ns) não puderam ser preparadas para o envio à nuvem.` : '',
-    ].filter(Boolean).join(' '),
+    assetsFailed: assetStats.failed,
+    assetError: assetStats.lastError,
     needsReload,
     pullError,
     localPersisted,
@@ -634,7 +600,26 @@ async function fetchAssetDataUrl(assetId, signal) {
       query: `asset=${encodeURIComponent(assetId)}`,
       signal,
     });
-    return data?.asset?.dataUrl || null;
+    let dataUrl = data?.asset?.dataUrl || null;
+    if (data?.asset?.chunked) {
+      const { total, totalChars } = data.asset;
+      if (!Number.isInteger(totalChars) || totalChars <= CLOUD_IMAGE_PART_CHARS || totalChars > CLOUD_IMAGE_MAX_CHARS
+        || total !== Math.ceil(totalChars / CLOUD_IMAGE_PART_CHARS)) return null;
+      const parts = [];
+      for (let index = 0; index < total; index += 1) {
+        const part = await syncRequest(null, {
+          method: 'GET', query: `asset=${encodeURIComponent(assetId)}&part=${index}`, signal,
+        });
+        const value = part?.asset?.data;
+        const expectedLength = Math.min(CLOUD_IMAGE_PART_CHARS, totalChars - index * CLOUD_IMAGE_PART_CHARS);
+        if (part?.asset?.index !== index || typeof value !== 'string' || value.length !== expectedLength) return null;
+        parts.push(value);
+      }
+      dataUrl = parts.join('');
+    }
+    // Nunca aplica um original incompleto ou outro arquivo sob a mesma chave.
+    if (dataUrl && isOriginalImageAsset(assetId) && await originalImageAssetId(dataUrl) !== assetId) return null;
+    return dataUrl;
   } catch {
     return null;
   }
@@ -643,6 +628,10 @@ async function fetchAssetDataUrl(assetId, signal) {
 async function resolveCachedAsset(assetId, assetCache) {
   if (!assetId) return null;
   if (assetCache.has(assetId)) return assetCache.get(assetId);
+  // Salvar já tem os bytes originais preparados. Evita baixá-los de novo e
+  // mantém a foto local íntegra mesmo quando um upload precisa ser retomado.
+  const prepared = assetCache.localAssets?.get(assetId);
+  if (prepared && isOriginalImageAsset(assetId)) return prepared;
   const pending = fetchAssetDataUrl(assetId, assetCache.signal).then((dataUrl) => {
     if (!dataUrl) assetCache.missing.add(assetId);
     return dataUrl || null;

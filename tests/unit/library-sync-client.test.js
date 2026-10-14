@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { originalImageAssetId, CLOUD_IMAGE_MAX_CHARS } from '../../src/utils/cloud-image-assets.js';
 import {
   SK, lsSet, lockAccountDataWrites, unlockAccountDataWrites, areAccountDataWritesLocked,
 } from '../../src/utils/storage.js';
@@ -161,9 +162,9 @@ describe('library-sync client pack', () => {
     const packed = await packLibraryForCloud({ library: [{ id: 'p1', doc: {
       slides: [{ id: 's1', refImageId: 'ref-card-1', refImage: null, imgExtraPrompt: 'Preserve o enquadramento' }],
     } }], brandRoster: [], libraryFolders: [] });
-    expect(packed.assets.get('ref-card-1')).toBe(reference);
+    expect(packed.assets.get(await originalImageAssetId(reference))).toBe(reference);
     expect(packed.manifest.docs[0].doc.slides[0]).toMatchObject({
-      refImageAssetId: 'ref-card-1', imgExtraPrompt: 'Preserve o enquadramento', refImage: null,
+      refImageAssetId: await originalImageAssetId(reference), imgExtraPrompt: 'Preserve o enquadramento', refImage: null,
     });
     expect(JSON.stringify(packed.manifest)).not.toContain('data:image');
   });
@@ -463,7 +464,7 @@ describe('library-sync client pack', () => {
     expect(areAccountDataWritesLocked()).toBe(false);
   });
 
-  it('referência legada sem ID continua disponível se o asset recém-enviado retornar 404', async () => {
+  it('referência legada sem ID usa o original preparado após confirmação do upload', async () => {
     const source = 'data:image/jpeg;base64,YQ==';
     let uploadedManifest;
     vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
@@ -481,7 +482,7 @@ describe('library-sync client pack', () => {
     const result = await pushLibraryToCloud({ pullAfter: true, snapshot: { library: [{
       id: 'p1', doc: { slides: [{ id: 's1', refImage: source }] },
     }] } });
-    expect(result).toMatchObject({ ok: true, assetsMissing: 1 });
+    expect(result).toMatchObject({ ok: true, assetsMissing: 0 });
     const restored = result.snapshot.library[0].doc.slides[0];
     expect(restored.refImageId).toBe(uploadedManifest.docs[0].doc.slides[0].refImageAssetId);
     expect(restored.refImageFailed).toBe(false);
@@ -775,20 +776,20 @@ describe('library-sync client pack', () => {
     expect(JSON.parse(local.getItem(SK.library))).toEqual(manifest.docs);
   });
 
-  it('bytes que não couberam no empacotamento contam como falha, mas ID órfão antigo não inventa falha nova', async () => {
+  it('imagem acima do limite interrompe o push antes de restaurar uma foto antiga', async () => {
     const manifest = cloudLibrary(1);
-    installCloudApi(manifest);
+    const { requests } = installCloudApi(manifest);
     const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
     const snapshot = { library: [{ id: 'p1', doc: { slides: [
-      { id: 's1', refImage: `data:image/jpeg;base64,${'A'.repeat(1_700_000)}` },
+      { id: 's1', refImageAssetId: 'old-photo', refImage: `data:image/jpeg;base64,${'A'.repeat(CLOUD_IMAGE_MAX_CHARS)}` },
       { id: 's2', refImageId: 'old-missing-reference', refImageAssetId: 'old-cloud-reference' },
     ] } }] };
     const packed = await packLibraryForCloud(snapshot);
     expect(packed.packingFailed).toBe(1);
     expect(packed.assets.size).toBe(0);
-    const result = await pushLibraryToCloud({ snapshot, pullAfter: false });
-    expect(result).toMatchObject({ ok: true, cloudSaved: true, assetsFailed: 1, assetsUploaded: 0 });
-    expect(result.assetError).toContain('1 imagem(ns) não puderam ser preparadas');
+    await expect(pushLibraryToCloud({ snapshot, pullAfter: true })).rejects.toThrow('Os originais continuam neste navegador');
+    expect(requests.some(({ body }) => body?.action === 'push')).toBe(false);
+    expect(imageMocks.store).not.toHaveBeenCalled();
   });
 
   it('rejeita manifesto inválido sem substituir a biblioteca por uma lista vazia', async () => {

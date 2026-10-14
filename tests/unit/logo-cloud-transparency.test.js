@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { packLibraryForCloud, pushLibraryToCloud, applyCloudManifest } from '../../src/utils/library-sync.js';
+import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { SK, unlockAccountDataWrites } from '../../src/utils/storage.js';
 
 const images = vi.hoisted(() => ({ read: vi.fn(), put: vi.fn() }));
@@ -66,30 +67,26 @@ describe('logos transparentes na sincronização', () => {
     });
     input.brandRoster = [{ id: 'b2', logoImageId: 'roster-logo' }];
     const packed = await packLibraryForCloud(input);
-    expect([...packed.assets.keys()].sort()).toEqual([
-      'brand-logo-logo-png', 'card-logo-logo-png', 'project-logo-logo-png', 'roster-logo-logo-png',
-    ]);
-    expect([...packed.assets.values()]).toEqual([PNG, PNG, PNG, PNG]);
+    // Mesmo original deduplicado sem reencode e separado de qualquer JPEG legado.
+    expect([...packed.assets.keys()]).toEqual([await originalImageAssetId(PNG)]);
+    expect([...packed.assets.values()]).toEqual([PNG]);
     expect(canvas.fillRect).not.toHaveBeenCalled();
     expect(canvas.encode).not.toHaveBeenCalled();
     expect(JSON.stringify(packed.manifest)).not.toContain('data:image');
     // O JPEG legado no ID original pode continuar no servidor; a nova chave
     // impede que a ordem de extensões do backend o devolva no lugar do PNG.
-    expect(packed.manifest.docs[0].doc.styleKit.logo.assetId).toBe('project-logo-logo-png');
+    expect(packed.manifest.docs[0].doc.styleKit.logo.assetId).toBe(await originalImageAssetId(PNG));
   });
 
-  it('reduz PNG grande sem pintar fundo e mantém a compactação JPEG das fotos', async () => {
+  it('preserva PNG grande e fotos sem Canvas, downsample nem fundo artificial', async () => {
     const canvas = browserCanvas();
-    const oversized = `data:image/png;base64,${'A'.repeat(1_600_000)}`;
+    const oversized = `data:image/png;base64,${'A'.repeat(2_400_000)}`;
     const packed = await packLibraryForCloud(snapshot({ slides: [{ id: 's1', logoImage: oversized }] }));
-    expect([...packed.assets.values()]).toEqual([PNG]);
-    expect(canvas.fillRect).not.toHaveBeenCalled();
-    expect(canvas.encode).toHaveBeenCalledWith('image/png');
-    canvas.encode.mockClear();
+    expect([...packed.assets.values()]).toEqual([oversized]);
     const photo = await packLibraryForCloud(snapshot({ slides: [{ id: 's1', bgImage: PNG }] }));
-    expect([...photo.assets.values()]).toEqual([JPEG]);
-    expect(canvas.fillRect).toHaveBeenCalled();
-    expect(canvas.encode).toHaveBeenCalledWith('image/jpeg', 0.78);
+    expect([...photo.assets.values()]).toEqual([PNG]);
+    expect(canvas.fillRect).not.toHaveBeenCalled();
+    expect(canvas.encode).not.toHaveBeenCalled();
   });
 
   it('a segunda tentativa de upload também mantém o PNG e o content-type', async () => {
