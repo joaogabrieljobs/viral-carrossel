@@ -29,6 +29,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const [loginHint, setLoginHint] = useState('');
   const [accountTab, setAccountTab] = useState('projects'); // projects | profile
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
+  const latestAccessRef = useRef(access);
+  latestAccessRef.current = access;
   const accessActive = !!access.active;
 
   const enterStudio = useCallback(() => {
@@ -64,6 +66,28 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       imageQuota: session.imageQuota || null,
     });
     return session;
+  }, []);
+
+  // Atualizar o consumo não reinicia o login nem a restauração de projetos.
+  // Respostas atrasadas de outra conta não alteram a sessão atual.
+  const refreshImageUsage = useCallback(async () => {
+    const owner = latestAccessRef.current.email;
+    const session = await fetchAccessSession();
+    if (latestAccessRef.current.email !== owner || !latestAccessRef.current.active) return null;
+    if (!session.active || session.email !== owner) {
+      setAccess((current) => ({
+        ...current,
+        imageQuota: { ...current.imageQuota, status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
+      }));
+      throw new Error('Não foi possível consultar o uso da conta.');
+    }
+    setAccess((current) => ({
+      ...current, tier: session.tier, plan: session.plan,
+      imageQuota: session.imageQuota || { status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
+      currentPeriodStart: session.currentPeriodStart || null,
+      currentPeriodEnd: session.currentPeriodEnd || null,
+    }));
+    return session.imageQuota || null;
   }, []);
 
   useEffect(() => {
@@ -276,6 +300,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     enterStudio,
     goAccount,
     refreshAccess,
+    refreshImageUsage,
     completeLanding,
     reopenLanding,
     openPortal,

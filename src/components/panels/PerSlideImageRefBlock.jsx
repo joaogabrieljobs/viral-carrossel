@@ -1,5 +1,5 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Sparkles, Loader2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 
 function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide') {
@@ -23,19 +23,26 @@ function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide')
   }
   return {
     label: 'Gerar imagem',
-    title: `Gera apenas a imagem deste ${itemLabel} (usa 1 imagem da quota).`,
+    title: `Gera apenas a imagem deste ${itemLabel}.`,
   };
 }
 
 function PerSlideImageRefBlock({
   slide, width, onChangeExtra, onRemoveRef, onPickRef,
-  onGenerateImage, generateImageBusy, generateImageDisabled,
+  onGenerateImage, generateImageBusy,
+  generationState,
   itemLabel = 'slide',
   collapsible = false,
 }) {
   const extra = slide.imgExtraPrompt ?? '';
   const ref = slide.refImage;
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
+  const disabled = generationState ? !generationState.canGenerate : false;
+  const disabledReason = disabled && !generateImageBusy
+    ? (generationState?.message || `Abra Direção e descreva a imagem deste ${itemLabel}.`)
+    : '';
+  const reasonId = useId();
+  const promptId = useId();
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao
   // mesmo tempo repetia a mesma caixa 7 vezes e empurrava os cards para baixo.
   // Abre sozinho quando o slide já tem referência ou prompt extra.
@@ -45,15 +52,12 @@ function PerSlideImageRefBlock({
     <button
       type="button"
       onClick={onGenerateImage}
-      disabled={generateImageDisabled || generateImageBusy}
+      disabled={disabled || generateImageBusy}
+      aria-describedby={disabledReason ? reasonId : undefined}
       aria-busy={generateImageBusy || undefined}
       aria-label={imageAction.label}
       className="vc-btn vc-btn-ghost"
-      title={
-        generateImageDisabled
-          ? `Defina palavras-chave de imagem neste ${itemLabel} antes de gerar.`
-          : imageAction.title
-      }
+      title={disabledReason || imageAction.title}
       style={{
         flex: 1,
         width: '100%',
@@ -79,24 +83,32 @@ function PerSlideImageRefBlock({
       <span aria-live="polite">{imageAction.label}</span>
     </button>
   );
+  const reasonText = disabledReason && (
+    <p id={reasonId} role="status" style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1.45 }}>
+      {disabledReason}
+    </p>
+  );
 
   if (!aberto) {
     return (
-      <div style={{ width: width || '100%', marginTop: 10, display: 'flex', gap: 8, boxSizing: 'border-box' }}>
-        {gerarBtn}
-        <button
-          type="button"
-          onClick={() => setAberto(true)}
-          className="vc-btn vc-btn-ghost"
-          aria-expanded={false}
-          title={`Referência e direção da imagem deste ${itemLabel}`}
-          style={{
-            height: 34, borderRadius: 9999, fontSize: 12, fontWeight: 500, padding: '0 12px',
-            fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-          }}
-        >
-          <ImageIcon size={12} /> Direção <ChevronDown size={12} />
-        </button>
+      <div style={{ width: width || '100%', marginTop: 10, boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {gerarBtn}
+          <button
+            type="button"
+            onClick={() => setAberto(true)}
+            className="vc-btn vc-btn-ghost"
+            aria-expanded={false}
+            title={`Referência e direção da imagem deste ${itemLabel}`}
+            style={{
+              height: 34, borderRadius: 9999, fontSize: 12, fontWeight: 500, padding: '0 12px',
+              fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            }}
+          >
+            <ImageIcon size={12} /> Direção <ChevronDown size={12} />
+          </button>
+        </div>
+        {reasonText}
       </div>
     );
   }
@@ -160,10 +172,11 @@ function PerSlideImageRefBlock({
           )}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <label className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
-            Prompt extra (este {itemLabel})
+          <label htmlFor={promptId} className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
+            {slide.imageQuery?.trim() ? 'Prompt extra' : 'Direção da imagem'} (este {itemLabel})
           </label>
           <textarea
+            id={promptId}
             value={extra}
             onChange={(e) => onChangeExtra(e.target.value)}
             rows={3}
@@ -174,6 +187,7 @@ function PerSlideImageRefBlock({
         </div>
       </div>
       {gerarBtn}
+      {reasonText}
       {ref && (
         <button
           type="button"

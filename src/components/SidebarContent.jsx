@@ -51,6 +51,7 @@ import { styleKitHasContent } from '../utils/style-kit.js';
 import { joinSlideCaptions } from '../utils/import-text.js';
 import { composeImgExtraPrompt } from '../utils/style-kit.js';
 import { resolveImageReferences } from '../utils/style-kit-storage.js';
+import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
 
 function guessFontFileFormat(file) {
   const n = (file?.name || '').toLowerCase();
@@ -232,6 +233,7 @@ function SidebarContent({
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
   exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
   openaiKey, hasOpenAI=false, hasTextAI=false, setKeysOpen,
+  imageGenerationAvailability = null,
   setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
   material = { content:'', sources:'', context:'' }, setMaterial = () => {},
   styleKit = { stylePrompt: '', contextMd: '', refImages: [] }, setStyleKit = () => {},
@@ -1424,10 +1426,10 @@ function SidebarContent({
                 onPickRef={() => openRefImagePicker(activeIdx)}
                 onGenerateImage={() => generateSlideImageAt(activeIdx)}
                 generateImageBusy={!!slideImgGenBusy[slide.id]}
-                generateImageDisabled={
-                  !(slide.imageQuery || '').trim() ||
-                  (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
-                }
+                generationState={slideImageGenerationState(slide, imageGenerationAvailability || {
+                  canGenerate: hasOpenAI,
+                  message: 'Confirme seu acesso às imagens em Configurar IA.',
+                }, styleKit)}
               />
             )}
 

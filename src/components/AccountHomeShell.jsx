@@ -1,7 +1,8 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, X, ChevronRight, Settings, Layers, User, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, Gauge, X, ChevronRight, Settings, Layers, User, Image as ImageIcon } from 'lucide-react';
 import AccountProfile from './AccountProfile.jsx';
+import AccountUsage from './AccountUsage.jsx';
 import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
@@ -62,6 +63,8 @@ function AccountHomeShell({
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
+  currentPeriodStart,
+  onRefreshUsage,
   planTier = null,
   imageQuota = null,
   useOwnImageKey = false,
@@ -82,6 +85,10 @@ function AccountHomeShell({
   const PAGE_SIZE = 48;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
+  useEffect(() => {
+    if (accountTab === 'usage') onRefreshUsage?.().catch(() => {});
+  }, [accountTab, onRefreshUsage]);
+
   // A Home desmonta enquanto o editor está aberto. Ao voltar, o seletor deve
   // refletir o projeto ativo — inclusive quando o documento foi convertido ou
   // importado apenas com `productKind`.
@@ -96,6 +103,7 @@ function AccountHomeShell({
         key={id}
         type="button"
         onClick={() => setAccountTab?.(id)}
+        aria-current={active ? 'page' : undefined}
         style={{
           height: isMobile ? 36 : 36,
           padding: '0 12px',
@@ -410,6 +418,7 @@ function AccountHomeShell({
               </nav>
               <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {isMobile && navBtn('images', 'Imagens', ImageIcon)}
+                {navBtn('usage', 'Uso', Gauge)}
                 {navBtn('profile', 'Perfil', User)}
               </nav>
             </>
@@ -422,17 +431,30 @@ function AccountHomeShell({
         overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
-          boxSizing: 'border-box', width: '100%', maxWidth: accountTab === 'profile' ? 820 : 720,
+          boxSizing: 'border-box', width: '100%', maxWidth: ['profile', 'usage'].includes(accountTab) ? 820 : 720,
           marginLeft: 'auto', marginRight: 'auto',
           padding: isMobile
             ? '20px 16px calc(88px + env(safe-area-inset-bottom, 0px))'
             : '40px 24px 72px',
           display: 'grid', gap: isMobile ? 22 : 28,
         }}>
-          {accountTab === 'images' && (
+          {['images', 'usage'].includes(accountTab) && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? -14 : -20 }}>
               {fecharBtn}
             </div>
+          )}
+          {accountTab === 'usage' && (
+            <AccountUsage
+              imageQuota={imageQuota}
+              planTier={planTier}
+              currentPeriodStart={currentPeriodStart}
+              currentPeriodEnd={currentPeriodEnd}
+              useOwnImageKey={useOwnImageKey}
+              isMobile={isMobile}
+              onRefresh={onRefreshUsage}
+              onOpenSettings={onOpenSettings}
+              onManageBilling={onManageBilling}
+            />
           )}
           {accountTab === 'images' && (
             <ImagesLibraryPanel
@@ -441,6 +463,7 @@ function AccountHomeShell({
               planTier={planTier}
               isMobile={isMobile}
               useOwnImageKey={useOwnImageKey}
+              onOpenUsage={() => setAccountTab?.('usage')}
             />
           )}
 
@@ -477,6 +500,9 @@ function AccountHomeShell({
                 onLogout={onLogout}
                 onOpenBrands={onOpenBrands}
                 currentPeriodEnd={currentPeriodEnd}
+                planTier={planTier}
+                imageQuota={imageQuota}
+                onOpenUsage={() => setAccountTab?.('usage')}
               />
             </>
           )}
@@ -974,7 +1000,7 @@ function AccountHomeShell({
             right: 0,
             zIndex: 30,
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
             gap: 4,
             padding: '8px 12px calc(8px + env(safe-area-inset-bottom, 0px))',
             background: 'var(--bg-sidebar)',
@@ -985,6 +1011,7 @@ function AccountHomeShell({
           {[
             { id: 'projects', label: 'Início', Icon: Layers, onClick: () => setAccountTab?.('projects') },
             { id: 'generate', label: 'Gerar', Icon: Sparkles, onClick: () => onGenerate?.(creationType) },
+            { id: 'usage', label: 'Uso', Icon: Gauge, onClick: () => setAccountTab?.('usage') },
             { id: 'profile', label: 'Perfil', Icon: User, onClick: () => setAccountTab?.('profile') },
           ].map(({ id, label, Icon, onClick }) => {
             const active = id === 'generate' ? false : accountTab === id;

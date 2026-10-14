@@ -180,6 +180,7 @@ import {
 } from './src/utils/style-kit.js';
 import { buildProjectDesignInstructions, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
+import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
@@ -1612,6 +1613,7 @@ export default function App() {
     enterStudio,
     goAccount,
     refreshAccess,
+    refreshImageUsage,
     completeLanding,
     reopenLanding,
     openPortal,
@@ -2171,17 +2173,14 @@ export default function App() {
   const selectedImageKeyProvider = aiSettings.imageProvider === 'zai' ? 'zai' : 'openai';
   const useOwnImageKey = !!aiSettings.useOwnImageKey;
   const hasByokImageKey =
-    !!aiSettings.keys[selectedImageKeyProvider] ||
+    !!aiSettings.keys[selectedImageKeyProvider]?.trim() ||
     (selectedImageKeyProvider === 'openai' && IS_LOCAL_DEV && serverStatus.openai);
-  const platformImageAllowed =
-    !useOwnImageKey &&
-    (
-      !!access.billingDisabled
-      || (Number(access.imageQuota?.limit) > 0 && Number(access.imageQuota?.remaining) > 0)
-      || (access.active && access.tier && access.tier !== 'essential' && access.imageQuota == null)
-    );
+  const imageGenerationAvailability = useMemo(
+    () => imageGenerationAccess({ access, useOwnImageKey, hasByokImageKey }),
+    [access, useOwnImageKey, hasByokImageKey],
+  );
   // Nome legado (`hasOpenAI`): pode gerar imagem (plataforma ou BYOK avançado).
-  const hasOpenAI = useOwnImageKey ? hasByokImageKey : platformImageAllowed;
+  const hasOpenAI = imageGenerationAvailability.canGenerate;
   const hasAnthropic = !!anthropicKey;
   // Texto incluso no plano = Z.ai no servidor. Assinante não precisa de chave.
   const hasAnyAI =
@@ -2614,17 +2613,17 @@ export default function App() {
       })}
       {editorIconBtn({
         onClick: () => setKeysOpen(true),
-        title: hasAnyAI
-          ? `IA pronta · texto ${aiSettings.textProvider} · imagem ${aiSettings.imageProvider}`
-          : 'Configurar provedores de IA',
+        title: hasAnyAI && hasOpenAI
+          ? 'IA pronta · texto e imagens disponíveis'
+          : (hasAnyAI ? `Texto pronto · ${imageGenerationAvailability.message}` : 'Configurar provedores de IA'),
         ariaLabel: 'Configurar IA',
         tour: 'settings',
         active: false,
-        style: hasAnyAI ? { position: 'relative' } : {},
+        style: hasAnyAI && hasOpenAI ? { position: 'relative' } : {},
         children: (
           <>
             <Settings size={13} />
-            {hasAnyAI ? (
+            {hasAnyAI && hasOpenAI ? (
               <span aria-hidden style={{
                 position: 'absolute', top: 5, right: 5, width: 6, height: 6,
                 borderRadius: 99, background: 'var(--success)',
@@ -3343,34 +3342,20 @@ export default function App() {
 
     const itemLabel = fmt === 'apresentacao' ? 'slide' : 'card';
 
-    const q = (snap.imageQuery || '').trim();
-    if (!q) {
-      toast(
-        `Este ${itemLabel} ainda não tem palavras-chave de imagem. Defina uma direção de imagem antes de gerar.`,
-        'error',
-      );
-      return { ok: false, reason: 'missing_query', slideId };
-    }
-
-    if (!hasOpenAI) {
-      if (!useOwnImageKey && (access.tier === 'essential' || Number(access.imageQuota?.limit) === 0)) {
-        toast('O plano Essencial não inclui imagens. Faça upgrade ou active a sua chave em Configurar IA.', 'error');
-      } else if (!useOwnImageKey && Number(access.imageQuota?.remaining) === 0) {
-        toast('Quota de imagens esgotada neste mês. Faça upgrade de plano.', 'error');
-      } else {
-        toast('Configure a chave de imagem em Configurar IA.', 'error');
-      }
-      return { ok: false, reason: 'image_provider_unavailable', slideId };
+    const imageState = slideImageGenerationState(snap, imageGenerationAvailability, styleKit);
+    if (!imageState.canGenerate) {
+      toast(imageState.message, 'error');
+      return { ok: false, reason: imageState.reason, slideId };
     }
 
     slideImgGenIdsRef.current.add(slideId);
     setSlideImgGenBusy(prev => ({ ...prev, [slideId]: true }));
     const job = startAIJob(parentSignal);
     try {
-      const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
+      const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, snap.imgExtraPrompt),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, imageState.extraPrompt),
         aspectRatio: imageAspectRatioForFormat(fmt),
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
@@ -3423,7 +3408,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, hasOpenAI, useOwnImageKey, access.tier, access.imageQuota, openaiKey, imgParams, styleKit, setSlides, toast]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast]);
 
   useEffect(() => {
     const onQuota = (ev) => {
@@ -4841,7 +4826,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     setSetupOpen: setSetupOpenForSidebar,
     setResearchOpen, fileInputRef,
     exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
-    openaiKey, hasOpenAI, hasTextAI: hasAnyAI, setKeysOpen,
+    openaiKey, hasOpenAI, imageGenerationAvailability, hasTextAI: hasAnyAI, setKeysOpen,
     setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
     material, setMaterial,
     styleKit, setStyleKit,
@@ -5167,7 +5152,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
-          planTier={access.plan?.name || access.tier || null}
+          currentPeriodStart={access.currentPeriodStart}
+          planTier={access.tier || null}
+          onRefreshUsage={refreshImageUsage}
           imageQuota={access.imageQuota}
           accountTab={accountTab}
           setAccountTab={setAccountTab}
@@ -6025,10 +6012,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
                   itemLabel={isPresentationProject ? 'slide' : 'card'}
-                  generateImageDisabled={
-                    !(slide.imageQuery || '').trim() ||
-                    (normalizeSlideImgMode(slide.imgMode) === 'dalle' && !hasOpenAI)
-                  }
+                  generationState={slideImageGenerationState(slide, imageGenerationAvailability, styleKit)}
                 />
               </div>
             ) : (
@@ -6208,10 +6192,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}
                       itemLabel={isPresentationProject ? 'slide' : 'card'}
-                      generateImageDisabled={
-                        !((s.imageQuery || '').trim()) ||
-                        (normalizeSlideImgMode(s.imgMode) === 'dalle' && !hasOpenAI)
-                      }
+                      generationState={slideImageGenerationState(s, imageGenerationAvailability, styleKit)}
                     />
                   </div>
                 ))}

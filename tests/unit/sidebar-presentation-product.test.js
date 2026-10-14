@@ -79,7 +79,7 @@ describe('estado da ação de imagem por slide', () => {
       onRemoveRef: vi.fn(),
       onPickRef: vi.fn(),
       onGenerateImage: vi.fn(),
-      generateImageDisabled: false,
+      generationState: { canGenerate: true },
     };
 
     const regenerated = renderToStaticMarkup(React.createElement(PerSlideImageRefBlock, {
@@ -101,6 +101,6 @@ describe('estado da ação de imagem por slide', () => {
     expect(busy).toContain('aria-busy="true"');
     expect(busy).toContain('aria-label="Gerando…"');
     expect(busy).toContain('Gerando…');
-    expect(busy).toContain('Prompt extra (este card)');
+    expect(busy).toContain('Direção da imagem (este card)');
   });
 });

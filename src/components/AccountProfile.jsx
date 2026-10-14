@@ -11,6 +11,7 @@ import {
   saveUserProfile,
 } from '../utils/user-profile.js';
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
+import { normalizeAccountUsage } from '../utils/account-usage.js';
 
 const SOCIAL_FIELDS = [
   { id: 'instagram', prefix: 'instagram.com/', placeholder: 'seuhandle' },
@@ -348,6 +349,9 @@ export default function AccountProfile({
   onOpenBrands,
   onLogout,
   currentPeriodEnd,
+  planTier,
+  imageQuota,
+  onOpenUsage,
 }) {
   const [profile, setProfile] = useState(() => loadUserProfile());
   const [editing, setEditing] = useState(false);
@@ -361,6 +365,13 @@ export default function AccountProfile({
   const textProvider = TEXT_PROVIDERS[aiSettings?.textProvider] || TEXT_PROVIDERS.openai;
   const imageProvider = IMAGE_PROVIDERS[aiSettings?.imageProvider] || IMAGE_PROVIDERS.openai;
   const aiReady = hasTextAI && hasImageAI;
+  const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodEnd });
+  const imageStatus = aiSettings?.useOwnImageKey
+    ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`
+    : usage.noIncludedImages ? 'não inclusas no plano'
+      : !usage.hasUsage ? 'consumo indisponível · consulte Uso'
+        : usage.exhausted ? 'limite deste ciclo atingido'
+          : `${usage.remaining} disponíveis no plano`;
 
   const openEdit = () => {
     setDraft(normalizeUserProfile(profile));
@@ -503,7 +514,7 @@ export default function AccountProfile({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Assinatura</div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Moont Studio · mensal</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Moont {usage.planName || 'Studio'}</h3>
             </div>
             <CreditCard size={18} color="var(--text-muted)" />
           </div>
@@ -580,7 +591,7 @@ export default function AccountProfile({
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>IA</div>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-                {aiReady ? 'Pronta para gerar' : 'Configure a chave de texto'}
+                {aiReady ? 'Pronta para gerar' : hasTextAI ? 'Texto pronto · confira as imagens' : 'Configure a IA'}
               </h3>
             </div>
             <Settings size={18} color="var(--text-muted)" />
@@ -588,10 +599,11 @@ export default function AccountProfile({
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
             Texto: {textProvider.name}{hasTextAI || textProvider.id === 'zai' ? '' : ' · falta chave'}
             {' · '}
-            Imagens: {aiSettings?.useOwnImageKey
-              ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`
-              : (hasImageAI ? 'inclusas no plano' : 'não disponíveis neste plano')}
+            Imagens: {imageStatus}
           </p>
+          <button type="button" onClick={onOpenUsage} style={{ minHeight: 40, borderRadius: 9999, border: '1px solid var(--border)', background: 'var(--accent-surface)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            Ver uso e saldo de imagens
+          </button>
           <button
             type="button"
             onClick={onOpenSettings}

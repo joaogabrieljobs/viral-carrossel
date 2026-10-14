@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Download, ImageOff, Loader2, Package } from 'lucide-react';
 import { downloadBlob } from '../../utils/export-helpers.js';
 import { imageGet } from '../../utils/image-store.js';
+import { normalizeAccountUsage } from '../../utils/account-usage.js';
 
 function extDeMime(mime) {
   const raw = String(mime || 'image/png').split('/')[1]?.toLowerCase() || 'png';
@@ -26,6 +27,7 @@ export default function ImagesLibraryPanel({
   planTier = null,
   isMobile = false,
   useOwnImageKey = false,
+  onOpenUsage,
 }) {
   const [baixandoTudo, setBaixandoTudo] = useState(false);
 
@@ -79,10 +81,9 @@ export default function ImagesLibraryPanel({
     };
   }, [refs]);
 
-  const limite = Number(imageQuota?.limit);
-  const usadas = Number(imageQuota?.used);
-  const restantes = Number(imageQuota?.remaining);
-  const temQuota = Number.isFinite(limite) && limite > 0;
+  const usage = normalizeAccountUsage({ imageQuota, planTier });
+  const { limit: limite, used: usadas, remaining: restantes } = usage;
+  const temQuota = usage.hasUsage && limite > 0;
   const pct = temQuota ? Math.min(100, Math.round((usadas / limite) * 100)) : 0;
 
   const baixarUma = async (img) => {
@@ -154,16 +155,17 @@ export default function ImagesLibraryPanel({
               }}/>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-              {planTier ? `Plano ${planTier}. ` : ''}O contador reinicia na renovação da assinatura.
+              {usage.planName ? `Plano ${usage.planName}. ` : ''}O contador reinicia na renovação da assinatura.
             </div>
           </>
         ) : (
           <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
-            {imageQuota === null
-              ? 'A carregar o consumo do plano…'
-              : 'O seu plano não inclui geração de imagens. Faça upgrade para o Criador, ou use a sua própria chave em Configurar IA.'}
+            {usage.noIncludedImages
+              ? 'O seu plano não inclui geração de imagens. Você pode importar imagens ou usar sua própria chave em Configurar IA.'
+              : 'Não foi possível confirmar o consumo. Abra Uso para atualizar o saldo.'}
           </div>
         )}
+        <button type="button" onClick={onOpenUsage} style={{ minHeight: 40, padding: '8px 16px', border: '1px solid var(--border)', borderRadius: 9999, background: 'var(--accent-surface)', color: 'var(--text-primary)', cursor: 'pointer' }}>Ver uso da conta</button>
       </section>
 
       {/* Galeria */}
