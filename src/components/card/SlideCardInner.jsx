@@ -416,6 +416,9 @@ function cultureResolveSurface(slide, num) {
  *  só quebra quando a palavra sozinha não cabe na linha — e o auto-fit reduz a
  *  fonte antes disso. */
 const VC_TEXT_ZONE_STYLE = {
+  // O editor grava Enter como \n. Preserve a quebra também fora do
+  // contentEditable, inclusive na árvore usada pela exportação.
+  whiteSpace: 'pre-wrap',
   wordBreak: 'normal',
   overflowWrap: 'break-word',
   hyphens: 'manual',

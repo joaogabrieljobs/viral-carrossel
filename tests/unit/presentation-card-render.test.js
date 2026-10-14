@@ -83,7 +83,7 @@ describe('texto complementar em cards de apresentação', () => {
       bgImageFailed: false,
     });
 
-    expect(html).toContain('Carregando imagem…');
+    expect(html).toContain('A carregar foto…');
     expect(html).toContain('role="status"');
   });
 
