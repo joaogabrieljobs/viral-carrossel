@@ -305,14 +305,18 @@ export async function imagemComoDataUrl(id) {
 
 /** Ids referenciados por uma biblioteca de projetos. */
 export function idsDeImagemEmUso(library, brands = []) {
+  const kitIds = (kit) => [
+    ...(kit?.refImages || []).map((ref) => ref?.imageId || ref?.assetId),
+    kit?.logo?.imageId || kit?.logo?.assetId,
+  ];
+  const brandIds = (brand) => [brand?.logoImageId, ...kitIds(brand?.styleKit)];
   return [...new Set([
     ...(library || []).flatMap((e) => [
-    ...(e?.doc?.slides || []).flatMap(s => [s?.bgImageId, s?.logoImageId]),
-    ...(e?.doc?.styleKit?.refImages || []).map(r => r?.imageId),
-    e?.doc?.styleKit?.logo?.imageId,
-    e?.doc?.brand?.logoImageId,
+      ...(e?.doc?.slides || []).flatMap(s => [s?.bgImageId, s?.logoImageId, s?.refImageId || s?.refImageAssetId]),
+      ...kitIds(e?.doc?.styleKit),
+      ...brandIds(e?.doc?.brand),
     ]),
-    ...(brands || []).map((brand) => brand?.logoImageId),
+    ...(brands || []).flatMap(brandIds),
   ].filter(Boolean))];
 }
 
@@ -353,11 +357,15 @@ export function semImagensDeRuntime(library) {
       const ehRuntime = bg.startsWith('blob:');
       const jaGuardada = !!s.bgImageId && (bg.startsWith('blob:') || bg.startsWith('data:'));
       const logoRuntime = !!s.logoImageId || String(s.logoImage || '').startsWith('blob:');
-      if (!ehRuntime && !jaGuardada && !logoRuntime) return s;
+      const refRuntime = String(s.refImage || '').startsWith('blob:');
+      if (!ehRuntime && !jaGuardada && !logoRuntime && !refRuntime) return s;
       mudou = true;
       const next = { ...s };
       if (ehRuntime || jaGuardada) delete next.bgImage;
       if (logoRuntime) delete next.logoImage;
+      // A migração só remove base64 depois de confirmar a gravação. Um ID
+      // legado pode estar órfão: não apague a cópia inline só porque ele existe.
+      if (refRuntime) delete next.refImage;
       return next;
     });
     const brand = semLogoDeRuntime(doc.brand);

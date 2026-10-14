@@ -46,6 +46,9 @@ import {
   idsDeImagemEmUso,
   dataUrlParaBlob,
 } from './src/utils/image-store.js';
+import { storeSlideReference, importSlideReference } from './src/utils/slide-reference.js';
+import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
+import { readDataOwner, dataOwnerAliases } from './src/utils/account-data-owner.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
@@ -922,12 +925,15 @@ export default function App() {
   libraryFoldersPersistRef.current = libraryFolders;
   /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
   const flushPersistRef = useRef(null);
+  const accessSessionRef = useRef(null);
   // O documento de exemplo do primeiro render não pode ir para a nuvem antes
   // de conhecer a conta e restaurar a biblioteca que já pertence a ela.
   const [accountLibraryReady, setAccountLibraryReady] = useState(false);
+  const [accountRestoreError, setAccountRestoreError] = useState('');
   const accountLibraryReadyRef = useRef(false);
   const markAccountLibraryReady = useCallback(() => {
     accountLibraryReadyRef.current = true;
+    setAccountRestoreError('');
     setAccountLibraryReady(true);
   }, []);
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
@@ -1348,13 +1354,13 @@ export default function App() {
     return newBrand;
   }, [doc.brand, doc.styleKit, brandRoster.length, history, upsertBrand]);
 
-  const editorSyncStateRef = useRef({ doc, activeDocId });
-  editorSyncStateRef.current = { doc, activeDocId };
+  const editorSyncStateRef = useRef({ doc, activeDocId, activeBrandId });
+  editorSyncStateRef.current = { doc, activeDocId, activeBrandId };
 
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
-  const flushPersistNow = useCallback(({ requireSaved = false } = {}) => {
+  const flushPersistNow = useCallback(({ requireSaved = false, returnSnapshot = false } = {}) => {
     if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
-      if (requireSaved) throw new Error('A biblioteca ainda está sendo restaurada. Aguarde e tente novamente.');
+      if (requireSaved || returnSnapshot) throw new Error('A biblioteca ainda está sendo restaurada. Aguarde e tente novamente.');
       return libraryPersistRef.current || [];
     }
     // A edição pendente já entra neste flush. Seu debounce antigo não pode
@@ -1362,7 +1368,7 @@ export default function App() {
     clearTimeout(docAutosaveTimerRef.current);
     const agora = Date.now();
     const lib = (libraryPersistRef.current || []).map((e) => (
-      e.id === activeDocId ? { ...e, doc, updatedAt: agora } : e
+      e.id === activeDocId && e.doc !== doc ? { ...e, doc, updatedAt: agora } : e
     ));
     libraryPersistRef.current = lib;
     const saved = [
@@ -1376,6 +1382,25 @@ export default function App() {
       throw new Error('Não foi possível gravar a biblioteca neste navegador. A sincronização não foi concluída.');
     }
     if (saved) setLastSavedAt(agora);
+    if (returnSnapshot) {
+      const documentFingerprint = JSON.stringify(semImagensDeRuntime([{ doc }])[0].doc);
+      const libraryFingerprint = JSON.stringify(semImagensDeRuntime(lib));
+      const foldersFingerprint = JSON.stringify(libraryFoldersPersistRef.current);
+      const brandsFingerprint = JSON.stringify(semLogosDeRuntimeDasMarcas(brandRoster));
+      return {
+        snapshot: { library: lib, brandRoster, libraryFolders: libraryFoldersPersistRef.current, activeDocId, activeBrandId },
+        localPersisted: saved,
+        isCurrent: () => {
+          const current = editorSyncStateRef.current;
+          return current.activeDocId === activeDocId
+            && current.activeBrandId === activeBrandId
+            && JSON.stringify(semImagensDeRuntime([{ doc: current.doc }])[0].doc) === documentFingerprint
+            && JSON.stringify(semImagensDeRuntime(libraryPersistRef.current)) === libraryFingerprint
+            && JSON.stringify(libraryFoldersPersistRef.current) === foldersFingerprint
+            && JSON.stringify(semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current)) === brandsFingerprint;
+        },
+      };
+    }
     return lib;
   }, [doc, activeDocId, brandRoster, activeBrandId]);
   flushPersistRef.current = flushPersistNow;
@@ -1422,29 +1447,25 @@ export default function App() {
     setCloudSyncBusy(true);
     let localSaved = false;
     try {
-      const lib = flushPersistNow({ requireSaved: true });
+      const pending = flushPersistNow({ returnSnapshot: true });
+      const lib = pending.snapshot.library;
       setLibrary(lib);
-      localSaved = true;
-      const savedEditor = editorSyncStateRef.current;
-      const savedDocument = JSON.stringify(semImagensDeRuntime([{ doc: savedEditor.doc }])[0].doc);
-      const savedLibrary = JSON.stringify(semImagensDeRuntime(lib));
-      const { readDataOwner } = await import('./src/utils/account-data-owner.js');
-      const { snapshotAccountVault } = await import('./src/utils/account-vault.js');
+      localSaved = pending.localPersisted;
       const owner = readDataOwner();
-      if (owner) snapshotAccountVault(owner);
+      const session = accessSessionRef.current;
+      const owners = [...new Set([owner, ...dataOwnerAliases(session?.email, session?.customerId)].filter(Boolean))];
+      if (localSaved) snapshotAccountVaultForOwners(owners);
 
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
       const result = await pushLibraryToCloud({
         force: true,
         allowShrink: false,
         pullAfter: true,
+        snapshot: pending.snapshot,
         beforeApply: () => {
-          const current = editorSyncStateRef.current;
-          const currentDocument = JSON.stringify(semImagensDeRuntime([{ doc: current.doc }])[0].doc);
-          if (currentDocument !== savedDocument || current.activeDocId !== savedEditor.activeDocId
-            || JSON.stringify(semImagensDeRuntime(libraryPersistRef.current)) !== savedLibrary) {
+          if (!pending.isCurrent()) {
             // Inclui texto digitado há menos de 400 ms, ainda fora do storage.
-            setLibrary(flushPersistRef.current({ requireSaved: true }));
+            setLibrary(flushPersistRef.current());
             throw new Error('Você editou um projeto durante a sincronização. As alterações foram preservadas; salve novamente.');
           }
         },
@@ -1454,15 +1475,18 @@ export default function App() {
       }
       const count = applyCloudLibrarySnapshot(result.snapshot, result);
       // O cofre do logout também deve conter a união restaurada da nuvem.
-      if (owner) snapshotAccountVault(owner);
+      if (result.localPersisted !== false) snapshotAccountVaultForOwners(owners);
       trackEvent('library_cloud_push', { project_count: String(count), source });
       const photosPending = Number(result.assetsFailed || 0) + Number(result.assetsMissing || 0);
+      const cachePending = result.localPersisted === false;
       toast(
-        photosPending
+        cachePending
+          ? `Lista atualizada: ${count} projeto(s). ${photosPending ? 'Algumas fotos ainda não foram confirmadas na nuvem.' : 'Cópia confirmada na nuvem.'} O navegador continua sem espaço para a cópia local.`
+          : photosPending
           ? `Lista sincronizada: ${count} projeto(s). Algumas fotos estão indisponíveis; os textos foram restaurados.`
           : `${source === 'salvar' ? 'Projeto salvo na sua conta' : 'Lista sincronizada'} · ${count} projeto(s).`,
-        photosPending ? 'warning' : 'success',
-        photosPending ? 6500 : 3500,
+        photosPending || cachePending ? 'warning' : 'success',
+        photosPending || cachePending ? 6500 : 3500,
       );
     } catch (e) {
       toast(
@@ -1621,11 +1645,17 @@ export default function App() {
   } = useAccess({
     setShellView,
     onLeaveEditor: () => setDrawerOpen(false),
-    onBeforeLogout: () => { try { flushPersistRef.current?.(); } catch { /* */ } },
+    onBeforeLogout: () => {
+      const pending = flushPersistRef.current({ returnSnapshot: true });
+      setLibrary(pending.snapshot.library);
+      return pending;
+    },
     onCloudLibraryApplied: applyCloudLibrarySnapshot,
     onLibraryReady: markAccountLibraryReady,
+    onLibraryBlocked: setAccountRestoreError,
     toast,
   });
+  accessSessionRef.current = access;
   const handleSyncCloud = useCallback(() => {
     if (!access?.active) {
       toast('Entre na conta para sincronizar seus projetos.', 'warning', 4500);
@@ -1646,7 +1676,11 @@ export default function App() {
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     cloudAutoPushTimerRef.current = setTimeout(() => {
       import('./src/utils/library-sync.js')
-        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(12_000))
+        .then(({ pushLibraryToCloudBestEffort }) => {
+          if (areAccountDataWritesLocked() || cloudSyncInFlightRef.current) return;
+          const pending = flushPersistRef.current({ returnSnapshot: true });
+          return pushLibraryToCloudBestEffort(12_000, { snapshot: pending.snapshot });
+        })
         .catch(() => {});
     }, 4_000);
     return () => {
@@ -2026,15 +2060,47 @@ export default function App() {
     return () => { cancelled = true; };
   }, [activeEntry?.id, doc.styleKit]);
 
+  // Referências antigas também saem do JSON. Só removemos os bytes embutidos
+  // após confirmar o IndexedDB; edições feitas durante a migração prevalecem.
+  const referenceMigrationsRef = useRef(new Map());
+  useEffect(() => {
+    if (!accountLibraryReady || areAccountDataWritesLocked()) return;
+    const owner = readDataOwner();
+    for (const entry of library) {
+      for (const slide of entry.doc?.slides || []) {
+        if (!slide.refImage?.startsWith('data:image/')) continue;
+        const key = `${entry.id}:${slide.id}`;
+        if (referenceMigrationsRef.current.get(key) === slide.refImage) continue;
+        referenceMigrationsRef.current.set(key, slide.refImage);
+        importSlideReference(slide).then(migrated => {
+          if (migrated === slide || readDataOwner() !== owner || areAccountDataWritesLocked()) return;
+          const patchSlide = current => current.id === slide.id && current.refImage === slide.refImage
+            && current.refImageId === slide.refImageId
+            ? { ...current, refImage: null, refImageId: migrated.refImageId, refImageFailed: false, refImageError: null }
+            : current;
+          setLibrary(current => current.map(project => project.id === entry.id
+            ? { ...project, doc: { ...project.doc, slides: project.doc.slides.map(patchSlide) } }
+            : project));
+          if (editorSyncStateRef.current.activeDocId === entry.id) {
+            history.setSilent(current => ({ ...current, slides: current.slides.map(patchSlide) }));
+          }
+        }).catch(() => { /* A cópia original permanece no documento. */ });
+      }
+    }
+  }, [library, accountLibraryReady, history.setSilent]);
+
   // Limpeza das imagens que nenhum projeto referencia.
   // Duas passagens: cedo (após boot) e tarde (após imports/edits) — FE-011.
   useEffect(() => {
     const run = async () => {
       try {
-        const removidas = await imageCleanupOrphans(idsDeImagemEmUso(
+        const inUse = new Set(idsDeImagemEmUso(
           libraryPersistRef.current,
           brandRosterPersistRef.current,
         ));
+        for (const id of getAccountVaultImageIds()) inUse.add(id);
+        for (const id of idsDeImagemEmUso([{ doc: editorSyncStateRef.current.doc }], [])) inUse.add(id);
+        const removidas = await imageCleanupOrphans([...inUse]);
         if (removidas > 0) console.log(`[imagem] limpeza: ${removidas} imagem(ns) órfã(s) removida(s)`);
       } catch { /* IndexedDB indisponível */ }
     };
@@ -2234,19 +2300,24 @@ export default function App() {
   const refImageInputRef = useRef(null);
   const videoFileInputRef = useRef(null);
   const refImageTargetIdxRef = useRef(null);
+  const referenceUploadRef = useRef(0);
   const slideRefs = useRef({});
 
   // Escuta eventos de quota do localStorage — disparados por lsSet quando o storage enche
   useEffect(() => {
     const onQuotaWarning  = (e) => toast(e.detail, 'warn', 8000);
-    const onQuotaExceeded = (e) => toast(e.detail, 'error', 0); // ttl=0 → permanente até fechar
+    let warningId;
+    const onQuotaExceeded = (e) => { warningId = toast(e.detail, 'error', 0); };
+    const onQuotaRecovered = () => { if (warningId) dismissToast(warningId); };
     window.addEventListener('vc:quota-warning',  onQuotaWarning);
     window.addEventListener('vc:quota-exceeded', onQuotaExceeded);
+    window.addEventListener('vc:quota-recovered', onQuotaRecovered);
     return () => {
       window.removeEventListener('vc:quota-warning',  onQuotaWarning);
       window.removeEventListener('vc:quota-exceeded', onQuotaExceeded);
+      window.removeEventListener('vc:quota-recovered', onQuotaRecovered);
     };
-  }, [toast]);
+  }, [toast, dismissToast]);
 
   // Cancela loops de imagem em voo quando o componente desmonta
   useEffect(() => {
@@ -3358,7 +3429,7 @@ export default function App() {
     try {
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage), job.signal),
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage, snap.refImageId || snap.refImageAssetId), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, imageState.extraPrompt),
         aspectRatio: imageAspectRatioForFormat(fmt),
       });
@@ -3435,17 +3506,31 @@ export default function App() {
     refImageTargetIdxRef.current = slideIdx;
     refImageInputRef.current?.click();
   }, []);
-  const handleRefImageFile = useCallback((e) => {
+  const handleRefImageFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
     const idx = refImageTargetIdxRef.current;
     refImageTargetIdxRef.current = null;
     e.target.value = '';
     if (!file || idx == null) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateSlideAt(idx, { refImage: reader.result });
-    };
-    reader.readAsDataURL(file);
+    const projectId = activeDocId;
+    const source = slides[idx];
+    if (!source) return;
+    const request = ++referenceUploadRef.current;
+    try {
+      const stored = await storeSlideReference(file);
+      if (request !== referenceUploadRef.current || editorSyncStateRef.current.activeDocId !== projectId) return;
+      history.set(current => ({ ...current, slides: current.slides.map(slide => (
+        slide.id === source.id && slide.refImage === source.refImage
+          && slide.refImageId === source.refImageId && slide.refImageAssetId === source.refImageAssetId
+          ? { ...slide, ...stored, refImageFailed: false, refImageError: null } : slide
+      )) }));
+    } catch (error) {
+      toast(error.message, 'warning', 6000);
+    }
+  }, [activeDocId, slides, history.set, toast]);
+  const removeSlideReference = useCallback((idx) => {
+    referenceUploadRef.current += 1;
+    updateSlideAt(idx, { refImage: null, refImageId: null, refImageAssetId: null, refImageFailed: false, refImageError: null });
   }, [updateSlideAt]);
 
   // Repara histórico se `slides` estiver vazio (storage/import estragado) — sem novo passo de undo.
@@ -4066,7 +4151,7 @@ ${jsonShapeLine}`;
             checkActive();
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
-              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
+              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
               aspectRatio: isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
             });
@@ -4686,7 +4771,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         try {
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
             signal: templateJob.signal,
-            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage),
+            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId),
             imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
             aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
           });
@@ -5071,7 +5156,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
         fontFamily: 'var(--font-ui)', fontSize: 14,
       }}>
         <style>{GLOBAL_STYLE}</style>
-        {accessActive ? 'Restaurando seus projetos…' : 'A verificar assinatura…'}
+        {accountRestoreError ? <div role="alert" style={{ maxWidth: 460, padding: 24, textAlign: 'center', lineHeight: 1.6 }}>
+          <p>{accountRestoreError}</p>
+          <button className="vc-btn vc-btn-primary" onClick={() => window.location.reload()}>Tentar novamente</button>
+        </div> : accessActive ? 'Restaurando seus projetos…' : 'A verificar assinatura…'}
       </div>
     );
   }
@@ -6011,7 +6099,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   slide={slide}
                   width={Math.min(vw - 48, f.w * previewScale)}
                   onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
-                  onRemoveRef={() => updateSlide({ refImage: null })}
+                  onRemoveRef={() => removeSlideReference(activeIdx)}
                   onPickRef={() => openRefImagePicker(activeIdx)}
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
@@ -6191,7 +6279,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       slide={s}
                       width={desktopThumbWidth}
                       onChangeExtra={(v) => updateSlideAt(i, { imgExtraPrompt: v })}
-                      onRemoveRef={() => updateSlideAt(i, { refImage: null })}
+                      onRemoveRef={() => removeSlideReference(i)}
                       onPickRef={() => openRefImagePicker(i)}
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}

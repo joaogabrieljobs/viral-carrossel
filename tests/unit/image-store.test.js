@@ -31,6 +31,20 @@ describe('semImagensDeRuntime', () => {
     expect(out[0].doc.slides[0].bgImage).toBe(data);
   });
 
+  it('referência usa apenas ID após migração, mas mantém base64 legado até confirmar os bytes', () => {
+    const data = 'data:image/png;base64,AAAA';
+    const out = semImagensDeRuntime(lib([
+      { id: 'confirmed', refImageId: 'ref_1', refImage: null },
+      { id: 'runtime', refImageId: 'ref_2', refImage: 'blob:local/ref' },
+      { id: 'legacy', refImage: data },
+      { id: 'orphan', refImageId: 'old', refImage: data },
+    ]))[0].doc.slides;
+    expect(out[0]).toEqual({ id: 'confirmed', refImageId: 'ref_1', refImage: null });
+    expect(out[1]).toEqual({ id: 'runtime', refImageId: 'ref_2' });
+    expect(out[2].refImage).toBe(data);
+    expect(out[3].refImage).toBe(data);
+  });
+
   it('não mexe em slides sem imagem nem no resto do documento', () => {
     const entrada = lib([{ id: 's1', title: 'T' }]);
     expect(semImagensDeRuntime(entrada)).toEqual(entrada);
@@ -76,13 +90,26 @@ describe('semImagensDeRuntime', () => {
 });
 
 describe('idsDeImagemEmUso', () => {
+  it('protege referências e logos do kit de marcas salvas e da marca embutida no documento', () => {
+    const library = [{ doc: {
+      slides: [],
+      styleKit: { refImages: [{ imageId: 'shared' }], logo: { imageId: 'project-logo' } },
+      brand: { logoImageId: 'brand-logo', styleKit: { refImages: [{ imageId: 'embedded-ref' }], logo: { imageId: 'embedded-logo' } } },
+    } }];
+    const brands = [{ styleKit: { refImages: [{ imageId: 'roster-ref' }, { imageId: 'shared' }], logo: { imageId: 'roster-logo' } } }];
+    expect(idsDeImagemEmUso(library, brands).sort()).toEqual([
+      'brand-logo', 'embedded-logo', 'embedded-ref', 'project-logo', 'roster-logo', 'roster-ref', 'shared',
+    ]);
+  });
+
   it('junta ids de todos os projetos, sem repetir', () => {
     const l = [
       { doc: { slides: [{ bgImageId: 'a' }, { bgImageId: 'b' }] } },
-      { doc: { slides: [{ bgImageId: 'b' }, { title: 'sem foto' }], brand: { logoImageId: 'logo' } } },
+      { doc: { slides: [{ bgImageId: 'b', refImageId: 'ref' }, { title: 'sem foto' }], brand: { logoImageId: 'logo' } } },
     ];
-    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'b', 'logo']);
+    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'b', 'logo', 'ref']);
     expect(idsDeImagemEmUso([], [{ logoImageId: 'perfil' }])).toEqual(['perfil']);
+    expect(idsDeImagemEmUso(lib([{ refImageAssetId: 'ref_cloud' }]))).toEqual(['ref_cloud']);
     expect(idsDeImagemEmUso(null)).toEqual([]);
   });
 });

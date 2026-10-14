@@ -8,10 +8,13 @@ import {
   imagemComoDataUrl, guardarImagemDoSlide, newImageId, semImagensDeRuntime, semLogosDeRuntimeDasMarcas,
 } from './image-store.js';
 import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
+import { importSlideReference } from './slide-reference.js';
 import { migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
+export const LIBRARY_CLOUD_META_FALLBACK_KEY = 'vc_library_cloud_meta_fallback';
+export const CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE = 'Não foi possível restaurar a versão mais recente dos seus projetos. A cópia deste navegador está desatualizada. Verifique sua conexão e tente novamente.';
 const SYNC_API = '/api/library-sync';
 const MAX_BODY_CHARS = 2_800_000;
 const MAX_ASSET_CHARS = 1_600_000;
@@ -73,20 +76,49 @@ function clearDeletedProjectIds(ids = []) {
 }
 
 function readCloudMeta() {
+  let primary = null;
   try {
     const raw = localStorage.getItem(LIBRARY_CLOUD_META_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch {
-    return null;
-  }
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) primary = parsed;
+  } catch { /* o recibo curto da aba ainda pode estar disponível */ }
+  try {
+    const fallback = JSON.parse(sessionStorage.getItem(LIBRARY_CLOUD_META_FALLBACK_KEY) || 'null');
+    if (fallback?.owner !== localStorage.getItem(SK.dataOwner)
+      || !fallback?.meta || typeof fallback.meta !== 'object' || Array.isArray(fallback.meta)) return primary;
+    const version = (meta) => [
+      Number(meta.revision || 0), Number(meta.updatedAt || 0),
+      Number(meta.recordedAt || Math.max(Number(meta.lastPullAt || 0), Number(meta.lastPushAt || 0))),
+    ];
+    const candidate = version(fallback.meta);
+    const stored = version(primary || {});
+    const newerAt = candidate.findIndex((value, index) => value !== stored[index]);
+    if (!primary || (newerAt >= 0 && candidate[newerAt] > stored[newerAt])) return fallback.meta;
+  } catch { /* sessão indisponível ou de outra conta */ }
+  return primary;
 }
 
 function writeCloudMeta(meta) {
+  const stored = {
+    ...meta, recordedAt: Math.max(Date.now(), Number(readCloudMeta()?.recordedAt || 0) + 1),
+  };
+  const raw = JSON.stringify(stored);
   try {
-    localStorage.setItem(LIBRARY_CLOUD_META_KEY, JSON.stringify(meta));
-  } catch { /* quota */ }
+    localStorage.setItem(LIBRARY_CLOUD_META_KEY, raw);
+    if (localStorage.getItem(LIBRARY_CLOUD_META_KEY) === raw) {
+      try { sessionStorage.removeItem(LIBRARY_CLOUD_META_FALLBACK_KEY); } catch { /* */ }
+      return true;
+    }
+  } catch { /* quota: manter apenas o recibo curto, sem duplicar os projetos */ }
+  try {
+    const shortMeta = Object.fromEntries([
+      'revision', 'updatedAt', 'projectCount', 'lastPullAt', 'lastPushAt', 'localPersisted', 'recordedAt',
+    ].filter((key) => stored[key] !== undefined).map((key) => [key, stored[key]]));
+    sessionStorage.setItem(LIBRARY_CLOUD_META_FALLBACK_KEY, JSON.stringify({
+      owner: localStorage.getItem(SK.dataOwner), meta: shortMeta,
+    }));
+  } catch { /* ambos os mecanismos de armazenamento estão indisponíveis */ }
+  return false;
 }
 
 async function compactDataUrl(dataUrl) {
@@ -142,7 +174,10 @@ function stripRuntime(value, depth = 0) {
 async function collectAsset(dataUrl, preferredId, bag) {
   if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null;
   const compact = await compactDataUrl(dataUrl);
-  if (!compact) return null;
+  if (!compact) {
+    bag.packingFailed = (bag.packingFailed || 0) + 1;
+    return null;
+  }
   const assetId = String(preferredId || newImageId()).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
   if (!bag.has(assetId)) bag.set(assetId, compact);
   return assetId;
@@ -168,12 +203,25 @@ async function packSlideForCloud(slide, assets) {
     } catch { /* */ }
   }
 
+  // A referência orienta a próxima geração e precisa viajar separadamente da
+  // foto final. stripRuntime remove os bytes, nunca a identidade do anexo.
+  let refDataUrl = typeof sl.refImage === 'string' && sl.refImage.startsWith('data:image/')
+    ? sl.refImage : null;
+  if (!refDataUrl && sl.refImageId) {
+    try { refDataUrl = await imagemComoDataUrl(sl.refImageId); } catch { /* mantém a referência ausente identificada */ }
+  }
+  const refAssetId = await collectAsset(refDataUrl, sl.refImageId || sl.refImageAssetId, assets);
+  const refIdentity = refAssetId || sl.refImageAssetId || sl.refImageId
+    || (refDataUrl ? newImageId() : undefined);
+
   const clean = stripRuntime({
     ...sl,
     bgImage: null,
     logoImage: null,
+    refImage: typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage) ? sl.refImage : null,
     bgImageAssetId: bgAssetId || sl.bgImageAssetId || undefined,
     logoImageAssetId: logoAssetId || sl.logoImageAssetId || undefined,
+    refImageAssetId: refIdentity,
   });
   return clean;
 }
@@ -229,14 +277,22 @@ async function packStyleKitForCloud(styleKit, assets) {
 }
 
 /**
- * Lê biblioteca local e monta manifesto + mapa de assets.
+ * Monta manifesto + assets. O snapshot explícito inclui a edição que ainda
+ * está no React quando o cache do navegador recusou a gravação.
  */
-export async function packLibraryForCloud() {
-  const docsRaw = lsGet(SK.library, []) || [];
-  const folders = lsGet(SK.libraryFolders, []) || [];
-  const brandsRaw = lsGet(SK.brands, []) || [];
-  const activeBrandId = lsGet(SK.activeBrandId, '') || '';
-  const activeDocId = lsGet(SK.activeDocId, '') || '';
+export async function packLibraryForCloud(snapshot) {
+  const readSnapshot = (key, storageKey, fallback) => (
+    snapshot && Object.prototype.hasOwnProperty.call(snapshot, key)
+      ? snapshot[key] : lsGet(storageKey, fallback)
+  );
+  const docsRaw = readSnapshot('library', SK.library, []) || [];
+  const folders = readSnapshot('libraryFolders', SK.libraryFolders, []) || [];
+  const brandsRaw = readSnapshot('brandRoster', SK.brands, []) || [];
+  const activeBrandId = readSnapshot('activeBrandId', SK.activeBrandId, '') || '';
+  const activeDocId = readSnapshot('activeDocId', SK.activeDocId, '') || '';
+  if (!Array.isArray(docsRaw) || !Array.isArray(brandsRaw) || !Array.isArray(folders)) {
+    throw new Error('A biblioteca em edição não está pronta para sincronizar. Tente novamente.');
+  }
   let userProfile = null;
   try {
     const raw = localStorage.getItem(USER_PROFILE_KEY);
@@ -291,7 +347,7 @@ export async function packLibraryForCloud() {
     modesIntroDone: modesIntroDone || null,
   };
 
-  return { manifest, assets, projectCount: docs.length };
+  return { manifest, assets, projectCount: docs.length, packingFailed: assets.packingFailed || 0 };
 }
 
 async function syncRequest(payload, { method = 'POST', query = '', signal } = {}) {
@@ -396,23 +452,26 @@ async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
  * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
  * Por defeito a nuvem faz MERGE (união) — projectos noutros browsers não somem.
  * @param {{ force?: boolean, allowShrink?: boolean, pullAfter?: boolean,
- *   signal?: AbortSignal, beforeApply?: () => void }} [opts]
+ *   signal?: AbortSignal, beforeApply?: () => void, snapshot?: object,
+ *   allowMemoryFallback?: boolean }} [opts]
  *   allowShrink/replace: substitui a nuvem (raro).
  *   pullAfter: após push, puxa manifesto completo → localStorage (Sync/Salvar).
  */
 export async function pushLibraryToCloud(opts = {}) {
   const context = captureSyncContext();
   const guardOpts = { signal: opts.signal, allowLocked: opts.pullAfter === false };
+  const allowMemoryFallback = !!opts.snapshot || opts.allowMemoryFallback === true;
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   const localMeta = readCloudMeta();
   const status = await fetchLibraryCloudStatus({ signal: opts.signal });
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
-  const { manifest, assets, projectCount } = await packLibraryForCloud();
+  const { manifest, assets, projectCount, packingFailed } = await packLibraryForCloud(opts.snapshot);
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   if (!projectCount && !(manifest.brands || []).length && !(manifest.deletedIds || []).length) {
     if (opts.pullAfter === true && !status?.empty) {
       const pulled = await pullLibraryFromCloud({
         signal: opts.signal, context, beforeApply: opts.beforeApply, expectedMeta: status.meta,
+        localSnapshot: opts.snapshot, allowMemoryFallback,
       });
       return { ...pulled, localProjectCount: pulled.projectCount, needsReload: !!pulled.snapshot };
     }
@@ -483,6 +542,7 @@ export async function pushLibraryToCloud(opts = {}) {
     projectCount: result.projectCount,
     lastPushAt: Date.now(),
     lastPullAt: localMeta?.lastPullAt || null,
+    localPersisted: localMeta?.localPersisted,
   });
 
   // Sync/Salvar: SEMPRE puxar a lista completa da nuvem para o browser.
@@ -494,11 +554,14 @@ export async function pushLibraryToCloud(opts = {}) {
   let snapshot = null;
   let assetsMissing = 0;
   let warnings = [];
+  let localPersisted = null;
+  let cacheError = '';
   if (mustPull) {
     try {
       assertSyncContext(context, { ...guardOpts, checkLibrary: true });
       const pulled = await pullLibraryFromCloud({
         signal: opts.signal, context, beforeApply: opts.beforeApply, expectedMeta: result,
+        localSnapshot: opts.snapshot, localAssets: assets, allowMemoryFallback,
       });
       if (!pulled.snapshot || (cloudProjects > 0 && !pulled.projectCount)) {
         pullError = cloudProjects > 0
@@ -509,6 +572,8 @@ export async function pushLibraryToCloud(opts = {}) {
         snapshot = pulled.snapshot;
         assetsMissing = pulled.assetsMissing;
         warnings = pulled.warnings;
+        localPersisted = pulled.localPersisted;
+        cacheError = pulled.cacheError || '';
         result = { ...result, revision: pulled.revision, updatedAt: pulled.updatedAt, projectCount: pulled.projectCount };
       }
     } catch (e) {
@@ -518,16 +583,22 @@ export async function pushLibraryToCloud(opts = {}) {
 
   return {
     ok: !pullError,
+    cloudSaved: true,
     revision: result.revision,
     updatedAt: result.updatedAt,
     projectCount: result.projectCount,
     localProjectCount: snapshot ? snapshot.library.length : localLibraryFingerprint().count,
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
-    assetsFailed: assetStats.failed,
-    assetError: assetStats.lastError || '',
+    assetsFailed: assetStats.failed + packingFailed,
+    assetError: [
+      assetStats.lastError,
+      packingFailed ? `${packingFailed} imagem(ns) não puderam ser preparadas para o envio à nuvem.` : '',
+    ].filter(Boolean).join(' '),
     needsReload,
     pullError,
+    localPersisted,
+    cacheError,
     snapshot,
     assetsMissing,
     warnings,
@@ -589,6 +660,46 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
       if (dataUrl) sl = { ...sl, logoImage: dataUrl };
     }
     try { sl = await importSlideLogo(sl); } catch { /* */ }
+    const refAsset = sl.refImageAssetId;
+    if (refAsset) {
+      let dataUrl = await resolveCachedAsset(refAsset, assetCache);
+      // A referência legada pode ainda não ter ID local. O asset preparado
+      // neste mesmo push mantém a associação exata se o upload/GET falhar.
+      if (!dataUrl) dataUrl = assetCache.localAssets?.get(refAsset) || null;
+      let localId = null;
+      if (!dataUrl) {
+        const sameLocalReference = localSlide?.refImageAssetId === refAsset
+          || localSlide?.refImageId === refAsset
+          || (sl.refImageId && localSlide?.refImageId === sl.refImageId);
+        if (sameLocalReference && typeof localSlide?.refImage === 'string'
+          && localSlide.refImage.startsWith('data:image/')) dataUrl = localSlide.refImage;
+        localId = (sameLocalReference && localSlide?.refImageId) || sl.refImageId || refAsset;
+        if (!dataUrl) {
+          try { dataUrl = await imagemComoDataUrl(localId); } catch { /* a referência fica identificada como indisponível */ }
+        }
+      }
+      if (dataUrl) {
+        try {
+          const packed = await guardarImagemDoSlide(dataUrl, { id: localId || refAsset });
+          sl = {
+            ...sl, refImageId: packed.bgImageId || null, refImage: packed.bgImageId ? null : dataUrl,
+            refImageFailed: false, refImageError: null,
+          };
+          if (packed.bgImageId && packed.bgImage?.startsWith('blob:')) URL.revokeObjectURL(packed.bgImage);
+        } catch {
+          // Conserva os bytes durante uma indisponibilidade local; a migração
+          // poderá tentar novamente sem alterar a referência escolhida.
+          sl = { ...sl, refImageId: null, refImage: dataUrl, refImageFailed: false, refImageError: null };
+        }
+      } else {
+        sl = {
+          ...sl, refImage: null, refImageFailed: true,
+          refImageError: 'A referência deste card está indisponível. Importe-a novamente antes de gerar.',
+        };
+      }
+    } else {
+      try { sl = await importSlideReference(sl); } catch { /* preserva o anexo legado */ }
+    }
     return sl;
   } catch {
     return { ...slide };
@@ -648,7 +759,9 @@ async function hydrateStyleKitFromCloud(styleKit, assetCache) {
  * Devolve snapshot para a UI e mantém gravações travadas até o chamador
  * atualizar o estado React ou recarregar a página.
  */
-export async function applyCloudManifest(manifest, { context = captureSyncContext(), signal, beforeApply } = {}) {
+export async function applyCloudManifest(manifest, {
+  context = captureSyncContext(), signal, beforeApply, localSnapshot, localAssets, allowMemoryFallback = false,
+} = {}) {
   if (!manifest || typeof manifest !== 'object' || !Array.isArray(manifest.docs)) {
     throw new Error('Manifesto da nuvem inválido.');
   }
@@ -656,8 +769,12 @@ export async function applyCloudManifest(manifest, { context = captureSyncContex
   const assetCache = new Map();
   assetCache.signal = signal;
   assetCache.missing = new Set();
+  assetCache.localAssets = localAssets;
   let localDocs = [];
-  try { localDocs = JSON.parse(context.library || '[]'); } catch { /* cache corrompida pode ser restaurada */ }
+  if (Array.isArray(localSnapshot?.library)) localDocs = localSnapshot.library;
+  else {
+    try { localDocs = JSON.parse(context.library || '[]'); } catch { /* cache corrompida pode ser restaurada */ }
+  }
   const docs = [];
   for (const entry of (manifest.docs || [])) {
     if (!entry?.doc) {
@@ -721,6 +838,7 @@ export async function applyCloudManifest(manifest, { context = captureSyncContex
     [SK.library, semImagensDeRuntime(snapshot.library)],
   ];
   const previous = writes.map(([key]) => [key, localStorage.getItem(key)]);
+  let cacheError = '';
   try {
     for (const [key, value] of writes) {
       if (!lsSet(key, value)) throw new Error('Gravação local recusada.');
@@ -738,7 +856,8 @@ export async function applyCloudManifest(manifest, { context = captureSyncContex
         else localStorage.setItem(key, raw);
       } catch { /* a biblioteca anterior continua na nuvem */ }
     }
-    throw new Error('A biblioteca está na nuvem, mas não foi possível gravar a lista neste navegador. Libere espaço e sincronize novamente.');
+    cacheError = 'A biblioteca está na nuvem, mas não foi possível gravar a lista neste navegador. Libere espaço e sincronize novamente.';
+    if (!allowMemoryFallback) throw new Error(cacheError);
   }
   if (manifest.userProfile && typeof manifest.userProfile === 'object') {
     try {
@@ -757,6 +876,7 @@ export async function applyCloudManifest(manifest, { context = captureSyncContex
     revision: Number(manifest.revision || 0),
     updatedAt: Number(manifest.updatedAt || 0),
     projectCount: docs.length,
+    localPersisted: !cacheError,
     lastPullAt: Date.now(),
     lastPushAt: readCloudMeta()?.lastPushAt || null,
   });
@@ -769,12 +889,16 @@ export async function applyCloudManifest(manifest, { context = captureSyncContex
     revision: manifest.revision,
     updatedAt: manifest.updatedAt,
     snapshot,
+    localPersisted: !cacheError,
+    cacheError,
     assetsMissing,
     warnings: assetsMissing ? [`${assetsMissing} imagem(ns) indisponível(is); todos os projetos foram restaurados.`] : [],
   };
 }
 
-export async function pullLibraryFromCloud({ context = captureSyncContext(), signal, beforeApply, expectedMeta } = {}) {
+export async function pullLibraryFromCloud({
+  context = captureSyncContext(), signal, beforeApply, expectedMeta, localSnapshot, localAssets, allowMemoryFallback = false,
+} = {}) {
   assertSyncContext(context, { signal, checkLibrary: true });
   const data = await syncRequest(null, { method: 'GET', query: 'full=1', signal });
   if (data.empty) {
@@ -796,7 +920,9 @@ export async function pullLibraryFromCloud({ context = captureSyncContext(), sig
       throw new Error(`A nuvem confirmou ${expectedCount} projeto(s), mas devolveu uma lista diferente. A lista local foi preservada; sincronize novamente.`);
     }
   }
-  const applied = await applyCloudManifest(data.manifest, { context, signal, beforeApply });
+  const applied = await applyCloudManifest(data.manifest, {
+    context, signal, beforeApply, localSnapshot, localAssets, allowMemoryFallback,
+  });
   return { ok: true, empty: false, ...applied };
 }
 
@@ -830,19 +956,31 @@ function reloadAfterCloudPull() {
 /**
  * Reconcilia por união após login, mesmo se a revisão local avançou num push
  * anterior sem pull. A contagem da nuvem só é sucesso após aplicar a lista à UI.
- * @returns {Promise<'ok'|'reloading'|'skipped'>}
+ * @returns {Promise<'ok'|'reloading'|'skipped'|'blocked'>}
  */
 export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
   if (typeof window === 'undefined') return 'skipped';
+  const localMeta = readCloudMeta();
+  const requiresCloudRestore = localMeta?.localPersisted === false;
   try {
     const status = await fetchLibraryCloudStatus();
     const local = localLibraryFingerprint();
     const hasLocalChanges = local.count > 0 || readDeletedProjectIds().length > 0;
+    // O callback aplica a união ao React antes de liberar autosave. Sem ele,
+    // um reload ainda precisaria do cache persistido e deve continuar estrito.
+    const allowMemoryFallback = typeof onApplied === 'function';
     let result;
-    if (hasLocalChanges) {
-      result = await pushLibraryToCloud({ force: true, pullAfter: true });
+    if (requiresCloudRestore) {
+      // A memória recebeu uma versão que não coube em localStorage. No próximo
+      // boot esta cache não representa uma edição local e nunca pode fazer push.
+      const expectedMeta = Number(status?.meta?.revision || 0) >= Number(localMeta?.revision || 0)
+        ? status.meta : localMeta;
+      result = await pullLibraryFromCloud({ expectedMeta, allowMemoryFallback });
+      if (!result.snapshot) throw new Error(CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE);
+    } else if (hasLocalChanges) {
+      result = await pushLibraryToCloud({ force: true, pullAfter: true, allowMemoryFallback });
     } else if (!status.empty && status.meta) {
-      result = await pullLibraryFromCloud({ expectedMeta: status.meta });
+      result = await pullLibraryFromCloud({ expectedMeta: status.meta, allowMemoryFallback });
     } else {
       return 'ok';
     }
@@ -859,25 +997,31 @@ export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
     }
     if (typeof toast === 'function') {
       const detail = result.assetsMissing ? ` ${result.assetsMissing} imagem(ns) indisponível(is).` : '';
-      toast(`Biblioteca sincronizada: ${result.projectCount} projeto(s).${detail}`,
-        result.assetsMissing ? 'warning' : 'success', 5000);
+      const cacheDetail = result.localPersisted === false
+        ? ' A lista foi atualizada, mas o navegador continua sem espaço para a cópia local.' : '';
+      toast(`Biblioteca sincronizada: ${result.projectCount} projeto(s).${detail}${cacheDetail}`,
+        result.assetsMissing || cacheDetail ? 'warning' : 'success', 5000);
     }
     return 'ok';
   } catch (e) {
     if (typeof toast === 'function') {
-      toast(e?.message || 'Não foi possível sincronizar a biblioteca.', 'warning', 5500);
+      toast(requiresCloudRestore ? CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE
+        : e?.message || 'Não foi possível sincronizar a biblioteca.', 'warning', 5500);
     }
-    return 'skipped';
+    return requiresCloudRestore ? 'blocked' : 'skipped';
   }
 }
 
-/** Best-effort (logout/auto) — só envia; nunca altera a biblioteca local. */
-export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000) {
+/** Best-effort (logout/auto) — só envia; devolve o recibo, incluindo falhas de assets. */
+export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000, opts = {}) {
   const controller = new AbortController();
   let timer;
   try {
     const result = await Promise.race([
-      pushLibraryToCloud({ force: true, allowShrink: false, pullAfter: false, signal: controller.signal }),
+      pushLibraryToCloud({
+        snapshot: opts.snapshot, force: true, allowShrink: false,
+        allowLocked: true, pullAfter: false, signal: controller.signal,
+      }),
       new Promise((_, reject) => {
         timer = setTimeout(() => {
           controller.abort();
@@ -885,9 +1029,9 @@ export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000) {
         }, timeoutMs);
       }),
     ]);
-    return result.ok !== false;
-  } catch {
-    return false;
+    return result;
+  } catch (error) {
+    return { ok: false, cloudSaved: false, pushError: String(error?.message || error || 'Falha ao sincronizar.') };
   } finally {
     clearTimeout(timer);
   }

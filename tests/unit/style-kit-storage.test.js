@@ -35,4 +35,14 @@ describe('moodboard armazenado e transportado', () => {
     imageGet.mockResolvedValueOnce(null);
     await expect(resolveImageReferences({ refImages: [{ imageId: 'missing' }] })).rejects.toThrow(/Reenvie/);
   });
+  it('ID do card prevalece ao moodboard e não é descartado se seus bytes faltarem', async () => {
+    imageGet.mockReset().mockResolvedValue({ blob: new Blob(['card']) });
+    const kit = { refImages: [{ imageId: 'moodboard' }] };
+    expect(await resolveImageReferences(kit, null, 'card_ref')).toEqual(['data:image/png;base64,YQ==']);
+    expect(imageGet).toHaveBeenCalledTimes(1);
+    expect(imageGet).toHaveBeenCalledWith('card_ref');
+    imageGet.mockReset().mockResolvedValue(null);
+    await expect(resolveImageReferences(kit, null, 'missing_card_ref')).rejects.toThrow('Reenvie a referência');
+    expect(imageGet).not.toHaveBeenCalledWith('moodboard');
+  });
 });

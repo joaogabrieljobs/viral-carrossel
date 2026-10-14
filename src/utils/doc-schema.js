@@ -68,8 +68,8 @@ const mkSlide = (n = 1, brand = null) => {
   videoMime: null,
   videoName: null,
   /** Campo opcional `presentationImgAdjust` (tela cheia) — não definido em slides novos; ver FullscreenViewer. */
-  /** Data URL ou URL https — enviada à API de imagem como referência (produto, pack, moodboard). */
-  refImage: null,
+  /** Referência por card: bytes originais em IndexedDB; refImage aceita o legado/backup portátil. */
+  refImage: null, refImageId: null, refImageAssetId: null,
   /** Instruções extras por slide (marca, packshot, cor de fundo) — entram no prompt Web trend e GPT Image. */
   imgExtraPrompt: '',
   imgMode: 'dalle',

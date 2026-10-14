@@ -5,6 +5,7 @@ import {
 import {
   applyCloudManifest, pullLibraryFromCloud, pushLibraryToCloud,
   pushLibraryToCloudBestEffort, reconcileLibraryCloud,
+  readCloudMeta, writeCloudMeta, LIBRARY_CLOUD_META_FALLBACK_KEY,
 } from '../../src/utils/library-sync.js';
 
 const imageMocks = vi.hoisted(() => ({
@@ -82,6 +83,7 @@ describe('library-sync client pack', () => {
   beforeEach(() => {
     local = makeMemoryStorage();
     vi.stubGlobal('localStorage', local);
+    vi.stubGlobal('sessionStorage', makeMemoryStorage());
     unlockAccountDataWrites();
     imageMocks.read.mockReset().mockResolvedValue(null);
     imageMocks.store.mockReset().mockResolvedValue({ bgImageId: 'restored-photo', bgImage: 'blob:restored' });
@@ -127,6 +129,57 @@ describe('library-sync client pack', () => {
     ]));
     const { localLibraryFingerprint } = await import('../../src/utils/library-sync.js');
     expect(localLibraryFingerprint()).toEqual({ count: 2, maxUpdated: 500 });
+  });
+
+  it('snapshot explícito envia a edição atual mesmo quando localStorage ainda guarda a versão antiga', async () => {
+    const old = cloudLibrary(1);
+    old.docs[0].doc.slides[0] = { id: 's1', title: 'Texto antigo' };
+    local.setItem(SK.library, JSON.stringify(old.docs));
+    local.setItem(SK.activeDocId, JSON.stringify('antigo'));
+    const current = structuredClone(old.docs);
+    current[0].doc.slides[0].title = 'Edição que não coube no cache';
+    current.push({ id: 'novo-projeto', name: 'Novo projeto', doc: { slides: [] } });
+    const snapshot = {
+      library: current, libraryFolders: [{ id: 'f-current', name: 'Pasta atual' }],
+      brandRoster: [{ id: 'b-current', name: 'Marca atual' }],
+      activeDocId: 'novo-projeto', activeBrandId: 'b-current',
+    };
+    const { requests } = installCloudApi(old);
+    await pushLibraryToCloud({ snapshot, pullAfter: false });
+    const { manifest } = requests.find((request) => request.body?.action === 'push').body;
+    expect(manifest.docs[0].doc.slides[0].title).toBe('Edição que não coube no cache');
+    expect(manifest.docs).toHaveLength(2);
+    expect(manifest).toMatchObject({ folders: snapshot.libraryFolders, brands: snapshot.brandRoster,
+      activeDocId: snapshot.activeDocId, activeBrandId: snapshot.activeBrandId });
+    expect(JSON.parse(local.getItem(SK.library))[0].doc.slides[0].title).toBe('Texto antigo');
+  });
+
+  it('pack envia a referência do card como asset separado sem bytes dentro do manifesto', async () => {
+    const reference = 'data:image/jpeg;base64,cmVmZXJlbmNpYQ==';
+    imageMocks.read.mockImplementation(async (id) => id === 'ref-card-1' ? reference : null);
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const packed = await packLibraryForCloud({ library: [{ id: 'p1', doc: {
+      slides: [{ id: 's1', refImageId: 'ref-card-1', refImage: null, imgExtraPrompt: 'Preserve o enquadramento' }],
+    } }], brandRoster: [], libraryFolders: [] });
+    expect(packed.assets.get('ref-card-1')).toBe(reference);
+    expect(packed.manifest.docs[0].doc.slides[0]).toMatchObject({
+      refImageAssetId: 'ref-card-1', imgExtraPrompt: 'Preserve o enquadramento', refImage: null,
+    });
+    expect(JSON.stringify(packed.manifest)).not.toContain('data:image');
+  });
+
+  it('pack migra referência data URL legada para um asset e preserva anexo remoto ausente', async () => {
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const reference = 'data:image/jpeg;base64,cmVm';
+    const packed = await packLibraryForCloud({ library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', refImage: reference },
+      { id: 's2', refImageId: 'old-browser-id', refImageAssetId: 'remote-reference' },
+    ] } }], brandRoster: [], libraryFolders: [] });
+    const [legacy, remote] = packed.manifest.docs[0].doc.slides;
+    expect(legacy.refImageAssetId).toBeTruthy();
+    expect(packed.assets.get(legacy.refImageAssetId)).toBe(reference);
+    expect(remote.refImageAssetId).toBe('remote-reference');
+    expect(packed.assets.size).toBe(1);
   });
 
   it('pull restaura todos os textos mesmo com asset 404 e entrega o snapshot para React', async () => {
@@ -182,6 +235,70 @@ describe('library-sync client pack', () => {
       bgImageAssetId: 'missing-photo', bgImageId: 'cached-photo-id', bgImage: 'data:image/jpeg;base64,YQ==',
     });
     expect(JSON.parse(local.getItem(SK.library))[0].doc.slides[0].bgImageId).toBe('cached-photo-id');
+  });
+
+  it('pull hidrata a referência do card em IndexedDB com ID estável', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id: 's1', refImageAssetId: 'reference-1', refImageId: 'other-browser-id' };
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => url.includes('?asset=')
+      ? response({ asset: { dataUrl: 'data:image/jpeg;base64,YQ==' } }) : normalFetch(url, opts));
+    imageMocks.store.mockImplementation(async (_src, meta) => ({ bgImageId: meta.id, bgImage: 'blob:runtime' }));
+    const pulled = await pullLibraryFromCloud();
+    expect(imageMocks.store).toHaveBeenCalledWith('data:image/jpeg;base64,YQ==', { id: 'reference-1' });
+    expect(pulled.snapshot.library[0].doc.slides[0]).toMatchObject({
+      refImageId: 'reference-1', refImageAssetId: 'reference-1', refImage: null, refImageFailed: false,
+    });
+  });
+
+  it('404 da referência não derruba a lista nem apaga a referência local correspondente', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id: 's1', title: 'Texto preservado', refImageAssetId: 'reference-1' };
+    const localDoc = structuredClone(manifest.docs[0]);
+    localDoc.doc.slides[0].refImageId = 'cached-reference';
+    local.setItem(SK.library, JSON.stringify([localDoc]));
+    imageMocks.read.mockImplementation(async (id) => id === 'cached-reference' ? 'data:image/jpeg;base64,YQ==' : null);
+    imageMocks.store.mockImplementation(async (_src, meta) => ({ bgImageId: meta.id, bgImage: 'blob:runtime' }));
+    installCloudApi(manifest);
+    const pulled = await pullLibraryFromCloud();
+    expect(pulled).toMatchObject({ ok: true, projectCount: 1, assetsMissing: 1 });
+    expect(pulled.snapshot.library[0].doc.slides[0]).toMatchObject({
+      title: 'Texto preservado', refImageAssetId: 'reference-1', refImageId: 'cached-reference', refImageFailed: false,
+    });
+  });
+
+  it('pull conserva os bytes da referência quando IndexedDB devolve fallback sem ID', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id: 's1', refImageAssetId: 'reference-1' };
+    const source = 'data:image/jpeg;base64,YQ==';
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => url.includes('?asset=')
+      ? response({ asset: { dataUrl: source } }) : normalFetch(url, opts));
+    imageMocks.store.mockResolvedValue({ bgImageId: null, bgImage: source });
+    const pulled = await pullLibraryFromCloud();
+    expect(pulled.snapshot.library[0].doc.slides[0]).toMatchObject({
+      refImageAssetId: 'reference-1', refImageId: null, refImage: source, refImageFailed: false,
+    });
+    expect(JSON.parse(local.getItem(SK.library))[0].doc.slides[0].refImage).toBe(source);
+  });
+
+  it('404 mantém a identidade da referência ausente e não reutiliza imagem local de outro anexo', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id: 's1', title: 'Texto preservado', refImageAssetId: 'reference-1' };
+    const localDoc = structuredClone(manifest.docs[0]);
+    localDoc.doc.slides[0] = { id: 's1', refImageId: 'different-reference', refImageAssetId: 'other-asset' };
+    local.setItem(SK.library, JSON.stringify([localDoc]));
+    imageMocks.read.mockImplementation(async (id) => id === 'different-reference' ? 'data:image/jpeg;base64,YQ==' : null);
+    installCloudApi(manifest);
+    const pulled = await pullLibraryFromCloud();
+    expect(pulled).toMatchObject({ ok: true, projectCount: 1 });
+    expect(pulled.snapshot.library[0].doc.slides[0]).toMatchObject({
+      title: 'Texto preservado', refImageAssetId: 'reference-1', refImage: null, refImageFailed: true,
+    });
+    expect(pulled.snapshot.library[0].doc.slides[0].refImageError).toContain('Importe-a novamente');
+    expect(imageMocks.read).not.toHaveBeenCalledWith('different-reference');
   });
 
   it('preserva referências remotas no próximo push quando fotos e logos faltam', async () => {
@@ -272,6 +389,105 @@ describe('library-sync client pack', () => {
     expect(areAccountDataWritesLocked()).toBe(false);
   });
 
+  it('Salvar com snapshot entrega a união verificada ao React mesmo se o cache estiver cheio', async () => {
+    const manifest = cloudLibrary();
+    manifest.docs.forEach((entry) => { entry.doc.slides[0].bgImageAssetId = null; });
+    const original = [structuredClone(manifest.docs[0])];
+    original[0].doc.slides[0].title = 'Cache antigo';
+    local.setItem(SK.library, JSON.stringify(original));
+    local.setItem(SK.libraryFolders, JSON.stringify([{ id: 'old-folder' }]));
+    const { requests } = installCloudApi(manifest);
+    const setItem = local.setItem.bind(local);
+    vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if (key === SK.library && JSON.parse(value).length === 5) throw new Error('quota');
+      setItem(key, value);
+    });
+    const beforeApply = vi.fn();
+    const result = await pushLibraryToCloud({
+      pullAfter: true, beforeApply, snapshot: { library: [manifest.docs[0]], brandRoster: [], libraryFolders: [] },
+    });
+    expect(result).toMatchObject({ ok: true, cloudSaved: true, localPersisted: false, projectCount: 5, localProjectCount: 5, pullError: '' });
+    expect(result.cacheError).toContain('não foi possível gravar a lista');
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).localPersisted).toBe(false);
+    expect(result.snapshot.library).toMatchObject(manifest.docs);
+    expect(beforeApply).toHaveBeenCalledTimes(1);
+    expect(requests.find((request) => request.body?.action === 'push').body.manifest.docs[0].doc.slides[0].title).toBe('Texto 1');
+    expect(JSON.parse(local.getItem(SK.library))).toEqual(original);
+    expect(JSON.parse(local.getItem(SK.libraryFolders))).toEqual([{ id: 'old-folder' }]);
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, original)).toBe(false);
+  });
+
+  it('snapshot explícito não relaxa verificação de versão e contagem recebidas da nuvem', async () => {
+    const manifest = cloudLibrary();
+    local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => url.includes('?full=1')
+      ? response({ manifest: cloudLibrary(2) }) : normalFetch(url, opts));
+    const result = await pushLibraryToCloud({ snapshot: { library: [manifest.docs[0]] }, pullAfter: true });
+    expect(result).toMatchObject({ ok: false, cloudSaved: true, snapshot: null });
+    expect(result.pullError).toContain('confirmou 5 projeto(s)');
+    expect(areAccountDataWritesLocked()).toBe(false);
+  });
+
+  it('snapshot explícito mantém o guard do cache e recusa edição concorrente antes do push', async () => {
+    const manifest = cloudLibrary(1);
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => {
+      if (JSON.parse(opts?.body || '{}').action === 'status') local.setItem(SK.library, JSON.stringify([{ id: 'new-local' }]));
+      return normalFetch(url, opts);
+    });
+    await expect(pushLibraryToCloud({ snapshot: { library: manifest.docs } })).rejects.toThrow('A biblioteca mudou');
+    expect(fetchMock.mock.calls.some(([, opts]) => JSON.parse(opts?.body || '{}').action === 'push')).toBe(false);
+  });
+
+  it('snapshot usa a referência atual em memória no 404 e preserva o guard de edição React', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id: 's1', title: 'Texto atual', refImageAssetId: 'reference-now' };
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1', doc: { slides: [{ id: 's1', title: 'Cache antigo' }] } }]));
+    const current = structuredClone(manifest.docs);
+    current[0].doc.slides[0].refImage = 'data:image/jpeg;base64,YQ==';
+    imageMocks.store.mockImplementation(async (_src, meta) => ({ bgImageId: meta.id, bgImage: 'blob:runtime' }));
+    installCloudApi(manifest);
+    const result = await pushLibraryToCloud({ snapshot: { library: current }, pullAfter: true });
+    expect(result.snapshot.library[0].doc.slides[0]).toMatchObject({ refImageId: 'reference-now', refImageFailed: false });
+    unlockAccountDataWrites();
+    const editedAgain = await pushLibraryToCloud({
+      snapshot: { library: current }, pullAfter: true,
+      beforeApply: () => { throw new Error('A edição atual mudou enquanto sincronizava.'); },
+    });
+    expect(editedAgain).toMatchObject({ ok: false, cloudSaved: true, snapshot: null });
+    expect(editedAgain.pullError).toContain('edição atual mudou');
+    expect(areAccountDataWritesLocked()).toBe(false);
+  });
+
+  it('referência legada sem ID continua disponível se o asset recém-enviado retornar 404', async () => {
+    const source = 'data:image/jpeg;base64,YQ==';
+    let uploadedManifest;
+    vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
+      const body = JSON.parse(opts?.body || '{}');
+      if (body.action === 'status') return response({ ok: true, empty: true });
+      if (body.action === 'push') {
+        uploadedManifest = { ...body.manifest, revision: 1 };
+        return response({ ok: true, projectCount: 1, revision: 1 });
+      }
+      if (body.action === 'putAsset') return response({ ok: true });
+      if (url.includes('?asset=')) return response({ error: 'Asset não encontrado.' }, 404);
+      return response({ ok: true, manifest: uploadedManifest });
+    }));
+    imageMocks.store.mockImplementation(async (_src, meta) => ({ bgImageId: meta.id, bgImage: 'blob:runtime' }));
+    const result = await pushLibraryToCloud({ pullAfter: true, snapshot: { library: [{
+      id: 'p1', doc: { slides: [{ id: 's1', refImage: source }] },
+    }] } });
+    expect(result).toMatchObject({ ok: true, assetsMissing: 1 });
+    const restored = result.snapshot.library[0].doc.slides[0];
+    expect(restored.refImageId).toBe(uploadedManifest.docs[0].doc.slides[0].refImageAssetId);
+    expect(restored.refImageFailed).toBe(false);
+    expect(imageMocks.store).toHaveBeenCalledWith(source, { id: restored.refImageId });
+  });
+
   it('preserva novo projeto criado enquanto aguardava o download', async () => {
     const newer = [{ id: 'new-local-project', name: 'Novo projeto' }];
     vi.stubGlobal('fetch', vi.fn(async () => {
@@ -356,12 +572,148 @@ describe('library-sync client pack', () => {
     expect(requests.some((request) => request.body?.action === 'push')).toBe(false);
   });
 
+  it('boot com cache cheio aplica a união ao React antes de liberar autosave, sem reload stale', async () => {
+    const manifest = cloudLibrary();
+    local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));
+    const setItem = local.setItem.bind(local);
+    vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if (key === SK.library && JSON.parse(value).length > 1) throw new Error('quota');
+      setItem(key, value);
+    });
+    const replace = vi.fn();
+    vi.stubGlobal('window', { location: { href: 'https://example.test/?app=1', replace } });
+    installCloudApi(manifest);
+    const toast = vi.fn();
+    const onApplied = vi.fn(async (snapshot, receipt) => {
+      expect(areAccountDataWritesLocked()).toBe(true);
+      expect(snapshot.library).toHaveLength(5);
+      expect(receipt.localPersisted).toBe(false);
+      expect(toast).not.toHaveBeenCalled();
+      unlockAccountDataWrites();
+    });
+    expect(await reconcileLibraryCloud({ toast, onApplied })).toBe('ok');
+    expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
+    expect(toast.mock.calls[0]).toEqual([expect.stringContaining('navegador continua sem espaço'), 'warning', 5000]);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('marcador de cache stale obriga pull antes de qualquer push e limpa o marcador após persistir', async () => {
+    const manifest = cloudLibrary();
+    const stale = [structuredClone(manifest.docs[0])];
+    stale[0].doc.slides[0].title = 'Edição velha do cache';
+    local.setItem(SK.library, JSON.stringify(stale));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ localPersisted: false, revision: 4, projectCount: 5 }));
+    const { requests } = installCloudApi(manifest);
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    const onApplied = vi.fn(async (snapshot) => {
+      expect(snapshot.library[0].doc.slides[0].title).toBe('Texto 1');
+      unlockAccountDataWrites();
+    });
+    expect(await reconcileLibraryCloud({ onApplied })).toBe('ok');
+    expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(requests.some((request) => request.body?.action === 'push')).toBe(false);
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).localPersisted).toBe(true);
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(5);
+  });
+
+  it.each(['status', 'pull', 'empty', 'old-revision'])('cache stale e falha %s bloqueiam o boot sem push nem aplicar dados velhos', async (failure) => {
+    const manifest = cloudLibrary();
+    local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ localPersisted: false, revision: 4, projectCount: 5 }));
+    const { requests, fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => {
+      const isStatus = JSON.parse(opts?.body || '{}').action === 'status';
+      if ((failure === 'status' && isStatus) || (failure === 'pull' && url.includes('?full=1'))) {
+        return response({ error: 'Rede temporariamente indisponível.' }, 503);
+      }
+      if (failure === 'empty' && url.includes('?full=1')) return response({ empty: true });
+      if (failure === 'old-revision' && url.includes('?full=1')) return response({ manifest: { ...manifest, revision: 3 } });
+      return normalFetch(url, opts);
+    });
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    const onApplied = vi.fn();
+    const toast = vi.fn();
+    expect(await reconcileLibraryCloud({ onApplied, toast })).toBe('blocked');
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(requests.some((request) => request.body?.action === 'push')).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(1);
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).localPersisted).toBe(false);
+    expect(toast.mock.calls[0][0]).toContain('cópia deste navegador está desatualizada');
+  });
+
+  it('auto-push não remove o marcador de cache stale antes de um pull persistido', async () => {
+    const manifest = cloudLibrary(1);
+    local.setItem(SK.library, JSON.stringify(manifest.docs));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ localPersisted: false, revision: 4 }));
+    installCloudApi(manifest);
+    await pushLibraryToCloud({ snapshot: { library: manifest.docs }, pullAfter: false });
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).localPersisted).toBe(false);
+  });
+
+  it('cache e metadados recusados deixam recibo na aba e bloqueiam boot offline sem push stale', async () => {
+    const manifest = cloudLibrary();
+    local.setItem(SK.dataOwner, JSON.stringify('email:a@example.test'));
+    local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ localPersisted: true, revision: 4, updatedAt: 800, recordedAt: 1 }));
+    const setItem = local.setItem.bind(local);
+    vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if ([SK.library, SK.libraryCloudMeta].includes(key)) throw new Error('quota');
+      setItem(key, value);
+    });
+    const { requests, fetchMock } = installCloudApi(manifest);
+    const result = await pushLibraryToCloud({ snapshot: { library: [manifest.docs[0]] }, pullAfter: true });
+    expect(result.localPersisted).toBe(false);
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).localPersisted).toBe(true);
+    expect(readCloudMeta().localPersisted).toBe(false);
+    const fallback = JSON.parse(sessionStorage.getItem(LIBRARY_CLOUD_META_FALLBACK_KEY));
+    expect(fallback.owner).toBe(JSON.stringify('email:a@example.test'));
+    expect(JSON.stringify(fallback).length).toBeLessThan(500);
+    unlockAccountDataWrites();
+    const pushesBeforeReload = requests.filter((request) => request.body?.action === 'push').length;
+    fetchMock.mockResolvedValue(response({ error: 'Offline.' }, 503));
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    const onApplied = vi.fn();
+    expect(await reconcileLibraryCloud({ onApplied })).toBe('blocked');
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(requests.filter((request) => request.body?.action === 'push')).toHaveLength(pushesBeforeReload);
+  });
+
+  it('recibo de sessionStorage não atravessa conta e só prevalece sobre metadados mais antigos', () => {
+    local.setItem(SK.dataOwner, JSON.stringify('email:a@example.test'));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 5, updatedAt: 900, localPersisted: true }));
+    sessionStorage.setItem(LIBRARY_CLOUD_META_FALLBACK_KEY, JSON.stringify({
+      owner: JSON.stringify('email:a@example.test'),
+      meta: { revision: 4, updatedAt: 800, recordedAt: Date.now(), localPersisted: false },
+    }));
+    expect(readCloudMeta()).toMatchObject({ revision: 5, localPersisted: true });
+    sessionStorage.setItem(LIBRARY_CLOUD_META_FALLBACK_KEY, JSON.stringify({
+      owner: JSON.stringify('email:a@example.test'),
+      meta: { revision: 6, updatedAt: 1000, recordedAt: Date.now(), localPersisted: false },
+    }));
+    expect(readCloudMeta()).toMatchObject({ revision: 6, localPersisted: false });
+    local.setItem(SK.dataOwner, JSON.stringify('email:b@example.test'));
+    expect(readCloudMeta()).toMatchObject({ revision: 5, localPersisted: true });
+  });
+
+  it('gravação confirmada em localStorage remove o fallback da aba sem espelhar metadados', () => {
+    local.setItem(SK.dataOwner, JSON.stringify('email:a@example.test'));
+    sessionStorage.setItem(LIBRARY_CLOUD_META_FALLBACK_KEY, JSON.stringify({
+      owner: JSON.stringify('email:a@example.test'),
+      meta: { revision: 4, updatedAt: 800, localPersisted: false },
+    }));
+    expect(writeCloudMeta({ revision: 5, updatedAt: 900, localPersisted: true })).toBe(true);
+    expect(readCloudMeta()).toMatchObject({ revision: 5, localPersisted: true });
+    expect(sessionStorage.getItem(LIBRARY_CLOUD_META_FALLBACK_KEY)).toBeNull();
+  });
+
   it('best-effort de logout só envia e não modifica lista nem meta após o lock', async () => {
     const original = [cloudLibrary(1).docs[0]];
     local.setItem(SK.library, JSON.stringify(original));
     lockAccountDataWrites();
     const { requests } = installCloudApi(cloudLibrary());
-    expect(await pushLibraryToCloudBestEffort()).toBe(true);
+    expect(await pushLibraryToCloudBestEffort()).toMatchObject({ ok: true, cloudSaved: true, assetsFailed: 0 });
     expect(requests.some((request) => request.url.includes('?full=1'))).toBe(false);
     expect(JSON.parse(local.getItem(SK.library))).toEqual(original);
     expect(local.getItem(SK.libraryCloudMeta)).toBeNull();
@@ -383,7 +735,7 @@ describe('library-sync client pack', () => {
     });
     const pending = pushLibraryToCloudBestEffort(50);
     await vi.advanceTimersByTimeAsync(50);
-    expect(await pending).toBe(false);
+    expect(await pending).toMatchObject({ ok: false, cloudSaved: false, pushError: 'Tempo de sincronização esgotado.' });
     expect(pushSignal.aborted).toBe(true);
     local.clear();
     releasePush(response({ ok: true, projectCount: 5, revision: 10 }));
@@ -402,6 +754,41 @@ describe('library-sync client pack', () => {
     const result = await pushLibraryToCloud({ pullAfter: false });
     expect(result.assetsUploaded).toBe(1);
     expect(requests.filter((request) => request.body?.action === 'putAsset')).toHaveLength(1);
+  });
+
+  it('logout envia o snapshot em memória com lock e devolve falhas de imagem para impedir descarte', async () => {
+    const manifest = cloudLibrary(1);
+    local.setItem(SK.library, JSON.stringify(manifest.docs));
+    const { fetchMock, requests } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => JSON.parse(opts?.body || '{}').action === 'putAsset'
+      ? response({ error: 'Upload indisponível.' }, 503) : normalFetch(url, opts));
+    lockAccountDataWrites();
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [{
+      id: 's1', title: 'Edição só em memória', refImage: 'data:image/jpeg;base64,YQ==',
+    }] } }] };
+    const result = await pushLibraryToCloudBestEffort(5_000, { snapshot });
+    expect(result).toMatchObject({ ok: true, cloudSaved: true, assetsFailed: 1, assetsUploaded: 0 });
+    expect(result.assetError).toBe('Upload indisponível.');
+    expect(requests.find((request) => request.body?.action === 'push').body.manifest.docs[0].doc.slides[0].title).toBe('Edição só em memória');
+    expect(requests.some((request) => request.url.includes('?full=1'))).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library))).toEqual(manifest.docs);
+  });
+
+  it('bytes que não couberam no empacotamento contam como falha, mas ID órfão antigo não inventa falha nova', async () => {
+    const manifest = cloudLibrary(1);
+    installCloudApi(manifest);
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', refImage: `data:image/jpeg;base64,${'A'.repeat(1_700_000)}` },
+      { id: 's2', refImageId: 'old-missing-reference', refImageAssetId: 'old-cloud-reference' },
+    ] } }] };
+    const packed = await packLibraryForCloud(snapshot);
+    expect(packed.packingFailed).toBe(1);
+    expect(packed.assets.size).toBe(0);
+    const result = await pushLibraryToCloud({ snapshot, pullAfter: false });
+    expect(result).toMatchObject({ ok: true, cloudSaved: true, assetsFailed: 1, assetsUploaded: 0 });
+    expect(result.assetError).toContain('1 imagem(ns) não puderam ser preparadas');
   });
 
   it('rejeita manifesto inválido sem substituir a biblioteca por uma lista vazia', async () => {

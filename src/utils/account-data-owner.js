@@ -89,7 +89,7 @@ function reloadAccountSwitch() {
 /**
  * @param {object} session — resultado de /api/auth/session
  * @param {{ explicitLogin?: boolean }} [opts]
- * @returns {Promise<'ok' | 'reloading'>}
+ * @returns {Promise<'ok' | 'reloading' | 'blocked'>}
  */
 export async function ensureAccountDataOwner(session, { explicitLogin = false } = {}) {
   if (typeof localStorage === 'undefined') return 'ok';
@@ -138,8 +138,12 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
   }
 
   // Conta diferente: guardar A, limpar activo, restaurar B.
+  const hasLocalProjects = libraryLooksOccupied();
   lockAccountDataWrites();
-  snapshotAccountVault(prev);
+  const preserved = snapshotAccountVault(prev);
+  // A sessão já pode ser de B, mas a biblioteca continua sendo de A. Nunca
+  // apagar a única cópia nem liberá-la para escrita pela conta seguinte.
+  if (hasLocalProjects && !preserved) return 'blocked';
   await clearAccountLocalData({ wipeMedia: false });
   writeDataOwner(next);
   restoreAccountVault(next, aliases);

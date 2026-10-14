@@ -37,7 +37,7 @@ export function slideImageInstruction(slide = {}, styleKit = {}) {
   if (query) return { query, extraPrompt: extra };
   if (extra) return { query: extra, extraPrompt: '' };
 
-  const hasReference = Boolean(slide.refImage || styleKit.refImages?.length);
+  const hasReference = Boolean(slide.refImage || slide.refImageId || slide.refImageAssetId || styleKit.refImages?.length);
   const content = [slide.title, slide.subtitle, slide.bodyAfterImage].map(text).filter(Boolean).join('\n');
   if (hasReference && content) {
     return {
@@ -51,6 +51,12 @@ export function slideImageInstruction(slide = {}, styleKit = {}) {
 export function slideImageGenerationState(slide = {}, accessState = ready, styleKit = {}) {
   const instruction = slideImageInstruction(slide, styleKit);
   if (!accessState.canGenerate) return { ...accessState, ...instruction };
+  if (slide.refImageFailed && !text(slide.refImage)) {
+    return {
+      ...blocked('reference_unavailable', 'Reenvie a referência deste card: o arquivo não está disponível neste navegador.'),
+      ...instruction,
+    };
+  }
   if (!instruction.query) {
     return {
       ...blocked('missing_direction', 'Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.'),

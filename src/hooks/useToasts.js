@@ -12,6 +12,7 @@ export function useToasts() {
     const id = uid();
     setToasts(t => [...t, { id, message, kind }]);
     if (ttl > 0) setTimeout(() => dismissToast(id), ttl);
+    return id;
   }, [dismissToast]);
   const setError = useCallback((msg) => { if (msg) toast(msg, 'error', 5000); }, [toast]);
 

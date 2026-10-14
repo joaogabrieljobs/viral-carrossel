@@ -2,6 +2,7 @@ import { normalizeStyleKit, MAX_REF_IMAGES } from './style-kit.js';
 import { imageGet, imagePut, newImageId, blobParaDataUrl, dataUrlParaBlob, imagemComoDataUrl } from './image-store.js';
 import { vcImageFileToStorageDataUrl } from './image-storage.js';
 import { storeSlideLogo, projectLogoFromStored } from './slide-logo.js';
+import { resolveSlideReference } from './slide-reference.js';
 
 export async function storeProjectReference(file) {
   const dataUrl = await vcImageFileToStorageDataUrl(file);
@@ -48,8 +49,10 @@ export async function exportProjectReferences(kit) {
 }
 
 /** Todas as refs do projeto; uma referência específica do card substitui o moodboard. */
-export async function resolveImageReferences(kit, slideRef = null) {
-  if (typeof slideRef === 'string' && slideRef.trim()) return [slideRef.trim()];
+export async function resolveImageReferences(kit, slideRef = null, slideRefImageId = null) {
+  if (slideRefImageId || (typeof slideRef === 'string' && slideRef.trim())) {
+    return [await resolveSlideReference({ refImage: slideRef, refImageId: slideRefImageId })];
+  }
   return Promise.all(normalizeStyleKit(kit).refImages.slice(0, MAX_REF_IMAGES).map(async r => {
     if (r.dataUrl) return r.dataUrl;
     const entry = await imageGet(r.imageId);

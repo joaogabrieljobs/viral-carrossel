@@ -4,6 +4,7 @@ import {
   importBrandLogo,
   importSlideLogo,
 } from '../utils/slide-logo.js';
+import { exportSlideReference, importSlideReference } from '../utils/slide-reference.js';
 /**
  * Biblioteca de projetos (multi-doc): abrir, criar, duplicar, apagar, renomear,
  * exportar/importar JSON. Extraído do App (~125 linhas de handlers).
@@ -340,6 +341,7 @@ export function useLibrary({
         if (!Array.isArray(slides)) return entry;
         const novos = await Promise.all(slides.map(async (sl) => {
           sl = await exportSlideLogo(sl);
+          sl = await exportSlideReference(sl);
           if (!sl?.bgImageId) return sl;
           try {
             const dataUrl = await imagemComoDataUrl(sl.bgImageId);
@@ -537,6 +539,7 @@ export function useLibrary({
             ...entry.doc,
             slides: await Promise.all(slides.map(async (sl) => {
               sl = await importSlideLogo(sl);
+              sl = await importSlideReference(sl);
               if (typeof sl?.bgImage !== 'string' || !sl.bgImage.startsWith('data:')) return sl;
               try {
                 return {

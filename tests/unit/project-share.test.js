@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   sanitizeDocForShare,
   packDocWithImagesForShare,
+  hydrateSharedDocImages,
   normalizeShareCode,
   buildTeamShareInviteUrl,
   stashPendingShareCode,
@@ -14,6 +15,12 @@ import {
 vi.mock('../../src/utils/image-store.js', () => ({
   imagemComoDataUrl: vi.fn(async (id) => (id === 'id1' ? 'data:image/png;base64,AAAA' : null)),
   guardarImagemDoSlide: vi.fn(async () => ({ bgImage: 'blob:x', bgImageId: 'new1' })),
+  imagePut: vi.fn(async () => undefined),
+  imageGet: vi.fn(async (id) => id === 'id1'
+    ? { blob: new Blob([Buffer.from('AAAA', 'base64')], { type: 'image/png' }) } : null),
+  newImageId: vi.fn(() => 'new-reference-id'),
+  dataUrlParaBlob: (src) => new Blob([Buffer.from(src.split(',')[1], 'base64')], { type: 'image/png' }),
+  blobParaDataUrl: async (blob) => `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`,
 }));
 
 vi.mock('../../src/utils/slide-logo.js', () => ({
@@ -82,6 +89,26 @@ describe('packDocWithImagesForShare', () => {
     expect(imagesOmitted).toBeGreaterThan(0);
     expect(doc.slides.every((s) => !s.bgImage)).toBe(true);
     expect(JSON.stringify(doc).length).toBeLessThan(2_800_000);
+  });
+
+  it('partilha embute os bytes da referência e importa um ID novo independente da conta original', async () => {
+    const { doc } = await packDocWithImagesForShare({ slides: [{
+      id: 's1', title: 'Direção com referência', refImageId: 'id1', refImageAssetId: 'remote-original',
+      imgExtraPrompt: 'Preserve a composição.',
+    }] });
+    expect(doc.slides[0].refImage).toBe('data:image/png;base64,AAAA');
+    expect(doc.slides[0].refImageId).toBeUndefined();
+    expect(doc.slides[0].refImageAssetId).toBeUndefined();
+    const imported = await hydrateSharedDocImages(doc);
+    expect(imported.slides[0]).toMatchObject({
+      refImage: null, refImageId: 'new-reference-id', imgExtraPrompt: 'Preserve a composição.',
+    });
+    expect(imported.slides[0].refImageAssetId).toBeFalsy();
+  });
+
+  it('partilha não confirma um documento portátil se a referência existir só como ID perdido', async () => {
+    await expect(packDocWithImagesForShare({ slides: [{ refImageId: 'missing-reference' }] }))
+      .rejects.toThrow(/referência/i);
   });
 });
 

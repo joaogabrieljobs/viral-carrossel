@@ -1,6 +1,7 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Sparkles, Loader2, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { resolveSlideReference } from '../../utils/slide-reference.js';
 
 function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide') {
   if (busy) {
@@ -35,18 +36,38 @@ function PerSlideImageRefBlock({
   collapsible = false,
 }) {
   const extra = slide.imgExtraPrompt ?? '';
-  const ref = slide.refImage;
+  const refSource = typeof slide.refImage === 'string' ? slide.refImage : '';
+  const refImageId = slide.refImageId || slide.refImageAssetId || null;
+  const hasReference = Boolean(refSource || refImageId || slide.refImageFailed);
+  const [preview, setPreview] = useState({ imageId: null, source: '', url: '', error: '' });
+  const currentPreview = preview.imageId === refImageId && preview.source === refSource;
+  const ref = refImageId ? (currentPreview ? preview.url : '') : refSource;
+  const refError = currentPreview ? preview.error : '';
+  useEffect(() => {
+    if (!refImageId) {
+      setPreview({ imageId: null, source: '', url: '', error: '' });
+      return undefined;
+    }
+    let cancelled = false;
+    setPreview({ imageId: refImageId, source: refSource, url: '', error: '' });
+    resolveSlideReference({ refImageId, refImage: refSource }).then((url) => {
+      if (!cancelled) setPreview({ imageId: refImageId, source: refSource, url, error: '' });
+    }).catch((error) => {
+      if (!cancelled) setPreview({ imageId: refImageId, source: refSource, url: '', error: error.message });
+    });
+    return () => { cancelled = true; };
+  }, [refImageId, refSource]);
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
-  const disabled = generationState ? !generationState.canGenerate : false;
+  const disabled = (generationState ? !generationState.canGenerate : false) || Boolean(refError);
   const disabledReason = disabled && !generateImageBusy
-    ? (generationState?.message || `Abra Direção e descreva a imagem deste ${itemLabel}.`)
+    ? (generationState?.message || refError || `Abra Direção e descreva a imagem deste ${itemLabel}.`)
     : '';
   const reasonId = useId();
   const promptId = useId();
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao
   // mesmo tempo repetia a mesma caixa 7 vezes e empurrava os cards para baixo.
   // Abre sozinho quando o slide já tem referência ou prompt extra.
-  const [aberto, setAberto] = useState(() => !collapsible || Boolean(ref) || Boolean(extra.trim()));
+  const [aberto, setAberto] = useState(() => !collapsible || hasReference || Boolean(extra.trim()));
 
   const gerarBtn = typeof onGenerateImage === 'function' && (
     <button
@@ -167,6 +188,8 @@ function PerSlideImageRefBlock({
         >
           {ref ? (
             <img src={ref} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
+          ) : refImageId && !refError ? (
+            <Loader2 size={20} aria-label="Carregando referência" style={{ animation: 'spin 0.8s linear infinite' }} />
           ) : (
             <ImageIcon size={20} strokeWidth={1.75} />
           )}
@@ -188,7 +211,7 @@ function PerSlideImageRefBlock({
       </div>
       {gerarBtn}
       {reasonText}
-      {ref && (
+      {hasReference && (
         <button
           type="button"
           onClick={onRemoveRef}

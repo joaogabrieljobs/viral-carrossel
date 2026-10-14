@@ -166,13 +166,13 @@ async function expectStoredProjects(page) {
   }), { timeout: 15_000 }).toEqual([...PROJECT_NAMES].sort());
 }
 
-async function expectHomeProjects(page) {
+async function expectHomeProjects(page, { stored = true } = {}) {
   await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(5);
   for (const name of PROJECT_NAMES) {
     await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toBeVisible();
   }
-  await expectStoredProjects(page);
+  if (stored) await expectStoredProjects(page);
 }
 
 async function goHome(page) {
@@ -314,7 +314,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(storedTitle).toBe(editedTitle);
   });
 
-  test('quota ao aplicar pull preserva lista local e não anuncia sucesso com 5 projetos', async ({ page }) => {
+  test('quota ao aplicar pull atualiza a UI com 5 projetos e avisa que a cópia local não foi gravada', async ({ page }) => {
     const cloud = await mockCloud(page, { offlineAtBoot: true });
     await seedOneProject(page);
     await page.goto('/?app=1');
@@ -330,13 +330,107 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     });
     cloud.online = true;
     await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
-    await expect(page.getByText(/Sincronização incompleta:/)).toBeVisible();
-    await expect(page.getByText(/(?:Lista sincronizada|Projeto salvo na sua conta).*5 projeto/)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(1);
+    await expect(page.getByText(/Lista atualizada: 5 projeto\(s\).*navegador continua sem espaço para a cópia local/)).toBeVisible();
+    await expect(page.getByText(/Sincronização incompleta:/)).toHaveCount(0);
+    await expectHomeProjects(page, { stored: false });
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).map((entry) => entry.name)))
       .toEqual(['Clínica Janine']);
     expect(cloud.manifest.docs).toHaveLength(5);
+    expect(cloud.pullCount).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+  });
+
+  test('Salvar envia o título recém-editado mesmo com library sempre sem espaço e mostra a união na UI', async ({ page }) => {
+    const cloud = await mockCloud(page, { offlineAtBoot: true });
+    await seedOneProject(page);
+    await page.goto('/?app=1');
+    await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
+    await page.getByRole('button', { name: /editar card/i }).first().click();
+    const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
+    await expect(title).toHaveValue('Comunicação da Clínica Janine');
+    const keepLibraryFull = () => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItem(key, value) {
+        if (this === localStorage && key === 'vc_library') {
+          throw new DOMException('E2E: library sempre sem espaço', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    };
+    await page.evaluate(keepLibraryFull);
+    await page.addInitScript(keepLibraryFull);
+    const editedTitle = 'Clínica Janine: sua pele, seu cuidado de verdade';
+    await title.fill(editedTitle);
+    cloud.online = true;
+    await page.getByRole('button', { name: /salvar projeto agora/i }).click();
+    await expect(page.getByText(/Lista atualizada: 5 projeto\(s\).*navegador continua sem espaço para a cópia local/)).toBeVisible();
+    expect(cloud.manifest.docs.find((entry) => entry.id === 'cloud-clinic-1').doc.slides[0].title).toBe(editedTitle);
+    expect(cloud.manifest.docs).toHaveLength(5);
+    expect(cloud.pullCount).toBeGreaterThan(0);
+    const cached = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')));
+    expect(cached).toHaveLength(1);
+    expect(cached[0].doc.slides[0].title).toBe('Comunicação da Clínica Janine');
+    await expect(title).toHaveValue(editedTitle);
+    await goHome(page);
+    await expectHomeProjects(page, { stored: false });
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(5);
+    expect(cloud.manifest.docs.find((entry) => entry.id === 'cloud-clinic-1').doc.slides[0].title).toBe(editedTitle);
+    await page.reload();
+    await expectHomeProjects(page, { stored: false });
+    await expect(page.getByText(/Biblioteca sincronizada: 5 projeto\(s\).*navegador continua sem espaço/)).toBeVisible();
+    await page.getByRole('button', { name: 'Abrir Clínica Janine', exact: true }).click();
+    await expect(page.getByText(editedTitle, { exact: true }).first()).toBeVisible();
+    // Dê ao autosave e ao auto-push reais um ciclo completo: nenhum deles pode
+    // promover o texto velho do cache à versão mais recente da nuvem.
+    const pushesAfterRestore = cloud.pushCount;
+    await expect.poll(() => cloud.pushCount, { timeout: 10_000 }).toBeGreaterThan(pushesAfterRestore);
+    expect(cloud.manifest.docs.find((entry) => entry.id === 'cloud-clinic-1').doc.slides[0].title).toBe(editedTitle);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].title))
+      .toBe('Comunicação da Clínica Janine');
+  });
+
+  test('logout com nuvem offline e quota mantém a conta e a edição sem chamar o endpoint de saída', async ({ page }) => {
+    const cloud = await mockCloud(page, { offlineAtBoot: true });
+    await seedOneProject(page);
+    await page.goto('/?app=1');
+    await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
+    await page.getByRole('button', { name: /editar card/i }).first().click();
+    const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
+    await expect(title).toHaveValue('Comunicação da Clínica Janine');
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItem(key, value) {
+        if (this === localStorage && ['vc_library', 'vc_account_vault'].includes(key)) {
+          throw new DOMException('E2E: cache e cofre sem espaço', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    const editedTitle = 'Uma edição que precisa continuar protegida';
+    await title.fill(editedTitle);
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Sair da conta', exact: true }).click();
+    await expect(page.getByText(/últimas alterações ainda não estão protegidas.*Você continua na conta/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sair da conta', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\?app=1/);
+    expect(cloud.logoutCount).toBe(0);
+    expect(cloud.session.active).toBe(true);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_data_owner')))).toBe(`email:${SESSAO_ATIVA.email}`);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).map((entry) => entry.id)))
+      .toEqual(['cloud-clinic-1']);
+    await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
+    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
+    if (!(await title.isVisible())) await page.getByRole('button', { name: /editar card/i }).first().click();
+    await expect(title).toHaveValue(editedTitle);
+    await title.fill(`${editedTitle} — e continua editável`);
+    await expect(title).toHaveValue(`${editedTitle} — e continua editável`);
+    expect(cloud.logoutCount).toBe(0);
   });
 
   test('formulário de login na landing restaura os 5 projetos e habilita ações da conta', async ({ page }) => {

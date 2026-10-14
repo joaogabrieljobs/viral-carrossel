@@ -9,6 +9,7 @@
 
 import { guardarImagemDoSlide, imagemComoDataUrl } from './image-store.js';
 import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
+import { exportSlideReference, importSlideReference } from './slide-reference.js';
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
 const SHARE_API = '/api/project-share';
@@ -153,6 +154,7 @@ export async function packDocWithImagesForShare(doc) {
 
   working.slides = await Promise.all((working.slides || []).map(async (slide) => {
     let next = await exportSlideLogo(slide);
+    next = await exportSlideReference(next);
     let dataUrl = typeof next.bgImage === 'string' && next.bgImage.startsWith('data:')
       ? next.bgImage
       : null;
@@ -288,6 +290,7 @@ export async function hydrateSharedDocImages(doc) {
 
   next.slides = await Promise.all(next.slides.map(async (slide) => {
     let sl = await importSlideLogo(slide);
+    sl = await importSlideReference(sl);
     const src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
     if (!src) return { ...sl, bgImage: null };
 

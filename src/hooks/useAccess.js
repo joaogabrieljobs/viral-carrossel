@@ -14,14 +14,92 @@ import {
 } from '../lib/billing.js';
 import { shouldShowOnboardingLanding, dismissOnboardingLanding } from '../utils/landing-gate.js';
 import { trackEvent } from '../utils/telemetry.js';
-import { SK } from '../utils/storage.js';
+import { SK, areAccountDataWritesLocked, lockAccountDataWrites, unlockAccountDataWrites } from '../utils/storage.js';
 import { clearAccountLocalData } from '../utils/clear-account-data.js';
-import { ensureAccountDataOwner } from '../utils/account-data-owner.js';
+import {
+  ensureAccountDataOwner, readDataOwner, normalizeDataOwnerId, dataOwnerAliases,
+} from '../utils/account-data-owner.js';
+import { snapshotAccountVaultForOwners } from '../utils/account-vault.js';
 import { captureShareInviteFromLocation } from '../utils/project-share.js';
 
-export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied, onLibraryReady, toast } = {}) {
-  const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onLibraryReady });
-  libraryCallbacksRef.current = { onCloudLibraryApplied, onLibraryReady };
+/** Só descarta a edição ativa depois de uma cópia confirmada desta mesma edição. */
+export async function logoutWithProtectedLibrary({
+  access = {}, onBeforeLogout, isSameAccount = () => true, inFlightRef, toast,
+} = {}) {
+  if (!inFlightRef || inFlightRef.current) return false;
+  inFlightRef.current = true;
+  let lockedHere = false;
+  let cleared = false;
+  try {
+    if (areAccountDataWritesLocked()) {
+      throw new Error('Aguarde a sincronização terminar antes de sair da conta.');
+    }
+    // Não inferir que o localStorage está atualizado: o flush pode ter falhado
+    // por quota. Um callback legado sem recibo não autoriza limpar a edição.
+    let prepared;
+    try { prepared = await onBeforeLogout?.(); } catch {
+      throw new Error('Não foi possível proteger as últimas alterações. Você continua na conta; salve ou sincronize antes de sair.');
+    }
+    if (!Array.isArray(prepared?.snapshot?.library) || typeof prepared?.isCurrent !== 'function') {
+      throw new Error('Não foi possível confirmar as últimas alterações. Você continua na conta; salve ou sincronize antes de sair.');
+    }
+    const owner = readDataOwner() || normalizeDataOwnerId(access.email, access.customerId);
+    const aliases = [...dataOwnerAliases(access.email, access.customerId)];
+    if (owner && !aliases.includes(owner)) {
+      throw new Error('A conta mudou durante a operação. Suas alterações foram mantidas; tente novamente.');
+    }
+    const ownerAtStart = readDataOwner();
+    const stillCurrent = () => {
+      try { return isSameAccount() && readDataOwner() === ownerAtStart && prepared.isCurrent() === true; }
+      catch { return false; }
+    };
+    if (!stillCurrent()) {
+      throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
+    }
+    let vaultSaved = false;
+    if (prepared.localPersisted === true) {
+      try { vaultSaved = snapshotAccountVaultForOwners(aliases) === true; } catch { /* exige confirmação da nuvem abaixo */ }
+    }
+    lockAccountDataWrites();
+    lockedHere = true;
+    // O timeout cancela pedidos antes da limpeza; o recibo inclui as imagens.
+    let cloudResult = null;
+    try {
+      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
+      cloudResult = await pushLibraryToCloudBestEffort(5_000, { snapshot: prepared.snapshot });
+    } catch { /* o cofre só vale quando contém a edição atual confirmada */ }
+    if (!stillCurrent()) {
+      throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
+    }
+    const cloudSaved = cloudResult?.ok === true && cloudResult.cloudSaved === true && cloudResult.assetsFailed === 0;
+    if (!vaultSaved && !cloudSaved) {
+      throw new Error('As últimas alterações ainda não estão protegidas. Você continua na conta; salve ou sincronize antes de sair.');
+    }
+    await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
+    cleared = true;
+    let logoutTimer;
+    try {
+      await Promise.race([
+        logoutAccess(),
+        new Promise((resolve) => { logoutTimer = setTimeout(resolve, 1_500); }),
+      ]);
+    } catch { /* a edição já tem cópia confirmada; a navegação conclui a saída */ }
+    finally { clearTimeout(logoutTimer); }
+    try { trackEvent('logout'); } catch { /* */ }
+    window.location.assign('/');
+    return true;
+  } catch (error) {
+    toast?.(error?.message || 'As últimas alterações ainda não estão protegidas. Você continua na conta; tente sincronizar novamente.', 'warning', 6500);
+    return false;
+  } finally {
+    if (lockedHere && !cleared) unlockAccountDataWrites();
+    inFlightRef.current = false;
+  }
+}
+
+export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied, onLibraryReady, onLibraryBlocked, toast } = {}) {
+  const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onLibraryReady, onLibraryBlocked });
+  libraryCallbacksRef.current = { onCloudLibraryApplied, onLibraryReady, onLibraryBlocked };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -30,6 +108,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const [accountTab, setAccountTab] = useState('projects'); // projects | profile
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const latestAccessRef = useRef(access);
+  const logoutInFlightRef = useRef(false);
   latestAccessRef.current = access;
   const accessActive = !!access.active;
 
@@ -144,11 +223,15 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         || billing === 'success';
       const ownerGate = await ensureAccountDataOwner(session, { explicitLogin });
       if (cancelled || ownerGate === 'reloading') return;
+      if (ownerGate === 'blocked') {
+        libraryCallbacksRef.current.onLibraryBlocked?.('Não foi possível proteger os projetos da conta anterior neste navegador. Mantenha esta aba aberta e tente novamente.');
+        return;
+      }
 
       // Multiutilizador: biblioteca na nuvem por conta (após isolamento local).
       if (session?.active) {
         try {
-          const { reconcileLibraryCloud } = await import('../utils/library-sync.js');
+          const { reconcileLibraryCloud, CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE } = await import('../utils/library-sync.js');
           const cloudGate = await reconcileLibraryCloud({
             toast,
             email: session?.email,
@@ -156,6 +239,10 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             onApplied: libraryCallbacksRef.current.onCloudLibraryApplied,
           });
           if (cancelled || cloudGate === 'reloading') return;
+          if (cloudGate === 'blocked') {
+            libraryCallbacksRef.current.onLibraryBlocked?.(CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE);
+            return;
+          }
         } catch { /* rede / Blob — cofre local continua */ }
         if (!cancelled) libraryCallbacksRef.current.onLibraryReady?.();
       }
@@ -254,39 +341,13 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     }
   }, [toast]);
   const handleLogout = useCallback(async () => {
-    // Ordem crítica: flush React→LS → cofre (rápido) → nuvem curto → limpar → sair.
-    try { onBeforeLogout?.(); } catch { /* */ }
-    try {
-      const {
-        readDataOwner, normalizeDataOwnerId, dataOwnerAliases,
-      } = await import('../utils/account-data-owner.js');
-      const { snapshotAccountVaultForOwners } = await import('../utils/account-vault.js');
-      const { lockAccountDataWrites } = await import('../utils/storage.js');
-      const owner = readDataOwner()
-        || normalizeDataOwnerId(access.email, access.customerId);
-      const aliases = [...dataOwnerAliases(access.email, access.customerId)];
-      if (owner && !aliases.includes(owner)) aliases.unshift(owner);
-      snapshotAccountVaultForOwners(aliases);
-      lockAccountDataWrites();
-    } catch { /* */ }
-    // O timeout do cliente cancela os pedidos pendentes antes de limpar a conta.
-    // Um Promise.race externo deixava o pull terminar depois do logout.
-    try {
-      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
-      await pushLibraryToCloudBestEffort(5_000);
-    } catch { /* best-effort */ }
-    try {
-      await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
-    } catch { /* best-effort */ }
-    try {
-      await Promise.race([
-        logoutAccess(),
-        new Promise((r) => setTimeout(r, 1_500)),
-      ]);
-    } catch { /* rede / offline */ }
-    try { trackEvent('logout'); } catch { /* */ }
-    window.location.assign('/');
-  }, [access.email, access.customerId, onBeforeLogout]);
+    const owner = latestAccessRef.current;
+    return logoutWithProtectedLibrary({
+      access: owner, onBeforeLogout, toast, inFlightRef: logoutInFlightRef,
+      isSameAccount: () => latestAccessRef.current.email === owner.email
+        && latestAccessRef.current.customerId === owner.customerId,
+    });
+  }, [onBeforeLogout, toast]);
 
   return {
     landingOpen, setLandingOpen,

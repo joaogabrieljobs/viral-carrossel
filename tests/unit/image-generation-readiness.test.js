@@ -31,6 +31,13 @@ describe('instrução e habilitação da imagem por slide', () => {
     expect(slideImageGenerationState({ title: 'Café' }, available, { refImages: [{ imageId: 'ref' }] }).canGenerate).toBe(true);
   });
 
+  it('reconhece referência no IndexedDB e bloqueia a referência explicitamente indisponível', () => {
+    expect(slideImageGenerationState({ title: 'Café', refImageId: 'stored' }, available).canGenerate).toBe(true);
+    expect(slideImageGenerationState({ title: 'Café', refImageAssetId: 'cloud' }, available).canGenerate).toBe(true);
+    expect(slideImageGenerationState({ imageQuery: 'Coffee', refImageAssetId: 'cloud', refImageFailed: true }, available)).toMatchObject({ canGenerate: false, reason: 'reference_unavailable' });
+    expect(slideImageGenerationState({ imageQuery: 'Coffee', refImageFailed: true, refImage: 'data:image/png;base64,YQ==' }, available).canGenerate).toBe(true);
+  });
+
   it('referência sozinha não habilita uma geração sem instrução', () => {
     const slide = { refImage: 'blob:ref', imgExtraPrompt: ' ', imageQuery: ' ' };
     const state = slideImageGenerationState(slide, available);

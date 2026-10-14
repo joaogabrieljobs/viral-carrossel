@@ -42,6 +42,7 @@ describe('account-data-owner', () => {
 
   afterEach(() => {
     unlockAccountDataWrites();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -136,6 +137,41 @@ describe('account-data-owner', () => {
     expect(areAccountDataWritesLocked()).toBe(true);
     expect(lsSet(SK.library, [])).toBe(false);
     expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('p1');
+  });
+
+  it('bloqueia troca de conta se o cofre não consegue preservar os projetos atuais', async () => {
+    writeDataOwner('email:a@x.com');
+    const libraryA = JSON.stringify([{ id: 'secret-a', name: 'Edição atual de A' }]);
+    const brandsA = JSON.stringify([{ id: 'brand-a' }]);
+    const vaultBefore = JSON.stringify({
+      'email:b@y.com': { savedAt: 1, keys: {
+        [SK.library]: JSON.stringify([{ id: 'proj-b' }]),
+        [SK.brands]: JSON.stringify([{ id: 'brand-b' }]),
+      } },
+    });
+    local.setItem(SK.library, libraryA);
+    local.setItem(SK.brands, brandsA);
+    local.setItem(ACCOUNT_VAULT_KEY, vaultBefore);
+    const setItem = local.setItem.bind(local);
+    const write = vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if (key === ACCOUNT_VAULT_KEY) throw new DOMException('full', 'QuotaExceededError');
+      setItem(key, value);
+    });
+    const remove = vi.spyOn(local, 'removeItem');
+    const removeSession = vi.spyOn(globalThis.sessionStorage, 'removeItem');
+
+    expect(await ensureAccountDataOwner({ active: true, email: 'b@y.com' })).toBe('blocked');
+    expect(readDataOwner()).toBe('email:a@x.com');
+    expect(local.getItem(SK.library)).toBe(libraryA);
+    expect(local.getItem(SK.brands)).toBe(brandsA);
+    expect(local.getItem(ACCOUNT_VAULT_KEY)).toBe(vaultBefore);
+    expect(remove).not.toHaveBeenCalled();
+    expect(removeSession).not.toHaveBeenCalled();
+    expect(write.mock.calls.map(([key]) => key)).toEqual([ACCOUNT_VAULT_KEY]);
+    expect(globalThis.location.replace).not.toHaveBeenCalled();
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [{ id: 'proj-b' }])).toBe(false);
+    expect(local.getItem(SK.library)).toBe(libraryA);
   });
 
   it('boot com cookie restaura cofre sem dono activo e bloqueia persistência antiga', async () => {
