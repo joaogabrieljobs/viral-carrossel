@@ -69,7 +69,7 @@ describe('isolamento das logos de marca, projeto e card', () => {
   it('salva o rascunho do pedido por projeto e limpa o objetivo ao trocar', () => {
     const app = source('ViralCarrossel.jsx');
     const quick = source('src/components/panels/CriarRapidoHome.jsx');
-    expect(app).toContain('current.quickPromptDraft === quickPrompt');
+    expect(app.includes("(current.quickPromptDraft || '') === quickPrompt")).toBe(true);
     expect(app).toContain("{ ...current, quickPromptDraft: quickPrompt }");
     expect(quick).toMatch(/useEffect\(\(\) => \{\s*setUploadingLogo\(false\);\s*setObjectiveId\(null\);\s*\}, \[projectId\]\);/);
   });

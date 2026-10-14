@@ -1807,6 +1807,7 @@ export default function App() {
         const blob = dataUrlParaBlob(portableLogo);
         if (!blob) return;
         const stored = await storeSlideLogo(blob);
+        if (!stored.logoImageId) return; // PNG já persistível no documento; não repetir a mesma migração.
         imagemUrlsRef.current.set(stored.logoImageId, stored.logoImage);
         setBrandRoster((current) => current.map((item) => (
           item?.id === profile.id && item.logo === portableLogo && !item.logoImageId
@@ -1853,6 +1854,7 @@ export default function App() {
       const blob = dataUrlParaBlob(portableLogo);
       if (!blob) return;
       const stored = await storeSlideLogo(blob);
+      if (!stored.logoImageId) return;
       if (cancelled || activeProjectRef.current !== projectId) {
         URL.revokeObjectURL(stored.logoImage);
         return;
@@ -2017,6 +2019,8 @@ export default function App() {
     let cancelled = false;
     migrateProjectReferences(source).then(migrated => {
       if (cancelled || activeProjectRef.current !== projectId) return;
+      // O fallback mantém o PNG portátil; isso não é uma nova edição do kit.
+      if (JSON.stringify(migrated) === JSON.stringify(source)) return;
       history.setSilent(current => current.styleKit === source ? { ...current, styleKit: migrated } : current);
     }).catch(() => toast('As referências antigas ainda não puderam ser migradas. Exporte um backup antes de limpar o navegador.', 'warning'));
     return () => { cancelled = true; };

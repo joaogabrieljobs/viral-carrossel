@@ -31,39 +31,60 @@ const IDB_WIPE_TIMEOUT_MS = 2_500;
 
 let _dbPromise = null;
 
-function withTimeout(promise, ms, label = 'IndexedDB') {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
 function openDB() {
   if (_dbPromise) return _dbPromise;
-  _dbPromise = withTimeout(new Promise((resolve, reject) => {
+  let resolveOpen;
+  let rejectOpen;
+  const pending = new Promise((resolve, reject) => { resolveOpen = resolve; rejectOpen = reject; });
+  _dbPromise = pending;
+  let settled = false;
+  const resetCurrent = () => { if (_dbPromise === pending) _dbPromise = null; };
+  const fail = (error) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    resetCurrent();
+    rejectOpen(error);
+  };
+  const timer = setTimeout(() => fail(new Error('O armazenamento de imagens não respondeu. Tente novamente.')), IDB_OPEN_TIMEOUT_MS);
+  try {
     if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB não disponível neste ambiente.'));
-      return;
+      throw new Error('IndexedDB não disponível neste ambiente.');
     }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onerror = () => reject(req.error || new Error('Falha ao abrir a base de imagens.'));
-    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => fail(req.error || new Error('Falha ao abrir a base de imagens.'));
+    req.onsuccess = () => {
+      const db = req.result;
+      // Uma abertura não pode ser cancelada pelo browser. Se ela chegou após
+      // timeout, bloqueio ou logout, fechar a conexão para não prender a fila.
+      if (settled || _dbPromise !== pending) {
+        try { db.close(); } catch { /* já fechada */ }
+        fail(new Error('A abertura do armazenamento foi interrompida. Tente novamente.'));
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      db.onversionchange = () => {
+        resetCurrent();
+        db.close();
+      };
+      db.onclose = resetCurrent;
+      resolveOpen(db);
+    };
     req.onupgradeneeded = (e) => {
+      if (settled || _dbPromise !== pending) {
+        try { e.target.transaction?.abort(); } catch { /* encerrada */ }
+        return;
+      }
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     };
     // Alguns browsers nunca disparam success/error se a origem está em limbo.
-    req.onblocked = () => reject(new Error('IndexedDB bloqueado (outra aba).'));
-  }), IDB_OPEN_TIMEOUT_MS, 'openDB').catch((err) => {
-    // Falha temporária (ex.: deleteDatabase a meio) não pode deixar o módulo
-    // preso num Promise rejeitado para sempre nesta aba.
-    _dbPromise = null;
-    throw err;
-  });
-  return _dbPromise;
+    req.onblocked = () => fail(new Error('O armazenamento está ocupado em outra aba. Tente novamente.'));
+  } catch (error) { fail(error); }
+  return pending;
 }
 
 function tx(db, mode) {

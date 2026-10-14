@@ -1,4 +1,4 @@
-import { imagePut, newImageId, imagemComoDataUrl, dataUrlParaBlob } from './image-store.js';
+import { imagePut, newImageId, imagemComoDataUrl, dataUrlParaBlob, blobParaDataUrl } from './image-store.js';
 
 /** Tamanho em px na escala 1080 (caixa da logo no card). */
 export const LOGO_SIZE_MIN = 48;
@@ -8,6 +8,8 @@ export const LOGO_SIZE_MAX = 900;
 export const LOGO_SIZE_DEFAULT = 260;
 /** Tamanho forçado em todo import novo (não herda valor antigo minúsculo). */
 export const LOGO_SIZE_IMPORT = 300;
+/** Limita o custo do PNG portátil quando o IndexedDB está indisponível. */
+export const LOGO_INLINE_MAX_BYTES = 256 * 1024;
 
 /**
  * Resolve a URL da logo a inserir em todos os cards. A logo específica do
@@ -18,6 +20,21 @@ export async function resolveLogoDataUrl(brand = {}, styleKit = {}) {
   if (styleKit?.logo?.imageId) return imagemComoDataUrl(styleKit.logo.imageId);
   if (brand?.logo && typeof brand.logo === 'string') return brand.logo;
   if (brand?.logoImageId) return imagemComoDataUrl(brand.logoImageId);
+  return null;
+}
+
+/** ID e imagem são inseparáveis: nunca completar um PNG de card/projeto com
+ * o ID de outra logo herdada da marca. */
+export function resolveLogoAssetSource(brand = {}, styleKit = {}, slide = {}) {
+  if (slide?.logoImageId || slide?.logoImage) {
+    return { source: 'slide', logoImageId: slide.logoImageId || null, logoImage: slide.logoImage || null };
+  }
+  if (styleKit?.logo?.imageId || styleKit?.logo?.dataUrl) {
+    return { source: 'project', logoImageId: styleKit.logo.imageId || null, logoImage: styleKit.logo.dataUrl || null };
+  }
+  if (brand?.logoImageId || brand?.logo) {
+    return { source: 'brand', logoImageId: brand.logoImageId || null, logoImage: brand.logo || null };
+  }
   return null;
 }
 
@@ -102,8 +119,7 @@ export function applyLogoAssetToSlides(slides = [], {
     }
     return {
       ...slide,
-      ...(logoImageId ? { logoImageId } : {}),
-      ...(logoImage ? { logoImage } : {}),
+      ...((logoImageId || logoImage) ? { logoImageId, logoImage } : {}),
       logoHidden: false,
     };
   });
@@ -174,13 +190,29 @@ export async function storeSlideLogo(file) {
     }
   } catch { /* ignore */ }
   const logoImageId = newImageId();
-  await imagePut(logoImageId, file);
+  try {
+    await imagePut(logoImageId, file);
+  } catch {
+    if (file.size > LOGO_INLINE_MAX_BYTES) {
+      throw new Error('O armazenamento de imagens está temporariamente indisponível. Tente novamente ou use um PNG de até 256 KB.');
+    }
+    // Bytes originais: mantém transparência e sobrevive a reload/backup. Não
+    // publicar ID antes de gravá-lo, nem object URL que só existe nesta aba.
+    return { logoImageId: null, logoImage: await blobParaDataUrl(file), logoHidden: false, logoLowRes };
+  }
   return {
     logoImageId,
     logoImage: URL.createObjectURL(file),
     logoHidden: false,
     logoLowRes,
   };
+}
+
+/** O kit guarda um ID confirmado ou o PNG portátil do modo de contingência. */
+export function projectLogoFromStored(stored, name = 'Logo do projeto') {
+  return stored.logoImageId
+    ? { imageId: stored.logoImageId, name }
+    : { dataUrl: stored.logoImage, name };
 }
 
 /** Controles efetivos (card override → marca → default). */

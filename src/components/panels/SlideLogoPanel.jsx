@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Upload } from 'lucide-react';
 import {
   storeSlideLogo,
+  resolveLogoAssetSource,
   resolveLogoControls,
   clearSlideLogoLayout,
   resolveLogoDataUrl,
@@ -55,9 +56,10 @@ export function SlideLogoPanel({
 
   const ctrl = resolveLogoControls(brand, slide);
   const hidden = !!slide.logoHidden;
-  const hasCustom = !!(slide.logoImageId && !hidden);
+  const hasCustom = !!((slide.logoImageId || slide.logoImage) && !hidden);
   const cardN = cardIndex + 1;
-  const hasLogoSource = !!(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId || slide?.logoImageId || slide?.logoImage);
+  const hasProjectLogo = !!(styleKit?.logo?.imageId || styleKit?.logo?.dataUrl);
+  const hasLogoSource = !!(brand?.logo || brand?.logoImageId || hasProjectLogo || slide?.logoImageId || slide?.logoImage);
   const logoOnGenerate = styleKit?.logoOnGenerate !== false;
 
   const setBrandLogo = (partial) => {
@@ -84,26 +86,24 @@ export function SlideLogoPanel({
     }
     setBusy(true);
     try {
-      const dataUrl = slide?.logoImage || await resolveLogoDataUrl(brand, styleKit);
-      if (!alive.current) return;
-      if (!dataUrl && !slide?.logoImageId) {
+      const asset = resolveLogoAssetSource(brand, styleKit, slide);
+      if (!asset) {
         toast?.('Carrega uma logo da marca ou do projeto primeiro.', 'error');
         return;
       }
-      const projectLogoId = styleKit?.logo?.imageId || null;
       // O card selecionado é a fonte de verdade: se ele usa um PNG próprio,
       // “Aplicar em todos” replica esse arquivo e o seu ajuste visual.
-      let logoImageId = slide?.logoImageId || projectLogoId || brand?.logoImageId || null;
-      let logoImage = slide?.logoImage || dataUrl;
-      // Backups legados podem trazer apenas data URL. Para uma camada por card,
-      // os bytes precisam primeiro de um ID durável no IndexedDB.
-      if ((ids || projectLogoId || slide?.logoImage) && !logoImageId) {
-        const stored = await storeSlideLogo(await origemParaBlob(dataUrl));
+      let { logoImageId, logoImage } = asset;
+      // PNG embutido já é portátil. Object URLs antigas ainda precisam de uma
+      // gravação confirmada (ou do fallback portátil) antes de serem replicadas.
+      if ((ids || asset.source !== 'brand') && !logoImageId && !String(logoImage).startsWith('data:image/png;base64,')) {
+        const stored = await storeSlideLogo(await origemParaBlob(logoImage));
         logoImageId = stored.logoImageId;
         logoImage = stored.logoImage;
       }
+      if (!alive.current) return;
       setSlides((list) => {
-        const withAsset = (ids || projectLogoId || slide?.logoImageId || slide?.logoImage)
+        const withAsset = (ids || asset.source !== 'brand')
           ? applyLogoAssetToSlides(list, {
               ids,
               logoImageId,
@@ -218,10 +218,10 @@ export function SlideLogoPanel({
   };
 
   const applyProjectOrBrandToCard = async () => {
-    if (styleKit?.logo?.imageId) {
+    if (hasProjectLogo) {
       updateSlide({
-        logoImageId: styleKit.logo.imageId,
-        logoImage: null,
+        logoImageId: styleKit.logo.imageId || null,
+        logoImage: styleKit.logo.dataUrl || null,
         logoHidden: false,
         logoPosition: slide.logoPosition || brand?.logoPosition || 'tr',
         logoSize: slide.logoSize ?? brand?.logoSize ?? LOGO_SIZE_DEFAULT,
@@ -442,7 +442,7 @@ export function SlideLogoPanel({
           Só no card {cardN}
         </div>
 
-        {(brand?.logo || brand?.logoImageId || styleKit?.logo?.imageId || hasCustom) ? (
+        {(brand?.logo || brand?.logoImageId || hasProjectLogo || hasCustom) ? (
           <button
             type="button"
             className="vc-btn"
@@ -508,7 +508,7 @@ export function SlideLogoPanel({
 
         {!hidden ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(styleKit?.logo?.imageId || brand?.logo || brand?.logoImageId) && !hasCustom ? (
+            {(hasProjectLogo || brand?.logo || brand?.logoImageId) && !hasCustom ? (
               <button
                 type="button"
                 className="vc-btn vc-btn-ghost"
@@ -517,7 +517,7 @@ export function SlideLogoPanel({
                 onClick={applyProjectOrBrandToCard}
                 style={{ width: '100%', minHeight: 40 }}
               >
-                {styleKit?.logo?.imageId ? 'Usar logo do projeto só neste card' : 'Duplicar logo da marca só neste card'}
+                {hasProjectLogo ? 'Usar logo do projeto só neste card' : 'Duplicar logo da marca só neste card'}
               </button>
             ) : null}
             <button

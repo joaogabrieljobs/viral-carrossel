@@ -1,7 +1,7 @@
 import { normalizeStyleKit, MAX_REF_IMAGES } from './style-kit.js';
 import { imageGet, imagePut, newImageId, blobParaDataUrl, dataUrlParaBlob, imagemComoDataUrl } from './image-store.js';
 import { vcImageFileToStorageDataUrl } from './image-storage.js';
-import { storeSlideLogo } from './slide-logo.js';
+import { storeSlideLogo, projectLogoFromStored } from './slide-logo.js';
 
 export async function storeProjectReference(file) {
   const dataUrl = await vcImageFileToStorageDataUrl(file);
@@ -16,8 +16,8 @@ export async function migrateProjectReferences(kit) {
   const k = normalizeStyleKit(kit);
   if (k.logo?.dataUrl) {
     const stored = await storeSlideLogo(dataUrlParaBlob(k.logo.dataUrl));
-    URL.revokeObjectURL(stored.logoImage);
-    k.logo = { imageId: stored.logoImageId, name: k.logo.name };
+    if (stored.logoImageId) URL.revokeObjectURL(stored.logoImage);
+    k.logo = projectLogoFromStored(stored, k.logo.name);
   }
   const refImages = await Promise.all(k.refImages.map(async r => {
     if (r.imageId || !r.dataUrl) return r;

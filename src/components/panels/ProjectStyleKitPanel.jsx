@@ -10,7 +10,7 @@ import {
 } from '../../utils/style-kit.js';
 import { imageGet } from '../../utils/image-store.js';
 import { storeProjectReference } from '../../utils/style-kit-storage.js';
-import { storeSlideLogo } from '../../utils/slide-logo.js';
+import { storeSlideLogo, projectLogoFromStored } from '../../utils/slide-logo.js';
 import { ContextStatusBar } from './ContextStatusBar.jsx';
 import { BrandTonePanel } from './BrandTonePanel.jsx';
 
@@ -137,9 +137,9 @@ function ProjectStyleKitPanel({
         setUploading(true);
         try {
           const stored = await storeSlideLogo(file);
-          URL.revokeObjectURL(stored.logoImage);
+          if (stored.logoImageId) URL.revokeObjectURL(stored.logoImage);
           if (!alive.current || version !== uploadVersion.current) return;
-          patch({ logo: { imageId: stored.logoImageId, name: file.name }, logoOnGenerate: true });
+          patch({ logo: projectLogoFromStored(stored, file.name), logoOnGenerate: true });
           toast('Logo salva. Novos cards deste projeto já saem com ela (pode desativar em Marca → Logo).', 'success');
         } catch (error) { if (alive.current) toast(error.message, 'error'); }
         finally { if (alive.current) setUploading(false); }

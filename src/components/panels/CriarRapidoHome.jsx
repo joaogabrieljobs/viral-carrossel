@@ -3,7 +3,7 @@ import { OBJECTIVE_TEMPLATES, applyObjectiveTemplate } from '../../utils/objecti
 import { trackEvent } from '../../utils/telemetry.js';
 import { BrandTonePanel } from './BrandTonePanel.jsx';
 import { buildIdentityChecklist, projectHasCarouselContent } from '../../utils/context-status.js';
-import { storeSlideLogo } from '../../utils/slide-logo.js';
+import { storeSlideLogo, projectLogoFromStored } from '../../utils/slide-logo.js';
 import { Check, Download, Image as ImageIcon, Loader2, Sparkles, Type, SlidersHorizontal, Upload, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -146,7 +146,7 @@ export function CriarRapidoHome({
       }
       setStyleKit?.((prev) => ({
         ...prev,
-        logo: { imageId: stored.logoImageId, name: file.name },
+        logo: projectLogoFromStored(stored, file.name),
         logoOnGenerate: true,
       }));
       setBrand?.((current) => ({

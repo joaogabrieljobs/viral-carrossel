@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/utils/image-store.js', async importOriginal => ({ ...(await importOriginal()), imagePut: vi.fn().mockResolvedValue(undefined), imagemComoDataUrl: vi.fn() }));
 import { imagePut, imagemComoDataUrl, semImagensDeRuntime, idsDeImagemEmUso } from '../../src/utils/image-store.js';
 import {
@@ -18,8 +18,27 @@ import {
   LOGO_SIZE_IMPORT,
   LOGO_SIZE_MAX,
   clearLogoOffsetOnSlide,
+  projectLogoFromStored,
+  LOGO_INLINE_MAX_BYTES,
+  resolveLogoAssetSource,
 } from '../../src/utils/slide-logo.js';
+import { exportProjectReferences, migrateProjectReferences } from '../../src/utils/style-kit-storage.js';
+import { normalizeStyleKit } from '../../src/utils/style-kit.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+
+beforeEach(() => {
+  imagePut.mockReset().mockResolvedValue(undefined);
+  imagemComoDataUrl.mockReset();
+  vi.stubGlobal('FileReader', class {
+    readAsDataURL(blob) {
+      blob.arrayBuffer().then((bytes) => {
+        this.result = `data:${blob.type};base64,${Buffer.from(bytes).toString('base64')}`;
+        this.onload?.();
+      });
+    }
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('logo por card', () => {
   it('guarda os bytes PNG originais e rejeita JPEG/arquivo falso', async () => {
@@ -30,6 +49,47 @@ describe('logo por card', () => {
     URL.revokeObjectURL(result.logoImage);
     await expect(storeSlideLogo(new Blob(['jpeg'], { type: 'image/jpeg' }))).rejects.toThrow(/PNG/i);
     await expect(storeSlideLogo(new Blob(['fake'], { type: 'image/png' }))).rejects.toThrow('válido');
+  });
+  it('PNG pequeno continua portátil quando IndexedDB não responde, inclusive após backup e reload', async () => {
+    imagePut.mockRejectedValue(new Error('openDB timeout (8000ms)'));
+    const stored = await storeSlideLogo(new Blob([Buffer.from(PNG, 'base64')], { type: 'image/png' }));
+    expect(stored).toMatchObject({ logoImageId: null, logoImage: `data:image/png;base64,${PNG}` });
+    const slides = applyLogoAssetToSlides([{ id: 'a', logoImageId: 'old', logoImage: 'blob:old' }], stored);
+    const kit = normalizeStyleKit({ logo: projectLogoFromStored(stored, 'Marca.png') });
+    const brand = { logo: stored.logoImage, logoImageId: stored.logoImageId };
+    const reloaded = JSON.parse(JSON.stringify(semImagensDeRuntime([{ doc: { slides, brand, styleKit: kit } }])))[0].doc;
+    expect(reloaded.slides[0].logoImageId).toBeNull();
+    expect(reloaded.slides[0].logoImage).toBe(stored.logoImage);
+    expect(reloaded.brand.logo).toBe(stored.logoImage);
+    expect(reloaded.styleKit.logo.dataUrl).toBe(stored.logoImage);
+    expect(brandWithSlideLogo({}, reloaded.slides[0]).logo).toBe(stored.logoImage);
+    expect((await exportSlideLogo(reloaded.slides[0])).logoImage).toBe(stored.logoImage);
+    expect((await importSlideLogo(reloaded.slides[0])).logoImage).toBe(stored.logoImage);
+    expect((await exportBrandLogo(reloaded.brand)).logo).toBe(stored.logoImage);
+    expect((await importBrandLogo(reloaded.brand)).logo).toBe(stored.logoImage);
+    const portableKit = await exportProjectReferences(reloaded.styleKit);
+    expect((await migrateProjectReferences(portableKit)).logo.dataUrl).toBe(stored.logoImage);
+    expect(imagemComoDataUrl).not.toHaveBeenCalled();
+  });
+  it('arquivo grande com IndexedDB indisponível recebe orientação e nunca um ID falso', async () => {
+    imagePut.mockRejectedValue(new Error('blocked'));
+    const file = new Blob([Buffer.from(PNG, 'base64'), new Uint8Array(LOGO_INLINE_MAX_BYTES)], { type: 'image/png' });
+    await expect(storeSlideLogo(file)).rejects.toThrow(/PNG de até 256 KB/);
+  });
+  it('ao replicar, mantém o ID e a imagem da mesma origem', () => {
+    const brand = { logoImageId: 'brand-id', logo: 'blob:brand' };
+    const kit = { logo: { imageId: 'project-id' } };
+    const portable = `data:image/png;base64,${PNG}`;
+    expect(resolveLogoAssetSource(brand, kit, { logoImage: portable })).toEqual({
+      source: 'slide', logoImageId: null, logoImage: portable,
+    });
+    expect(resolveLogoAssetSource(brand, { logo: { dataUrl: portable } })).toEqual({
+      source: 'project', logoImageId: null, logoImage: portable,
+    });
+    expect(resolveLogoAssetSource(brand, { logo: { dataUrl: portable } }, { logoImageId: 'slide-id' })).toEqual({
+      source: 'slide', logoImageId: 'slide-id', logoImage: null,
+    });
+    expect(resolveLogoAssetSource(brand)).toEqual({ source: 'brand', logoImageId: 'brand-id', logoImage: 'blob:brand' });
   });
   it('troca a logo somente quando há override no card; permite esconder e herdar marca', () => {
     const brand = { logo: 'global.png', logoSize: 40, logoPosition: 'br', logoOpacity: 70 };
