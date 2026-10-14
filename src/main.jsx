@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { shouldShowOnboardingLanding } from './utils/landing-gate.js';
-import { GLOBAL_STYLE } from './styles/global-style.js';
+import BootScreen from './components/BootScreen.jsx';
 
 /** Mostra o erro em vez de página em branco quando o render falha (ex.: dados corruptos). */
 class RootErrorBoundary extends React.Component {
@@ -54,67 +54,6 @@ class RootErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
-}
-
-function BootScreen() {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-label="A carregar"
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 20,
-        background: '#090a0f',
-        color: '#bbb9c7',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: 14,
-      }}
-    >
-      <style>{GLOBAL_STYLE}</style>
-      <img
-        src="/moont-mark.svg"
-        alt=""
-        width={56}
-        height={56}
-        decoding="async"
-        style={{
-          display: 'block',
-          width: 56,
-          height: 56,
-          borderRadius: 14,
-          objectFit: 'contain',
-          boxShadow: '0 0 28px rgba(91, 83, 232, 0.28)',
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          width: 120,
-          height: 3,
-          borderRadius: 99,
-          background: 'rgba(255,255,255,0.08)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            width: '40%',
-            height: '100%',
-            borderRadius: 99,
-            background: 'rgba(91, 83, 232, 0.92)',
-            animation: 'vc-boot-bar 1.1s ease-in-out infinite',
-          }}
-        />
-      </div>
-      <style>{`@keyframes vc-boot-bar { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
-      <span style={{ letterSpacing: '-0.011em' }}>A carregar…</span>
-    </div>
-  );
 }
 
 // Landing first paint sem o monólito do studio; quem já passou pela intro

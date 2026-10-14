@@ -54,6 +54,7 @@ import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import BrandLogo from './src/components/BrandLogo.jsx';
+import BootScreen from './src/components/BootScreen.jsx';
 import AccountProfile from './src/components/AccountProfile.jsx';
 import {
   fetchAccessSession,
@@ -5176,7 +5177,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         }}
       >
         <style>{GLOBAL_STYLE}</style>
-        <Suspense fallback={null}>
+        <Suspense fallback={<BootScreen />}>
           <OnboardingLanding
             onEnter={completeLanding}
             onEnterProfessional={() => {
@@ -5201,18 +5202,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
   if (access.status === 'loading' || (accessActive && !accountLibraryReady)) {
     return (
-      <div style={{
-        width: '100%', height: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg-primary, #0e0c14)', color: 'var(--text-muted, #8a8696)',
-        fontFamily: 'var(--font-ui)', fontSize: 14,
-      }}>
-        <style>{GLOBAL_STYLE}</style>
-        {accountRestoreError ? <div role="alert" style={{ maxWidth: 460, padding: 24, textAlign: 'center', lineHeight: 1.6 }}>
+      <BootScreen
+        label={accessActive ? 'Restaurando seus projetos…' : 'Abrindo sua conta…'}
+        busy={!accountRestoreError}
+      >
+        {accountRestoreError && <div role="alert" style={{ lineHeight: 1.6 }}>
           <p>{accountRestoreError}</p>
           <button className="vc-btn vc-btn-primary" onClick={() => window.location.reload()}>Tentar novamente</button>
-        </div> : accessActive ? 'Restaurando seus projetos…' : 'A verificar assinatura…'}
-      </div>
+        </div>}
+      </BootScreen>
     );
   }
 
@@ -5231,7 +5229,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         }}
       >
         <style>{GLOBAL_STYLE}</style>
-        <Suspense fallback={null}>
+        <Suspense fallback={<BootScreen label="Abrindo sua conta…" />}>
           <Paywall
             isMobile={isMobile}
             initialEmail={paywallEmail}

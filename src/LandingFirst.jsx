@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { GLOBAL_STYLE } from './styles/global-style.js';
 import { dismissOnboardingLanding } from './utils/landing-gate.js';
 import { fetchAccessSession } from './lib/billing.js';
-import BrandLogo from './components/BrandLogo.jsx';
+import BootScreen from './components/BootScreen.jsx';
 
 const OnboardingLanding = lazy(() => import('./components/OnboardingLandingProduct.jsx'));
 const LoginModal = lazy(() => import('./components/LoginModal.jsx'));
@@ -19,27 +19,6 @@ function useIsMobile() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
   return mobile;
-}
-
-function BootScreen({ label = 'A carregar…' }) {
-  return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 16,
-      background: '#0e0c14',
-      color: '#8a8696',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      fontSize: 14,
-    }}>
-      <style>{GLOBAL_STYLE}</style>
-      <BrandLogo height={28} />
-      <span>{label}</span>
-    </div>
-  );
 }
 
 /**
@@ -85,7 +64,7 @@ export default function LandingFirst() {
 
   if (phase === 'studio') {
     return (
-      <Suspense fallback={<BootScreen label="A abrir o studio…" />}>
+      <Suspense fallback={<BootScreen label="Abrindo seu studio…" />}>
         <StudioApp />
       </Suspense>
     );
