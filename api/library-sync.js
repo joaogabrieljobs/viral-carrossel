@@ -44,7 +44,7 @@ function mapStoreError(e) {
   if (code === 'library_too_large' || code === 'library_asset_too_large') {
     return { status: 413, body: { error: e.message, code } };
   }
-  if (code === 'library_storage_unconfigured') {
+  if (code === 'library_storage_unconfigured' || code === 'library_storage_unavailable') {
     return { status: 503, body: { error: e.message, code } };
   }
   if (code === 'library_bad_owner' || code === 'library_bad_manifest' || code === 'library_bad_asset') {

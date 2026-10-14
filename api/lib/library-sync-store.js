@@ -4,7 +4,7 @@
  * Sem TTL — projetos da conta persistem enquanto a assinatura existir.
  */
 
-import { put, get, head } from '@vercel/blob';
+import { put, get } from '@vercel/blob';
 
 const META_PREFIX = 'vc:library-sync:meta:';
 const BLOB_PREFIX = 'library-sync/';
@@ -176,36 +176,31 @@ function storageUnconfiguredError(errors = []) {
 export async function getLibrarySyncMeta(customerId) {
   const id = sanitizeCustomerId(customerId);
   if (!id) return null;
-  const key = `${META_PREFIX}${id}`;
+  const manifest = await getLibraryManifest(id);
+  return manifest ? metaForManifest(id, manifest) : null;
+}
 
-  if (hasUpstash()) {
-    try {
-      const raw = await upstash(['GET', key]);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.customerId) return parsed;
-      }
-    } catch { /* tenta blob/memória */ }
-  }
+function metaForManifest(id, manifest) {
+  return {
+    customerId: id,
+    revision: Number(manifest.revision || 1),
+    updatedAt: Number(manifest.updatedAt || 0),
+    projectCount: manifest.docs.length,
+    assetIds: Array.isArray(manifest.assetIds) ? manifest.assetIds : [],
+    blobPath: manifestPath(id),
+  };
+}
 
-  if (hasBlob()) {
-    try {
-      const buf = await readBlobPrivate(manifestPath(id));
-      if (buf) {
-        const manifest = JSON.parse(buf.toString('utf8'));
-        return {
-          customerId: id,
-          revision: Number(manifest.revision || 1),
-          updatedAt: Number(manifest.updatedAt || 0),
-          projectCount: Array.isArray(manifest.docs) ? manifest.docs.length : 0,
-          assetIds: Array.isArray(manifest.assetIds) ? manifest.assetIds : [],
-          blobPath: manifestPath(id),
-        };
-      }
-    } catch { /* ignore */ }
-  }
+function compareManifestVersion(a, b) {
+  return Number(a?.revision || 0) - Number(b?.revision || 0)
+    || Number(a?.updatedAt || 0) - Number(b?.updatedAt || 0);
+}
 
-  return memoryMeta.get(key) || null;
+function libraryReadError() {
+  return Object.assign(
+    new Error('Não foi possível confirmar a biblioteca mais recente na nuvem. Tente sincronizar novamente.'),
+    { code: 'library_storage_unavailable' },
+  );
 }
 
 /**
@@ -216,29 +211,47 @@ export async function getLibraryManifest(customerId) {
   const id = sanitizeCustomerId(customerId);
   if (!id) return null;
   const pathname = manifestPath(id);
+  const candidates = [];
+  let cachedMeta = null;
+  let readFailed = false;
+  const addCandidate = (value) => {
+    if (!value || !Array.isArray(value.docs)) throw libraryReadError();
+    candidates.push(value);
+  };
 
   if (hasBlob()) {
     try {
       const buf = await readBlobPrivate(pathname);
-      if (buf) return JSON.parse(buf.toString('utf8'));
-    } catch { /* ignore */ }
-    try {
-      const meta = await head(pathname).catch(() => null);
-      if (meta?.url) {
-        const res = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
-        if (res.ok) return await res.json();
-      }
-    } catch { /* ignore */ }
+      if (buf) addCandidate(JSON.parse(buf.toString('utf8')));
+    } catch { readFailed = true; }
   }
 
   if (hasUpstash()) {
     try {
-      const raw = await upstash(['GET', `${META_PREFIX}${id}:full`]);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
+      const [raw, rawMeta] = await Promise.all([
+        upstash(['GET', `${META_PREFIX}${id}:full`]),
+        upstash(['GET', `${META_PREFIX}${id}`]),
+      ]);
+      if (raw) addCandidate(JSON.parse(raw));
+      if (rawMeta) cachedMeta = JSON.parse(rawMeta);
+    } catch { readFailed = true; }
   }
 
-  return memoryManifest.get(id) || null;
+  if (allowMemory()) {
+    const local = memoryManifest.get(id);
+    if (local) addCandidate(local);
+    cachedMeta ||= memoryMeta.get(`${META_PREFIX}${id}`) || null;
+  }
+
+  // Redis pode conter um save mais novo após falha do put no Blob. Status,
+  // pull e merge precisam escolher a mesma versão, nunca fontes diferentes.
+  const latest = candidates.sort((a, b) => compareManifestVersion(b, a))[0] || null;
+  // Falha de leitura não significa biblioteca vazia. Gravar assim apagaria
+  // os projetos que só existem na fonte temporariamente indisponível.
+  if (readFailed || (cachedMeta && (!latest || compareManifestVersion(cachedMeta, latest) > 0))) {
+    throw libraryReadError();
+  }
+  return latest;
 }
 
 function entryUpdatedAt(entry) {
@@ -277,7 +290,8 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
     throw Object.assign(new Error('Manifesto inválido.'), { code: 'library_bad_manifest' });
   }
 
-  const existing = await getLibrarySyncMeta(id);
+  const cloudManifest = await getLibraryManifest(id);
+  const existing = cloudManifest ? metaForManifest(id, cloudManifest) : null;
   const baseRevision = Number(opts.baseRevision);
   if (
     existing
@@ -304,17 +318,14 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
   let brands = Array.isArray(manifest.brands) ? manifest.brands : [];
   let assetIds = Array.isArray(manifest.assetIds) ? manifest.assetIds : [];
 
-  if (!opts.replace && existing) {
-    const cloudManifest = await getLibraryManifest(id);
-    if (cloudManifest) {
-      docs = mergeById(cloudManifest.docs, docs);
-      folders = mergeById(cloudManifest.folders, folders);
-      brands = mergeById(cloudManifest.brands, brands);
-      assetIds = [
-        ...(Array.isArray(cloudManifest.assetIds) ? cloudManifest.assetIds : []),
-        ...assetIds,
-      ];
-    }
+  if (!opts.replace && cloudManifest) {
+    docs = mergeById(cloudManifest.docs, docs);
+    folders = mergeById(cloudManifest.folders, folders);
+    brands = mergeById(cloudManifest.brands, brands);
+    assetIds = [
+      ...(Array.isArray(cloudManifest.assetIds) ? cloudManifest.assetIds : []),
+      ...assetIds,
+    ];
   }
 
   const deletedIds = new Set(
