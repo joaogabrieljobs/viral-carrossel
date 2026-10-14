@@ -121,9 +121,12 @@ function writeCloudMeta(meta) {
   return false;
 }
 
-async function compactDataUrl(dataUrl) {
+async function compactDataUrl(dataUrl, { preserveAlpha = false } = {}) {
   const src = String(dataUrl || '');
   if (!src.startsWith('data:image/')) return null;
+  // Logos precisam manter os bytes/alpha do PNG. O fundo branco usado para
+  // compactar fotos apagava completamente marcas brancas na volta da nuvem.
+  if (preserveAlpha && src.length <= MAX_ASSET_CHARS) return src;
   if (src.length <= IMAGE_MAX_CHARS && src.startsWith('data:image/jpeg')) return src;
   if (typeof document === 'undefined' || typeof Image === 'undefined') {
     return src.length <= MAX_ASSET_CHARS ? src : null;
@@ -139,13 +142,20 @@ async function compactDataUrl(dataUrl) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return src.length <= IMAGE_MAX_CHARS ? src : null;
-    for (const edge of [IMAGE_MAX_EDGE, 720, 512]) {
+    for (const edge of (preserveAlpha ? [2048, 1440, 1080, 720, 512] : [IMAGE_MAX_EDGE, 720, 512])) {
       const scale = Math.min(1, edge / Math.max(img.naturalWidth, img.naturalHeight));
       canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
       canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (!preserveAlpha) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (preserveAlpha) {
+        const out = canvas.toDataURL('image/png');
+        if (out.startsWith('data:image/png') && out.length <= MAX_ASSET_CHARS) return out;
+        continue;
+      }
       for (const quality of [0.78, 0.6, 0.45]) {
         const out = canvas.toDataURL('image/jpeg', quality);
         if (out.startsWith('data:image/jpeg') && out.length <= IMAGE_MAX_CHARS) return out;
@@ -171,15 +181,25 @@ function stripRuntime(value, depth = 0) {
   return value;
 }
 
-async function collectAsset(dataUrl, preferredId, bag) {
+async function collectAsset(dataUrl, preferredId, bag, { preserveAlpha = false } = {}) {
   if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null;
-  const compact = await compactDataUrl(dataUrl);
+  const compact = await compactDataUrl(dataUrl, { preserveAlpha });
   if (!compact) {
     bag.packingFailed = (bag.packingFailed || 0) + 1;
     return null;
   }
-  const assetId = String(preferredId || newImageId()).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
-  if (!bag.has(assetId)) bag.set(assetId, compact);
+  const sourceId = String(preferredId || newImageId()).replace(/[^a-zA-Z0-9._-]/g, '_');
+  // A store legada procura .jpg antes de .png no mesmo ID. Use outra chave
+  // para que um JPEG já publicado nunca esconda a logo transparente corrigida.
+  const assetId = preserveAlpha && compact.startsWith('data:image/png;')
+    ? `${sourceId.slice(0, 71)}-logo-png`
+    : sourceId.slice(0, 80);
+  // Um arquivo também usado como foto deve manter a versão com transparência.
+  if (!bag.has(assetId) || preserveAlpha) bag.set(assetId, compact);
+  if (preserveAlpha) {
+    bag.logoAssetIds ||= new Set();
+    bag.logoAssetIds.add(assetId);
+  }
   return assetId;
 }
 
@@ -195,11 +215,11 @@ async function packSlideForCloud(slide, assets) {
 
   let logoAssetId = null;
   if (typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:')) {
-    logoAssetId = await collectAsset(sl.logoImage, sl.logoImageId, assets);
+    logoAssetId = await collectAsset(sl.logoImage, slide.logoImageId, assets, { preserveAlpha: true });
   } else if (sl.logoImageId) {
     try {
       const logoUrl = await imagemComoDataUrl(sl.logoImageId);
-      logoAssetId = await collectAsset(logoUrl, sl.logoImageId, assets);
+      logoAssetId = await collectAsset(logoUrl, sl.logoImageId, assets, { preserveAlpha: true });
     } catch { /* */ }
   }
 
@@ -231,11 +251,11 @@ async function packBrandForCloud(brand, assets) {
   try { packed = await exportBrandLogo(brand); } catch { /* */ }
   let logoAssetId = null;
   if (typeof packed?.logo === 'string' && packed.logo.startsWith('data:')) {
-    logoAssetId = await collectAsset(packed.logo, packed.logoImageId, assets);
+    logoAssetId = await collectAsset(packed.logo, brand?.logoImageId, assets, { preserveAlpha: true });
   } else if (packed?.logoImageId) {
     try {
       const url = await imagemComoDataUrl(packed.logoImageId);
-      logoAssetId = await collectAsset(url, packed.logoImageId, assets);
+      logoAssetId = await collectAsset(url, packed.logoImageId, assets, { preserveAlpha: true });
     } catch { /* */ }
   }
   return stripRuntime({
@@ -260,11 +280,11 @@ async function packStyleKitForCloud(styleKit, assets) {
   }
   let logoAssetId = null;
   if (kit?.logo?.dataUrl) {
-    logoAssetId = await collectAsset(kit.logo.dataUrl, kit.logo.imageId, assets);
+    logoAssetId = await collectAsset(kit.logo.dataUrl, kit.logo.imageId, assets, { preserveAlpha: true });
   } else if (kit?.logo?.imageId) {
     try {
       const url = await imagemComoDataUrl(kit.logo.imageId);
-      logoAssetId = await collectAsset(url, kit.logo.imageId, assets);
+      logoAssetId = await collectAsset(url, kit.logo.imageId, assets, { preserveAlpha: true });
     } catch { /* */ }
   }
   return stripRuntime({
@@ -421,7 +441,7 @@ async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
       if (attempt === 1) {
         // Retry mais agressivo (menor).
         // eslint-disable-next-line no-await-in-loop
-        payload = await compactDataUrl(dataUrl);
+        payload = await compactDataUrl(dataUrl, { preserveAlpha: assets.logoAssetIds?.has(assetId) });
         if (!payload) break;
       }
       try {
@@ -631,6 +651,25 @@ async function resolveCachedAsset(assetId, assetCache) {
   return pending;
 }
 
+/** Recupera o PNG original de uma logo que a compactação antiga achatou em JPEG.
+ * Só reutiliza o arquivo local quando a identidade remota coincide. */
+async function resolveCloudLogo(assetId, assetCache, local = {}) {
+  const remote = await resolveCachedAsset(assetId, assetCache);
+  if (remote?.startsWith('data:image/png;')) return remote;
+  const prepared = assetCache.localAssets?.get(assetId);
+  if (prepared?.startsWith('data:image/png;')) return prepared;
+  if (assetId && (local?.assetId === assetId || local?.imageId === assetId)) {
+    if (local.dataUrl?.startsWith('data:image/png;')) return local.dataUrl;
+    if (local.imageId) {
+      try {
+        const original = await imagemComoDataUrl(local.imageId);
+        if (original?.startsWith('data:image/png;')) return original;
+      } catch { /* preserva a cópia remota se o original não estiver acessível */ }
+    }
+  }
+  return remote;
+}
+
 async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
   try {
     let sl = { ...slide };
@@ -656,8 +695,12 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
     }
     const logoAsset = sl.logoImageAssetId;
     if (logoAsset) {
-      const dataUrl = await resolveCachedAsset(logoAsset, assetCache);
-      if (dataUrl) sl = { ...sl, logoImage: dataUrl };
+      const dataUrl = await resolveCloudLogo(logoAsset, assetCache, {
+        assetId: localSlide?.logoImageAssetId, imageId: localSlide?.logoImageId, dataUrl: localSlide?.logoImage,
+      });
+      // O ID de outro navegador não confirma uma gravação local. PNG só recebe
+      // um novo ID após import; JPEG legado continua portátil até ser trocado.
+      if (dataUrl) sl = { ...sl, logoImage: dataUrl, logoImageId: null };
     }
     try { sl = await importSlideLogo(sl); } catch { /* */ }
     const refAsset = sl.refImageAssetId;
@@ -706,12 +749,14 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
   }
 }
 
-async function hydrateBrandFromCloud(brand, assetCache) {
+async function hydrateBrandFromCloud(brand, assetCache, localBrand) {
   try {
     let next = { ...(brand || {}) };
     if (next.logoAssetId) {
-      const dataUrl = await resolveCachedAsset(next.logoAssetId, assetCache);
-      if (dataUrl) next = { ...next, logo: dataUrl };
+      const dataUrl = await resolveCloudLogo(next.logoAssetId, assetCache, {
+        assetId: localBrand?.logoAssetId, imageId: localBrand?.logoImageId, dataUrl: localBrand?.logo,
+      });
+      if (dataUrl) next = { ...next, logo: dataUrl, logoImageId: null };
     }
     try { next = await importBrandLogo(next); } catch { /* */ }
     return next;
@@ -720,7 +765,7 @@ async function hydrateBrandFromCloud(brand, assetCache) {
   }
 }
 
-async function hydrateStyleKitFromCloud(styleKit, assetCache) {
+async function hydrateStyleKitFromCloud(styleKit, assetCache, localStyleKit) {
   try {
     let kit = { ...(styleKit || {}) };
     const refs = [];
@@ -740,8 +785,8 @@ async function hydrateStyleKitFromCloud(styleKit, assetCache) {
     kit.refImages = [];
     const logoAssetId = kit.logo?.assetId;
     if (kit.logo?.assetId) {
-      const dataUrl = await resolveCachedAsset(kit.logo.assetId, assetCache);
-      if (dataUrl) kit.logo = { ...kit.logo, dataUrl };
+      const dataUrl = await resolveCloudLogo(kit.logo.assetId, assetCache, localStyleKit?.logo);
+      if (dataUrl) kit.logo = { ...kit.logo, dataUrl, imageId: null };
     }
     try { kit = await migrateProjectReferences(kit); } catch { /* */ }
     return {
@@ -782,8 +827,9 @@ export async function applyCloudManifest(manifest, {
       continue;
     }
     try {
-      const localSlides = (Array.isArray(localDocs) ? localDocs : [])
-        .find((localEntry) => localEntry?.id === entry.id)?.doc?.slides || [];
+      const localDoc = (Array.isArray(localDocs) ? localDocs : [])
+        .find((localEntry) => localEntry?.id === entry.id)?.doc;
+      const localSlides = localDoc?.slides || [];
       const slides = Array.isArray(entry.doc.slides)
         ? await Promise.all(entry.doc.slides.map((s) => hydrateSlideFromCloud(s, assetCache,
           localSlides.find((localSlide) => localSlide?.id === s?.id))))
@@ -793,8 +839,8 @@ export async function applyCloudManifest(manifest, {
         doc: {
           ...entry.doc,
           slides,
-          brand: await hydrateBrandFromCloud(entry.doc.brand, assetCache),
-          styleKit: await hydrateStyleKitFromCloud(entry.doc.styleKit, assetCache),
+          brand: await hydrateBrandFromCloud(entry.doc.brand, assetCache, localDoc?.brand),
+          styleKit: await hydrateStyleKitFromCloud(entry.doc.styleKit, assetCache, localDoc?.styleKit),
         },
       });
     } catch {
@@ -812,9 +858,11 @@ export async function applyCloudManifest(manifest, {
   }
 
   const brands = [];
+  const localBrands = localSnapshot?.brandRoster || lsGet(SK.brands, []) || [];
   for (const profile of (Array.isArray(manifest.brands) ? manifest.brands : [])) {
     try {
-      brands.push(await hydrateBrandFromCloud(profile, assetCache));
+      brands.push(await hydrateBrandFromCloud(profile, assetCache,
+        Array.isArray(localBrands) ? localBrands.find((item) => item?.id === profile.id) : undefined));
     } catch {
       brands.push(profile);
     }
