@@ -78,6 +78,16 @@ function readInitialShellView() {
 // Evita spam de toast quando cada debounce de gravação volta a bater no limite.
 let VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
 let VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
+const quotaFailedKeys = new Set();
+
+function confirmQuotaRecovery(key) {
+  if (!quotaFailedKeys.delete(key) || quotaFailedKeys.size) return;
+  VC_QUOTA_SLIM_ALREADY_NOTIFIED = false;
+  VC_QUOTA_HARD_ALREADY_NOTIFIED = false;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vc:quota-recovered'));
+  }
+}
 
 /**
  * Trava gravações da conta (biblioteca/marcas/dono) durante logout ou troca.
@@ -116,6 +126,7 @@ const lsSet = (key, value) => {
   }
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    confirmQuotaRecovery(key);
     return true;
   } catch (err) {
     const isQuota = err instanceof DOMException && (
@@ -134,16 +145,20 @@ const lsSet = (key, value) => {
           if (!VC_QUOTA_SLIM_ALREADY_NOTIFIED) {
             VC_QUOTA_SLIM_ALREADY_NOTIFIED = true;
             window.dispatchEvent(new CustomEvent('vc:quota-warning', {
-              detail: 'Limite de armazenamento quase atingido. Cópias de imagens já salvas foram removidas do cache. Exporte seus projetos como JSON para não perder dados.',
+              detail: 'O armazenamento deste navegador está quase cheio. A cópia local foi salva sem duplicar imagens já armazenadas. Clique em Salvar para sincronizar com sua conta.',
             }));
           }
+          confirmQuotaRecovery(key);
           return true;
         }
       } catch { /* fallback falhou também */ }
+      // Só uma falha final deixa a chave pendente. A compactação bem-sucedida
+      // acima já persistiu os dados e não constitui uma gravação perdida.
+      quotaFailedKeys.add(key);
       if (!VC_QUOTA_HARD_ALREADY_NOTIFIED) {
         VC_QUOTA_HARD_ALREADY_NOTIFIED = true;
         window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-          detail: 'Limite de armazenamento do browser atingido. Exporte seus projetos como JSON antes que dados sejam perdidos.',
+          detail: 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para tentar guardar as alterações na sua conta.',
         }));
       }
     }
