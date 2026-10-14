@@ -55,6 +55,7 @@ async function upstash(command) {
       throw new Error(`Upstash ${res.status}: ${text.slice(0, 200)}`);
     }
     const json = await res.json();
+    if (json?.error) throw new Error('Upstash devolveu erro ao consultar o contador.');
     return json?.result;
   } finally {
     clearTimeout(timer);
@@ -101,8 +102,9 @@ async function withQuotaStore(upstashFn, memoryFn, stripeFn, customerId) {
       }
     }
   }
-  if (isProductionQuotaStrict() && podeUsarStripe(customerId)) {
-    // Stripe era o caminho esperado e falhou — não degradar a memória em prod.
+  if (isProductionQuotaStrict()) {
+    // Sem contador persistente, nem uma configuração incompleta pode conceder
+    // créditos por instância ou apresentar saldo fictício em produção.
     const err = new Error('quota_store_unavailable');
     err.code = 'quota_store_unavailable';
     throw err;

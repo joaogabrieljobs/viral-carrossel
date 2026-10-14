@@ -57,8 +57,20 @@ export function getStripePriceIdForTier(tier) {
 }
 
 export function periodBoundsFromSubscription(sub) {
-  const startSec = sub?.current_period_start;
-  const endSec = sub?.current_period_end;
+  // Stripe Basil+ moveu o período para o item. É o mesmo item usado para
+  // resolver o plano; não misturar datas de produtos com ciclos diferentes.
+  const item = sub?.items?.data?.[0];
+  const validPeriod = (source) => {
+    const start = Number(source?.current_period_start);
+    const end = Number(source?.current_period_end);
+    return Number.isSafeInteger(start) && start > 0
+      && Number.isSafeInteger(end) && end > start
+      && end <= 8_640_000_000_000
+      ? { start, end } : null;
+  };
+  const period = validPeriod(item) || validPeriod(sub);
+  const startSec = period?.start ?? null;
+  const endSec = period?.end ?? null;
   return {
     periodStart: startSec ? new Date(startSec * 1000).toISOString() : null,
     periodEnd: endSec ? new Date(endSec * 1000).toISOString() : null,

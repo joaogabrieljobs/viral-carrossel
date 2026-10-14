@@ -15,7 +15,7 @@ import cleanupHandler from '../../api/cron/cleanup-image-references.js';
 import middleware from '../../middleware.js';
 import { makeReq, makeRes } from '../helpers/http.js';
 import { createAccessToken, COOKIE_NAME } from '../../api/lib/access.js';
-import { consumeImageCredit, resetMemoryQuotas } from '../../api/lib/image-quota.js';
+import { consumeImageCredit, getQuotaUsage, resetMemoryQuotas } from '../../api/lib/image-quota.js';
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 
 beforeEach(() => {
@@ -97,6 +97,32 @@ it('quota esgotada não inicia upload nem tarefa paga', async () => {
   const res = await generate([PNG]);
   expect(res.body.code).toBe('quota_exhausted');
   expect(put).not.toHaveBeenCalled(); expect(createGptImage2Task).not.toHaveBeenCalled();
+});
+
+it('geração usa o período do item Stripe e acumula no mesmo contador da sessão', async () => {
+  const periodStartSec = 1791846000;
+  const periodEndSec = 1794524400;
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{
+    id: 'sub_ref', status: 'active', metadata: { tier: 'creator' },
+    items: { data: [{ current_period_start: periodStartSec, current_period_end: periodEndSec }] },
+  }] });
+  expect((await generate([])).body.quota).toMatchObject({ used: 1, available: true });
+  expect((await generate([])).body.quota).toMatchObject({ used: 2, remaining: 48 });
+  expect(await getQuotaUsage({ customerId: 'cus_ref', periodStartSec, limit: 50 }))
+    .toMatchObject({ used: 2, remaining: 48 });
+});
+
+it('sem período confirmado não cobra, não faz upload e não inicia a geração', async () => {
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{
+    id: 'sub_ref', status: 'active', metadata: { tier: 'creator' }, items: { data: [{}] },
+  }] });
+  const res = await generate([PNG]);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toMatchObject({ code: 'quota_period_unavailable', quota: {
+    used: null, remaining: null, limit: 50, available: false, status: 'unavailable',
+  } });
+  expect(put).not.toHaveBeenCalled();
+  expect(createGptImage2Task).not.toHaveBeenCalled();
 });
 
 it('tempo de upload reduz o orçamento de polling sem ultrapassar a função', async () => {

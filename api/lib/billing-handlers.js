@@ -56,6 +56,9 @@ export async function handleSession(req, res) {
       tier: 'max',
       plan: getPlan('max'),
       imageQuota: {
+        status: 'available',
+        available: true,
+        allowed: true,
         used: 0,
         limit: imageQuotaForTier('max'),
         remaining: imageQuotaForTier('max'),
@@ -84,21 +87,31 @@ export async function handleSession(req, res) {
     const bounds = periodBoundsFromSubscription(sub);
     const limit = imageQuotaForTier(tier);
     let imageQuota = {
-      used: 0,
+      status: 'unavailable',
+      available: false,
+      allowed: false,
+      used: null,
       limit,
-      remaining: limit,
+      remaining: null,
       tier,
+      code: 'quota_store_unavailable',
     };
     try {
+      if (limit > 0 && !bounds.periodStartSec) {
+        throw Object.assign(new Error('Período da assinatura indisponível.'), { code: 'quota_period_unavailable' });
+      }
       imageQuota = {
-        ...await getQuotaUsage({
+        ...(limit > 0 ? await getQuotaUsage({
           customerId: access.customerId,
           periodStartSec: bounds.periodStartSec,
           limit,
-        }),
+        }) : { used: 0, limit: 0, remaining: 0, allowed: false }),
+        status: 'available',
+        available: true,
         tier,
       };
     } catch (qe) {
+      imageQuota.code = qe?.code === 'quota_period_unavailable' ? qe.code : 'quota_store_unavailable';
       console.warn('[auth/session] quota', qe?.message || qe);
     }
 

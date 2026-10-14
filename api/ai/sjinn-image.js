@@ -84,8 +84,8 @@ export default async function handler(req, res) {
   void body.resolution;
 
   let tier = 'creator';
-  let periodStartSec = Math.floor(Date.now() / 1000);
-  let periodEndSec = periodStartSec + 30 * 24 * 3600;
+  let periodStartSec = null;
+  let periodEndSec = null;
   let customerId = access.customerId || 'billing-disabled';
   let limit = 50;
 
@@ -94,6 +94,9 @@ export default async function handler(req, res) {
       tier = 'max';
       limit = 300;
       customerId = `dev:${access.email || 'local'}`;
+      const now = new Date();
+      periodStartSec = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000;
+      periodEndSec = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) / 1000;
     } else {
       const sub = await findActiveSubscription(access.customerId);
       if (!sub) {
@@ -101,8 +104,8 @@ export default async function handler(req, res) {
       }
       tier = resolveTierFromSubscription(sub);
       const bounds = periodBoundsFromSubscription(sub);
-      periodStartSec = bounds.periodStartSec || periodStartSec;
-      periodEndSec = bounds.periodEndSec || periodEndSec;
+      periodStartSec = bounds.periodStartSec;
+      periodEndSec = bounds.periodEndSec;
       limit = imageQuotaForTier(tier);
       customerId = access.customerId;
     }
@@ -116,7 +119,15 @@ export default async function handler(req, res) {
       error: 'O plano Essencial não inclui geração de imagem. Faça upgrade para o Criador ou active a sua chave em Configurações → Avançado.',
       code: 'plan_no_images',
       tier,
-      quota: { used: 0, limit: 0, remaining: 0, tier },
+      quota: { used: 0, limit: 0, remaining: 0, tier, status: 'available', available: true, allowed: false },
+    });
+  }
+
+  if (!periodStartSec || !periodEndSec) {
+    return res.status(503).json({
+      error: 'Não foi possível confirmar o período da assinatura. Nenhum crédito foi usado.',
+      code: 'quota_period_unavailable',
+      quota: { used: null, limit, remaining: null, tier, status: 'unavailable', available: false, allowed: false, code: 'quota_period_unavailable' },
     });
   }
 
@@ -133,6 +144,7 @@ export default async function handler(req, res) {
     return res.status(503).json({
       error: 'Não foi possível reservar crédito de imagem. Tente de novo.',
       code: 'quota_store_error',
+      quota: { used: null, limit, remaining: null, tier, status: 'unavailable', available: false, allowed: false, code: 'quota_store_unavailable' },
     });
   }
 
@@ -146,6 +158,9 @@ export default async function handler(req, res) {
         limit: consumed.limit,
         remaining: 0,
         tier,
+        status: 'available',
+        available: true,
+        allowed: false,
       },
     });
   }
@@ -172,6 +187,9 @@ export default async function handler(req, res) {
         limit: consumed.limit,
         remaining: consumed.remaining,
         tier,
+        status: 'available',
+        available: true,
+        allowed: consumed.remaining > 0,
       },
       ...(consumed.degraded ? { quotaDegraded: true } : {}),
     });
@@ -188,8 +206,8 @@ export default async function handler(req, res) {
       code: e?.code || 'sjinn_error',
       tier,
       quota: usage
-        ? { used: usage.used, limit: usage.limit, remaining: usage.remaining, tier }
-        : undefined,
+        ? { used: usage.used, limit: usage.limit, remaining: usage.remaining, tier, status: 'available', available: true, allowed: usage.allowed }
+        : { used: null, limit, remaining: null, tier, status: 'unavailable', available: false, allowed: false, code: 'quota_store_unavailable' },
     });
   } finally {
     await cleanupReferences?.();

@@ -34,7 +34,7 @@ beforeEach(() => {
   stripeMock.customers.retrieve = vi.fn();
   stripeMock.customers.update = vi.fn();
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('contador de imagens nos metadados do Stripe', () => {
   it('cliente sem contador começa em zero', async () => {
@@ -102,6 +102,33 @@ describe('contador de imagens nos metadados do Stripe', () => {
 });
 
 describe('encadeamento do armazenamento de quota', () => {
+  it.each(['network', 'command'])('Redis %s inválido consulta o saldo persistente no Stripe', async (failure) => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
+    vi.stubGlobal('fetch', failure === 'network'
+      ? vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }))
+      : vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'command failed' }))));
+    clienteStateful({ [CHAVE]: '7' });
+    const { getQuotaUsage } = await import('../../api/lib/image-quota.js');
+    expect(await getQuotaUsage({ customerId: CUS, periodStartSec: PERIODO, limit: 50 }))
+      .toMatchObject({ used: 7, remaining: 43, allowed: true });
+    expect(stripeMock.customers.retrieve).toHaveBeenCalledWith(CUS);
+  });
+
+  it('produção sem contador configurado não anuncia saldo nem concede créditos em memória', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+    const { getQuotaUsage, consumeImageCredit } = await import('../../api/lib/image-quota.js');
+    const args = { customerId: CUS, periodStartSec: PERIODO, limit: 50 };
+    await expect(getQuotaUsage(args)).rejects.toMatchObject({ code: 'quota_store_unavailable' });
+    await expect(consumeImageCredit(args)).rejects.toMatchObject({ code: 'quota_store_unavailable' });
+  });
+
   it('sem Upstash, consumeImageCredit conta no Stripe e respeita o limite do plano', async () => {
     process.env.VC_QUOTA_ALLOW_STRIPE = '1';
     delete process.env.UPSTASH_REDIS_REST_URL;
