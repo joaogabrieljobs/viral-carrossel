@@ -2,6 +2,37 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { X, Loader2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
 import { FORMATS } from '../utils/formats.js';
+import { canvasToPngBlob } from '../utils/image-storage.js';
+
+/**
+ * Recorta na resolução dos pixels de origem. PNG preserva alpha e evita uma
+ * segunda compressão JPEG. O Blob dispensa a cópia base64 de uma foto grande.
+ * Sem recorte, reutiliza os bytes originais (inclusive JPEG/WebP).
+ */
+export async function prepareImageCrop(image, crop, imageSrc) {
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  if (!width || !height) throw new Error('Imagem com dimensão inválida.');
+  const sx = Math.max(0, Math.min(Math.floor(crop.x), width - 1));
+  const sy = Math.max(0, Math.min(Math.floor(crop.y), height - 1));
+  const sw = Math.min(Math.max(1, Math.floor(crop.w)), width - sx);
+  const sh = Math.min(Math.max(1, Math.floor(crop.h)), height - sy);
+  if (sx === 0 && sy === 0 && sw === width && sh === height && imageSrc) return imageSrc;
+
+  const canvas = document.createElement('canvas');
+  try {
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Não foi possível preparar o recorte.');
+    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+    return await canvasToPngBlob(canvas);
+  } finally {
+    // Libera logo o buffer RGBA; o Blob concluído mantém apenas o PNG.
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
 
 export function getImageCropFormat(fmt = 'carrossel') {
   const key = Object.prototype.hasOwnProperty.call(FORMATS, fmt) ? fmt : 'carrossel';
@@ -204,29 +235,14 @@ export default function ImageCropModal({ open, imageSrc, fmt = 'carrossel', onCl
     queueMicrotask(() => {
       const img = new Image();
       img.crossOrigin = String(imageSrc).startsWith('data:') ? undefined : 'anonymous';
-      img.onload = () => {
+      img.onload = async () => {
         try {
-          const sx = Math.max(0, Math.min(Math.floor(cropN.x), img.naturalWidth - 2));
-          const sy = Math.max(0, Math.min(Math.floor(cropN.y), img.naturalHeight - 2));
-          let sw = Math.max(2, Math.floor(cropN.w));
-          let sh = Math.max(2, Math.floor(cropN.h));
-          sw = Math.min(sw, img.naturalWidth - sx);
-          sh = Math.min(sh, img.naturalHeight - sy);
-          const maxSide = 2200;
-          const ds = Math.min(1, maxSide / Math.max(sw, sh));
-          const cw = Math.max(2, Math.round(sw * ds));
-          const ch = Math.max(2, Math.round(sh * ds));
-          const canvas = document.createElement('canvas');
-          canvas.width = cw;
-          canvas.height = ch;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('no ctx');
-          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
-          onApply(canvas.toDataURL('image/jpeg', 0.92));
+          const cropped = await prepareImageCrop(img, cropN, imageSrc);
+          onApply(cropped);
           onClose();
         } catch {
           setHint(
-            'Exportação falhou: URLs externas por vezes bloqueiam leitura. Use Upload neste card ou gere outra imagem.',
+            'Não foi possível recortar a imagem. Tente uma região menor; para URLs externas, importe o arquivo PNG ou JPEG.',
           );
         } finally {
           setBusy(false);

@@ -1,60 +1,25 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 
+// Exportações legadas mantidas por compatibilidade com o App extraído.
+// Estes limites não se aplicam aos originais guardados no IndexedDB.
 const VC_BG_SAVE_MAX_PX = 1536;
 const VC_BG_SAVE_JPEG_Q = 0.88;
-/** Só comprime fotos base64 «pesadas» — HEIC do iPhone passa quase sempre. */
 const VC_BG_COMPRESS_MIN_CHARS = 380_000;
-/** createImageBitmap/HEIC pode nunca resolver — não deixar o import pendurado. */
+/** Uma leitura de ficheiro nunca deve deixar o import pendurado. */
 const VC_FILE_DECODE_TIMEOUT_MS = 12_000;
 
-/** Redimensiona/recomprime data URLs de fundo antes de meter no localStorage (alivia quota). */
+/**
+ * Compatibilidade com o import antigo. Os bytes vivem no IndexedDB; reduzir a
+ * única cópia para poupar localStorage descartava detalhe e transparência.
+ */
 function vcShrinkDataUrlForStorage(dataUrl) {
-  return new Promise((resolve) => {
-    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
-      resolve(dataUrl);
-      return;
-    }
-    if (dataUrl.length < VC_BG_COMPRESS_MIN_CHARS) {
-      resolve(dataUrl);
-      return;
-    }
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const w = img.naturalWidth;
-        const h = img.naturalHeight;
-        if (!w || !h) {
-          resolve(dataUrl);
-          return;
-        }
-        const fac = VC_BG_SAVE_MAX_PX / Math.max(w, h);
-        const scale = fac < 1 ? fac : 1;
-        const nw = Math.max(2, Math.round(w * scale));
-        const nh = Math.max(2, Math.round(h * scale));
-        const c = document.createElement('canvas');
-        c.width = nw;
-        c.height = nh;
-        const ctx = c.getContext('2d');
-        if (!ctx) {
-          resolve(dataUrl);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, nw, nh);
-        const jpeg = c.toDataURL('image/jpeg', VC_BG_SAVE_JPEG_Q);
-        resolve(jpeg.length < dataUrl.length ? jpeg : dataUrl);
-      } catch {
-        resolve(dataUrl);
-      }
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
+  return Promise.resolve(dataUrl);
 }
 
 /**
- * Importação de ficheiro → JPEG (~max VC_BG_SAVE_MAX_PX).
- * Ordem: FileReader (fiável para uploads) → Image+objectURL → createImageBitmap.
- * Timeout duro: createImageBitmap com HEIC/RAW pode nunca resolver nem rejeitar.
+ * Importação de ficheiro → data URL com os bytes e o MIME originais.
+ * FileReader é o caminho principal; arrayBuffer é o fallback de leitura.
+ * Nenhum caminho rasteriza/recomprime a foto, inclusive PNGs transparentes.
  */
 function vcImageFileToStorageDataUrl(file) {
   return new Promise((resolve) => {
@@ -76,98 +41,34 @@ function vcImageFileToStorageDataUrl(file) {
       finish(url);
     };
 
-    const encodeFromWidthHeight = (drawable, w, h, closeFn) => {
+    const tryArrayBuffer = async () => {
+      if (settled) return;
       try {
-        if (!w || !h) {
-          closeFn?.();
-          return false;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (settled) return;
+        // Blocos pequenos evitam exceder a pilha ao ler fotos grandes.
+        const chunks = [];
+        for (let offset = 0; offset < bytes.length; offset += 32768) {
+          chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)));
         }
-        const fac = VC_BG_SAVE_MAX_PX / Math.max(w, h);
-        const scale = fac < 1 ? fac : 1;
-        const nw = Math.max(2, Math.round(w * scale));
-        const nh = Math.max(2, Math.round(h * scale));
-        const c = document.createElement('canvas');
-        c.width = nw;
-        c.height = nh;
-        const ctx = c.getContext('2d');
-        if (!ctx) {
-          closeFn?.();
-          return false;
-        }
-        ctx.drawImage(drawable, 0, 0, w, h, 0, 0, nw, nh);
-        closeFn?.();
-        const jpeg = c.toDataURL('image/jpeg', VC_BG_SAVE_JPEG_Q);
-        if (typeof jpeg === 'string' && jpeg.startsWith('data:') && jpeg.length >= 32) {
-          done(jpeg);
-          return true;
-        }
-        return false;
-      } catch {
-        try { closeFn?.(); } catch { /* */ }
-        return false;
-      }
-    };
-
-    const tryImageWithObjectUrl = () => {
-      let objUrl = '';
-      try {
-        objUrl = URL.createObjectURL(file);
+        done(`data:${file.type || 'application/octet-stream'};base64,${btoa(chunks.join(''))}`);
       } catch {
         done('');
-        return;
       }
-      const img = new Image();
-      const cleanup = () => {
-        if (objUrl) {
-          try { URL.revokeObjectURL(objUrl); } catch { /* */ }
-          objUrl = '';
-        }
-      };
-      img.onload = () => {
-        const ok = encodeFromWidthHeight(img, img.naturalWidth, img.naturalHeight, cleanup);
-        if (!ok) {
-          cleanup();
-          done('');
-        }
-      };
-      img.onerror = () => {
-        cleanup();
-        done('');
-      };
-      img.src = objUrl;
     };
 
-    const tryBitmap = () => {
-      if (typeof createImageBitmap !== 'function') {
-        tryImageWithObjectUrl();
-        return;
-      }
-      createImageBitmap(file)
-        .then((bmp) => {
-          const ok = encodeFromWidthHeight(bmp, bmp.width, bmp.height, () => {
-            try { bmp.close(); } catch { /* */ }
-          });
-          if (!ok) tryImageWithObjectUrl();
-        })
-        .catch(() => tryImageWithObjectUrl());
-    };
-
-    // Primário: FileReader — não depende de decode bitmap (HEIC/RAW).
     try {
       const reader = new FileReader();
       reader.onload = () => {
-        void vcShrinkDataUrlForStorage(String(reader.result || '')).then((url) => {
-          if (typeof url === 'string' && url.startsWith('data:') && url.length >= 32) {
-            done(url);
-            return;
-          }
-          tryBitmap();
-        });
+        const url = String(reader.result || '');
+        if (url.startsWith('data:') && url.length >= 32) done(url);
+        else void tryArrayBuffer();
       };
-      reader.onerror = () => tryBitmap();
+      reader.onerror = () => { void tryArrayBuffer(); };
+      reader.onabort = () => done('');
       reader.readAsDataURL(file);
     } catch {
-      tryBitmap();
+      void tryArrayBuffer();
     }
   });
 }
