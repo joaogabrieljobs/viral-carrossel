@@ -240,8 +240,12 @@ export function applyPersistedImagePatches(slides = [], patches = []) {
       if (slide.bgImageId) return slide;
       if (candidate.expectedSource != null && slide.bgImage !== candidate.expectedSource) return slide;
     }
+    const patch = candidate.patch || {};
+    // Repetir o mesmo erro do IndexedDB não é uma nova edição. Preservar
+    // a identidade impede hidratação → autosave → sync de reiniciar em loop.
+    if (Object.entries(patch).every(([key, value]) => Object.is(slide[key], value))) return slide;
     changed = true;
-    return { ...slide, ...(candidate.patch || {}) };
+    return { ...slide, ...patch };
   });
   return changed ? next : slides;
 }

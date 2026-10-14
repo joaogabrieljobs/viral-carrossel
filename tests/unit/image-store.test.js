@@ -138,6 +138,36 @@ describe('applyPersistedImagePatches', () => {
     expect(out[0].bgImage).toBe('blob:http://local/1');
     expect(out[1]).toBe(slides[1]);
   });
+
+  it('não reinicia autosave e hidratação ao repetir o mesmo erro do IndexedDB', () => {
+    const slides = [{ id: 's1', bgImageId: 'img_1', bgImage: null }];
+    const failure = [{
+      id: 's1',
+      expectedImageId: 'img_1',
+      patch: { bgImageFailed: true, bgImageError: 'stored_image_unavailable' },
+    }];
+    const first = applyPersistedImagePatches(slides, failure);
+    expect(first).not.toBe(slides);
+    expect(first[0].bgImageId).toBe('img_1');
+    expect(applyPersistedImagePatches(first, failure)).toBe(first);
+    expect(applyPersistedImagePatches(first, failure)[0]).toBe(first[0]);
+  });
+
+  it('continua aceitando a recuperação da foto depois de uma falha repetida', () => {
+    const slides = [{
+      id: 's1', bgImageId: 'img_1', bgImage: null,
+      bgImageFailed: true, bgImageError: 'hydrate_timeout',
+    }];
+    const recovered = applyPersistedImagePatches(slides, [{
+      id: 's1',
+      expectedImageId: 'img_1',
+      patch: { bgImage: 'blob:foto-recuperada', bgImageFailed: false, bgImageError: null },
+    }]);
+    expect(recovered).not.toBe(slides);
+    expect(recovered[0]).toMatchObject({
+      bgImageId: 'img_1', bgImage: 'blob:foto-recuperada', bgImageFailed: false, bgImageError: null,
+    });
+  });
 });
 
 describe('applySlidePatchIfImageCurrent', () => {
