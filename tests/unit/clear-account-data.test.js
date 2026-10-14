@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearAccountLocalData } from '../../src/utils/clear-account-data.js';
-import { SK } from '../../src/utils/storage.js';
+import { SK, areAccountDataWritesLocked, lsSet, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { USER_PROFILE_KEY } from '../../src/utils/user-profile.js';
 import { PENDING_SHARE_KEY } from '../../src/utils/project-share.js';
 import { ACCOUNT_VAULT_KEY } from '../../src/utils/account-vault.js';
@@ -22,6 +22,7 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
   let session;
 
   beforeEach(() => {
+    unlockAccountDataWrites();
     local = makeMemoryStorage();
     session = makeMemoryStorage();
     vi.stubGlobal('localStorage', local);
@@ -38,6 +39,7 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
   });
 
   afterEach(() => {
+    unlockAccountDataWrites();
     vi.unstubAllGlobals();
   });
 
@@ -55,6 +57,16 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
 
   it('nunca lança mesmo sem IndexedDB', async () => {
     await expect(clearAccountLocalData()).resolves.toBeUndefined();
+  });
+
+  it('bloqueia o flush de pagehide depois de limpar a conta', async () => {
+    await clearAccountLocalData();
+
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [{ id: 'p1' }])).toBe(false);
+    expect(lsSet(SK.brands, [{ id: 'b1' }])).toBe(false);
+    expect(local.getItem(SK.library)).toBeNull();
+    expect(local.getItem(SK.brands)).toBeNull();
   });
 
   it('preserva convite ?share= no sessionStorage ao limpar conta', async () => {

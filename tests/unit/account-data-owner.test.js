@@ -7,7 +7,7 @@ import {
   readDataOwner,
   writeDataOwner,
 } from '../../src/utils/account-data-owner.js';
-import { SK } from '../../src/utils/storage.js';
+import { SK, areAccountDataWritesLocked, lsSet, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { ACCOUNT_VAULT_KEY, snapshotAccountVault } from '../../src/utils/account-vault.js';
 
 function makeMemoryStorage() {
@@ -26,6 +26,7 @@ describe('account-data-owner', () => {
   let local;
 
   beforeEach(() => {
+    unlockAccountDataWrites();
     local = makeMemoryStorage();
     vi.stubGlobal('localStorage', local);
     vi.stubGlobal('sessionStorage', makeMemoryStorage());
@@ -40,6 +41,7 @@ describe('account-data-owner', () => {
   });
 
   afterEach(() => {
+    unlockAccountDataWrites();
     vi.unstubAllGlobals();
   });
 
@@ -82,6 +84,9 @@ describe('account-data-owner', () => {
     expect(readDataOwner()).toBe('email:novo@z.com');
     expect(globalThis.location.replace).toHaveBeenCalled();
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toBeTruthy();
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [{ id: 'orfao' }])).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('meus');
   });
 
   it('ao mudar de conta guarda A no cofre e restaura B', async () => {
@@ -110,6 +115,9 @@ describe('account-data-owner', () => {
     // Cofre de A preservado
     const vault = JSON.parse(local.getItem(ACCOUNT_VAULT_KEY));
     expect(JSON.parse(vault['email:a@x.com'].keys[SK.library])[0].id).toBe('secret-a');
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [{ id: 'secret-a' }])).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('proj-b');
   });
 
   it('mesma conta com biblioteca vazia restaura do cofre e recarrega', async () => {
@@ -125,6 +133,20 @@ describe('account-data-owner', () => {
     expect(result).toBe('reloading');
     expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('p1');
     expect(globalThis.location.replace).toHaveBeenCalled();
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [])).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library))[0].id).toBe('p1');
+  });
+
+  it('boot com cookie restaura cofre sem dono activo e bloqueia persistência antiga', async () => {
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1' }, { id: 'p2' }]));
+    snapshotAccountVault('email:a@x.com');
+    local.removeItem(SK.library);
+
+    expect(await ensureAccountDataOwner({ active: true, email: 'a@x.com' })).toBe('reloading');
+    expect(areAccountDataWritesLocked()).toBe(true);
+    expect(lsSet(SK.library, [])).toBe(false);
+    expect(JSON.parse(local.getItem(SK.library)).map((entry) => entry.id)).toEqual(['p1', 'p2']);
   });
 
   it('migra id:cus → email: sem limpar dados', async () => {

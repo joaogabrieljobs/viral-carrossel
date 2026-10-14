@@ -4,7 +4,7 @@
  * activas mas a mesma conta recupera os projetos ao reentrar neste browser.
  */
 import { clearAccountLocalData } from './clear-account-data.js';
-import { SK, lockAccountDataWrites, unlockAccountDataWrites } from './storage.js';
+import { SK, lockAccountDataWrites } from './storage.js';
 import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
@@ -69,6 +69,9 @@ export function writeDataOwner(ownerId) {
 }
 
 function reloadAccountSwitch() {
+  // O React ainda contém o estado anterior até ao novo boot. Um flush de
+  // pagehide não pode substituir o cofre que acabámos de restaurar.
+  lockAccountDataWrites();
   const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
   try {
     const href = loc?.href || 'https://viralcarrossel.com.br/';
@@ -104,7 +107,6 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
       // Login fresco: limpar activo órfão (outra pessoa) e restaurar o cofre desta conta.
       lockAccountDataWrites();
       await clearAccountLocalData({ wipeMedia: false });
-      unlockAccountDataWrites();
       writeDataOwner(next);
       restoreAccountVault(next, aliases);
       reloadAccountSwitch();
@@ -139,7 +141,6 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false } 
   lockAccountDataWrites();
   snapshotAccountVault(prev);
   await clearAccountLocalData({ wipeMedia: false });
-  unlockAccountDataWrites();
   writeDataOwner(next);
   restoreAccountVault(next, aliases);
   reloadAccountSwitch();

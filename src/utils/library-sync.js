@@ -2,11 +2,13 @@
  * Sync da biblioteca com a nuvem (por conta autenticada).
  * Manifesto leve + assets de imagem enviados à parte (limite body serverless).
  */
-import { SK, lsSet } from './storage.js';
+import { SK, lsSet, areAccountDataWritesLocked, lockAccountDataWrites } from './storage.js';
 import { lsGet } from './telemetry.js';
-import { imagemComoDataUrl, guardarImagemDoSlide, newImageId } from './image-store.js';
+import {
+  imagemComoDataUrl, guardarImagemDoSlide, newImageId, semImagensDeRuntime, semLogosDeRuntimeDasMarcas,
+} from './image-store.js';
 import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
-import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
+import { migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
@@ -15,6 +17,26 @@ const MAX_BODY_CHARS = 2_800_000;
 const MAX_ASSET_CHARS = 1_600_000;
 const IMAGE_MAX_EDGE = 720;
 const IMAGE_MAX_CHARS = 160_000;
+
+function captureSyncContext() {
+  return {
+    owner: localStorage.getItem(SK.dataOwner),
+    library: localStorage.getItem(SK.library),
+    deletedIds: localStorage.getItem(SK.libraryDeletedIds),
+  };
+}
+
+function assertSyncContext(context, { signal, checkLibrary = false, allowLocked = false } = {}) {
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  if (localStorage.getItem(SK.dataOwner) !== context.owner
+    || (!allowLocked && areAccountDataWritesLocked())) {
+    throw new Error('A conta mudou durante a sincronização. Entre novamente para atualizar a biblioteca.');
+  }
+  if (checkLibrary && (localStorage.getItem(SK.library) !== context.library
+    || localStorage.getItem(SK.libraryDeletedIds) !== context.deletedIds)) {
+    throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; sincronize novamente.');
+  }
+}
 
 function readDeletedProjectIds() {
   try {
@@ -127,7 +149,8 @@ async function collectAsset(dataUrl, preferredId, bag) {
 }
 
 async function packSlideForCloud(slide, assets) {
-  let sl = await exportSlideLogo(slide);
+  let sl = slide;
+  try { sl = await exportSlideLogo(slide); } catch { /* logo local em falta não bloqueia os textos */ }
   let bgAssetId = null;
   let dataUrl = typeof sl.bgImage === 'string' && sl.bgImage.startsWith('data:') ? sl.bgImage : null;
   if (!dataUrl && sl.bgImageId) {
@@ -149,8 +172,8 @@ async function packSlideForCloud(slide, assets) {
     ...sl,
     bgImage: null,
     logoImage: null,
-    bgImageAssetId: bgAssetId || undefined,
-    logoImageAssetId: logoAssetId || undefined,
+    bgImageAssetId: bgAssetId || sl.bgImageAssetId || undefined,
+    logoImageAssetId: logoAssetId || sl.logoImageAssetId || undefined,
   });
   return clean;
 }
@@ -170,13 +193,12 @@ async function packBrandForCloud(brand, assets) {
   return stripRuntime({
     ...packed,
     logo: null,
-    logoAssetId: logoAssetId || undefined,
+    logoAssetId: logoAssetId || packed?.logoAssetId || undefined,
   });
 }
 
 async function packStyleKitForCloud(styleKit, assets) {
-  let kit = styleKit;
-  try { kit = await exportProjectReferences(styleKit); } catch { /* */ }
+  const kit = styleKit;
   const refs = [];
   for (const ref of (kit?.refImages || [])) {
     let dataUrl = typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
@@ -186,7 +208,7 @@ async function packStyleKitForCloud(styleKit, assets) {
       try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* */ }
     }
     const assetId = await collectAsset(dataUrl, ref?.imageId, assets);
-    if (assetId) refs.push({ name: ref?.name, assetId });
+    if (assetId || ref?.assetId) refs.push({ name: ref?.name, assetId: assetId || ref.assetId });
   }
   let logoAssetId = null;
   if (kit?.logo?.dataUrl) {
@@ -201,7 +223,7 @@ async function packStyleKitForCloud(styleKit, assets) {
     ...kit,
     refImages: refs,
     logo: kit?.logo
-      ? { name: kit.logo.name, assetId: logoAssetId || undefined }
+      ? { name: kit.logo.name, assetId: logoAssetId || kit.logo.assetId || undefined }
       : kit?.logo,
   });
 }
@@ -272,7 +294,8 @@ export async function packLibraryForCloud() {
   return { manifest, assets, projectCount: docs.length };
 }
 
-async function syncRequest(payload, { method = 'POST', query = '' } = {}) {
+async function syncRequest(payload, { method = 'POST', query = '', signal } = {}) {
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
   const url = query ? `${SYNC_API}?${query}` : SYNC_API;
   const body = method === 'GET' ? undefined : JSON.stringify(payload);
   if (body && body.length > MAX_BODY_CHARS) {
@@ -285,6 +308,7 @@ async function syncRequest(payload, { method = 'POST', query = '' } = {}) {
       credentials: 'include',
       headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
       body,
+      signal,
     });
   } catch (e) {
     const raw = String(e?.message || e || '');
@@ -317,13 +341,12 @@ async function syncRequest(payload, { method = 'POST', query = '' } = {}) {
   return data;
 }
 
-export async function fetchLibraryCloudStatus() {
-  return syncRequest({ action: 'status' });
+export async function fetchLibraryCloudStatus(opts = {}) {
+  return syncRequest({ action: 'status' }, opts);
 }
 
 /** Upload de fotos — 1 a 1 com retry; nunca bloqueia o save da estrutura. */
-async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
-  const remote = new Set(remoteAssetIds || []);
+async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
   let uploaded = 0;
   let skipped = 0;
   let failed = 0;
@@ -331,12 +354,13 @@ async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
   const entries = [...assets.entries()];
 
   for (const [assetId, dataUrl] of entries) {
-    if (remote.has(assetId)) {
-      skipped += 1;
-      continue;
-    }
+    assertCurrent?.();
+    if (signal?.aborted) throw new Error('Sincronização cancelada.');
+    // assetIds no manifesto são referências, não recibos de upload.
+    // Reenvio idempotente recupera imagens de tentativas anteriores falhadas.
     let ok = false;
     for (let attempt = 0; attempt < 2 && !ok; attempt += 1) {
+      assertCurrent?.();
       let payload = dataUrl;
       if (attempt === 1) {
         // Retry mais agressivo (menor).
@@ -351,10 +375,11 @@ async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
           assetId,
           dataUrl: payload,
           contentType: payload.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-        });
+        }, { signal });
         uploaded += 1;
         ok = true;
       } catch (e) {
+        if (signal?.aborted) throw e;
         lastError = String(e?.message || e || 'upload');
         // Pausa curta entre retries / rate-limit.
         // eslint-disable-next-line no-await-in-loop
@@ -370,15 +395,27 @@ async function uploadAssetsBestEffort(assets, remoteAssetIds = []) {
  * Envia biblioteca local → nuvem.
  * Ordem: 1) manifesto (textos/estrutura) 2) fotos best-effort.
  * Por defeito a nuvem faz MERGE (união) — projectos noutros browsers não somem.
- * @param {{ force?: boolean, allowShrink?: boolean, pullAfter?: boolean }} [opts]
+ * @param {{ force?: boolean, allowShrink?: boolean, pullAfter?: boolean,
+ *   signal?: AbortSignal, beforeApply?: () => void }} [opts]
  *   allowShrink/replace: substitui a nuvem (raro).
  *   pullAfter: após push, puxa manifesto completo → localStorage (Sync/Salvar).
  */
 export async function pushLibraryToCloud(opts = {}) {
+  const context = captureSyncContext();
+  const guardOpts = { signal: opts.signal, allowLocked: opts.pullAfter === false };
+  assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   const localMeta = readCloudMeta();
-  const status = await fetchLibraryCloudStatus();
+  const status = await fetchLibraryCloudStatus({ signal: opts.signal });
+  assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   const { manifest, assets, projectCount } = await packLibraryForCloud();
+  assertSyncContext(context, { ...guardOpts, checkLibrary: true });
   if (!projectCount && !(manifest.brands || []).length && !(manifest.deletedIds || []).length) {
+    if (opts.pullAfter === true && !status?.empty) {
+      const pulled = await pullLibraryFromCloud({
+        signal: opts.signal, context, beforeApply: opts.beforeApply, expectedMeta: status.meta,
+      });
+      return { ...pulled, localProjectCount: pulled.projectCount, needsReload: !!pulled.snapshot };
+    }
     return { ok: true, empty: true, skipped: true, revision: localMeta?.revision || 0 };
   }
 
@@ -410,7 +447,7 @@ export async function pushLibraryToCloud(opts = {}) {
   };
   let result;
   try {
-    result = await syncRequest(pushBody);
+    result = await syncRequest(pushBody, { signal: opts.signal });
   } catch (e) {
     if (e?.code === 'library_conflict') {
       // Conflito: ainda MERGE (nunca replace cego) para não apagar a nuvem.
@@ -419,22 +456,28 @@ export async function pushLibraryToCloud(opts = {}) {
         manifest,
         force: true,
         replace: false,
-      });
+      }, { signal: opts.signal });
     } else {
       throw e;
     }
   }
 
-  if (Array.isArray(manifest.deletedIds) && manifest.deletedIds.length) {
+  assertSyncContext(context, { ...guardOpts, checkLibrary: true });
+  if (!areAccountDataWritesLocked() && Array.isArray(manifest.deletedIds) && manifest.deletedIds.length) {
     clearDeletedProjectIds(manifest.deletedIds);
+    context.deletedIds = localStorage.getItem(SK.libraryDeletedIds);
   }
 
   // 2) Fotos depois (não falha o save).
   const assetStats = assets.size
-    ? await uploadAssetsBestEffort(assets, status?.meta?.assetIds || [])
+    ? await uploadAssetsBestEffort(assets, {
+      signal: opts.signal,
+      assertCurrent: () => assertSyncContext(context, guardOpts),
+    })
     : { uploaded: 0, skipped: 0, failed: 0, lastError: '' };
 
-  writeCloudMeta({
+  assertSyncContext(context, guardOpts);
+  if (!areAccountDataWritesLocked()) writeCloudMeta({
     revision: result.revision,
     updatedAt: result.updatedAt,
     projectCount: result.projectCount,
@@ -445,19 +488,28 @@ export async function pushLibraryToCloud(opts = {}) {
   // Sync/Salvar: SEMPRE puxar a lista completa da nuvem para o browser.
   // Sem isto a UI fica com 1 projecto enquanto o toast diz «4 na nuvem».
   const cloudProjects = Number(result.projectCount || 0);
-  const mustPull = opts.pullAfter === true || cloudProjects > projectCount;
+  const mustPull = opts.pullAfter !== false && (opts.pullAfter === true || cloudProjects > projectCount);
   let needsReload = false;
   let pullError = '';
+  let snapshot = null;
+  let assetsMissing = 0;
+  let warnings = [];
   if (mustPull) {
     try {
-      const pulled = await pullLibraryFromCloud();
-      if (pulled?.empty || !Number(pulled?.projectCount || 0)) {
+      assertSyncContext(context, { ...guardOpts, checkLibrary: true });
+      const pulled = await pullLibraryFromCloud({
+        signal: opts.signal, context, beforeApply: opts.beforeApply, expectedMeta: result,
+      });
+      if (!pulled.snapshot || (cloudProjects > 0 && !pulled.projectCount)) {
         pullError = cloudProjects > 0
           ? `Nuvem reportou ${cloudProjects} projeto(s) mas o download veio vazio.`
           : 'Download da biblioteca veio vazio.';
       } else {
         needsReload = true;
-        result = { ...result, projectCount: pulled.projectCount };
+        snapshot = pulled.snapshot;
+        assetsMissing = pulled.assetsMissing;
+        warnings = pulled.warnings;
+        result = { ...result, revision: pulled.revision, updatedAt: pulled.updatedAt, projectCount: pulled.projectCount };
       }
     } catch (e) {
       pullError = String(e?.message || e || 'falha ao restaurar lista');
@@ -465,27 +517,31 @@ export async function pushLibraryToCloud(opts = {}) {
   }
 
   return {
-    ok: true,
+    ok: !pullError,
     revision: result.revision,
     updatedAt: result.updatedAt,
     projectCount: result.projectCount,
-    localProjectCount: projectCount,
+    localProjectCount: snapshot ? snapshot.library.length : localLibraryFingerprint().count,
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
     assetsFailed: assetStats.failed,
     assetError: assetStats.lastError || '',
     needsReload,
     pullError,
+    snapshot,
+    assetsMissing,
+    warnings,
   };
 }
 
 /** Foto em falta NÃO pode derrubar o restore da lista de projetos. */
-async function fetchAssetDataUrl(assetId) {
+async function fetchAssetDataUrl(assetId, signal) {
   if (!assetId) return null;
   try {
     const data = await syncRequest(null, {
       method: 'GET',
       query: `asset=${encodeURIComponent(assetId)}`,
+      signal,
     });
     return data?.asset?.dataUrl || null;
   } catch {
@@ -496,12 +552,15 @@ async function fetchAssetDataUrl(assetId) {
 async function resolveCachedAsset(assetId, assetCache) {
   if (!assetId) return null;
   if (assetCache.has(assetId)) return assetCache.get(assetId);
-  const dataUrl = await fetchAssetDataUrl(assetId);
-  assetCache.set(assetId, dataUrl || null);
-  return dataUrl || null;
+  const pending = fetchAssetDataUrl(assetId, assetCache.signal).then((dataUrl) => {
+    if (!dataUrl) assetCache.missing.add(assetId);
+    return dataUrl || null;
+  });
+  assetCache.set(assetId, pending);
+  return pending;
 }
 
-async function hydrateSlideFromCloud(slide, assetCache) {
+async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
   try {
     let sl = { ...slide };
     const bgAsset = sl.bgImageAssetId;
@@ -509,25 +568,30 @@ async function hydrateSlideFromCloud(slide, assetCache) {
       const dataUrl = await resolveCachedAsset(bgAsset, assetCache);
       if (dataUrl) {
         try {
-          const packed = await guardarImagemDoSlide(dataUrl);
+          const packed = await guardarImagemDoSlide(dataUrl, { id: bgAsset });
           sl = { ...sl, ...packed, bgImageFailed: false, bgImageError: null };
         } catch { /* */ }
+      } else {
+        // Uma falha remota não remove a cópia desta mesma foto no navegador.
+        const sameLocalPhoto = localSlide?.bgImageAssetId === bgAsset
+          || localSlide?.bgImageId === bgAsset
+          || (sl.bgImageId && localSlide?.bgImageId === sl.bgImageId);
+        const localId = (sameLocalPhoto && localSlide?.bgImageId) || sl.bgImageId || bgAsset;
+        try {
+          const localPhoto = await imagemComoDataUrl(localId);
+          if (localPhoto) sl = { ...sl, bgImage: localPhoto, bgImageId: localId, bgImageFailed: false, bgImageError: null };
+        } catch { /* continua com os textos e a referência remota */ }
       }
-      delete sl.bgImageAssetId;
     }
     const logoAsset = sl.logoImageAssetId;
     if (logoAsset) {
       const dataUrl = await resolveCachedAsset(logoAsset, assetCache);
       if (dataUrl) sl = { ...sl, logoImage: dataUrl };
-      delete sl.logoImageAssetId;
     }
     try { sl = await importSlideLogo(sl); } catch { /* */ }
     return sl;
   } catch {
-    const fallback = { ...slide };
-    delete fallback.bgImageAssetId;
-    delete fallback.logoImageAssetId;
-    return fallback;
+    return { ...slide };
   }
 }
 
@@ -537,14 +601,11 @@ async function hydrateBrandFromCloud(brand, assetCache) {
     if (next.logoAssetId) {
       const dataUrl = await resolveCachedAsset(next.logoAssetId, assetCache);
       if (dataUrl) next = { ...next, logo: dataUrl };
-      delete next.logoAssetId;
     }
     try { next = await importBrandLogo(next); } catch { /* */ }
     return next;
   } catch {
-    const fallback = { ...(brand || {}) };
-    delete fallback.logoAssetId;
-    return fallback;
+    return { ...(brand || {}) };
   }
 }
 
@@ -553,33 +614,50 @@ async function hydrateStyleKitFromCloud(styleKit, assetCache) {
     let kit = { ...(styleKit || {}) };
     const refs = [];
     for (const ref of (kit.refImages || [])) {
-      if (!ref?.assetId) continue;
+      if (!ref?.assetId) {
+        refs.push(ref);
+        continue;
+      }
       try {
         const dataUrl = await resolveCachedAsset(ref.assetId, assetCache);
-        if (dataUrl) refs.push({ name: ref.name, dataUrl });
-      } catch { /* foto em falta */ }
+        if (dataUrl) {
+          const imported = await migrateProjectReferences({ refImages: [{ name: ref.name, dataUrl }] });
+          refs.push({ ...imported.refImages[0], assetId: ref.assetId });
+        } else refs.push({ ...ref });
+      } catch { refs.push({ ...ref }); }
     }
-    kit.refImages = refs;
+    kit.refImages = [];
+    const logoAssetId = kit.logo?.assetId;
     if (kit.logo?.assetId) {
       const dataUrl = await resolveCachedAsset(kit.logo.assetId, assetCache);
-      if (dataUrl) kit.logo = { ...kit.logo, dataUrl, assetId: undefined };
-      else kit.logo = { ...kit.logo, assetId: undefined };
+      if (dataUrl) kit.logo = { ...kit.logo, dataUrl };
     }
     try { kit = await migrateProjectReferences(kit); } catch { /* */ }
-    return kit;
+    return {
+      ...kit,
+      refImages: refs,
+      ...(logoAssetId ? { logo: { ...styleKit.logo, ...kit.logo, assetId: logoAssetId } } : {}),
+    };
   } catch {
-    return { ...(styleKit || {}), refImages: [] };
+    return { ...(styleKit || {}) };
   }
 }
 
 /**
  * Aplica manifesto da nuvem ao localStorage (e IndexedDB).
+ * Devolve snapshot para a UI e mantém gravações travadas até o chamador
+ * atualizar o estado React ou recarregar a página.
  */
-export async function applyCloudManifest(manifest) {
-  if (!manifest || typeof manifest !== 'object') {
+export async function applyCloudManifest(manifest, { context = captureSyncContext(), signal, beforeApply } = {}) {
+  if (!manifest || typeof manifest !== 'object' || !Array.isArray(manifest.docs)) {
     throw new Error('Manifesto da nuvem inválido.');
   }
+  assertSyncContext(context, { signal, checkLibrary: true });
   const assetCache = new Map();
+  assetCache.signal = signal;
+  assetCache.missing = new Set();
+  let localDocs = [];
+  try { localDocs = JSON.parse(context.library || '[]'); } catch { /* cache corrompida pode ser restaurada */ }
   const docs = [];
   for (const entry of (manifest.docs || [])) {
     if (!entry?.doc) {
@@ -587,8 +665,11 @@ export async function applyCloudManifest(manifest) {
       continue;
     }
     try {
+      const localSlides = (Array.isArray(localDocs) ? localDocs : [])
+        .find((localEntry) => localEntry?.id === entry.id)?.doc?.slides || [];
       const slides = Array.isArray(entry.doc.slides)
-        ? await Promise.all(entry.doc.slides.map((s) => hydrateSlideFromCloud(s, assetCache)))
+        ? await Promise.all(entry.doc.slides.map((s) => hydrateSlideFromCloud(s, assetCache,
+          localSlides.find((localSlide) => localSlide?.id === s?.id))))
         : [];
       docs.push({
         ...entry,
@@ -606,12 +687,7 @@ export async function applyCloudManifest(manifest) {
         doc: {
           ...entry.doc,
           slides: Array.isArray(entry.doc.slides)
-            ? entry.doc.slides.map((s) => {
-              const clean = { ...s };
-              delete clean.bgImageAssetId;
-              delete clean.logoImageAssetId;
-              return clean;
-            })
+            ? entry.doc.slides.map((s) => ({ ...s }))
             : [],
         },
       });
@@ -619,7 +695,7 @@ export async function applyCloudManifest(manifest) {
   }
 
   const brands = [];
-  for (const profile of (manifest.brands || [])) {
+  for (const profile of (Array.isArray(manifest.brands) ? manifest.brands : [])) {
     try {
       brands.push(await hydrateBrandFromCloud(profile, assetCache));
     } catch {
@@ -627,11 +703,43 @@ export async function applyCloudManifest(manifest) {
     }
   }
 
-  lsSet(SK.library, docs);
-  lsSet(SK.libraryFolders, Array.isArray(manifest.folders) ? manifest.folders : []);
-  lsSet(SK.brands, brands);
-  if (manifest.activeBrandId != null) lsSet(SK.activeBrandId, manifest.activeBrandId);
-  if (manifest.activeDocId != null) lsSet(SK.activeDocId, manifest.activeDocId);
+  beforeApply?.();
+  assertSyncContext(context, { signal, checkLibrary: true });
+  const snapshot = {
+    library: docs,
+    libraryFolders: Array.isArray(manifest.folders) ? manifest.folders : [],
+    brandRoster: brands,
+    activeDocId: docs.some((entry) => entry?.id === manifest.activeDocId)
+      ? manifest.activeDocId : docs[0]?.id || '',
+    activeBrandId: manifest.activeBrandId ?? brands[0]?.id ?? '',
+  };
+  const writes = [
+    [SK.libraryFolders, snapshot.libraryFolders],
+    [SK.brands, semLogosDeRuntimeDasMarcas(snapshot.brandRoster)],
+    [SK.activeBrandId, snapshot.activeBrandId],
+    [SK.activeDocId, snapshot.activeDocId],
+    [SK.library, semImagensDeRuntime(snapshot.library)],
+  ];
+  const previous = writes.map(([key]) => [key, localStorage.getItem(key)]);
+  try {
+    for (const [key, value] of writes) {
+      if (!lsSet(key, value)) throw new Error('Gravação local recusada.');
+    }
+    const saved = JSON.parse(localStorage.getItem(SK.library));
+    if (!Array.isArray(saved) || JSON.stringify(saved.map((entry) => entry?.id))
+      !== JSON.stringify(docs.map((entry) => entry?.id))) {
+      throw new Error('A lista gravada não corresponde à biblioteca recebida.');
+    }
+  } catch {
+    // Não reportar sucesso nem deixar marcas/pastas de uma aplicação parcial.
+    for (const [key, raw] of previous) {
+      try {
+        if (raw == null) localStorage.removeItem(key);
+        else localStorage.setItem(key, raw);
+      } catch { /* a biblioteca anterior continua na nuvem */ }
+    }
+    throw new Error('A biblioteca está na nuvem, mas não foi possível gravar a lista neste navegador. Libere espaço e sincronize novamente.');
+  }
   if (manifest.userProfile && typeof manifest.userProfile === 'object') {
     try {
       localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(manifest.userProfile));
@@ -652,26 +760,44 @@ export async function applyCloudManifest(manifest) {
     lastPullAt: Date.now(),
     lastPushAt: readCloudMeta()?.lastPushAt || null,
   });
-
-  return { projectCount: docs.length, revision: manifest.revision };
+  // Mesmo turno síncrono da gravação: pagehide/autosave só volta a gravar
+  // depois de React aplicar snapshot, ou no boot seguinte ao reload legado.
+  lockAccountDataWrites();
+  const assetsMissing = assetCache.missing.size;
+  return {
+    projectCount: docs.length,
+    revision: manifest.revision,
+    updatedAt: manifest.updatedAt,
+    snapshot,
+    assetsMissing,
+    warnings: assetsMissing ? [`${assetsMissing} imagem(ns) indisponível(is); todos os projetos foram restaurados.`] : [],
+  };
 }
 
-export async function pullLibraryFromCloud() {
-  const data = await syncRequest(null, { method: 'GET', query: 'full=1' });
-  if (data.empty || !data.manifest) {
+export async function pullLibraryFromCloud({ context = captureSyncContext(), signal, beforeApply, expectedMeta } = {}) {
+  assertSyncContext(context, { signal, checkLibrary: true });
+  const data = await syncRequest(null, { method: 'GET', query: 'full=1', signal });
+  if (data.empty) {
+    if (Number(expectedMeta?.projectCount || 0) > 0) {
+      throw new Error('A nuvem confirmou projetos, mas devolveu uma biblioteca vazia. A lista local foi preservada; sincronize novamente.');
+    }
     return { ok: true, empty: true, projectCount: 0 };
   }
-  const applied = await applyCloudManifest(data.manifest);
-  return { ok: true, empty: false, ...applied };
-}
-
-function libraryLooksOccupied() {
-  try {
-    const lib = lsGet(SK.library, []);
-    return Array.isArray(lib) && lib.length > 0;
-  } catch {
-    return false;
+  if (!data.manifest) throw new Error('A nuvem não devolveu a biblioteca. Sincronize novamente.');
+  if (expectedMeta) {
+    const expectedRevision = Number(expectedMeta.revision || 0);
+    const receivedRevision = Number(data.manifest.revision || 0);
+    const expectedCount = Number(expectedMeta.projectCount);
+    const receivedCount = Array.isArray(data.manifest.docs) ? data.manifest.docs.length : NaN;
+    if (!Number.isFinite(receivedRevision) || receivedRevision < expectedRevision) {
+      throw new Error('A nuvem devolveu uma versão anterior à que acabou de salvar. A lista local foi preservada; sincronize novamente.');
+    }
+    if (receivedRevision === expectedRevision && Number.isFinite(expectedCount) && receivedCount !== expectedCount) {
+      throw new Error(`A nuvem confirmou ${expectedCount} projeto(s), mas devolveu uma lista diferente. A lista local foi preservada; sincronize novamente.`);
+    }
   }
+  const applied = await applyCloudManifest(data.manifest, { context, signal, beforeApply });
+  return { ok: true, empty: false, ...applied };
 }
 
 /** Contagem + updatedAt mais recente da biblioteca local (anti-wipe no reconcile). */
@@ -702,99 +828,40 @@ function reloadAfterCloudPull() {
 }
 
 /**
- * Reconcilia nuvem ↔ local após login.
- * Nunca substitui biblioteca local ocupada por uma nuvem mais velha / sem meta local.
+ * Reconcilia por união após login, mesmo se a revisão local avançou num push
+ * anterior sem pull. A contagem da nuvem só é sucesso após aplicar a lista à UI.
  * @returns {Promise<'ok'|'reloading'|'skipped'>}
  */
-export async function reconcileLibraryCloud({ toast, email, customerId } = {}) {
+export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
   if (typeof window === 'undefined') return 'skipped';
-  let status;
   try {
-    status = await fetchLibraryCloudStatus();
-  } catch (e) {
+    const status = await fetchLibraryCloudStatus();
+    const local = localLibraryFingerprint();
+    const hasLocalChanges = local.count > 0 || readDeletedProjectIds().length > 0;
+    let result;
+    if (hasLocalChanges) {
+      result = await pushLibraryToCloud({ force: true, pullAfter: true });
+    } else if (!status.empty && status.meta) {
+      result = await pullLibraryFromCloud({ expectedMeta: status.meta });
+    } else {
+      return 'ok';
+    }
+    if (result.pullError || result.ok === false) {
+      throw new Error(result.pullError || 'Não foi possível atualizar a lista local.');
+    }
+    if (!result.snapshot) return 'ok';
+    if (typeof onApplied === 'function') {
+      await onApplied(result.snapshot, result);
+    } else {
+      // applyCloudManifest já travou as gravações antes de devolver o resultado.
+      reloadAfterCloudPull();
+      return 'reloading';
+    }
     if (typeof toast === 'function') {
-      toast(e?.message || 'Sync na nuvem indisponível agora.', 'warning', 4500);
+      const detail = result.assetsMissing ? ` ${result.assetsMissing} imagem(ns) indisponível(is).` : '';
+      toast(`Biblioteca sincronizada: ${result.projectCount} projeto(s).${detail}`,
+        result.assetsMissing ? 'warning' : 'success', 5000);
     }
-    return 'skipped';
-  }
-
-  const local = localLibraryFingerprint();
-  const localOccupied = local.count > 0;
-  const localMeta = readCloudMeta();
-  const cloud = status?.meta;
-
-  try {
-    if (!cloud || status.empty) {
-      if (localOccupied) {
-        const pushed = await pushLibraryToCloud({ force: true });
-        if (typeof toast === 'function' && !pushed.skipped) {
-          toast(`Biblioteca guardada na nuvem (${pushed.projectCount} projeto(s)).`, 'success', 4500);
-        }
-      }
-      return 'ok';
-    }
-
-    // Local vazio → cofre por aliases primeiro; só depois nuvem.
-    if (!localOccupied) {
-      try {
-        const { restoreAccountVault, accountVaultHasProjects } = await import('./account-vault.js');
-        const { normalizeDataOwnerId, dataOwnerAliases, readDataOwner } = await import('./account-data-owner.js');
-        const owner = readDataOwner() || normalizeDataOwnerId(email, customerId);
-        const aliases = [...dataOwnerAliases(email, customerId)];
-        if (owner && !aliases.includes(owner)) aliases.unshift(owner);
-        if (accountVaultHasProjects(owner, aliases) && restoreAccountVault(owner, aliases)) {
-          if (typeof toast === 'function') {
-            toast('Projetos restaurados do cofre desta conta.', 'success', 4500);
-          }
-          reloadAfterCloudPull();
-          return 'reloading';
-        }
-      } catch { /* tenta nuvem */ }
-
-      const pulled = await pullLibraryFromCloud();
-      if (pulled?.empty || !pulled?.projectCount) {
-        return 'ok';
-      }
-      if (typeof toast === 'function') {
-        toast('Projetos restaurados da nuvem nesta conta.', 'success', 5000);
-      }
-      reloadAfterCloudPull();
-      return 'reloading';
-    }
-
-    const cloudRev = Number(cloud.revision || 0);
-    const localRev = Number(localMeta?.revision || 0);
-    const cloudAt = Number(cloud.updatedAt || 0);
-    const cloudCount = Number(cloud.projectCount || 0);
-
-    // Local sem meta de sync: NÃO puxar (apagava projetos novos). Empurrar.
-    if (!localMeta) {
-      await pushLibraryToCloud({ force: true });
-      if (typeof toast === 'function') {
-        toast(`Biblioteca guardada na nuvem (${local.count} projeto(s)).`, 'success', 4500);
-      }
-      return 'ok';
-    }
-
-    const localClearlyNewer = local.maxUpdated > cloudAt + 1_500
-      || local.count > cloudCount;
-
-    // Só puxar se a nuvem for claramente mais nova e não tiver menos projetos.
-    const cloudClearlyNewer = cloudRev > localRev
-      && cloudAt >= local.maxUpdated
-      && cloudCount >= local.count
-      && !localClearlyNewer;
-
-    if (cloudClearlyNewer) {
-      await pullLibraryFromCloud();
-      if (typeof toast === 'function') {
-        toast('Projetos actualizados a partir da nuvem.', 'success', 5000);
-      }
-      reloadAfterCloudPull();
-      return 'reloading';
-    }
-
-    await pushLibraryToCloud({ force: localClearlyNewer || cloudRev !== localRev });
     return 'ok';
   } catch (e) {
     if (typeof toast === 'function') {
@@ -804,16 +871,25 @@ export async function reconcileLibraryCloud({ toast, email, customerId } = {}) {
   }
 }
 
-/** Best-effort (logout/auto) — nunca reduz o nº de projetos na nuvem. */
+/** Best-effort (logout/auto) — só envia; nunca altera a biblioteca local. */
 export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000) {
+  const controller = new AbortController();
+  let timer;
   try {
-    await Promise.race([
-      pushLibraryToCloud({ force: true, allowShrink: false }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+    const result = await Promise.race([
+      pushLibraryToCloud({ force: true, allowShrink: false, pullAfter: false, signal: controller.signal }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Tempo de sincronização esgotado.'));
+        }, timeoutMs);
+      }),
     ]);
-    return true;
+    return result.ok !== false;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

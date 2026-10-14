@@ -5,7 +5,7 @@
  *
  * Fonte da verdade é o servidor (`/api/auth/session`); este hook só reflete.
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   fetchAccessSession,
   confirmCheckoutSession,
@@ -19,7 +19,9 @@ import { clearAccountLocalData } from '../utils/clear-account-data.js';
 import { ensureAccountDataOwner } from '../utils/account-data-owner.js';
 import { captureShareInviteFromLocation } from '../utils/project-share.js';
 
-export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, toast } = {}) {
+export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied, onLibraryReady, toast } = {}) {
+  const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onLibraryReady });
+  libraryCallbacksRef.current = { onCloudLibraryApplied, onLibraryReady };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -127,9 +129,11 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, toast }
             toast,
             email: session?.email,
             customerId: session?.customerId,
+            onApplied: libraryCallbacksRef.current.onCloudLibraryApplied,
           });
           if (cancelled || cloudGate === 'reloading') return;
         } catch { /* rede / Blob — cofre local continua */ }
+        if (!cancelled) libraryCallbacksRef.current.onLibraryReady?.();
       }
 
       // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a
@@ -241,14 +245,11 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, toast }
       snapshotAccountVaultForOwners(aliases);
       lockAccountDataWrites();
     } catch { /* */ }
-    // Nuvem: até ~5s (merge é rápido; fotos best-effort). Cofre já está gravado.
+    // O timeout do cliente cancela os pedidos pendentes antes de limpar a conta.
+    // Um Promise.race externo deixava o pull terminar depois do logout.
     try {
-      const push = import('../utils/library-sync.js')
-        .then(({ pushLibraryToCloudBestEffort }) => pushLibraryToCloudBestEffort(5_000));
-      await Promise.race([
-        push,
-        new Promise((r) => setTimeout(r, 5_000)),
-      ]);
+      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
+      await pushLibraryToCloudBestEffort(5_000);
     } catch { /* best-effort */ }
     try {
       await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });

@@ -12,6 +12,7 @@ import {
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Sparkles, Search, Download, Trash2, Copy,
   Plus, Palette, Layout, LayoutGrid, Crop, Wand2, Loader2, Save,
@@ -920,6 +921,17 @@ export default function App() {
   libraryFoldersPersistRef.current = libraryFolders;
   /** Aponta para `flushPersistNow`, definido mais abaixo (precisa do `doc`). */
   const flushPersistRef = useRef(null);
+  // O documento de exemplo do primeiro render não pode ir para a nuvem antes
+  // de conhecer a conta e restaurar a biblioteca que já pertence a ela.
+  const [accountLibraryReady, setAccountLibraryReady] = useState(false);
+  const accountLibraryReadyRef = useRef(false);
+  const markAccountLibraryReady = useCallback(() => {
+    accountLibraryReadyRef.current = true;
+    setAccountLibraryReady(true);
+  }, []);
+  const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
+  const cloudSyncInFlightRef = useRef(false);
+  const docAutosaveTimerRef = useRef(null);
 
   // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
   // React (stale) por cima da nuvem. O lock impede isso; aqui libertamos no boot.
@@ -936,7 +948,7 @@ export default function App() {
   useEffect(() => {
     const flushLibrary = () => {
       // Logout/troca de conta: não repor biblioteca no pagehide.
-      if (areAccountDataWritesLocked()) return;
+      if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) return;
       if (flushPersistRef.current) { flushPersistRef.current(); return; }
       lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current));
       lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
@@ -962,17 +974,18 @@ export default function App() {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const firstSaveRef = useRef(true);
   useEffect(() => {
+    if (!accountLibraryReady) return undefined;
     const t = setTimeout(() => {
-      lsSet(SK.library, semImagensDeRuntime(library));
+      if (!lsSet(SK.library, semImagensDeRuntime(library))) return;
       if (firstSaveRef.current) { firstSaveRef.current = false; return; }
       setLastSavedAt(Date.now());
     }, 100);
     return () => clearTimeout(t);
-  }, [library]);
-  useEffect(() => { lsSet(SK.libraryFolders, libraryFolders); }, [libraryFolders]);
-  useEffect(() => { lsSet(SK.activeDocId, activeDocId); }, [activeDocId]);
-  useEffect(() => { lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster)); }, [brandRoster]);
-  useEffect(() => { lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId]);
+  }, [library, accountLibraryReady]);
+  useEffect(() => { if (accountLibraryReady) lsSet(SK.libraryFolders, libraryFolders); }, [libraryFolders, accountLibraryReady]);
+  useEffect(() => { if (accountLibraryReady) lsSet(SK.activeDocId, activeDocId); }, [activeDocId, accountLibraryReady]);
+  useEffect(() => { if (accountLibraryReady) lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster)); }, [brandRoster, accountLibraryReady]);
+  useEffect(() => { if (accountLibraryReady) lsSet(SK.activeBrandId, activeBrandId); }, [activeBrandId, accountLibraryReady]);
 
   // Guard de primeira visita: localStorage vazio → activeDocId nasce null porque a
   // biblioteca ainda não foi persistida. Sem isso, o efeito de save-back faz early-
@@ -1334,115 +1347,149 @@ export default function App() {
     return newBrand;
   }, [doc.brand, doc.styleKit, brandRoster.length, history, upsertBrand]);
 
+  const editorSyncStateRef = useRef({ doc, activeDocId });
+  editorSyncStateRef.current = { doc, activeDocId };
+
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
-  const flushPersistNow = useCallback(() => {
-    if (areAccountDataWritesLocked()) {
+  const flushPersistNow = useCallback(({ requireSaved = false } = {}) => {
+    if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
+      if (requireSaved) throw new Error('A biblioteca ainda está sendo restaurada. Aguarde e tente novamente.');
       return libraryPersistRef.current || [];
     }
+    // A edição pendente já entra neste flush. Seu debounce antigo não pode
+    // reaplicar o mesmo doc com outro updatedAt durante o pull.
+    clearTimeout(docAutosaveTimerRef.current);
     const agora = Date.now();
     const lib = (libraryPersistRef.current || []).map((e) => (
       e.id === activeDocId ? { ...e, doc, updatedAt: agora } : e
     ));
     libraryPersistRef.current = lib;
-    lsSet(SK.library, semImagensDeRuntime(lib));
-    lsSet(SK.libraryFolders, libraryFoldersPersistRef.current);
-    if (activeDocId) lsSet(SK.activeDocId, activeDocId);
-    lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster));
-    lsSet(SK.activeBrandId, activeBrandId);
-    setLastSavedAt(agora);
+    const saved = [
+      lsSet(SK.library, semImagensDeRuntime(lib)),
+      lsSet(SK.libraryFolders, libraryFoldersPersistRef.current),
+      lsSet(SK.activeDocId, activeDocId),
+      lsSet(SK.brands, semLogosDeRuntimeDasMarcas(brandRoster)),
+      lsSet(SK.activeBrandId, activeBrandId),
+    ].every(Boolean);
+    if (!saved && requireSaved) {
+      throw new Error('Não foi possível gravar a biblioteca neste navegador. A sincronização não foi concluída.');
+    }
+    if (saved) setLastSavedAt(agora);
     return lib;
   }, [doc, activeDocId, brandRoster, activeBrandId]);
   flushPersistRef.current = flushPersistNow;
 
-  const reloadAfterCloudSync = useCallback(() => {
-    // Trava ANTES do navigate: pagehide/beforeunload chamam flush com a
-    // library React antiga e apagavam os projectos que o pull acabou de gravar.
-    try { lockAccountDataWrites(); } catch { /* */ }
-    try {
-      const pulled = lsGet(SK.library, null);
-      if (Array.isArray(pulled) && pulled.length) {
-        libraryPersistRef.current = pulled;
-        setLibrary(pulled);
-      }
-    } catch { /* */ }
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('app', '1');
-      window.location.replace(url.pathname + url.search + url.hash);
-    } catch {
-      window.location.reload();
+  const applyCloudLibrarySnapshot = useCallback((snapshot, result) => {
+    if (!Array.isArray(snapshot?.library) || snapshot.library.length !== Number(result?.projectCount)) {
+      throw new Error('A lista recebida não corresponde à biblioteca da nuvem. Tente sincronizar novamente.');
     }
-  }, [setLibrary]);
+    const folders = normalizeLibraryFolders(snapshot.libraryFolders || []);
+    const restored = snapshot.library.map((entry) => normalizeLibraryEntry({
+      ...entry, doc: ensureDocShape(entry.doc || {}),
+    }, folders));
+    const nextActiveId = restored.some((entry) => entry.id === snapshot.activeDocId)
+      ? snapshot.activeDocId : (restored[0]?.id || null);
+    const nextDoc = restored.find((entry) => entry.id === nextActiveId)?.doc || DEFAULT_DOC;
+    const roster = snapshot.brandRoster?.length
+      ? snapshot.brandRoster.map(hydrateBrandTextColors)
+      : [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
 
-  /** Botão «Salvar»: flush local + push na nuvem da conta (quando a sessão estiver activa). */
-  const salvarProjeto = useCallback(async () => {
-    const lib = flushPersistNow();
-    setLibrary(lib);
-    // Cofre local imediato — sobrevive a logout mesmo se a nuvem falhar.
+    // O pull mantém o storage protegido até todos os estados e refs apontarem
+    // para a mesma lista. Só então pagehide e autosave podem gravar novamente.
+    lockAccountDataWrites();
+    flushSync(() => {
+      libraryPersistRef.current = restored;
+      libraryFoldersPersistRef.current = folders;
+      brandRosterPersistRef.current = roster;
+      setLibrary(restored);
+      setLibraryFolders(folders);
+      setBrandRoster(roster);
+      setActiveDocId(nextActiveId);
+      setActiveBrandId(snapshot.activeBrandId || nextDoc.brand?.id || 'default');
+      history.reset(nextDoc);
+      setLastSavedAt(Date.now());
+    });
+    unlockAccountDataWrites();
+    return restored.length;
+  }, [history.reset]);
+
+  // Salvar e Sync usam a mesma transação: flush → merge → pull → React → toast.
+  // O ref bloqueia também dois cliques antes de o estado busy renderizar.
+  const syncProjectLibrary = useCallback(async (source = 'sync') => {
+    if (cloudSyncInFlightRef.current) return;
+    cloudSyncInFlightRef.current = true;
+    setCloudSyncBusy(true);
+    let localSaved = false;
     try {
+      const lib = flushPersistNow({ requireSaved: true });
+      setLibrary(lib);
+      localSaved = true;
+      const savedEditor = editorSyncStateRef.current;
+      const savedDocument = JSON.stringify(semImagensDeRuntime([{ doc: savedEditor.doc }])[0].doc);
+      const savedLibrary = JSON.stringify(semImagensDeRuntime(lib));
       const { readDataOwner } = await import('./src/utils/account-data-owner.js');
       const { snapshotAccountVault } = await import('./src/utils/account-vault.js');
       const owner = readDataOwner();
       if (owner) snapshotAccountVault(owner);
-    } catch { /* */ }
-    try {
+
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
-      // Merge + pull — a lista do ecrã tem de reflectir a nuvem.
       const result = await pushLibraryToCloud({
         force: true,
         allowShrink: false,
         pullAfter: true,
+        beforeApply: () => {
+          const current = editorSyncStateRef.current;
+          const currentDocument = JSON.stringify(semImagensDeRuntime([{ doc: current.doc }])[0].doc);
+          if (currentDocument !== savedDocument || current.activeDocId !== savedEditor.activeDocId
+            || JSON.stringify(semImagensDeRuntime(libraryPersistRef.current)) !== savedLibrary) {
+            // Inclui texto digitado há menos de 400 ms, ainda fora do storage.
+            setLibrary(flushPersistRef.current({ requireSaved: true }));
+            throw new Error('Você editou um projeto durante a sincronização. As alterações foram preservadas; salve novamente.');
+          }
+        },
       });
-      if (result?.skipped || result?.empty) {
-        toast('Projeto salvo neste navegador.', 'success', 2200);
-        return;
+      if (!result?.ok || result.pullError || !result.snapshot) {
+        throw new Error(result?.pullError || 'Não foi possível confirmar a lista completa da conta. Tente sincronizar novamente.');
       }
-      trackEvent('library_cloud_push', {
-        project_count: String(result.projectCount || 0),
-        source: 'salvar',
-      });
-      if (result?.pullError) {
-        toast(
-          `Salvo na nuvem (${result.projectCount} projeto(s)), mas a lista local falhou: ${result.pullError.slice(0, 80)}. Tenta Sync na nuvem.`,
-          'warning',
-          7000,
-        );
-        return;
-      }
-      if (result?.needsReload || Number(result.projectCount) !== Number(lib?.length || 0)) {
-        toast(`Salvo · ${result.projectCount} projeto(s) na conta — a actualizar lista…`, 'success', 2500);
-        window.setTimeout(() => reloadAfterCloudSync(), 350);
-        return;
-      }
-      if (result?.assetsFailed > 0) {
-        toast(
-          `Salvo na conta (${result.projectCount} projeto(s)). A enviar fotos… ${result.assetsFailed} ainda locais${result.assetError ? ` (${result.assetError.slice(0, 60)})` : ''}.`,
-          'warning',
-          6500,
-        );
-      } else {
-        toast(`Projeto salvo na conta · ${result.projectCount} na nuvem.`, 'success', 3200);
-      }
+      const count = applyCloudLibrarySnapshot(result.snapshot, result);
+      // O cofre do logout também deve conter a união restaurada da nuvem.
+      if (owner) snapshotAccountVault(owner);
+      trackEvent('library_cloud_push', { project_count: String(count), source });
+      const photosPending = Number(result.assetsFailed || 0) + Number(result.assetsMissing || 0);
+      toast(
+        photosPending
+          ? `Lista sincronizada: ${count} projeto(s). Algumas fotos estão indisponíveis; os textos foram restaurados.`
+          : `${source === 'salvar' ? 'Projeto salvo na sua conta' : 'Lista sincronizada'} · ${count} projeto(s).`,
+        photosPending ? 'warning' : 'success',
+        photosPending ? 6500 : 3500,
+      );
     } catch (e) {
       toast(
-        `Salvo neste navegador e no cofre. Nuvem: ${String(e?.message || 'falhou').slice(0, 120)}`,
+        `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${e?.message || 'tente novamente.'}`,
         'warning',
-        6500,
+        7000,
       );
+    } finally {
+      cloudSyncInFlightRef.current = false;
+      setCloudSyncBusy(false);
     }
-  }, [flushPersistNow, reloadAfterCloudSync, setLibrary, toast]);
+  }, [flushPersistNow, applyCloudLibrarySnapshot, toast]);
+
+  const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
   // Autosave: salva o doc atual na entrada da biblioteca (debounced)
   useEffect(() => {
-    if (!activeDocId) return;
+    if (!activeDocId || !accountLibraryReady) return;
     const t = setTimeout(() => {
+      if (areAccountDataWritesLocked()) return;
       setLibrary(prev => prev.map(e => e.id === activeDocId
         ? { ...e, doc, updatedAt: Date.now() }
         : e
       ));
     }, 400);
+    docAutosaveTimerRef.current = t;
     return () => clearTimeout(t);
-  }, [doc, activeDocId]);
+  }, [doc, activeDocId, accountLibraryReady]);
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedCardElement, setSelectedCardElement] = useState(null);
@@ -1573,89 +1620,22 @@ export default function App() {
     setShellView,
     onLeaveEditor: () => setDrawerOpen(false),
     onBeforeLogout: () => { try { flushPersistRef.current?.(); } catch { /* */ } },
+    onCloudLibraryApplied: applyCloudLibrarySnapshot,
+    onLibraryReady: markAccountLibraryReady,
     toast,
   });
-  const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
-  const reloadAfterCloudSync = useCallback(() => {
-    // Trava ANTES do navigate: pagehide/beforeunload chamam flush com a
-    // library React antiga e apagavam os 4 projectos que o pull acabou de gravar.
-    try { lockAccountDataWrites(); } catch { /* */ }
-    try {
-      const pulled = lsGet(SK.library, null);
-      if (Array.isArray(pulled) && pulled.length) {
-        libraryPersistRef.current = pulled;
-        setLibrary(pulled);
-      }
-    } catch { /* */ }
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('app', '1');
-      window.location.replace(url.pathname + url.search + url.hash);
-    } catch {
-      window.location.reload();
-    }
-  }, [setLibrary]);
-
-  const handleSyncCloud = useCallback(async () => {
-    if (cloudSyncBusy) return;
+  const handleSyncCloud = useCallback(() => {
     if (!access?.active) {
-      toast('Entre na conta com assinatura activa para sincronizar na nuvem.', 'warning', 4500);
+      toast('Entre na conta para sincronizar seus projetos.', 'warning', 4500);
       return;
     }
-    setCloudSyncBusy(true);
-    try {
-      flushPersistNow();
-      try {
-        const { readDataOwner } = await import('./src/utils/account-data-owner.js');
-        const { snapshotAccountVault } = await import('./src/utils/account-vault.js');
-        const owner = readDataOwner();
-        if (owner) snapshotAccountVault(owner);
-      } catch { /* */ }
-      const { pushLibraryToCloud, pullLibraryFromCloud } = await import('./src/utils/library-sync.js');
-      // Merge push + pull obrigatório — a lista do ecrã tem de bater com a nuvem.
-      const result = await pushLibraryToCloud({
-        force: true,
-        allowShrink: false,
-        pullAfter: true,
-      });
-      if (result?.skipped || result?.empty) {
-        toast('Nada para sincronizar — crie um projeto primeiro.', 'info', 3500);
-        return;
-      }
-      if (result?.pullError) {
-        // Push ok mas pull falhou: tenta pull isolado uma vez.
-        try {
-          await pullLibraryFromCloud();
-        } catch (e2) {
-          toast(
-            `Nuvem tem ${result.projectCount} projeto(s), mas não deu para mostrar aqui: ${String(result.pullError || e2?.message || '').slice(0, 100)}`,
-            'error',
-            8000,
-          );
-          return;
-        }
-      }
-      trackEvent('library_cloud_push', { project_count: String(result.projectCount || 0) });
-      const photoWarn = result?.assetsFailed > 0
-        ? ` · ${result.assetsFailed} foto(s) ainda locais`
-        : '';
-      toast(
-        `Lista restaurada: ${result.projectCount} projeto(s) na conta${photoWarn}.`,
-        result?.assetsFailed > 0 ? 'warning' : 'success',
-        2800,
-      );
-      window.setTimeout(() => reloadAfterCloudSync(), 350);
-    } catch (e) {
-      toast(e?.message || 'Não foi possível sincronizar na nuvem.', 'error', 5500);
-    } finally {
-      setCloudSyncBusy(false);
-    }
-  }, [access?.active, cloudSyncBusy, flushPersistNow, reloadAfterCloudSync, toast]);
+    return syncProjectLibrary('sync');
+  }, [access?.active, syncProjectLibrary, toast]);
   // Auto-push na nuvem ~4s após editar a biblioteca (não depende só do logout).
   const cloudAutoPushTimerRef = useRef(null);
   const cloudAutoPushSkipFirstRef = useRef(true);
   useEffect(() => {
-    if (!access?.active) return undefined;
+    if (!access?.active || !accountLibraryReady || cloudSyncBusy) return undefined;
     if (cloudAutoPushSkipFirstRef.current) {
       cloudAutoPushSkipFirstRef.current = false;
       return undefined;
@@ -1670,7 +1650,7 @@ export default function App() {
     return () => {
       if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     };
-  }, [library, access?.active]);
+  }, [library, access?.active, accountLibraryReady, cloudSyncBusy]);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
@@ -2178,7 +2158,7 @@ export default function App() {
     const timer = window.setTimeout(() => {
       if (activeProjectRef.current !== projectId) return;
       history.setSilent((current) => (
-        current.quickPromptDraft === quickPrompt
+        (current.quickPromptDraft || '') === quickPrompt
           ? current
           : { ...current, quickPromptDraft: quickPrompt }
       ));
@@ -5049,6 +5029,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
   const isPresentationProject = activeProductKind === 'apresentacao';
   const stripThumbWidth = isPresentationProject ? 80 : 44;
   const stripThumbHeight = isPresentationProject ? 45 : 56;
+  const completePasswordLogin = () => {
+    // Passa pelo mesmo isolamento/restauração usado no retorno do Google.
+    lockAccountDataWrites();
+    window.location.assign('/?app=1&login=password');
+  };
 
   if (landingOpen) {
     return (
@@ -5081,18 +5066,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
-            onLoggedIn={async () => {
-              await refreshAccess();
-              setLoginOpen(false);
-              enterStudio();
-            }}
+            onLoggedIn={completePasswordLogin}
           />
         </Suspense>
       </div>
     );
   }
 
-  if (access.status === 'loading') {
+  if (access.status === 'loading' || (accessActive && !accountLibraryReady)) {
     return (
       <div style={{
         width: '100%', height: '100vh',
@@ -5101,7 +5082,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         fontFamily: 'var(--font-ui)', fontSize: 14,
       }}>
         <style>{GLOBAL_STYLE}</style>
-        A verificar assinatura…
+        {accessActive ? 'Restaurando seus projetos…' : 'A verificar assinatura…'}
       </div>
     );
   }
@@ -5133,11 +5114,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
-            onLoggedIn={async () => {
-              await refreshAccess();
-              setLoginOpen(false);
-              enterStudio();
-            }}
+            onLoggedIn={completePasswordLogin}
           />
         </Suspense>
       </div>
@@ -5186,7 +5163,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onManageBilling={access.billingDisabled ? undefined : openPortal}
           onLogout={handleLogout}
           onSyncCloud={access.active ? handleSyncCloud : null}
-          cloudSyncBusy={cloudSyncBusy}
+          cloudSyncBusy={cloudSyncBusy || !accountLibraryReady}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
@@ -5353,6 +5330,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 <button
                   type="button"
                   onClick={salvarProjeto}
+                  disabled={cloudSyncBusy || !accountLibraryReady}
+                  aria-busy={cloudSyncBusy}
                   title="Salvar projeto agora (⌘S)"
                   aria-label="Salvar projeto agora"
                   style={{
@@ -5365,7 +5344,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   }}
                 >
                   <Save size={11} aria-hidden/>
-                  {!headerVeryTight && 'Salvar'}
+                  {!headerVeryTight && (cloudSyncBusy ? 'Salvando…' : 'Salvar')}
                 </button>
               </div>
             )}
