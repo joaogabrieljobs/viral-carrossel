@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { originalImageAssetId, CLOUD_IMAGE_MAX_CHARS } from '../../src/utils/cloud-image-assets.js';
+import { originalImageAssetId, CLOUD_IMAGE_MAX_CHARS, CLOUD_IMAGE_PART_CHARS } from '../../src/utils/cloud-image-assets.js';
 import {
   SK, lsSet, lockAccountDataWrites, unlockAccountDataWrites, areAccountDataWritesLocked,
 } from '../../src/utils/storage.js';
@@ -599,6 +599,50 @@ describe('library-sync client pack', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it('cofre restaurado vence a cache antiga e envia a edição atual mesmo com localPersisted false', async () => {
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    const stale = cloudLibrary(1).docs;
+    local.setItem(SK.library, JSON.stringify(stale));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 3, projectCount: 1, localPersisted: false }));
+    const current = structuredClone(stale);
+    current[0].updatedAt = 900;
+    current[0].doc.slides[0].title = 'Edição recuperada do cofre';
+    const localSnapshot = { library: current, brandRoster: [], libraryFolders: [] };
+    const merged = cloudLibrary(2);
+    merged.docs[0] = structuredClone(current[0]);
+    const { requests } = installCloudApi(merged);
+    const setItem = local.setItem.bind(local);
+    vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if (key === SK.library) throw new Error('quota');
+      setItem(key, value);
+    });
+    const onApplied = vi.fn((snapshot, result) => {
+      expect(snapshot.library).toHaveLength(2);
+      expect(snapshot.library[0].doc.slides[0].title).toBe('Edição recuperada do cofre');
+      expect(result.localPersisted).toBe(false);
+      unlockAccountDataWrites();
+    });
+    expect(await reconcileLibraryCloud({ localSnapshot, onApplied })).toBe('ok');
+    const pushed = requests.find(({ body }) => body?.action === 'push').body.manifest;
+    expect(pushed.docs[0].doc.slides[0].title).toBe('Edição recuperada do cofre');
+    expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(local.getItem(SK.library))[0].doc.slides[0].title).toBe(stale[0].doc.slides[0].title);
+  });
+
+  it('falha na nuvem não bloqueia a edição já restaurada do cofre mesmo com cache antiga marcada', async () => {
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 3, projectCount: 1, localPersisted: false }));
+    const localSnapshot = { library: cloudLibrary(1).docs, brandRoster: [], libraryFolders: [] };
+    const before = structuredClone(localSnapshot);
+    vi.stubGlobal('fetch', vi.fn(async () => response({ error: 'Rede indisponível.' }, 503)));
+    const onApplied = vi.fn();
+    const toast = vi.fn();
+    expect(await reconcileLibraryCloud({ localSnapshot, onApplied, toast })).toBe('skipped');
+    expect(localSnapshot).toEqual(before);
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Rede indisponível.', 'warning', 5500);
+  });
+
   it('marcador de cache stale obriga pull antes de qualquer push e limpa o marcador após persistir', async () => {
     const manifest = cloudLibrary();
     const stale = [structuredClone(manifest.docs[0])];
@@ -747,7 +791,8 @@ describe('library-sync client pack', () => {
 
   it('reenvia uma foto referenciada no manifesto cujo upload anterior falhou', async () => {
     const manifest = cloudLibrary(1);
-    manifest.assetIds = ['photo-1'];
+    const photo = 'data:image/jpeg;base64,YQ==';
+    manifest.assetIds = [await originalImageAssetId(photo)];
     const localDoc = structuredClone(manifest.docs[0]);
     localDoc.doc.slides[0] = { id: 's1', title: 'Oi', bgImageId: 'photo-1', bgImage: 'data:image/jpeg;base64,YQ==' };
     local.setItem(SK.library, JSON.stringify([localDoc]));
@@ -755,6 +800,187 @@ describe('library-sync client pack', () => {
     const result = await pushLibraryToCloud({ pullAfter: false });
     expect(result.assetsUploaded).toBe(1);
     expect(requests.filter((request) => request.body?.action === 'putAsset')).toHaveLength(1);
+  });
+
+  it('retoma depois do timeout sem reenviar fotos já confirmadas nem confiar em resposta tardia', async () => {
+    local.setItem(SK.dataOwner, 'email:resume@example.test');
+    const firstPhoto = 'data:image/png;base64,Zmlyc3Q=';
+    const secondPhoto = 'data:image/png;base64,c2Vjb25k';
+    const firstId = await originalImageAssetId(firstPhoto);
+    const secondId = await originalImageAssetId(secondPhoto);
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', bgImage: firstPhoto }, { id: 's2', bgImage: secondPhoto },
+    ] } }] };
+    const { fetchMock, requests } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    let releaseSecond;
+    let signal;
+    let interruptedId;
+    let uploads = 0;
+    let secondStarted;
+    const started = new Promise((resolve) => { secondStarted = resolve; });
+    fetchMock.mockImplementation((url, opts) => {
+      const body = JSON.parse(opts.body || '{}');
+      if (body.action === 'putAsset' && ++uploads === 2) {
+        signal = opts.signal;
+        interruptedId = body.assetId;
+        secondStarted();
+        return new Promise((resolve) => { releaseSecond = resolve; });
+      }
+      return normalFetch(url, opts);
+    });
+    const pending = pushLibraryToCloudBestEffort(150, { snapshot });
+    await started;
+    expect(await pending).toMatchObject({ ok: false, cloudSaved: false });
+    expect(signal.aborted).toBe(true);
+    releaseSecond(response({ ok: true, assetId: interruptedId }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fetchMock.mockImplementation(normalFetch);
+    expect(await pushLibraryToCloudBestEffort(5_000, { snapshot })).toMatchObject({
+      ok: true, cloudSaved: true, assetsUploaded: 1, assetsSkipped: 1, assetsFailed: 0,
+    });
+    expect(requests.filter(({ body }) => body?.action === 'putAsset').map(({ body }) => body.assetId).sort())
+      .toEqual([firstId, secondId].sort());
+  });
+
+  it('só guarda recibo de uma resposta que confirma o upload, mesmo com HTTP 200', async () => {
+    local.setItem(SK.dataOwner, 'email:failed-upload@example.test');
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', refImage: 'data:image/png;base64,ZmFpbGVk' },
+    ] } }] };
+    const { fetchMock } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => JSON.parse(opts.body || '{}').action === 'putAsset'
+      ? response({ ok: false }) : normalFetch(url, opts));
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 0, assetsSkipped: 0, assetsFailed: 1,
+    });
+    fetchMock.mockImplementation(normalFetch);
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 1, assetsSkipped: 0, assetsFailed: 0,
+    });
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 0, assetsSkipped: 1, assetsFailed: 0,
+    });
+  });
+
+  it('chunks só geram recibo quando a última resposta confirma a imagem completa', async () => {
+    local.setItem(SK.dataOwner, 'email:chunk-upload@example.test');
+    const photo = `data:image/png;base64,${'A'.repeat(CLOUD_IMAGE_PART_CHARS)}`;
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [{ id: 's1', bgImage: photo }] } }] };
+    const { fetchMock } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    let complete = false;
+    let parts = 0;
+    fetchMock.mockImplementation((url, opts) => {
+      const body = JSON.parse(opts.body || '{}');
+      if (body.action === 'putAssetChunk') {
+        parts += 1;
+        return response({ ok: true, assetId: body.assetId, complete: complete && body.index === body.total - 1 });
+      }
+      return normalFetch(url, opts);
+    });
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 0, assetsFailed: 1,
+    });
+    expect(parts).toBe(4);
+    complete = true;
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 1, assetsSkipped: 0, assetsFailed: 0,
+    });
+    expect(parts).toBe(6);
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({
+      assetsUploaded: 0, assetsSkipped: 1, assetsFailed: 0,
+    });
+    expect(parts).toBe(6);
+  });
+
+  it('recibos não atravessam contas e uma troca de conta durante o upload não cria recibo', async () => {
+    const ownerA = 'email:upload-account-a@example.test';
+    local.setItem(SK.dataOwner, ownerA);
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', bgImage: 'data:image/png;base64,YWNjb3VudA==' },
+    ] } }] };
+    const { fetchMock, requests } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => {
+      if (JSON.parse(opts.body || '{}').action === 'putAsset') {
+        local.setItem(SK.dataOwner, 'email:upload-account-b@example.test');
+      }
+      return normalFetch(url, opts);
+    });
+    await expect(pushLibraryToCloud({ snapshot, pullAfter: false })).rejects.toThrow('A conta mudou');
+    fetchMock.mockImplementation(normalFetch);
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({ assetsUploaded: 1, assetsSkipped: 0 });
+    local.setItem(SK.dataOwner, ownerA);
+    expect(await pushLibraryToCloud({ snapshot, pullAfter: false })).toMatchObject({ assetsUploaded: 1, assetsSkipped: 0 });
+    expect(requests.filter(({ body }) => body?.action === 'putAsset')).toHaveLength(3);
+  });
+
+  it('cancelamento externo interrompe best-effort imediatamente e não envia o próximo asset', async () => {
+    local.setItem(SK.dataOwner, 'email:cancel-upload@example.test');
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', bgImage: 'data:image/png;base64,Y2FuY2VsLTE=' },
+      { id: 's2', bgImage: 'data:image/png;base64,Y2FuY2VsLTI=' },
+    ] } }] };
+    const { fetchMock } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    let release;
+    let start;
+    const started = new Promise((resolve) => { start = resolve; });
+    let uploads = 0;
+    fetchMock.mockImplementation((url, opts) => {
+      if (JSON.parse(opts.body || '{}').action === 'putAsset') {
+        uploads += 1;
+        start();
+        return new Promise((resolve) => { release = resolve; });
+      }
+      return normalFetch(url, opts);
+    });
+    const controller = new AbortController();
+    const pending = pushLibraryToCloudBestEffort(60_000, { snapshot, signal: controller.signal });
+    await started;
+    controller.abort();
+    expect(await pending).toMatchObject({ ok: false, cloudSaved: false, pushError: 'Sincronização cancelada.' });
+    release(response({ ok: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(uploads).toBe(1);
+    fetchMock.mockImplementation(normalFetch);
+    expect(await pushLibraryToCloudBestEffort(5_000, { snapshot })).toMatchObject({
+      assetsUploaded: 2, assetsSkipped: 0, assetsFailed: 0,
+    });
+  });
+
+  it('cancelar um push concorrente não cancela o outro nem apaga seu recibo', async () => {
+    local.setItem(SK.dataOwner, 'email:parallel-upload@example.test');
+    const snapshot = { library: [{ id: 'p1', doc: { slides: [
+      { id: 's1', bgImage: 'data:image/png;base64,cGFyYWxsZWw=' },
+    ] } }] };
+    const { fetchMock } = installCloudApi(cloudLibrary(1));
+    const normalFetch = fetchMock.getMockImplementation();
+    let release;
+    let start;
+    const started = new Promise((resolve) => { start = resolve; });
+    fetchMock.mockImplementation((url, opts) => {
+      if (JSON.parse(opts.body || '{}').action === 'putAsset') {
+        start();
+        return new Promise((resolve) => { release = resolve; });
+      }
+      return normalFetch(url, opts);
+    });
+    const controller = new AbortController();
+    const first = pushLibraryToCloudBestEffort(60_000, { snapshot, signal: controller.signal });
+    await started;
+    fetchMock.mockImplementation(normalFetch);
+    const second = await pushLibraryToCloudBestEffort(5_000, { snapshot });
+    expect(second).toMatchObject({ ok: true, assetsUploaded: 1, assetsFailed: 0 });
+    controller.abort();
+    expect(await first).toMatchObject({ ok: false });
+    release(response({ ok: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(await pushLibraryToCloudBestEffort(5_000, { snapshot })).toMatchObject({
+      ok: true, assetsUploaded: 0, assetsSkipped: 1, assetsFailed: 0,
+    });
   });
 
   it('logout envia o snapshot em memória com lock e devolve falhas de imagem para impedir descarte', async () => {

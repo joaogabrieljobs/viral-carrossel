@@ -12,6 +12,7 @@ import { importSlideReference } from './slide-reference.js';
 import { migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, isOriginalImageAsset, imageContentType } from './cloud-image-assets.js';
+import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './cloud-upload-receipts.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
 export const LIBRARY_CLOUD_META_FALLBACK_KEY = 'vc_library_cloud_meta_fallback';
@@ -387,7 +388,7 @@ export async function fetchLibraryCloudStatus(opts = {}) {
 }
 
 /** Upload de fotos — 1 a 1 com retry; nunca bloqueia o save da estrutura. */
-async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
+async function uploadAssetsBestEffort(assets, { owner, signal, assertCurrent } = {}) {
   let uploaded = 0;
   let skipped = 0;
   let failed = 0;
@@ -397,25 +398,41 @@ async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
   for (const [assetId, dataUrl] of entries) {
     assertCurrent?.();
     if (signal?.aborted) throw new Error('Sincronização cancelada.');
-    // assetIds no manifesto são referências, não recibos de upload.
-    // Reenvio idempotente recupera imagens de tentativas anteriores falhadas.
+    // Um timeout não deve obrigar a reenviar as primeiras fotos a cada save.
+    // Só recibos desta conta e dos mesmos bytes dispensam um novo upload.
+    if (hasConfirmedOriginalUpload(owner, assetId)) {
+      skipped += 1;
+      continue;
+    }
     let ok = false;
     for (let attempt = 0; attempt < 2 && !ok; attempt += 1) {
       assertCurrent?.();
       try {
         // eslint-disable-next-line no-await-in-loop
         if (dataUrl.length <= CLOUD_IMAGE_PART_CHARS) {
-          await syncRequest({ action: 'putAsset', assetId, dataUrl, contentType: imageContentType(dataUrl) }, { signal });
+          const saved = await syncRequest({ action: 'putAsset', assetId, dataUrl, contentType: imageContentType(dataUrl) }, { signal });
+          if (saved.ok !== true || (saved.assetId && saved.assetId !== assetId)) {
+            throw new Error('A nuvem não confirmou o envio da imagem.');
+          }
         } else {
           const total = Math.ceil(dataUrl.length / CLOUD_IMAGE_PART_CHARS);
           for (let index = 0; index < total; index += 1) {
             assertCurrent?.();
-            await syncRequest({
+            const saved = await syncRequest({
               action: 'putAssetChunk', assetId, index, total, totalChars: dataUrl.length,
               data: dataUrl.slice(index * CLOUD_IMAGE_PART_CHARS, (index + 1) * CLOUD_IMAGE_PART_CHARS),
             }, { signal });
+            if (saved.ok !== true || (saved.assetId && saved.assetId !== assetId)
+              || (index === total - 1 && saved.complete !== true)) {
+              throw new Error('A nuvem não confirmou o envio completo da imagem.');
+            }
           }
         }
+        // Uma resposta tardia de um pedido cancelado ou de outra conta não
+        // confirma proteção e não autoriza pular o original na próxima vez.
+        assertCurrent?.();
+        if (signal?.aborted) throw new Error('Sincronização cancelada.');
+        rememberConfirmedOriginalUpload(owner, assetId);
         uploaded += 1;
         ok = true;
       } catch (e) {
@@ -423,7 +440,7 @@ async function uploadAssetsBestEffort(assets, { signal, assertCurrent } = {}) {
         lastError = String(e?.message || e || 'upload');
         // Pausa curta entre retries / rate-limit.
         // eslint-disable-next-line no-await-in-loop
-        await new Promise((r) => setTimeout(r, 280));
+        await waitForSyncRetry(280, signal);
       }
     }
     if (!ok) failed += 1;
@@ -519,6 +536,7 @@ export async function pushLibraryToCloud(opts = {}) {
   // 2) Fotos depois (não falha o save).
   const assetStats = assets.size
     ? await uploadAssetsBestEffort(assets, {
+      owner: context.owner,
       signal: opts.signal,
       assertCurrent: () => assertSyncContext(context, guardOpts),
     })
@@ -579,6 +597,7 @@ export async function pushLibraryToCloud(opts = {}) {
     localProjectCount: snapshot ? snapshot.library.length : localLibraryFingerprint().count,
     assetCount: assets.size,
     assetsUploaded: assetStats.uploaded,
+    assetsSkipped: assetStats.skipped,
     assetsFailed: assetStats.failed,
     assetError: assetStats.lastError,
     needsReload,
@@ -995,10 +1014,13 @@ function reloadAfterCloudPull() {
  * anterior sem pull. A contagem da nuvem só é sucesso após aplicar a lista à UI.
  * @returns {Promise<'ok'|'reloading'|'skipped'|'blocked'>}
  */
-export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
+export async function reconcileLibraryCloud({ toast, onApplied, localSnapshot } = {}) {
   if (typeof window === 'undefined') return 'skipped';
   const localMeta = readCloudMeta();
-  const requiresCloudRestore = localMeta?.localPersisted === false;
+  const hasRestoredSnapshot = Array.isArray(localSnapshot?.library);
+  // O cofre durável já restaurado na UI é mais recente que a cache que não
+  // coube em localStorage. Apenas essa cache antiga exige pull obrigatório.
+  const requiresCloudRestore = localMeta?.localPersisted === false && !hasRestoredSnapshot;
   try {
     const status = await fetchLibraryCloudStatus();
     const local = localLibraryFingerprint();
@@ -1007,7 +1029,11 @@ export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
     // um reload ainda precisaria do cache persistido e deve continuar estrito.
     const allowMemoryFallback = typeof onApplied === 'function';
     let result;
-    if (requiresCloudRestore) {
+    if (hasRestoredSnapshot) {
+      result = await pushLibraryToCloud({
+        snapshot: localSnapshot, force: true, pullAfter: true, allowMemoryFallback,
+      });
+    } else if (requiresCloudRestore) {
       // A memória recebeu uma versão que não coube em localStorage. No próximo
       // boot esta cache não representa uma edição local e nunca pode fazer push.
       const expectedMeta = Number(status?.meta?.revision || 0) >= Number(localMeta?.revision || 0)
@@ -1053,24 +1079,36 @@ export async function reconcileLibraryCloud({ toast, onApplied } = {}) {
 export async function pushLibraryToCloudBestEffort(timeoutMs = 8_000, opts = {}) {
   const controller = new AbortController();
   let timer;
+  let rejectAborted;
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort();
+  if (opts.signal?.aborted) controller.abort();
+  else opts.signal?.addEventListener('abort', abortFromCaller, { once: true });
   try {
+    const cancelled = new Promise((_, reject) => {
+      rejectAborted = () => reject(new Error(timedOut
+        ? 'Tempo de sincronização esgotado.' : 'Sincronização cancelada.'));
+      if (controller.signal.aborted) rejectAborted();
+      else controller.signal.addEventListener('abort', rejectAborted, { once: true });
+    });
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     const result = await Promise.race([
       pushLibraryToCloud({
         snapshot: opts.snapshot, force: true, allowShrink: false,
         allowLocked: true, pullAfter: false, signal: controller.signal,
       }),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error('Tempo de sincronização esgotado.'));
-        }, timeoutMs);
-      }),
+      cancelled,
     ]);
     return result;
   } catch (error) {
     return { ok: false, cloudSaved: false, pushError: String(error?.message || error || 'Falha ao sincronizar.') };
   } finally {
     clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', abortFromCaller);
+    controller.signal.removeEventListener('abort', rejectAborted);
   }
 }
 
