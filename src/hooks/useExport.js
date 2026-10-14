@@ -12,6 +12,7 @@ import { canvasToPngBlob } from '../utils/image-storage.js';
 import { downloadBlob, vcPrepareHtml2CanvasClone, downloadCanvasPng } from '../utils/export-helpers.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { blobFromSlideRef } from '../utils/ai-client.js';
+import { waitForExportFonts } from '../utils/export-fonts.js';
 
 const loadHtml2Canvas = async () => (await import('html2canvas')).default;
 const loadJsPdf = async () => (await import('jspdf')).jsPDF;
@@ -125,6 +126,7 @@ export async function waitForExportReadiness({
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   }),
   waitForAssets = waitForExportAssets,
+  waitForFonts = waitForExportFonts,
 } = {}) {
   const directUrls = slideImageUrls(slides);
 
@@ -134,6 +136,8 @@ export async function waitForExportReadiness({
   if (fontsReady) {
     try { await fontsReady; } catch {}
   }
+
+  await waitForFonts((Array.isArray(roots) ? roots : []).filter(Boolean));
 
   await waitForFrames();
 
@@ -212,8 +216,9 @@ export function useExport({
       windowWidth: w,
       windowHeight: h,
       imageTimeout: 15000,
-      onclone: (clonedDoc, clonedEl) => {
-        vcPrepareHtml2CanvasClone(clonedDoc, clonedEl);
+      onclone: async (clonedDoc, clonedEl) => {
+        await waitForExportFonts([clonedEl], { doc: clonedDoc });
+        await vcPrepareHtml2CanvasClone(clonedDoc, clonedEl);
       },
     });
   };

@@ -1,32 +1,88 @@
 import { canvasToPngBlob } from './image-storage.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 
-/**
- * html2canvas 1.4.x rasteriza mal `<img>` com `object-fit` + `transform` (sanduíche Cultura) — faixa achatada/larga.
- * Substituir por `div` com `background-*` replica o enquadramento sem distorcer no PNG/PDF.
- */
-function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
+/** Geometria explícita: html2canvas ignora object-fit e reduz backgrounds antes do scale. */
+export function vcExportImageGeometry(imageWidth, imageHeight, boxWidth, boxHeight, size = 'cover', position = '50% 50%') {
+  if (![imageWidth, imageHeight, boxWidth, boxHeight].every(value => Number.isFinite(value) && value > 0)) return null;
+  const length = (value, total) => /^-?[\d.]+%$/.test(value) ? parseFloat(value) * total / 100
+    : /^-?[\d.]+(?:px)?$/.test(value) ? parseFloat(value) : null;
+  let width;
+  let height;
+  if (size === 'cover' || size === 'contain' || size === 'scale-down') {
+    const fit = size === 'cover' ? Math.max(boxWidth / imageWidth, boxHeight / imageHeight)
+      : Math.min(boxWidth / imageWidth, boxHeight / imageHeight, size === 'scale-down' ? 1 : Infinity);
+    width = imageWidth * fit; height = imageHeight * fit;
+  } else {
+    const parts = (size === 'fill' ? '100% 100%' : size === 'none' ? 'auto auto' : size).trim().split(/\s+/);
+    if (parts.length > 2) return null;
+    const [horizontal = 'auto', vertical = 'auto'] = parts;
+    width = horizontal === 'auto' ? null : length(horizontal, boxWidth);
+    height = vertical === 'auto' ? null : length(vertical, boxHeight);
+    if ((horizontal !== 'auto' && width == null) || (vertical !== 'auto' && height == null)) return null;
+    if (width == null && height == null) { width = imageWidth; height = imageHeight; }
+    else if (width == null) width = height * imageWidth / imageHeight;
+    else if (height == null) height = width * imageHeight / imageWidth;
+  }
+  const positions = position.trim().split(/\s+/);
+  if (positions.length > 2) return null;
+  let [horizontal, vertical = '50%'] = positions;
+  if (positions.length === 1 && ['top', 'bottom'].includes(horizontal)) [horizontal, vertical] = ['50%', horizontal];
+  const keywords = { left: '0%', top: '0%', center: '50%', right: '100%', bottom: '100%' };
+  const x = length(keywords[horizontal] || horizontal, boxWidth - width);
+  const y = length(keywords[vertical] || vertical, boxHeight - height);
+  return width > 0 && height > 0 && x != null && y != null ? { x, y, width, height } : null;
+}
+
+function exportImageSource(clonedDoc, src) {
+  return new Promise((resolve, reject) => {
+    const image = new clonedDoc.defaultView.Image();
+    const timer = setTimeout(() => finish(new Error('A imagem não carregou a tempo para exportar.')), 15000);
+    const finish = (error) => {
+      clearTimeout(timer);
+      image.onload = null; image.onerror = null;
+      if (error) reject(error); else resolve(image);
+    };
+    image.onload = () => finish();
+    image.onerror = () => finish(new Error('Não foi possível carregar a imagem para exportar.'));
+    if (/^https?:/i.test(src)) image.crossOrigin = 'anonymous';
+    image.src = src;
+    if (image.complete && image.naturalWidth) finish();
+  });
+}
+
+function positionedExportImage(clonedDoc, src, geometry) {
+  const image = clonedDoc.createElement('img');
+  image.src = src;
+  Object.assign(image.style, {
+    position: 'absolute', left: `${geometry.x}px`, top: `${geometry.y}px`,
+    width: `${geometry.width}px`, height: `${geometry.height}px`, maxWidth: 'none', maxHeight: 'none',
+    margin: '0', padding: '0', border: '0', display: 'block', objectFit: 'fill', pointerEvents: 'none',
+  });
+  return image;
+}
+
+/** Resolve object-fit no clone sem converter logos/fotos em um background de baixa resolução. */
+async function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
   if (!clonedSlideRoot?.querySelectorAll) return;
   const view = clonedDoc.defaultView;
   if (!view?.getComputedStyle) return;
   const list = Array.from(clonedSlideRoot.querySelectorAll('img'));
-  list.forEach((img) => {
+  await Promise.all(list.map(async (img) => {
     const src = img.getAttribute('src');
     if (!src) return;
     const parent = img.parentElement;
     if (!parent) return;
 
     const computed = view.getComputedStyle(img);
-    const fit = (computed.objectFit || 'fill').trim();
-    const pos = computed.objectPosition || '50% 50%';
-    let bgSize = '100% 100%';
-    if (fit === 'cover') bgSize = 'cover';
-    else if (fit === 'contain') bgSize = 'contain';
+    const source = await exportImageSource(clonedDoc, src);
+    const geometry = vcExportImageGeometry(source.naturalWidth, source.naturalHeight,
+      parseFloat(computed.width), parseFloat(computed.height),
+      (computed.objectFit || 'fill').trim(), computed.objectPosition || '50% 50%');
+    if (!geometry) return;
 
     const stub = clonedDoc.createElement('div');
     stub.setAttribute('data-vc-html2canvas-img', '');
-    const cssUrl = `url("${src.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
-    stub.style.position = computed.position === 'static' ? 'absolute' : computed.position;
+    stub.style.position = computed.position === 'static' ? 'relative' : computed.position;
     stub.style.top = computed.top;
     stub.style.left = computed.left;
     stub.style.right = computed.right;
@@ -37,19 +93,50 @@ function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
     stub.style.padding = computed.padding;
     stub.style.border = computed.border;
     stub.style.boxSizing = computed.boxSizing || 'border-box';
-    stub.style.display = 'block';
-    stub.style.transform = 'none';
+    stub.style.display = computed.display === 'inline' ? 'inline-block' : computed.display;
+    stub.style.verticalAlign = computed.verticalAlign;
+    stub.style.zIndex = computed.zIndex;
+    stub.style.transform = computed.transform;
+    stub.style.transformOrigin = computed.transformOrigin;
     stub.style.filter = computed.filter;
     stub.style.opacity = computed.opacity;
     stub.style.borderRadius = computed.borderRadius;
     stub.style.pointerEvents = 'none';
-    stub.style.backgroundImage = cssUrl;
-    stub.style.backgroundRepeat = 'no-repeat';
-    stub.style.backgroundSize = bgSize;
-    stub.style.backgroundPosition = pos;
-
+    stub.style.overflow = 'hidden';
+    stub.appendChild(positionedExportImage(clonedDoc, src, geometry));
     parent.replaceChild(stub, img);
-  });
+  }));
+}
+
+/**
+ * html2canvas 1.4.x faz resize do background para pixels CSS antes de ampliar
+ * o resultado. Camadas de foto isoladas viram img com crop explícito: o bitmap
+ * original só é reamostrado ao desenhar no canvas final (3×).
+ * Gradientes, texturas repetidas e backgrounds compostos seguem intactos.
+ */
+async function vcFixHtml2CanvasBackgroundImages(clonedDoc, clonedSlideRoot) {
+  const view = clonedDoc.defaultView;
+  if (!view?.getComputedStyle || !clonedSlideRoot?.querySelectorAll) return;
+  await Promise.all([clonedSlideRoot, ...clonedSlideRoot.querySelectorAll('*')].map(async (node) => {
+    if (node.tagName === 'IMG' || node.children.length || node.textContent?.trim()) return;
+    const computed = view.getComputedStyle(node);
+    const match = String(computed.backgroundImage || '').match(/^url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)$/);
+    if (!match || computed.backgroundRepeat !== 'no-repeat') return;
+    // As camadas de foto do renderer não têm borda nem padding. Outros fundos
+    // usam a semântica nativa para não alterar background-origin/clip.
+    if (['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+      'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].some(key => parseFloat(computed[key]) > 0)) return;
+    const src = match[1] ?? match[2] ?? match[3];
+    const source = await exportImageSource(clonedDoc, src);
+    const geometry = vcExportImageGeometry(source.naturalWidth, source.naturalHeight,
+      parseFloat(computed.width), parseFloat(computed.height), computed.backgroundSize, computed.backgroundPosition);
+    if (!geometry) return;
+    if (computed.position === 'static') node.style.position = 'relative';
+    node.style.backgroundImage = 'none';
+    node.style.overflow = 'hidden';
+    node.setAttribute('data-vc-html2canvas-photo', '');
+    node.appendChild(positionedExportImage(clonedDoc, src, geometry));
+  }));
 }
 
 /**
@@ -122,8 +209,9 @@ function vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot) {
   });
 }
 
-function vcPrepareHtml2CanvasClone(clonedDoc, clonedSlideRoot) {
-  vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot);
+async function vcPrepareHtml2CanvasClone(clonedDoc, clonedSlideRoot) {
+  await vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot);
+  await vcFixHtml2CanvasBackgroundImages(clonedDoc, clonedSlideRoot);
   vcFixHtml2CanvasTextClip(clonedDoc, clonedSlideRoot);
 }
 
@@ -177,6 +265,7 @@ async function downloadBlob(blob, filename) {
 
 export {
   vcFixHtml2CanvasImages,
+  vcFixHtml2CanvasBackgroundImages,
   vcFixHtml2CanvasTextClip,
   vcPrepareHtml2CanvasClone,
   vcPreferFileShareForDownloads,
