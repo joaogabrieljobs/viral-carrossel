@@ -167,6 +167,7 @@ describe('library-sync-store', () => {
       vi.stubEnv('VITEST', 'false');
       vi.stubEnv('NODE_ENV', 'production');
       vi.stubEnv('LIBRARY_SYNC_STORAGE', '');
+      vi.stubEnv('LIBRARY_SYNC_BLOB_OWNERS', '');
       vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
       vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
       vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
@@ -214,6 +215,17 @@ describe('library-sync-store', () => {
       await expect(putLibraryManifest(customerId, { docs: [] }, { force: true }))
         .rejects.toMatchObject({ code: 'library_storage_unavailable' });
       expect(blob.put).not.toHaveBeenCalled();
+    });
+
+    it('permite ativar Blob só para a conta auditada sem alterar outras bibliotecas', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      vi.stubEnv('LIBRARY_SYNC_BLOB_OWNERS', ` ${customerId} `);
+      fetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
+      setBlob(manifest(137, 9));
+      expect(await getLibrarySyncMeta(customerId)).toMatchObject({ projectCount: 9 });
+      expect(fetch).not.toHaveBeenCalled();
+      await expect(getLibrarySyncMeta('cus_not_audited')).rejects.toMatchObject({ code: 'library_storage_unavailable' });
+      expect(fetch).toHaveBeenCalled();
     });
 
     it('Blob explícito mantém falhas reais visíveis e nunca troca para Redis', async () => {

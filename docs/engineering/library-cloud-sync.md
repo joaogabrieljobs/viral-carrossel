@@ -29,6 +29,8 @@ Status e download escolhem o mesmo manifesto completo, pela maior revisão e dat
 
 Essa escolha é explícita, não uma reação automática a indisponibilidade. Em instalações que já gravaram bibliotecas no Redis, reconciliar/exportar suas revisões antes de trocar de modo. Não remover dados antigos do Redis ao mudar a configuração.
 
+Para implantação gradual, `LIBRARY_SYNC_BLOB_OWNERS` limita o modo Blob aos IDs de conta verificados (separados por vírgula). As demais contas continuam consultando ambas as fontes. Em produção, a mudança foi limitada à conta auditada. Não foi possível verificar dados eventualmente exclusivos do Redis indisponível; eles permanecem intactos, e uma futura reativação exige reconciliação por ID com o Blob atualizado.
+
 Na investigação de produção de 13/10, a leitura direta do Blob confirmou nove projetos (revisão 137) na conta afetada. O bloqueio vinha do Redis configurado no servidor, cujo endereço falhava com `ENOTFOUND`. A biblioteca passa a usar diretamente o Blob já verificado, preservando o manifesto e os dados locais durante o merge. Os dados e a configuração global do Redis não são apagados.
 
 ## Cliente

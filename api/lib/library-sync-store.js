@@ -15,11 +15,17 @@ const memoryMeta = new Map();
 const memoryManifest = new Map();
 const memoryAssets = new Map();
 
-function hasUpstash() {
+function usesBlobOnly(customerId) {
+  if (process.env.LIBRARY_SYNC_STORAGE?.trim() !== 'blob') return false;
+  const owners = process.env.LIBRARY_SYNC_BLOB_OWNERS?.trim();
+  return !owners || owners.split(',').some((owner) => owner.trim() === customerId);
+}
+
+function hasUpstash(customerId) {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
   // Escolha operacional explícita: o Redis usado por outros recursos pode não
   // participar da biblioteca. Não é um fallback automático após erro de rede.
-  if (process.env.LIBRARY_SYNC_STORAGE?.trim() === 'blob') return false;
+  if (usesBlobOnly(customerId)) return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -234,7 +240,7 @@ function readFailureDiagnostic(source, error) {
 export async function getLibraryManifest(customerId) {
   const id = sanitizeCustomerId(customerId);
   if (!id) return null;
-  if (process.env.LIBRARY_SYNC_STORAGE?.trim() === 'blob' && !hasBlob() && !allowMemory()) {
+  if (usesBlobOnly(id) && !hasBlob() && !allowMemory()) {
     throw storageUnconfiguredError(['Blob não configurado para a biblioteca']);
   }
   const pathname = manifestPath(id);
@@ -257,7 +263,7 @@ export async function getLibraryManifest(customerId) {
     }
   }
 
-  if (hasUpstash()) {
+  if (hasUpstash(id)) {
     try {
       const [raw, rawMeta] = await Promise.all([
         upstash(['GET', `${META_PREFIX}${id}:full`]),
@@ -407,7 +413,7 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
   if (hasBlob()) {
     try {
       await putBlobPrivate(pathname, serialized, 'application/json');
-      if (hasUpstash()) {
+      if (hasUpstash(id)) {
         try {
           await upstash(['SET', `${META_PREFIX}${id}`, JSON.stringify(meta)]);
         } catch { /* blob já tem o manifesto */ }
@@ -422,7 +428,7 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
     }
   }
 
-  if (hasUpstash() && serialized.length <= 450_000) {
+  if (hasUpstash(id) && serialized.length <= 450_000) {
     try {
       await upstash(['SET', `${META_PREFIX}${id}:full`, serialized]);
       await upstash(['SET', `${META_PREFIX}${id}`, JSON.stringify(meta)]);
