@@ -60,6 +60,8 @@ export default function AccountUsage({
   const [refreshMessage, setRefreshMessage] = useState('');
   const refreshInFlight = useRef(false);
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodStart, currentPeriodEnd });
+  // Ciclos que atravessam a correção podem ter contadores legados incompletos.
+  const hasLegacyCycle = usage.limit > 0 && usage.periodStart?.slice(0, 10) <= '2026-10-14';
   const padding = isMobile ? 18 : 26;
   const quotaState = usage.noIncludedImages
     ? 'Sem imagens inclusas'
@@ -141,6 +143,7 @@ export default function AccountUsage({
                   ? 'Você utilizou todas as imagens disponíveis neste ciclo. Aguarde a renovação ou consulte as opções do seu plano.'
                   : 'O saldo considera apenas as imagens geradas com o plano e é renovado a cada ciclo.'}
           </p>
+          {hasLegacyCycle && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Neste ciclo, gerações anteriores à correção do contador em 14/10/2026 podem não estar incluídas.</p>}
           {(usage.noIncludedImages || usage.exhausted) && onManageBilling && (
             <div><button type="button" onClick={onManageBilling} style={{ ...buttonStyle, marginTop: 4, background: 'var(--text-primary)', color: 'var(--bg-base)', borderColor: 'transparent' }}>Ver opções do plano <ArrowUpRight size={14} aria-hidden="true" /></button></div>
           )}

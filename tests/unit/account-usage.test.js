@@ -98,4 +98,10 @@ describe('account usage page', () => {
     expect(html).toContain('O consumo e a cobrança ficam no provedor da chave');
     expect(html).toContain('Gerenciar chave de imagem');
   });
+
+  it('identifies incomplete legacy cycles without carrying the notice into the next cycle', () => {
+    const props = { imageQuota: { used: 0, limit: 50 } };
+    expect(render({ ...props, currentPeriodStart: '2026-10-01T12:00:00Z' })).toContain('anteriores à correção do contador');
+    expect(render({ ...props, currentPeriodStart: '2026-11-01T12:00:00Z' })).not.toContain('anteriores à correção do contador');
+  });
 });
