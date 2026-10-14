@@ -392,7 +392,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       .toBe('Comunicação da Clínica Janine');
   });
 
-  test('logout com nuvem offline e quota mantém a conta e a edição sem chamar o endpoint de saída', async ({ page }) => {
+  test('logout com todos os destinos indisponíveis mantém a conta e a edição', async ({ page }) => {
     const cloud = await mockCloud(page, { offlineAtBoot: true });
     await seedOneProject(page);
     await page.goto('/?app=1');
@@ -403,6 +403,11 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
     await expect(title).toHaveValue('Comunicação da Clínica Janine');
     await page.evaluate(() => {
+      const open = indexedDB.open.bind(indexedDB);
+      indexedDB.open = function(name, ...args) {
+        if (name === 'viral-carrossel-account-vault') throw new DOMException('E2E: cofre indisponível', 'SecurityError');
+        return open(name, ...args);
+      };
       const original = Storage.prototype.setItem;
       Storage.prototype.setItem = function setItem(key, value) {
         if (this === localStorage && ['vc_library', 'vc_account_vault'].includes(key)) {
@@ -431,6 +436,95 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await title.fill(`${editedTitle} — e continua editável`);
     await expect(title).toHaveValue(`${editedTitle} — e continua editável`);
     expect(cloud.logoutCount).toBe(0);
+  });
+
+  for (const quotaPersists of [false, true]) test(`quota com 23 cards recupera edição e fotos sem nuvem; quota persistente: ${quotaPersists}`, async ({ page }, testInfo) => {
+    const cloud = await mockCloud(page, { offlineAtBoot: true });
+    await seedOneProject(page);
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('e2e-23-cards')) return;
+      sessionStorage.setItem('e2e-23-cards', '1');
+      const library = JSON.parse(localStorage.getItem('vc_library'));
+      const original = library[0].doc.slides[0];
+      library[0].doc.slides = Array.from({ length: 23 }, (_, i) => ({
+        ...original, id: i ? `photo-${i}` : original.id, num: i + 1,
+        title: i ? `Texto do card ${i + 1}` : original.title,
+        bgImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+      }));
+      localStorage.setItem('vc_library', JSON.stringify(library));
+    });
+    await page.goto('/?app=1');
+    await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
+    await page.getByRole('button', { name: /editar card/i }).first().click();
+    const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (this === localStorage && ['vc_library', 'vc_account_vault'].includes(key)) {
+          throw new DOMException('E2E: localStorage cheio', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    if (quotaPersists) await page.addInitScript(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (this === localStorage && ['vc_library', 'vc_account_vault'].includes(key)) {
+          throw new DOMException('E2E: quota continua cheia após login', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    const editedTitle = 'Edição final que não coube no armazenamento antigo';
+    await title.fill(editedTitle);
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Sair da conta', exact: true }).click();
+    await expect.poll(() => cloud.logoutCount, { timeout: 20_000 }).toBe(1);
+    await expect(page).toHaveURL(/\/$/);
+    expect(await page.evaluate(() => localStorage.getItem('vc_library'))).toBeNull();
+    cloud.session = { ...SESSAO_ATIVA };
+    await page.goto('/?app=1&login=password');
+    await expect(page.getByRole('button', { name: /continuar no editor/i })).toBeVisible();
+    const restored = await page.evaluate(async (owner) => {
+      const library = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('viral-carrossel-account-vault', 1);
+        req.onsuccess = () => {
+          const db = req.result;
+          const read = db.transaction('accounts').objectStore('accounts').get('vault');
+          read.onsuccess = () => { db.close(); resolve(JSON.parse(read.result[owner].keys.vc_library)); };
+          read.onerror = () => { db.close(); reject(read.error); };
+        };
+        req.onerror = () => reject(req.error);
+      });
+      const db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('viral-carrossel-img', 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const slides = library[0].doc.slides;
+      const photos = await Promise.all(slides.map(slide => new Promise((resolve, reject) => {
+        const req = db.transaction('images').objectStore('images').get(slide.bgImageId);
+        req.onsuccess = () => resolve(req.result?.blob?.size > 0);
+        req.onerror = () => reject(req.error);
+      })));
+      db.close();
+      return { count: slides.length, title: slides[0].title, photos };
+    }, `email:${SESSAO_ATIVA.email}`);
+    expect(restored).toEqual({ count: 23, title: editedTitle, photos: Array(23).fill(true) });
+    await page.reload();
+    // Com cache disponível, o boot já pode reabrir o editor restaurado.
+    const continueEditing = page.getByRole('button', { name: /continuar no editor/i });
+    await expect(continueEditing.or(page.getByRole('button', { name: 'Salvar projeto agora', exact: true }))).toBeVisible();
+    if (quotaPersists) expect(await page.evaluate(() => localStorage.getItem('vc_library'))).toBeNull();
+    else expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].title)).toBe(editedTitle);
+    if (await continueEditing.isVisible()) await continueEditing.click();
+    await expect(page.locator('main [data-vc-card-surface]')).toHaveCount(23);
+    await expect(page.locator('main').getByText(editedTitle, { exact: true }).first()).toBeVisible();
+    await expect.poll(() => page.locator('main [data-vc-card-surface]').first().evaluate(el =>
+      [...el.querySelectorAll('*')].some(child => /url\(/.test(child.style.backgroundImage)))).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('logout-quota-recuperado.png') });
   });
 
   test('formulário de login na landing restaura os 5 projetos e habilita ações da conta', async ({ page }) => {
@@ -470,6 +564,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await goHome(page);
     await expectHomeProjects(page);
     await page.reload();
+    await goHome(page);
     await expectHomeProjects(page);
   });
 });

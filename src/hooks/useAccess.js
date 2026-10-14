@@ -56,17 +56,21 @@ export async function logoutWithProtectedLibrary({
     if (!stillCurrent()) {
       throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
     }
-    let vaultSaved = false;
-    if (prepared.localPersisted === true) {
-      try { vaultSaved = snapshotAccountVaultForOwners(aliases) === true; } catch { /* exige confirmação da nuvem abaixo */ }
-    }
     lockAccountDataWrites();
     lockedHere = true;
+    // O cofre recebe a edição em memória, mesmo se o cache pequeno estiver
+    // cheio. Só a transação durável concluída autoriza a limpeza da conta.
+    let vaultSaved = false;
+    try { vaultSaved = await snapshotAccountVaultForOwners(aliases, { snapshot: prepared.snapshot }) === true; }
+    catch { /* exige confirmação da nuvem abaixo */ }
+    if (!stillCurrent()) {
+      throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
+    }
     // O timeout cancela pedidos antes da limpeza; o recibo inclui as imagens.
     let cloudResult = null;
     try {
       const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
-      cloudResult = await pushLibraryToCloudBestEffort(5_000, { snapshot: prepared.snapshot });
+      cloudResult = await pushLibraryToCloudBestEffort(vaultSaved ? 5_000 : 30_000, { snapshot: prepared.snapshot });
     } catch { /* o cofre só vale quando contém a edição atual confirmada */ }
     if (!stillCurrent()) {
       throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
@@ -221,30 +225,46 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         || loginStatus === 'password'
         || billing === 'restored'
         || billing === 'success';
-      const ownerGate = await ensureAccountDataOwner(session, { explicitLogin });
+      const sessionOwners = dataOwnerAliases(session?.email, session?.customerId);
+      const sessionStillOwnsData = () => !cancelled && (!session?.active || !sessionOwners.size || sessionOwners.has(readDataOwner()));
+      let restoredSnapshot;
+      const ownerGate = await ensureAccountDataOwner(session, {
+        explicitLogin,
+        isCurrent: () => !cancelled,
+        onRestored: typeof libraryCallbacksRef.current.onCloudLibraryApplied === 'function'
+          ? async (snapshot, result) => {
+            if (!sessionStillOwnsData()) throw new Error('A conta mudou durante a restauração.');
+            await libraryCallbacksRef.current.onCloudLibraryApplied(snapshot, result);
+            restoredSnapshot = snapshot;
+          }
+          : undefined,
+      });
       if (cancelled || ownerGate === 'reloading') return;
       if (ownerGate === 'blocked') {
         libraryCallbacksRef.current.onLibraryBlocked?.('Não foi possível proteger os projetos da conta anterior neste navegador. Mantenha esta aba aberta e tente novamente.');
         return;
       }
+      if (!sessionStillOwnsData()) return;
 
       // Multiutilizador: biblioteca na nuvem por conta (após isolamento local).
       if (session?.active) {
         try {
           const { reconcileLibraryCloud, CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE } = await import('../utils/library-sync.js');
+          if (!sessionStillOwnsData()) return;
           const cloudGate = await reconcileLibraryCloud({
             toast,
             email: session?.email,
             customerId: session?.customerId,
+            localSnapshot: restoredSnapshot,
             onApplied: libraryCallbacksRef.current.onCloudLibraryApplied,
           });
-          if (cancelled || cloudGate === 'reloading') return;
+          if (!sessionStillOwnsData() || cloudGate === 'reloading') return;
           if (cloudGate === 'blocked') {
             libraryCallbacksRef.current.onLibraryBlocked?.(CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE);
             return;
           }
         } catch { /* rede / Blob — cofre local continua */ }
-        if (!cancelled) libraryCallbacksRef.current.onLibraryReady?.();
+        if (sessionStillOwnsData()) libraryCallbacksRef.current.onLibraryReady?.();
       }
 
       // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a

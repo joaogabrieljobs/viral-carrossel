@@ -80,7 +80,7 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(mocks.clear).not.toHaveBeenCalled();
     pendingFlush.resolve(prepare());
     expect(await pending).toBe(true);
-    expect(mocks.vault).toHaveBeenCalledWith(['email:conta@example.test', 'id:cus_123']);
+    expect(mocks.vault).toHaveBeenCalledWith(['email:conta@example.test', 'id:cus_123'], { snapshot });
     expect(mocks.push).toHaveBeenCalledWith(5_000, { snapshot });
     expect(mocks.vault.mock.invocationCallOrder[0]).toBeLessThan(mocks.push.mock.invocationCallOrder[0]);
     expect(mocks.push.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
@@ -91,19 +91,45 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(mocks.state.locked).toBe(true);
   });
 
-  it('cache recusado não cria cofre stale; nuvem confirmada com todas as imagens permite sair', async () => {
+  it('cache recusado usa snapshot fresco no cofre, sem depender da nuvem', async () => {
     mocks.vault.mockReturnValue(true);
-    mocks.push.mockResolvedValue(cloudReceipt);
     expect(await run({ onBeforeLogout: async () => prepare(false) })).toBe(true);
-    expect(mocks.vault).not.toHaveBeenCalled();
+    expect(mocks.vault).toHaveBeenCalledWith(['email:conta@example.test', 'id:cus_123'], { snapshot });
     expect(mocks.push).toHaveBeenCalledWith(5_000, { snapshot });
     expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('aguarda a transação do cofre antes de enviar ou limpar', async () => {
+    const saved = deferred();
+    mocks.vault.mockReturnValue(saved.promise);
+    const pending = run({ onBeforeLogout: async () => prepare(false) });
+    await vi.waitFor(() => expect(mocks.vault).toHaveBeenCalledTimes(1));
+    expect(mocks.state.locked).toBe(true);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+    saved.resolve(true);
+    expect(await pending).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('edição durante gravação do cofre impede apagar o estado mais recente', async () => {
+    const saved = deferred();
+    mocks.vault.mockReturnValue(saved.promise);
+    let current = true;
+    const pending = run({ onBeforeLogout: async () => prepare(false, () => current) });
+    await vi.waitFor(() => expect(mocks.vault).toHaveBeenCalledTimes(1));
+    current = false;
+    saved.resolve(true);
+    expect(await pending).toBe(false);
+    expectRetained();
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it('cache e nuvem falhando mantêm a conta, a aba e o estado editável', async () => {
     expect(await run({ onBeforeLogout: async () => prepare(false) })).toBe(false);
     expectRetained();
-    expect(mocks.vault).not.toHaveBeenCalled();
+    expect(mocks.vault).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith(30_000, { snapshot });
     expect(toast).toHaveBeenCalledWith(expect.stringContaining('últimas alterações ainda não estão protegidas'), 'warning', 6500);
   });
 

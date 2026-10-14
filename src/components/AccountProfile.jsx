@@ -355,6 +355,7 @@ export default function AccountProfile({
 }) {
   const [profile, setProfile] = useState(() => loadUserProfile());
   const [editing, setEditing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_USER_PROFILE);
 
   useEffect(() => {
@@ -550,18 +551,16 @@ export default function AccountProfile({
           {onLogout && (
             <button
               type="button"
-              onClick={(e) => {
+              disabled={loggingOut}
+              aria-busy={loggingOut}
+              onClick={async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                try {
-                  const ret = onLogout();
-                  if (ret && typeof ret.then === 'function') {
-                    ret.catch((err) => console.warn('[logout]', err));
-                  }
-                } catch (err) {
-                  console.warn('[logout]', err);
-                  try { window.location.assign('/'); } catch { /* */ }
-                }
+                if (loggingOut) return;
+                setLoggingOut(true);
+                try { await onLogout(); }
+                catch (err) { console.warn('[logout]', err); }
+                finally { setLoggingOut(false); }
               }}
               style={{
                 height: 38,
@@ -574,7 +573,7 @@ export default function AccountProfile({
                 cursor: 'pointer',
               }}
             >
-              Sair da conta
+              {loggingOut ? 'Salvando e saindo…' : 'Sair da conta'}
             </button>
           )}
         </div>

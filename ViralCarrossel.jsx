@@ -939,6 +939,13 @@ export default function App() {
   }, []);
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
   const cloudSyncInFlightRef = useRef(false);
+  const cloudAutoPushRef = useRef(null);
+  const stopCloudAutoPush = useCallback(async () => {
+    const pending = cloudAutoPushRef.current;
+    if (!pending) return;
+    pending.controller.abort();
+    await pending.promise?.catch(() => {});
+  }, []);
   const docAutosaveTimerRef = useRef(null);
 
   // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
@@ -1448,6 +1455,7 @@ export default function App() {
     setCloudSyncBusy(true);
     let localSaved = false;
     try {
+      await stopCloudAutoPush();
       const pending = flushPersistNow({ returnSnapshot: true });
       const lib = pending.snapshot.library;
       setLibrary(lib);
@@ -1455,7 +1463,7 @@ export default function App() {
       const owner = readDataOwner();
       const session = accessSessionRef.current;
       const owners = [...new Set([owner, ...dataOwnerAliases(session?.email, session?.customerId)].filter(Boolean))];
-      if (localSaved) snapshotAccountVaultForOwners(owners);
+      await snapshotAccountVaultForOwners(owners, { snapshot: pending.snapshot });
 
       const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
       const result = await pushLibraryToCloud({
@@ -1476,7 +1484,7 @@ export default function App() {
       }
       const count = applyCloudLibrarySnapshot(result.snapshot, result);
       // O cofre do logout também deve conter a união restaurada da nuvem.
-      if (result.localPersisted !== false) snapshotAccountVaultForOwners(owners);
+      await snapshotAccountVaultForOwners(owners, { snapshot: result.snapshot });
       trackEvent('library_cloud_push', { project_count: String(count), source });
       const photosPending = Number(result.assetsFailed || 0) + Number(result.assetsMissing || 0);
       const cachePending = result.localPersisted === false;
@@ -1499,7 +1507,7 @@ export default function App() {
       cloudSyncInFlightRef.current = false;
       setCloudSyncBusy(false);
     }
-  }, [flushPersistNow, applyCloudLibrarySnapshot, toast]);
+  }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast]);
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
@@ -1648,7 +1656,8 @@ export default function App() {
   } = useAccess({
     setShellView,
     onLeaveEditor: () => setDrawerOpen(false),
-    onBeforeLogout: () => {
+    onBeforeLogout: async () => {
+      await stopCloudAutoPush();
       const pending = flushPersistRef.current({ returnSnapshot: true });
       setLibrary(pending.snapshot.library);
       return pending;
@@ -1677,19 +1686,28 @@ export default function App() {
     }
     if (areAccountDataWritesLocked()) return undefined;
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    const controller = new AbortController();
     cloudAutoPushTimerRef.current = setTimeout(() => {
       import('./src/utils/library-sync.js')
-        .then(({ pushLibraryToCloudBestEffort }) => {
-          if (areAccountDataWritesLocked() || cloudSyncInFlightRef.current) return;
+        .then(async ({ pushLibraryToCloudBestEffort }) => {
+          if (controller.signal.aborted || areAccountDataWritesLocked() || cloudSyncInFlightRef.current) return;
+          await stopCloudAutoPush();
+          if (controller.signal.aborted || areAccountDataWritesLocked() || cloudSyncInFlightRef.current) return;
           const pending = flushPersistRef.current({ returnSnapshot: true });
-          return pushLibraryToCloudBestEffort(12_000, { snapshot: pending.snapshot });
+          const task = { controller, promise: pushLibraryToCloudBestEffort(12_000, {
+            snapshot: pending.snapshot, signal: controller.signal,
+          }) };
+          cloudAutoPushRef.current = task;
+          try { await task.promise; }
+          finally { if (cloudAutoPushRef.current === task) cloudAutoPushRef.current = null; }
         })
         .catch(() => {});
     }, 4_000);
     return () => {
+      controller.abort();
       if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     };
-  }, [library, access?.active, accountLibraryReady, cloudSyncBusy]);
+  }, [library, access?.active, accountLibraryReady, cloudSyncBusy, stopCloudAutoPush]);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
@@ -2101,7 +2119,7 @@ export default function App() {
           libraryPersistRef.current,
           brandRosterPersistRef.current,
         ));
-        for (const id of getAccountVaultImageIds()) inUse.add(id);
+        for (const id of await getAccountVaultImageIds()) inUse.add(id);
         for (const id of idsDeImagemEmUso([{ doc: editorSyncStateRef.current.doc }], [])) inUse.add(id);
         const removidas = await imageCleanupOrphans([...inUse]);
         if (removidas > 0) console.log(`[imagem] limpeza: ${removidas} imagem(ns) órfã(s) removida(s)`);
