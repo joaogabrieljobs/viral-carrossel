@@ -337,8 +337,8 @@ function BrandLogoLayer({
 
 /** Texto editável no próprio card. Um clique continua selecionando/arrastando;
  * o segundo clique entra na edição e grava no histórico ao sair. */
-function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = {}, children }) {
-  const [editing, setEditing] = React.useState(false);
+function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = {}, autoEdit = false, onEditEnd, preserveWhitespace = false, children }) {
+  const [editing, setEditing] = React.useState(autoEdit);
   const ref = React.useRef(null);
   React.useEffect(() => {
     if (!editing || !ref.current) return;
@@ -347,16 +347,19 @@ function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = 
     const range = document.createRange?.();
     if (selection && range) {
       range.selectNodeContents(ref.current);
-      range.collapse(false);
+      if (!autoEdit) range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
     }
-  }, [editing]);
+  }, [editing, autoEdit]);
   const commit = React.useCallback(() => {
-    const next = String(ref.current?.innerText ?? ref.current?.textContent ?? '').trim();
+    const raw = String(ref.current?.innerText ?? ref.current?.textContent ?? '');
+    const next = preserveWhitespace ? raw : raw.trim();
+    const previous = preserveWhitespace ? String(value ?? '') : String(value ?? '').trim();
     setEditing(false);
-    if (next !== String(value ?? '').trim()) onCommit?.(next);
-  }, [onCommit, value]);
+    if (next !== previous) onCommit?.(next);
+    onEditEnd?.();
+  }, [onCommit, onEditEnd, preserveWhitespace, value]);
   return (
     <Tag
       {...elementProps}
@@ -374,7 +377,12 @@ function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = 
       onBlur={editing ? commit : undefined}
       onKeyDown={editing ? (event) => {
         event.stopPropagation();
-        if (event.key === 'Escape') { event.preventDefault(); setEditing(false); }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          if (ref.current) ref.current.textContent = String(value ?? '');
+          setEditing(false);
+          onEditEnd?.();
+        }
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); commit(); }
       } : elementProps.onKeyDown}
       title={editing ? 'Edite o texto e clique fora para salvar' : `${elementProps.title || ''}${elementProps.title ? ' · ' : ''}Duplo clique para editar`}
@@ -1101,6 +1109,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   bgScale,
   photoRegionId,
   onPhotoZoneClick,
+  brandFooterChrome = null,
   showCanvasChrome,
   showSupportingText = false,
   onInlineTextChange = null,
@@ -1469,6 +1478,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         {mainColumn}
       </div>
 
+      {brandFooterChrome}
+
       {brand.showHandle && slide.showHandle && !hideInstaBadge && (
         <div style={{
           ...vcHandleBadgeBoxPositionStyle(brand),
@@ -1550,6 +1561,10 @@ const SlideCardInner = React.forwardRef(({
   onElementOffsetChange = null,
   /** `(campo, texto) => void` — edição direta por duplo clique. */
   onInlineTextChange = null,
+  /** Texto livre: criação no ponto do Control + clique e edição inicial. */
+  onCreateText = null,
+  autoEditOverlayId = null,
+  onOverlayEditEnd = null,
   /** Seleção do elemento para a ação de excluir da barra rápida. */
   onElementSelect = null,
   selectedElement = null,
@@ -2046,9 +2061,15 @@ const SlideCardInner = React.forwardRef(({
             );
           }
           return (
-            <div
+            <InlineEditableText
               key={ov.id}
-              {...mov(chave, {
+              as="div"
+              value={ov.text}
+              preserveWhitespace
+              onCommit={(text) => commitInlineText(chave, text)}
+              autoEdit={autoEditOverlayId === ov.id}
+              onEditEnd={onOverlayEditEnd}
+              elementProps={mov(chave, {
                 position: 'absolute',
                 left: `${ov.x}%`,
                 top: `${ov.y}%`,
@@ -2062,11 +2083,13 @@ const SlideCardInner = React.forwardRef(({
                 letterSpacing: `${ov.tracking}em`,
                 lineHeight: ov.leading,
                 textAlign: ov.align,
-                whiteSpace: 'pre-line',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'break-word',
+                minHeight: '1em',
               })}
             >
               {ov.text}
-            </div>
+            </InlineEditableText>
           );
         })}
     </>
@@ -2864,6 +2887,7 @@ const SlideCardInner = React.forwardRef(({
         bgPos={bgPos}
         bgScale={bgScale}
         photoRegionId={normalizePhotoRegion(slide)}
+        brandFooterChrome={brandFooterChrome}
         onPhotoZoneClick={onPhotoZoneClick}
         showCanvasChrome={showCanvasChrome}
         mov={mov}
@@ -3378,7 +3402,29 @@ const SlideCardInner = React.forwardRef(({
     && CSS.supports('zoom', '1');
 
   return (
-    <div style={{
+    <div
+      data-vc-card-surface={slide.id}
+      onPointerDownCapture={onCreateText && !forExport ? (event) => {
+        if (!event.ctrlKey || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        // Finaliza a edição anterior antes de inserir outro elemento.
+        if (document.activeElement?.isContentEditable) document.activeElement.blur();
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        onCreateText({
+          x: ((event.clientX - rect.left) / rect.width) * 100,
+          y: ((event.clientY - rect.top) / rect.height) * 100,
+        });
+      } : undefined}
+      onClickCapture={onCreateText && !forExport ? (event) => {
+        if (event.ctrlKey) { event.preventDefault(); event.stopPropagation(); }
+      } : undefined}
+      onContextMenuCapture={onCreateText && !forExport ? (event) => {
+        // No macOS, Control + clique também emite contextmenu.
+        if (event.ctrlKey) { event.preventDefault(); event.stopPropagation(); }
+      } : undefined}
+      style={{
       width:f.w*scale, height:f.h*scale,
       position:'relative', overflow:'hidden',
       borderRadius: scale < 0.9 ? 10 : 0,

@@ -24,6 +24,7 @@ import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
 import { ElementsPanel } from './panels/ElementsPanel.jsx';
+import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
 import { addOverlayToSlide, removeOverlayFromSlide, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
@@ -255,6 +256,7 @@ function SidebarContent({
   onDeleteProject = null,
   onGenerateProject = null,
   selectedCardElement = null,
+  onCreateText = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   slideImgGenBusy = {},
@@ -753,6 +755,25 @@ function SidebarContent({
 
       {/* Scrollable body */}
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
+
+        {tab === 'texto' && (
+          <TextAreaPanel
+            slide={slide}
+            onCreate={onCreateText}
+            selectedOverlayId={
+              selectedCardElement?.slideId === slide?.id
+                ? parseOverlayMoveKey(selectedCardElement.key)
+                : null
+            }
+            onUpdate={(overlays) => updateSlide({ overlays })}
+            onRemove={(overlayId) => {
+              const next = removeOverlayFromSlide(slide, overlayId);
+              const elementOffsets = { ...(slide?.elementOffsets || {}) };
+              delete elementOffsets[`ov_${overlayId}`];
+              updateSlide({ overlays: next.overlays, elementOffsets });
+            }}
+          />
+        )}
 
         {tab === 'narrativa' && appMode === 'criador' && projectHasCarouselContent(slides) && (
           <S title="Depois de gerar" hint={`Revise, baixe ou abra mais controlos — sem recriar ${isPresentationProject ? 'a apresentação' : 'o carrossel'}.`}>

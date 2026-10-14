@@ -1,9 +1,26 @@
 /**
- * Elementos inseríveis no card (estilo Canva) — CTAs e linhas.
+ * Elementos inseríveis no card — textos livres, CTAs e linhas.
  * Vivem em `slide.overlays[]` e renderizam por cima da composição.
  */
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+export const MAX_CARD_OVERLAYS = 12;
+
+/** Área de texto ancorada no ponto escolhido, com margem no lado direito. */
+export function makeTextOverlay({ x = 26, y = 45, color = '#3A322C' } = {}) {
+  const left = clamp(x, 0, 90, 26);
+  return normalizeOverlay({
+    type: 'text',
+    x: left,
+    y: clamp(y, 0, 90, 45),
+    w: Math.min(48, 98 - left),
+    text: 'Digite seu texto',
+    color,
+    size: 3.4,
+    weight: 500,
+  });
+}
 
 /** Catálogo mostrado no painel Elementos. */
 export const ELEMENT_CATALOG = Object.freeze([
@@ -216,7 +233,7 @@ function makeCtaOverlay({
 export function normalizeOverlay(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const type = String(raw.type || '');
-  // `text` legado: ainda normaliza se existir no doc; novo catálogo não cria mais.
+  // Textos livres e documentos antigos compartilham o mesmo formato.
   if (!['cta', 'rule', 'text'].includes(type)) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id : uid();
   const base = {
@@ -248,8 +265,8 @@ export function normalizeOverlay(raw) {
   }
   return {
     ...base,
-    w: clamp(raw.w, 10, 90, 48),
-    text: String(raw.text || '').slice(0, 240),
+    w: clamp(raw.w, 8, 90, 48),
+    text: String(raw.text ?? ''),
     color: String(raw.color || '#3A322C'),
     align: ['left', 'center', 'right'].includes(raw.align) ? raw.align : 'left',
     size: clamp(raw.size, 1.5, 8, 3.4),
@@ -267,7 +284,7 @@ function clamp(v, min, max, fallback) {
 
 export function normalizeOverlays(list) {
   if (!Array.isArray(list)) return [];
-  return list.map(normalizeOverlay).filter(Boolean).slice(0, 12);
+  return list.map(normalizeOverlay).filter(Boolean).slice(0, MAX_CARD_OVERLAYS);
 }
 
 export function addOverlayToSlide(slide, overlay) {

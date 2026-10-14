@@ -47,6 +47,7 @@ import {
   dataUrlParaBlob,
 } from './src/utils/image-store.js';
 import { storeSlideReference, importSlideReference } from './src/utils/slide-reference.js';
+import { makeTextOverlay, addOverlayToSlide, updateOverlayOnSlide, normalizeOverlays, MAX_CARD_OVERLAYS } from './src/utils/card-overlays.js';
 import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
 import { readDataOwner, dataOwnerAliases } from './src/utils/account-data-owner.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
@@ -1518,9 +1519,11 @@ export default function App() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedCardElement, setSelectedCardElement] = useState(null);
+  const [editingTextArea, setEditingTextArea] = useState(null);
   useEffect(() => {
     setActiveIdx(0);
     setSelectedCardElement(null);
+    setEditingTextArea(null);
   }, [activeDocId]);
   useEffect(() => {
     setActiveIdx((index) => Math.min(index, Math.max(0, slides.length - 1)));
@@ -2736,8 +2739,38 @@ export default function App() {
 
   const patchInlineTextAt = useCallback((idx, field, text) => {
     if (!field) return;
+    if (field.startsWith('ov_')) {
+      setSlides(current => current.map((slide, i) => i === idx
+        ? updateOverlayOnSlide(slide, field.slice(3), { text }) : slide));
+      return;
+    }
     updateSlideAt(idx, { [field]: text });
-  }, [updateSlideAt]);
+  }, [setSlides, updateSlideAt]);
+
+  const createTextAreaAt = useCallback((idx, position = {}) => {
+    const slide = slides[idx];
+    if (!slide) return;
+    if (normalizeOverlays(slide.overlays).length >= MAX_CARD_OVERLAYS) {
+      toast('Este card já tem 12 elementos extras. Remova um para criar outro texto.', 'warning', 4500);
+      return;
+    }
+    const overlay = makeTextOverlay({
+      // Pelo botão, deixa o texto inicial longe do bloco principal do layout.
+      y: String(slide.layout || '').startsWith('t') ? 70 : 22,
+      ...position,
+      color: brand.textColor || brand.titleColor,
+    });
+    // O blur do texto anterior pode atualizar o mesmo card neste evento.
+    setSlides(current => current.map(item => item.id === slide.id
+      ? addOverlayToSlide(item, overlay) : item));
+    setActiveIdx(idx);
+    setCanvasEditMode(false);
+    setSelectedCardElement({ slideId: slide.id, key: `ov_${overlay.id}` });
+    setEditingTextArea({ slideId: slide.id, overlayId: overlay.id });
+    if (isMobile) setDrawerOpen(false);
+  }, [slides, brand.textColor, brand.titleColor, setSlides, toast, isMobile]);
+
+  const finishTextAreaEdit = useCallback(() => setEditingTextArea(null), []);
 
   /** Novo deslocamento de um elemento do card (arrasto direto na pré-visualização). */
   const patchElementOffsetAt = useCallback((idx, chave, offset) => {
@@ -4943,6 +4976,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       toast('Projeto apagado.', 'success', 3000);
     },
     selectedCardElement,
+    onCreateText: () => createTextAreaAt(activeIdx),
     onGenerateProject: generateProjectByKind,
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,
@@ -5860,6 +5894,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     movableElements={!canvasEditMode}
                     onElementOffsetChange={patchElementOffsetAt}
                     onInlineTextChange={(field, text) => patchInlineTextAt(activeIdx, field, text)}
+                    onCreateText={(position) => createTextAreaAt(activeIdx, position)}
+                    autoEditOverlayId={editingTextArea?.slideId === slide.id ? editingTextArea.overlayId : null}
+                    onOverlayEditEnd={finishTextAreaEdit}
                     onElementSelect={(key) => setSelectedCardElement({ slideId: slide.id, key })}
                     selectedElement={selectedCardElement?.slideId === slide.id ? selectedCardElement.key : null}
                   />
@@ -6160,6 +6197,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}
                         onInlineTextChange={(field, text) => patchInlineTextAt(i, field, text)}
+                        onCreateText={(position) => createTextAreaAt(i, position)}
+                        autoEditOverlayId={editingTextArea?.slideId === s.id ? editingTextArea.overlayId : null}
+                        onOverlayEditEnd={finishTextAreaEdit}
                         onElementSelect={(key) => { setActiveIdx(i); setSelectedCardElement({ slideId: s.id, key }); }}
                         selectedElement={selectedCardElement?.slideId === s.id ? selectedCardElement.key : null}
                       />

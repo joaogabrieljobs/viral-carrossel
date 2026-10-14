@@ -22,6 +22,9 @@ const SlideCard = React.memo(SlideCardInner, (prev, next) => {
   if (prev.movableElements !== next.movableElements) return false;
   if (prev.onElementOffsetChange !== next.onElementOffsetChange) return false;
   if (prev.onInlineTextChange !== next.onInlineTextChange) return false;
+  if (prev.onCreateText !== next.onCreateText) return false;
+  if (prev.autoEditOverlayId !== next.autoEditOverlayId) return false;
+  if (prev.onOverlayEditEnd !== next.onOverlayEditEnd) return false;
   if (prev.onElementSelect !== next.onElementSelect) return false;
   if (prev.selectedElement !== next.selectedElement) return false;
   return true;

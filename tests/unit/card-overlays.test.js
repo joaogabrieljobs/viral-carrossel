@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   ELEMENT_CATALOG,
+  MAX_CARD_OVERLAYS,
   addOverlayToSlide,
+  makeTextOverlay,
   normalizeOverlay,
   normalizeOverlays,
   overlayMoveKey,
   removeOverlayFromSlide,
   updateOverlayOnSlide,
 } from '../../src/utils/card-overlays.js';
+import { DEFAULT_BRAND, ensureDocShape, mkSlide } from '../../src/utils/doc-schema.js';
 
 describe('card-overlays', () => {
   it('catálogo tem CTAs variados + linhas (sem bloco de texto solto)', () => {
@@ -28,7 +31,52 @@ describe('card-overlays', () => {
   it('normalizeOverlay rejeita tipos inválidos e limita lista', () => {
     expect(normalizeOverlay({ type: 'bomb' })).toBeNull();
     const many = Array.from({ length: 20 }, () => ({ type: 'rule', x: 10, y: 10, w: 20 }));
-    expect(normalizeOverlays(many)).toHaveLength(12);
+    expect(MAX_CARD_OVERLAYS).toBe(12);
+    expect(normalizeOverlays(many)).toHaveLength(MAX_CARD_OVERLAYS);
+  });
+
+  it('cria texto livre pronto para editar com IDs independentes', () => {
+    const first = makeTextOverlay();
+    const second = makeTextOverlay();
+    expect(first).toMatchObject({
+      type: 'text', text: 'Digite seu texto', x: 26, y: 45, w: 48,
+      color: '#3A322C', size: 3.4, weight: 500, align: 'left',
+    });
+    expect(first.id).toBeTruthy();
+    expect(first.id).not.toBe(second.id);
+  });
+
+  it('mantém a caixa criada perto das bordas dentro do card', () => {
+    const edge = makeTextOverlay({ x: 99, y: 102, color: '#ffffff' });
+    expect(edge).toMatchObject({ x: 90, y: 90, w: 8, color: '#ffffff' });
+    expect(normalizeOverlays([edge])[0].x + normalizeOverlays([edge])[0].w).toBe(98);
+    expect(makeTextOverlay({ x: 70, y: 40 })).toMatchObject({ x: 70, y: 40, w: 28 });
+    expect(makeTextOverlay({ x: -20, y: -10 })).toMatchObject({ x: 0, y: 0, w: 48 });
+    expect(makeTextOverlay({ x: NaN, y: Infinity })).toMatchObject({ x: 26, y: 45, w: 48 });
+  });
+
+  it('preserva texto completo, quebras de linha e estilo ao salvar e reabrir o projeto', () => {
+    const content = `Primeira linha\n${'Conteúdo que precisa continuar salvo. '.repeat(15)}\nÚltima linha`;
+    const overlay = makeTextOverlay();
+    const created = addOverlayToSlide(mkSlide(1, DEFAULT_BRAND), overlay);
+    const edited = updateOverlayOnSlide(created, overlay.id, {
+      text: content, align: 'right', size: 5.2, weight: 600, color: '#123456',
+    });
+    const saved = JSON.parse(JSON.stringify({ brand: DEFAULT_BRAND, slides: [edited] }));
+    const restored = ensureDocShape(saved).slides[0].overlays[0];
+    expect(restored).toMatchObject({
+      text: content, align: 'right', size: 5.2, weight: 600, color: '#123456',
+    });
+    expect(updateOverlayOnSlide(edited, overlay.id, { text: '' }).overlays[0].text).toBe('');
+  });
+
+  it('preserva a geometria e a tipografia de textos livres legados', () => {
+    const legacy = {
+      id: 'old-text', type: 'text', text: 'Texto antigo\nSegunda linha',
+      x: 14, y: 36, w: 52, color: '#aabbcc', align: 'center',
+      size: 4.2, weight: 700, tracking: 0.03, leading: 1.4,
+    };
+    expect(normalizeOverlay(legacy)).toEqual(legacy);
   });
 
   it('add/remove/update no slide', () => {

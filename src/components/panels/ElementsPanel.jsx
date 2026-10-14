@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { TextOverlayEditor } from './TextAreaPanel.jsx';
 import {
   ELEMENT_CATALOG,
   normalizeOverlays,
@@ -155,6 +156,9 @@ export function ElementsPanel({
 }
 
 function OverlayEditor({ overlay, onChange, onRemove }) {
+  if (overlay.type === 'text') {
+    return <TextOverlayEditor overlay={overlay} onChange={onChange} onRemove={onRemove} />;
+  }
   if (overlay.type === 'rule') {
     return (
       <div style={editorBox}>
