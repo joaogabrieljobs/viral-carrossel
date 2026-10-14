@@ -23,6 +23,14 @@ Auth: `requireActiveSubscription` (cookie `vc_access`).
 
 Status e download escolhem o mesmo manifesto completo, pela maior revisão e data, entre Blob e Redis. Metadados isolados não comprovam que a biblioteca está disponível. Se uma leitura falhar ou a meta indicar uma versão posterior ao manifesto disponível, a API responde 503 e impede um push de sobrescrever projetos com uma lista incompleta.
 
+### Biblioteca diretamente no Blob
+
+`LIBRARY_SYNC_STORAGE=blob` define o Blob como armazenamento exclusivo da biblioteca. Status, pull e merge usam o mesmo manifesto privado; nenhum acesso ao Redis é feito pela biblioteca. As variáveis Redis continuam disponíveis para outros recursos. Falhas do Blob continuam sendo erros: não existe fallback silencioso para Redis nem sucesso sem gravação.
+
+Essa escolha é explícita, não uma reação automática a indisponibilidade. Em instalações que já gravaram bibliotecas no Redis, reconciliar/exportar suas revisões antes de trocar de modo. Não remover dados antigos do Redis ao mudar a configuração.
+
+Na investigação de produção de 13/10, a leitura direta do Blob confirmou nove projetos (revisão 137) na conta afetada. O bloqueio vinha do Redis configurado no servidor, cujo endereço falhava com `ENOTFOUND`. A biblioteca passa a usar diretamente o Blob já verificado, preservando o manifesto e os dados locais durante o merge. Os dados e a configuração global do Redis não são apagados.
+
 ## Cliente
 
 `src/utils/library-sync.js` — pack (compacta imagens), upload de assets, push/pull, `reconcileLibraryCloud` no boot (`useAccess`).

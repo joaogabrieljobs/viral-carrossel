@@ -166,6 +166,7 @@ describe('library-sync-store', () => {
     beforeEach(() => {
       vi.stubEnv('VITEST', 'false');
       vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', '');
       vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
       vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
       vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
@@ -187,6 +188,56 @@ describe('library-sync-store', () => {
 
       expect((await getLibraryManifest(customerId)).docs).toHaveLength(5);
       expect(await getLibrarySyncMeta(customerId)).toMatchObject({ revision: 2, projectCount: 5 });
+    });
+
+    it('Blob explícito restaura e une a biblioteca mesmo com Redis externo inacessível', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      fetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
+      setBlob(manifest(137, 9));
+      blob.put.mockImplementation(async (_path, body) => setBlob(JSON.parse(body)));
+
+      expect(await getLibrarySyncMeta(customerId)).toMatchObject({ revision: 137, projectCount: 9 });
+      const saved = await putLibraryManifest(customerId, {
+        docs: [{ id: 'local', name: 'Novo projeto', doc: {} }],
+      }, { baseRevision: 137 });
+      expect(saved.meta).toMatchObject({ revision: 138, projectCount: 10 });
+      expect((await getLibraryManifest(customerId)).docs.map((doc) => doc.id))
+        .toEqual([...Array.from({ length: 9 }, (_, i) => `p${i}`), 'local']);
+      expect(await getLibrarySyncMeta(customerId)).toMatchObject({ revision: 138, projectCount: 10 });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('não ignora falha Redis automaticamente quando ele participa da biblioteca', async () => {
+      setBlob(manifest(137, 9));
+      fetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
+
+      await expect(putLibraryManifest(customerId, { docs: [] }, { force: true }))
+        .rejects.toMatchObject({ code: 'library_storage_unavailable' });
+      expect(blob.put).not.toHaveBeenCalled();
+    });
+
+    it('Blob explícito mantém falhas reais visíveis e nunca troca para Redis', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      setBlob(manifest(137, 9));
+      blob.put.mockRejectedValue(new Error('Blob indisponível'));
+      await expect(putLibraryManifest(customerId, { docs: [] }, { force: true }))
+        .rejects.toMatchObject({ code: 'library_storage_unconfigured' });
+
+      blob.put.mockClear();
+      blob.get.mockRejectedValue(new Error('timeout'));
+      await expect(putLibraryManifest(customerId, { docs: [] }, { force: true }))
+        .rejects.toMatchObject({ code: 'library_storage_unavailable' });
+      expect(blob.put).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('Blob explícito sem credenciais não anuncia biblioteca vazia nem usa Redis', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      vi.stubEnv('BLOB_READ_WRITE_TOKEN', '');
+      vi.stubEnv('BLOB_STORE_ID', '');
+      vi.stubEnv('VERCEL_OIDC_TOKEN', '');
+      await expect(getLibrarySyncMeta(customerId)).rejects.toMatchObject({ code: 'library_storage_unconfigured' });
+      expect(fetch).not.toHaveBeenCalled();
     });
 
     it('ignora meta Redis antiga quando Blob tem a revisão actual', async () => {

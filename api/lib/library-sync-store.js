@@ -17,6 +17,9 @@ const memoryAssets = new Map();
 
 function hasUpstash() {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
+  // Escolha operacional explícita: o Redis usado por outros recursos pode não
+  // participar da biblioteca. Não é um fallback automático após erro de rede.
+  if (process.env.LIBRARY_SYNC_STORAGE?.trim() === 'blob') return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -231,6 +234,9 @@ function readFailureDiagnostic(source, error) {
 export async function getLibraryManifest(customerId) {
   const id = sanitizeCustomerId(customerId);
   if (!id) return null;
+  if (process.env.LIBRARY_SYNC_STORAGE?.trim() === 'blob' && !hasBlob() && !allowMemory()) {
+    throw storageUnconfiguredError(['Blob não configurado para a biblioteca']);
+  }
   const pathname = manifestPath(id);
   const candidates = [];
   let cachedMeta = null;
