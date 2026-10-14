@@ -146,16 +146,24 @@ async function putBlobPrivate(pathname, body, contentType = 'application/json') 
 }
 
 async function readBlobPrivate(pathname) {
-  const result = await get(pathname, { access: 'private', useCache: false, ...blobAuthOpts() });
-  if (!result?.stream) return null;
-  const chunks = [];
-  const reader = result.stream.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
+  let stage = 'blob_get';
+  try {
+    const result = await get(pathname, { access: 'private', useCache: false, ...blobAuthOpts() });
+    if (!result?.stream) return null;
+    stage = 'blob_stream';
+    const chunks = [];
+    const reader = result.stream.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    stage = 'blob_decode';
+    return Buffer.concat(chunks.map((c) => Buffer.from(c)));
+  } catch (error) {
+    error.libraryReadStage = stage;
+    throw error;
   }
-  return Buffer.concat(chunks.map((c) => Buffer.from(c)));
 }
 
 function storageUnconfiguredError(errors = []) {
@@ -196,11 +204,24 @@ function compareManifestVersion(a, b) {
     || Number(a?.updatedAt || 0) - Number(b?.updatedAt || 0);
 }
 
-function libraryReadError() {
+function libraryReadError(diagnostics = []) {
   return Object.assign(
     new Error('Não foi possível confirmar a biblioteca mais recente na nuvem. Tente sincronizar novamente.'),
-    { code: 'library_storage_unavailable' },
+    { code: 'library_storage_unavailable', storageDiagnostics: diagnostics },
   );
+}
+
+// Só classificação técnica: nunca registrar documento, conta, URL ou token.
+function readFailureDiagnostic(source, error) {
+  const safeCode = (value) => /^[a-zA-Z0-9_]{1,80}$/.test(String(value || '')) ? String(value) : undefined;
+  return {
+    source,
+    stage: safeCode(error?.libraryReadStage) || 'manifest_parse',
+    name: safeCode(error?.name),
+    code: safeCode(error?.code),
+    causeCode: safeCode(error?.cause?.code),
+    httpStatus: Number(/Failed to fetch blob: (\d{3})/.exec(error?.message || '')?.[1]) || undefined,
+  };
 }
 
 /**
@@ -214,6 +235,7 @@ export async function getLibraryManifest(customerId) {
   const candidates = [];
   let cachedMeta = null;
   let readFailed = false;
+  const diagnostics = [];
   const addCandidate = (value) => {
     if (!value || !Array.isArray(value.docs)) throw libraryReadError();
     candidates.push(value);
@@ -223,7 +245,10 @@ export async function getLibraryManifest(customerId) {
     try {
       const buf = await readBlobPrivate(pathname);
       if (buf) addCandidate(JSON.parse(buf.toString('utf8')));
-    } catch { readFailed = true; }
+    } catch (error) {
+      readFailed = true;
+      diagnostics.push(readFailureDiagnostic('blob', error));
+    }
   }
 
   if (hasUpstash()) {
@@ -234,7 +259,10 @@ export async function getLibraryManifest(customerId) {
       ]);
       if (raw) addCandidate(JSON.parse(raw));
       if (rawMeta) cachedMeta = JSON.parse(rawMeta);
-    } catch { readFailed = true; }
+    } catch (error) {
+      readFailed = true;
+      diagnostics.push(readFailureDiagnostic('redis', error));
+    }
   }
 
   if (allowMemory()) {
@@ -249,7 +277,7 @@ export async function getLibraryManifest(customerId) {
   // Falha de leitura não significa biblioteca vazia. Gravar assim apagaria
   // os projetos que só existem na fonte temporariamente indisponível.
   if (readFailed || (cachedMeta && (!latest || compareManifestVersion(cachedMeta, latest) > 0))) {
-    throw libraryReadError();
+    throw libraryReadError(diagnostics.length ? diagnostics : [{ source: 'metadata', stage: 'manifest_behind' }]);
   }
   return latest;
 }

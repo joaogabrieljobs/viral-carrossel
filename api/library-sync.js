@@ -150,7 +150,8 @@ export default async function handler(req, res) {
   } catch (e) {
     const mapped = mapStoreError(e);
     if (mapped.status >= 500) {
-      console.error('[library-sync]', e?.message || e, e?.code || '', e?.stack?.slice?.(0, 200) || '');
+      console.error('[library-sync]', e?.code || 'library_error',
+        e?.storageDiagnostics ? JSON.stringify(e.storageDiagnostics) : e?.message || 'Falha no sync');
     }
     return res.status(mapped.status).json(mapped.body);
   }
