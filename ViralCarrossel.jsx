@@ -55,6 +55,7 @@ import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
 import BrandLogo from './src/components/BrandLogo.jsx';
 import BootScreen from './src/components/BootScreen.jsx';
+import { readDeletedProjectIds, rememberDeletedProjectIds } from './src/utils/project-deletions.js';
 import AccountProfile from './src/components/AccountProfile.jsx';
 import {
   fetchAccessSession,
@@ -1397,7 +1398,7 @@ export default function App() {
       const foldersFingerprint = JSON.stringify(libraryFoldersPersistRef.current);
       const brandsFingerprint = JSON.stringify(semLogosDeRuntimeDasMarcas(brandRoster));
       return {
-        snapshot: { library: lib, brandRoster, libraryFolders: libraryFoldersPersistRef.current, activeDocId, activeBrandId },
+        snapshot: { library: lib, deletedIds: readDeletedProjectIds(), brandRoster, libraryFolders: libraryFoldersPersistRef.current, activeDocId, activeBrandId },
         localPersisted: saved,
         isCurrent: () => {
           const current = editorSyncStateRef.current;
@@ -1418,6 +1419,7 @@ export default function App() {
     if (!Array.isArray(snapshot?.library) || snapshot.library.length !== Number(result?.projectCount)) {
       throw new Error('A lista recebida não corresponde à biblioteca da nuvem. Tente sincronizar novamente.');
     }
+    rememberDeletedProjectIds(snapshot.deletedIds || []);
     const folders = normalizeLibraryFolders(snapshot.libraryFolders || []);
     const restored = snapshot.library.map((entry) => normalizeLibraryEntry({
       ...entry, doc: ensureDocShape(entry.doc || {}),

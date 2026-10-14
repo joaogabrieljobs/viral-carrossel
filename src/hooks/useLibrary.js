@@ -44,6 +44,7 @@ import {
 } from '../utils/library-organizer.js';
 import { cloneBrandStyleKit } from '../utils/brand-context.js';
 import { normalizeStyleKit, styleKitHasContent } from '../utils/style-kit.js';
+import { rememberDeletedProjectIds } from '../utils/project-deletions.js';
 
 /**
  * Monta um documento novo sem perder a identidade que veio no seed.
@@ -307,11 +308,7 @@ export function useLibrary({
     return entries;
   }, [brandRoster, activeBrandId, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, snapshotEntries]);
   const deleteDoc = useCallback((docId) => {
-    if (docId) {
-      import('../utils/library-sync.js')
-        .then(({ rememberDeletedProjectIds }) => rememberDeletedProjectIds([docId]))
-        .catch(() => {});
-    }
+    if (docId) rememberDeletedProjectIds([docId]);
     setLibrary(prev => {
       const next = prev.filter(e => e.id !== docId);
       if (next.length === 0) {

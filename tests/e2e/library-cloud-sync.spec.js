@@ -104,11 +104,13 @@ async function mockCloud(page, { offlineAtBoot = false, pushDelay = 0, pullDelay
             const previous = docs.get(entry.id);
             if (!previous || Number(entry.updatedAt || 0) >= Number(previous.updatedAt || 0)) docs.set(entry.id, entry);
           }
-          for (const id of body.manifest.deletedIds || []) docs.delete(id);
+          const deletedIds = [...new Set([...(state.manifest.deletedIds || []), ...(body.manifest.deletedIds || [])])];
+          for (const id of deletedIds) docs.delete(id);
           state.manifest = {
             ...state.manifest,
             ...body.manifest,
             docs: [...docs.values()],
+            deletedIds,
             revision: state.manifest.revision + 1,
             updatedAt: Date.now(),
           };
@@ -566,5 +568,55 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.reload();
     await goHome(page);
     await expectHomeProjects(page);
+  });
+
+  for (const quota of [false, true]) test(`excluir rascunhos mantém apenas Janine com 23 cards após sync e novo login; quota: ${quota}`, async ({ page }) => {
+    const cloud = await mockCloud(page);
+    const janine = cloud.manifest.docs[0];
+    janine.name = 'CLINICA JANINE ARAUJO';
+    janine.doc.slides = Array.from({ length: 23 }, (_, index) => ({
+      id: `janine-${index}`, num: index + 1, title: `Janine — card ${index + 1}`,
+    }));
+    await page.goto('/?app=1');
+    await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();
+    // O cofre antigo tem os cinco projetos: a exclusão precisa vencer esse backup.
+    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    if (quota) await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (this === localStorage && key === 'vc_library_deleted_ids') throw new DOMException('quota', 'QuotaExceededError');
+        return original.call(this, key, value);
+      };
+    });
+    for (const name of PROJECT_NAMES.slice(1)) {
+      await page.getByRole('button', { name: `Apagar ${name}`, exact: true }).click();
+      await page.getByRole('button', { name: 'Confirmar eliminação', exact: true }).click();
+      await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
+    }
+    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await expect.poll(() => cloud.manifest.docs.map(entry => entry.id)).toEqual([janine.id]);
+    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    // Outro save sem novas exclusões não pode apagar o registro delas.
+    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    expect(cloud.manifest.deletedIds).toHaveLength(4);
+    await page.reload();
+    await goHome(page);
+    for (const name of PROJECT_NAMES.slice(1)) await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Sair da conta', exact: true }).click();
+    await expect.poll(() => cloud.logoutCount).toBe(1);
+    await expect(page).toHaveURL(/\/$/);
+    cloud.session = { ...SESSAO_ATIVA };
+    await page.goto('/?app=1&login=password');
+    await expect.poll(() => page.evaluate(() => {
+      const library = JSON.parse(localStorage.getItem('vc_library') || '[]');
+      return library.map(entry => ({ id: entry.id, count: entry.doc.slides.length }));
+    })).toEqual([{ id: janine.id, count: 23 }]);
+    await goHome(page);
+    await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();
+    for (const name of PROJECT_NAMES.slice(1)) await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
+    expect(cloud.manifest.docs[0].doc.slides).toHaveLength(23);
   });
 });

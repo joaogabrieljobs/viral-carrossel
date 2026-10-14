@@ -13,6 +13,8 @@ import { migrateProjectReferences } from './style-kit-storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, isOriginalImageAsset, imageContentType } from './cloud-image-assets.js';
 import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './cloud-upload-receipts.js';
+import { readDeletedProjectIds, rememberDeletedProjectIds, mergeDeletedProjectIds } from './project-deletions.js';
+export { rememberDeletedProjectIds } from './project-deletions.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
 export const LIBRARY_CLOUD_META_FALLBACK_KEY = 'vc_library_cloud_meta_fallback';
@@ -24,7 +26,7 @@ function captureSyncContext() {
   return {
     owner: localStorage.getItem(SK.dataOwner),
     library: localStorage.getItem(SK.library),
-    deletedIds: localStorage.getItem(SK.libraryDeletedIds),
+    deletedIds: JSON.stringify(readDeletedProjectIds()),
   };
 }
 
@@ -35,43 +37,9 @@ function assertSyncContext(context, { signal, checkLibrary = false, allowLocked 
     throw new Error('A conta mudou durante a sincronização. Entre novamente para atualizar a biblioteca.');
   }
   if (checkLibrary && (localStorage.getItem(SK.library) !== context.library
-    || localStorage.getItem(SK.libraryDeletedIds) !== context.deletedIds)) {
+    || JSON.stringify(readDeletedProjectIds()) !== context.deletedIds)) {
     throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; sincronize novamente.');
   }
-}
-
-function readDeletedProjectIds() {
-  try {
-    const raw = localStorage.getItem(SK.libraryDeletedIds);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return [...new Set(parsed.map((x) => String(x || '').trim()).filter(Boolean))].slice(0, 500);
-  } catch {
-    return [];
-  }
-}
-
-/** Marca projectos apagados para a nuvem os remover no merge. */
-export function rememberDeletedProjectIds(ids = []) {
-  const add = (Array.isArray(ids) ? ids : [ids])
-    .map((x) => String(x || '').trim())
-    .filter(Boolean);
-  if (!add.length) return;
-  try {
-    const next = [...new Set([...readDeletedProjectIds(), ...add])].slice(0, 500);
-    localStorage.setItem(SK.libraryDeletedIds, JSON.stringify(next));
-  } catch { /* quota */ }
-}
-
-function clearDeletedProjectIds(ids = []) {
-  const drop = new Set((Array.isArray(ids) ? ids : []).map((x) => String(x || '').trim()).filter(Boolean));
-  if (!drop.size) return;
-  try {
-    const next = readDeletedProjectIds().filter((id) => !drop.has(id));
-    if (next.length) localStorage.setItem(SK.libraryDeletedIds, JSON.stringify(next));
-    else localStorage.removeItem(SK.libraryDeletedIds);
-  } catch { /* */ }
 }
 
 function readCloudMeta() {
@@ -267,7 +235,10 @@ export async function packLibraryForCloud(snapshot) {
 
   const assets = new Map();
   const docs = [];
+  const deletedIds = mergeDeletedProjectIds(readDeletedProjectIds(), snapshot?.deletedIds);
+  const deleted = new Set(deletedIds);
   for (const entry of docsRaw) {
+    if (deleted.has(String(entry?.id))) continue;
     if (!entry?.doc) {
       docs.push(stripRuntime(entry));
       continue;
@@ -298,7 +269,6 @@ export async function packLibraryForCloud(snapshot) {
     onboardingDone = localStorage.getItem(SK.onboarding);
     modesIntroDone = localStorage.getItem(SK.modesIntro);
   } catch { /* */ }
-  const deletedIds = readDeletedProjectIds();
   const manifest = {
     vcVersion: 3,
     folders,
@@ -528,10 +498,8 @@ export async function pushLibraryToCloud(opts = {}) {
   }
 
   assertSyncContext(context, { ...guardOpts, checkLibrary: true });
-  if (!areAccountDataWritesLocked() && Array.isArray(manifest.deletedIds) && manifest.deletedIds.length) {
-    clearDeletedProjectIds(manifest.deletedIds);
-    context.deletedIds = localStorage.getItem(SK.libraryDeletedIds);
-  }
+  // Não apagar tombstones após confirmação: abas antigas e cofres ainda
+  // podem trazer os mesmos IDs e precisam continuar sujeitos à exclusão.
 
   // 2) Fotos depois (não falha o save).
   const assetStats = assets.size
@@ -829,7 +797,10 @@ export async function applyCloudManifest(manifest, {
     try { localDocs = JSON.parse(context.library || '[]'); } catch { /* cache corrompida pode ser restaurada */ }
   }
   const docs = [];
+  const deletedIds = mergeDeletedProjectIds(readDeletedProjectIds(), localSnapshot?.deletedIds, manifest.deletedIds);
+  const deleted = new Set(deletedIds);
   for (const entry of (manifest.docs || [])) {
+    if (deleted.has(String(entry?.id))) continue;
     if (!entry?.doc) {
       docs.push(entry);
       continue;
@@ -878,8 +849,10 @@ export async function applyCloudManifest(manifest, {
 
   beforeApply?.();
   assertSyncContext(context, { signal, checkLibrary: true });
+  rememberDeletedProjectIds(deletedIds);
   const snapshot = {
     library: docs,
+    deletedIds,
     libraryFolders: Array.isArray(manifest.folders) ? manifest.folders : [],
     brandRoster: brands,
     activeDocId: docs.some((entry) => entry?.id === manifest.activeDocId)

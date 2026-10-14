@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { originalImageAssetId, CLOUD_IMAGE_MAX_CHARS, CLOUD_IMAGE_PART_CHARS } from '../../src/utils/cloud-image-assets.js';
+import { readDeletedProjectIds, rememberDeletedProjectIds } from '../../src/utils/project-deletions.js';
 import {
   SK, lsSet, lockAccountDataWrites, unlockAccountDataWrites, areAccountDataWritesLocked,
 } from '../../src/utils/storage.js';
@@ -1022,5 +1023,44 @@ describe('library-sync client pack', () => {
     local.setItem(SK.library, JSON.stringify([{ id: 'existing' }]));
     await expect(applyCloudManifest({ docs: null })).rejects.toThrow('Manifesto da nuvem inválido');
     expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'existing' }]);
+  });
+
+  it('push confirmado conserva exclusões e não reenvia projetos de uma lista stale', async () => {
+    const cloud = cloudLibrary(1);
+    const { requests } = installCloudApi(cloud);
+    local.setItem(SK.library, JSON.stringify(cloudLibrary(2).docs));
+    rememberDeletedProjectIds(['p2']);
+    await pushLibraryToCloud({ pullAfter: false });
+    const sent = requests.find(({ body }) => body?.action === 'push').body.manifest;
+    expect(sent.docs.map(entry => entry.id)).toEqual(['p1']);
+    expect(sent.deletedIds).toEqual(['p2']);
+    expect(readDeletedProjectIds()).toEqual(['p2']);
+    expect(JSON.parse(local.getItem(SK.libraryDeletedIds))).toEqual(['p2']);
+  });
+
+  it('pull reúne exclusões locais e remotas antes de restaurar a lista', async () => {
+    const manifest = { ...cloudLibrary(3), deletedIds: ['p2'], activeDocId: 'p2' };
+    installCloudApi(manifest);
+    rememberDeletedProjectIds(['p3']);
+    const result = await applyCloudManifest(manifest);
+    expect(result.projectCount).toBe(1);
+    expect(result.snapshot.library.map(entry => entry.id)).toEqual(['p1']);
+    expect(result.snapshot.activeDocId).toBe('p1');
+    expect(result.snapshot.deletedIds).toEqual(['p2', 'p3']);
+    expect(readDeletedProjectIds()).toEqual(['p2', 'p3']);
+  });
+
+  it('exclusão com quota e tombstone recuperado do cofre entram no push', async () => {
+    const original = local.setItem;
+    local.setItem = (key, value) => {
+      if (key === SK.libraryDeletedIds) throw new DOMException('quota', 'QuotaExceededError');
+      original(key, value);
+    };
+    rememberDeletedProjectIds(['p2']);
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const packed = await packLibraryForCloud({ library: cloudLibrary(3).docs, deletedIds: ['p3'] });
+    expect(packed.manifest.docs.map(entry => entry.id)).toEqual(['p1']);
+    expect(packed.manifest.deletedIds).toEqual(['p2', 'p3']);
+    expect(packed.projectCount).toBe(1);
   });
 });
