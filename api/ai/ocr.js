@@ -3,6 +3,7 @@ import { requireActiveSubscription } from '../lib/require-access.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { parseImageReferences } from '../lib/image-references.js';
 import { consumeOcrCredit, refundOcrCredit } from '../lib/ocr-quota.js';
+import { randomUUID } from 'node:crypto';
 
 const OCR_URL = 'https://api.z.ai/api/paas/v4/layout_parsing';
 const OCR_TEXT_MAX = 18_000;
@@ -29,6 +30,9 @@ export default async function handler(req, res) {
   if (!access) return;
 
   let quotaConsumed = false;
+  // Mesmo ID e dia UTC na reserva e no reembolso, inclusive se a chamada
+  // atravessar a meia-noite ou o tratamento de erro tentar reembolsar de novo.
+  const quotaContext = { customerId: access.customerId || 'dev', now: Date.now(), operationId: randomUUID() };
   try {
     const { image } = readBody(req);
     let parsed;
@@ -42,7 +46,7 @@ export default async function handler(req, res) {
     if (Date.now() < providerUnavailableUntil) {
       return res.status(503).json({ error: 'A leitura online está indisponível. O app tentará ler no seu aparelho.' });
     }
-    const quota = await consumeOcrCredit({ customerId: access.customerId || 'dev' });
+    const quota = await consumeOcrCredit(quotaContext);
     if (!quota.allowed) {
       return res.status(quota.reason === 'exhausted' ? 429 : 503).json({
         error: quota.reason === 'exhausted'
@@ -74,7 +78,7 @@ export default async function handler(req, res) {
       if (upstream.status === 401 || upstream.status === 403) {
         providerUnavailableUntil = Date.now() + 5 * 60_000;
       }
-      await refundOcrCredit({ customerId: access.customerId || 'dev' });
+      await refundOcrCredit(quotaContext);
       quotaConsumed = false;
       const responseStatus = upstream.status === 429
         ? 429
@@ -89,13 +93,13 @@ export default async function handler(req, res) {
     }
     const text = String(payload?.md_results || '').trim().slice(0, OCR_TEXT_MAX);
     if (text.replace(/\s/g, '').length < 3) {
-      await refundOcrCredit({ customerId: access.customerId || 'dev' });
+      await refundOcrCredit(quotaContext);
       quotaConsumed = false;
       return res.status(422).json({ error: 'Não encontrei texto legível nesta imagem.' });
     }
     return res.status(200).json({ ok: true, text });
   } catch (error) {
-    if (quotaConsumed) await refundOcrCredit({ customerId: access.customerId || 'dev' });
+    if (quotaConsumed) await refundOcrCredit(quotaContext);
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
       return res.status(504).json({ error: 'A leitura demorou demais. Tente uma imagem menor.' });
     }

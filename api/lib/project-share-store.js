@@ -6,6 +6,7 @@
 
 import { randomBytes } from 'crypto';
 import { put, get, head } from '@vercel/blob';
+import { isUpstashDisabled } from './upstash-config.js';
 
 const SHARE_PREFIX = 'vc:project-share:';
 const BLOB_PREFIX = 'project-shares/';
@@ -19,6 +20,7 @@ const localMutations = new Map();
 
 function hasUpstash() {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
+  if (isUpstashDisabled()) return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -116,6 +118,11 @@ async function putBlobPrivate(pathname, serialized, ifMatch) {
   });
 }
 
+function strongBlobEtag(etag) {
+  // Blob.get pode devolver W/"…"; If-Match do put exige o ETag forte.
+  return typeof etag === 'string' ? etag.replace(/^W\/(?=")/, '') : etag;
+}
+
 async function readBlobPrivateVersioned(pathname) {
   const result = await get(pathname, { access: 'private', useCache: false });
   if (result === null) return null; // 404 legítimo do SDK.
@@ -128,7 +135,7 @@ async function readBlobPrivateVersioned(pathname) {
     chunks.push(value);
   }
   const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-  return { record: JSON.parse(buf.toString('utf8')), etag: result.blob?.etag || null };
+  return { record: JSON.parse(buf.toString('utf8')), etag: strongBlobEtag(result.blob?.etag) || null };
 }
 
 async function readBlobPrivate(pathname) {
@@ -255,6 +262,12 @@ function validCode(code) {
   return /^[A-Z0-9]{6,12}$/.test(normalized) ? normalized : '';
 }
 
+function shareExpired(record) {
+  const updatedAt = Number(record?.updatedAt);
+  return Number.isFinite(updatedAt) && updatedAt > 0
+    && Date.now() - updatedAt >= SHARE_TTL_SEC * 1000;
+}
+
 function storageReadUnavailable() {
   return Object.assign(new Error('Não foi possível confirmar a versão atual da partilha.'), {
     code: 'share_storage_unconfigured',
@@ -278,7 +291,7 @@ async function readBlobForMutation(pathname) {
   }
   if (versioned) {
     if (!versioned.etag || !versioned.record?.doc) throw storageReadUnavailable();
-    return versioned;
+    return shareExpired(versioned.record) ? null : versioned;
   }
 
   let meta;
@@ -294,7 +307,7 @@ async function readBlobForMutation(pathname) {
     if (!response.ok) throw new Error('Blob público inacessível.');
     const record = await response.json();
     if (!record?.doc) throw new Error('Documento inválido.');
-    return { record, etag: meta.etag };
+    return shareExpired(record) ? null : { record, etag: strongBlobEtag(meta.etag) };
   } catch {
     throw storageReadUnavailable();
   }
@@ -330,7 +343,8 @@ async function readCurrentForMutation(code) {
   }
   if (hasBlob()) {
     const versioned = await readBlobForMutation(pathname);
-    return versioned ? { ...versioned, source: 'blob' } : null;
+    return versioned && !shareExpired(versioned.record)
+      ? { ...versioned, source: 'blob' } : null;
   }
   // Somente dev/test sem armazenamento remoto usam o mapa em memória.
   const record = await getSharedProject(code);
@@ -439,7 +453,7 @@ export async function getSharedProject(code) {
           const parsed = JSON.parse(raw);
           if (parsed?.blobPath && hasBlob()) {
             const fromBlob = await readBlobPrivate(parsed.blobPath).catch(() => null);
-            if (fromBlob) return fromBlob;
+            if (fromBlob && !shareExpired(fromBlob)) return fromBlob;
           }
           if (parsed?.doc) return parsed;
         } catch { /* ignore */ }
@@ -450,14 +464,17 @@ export async function getSharedProject(code) {
   if (hasBlob()) {
     try {
       const fromBlob = await readBlobPrivate(pathname);
-      if (fromBlob) return fromBlob;
+      if (fromBlob && !shareExpired(fromBlob)) return fromBlob;
     } catch { /* ignore */ }
     // Compat: blobs antigos públicos (se existirem).
     try {
       const meta = await head(pathname).catch(() => null);
       if (meta?.url) {
         const res = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
-        if (res.ok) return await res.json();
+        if (res.ok) {
+          const legacy = await res.json();
+          if (!shareExpired(legacy)) return legacy;
+        }
       }
     } catch { /* ignore */ }
   }

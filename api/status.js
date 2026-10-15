@@ -1,5 +1,6 @@
 // Health-check: em produção não revela se o host tem API keys.
 import { applyCors } from './lib/cors.js';
+import { isUpstashDisabled } from './lib/upstash-config.js';
 
 export default function handler(req, res) {
   applyCors(req, res);
@@ -18,7 +19,7 @@ export default function handler(req, res) {
     unsplash: Boolean(String(process.env.UNSPLASH_ACCESS_KEY || '').trim()),
     pexels: Boolean(String(process.env.PEXELS_API_KEY || '').trim()),
     sjinn: Boolean(String(process.env.SJINN_API_KEY || '').trim()),
-    upstash: Boolean(
+    upstash: !isUpstashDisabled() && Boolean(
       String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
       && String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim(),
     ),

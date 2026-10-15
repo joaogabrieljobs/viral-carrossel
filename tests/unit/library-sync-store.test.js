@@ -219,6 +219,7 @@ describe('library-sync-store', () => {
     beforeEach(() => {
       vi.stubEnv('VITEST', 'false');
       vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('UPSTASH_DISABLED', '');
       vi.stubEnv('LIBRARY_SYNC_STORAGE', '');
       vi.stubEnv('LIBRARY_SYNC_BLOB_OWNERS', '');
       vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
@@ -448,6 +449,21 @@ describe('library-sync-store', () => {
       expect((await getLibraryManifest(customerId)).docs.map((doc) => doc.id))
         .toEqual([...Array.from({ length: 9 }, (_, i) => `p${i}`), 'local']);
       expect(await getLibrarySyncMeta(customerId)).toMatchObject({ revision: 138, projectCount: 10 });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('flag de corte lê e grava Blob sem consultar Redis legado indisponível', async () => {
+      vi.stubEnv('UPSTASH_DISABLED', '1');
+      fetch.mockRejectedValue(new TypeError('fetch failed'));
+      setBlob(manifest(137, 9));
+      blob.put.mockImplementation(async (_path, body) => setBlob(JSON.parse(body)));
+
+      expect(await getLibrarySyncMeta(customerId)).toMatchObject({ revision: 137, projectCount: 9 });
+      const saved = await putLibraryManifest(customerId, {
+        docs: [{ id: 'local', name: 'Novo projeto', doc: {} }],
+      }, { baseRevision: 137 });
+      expect(saved.meta).toMatchObject({ revision: 138, projectCount: 10 });
+      expect((await getLibraryManifest(customerId)).docs).toHaveLength(10);
       expect(fetch).not.toHaveBeenCalled();
     });
 

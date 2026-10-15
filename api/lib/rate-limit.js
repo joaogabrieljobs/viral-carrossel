@@ -1,14 +1,15 @@
 /**
  * Rate limit por IP.
  *
- * Preferência: Upstash Redis (atómico entre instâncias serverless) quando
- * UPSTASH_REDIS_REST_* está configurado — auditoria BE-004.
- * Fallback: Map em memória (por cold start), igual ao comportamento histórico.
+ * RATE_LIMIT_BACKEND=postgres usa uma janela fixa partilhada entre lambdas.
+ * Sem a flag, preserva Upstash Redis quando configurado e disponível.
+ * Falha do backend partilhado usa temporariamente um Map por instância.
  */
 
 const buckets = new Map();
 const UPSTASH_RETRY_MS = 30_000;
 let upstashUnavailableUntil = 0;
+let postgresUnavailableUntil = 0;
 
 function headerValue(headers, name) {
   const value = headers?.[name] || headers?.[name.toLowerCase()];
@@ -28,6 +29,7 @@ function clientIp(req) {
 }
 
 function hasUpstash() {
+  if (process.env.UPSTASH_DISABLED === '1') return false;
   const testing = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
   if (testing && process.env.RATE_LIMIT_TEST_UPSTASH !== '1') return false;
   return !!(
@@ -107,6 +109,24 @@ async function consumeUpstash(req, { limit, windowMs, keyPrefix }) {
  * @returns {Promise<null | { retryAfterSec: number }>} null = ok
  */
 export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, keyPrefix = 'api' } = {}) {
+  if (process.env.RATE_LIMIT_BACKEND === 'postgres') {
+    if (Date.now() >= postgresUnavailableUntil) {
+      try {
+        // Carregar apenas quando o backend partilhado estiver ativado. O import
+        // é cacheado pelo runtime após a primeira requisição da instância.
+        const { consumePostgresRateLimit } = await import('./rate-limit-postgres.js');
+        const result = await consumePostgresRateLimit({
+          ip: clientIp(req), keyPrefix, limit, windowMs,
+        });
+        postgresUnavailableUntil = 0;
+        return result;
+      } catch (error) {
+        postgresUnavailableUntil = Date.now() + UPSTASH_RETRY_MS;
+        console.warn('[rate-limit] Postgres falhou; usando limite local temporário:', error?.message || error);
+      }
+    }
+    return consumeMemory(req, { limit, windowMs, keyPrefix });
+  }
   if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {
       const result = await consumeUpstash(req, { limit, windowMs, keyPrefix });
@@ -132,4 +152,5 @@ export function rateLimitResponse(res, retryAfterSec, nested = false) {
 export function resetRateLimits() {
   buckets.clear();
   upstashUnavailableUntil = 0;
+  postgresUnavailableUntil = 0;
 }

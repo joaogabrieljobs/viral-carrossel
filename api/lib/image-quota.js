@@ -11,6 +11,7 @@
  * logo um assinante gerava sem limite e a plataforma pagava (auditoria H5).
  */
 import { stripeQuotaGet, stripeQuotaConsume, stripeQuotaRefund } from './quota-stripe-store.js';
+import { isUpstashDisabled } from './upstash-config.js';
 
 const memory = new Map();
 
@@ -21,6 +22,7 @@ let _warnedNoUpstash = false;
 function hasUpstash() {
   // Unitários usam só memória (Upstash de prod/local pode estar offline e estourar timeout).
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
+  if (isUpstashDisabled()) return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()

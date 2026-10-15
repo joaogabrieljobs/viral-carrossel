@@ -102,6 +102,27 @@ describe('contador de imagens nos metadados do Stripe', () => {
 });
 
 describe('encadeamento do armazenamento de quota', () => {
+  it('flag de corte importa Stripe mesmo se credenciais Redis antigas apontam para servidor indisponível', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_fake');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
+    vi.stubEnv('UPSTASH_DISABLED', '1');
+    clienteStateful({ [CHAVE]: '7' });
+    const redisFetch = vi.fn().mockRejectedValue(new Error('Redis indisponível'));
+    vi.stubGlobal('fetch', redisFetch);
+    const { getLegacyQuotaUsage } = await import('../../api/lib/image-quota.js');
+    expect(await getLegacyQuotaUsage({ customerId: CUS, periodStartSec: PERIODO }))
+      .toEqual({ used: 7 });
+    expect(redisFetch).not.toHaveBeenCalled();
+
+    stripeMock.customers.retrieve.mockRejectedValue(new Error('Stripe indisponível'));
+    await expect(getLegacyQuotaUsage({ customerId: CUS, periodStartSec: PERIODO }))
+      .rejects.toMatchObject({ code: 'quota_store_unavailable' });
+  });
+
   it('migra o maior uso persistente entre Redis e Stripe sem conceder créditos de novo', async () => {
     vi.stubEnv('VITEST', 'false');
     vi.stubEnv('NODE_ENV', 'production');

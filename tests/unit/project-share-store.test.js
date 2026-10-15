@@ -18,6 +18,7 @@ describe('project-share-store', () => {
     vi.unstubAllEnvs();
     vi.stubEnv('VITEST', 'true');
     vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('UPSTASH_DISABLED', '');
   });
 
   it('grava em memória em test sem Blob/Redis', async () => {
@@ -75,6 +76,29 @@ describe('project-share-store', () => {
     expect(opts.access).toBe('private');
   });
 
+  it('flag de corte publica e lê partilha no Blob sem consultar Redis legado', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_DISABLED', '1');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-test');
+    const redisFetch = vi.fn().mockRejectedValue(new Error('Redis indisponível'));
+    vi.stubGlobal('fetch', redisFetch);
+    let record;
+    put.mockImplementation(async (_path, serialized) => { record = JSON.parse(serialized); return { etag: 'v1' }; });
+    get.mockImplementation(async () => ({
+      stream: new Response(JSON.stringify(record)).body,
+      blob: { etag: 'v1' },
+    }));
+
+    const { putSharedProject, getSharedProject } = await import('../../api/lib/project-share-store.js');
+    await putSharedProject({ code: 'BLOBONLY', name: 'Equipa', doc: { slides: [{ title: 'A' }] } });
+    expect((await getSharedProject('BLOBONLY')).doc.slides[0].title).toBe('A');
+    expect(put.mock.calls[0][2].access).toBe('private');
+    expect(redisFetch).not.toHaveBeenCalled();
+  });
+
   it('conflito de ETag relê Blob e une membro sem restaurar documento antigo', async () => {
     vi.stubEnv('VITEST', 'false');
     vi.stubEnv('NODE_ENV', 'production');
@@ -118,6 +142,49 @@ describe('project-share-store', () => {
     expect(put).toHaveBeenCalledTimes(2);
     expect(put.mock.calls[0][2].ifMatch).toBe('v1');
     expect(put.mock.calls[1][2].ifMatch).toBe('v2');
+  });
+
+  it('normaliza ETag fraco devolvido pelo Blob antes de atualizar uma partilha', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_DISABLED', '1');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    get.mockResolvedValue({
+      stream: new Response(JSON.stringify({ code: 'WEAK1234', revision: 1,
+        members: [], doc: { slides: [{ title: 'A' }] } })).body,
+      blob: { etag: 'W/"version-1"' },
+    });
+    put.mockResolvedValue({ etag: '"version-2"' });
+
+    const { mutateSharedProject } = await import('../../api/lib/project-share-store.js');
+    await mutateSharedProject('WEAK1234', (current) => ({
+      ...current, members: ['novo@exemplo.test'], keepRevision: true,
+    }));
+    expect(put).toHaveBeenCalledOnce();
+    expect(put.mock.calls[0][2].ifMatch).toBe('"version-1"');
+  });
+
+  it('partilha guardada só no Blob expira após 30 dias e não aceita alterações', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_DISABLED', '1');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    const { getSharedProject, mutateSharedProject, SHARE_TTL_SEC } =
+      await import('../../api/lib/project-share-store.js');
+    const expired = {
+      code: 'EXPIRED1', revision: 1, updatedAt: Date.now() - SHARE_TTL_SEC * 1000 - 1,
+      members: [], doc: { slides: [{ title: 'Privado' }] },
+    };
+    get.mockImplementation(async () => ({
+      stream: new Response(JSON.stringify(expired)).body,
+      blob: { etag: '"old"' },
+    }));
+
+    expect(await getSharedProject('EXPIRED1')).toBeNull();
+    expect(await mutateSharedProject('EXPIRED1', (current) => ({
+      ...current, members: ['novo@exemplo.test'], keepRevision: true,
+    }))).toBeNull();
+    expect(put).not.toHaveBeenCalled();
   });
 
   it('falha de GET no Blob não combina memória antiga com ETag novo', async () => {

@@ -1,4 +1,6 @@
 /** Quota diária persistente para páginas lidas pelo OCR da plataforma. */
+import { consumePostgresOcrCredit, refundPostgresOcrCredit } from './ocr-quota-postgres.js';
+
 const memory = new Map();
 export const DEFAULT_OCR_DAILY_LIMIT = 60;
 export const DEGRADED_OCR_DAILY_LIMIT = 12;
@@ -10,6 +12,7 @@ function production() {
 }
 
 function hasUpstash() {
+  if (process.env.UPSTASH_DISABLED === '1') return false;
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
@@ -48,8 +51,17 @@ function configuredLimit() {
     : DEFAULT_OCR_DAILY_LIMIT;
 }
 
-export async function consumeOcrCredit({ customerId, now = Date.now() } = {}) {
+export async function consumeOcrCredit({ customerId, now = Date.now(), operationId } = {}) {
   const limit = configuredLimit();
+  if (process.env.OCR_QUOTA_BACKEND === 'postgres') {
+    try {
+      return await consumePostgresOcrCredit({ customerId, now, limit, operationId });
+    } catch (error) {
+      // Quota paga não pode virar um contador local por instância se o banco cair.
+      console.error('[ocr-quota] Postgres indisponível:', error?.message || error);
+      return { allowed: false, reason: 'unavailable', used: null, limit };
+    }
+  }
   const key = dayKey(customerId, now);
   if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {
@@ -75,7 +87,14 @@ export async function consumeOcrCredit({ customerId, now = Date.now() } = {}) {
   return { allowed: true, used, limit: effectiveLimit, degraded: production() };
 }
 
-export async function refundOcrCredit({ customerId, now = Date.now() } = {}) {
+export async function refundOcrCredit({ customerId, now = Date.now(), operationId } = {}) {
+  if (process.env.OCR_QUOTA_BACKEND === 'postgres') {
+    try { return await refundPostgresOcrCredit({ customerId, now, operationId }); }
+    catch (error) {
+      console.error('[ocr-quota] falha ao reembolsar no Postgres:', error?.message || error);
+      return null;
+    }
+  }
   const key = dayKey(customerId, now);
   if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {

@@ -23,7 +23,7 @@ flowchart LR
 
 ## Modelo de dados
 
-As migrações estão em `db/migrations/001_account_library.sql` a `004_account_metadata.sql`.
+As migrações estão em `db/migrations/001_account_library.sql` a `005_request_limits.sql`.
 
 | Tabela | Função | Chave e proteção principal |
 | --- | --- | --- |
@@ -35,6 +35,8 @@ As migrações estão em `db/migrations/001_account_library.sql` a `004_account_
 | `moont.account_projects` | Um JSON de projeto por linha, versão e exclusão persistente | `(owner_id, project_id)`; índice para lista paginada; `deleted_at` impede retorno de projeto excluído |
 | `moont.image_quota_periods` | Uso por conta e ciclo de assinatura | `(owner_id, period_start_sec)` |
 | `moont.image_quota_operations` | Reserva, confirmação ou devolução de um crédito por geração | `(owner_id, period_start_sec, operation_id)` |
+| `moont.rate_limit_buckets` | Limite de pedidos partilhado entre funções | Hash de IP/rota e janela; limpeza limitada de janelas vencidas |
+| `moont.ocr_daily_quotas` e `moont.ocr_daily_operations` | Teto diário de OCR por conta e reembolso idempotente | `(owner_id, quota_day)` e identificador de operação |
 
 **Distinção atual de IDs:** a identidade já possui UUID próprio, mas a biblioteca, os assets e a quota ainda usam preferencialmente o `customerId` Stripe como `owner_id`, preservando as chaves legadas. O UUID ainda não substitui essa chave em todos os dados. O cliente local também usa aliases de owner; uma futura troca para UUID exige migração explícita desses aliases e dos caminhos do Blob. Dois customers com o mesmo e-mail não devem ser mesclados automaticamente.
 
@@ -45,12 +47,15 @@ As migrações estão em `db/migrations/001_account_library.sql` a `004_account_
 3. **Sincronizar.** A interface tenta a fila pendente, salva projetos e metadados alterados, lê a biblioteca da conta e aplica o snapshot ao React. `GET /api/projects` entrega resumos paginados e `GET /api/projects?id=...` entrega um projeto completo; durante a transição, o boot e o Sync ainda consultam o manifesto completo via `/api/library-sync?full=1` para montar a lista local.
 4. **Excluir.** `DELETE /api/projects` exige a versão conhecida, grava um tombstone e reduz a contagem na mesma transação. O manifesto legado sintetizado pelo banco inclui o ID em `deletedIds`, impedindo que um push antigo o ressuscite. No backend Postgres, o endpoint legado de push não aceita `replace` como varredura de toda a biblioteca.
 5. **Marcas, pastas e perfil.** `/api/account-library-meta` grava esses dados separadamente, com `baseRevision`. Um salvamento de projeto não substitui essas preferências. Imagens de marca são enviadas ao Blob antes do metadado que as referencia.
-6. **Gerar imagem.** Com `IMAGE_QUOTA_BACKEND=postgres`, o primeiro uso do ciclo importa o maior contador legado persistente disponível (Upstash/Stripe); erro de leitura não cria saldo zero. Cada operação reserva um crédito em transação, confirma no sucesso e devolve em falha. A tela de Uso lê `used`, `limit` e `remaining` dessa quota; o limite continua ligado ao plano Stripe.
+6. **Gerar imagem.** Com `IMAGE_QUOTA_BACKEND=postgres`, o primeiro uso do ciclo importa o maior contador legado persistente disponível (Upstash/Stripe); com `UPSTASH_DISABLED=1`, importa somente o Stripe. Erro de leitura da fonte habilitada não cria saldo zero. Cada operação reserva um crédito em transação, confirma no sucesso e devolve em falha. A tela de Uso lê `used`, `limit` e `remaining` dessa quota; o limite continua ligado ao plano Stripe.
 7. **Sair.** O cliente tenta proteger a edição atual antes de limpar dados locais. Na V2, não envia um manifesto legado no logout, pois isso poderia desfazer exclusões. A revogação do cookie e da época de sessão ocorre no servidor quando o backend de identidade está ativo.
+8. **OCR e proteção de rotas.** `OCR_QUOTA_BACKEND=postgres` guarda o contador diário por conta, com reserva e reembolso por operação. `RATE_LIMIT_BACKEND=postgres` usa contadores por IP/rota/janela, partilhados entre funções. Se o banco falhar, o OCR recusa novas leituras; o limitador de pedidos volta por 30 segundos ao limite local. Este último modo é apenas uma degradação de disponibilidade, não uma proteção distribuída.
 
 ## Migração e ativação
 
-As rotas V2 e a interface são separadas pelas flags `LIBRARY_SYNC_BACKEND=postgres` (servidor), `ACCOUNT_IDENTITY_BACKEND=postgres` (servidor), `IMAGE_QUOTA_BACKEND=postgres` (servidor) e `VITE_PROJECTS_V2=true` (build da interface). A rota de projetos e a de metadados recusam requisições enquanto o backend Postgres da biblioteca estiver desligado. A leitura inicial do Blob ocorre **uma vez por owner**; por isso, atualizar o Blob depois que uma linha vazia foi criada no Postgres não atualiza aquela conta automaticamente.
+As rotas V2 e a interface são separadas pelas flags `LIBRARY_SYNC_BACKEND=postgres`, `ACCOUNT_IDENTITY_BACKEND=postgres`, `IMAGE_QUOTA_BACKEND=postgres`, `OCR_QUOTA_BACKEND=postgres`, `RATE_LIMIT_BACKEND=postgres` (servidor) e `VITE_PROJECTS_V2=true` (build da interface). A rota de projetos e a de metadados recusam requisições enquanto o backend Postgres da biblioteca estiver desligado. A leitura inicial do Blob ocorre **uma vez por owner**; por isso, atualizar o Blob depois que uma linha vazia foi criada no Postgres não atualiza aquela conta automaticamente.
+
+`UPSTASH_DISABLED=1` desliga a consulta às credenciais Redis legadas sem apagar esses segredos da Vercel. A migração inicial dos projetos usa o manifesto no Blob; a quota importa do Stripe e falha se ele estiver indisponível; novas partilhas usam Blob privado sem ponteiro Redis e expiram após 30 dias pela data da última atualização. Antes de ativar, verificar que não há manifestos ou partilhas necessários armazenados **somente** no Redis. Links de partilha existentes apenas ali ficam inacessíveis com a flag; esta opção não migra tais documentos. A ausência da flag preserva o comportamento anterior.
 
 Ordem segura de virada: preservar/exportar a biblioteca de teste e verificar imagens; aplicar migrações e testar conexão; confirmar que o Blob da conta contém a edição mais recente; importar e conferir os projetos no banco; publicar código e flags da interface, biblioteca, identidade e quota no mesmo deploy; validar em dois navegadores e acompanhar erros e contagens. Não remover os manifestos e assets legados na mesma virada. Em uma volta atrás, primeiro suspender gravações e reconciliar as alterações criadas no Postgres para o formato legado; desligar flags sem essa cópia ocultaria projetos recentes. Rollback de código é diferente de rollback de dados.
 
@@ -69,6 +74,7 @@ Ainda há gargalos antes de prometer uma biblioteca com milhares de projetos **e
 - A quota possui operações `reserved`; ainda falta uma rotina auditada para identificar reservas antigas que ficaram sem confirmação após timeout, sem devolver crédito de uma geração efetivamente concluída.
 - A autorização consulta Stripe durante os acessos protegidos em produção. Monitorar latência e falhas da dependência; uma futura projeção local do estado de assinatura requer webhooks confiáveis, reconciliação e política clara para atraso na revogação.
 - As funções mantêm pools pequenos por instância, mas a quantidade de instâncias pode crescer. Acompanhar conexões ativas, saturação do pooler, tempo de query e custo de egress/armazenamento de imagens.
+- O limite distribuído por IP grava uma linha no Postgres a cada pedido. Isto remove a dependência de Redis avariado, mas não é a solução final se o tráfego crescer muito: monitorar o Micro e migrar esta proteção para Redis funcional ou WAF gerido antes de aumentar substancialmente o volume de requisições.
 
 ## Operação e indicadores
 

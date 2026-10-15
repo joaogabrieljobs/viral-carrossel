@@ -6,6 +6,7 @@
 
 import { put, get, BlobPreconditionFailedError } from '@vercel/blob';
 import { createHash } from 'node:crypto';
+import { isUpstashDisabled } from './upstash-config.js';
 
 const META_PREFIX = 'vc:library-sync:meta:';
 const BLOB_PREFIX = 'library-sync/';
@@ -31,6 +32,7 @@ function usesBlobOnly(customerId) {
 
 function hasUpstash(customerId) {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
+  if (isUpstashDisabled()) return false;
   // Escolha operacional explícita: o Redis usado por outros recursos pode não
   // participar da biblioteca. Não é um fallback automático após erro de rede.
   if (usesBlobOnly(customerId)) return false;
