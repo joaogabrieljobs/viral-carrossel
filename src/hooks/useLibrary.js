@@ -308,7 +308,10 @@ export function useLibrary({
     return entries;
   }, [brandRoster, activeBrandId, flushCurrent, setLibrary, setActiveDocId, setLibraryOpen, snapshotEntries]);
   const deleteDoc = useCallback((docId) => {
-    if (docId) rememberDeletedProjectIds([docId]);
+    if (docId && rememberDeletedProjectIds([docId]) === null) {
+      toast?.('Outra aba está atualizando sua conta. Recarregue esta aba antes de excluir o projeto.', 'warning', 5000);
+      return;
+    }
     setLibrary(prev => {
       const next = prev.filter(e => e.id !== docId);
       if (next.length === 0) {
@@ -320,7 +323,7 @@ export function useLibrary({
       if (docId === activeDocId) setActiveDocId(next[0].id);
       return next;
     });
-  }, [activeDocId]);
+  }, [activeDocId, toast]);
 
 
   // ── EXPORT / IMPORT de projetos ─────────────────────────────────────────────

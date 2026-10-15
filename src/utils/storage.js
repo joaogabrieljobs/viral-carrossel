@@ -40,6 +40,8 @@ const SK = {
   backupNudgeDone: 'vc_backup_nudge_done',
   /** Conta dona dos dados locais (email/customerId) — isola biblioteca entre logins. */
   dataOwner: 'vc_data_owner',
+  /** Aliases confirmados pela sessão para o mesmo owner (email ↔ Stripe id). */
+  dataOwnerAliases: 'vc_data_owner_aliases',
   /** Meta do último sync nuvem (revision/updatedAt) — vai no cofre; não sobrevive sola. */
   libraryCloudMeta: 'vc_library_cloud_meta',
   /** IDs apagados localmente — a nuvem remove-os no merge (tombstones). */
@@ -95,17 +97,224 @@ function confirmQuotaRecovery(key) {
  * e o próximo login herda os projetos do utilizador anterior.
  */
 let accountDataWriteLocked = false;
+const WRITE_LOCK_KEY = 'vc_account_write_lock';
+const WRITE_LOCK_TOKEN_KEY = 'vc_account_write_lock_token';
+const WRITE_LOCK_TTL_MS = 60_000;
+const WRITE_LOCK_PROBE_CHANNEL = 'vc_account_write_lock_probe';
+const WRITE_LOCK_PROBE_MS = 180;
+let memoryWriteLockToken = '';
+let writeLockStore = null;
+const knownWriteLockTokens = new WeakMap();
+let writeLockChannel = null;
+let pendingWriteLockProbe = null;
+let pendingWriteLockRelease = false;
+let writeLockDocumentDeparting = false;
+let tabOwnerStore = null;
+let tabOwnerBound = false;
+let tabOwnerId = null;
+let lastForeignWriteNotice = 0;
+
+function currentDataOwner() {
+  try {
+    const raw = localStorage.getItem(SK.dataOwner);
+    if (!raw) return null;
+    try { return JSON.parse(raw) || null; } catch { return raw; }
+  } catch { return null; }
+}
+
+/** Fixa a identidade da aba; só uma troca autenticada nesta própria aba a altera. */
+export function bindAccountDataWriteOwner(ownerId, { switchedHere = false } = {}) {
+  const store = typeof localStorage === 'undefined' ? null : localStorage;
+  if (store !== tabOwnerStore) {
+    tabOwnerStore = store;
+    tabOwnerBound = false;
+    tabOwnerId = null;
+  }
+  if (!tabOwnerBound || switchedHere) {
+    tabOwnerBound = true;
+    tabOwnerId = ownerId || null;
+  }
+}
+
+function foreignAccountOwner() {
+  bindAccountDataWriteOwner(currentDataOwner());
+  return tabOwnerId !== currentDataOwner();
+}
+
+export function isAccountDataWriteOwnerCurrent() {
+  return !foreignAccountOwner();
+}
+
+function newWriteLockToken() {
+  try { return crypto.randomUUID(); }
+  catch { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; }
+}
+
+function rememberWriteLockToken(token) {
+  memoryWriteLockToken = token;
+  if (writeLockStore) {
+    knownWriteLockTokens.set(writeLockStore, token);
+    try { writeLockStore.setItem(WRITE_LOCK_TOKEN_KEY, token); } catch { /* */ }
+  }
+}
+
+function navigationIsReload() {
+  try { return performance.getEntriesByType('navigation')?.[0]?.type === 'reload'; }
+  catch { return false; }
+}
+
+function ensureWriteLockChannel() {
+  if (writeLockChannel || typeof window === 'undefined' || typeof window.BroadcastChannel !== 'function') return writeLockChannel;
+  try {
+    writeLockChannel = new window.BroadcastChannel(WRITE_LOCK_PROBE_CHANNEL);
+    window.addEventListener?.('pagehide', () => { writeLockDocumentDeparting = true; });
+    window.addEventListener?.('pageshow', () => { writeLockDocumentDeparting = false; });
+    writeLockChannel.onmessage = ({ data }) => {
+      if (data?.type === 'probe' && data.token === memoryWriteLockToken
+        && !pendingWriteLockProbe && !writeLockDocumentDeparting
+        && readCrossTabWriteLock()?.token === data.token) {
+        writeLockChannel.postMessage({ type: 'held', token: data.token, probeId: data.probeId });
+      } else if (data?.type === 'held' && pendingWriteLockProbe?.probeId === data.probeId
+        && pendingWriteLockProbe.token === data.token) {
+        const pending = pendingWriteLockProbe;
+        clearTimeout(pending.timer);
+        pendingWriteLockProbe = null;
+        // A aba original ainda está viva; esta aba duplicada não herda o lease.
+        rememberWriteLockToken(newWriteLockToken());
+        pendingWriteLockRelease = false;
+        pending.waiters.forEach((resolve) => resolve());
+      }
+    };
+  } catch { writeLockChannel = null; }
+  return writeLockChannel;
+}
+
+function thisTabWriteLockToken() {
+  const store = typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  if (store === writeLockStore && memoryWriteLockToken) {
+    // A limpeza da conta pode remover a chave de sessão antes do redirect.
+    try {
+      if (store?.getItem(WRITE_LOCK_TOKEN_KEY) !== memoryWriteLockToken) {
+        store?.setItem(WRITE_LOCK_TOKEN_KEY, memoryWriteLockToken);
+      }
+    } catch { /* */ }
+    return memoryWriteLockToken;
+  }
+  writeLockStore = store;
+  if (store && knownWriteLockTokens.has(store)) {
+    memoryWriteLockToken = knownWriteLockTokens.get(store);
+    return memoryWriteLockToken;
+  }
+  let previous = '';
+  try { previous = store?.getItem(WRITE_LOCK_TOKEN_KEY) || ''; } catch { /* */ }
+  const existing = readCrossTabWriteLock();
+  // sessionStorage pode ser CLONADO por "Duplicar aba". Só o mesmo documento
+  // recarregado pode recuperar o token, depois de perguntar às abas vivas.
+  if (previous && existing?.token === previous && (navigationIsReload() || existing.transfer === true)) {
+    const channel = ensureWriteLockChannel();
+    if (channel) {
+      const probeId = newWriteLockToken();
+      const pending = { token: previous, probeId, timer: null, waiters: [] };
+      pendingWriteLockProbe = pending;
+      pending.timer = setTimeout(() => {
+        if (pendingWriteLockProbe !== pending) return;
+        pendingWriteLockProbe = null;
+        if (readCrossTabWriteLock()?.token === previous) {
+          rememberWriteLockToken(previous);
+          if (pendingWriteLockRelease) {
+            try { localStorage.removeItem(WRITE_LOCK_KEY); } catch { /* TTL protege */ }
+          }
+        }
+        pendingWriteLockRelease = false;
+        pending.waiters.forEach((resolve) => resolve());
+      }, WRITE_LOCK_PROBE_MS);
+      try { channel.postMessage({ type: 'probe', token: previous, probeId }); }
+      catch {
+        clearTimeout(pending.timer);
+        pendingWriteLockProbe = null;
+        pending.waiters.forEach((resolve) => resolve());
+      }
+    }
+  }
+  // Cada novo documento nasce com token próprio, inclusive quando a sessão
+  // clonada trouxe um token antigo sem lease ativo.
+  rememberWriteLockToken(newWriteLockToken());
+  ensureWriteLockChannel();
+  return memoryWriteLockToken;
+}
+
+/** Boot aguarda o probe antes de decidir se pode restaurar a biblioteca. */
+export function isAccountWriteLockProbePending() {
+  thisTabWriteLockToken();
+  return !!pendingWriteLockProbe;
+}
+
+export function waitForAccountWriteLockProbe() {
+  thisTabWriteLockToken();
+  if (!pendingWriteLockProbe) return Promise.resolve();
+  return new Promise((resolve) => pendingWriteLockProbe.waiters.push(resolve));
+}
+
+function readCrossTabWriteLock() {
+  try {
+    const raw = localStorage.getItem(WRITE_LOCK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || Number(parsed.until) < Date.now()) {
+      try { localStorage.removeItem(WRITE_LOCK_KEY); } catch { /* */ }
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function claimCrossTabWriteLock({ transfer = false } = {}) {
+  if (foreignWriteLock()) return false;
+  const token = thisTabWriteLockToken();
+  try {
+    localStorage.setItem(WRITE_LOCK_KEY, JSON.stringify({
+      token,
+      until: Date.now() + WRITE_LOCK_TTL_MS,
+      transfer,
+    }));
+  } catch { /* */ }
+  return !foreignWriteLock();
+}
+
+/** Reserva a janela curta de aplicação do pull sem bloquear as próprias escritas. */
+export function lockOtherAccountTabs() {
+  if (foreignWriteLock() || foreignAccountOwner()) return false;
+  return claimCrossTabWriteLock();
+}
 
 export function lockAccountDataWrites() {
   accountDataWriteLocked = true;
+  claimCrossTabWriteLock({ transfer: true });
 }
 
 export function unlockAccountDataWrites() {
   accountDataWriteLocked = false;
+  // A mesma aba também detém o lease compartilhado. Liberá-lo aqui evita
+  // que outras abas fiquem até 60 segundos sem autosave após o pull terminar.
+  try {
+    const cross = readCrossTabWriteLock();
+    const mine = thisTabWriteLockToken();
+    if (pendingWriteLockProbe) pendingWriteLockRelease = true;
+    if (mine && cross?.token === mine) localStorage.removeItem(WRITE_LOCK_KEY);
+  } catch { /* o lease expira se o browser impedir a remoção */ }
+}
+
+function foreignWriteLock() {
+  const cross = readCrossTabWriteLock();
+  if (!cross) return false;
+  const mine = thisTabWriteLockToken();
+  return !(mine && cross.token === mine);
 }
 
 export function areAccountDataWritesLocked() {
-  return accountDataWriteLocked;
+  return accountDataWriteLocked || foreignWriteLock() || foreignAccountOwner();
 }
 
 const ACCOUNT_WRITE_KEYS = new Set([
@@ -116,13 +325,22 @@ const ACCOUNT_WRITE_KEYS = new Set([
   SK.activeBrandId,
   SK.dataOwner,
   SK.legacyDoc,
+  SK.libraryCloudMeta,
+  SK.libraryDeletedIds,
 ]);
 
 // lsSet retorna true em sucesso, false em falha.
 // Em caso de QuotaExceededError dispara evento customizado que o App escuta para exibir toast.
 const lsSet = (key, value) => {
-  if (accountDataWriteLocked && ACCOUNT_WRITE_KEYS.has(key)) {
-    return false;
+  if (ACCOUNT_WRITE_KEYS.has(key)) {
+    const foreign = foreignWriteLock() || foreignAccountOwner();
+    if (accountDataWriteLocked || foreign) {
+      if (foreign && Date.now() - lastForeignWriteNotice > 2_000 && typeof window !== 'undefined') {
+        lastForeignWriteNotice = Date.now();
+        window.dispatchEvent(new CustomEvent('vc:account-write-blocked', { detail: { key } }));
+      }
+      return false;
+    }
   }
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -144,7 +362,7 @@ const lsSet = (key, value) => {
           localStorage.setItem(key, JSON.stringify(slim));
           if (!VC_QUOTA_SLIM_ALREADY_NOTIFIED) {
             VC_QUOTA_SLIM_ALREADY_NOTIFIED = true;
-            window.dispatchEvent(new CustomEvent('vc:quota-warning', {
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vc:quota-warning', {
               detail: 'O armazenamento deste navegador está quase cheio. A cópia local foi salva sem duplicar imagens já armazenadas. Clique em Salvar para sincronizar com sua conta.',
             }));
           }
@@ -157,7 +375,7 @@ const lsSet = (key, value) => {
       quotaFailedKeys.add(key);
       if (!VC_QUOTA_HARD_ALREADY_NOTIFIED) {
         VC_QUOTA_HARD_ALREADY_NOTIFIED = true;
-        window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
           detail: 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para tentar guardar as alterações na sua conta.',
         }));
       }

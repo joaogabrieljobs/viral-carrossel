@@ -2,7 +2,7 @@
  * Sync da biblioteca com a nuvem (por conta autenticada).
  * Manifesto leve + assets de imagem enviados à parte (limite body serverless).
  */
-import { SK, lsSet, areAccountDataWritesLocked, lockAccountDataWrites } from './storage.js';
+import { SK, lsSet, areAccountDataWritesLocked, lockAccountDataWrites, lockOtherAccountTabs, unlockAccountDataWrites, waitForAccountWriteLockProbe } from './storage.js';
 import { lsGet } from './telemetry.js';
 import {
   imagemComoDataUrl, guardarImagemDoSlide, newImageId, semImagensDeRuntime, semLogosDeRuntimeDasMarcas,
@@ -79,7 +79,7 @@ function writeCloudMeta(meta) {
   } catch { /* quota: manter apenas o recibo curto, sem duplicar os projetos */ }
   try {
     const shortMeta = Object.fromEntries([
-      'revision', 'updatedAt', 'projectCount', 'lastPullAt', 'lastPushAt', 'localPersisted', 'recordedAt',
+      'revision', 'updatedAt', 'projectCount', 'lastPullAt', 'lastPushAt', 'localPersisted', 'needsPull', 'pendingRevision', 'recordedAt',
     ].filter((key) => stored[key] !== undefined).map((key) => [key, stored[key]]));
     sessionStorage.setItem(LIBRARY_CLOUD_META_FALLBACK_KEY, JSON.stringify({
       owner: localStorage.getItem(SK.dataOwner), meta: shortMeta,
@@ -511,14 +511,6 @@ export async function pushLibraryToCloud(opts = {}) {
     : { uploaded: 0, skipped: 0, failed: 0, lastError: '' };
 
   assertSyncContext(context, guardOpts);
-  if (!areAccountDataWritesLocked()) writeCloudMeta({
-    revision: result.revision,
-    updatedAt: result.updatedAt,
-    projectCount: result.projectCount,
-    lastPushAt: Date.now(),
-    lastPullAt: localMeta?.lastPullAt || null,
-    localPersisted: localMeta?.localPersisted,
-  });
 
   // Sync/Salvar: SEMPRE puxar a lista completa da nuvem para o browser.
   // Sem isto a UI fica com 1 projecto enquanto o toast diz «4 na nuvem».
@@ -554,6 +546,34 @@ export async function pushLibraryToCloud(opts = {}) {
     } catch (e) {
       pullError = String(e?.message || e || 'falha ao restaurar lista');
     }
+  }
+
+  const confirmedCount = Number(result.projectCount || 0);
+  if (mustPull && !pullError && snapshot) {
+    const applied = readCloudMeta() || {};
+    writeCloudMeta({
+      ...applied,
+      revision: result.revision,
+      updatedAt: result.updatedAt,
+      projectCount: snapshot.library.length,
+      lastPushAt: Date.now(),
+      needsPull: false,
+    });
+  } else if (!areAccountDataWritesLocked()) {
+    const metaCount = confirmedCount > projectCount ? projectCount : (confirmedCount || projectCount);
+    const pullFailed = mustPull && !!pullError;
+    writeCloudMeta({
+      // A resposta do push confirma a nuvem, não o conteúdo deste browser.
+      // Mesmo 5=5 pode conter projetos diferentes se o GET falhou.
+      revision: pullFailed ? localMeta?.revision : result.revision,
+      updatedAt: pullFailed ? localMeta?.updatedAt : result.updatedAt,
+      projectCount: metaCount,
+      needsPull: pullFailed || confirmedCount > metaCount,
+      ...(pullFailed ? { pendingRevision: result.revision } : {}),
+      lastPushAt: Date.now(),
+      lastPullAt: localMeta?.lastPullAt || null,
+      localPersisted: localMeta?.localPersisted,
+    });
   }
 
   return {
@@ -654,7 +674,10 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
       const dataUrl = await resolveCachedAsset(bgAsset, assetCache);
       if (dataUrl) {
         try {
-          const packed = await guardarImagemDoSlide(dataUrl, { id: bgAsset });
+          const sameLocalPhoto = localSlide?.bgImageAssetId === bgAsset;
+          const packed = await guardarImagemDoSlide(dataUrl, {
+            id: (sameLocalPhoto && localSlide?.bgImageId) || bgAsset,
+          });
           sl = { ...sl, ...packed, bgImageFailed: false, bgImageError: null };
         } catch { /* */ }
       } else {
@@ -699,7 +722,10 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
       }
       if (dataUrl) {
         try {
-          const packed = await guardarImagemDoSlide(dataUrl, { id: localId || refAsset });
+          const sameLocalReference = localSlide?.refImageAssetId === refAsset;
+          const packed = await guardarImagemDoSlide(dataUrl, {
+            id: localId || (sameLocalReference && localSlide?.refImageId) || refAsset,
+          });
           sl = {
             ...sl, refImageId: packed.bgImageId || null, refImage: packed.bgImageId ? null : dataUrl,
             refImageFailed: false, refImageError: null,
@@ -849,6 +875,10 @@ export async function applyCloudManifest(manifest, {
 
   beforeApply?.();
   assertSyncContext(context, { signal, checkLibrary: true });
+  if (!lockOtherAccountTabs()) {
+    throw new Error('Outra aba está atualizando a biblioteca. Aguarde e sincronize novamente.');
+  }
+  try {
   rememberDeletedProjectIds(deletedIds);
   const snapshot = {
     library: docs,
@@ -886,7 +916,9 @@ export async function applyCloudManifest(manifest, {
       } catch { /* a biblioteca anterior continua na nuvem */ }
     }
     cacheError = 'A biblioteca está na nuvem, mas não foi possível gravar a lista neste navegador. Libere espaço e sincronize novamente.';
-    if (!allowMemoryFallback) throw new Error(cacheError);
+    if (!allowMemoryFallback) {
+      throw new Error(cacheError);
+    }
   }
   if (manifest.userProfile && typeof manifest.userProfile === 'object') {
     try {
@@ -923,6 +955,11 @@ export async function applyCloudManifest(manifest, {
     assetsMissing,
     warnings: assetsMissing ? [`${assetsMissing} imagem(ns) indisponível(is); todos os projetos foram restaurados.`] : [],
   };
+  } catch (error) {
+    // Falha antes da aplicação React: não deixar a outra aba parada pelo TTL.
+    unlockAccountDataWrites();
+    throw error;
+  }
 }
 
 export async function pullLibraryFromCloud({
@@ -989,11 +1026,17 @@ function reloadAfterCloudPull() {
  */
 export async function reconcileLibraryCloud({ toast, onApplied, localSnapshot } = {}) {
   if (typeof window === 'undefined') return 'skipped';
+  // No reload, o lease anterior só é retomado depois de verificar se a aba
+  // original ainda existe. Não classificar esse intervalo como falha de sync.
+  await waitForAccountWriteLockProbe();
   const localMeta = readCloudMeta();
   const hasRestoredSnapshot = Array.isArray(localSnapshot?.library);
   // O cofre durável já restaurado na UI é mais recente que a cache que não
   // coube em localStorage. Apenas essa cache antiga exige pull obrigatório.
-  const requiresCloudRestore = localMeta?.localPersisted === false && !hasRestoredSnapshot;
+  // Um push já confirmado cujo GET falhou deixou um recibo `needsPull`.
+  // Sem snapshot novo do cofre, a cache antiga não deve ser enviada de novo.
+  const requiresCloudRestore = (localMeta?.localPersisted === false || localMeta?.needsPull === true)
+    && !hasRestoredSnapshot;
   try {
     const status = await fetchLibraryCloudStatus();
     const local = localLibraryFingerprint();
@@ -1009,8 +1052,10 @@ export async function reconcileLibraryCloud({ toast, onApplied, localSnapshot } 
     } else if (requiresCloudRestore) {
       // A memória recebeu uma versão que não coube em localStorage. No próximo
       // boot esta cache não representa uma edição local e nunca pode fazer push.
-      const expectedMeta = Number(status?.meta?.revision || 0) >= Number(localMeta?.revision || 0)
-        ? status.meta : localMeta;
+      // O mesmo vale quando o manifesto subiu, mas o pull não foi confirmado.
+      const expectedRevision = Math.max(Number(localMeta?.revision || 0), Number(localMeta?.pendingRevision || 0));
+      const expectedMeta = Number(status?.meta?.revision || 0) >= expectedRevision
+        ? status.meta : { ...status?.meta, revision: expectedRevision };
       result = await pullLibraryFromCloud({ expectedMeta, allowMemoryFallback });
       if (!result.snapshot) throw new Error(CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE);
     } else if (hasLocalChanges) {

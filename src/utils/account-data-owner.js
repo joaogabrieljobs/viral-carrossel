@@ -4,7 +4,7 @@
  * activas mas a mesma conta recupera os projetos ao reentrar neste browser.
  */
 import { clearAccountLocalData } from './clear-account-data.js';
-import { SK, areAccountDataWritesLocked, lockAccountDataWrites, unlockAccountDataWrites } from './storage.js';
+import { SK, areAccountDataWritesLocked, bindAccountDataWriteOwner, isAccountDataWriteOwnerCurrent, isAccountWriteLockProbePending, lockAccountDataWrites, unlockAccountDataWrites, waitForAccountWriteLockProbe } from './storage.js';
 import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
@@ -61,11 +61,15 @@ export function readDataOwner() {
   }
 }
 
-export function writeDataOwner(ownerId) {
+export function writeDataOwner(ownerId, aliases = []) {
   if (!ownerId) return;
+  const ownerAliases = JSON.stringify([...new Set([ownerId, ...aliases])]);
   try {
     localStorage.setItem(DATA_OWNER_KEY, JSON.stringify(ownerId));
+    bindAccountDataWriteOwner(ownerId, { switchedHere: true });
   } catch { /* quota / privado */ }
+  try { localStorage.setItem(SK.dataOwnerAliases, ownerAliases); } catch { /* quota */ }
+  try { sessionStorage.setItem(SK.dataOwnerAliases, ownerAliases); } catch { /* privado */ }
 }
 
 /** O restore agora aguarda IndexedDB; o React antigo não pode gravar nesse intervalo. */
@@ -116,10 +120,18 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
   if (typeof localStorage === 'undefined') return 'ok';
   if (!session?.active) return 'ok';
 
+  // Depois de login/redirect, este documento pode estar retomando o lease da
+  // própria aba. Decidir o owner antes do probe deixaria a biblioteca vazia.
+  if (isAccountWriteLockProbePending()) await waitForAccountWriteLockProbe();
+
   const next = normalizeDataOwnerId(session.email, session.customerId);
   if (!next) return 'ok';
 
   const prev = readDataOwner();
+  // A aba que iniciou com A não pode gravar a biblioteca de B depois de a
+  // outra aba trocar a conta e de o cadeado temporário expirar.
+  bindAccountDataWriteOwner(prev);
+  if (!isAccountDataWriteOwnerCurrent()) return 'blocked';
 
   const aliases = [...dataOwnerAliases(session.email, session.customerId)];
   const ownerUnchanged = (expected) => readDataOwner() === expected
@@ -144,15 +156,15 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
       // Login fresco: estados React/BYOK órfãos podem ser de outra pessoa.
       // O cofre desta conta só entra depois de desmontar este contexto.
       lockAccountDataWrites();
-      await clearAccountLocalData({ wipeMedia: false });
+      await clearAccountLocalData();
       if (!ownerUnchanged(null)) return block();
-      writeDataOwner(next);
+      writeDataOwner(next, aliases);
       if (!ownerUnchanged(next)) return block();
       reloadAccountSwitch();
       return 'reloading';
     }
     // Boot silencioso: reclamar biblioteca actual; se vazia, restaurar cofre.
-    writeDataOwner(next);
+    writeDataOwner(next, aliases);
     if (!ownerUnchanged(next)) return block();
     if (!libraryLooksOccupied()) {
       const restored = await resumeFromVault();
@@ -162,11 +174,12 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
   }
 
   if (isSameDataOwner(prev, next, session)) {
+    if (prev === next) writeDataOwner(next, aliases);
     if (prev !== next) {
       // Migrar id:cus → email: e mover snapshot se existir.
       await snapshotAccountVault(prev);
       if (!ownerUnchanged(prev)) return block();
-      writeDataOwner(next);
+      writeDataOwner(next, aliases);
       if (!ownerUnchanged(next)) return block();
       await snapshotAccountVault(next);
       if (!ownerUnchanged(next)) return block();
@@ -185,9 +198,9 @@ export async function ensureAccountDataOwner(session, { explicitLogin = false, o
   const preserved = await snapshotAccountVault(prev);
   if (!ownerUnchanged(prev)) return block();
   if (hasLocalProjects && !preserved) return 'blocked';
-  await clearAccountLocalData({ wipeMedia: false });
+  await clearAccountLocalData();
   if (!ownerUnchanged(null)) return block();
-  writeDataOwner(next);
+  writeDataOwner(next, aliases);
   if (!ownerUnchanged(next)) return block();
   reloadAccountSwitch();
   return 'reloading';

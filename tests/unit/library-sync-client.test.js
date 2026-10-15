@@ -663,6 +663,28 @@ describe('library-sync client pack', () => {
     expect(JSON.parse(local.getItem(SK.library))).toHaveLength(5);
   });
 
+  it('recibo needsPull restaura a versão da nuvem antes de reenviar uma lista stale de igual tamanho', async () => {
+    const manifest = cloudLibrary(1);
+    const stale = structuredClone(manifest.docs);
+    stale[0].doc.slides[0].title = 'Versão antiga deste browser';
+    local.setItem(SK.library, JSON.stringify(stale));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({
+      localPersisted: true, needsPull: true, revision: 3,
+      pendingRevision: manifest.revision, projectCount: 1,
+    }));
+    const { requests } = installCloudApi(manifest);
+    vi.stubGlobal('window', { location: { href: 'https://example.test/', replace: vi.fn() } });
+    const onApplied = vi.fn((snapshot) => {
+      expect(snapshot.library[0].doc.slides[0].title).toBe('Texto 1');
+      unlockAccountDataWrites();
+    });
+
+    expect(await reconcileLibraryCloud({ onApplied })).toBe('ok');
+    expect(requests.some((request) => request.body?.action === 'push')).toBe(false);
+    expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).needsPull).toBeUndefined();
+  });
+
   it.each(['status', 'pull', 'empty', 'old-revision'])('cache stale e falha %s bloqueiam o boot sem push nem aplicar dados velhos', async (failure) => {
     const manifest = cloudLibrary();
     local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));
@@ -1036,6 +1058,53 @@ describe('library-sync client pack', () => {
     expect(sent.deletedIds).toEqual(['p2']);
     expect(readDeletedProjectIds()).toEqual(['p2']);
     expect(JSON.parse(local.getItem(SK.libraryDeletedIds))).toEqual(['p2']);
+    expect(JSON.parse(local.getItem(SK.libraryCloudMeta)).projectCount).toBe(1);
+  });
+
+  it('push sem pull não grava na meta uma contagem maior do que a lista local', async () => {
+    local.setItem(SK.library, JSON.stringify(cloudLibrary(1).docs));
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      const body = options.body ? JSON.parse(options.body) : null;
+      if (body?.action === 'push') return response({ ok: true, revision: 9, updatedAt: 900, projectCount: 5 });
+      if (body?.action === 'status') return response({ ok: true, meta: { revision: 9, projectCount: 5 } });
+      throw new Error(`Pedido inesperado: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await pushLibraryToCloud({ pullAfter: false });
+    const meta = JSON.parse(local.getItem(SK.libraryCloudMeta));
+    expect(meta.projectCount).toBe(1);
+    expect(meta.needsPull).toBe(true);
+  });
+
+  it('GET falho com contagem igual conserva revisão local e pede novo pull', async () => {
+    local.setItem(SK.library, JSON.stringify(cloudLibrary(1).docs));
+    local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 3, updatedAt: 700, projectCount: 1, needsPull: false }));
+    vi.stubGlobal('fetch', vi.fn(async (url, options = {}) => {
+      const body = options.body ? JSON.parse(options.body) : null;
+      if (body?.action === 'status') return response({ ok: true, meta: { revision: 4, projectCount: 1 } });
+      if (body?.action === 'push') return response({ ok: true, revision: 5, updatedAt: 900, projectCount: 1 });
+      if (url.includes('?full=1')) return response({ error: 'temporariamente indisponível' }, 503);
+      throw new Error(`Pedido inesperado: ${url}`);
+    }));
+    const result = await pushLibraryToCloud({ pullAfter: true });
+    expect(result).toMatchObject({ ok: false, cloudSaved: true, projectCount: 1 });
+    const meta = JSON.parse(local.getItem(SK.libraryCloudMeta));
+    expect(meta).toMatchObject({ revision: 3, updatedAt: 700, projectCount: 1,
+      needsPull: true, pendingRevision: 5 });
+  });
+
+  it('falha de aplicação do pull libera o lease da outra aba imediatamente', async () => {
+    const manifest = cloudLibrary(1);
+    installCloudApi(manifest);
+    local.setItem(SK.library, JSON.stringify([{ id: 'anterior', doc: { slides: [] } }]));
+    const setItem = local.setItem.bind(local);
+    vi.spyOn(local, 'setItem').mockImplementation((key, value) => {
+      if (key === SK.library) throw new Error('quota');
+      setItem(key, value);
+    });
+    await expect(applyCloudManifest(manifest)).rejects.toThrow('Libere espaço');
+    expect(local.getItem('vc_account_write_lock')).toBeNull();
+    expect(areAccountDataWritesLocked()).toBe(false);
   });
 
   it('pull reúne exclusões locais e remotas antes de restaurar a lista', async () => {

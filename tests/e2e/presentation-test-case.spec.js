@@ -131,6 +131,10 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   await useProfessionalControls(page);
   await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
 
+  await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
+  await page.getByPlaceholder('Ex.: Pitch clínica').fill('Nova apresentação');
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+
   const modal = page.locator('.modal-panel');
   await modal.getByLabel('Qual é o tema da apresentação?', { exact: true })
     .fill('Como transformar testes A/B em decisões confiáveis');

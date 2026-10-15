@@ -109,6 +109,8 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   // Troca de projeto vive na Home no fluxo com divulgação progressiva.
   await page.getByRole('tab', { name: /^Home$/i }).first().click();
   await page.getByRole('button', { name: /Criar nova comunicação/i }).first().click();
+  await page.getByPlaceholder('Ex.: Clínica Janine').fill('Projeto B MUSA');
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
   await narrativa(page);
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue('');

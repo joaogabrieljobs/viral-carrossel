@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
-import { SK } from '../../src/utils/storage.js';
+import { SK, lockOtherAccountTabs, unlockAccountDataWrites } from '../../src/utils/storage.js';
 import { readDeletedProjectIds, rememberDeletedProjectIds, PROJECT_DELETIONS_FALLBACK_KEY } from '../../src/utils/project-deletions.js';
 
 function storage() {
@@ -60,5 +60,34 @@ describe('exclusões duráveis por conta', () => {
     rememberDeletedProjectIds(['excluido']);
     expect(sessionStorage.getItem(PROJECT_DELETIONS_FALLBACK_KEY)).toBeNull();
     expect(readDeletedProjectIds()).toEqual(['excluido']);
+  });
+
+  it('aba antiga de A não grava um tombstone no espaço da conta B', () => {
+    expect(rememberDeletedProjectIds(['rascunho-a'])).toEqual(['rascunho-a']);
+    const previousFallback = sessionStorage.getItem(PROJECT_DELETIONS_FALLBACK_KEY);
+    local.setItem(SK.dataOwner, 'email:b@example.test');
+    local.setItem(SK.libraryDeletedIds, '["b-existente"]');
+
+    expect(rememberDeletedProjectIds(['id-compartilhado'])).toBeNull();
+    expect(local.getItem(SK.libraryDeletedIds)).toBe('["b-existente"]');
+    expect(sessionStorage.getItem(PROJECT_DELETIONS_FALLBACK_KEY)).toBe(previousFallback);
+    expect(readDeletedProjectIds()).toEqual(['b-existente']);
+  });
+
+  it('aba impedida por lease alheio não registra exclusão em fallback', async () => {
+    expect(lockOtherAccountTabs()).toBe(true);
+    const originalSession = sessionStorage;
+    const duplicateSession = storage();
+    duplicateSession.setItem('vc_account_write_lock_token', originalSession.getItem('vc_account_write_lock_token'));
+    vi.stubGlobal('sessionStorage', duplicateSession);
+    vi.stubGlobal('performance', { getEntriesByType: () => [{ type: 'navigate' }] });
+    vi.resetModules();
+    const duplicate = await import('../../src/utils/project-deletions.js');
+
+    expect(duplicate.rememberDeletedProjectIds(['do-clone'])).toBeNull();
+    expect(local.getItem(SK.libraryDeletedIds)).toBeNull();
+    expect(duplicateSession.getItem(PROJECT_DELETIONS_FALLBACK_KEY)).toBeNull();
+    vi.stubGlobal('sessionStorage', originalSession);
+    unlockAccountDataWrites();
   });
 });

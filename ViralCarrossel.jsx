@@ -31,7 +31,7 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
-import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
+import { videoPut, videoGet, videoDelete, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
 import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
@@ -1812,28 +1812,53 @@ export default function App() {
   // Modal de boas-vindas dos 3 modos — só na 1.ª visita da conta (nunca a cada geração).
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
   const modesIntroScheduledRef = useRef(false);
-  const bootLibraryCountRef = useRef(null);
-  if (bootLibraryCountRef.current === null) {
-    bootLibraryCountRef.current = library.length;
+  const bootProjectsRef = useRef(null);
+  if (bootProjectsRef.current === null) {
+    const persistedLibrary = lsGet(SK.library, null);
+    const legacyDoc = lsGet(SK.legacyDoc, null);
+    const hadSavedProjects = (Array.isArray(persistedLibrary) && persistedLibrary.length > 0)
+      || !!legacyDoc?.slides?.length;
+    // `library` sempre contém um Carrossel de exemplo, mesmo no primeiro acesso.
+    // Guardar o ID permite distinguir esse placeholder de projetos restaurados
+    // da nuvem quando o carregamento da conta terminar.
+    bootProjectsRef.current = {
+      hadSavedProjects,
+      placeholderId: hadSavedProjects ? null : library[0]?.id,
+    };
   }
+  const hadProjectsAtRestoreRef = useRef(null);
+  if (accountLibraryReady && hadProjectsAtRestoreRef.current === null) {
+    // A decisão de primeira visita pertence ao boot. Criar o primeiro projeto
+    // nesta sessão não pode cancelá-la nem suprimir o tour da primeira geração.
+    hadProjectsAtRestoreRef.current = bootProjectsRef.current.hadSavedProjects
+      || library.some((entry) => entry.id !== bootProjectsRef.current.placeholderId);
+  }
+  const hadProjectsAtRestore = hadProjectsAtRestoreRef.current === true;
   useEffect(() => {
-    if (typeof window === 'undefined' || landingOpen) return undefined;
+    if (typeof window === 'undefined' || landingOpen || !accountLibraryReady) return undefined;
     try {
       if (localStorage.getItem(SK.modesIntro)) return undefined;
-      // Conta que já tinha projetos no boot (reentrada) — sem modal.
-      if ((bootLibraryCountRef.current || 0) > 0) {
+      // Conta com projetos salvos ou restaurados — sem modal de primeira visita.
+      if (hadProjectsAtRestore) {
         localStorage.setItem(SK.modesIntro, '1');
         localStorage.setItem(SK.onboarding, '1');
         return undefined;
       }
       if (!modesIntroScheduledRef.current) {
         modesIntroScheduledRef.current = true;
-        const t = window.setTimeout(() => setModesIntroOpen(true), 600);
-        return () => window.clearTimeout(t);
+        let opened = false;
+        const t = window.setTimeout(() => {
+          opened = true;
+          setModesIntroOpen(true);
+        }, 600);
+        return () => {
+          window.clearTimeout(t);
+          if (!opened) modesIntroScheduledRef.current = false;
+        };
       }
     } catch { /* */ }
     return undefined;
-  }, [landingOpen]);
+  }, [landingOpen, accountLibraryReady, hadProjectsAtRestore]);
   // Identidade estável: como props inline, entravam nas deps do layout effect do
   // tour e realimentavam o ciclo render → effect → setState → render (React #185).
   const tourEnterEditor = useCallback(() => setShellView('project'), [setShellView]);
@@ -2183,18 +2208,9 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [library, setVideoUrlsSync]);
-  // Cleanup periódico de orphans (vídeos sem slide apontando) — 1× por sessão após boot
-  useEffect(() => {
-    const id = setTimeout(async () => {
-      try {
-        const inUse = (library || []).flatMap(e => (e.doc?.slides || []).map(s => s.videoId).filter(Boolean));
-        const removed = await videoCleanupOrphans(inUse);
-        if (removed > 0) console.log(`[video] cleanup: removeu ${removed} vídeo(s) orfão(s)`);
-      } catch { /* */ }
-    }, 5000);
-    return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // A biblioteca ainda está vazia durante o restore e o cofre durável pode
+  // referenciar vídeos ausentes da lista ativa. Sem índice de refs do cofre,
+  // um GC automático destruiria a única cópia local desses arquivos.
   // Revogar todas as object URLs quando o componente desmonta (raro mas correto)
   useEffect(() => () => {
     Object.values(videoUrlsRef.current).forEach(url => {
@@ -2297,12 +2313,12 @@ export default function App() {
   // Tour guiado — uma única vez por conta (1.ª geração). Depois só pela Ajuda.
   const tourScheduledRef = useRef(false);
   useEffect(() => {
-    if (typeof window === 'undefined' || landingOpen || modesIntroOpen) return undefined;
+    if (typeof window === 'undefined' || landingOpen || !accountLibraryReady || modesIntroOpen) return undefined;
     if (isDefault(slides)) return undefined;
     try {
       if (localStorage.getItem(SK.onboarding)) return undefined;
-      // Reentrada com biblioteca já existente no boot → não interromper.
-      if ((bootLibraryCountRef.current || 0) > 0) {
+      // Reentrada com projetos salvos ou restaurados → não interromper.
+      if (hadProjectsAtRestore) {
         localStorage.setItem(SK.onboarding, '1');
         localStorage.setItem(SK.modesIntro, '1');
         return undefined;
@@ -2310,11 +2326,18 @@ export default function App() {
       if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
       if (tourScheduledRef.current || tourOpen) return undefined;
       tourScheduledRef.current = true;
-      const t = window.setTimeout(() => setTourOpen(true), 850);
-      return () => window.clearTimeout(t);
+      let opened = false;
+      const t = window.setTimeout(() => {
+        opened = true;
+        setTourOpen(true);
+      }, 850);
+      return () => {
+        window.clearTimeout(t);
+        if (!opened) tourScheduledRef.current = false;
+      };
     } catch { /* ignore */ }
     return undefined;
-  }, [landingOpen, modesIntroOpen, slides, tourOpen]);
+  }, [landingOpen, accountLibraryReady, hadProjectsAtRestore, modesIntroOpen, slides, tourOpen]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -2330,20 +2353,29 @@ export default function App() {
   const refImageTargetIdxRef = useRef(null);
   const referenceUploadRef = useRef(0);
   const slideRefs = useRef({});
+  const lastForeignWriteWarningRef = useRef(0);
 
   // Escuta eventos de quota do localStorage — disparados por lsSet quando o storage enche
   useEffect(() => {
     const onQuotaWarning  = (e) => toast(e.detail, 'warn', 8000);
+    const onForeignWriteBlocked = () => {
+      const now = Date.now();
+      if (now - lastForeignWriteWarningRef.current < 10_000) return;
+      lastForeignWriteWarningRef.current = now;
+      toast('Outra aba está atualizando seus projetos. Esta alteração não foi salva; volte à aba mais recente antes de continuar.', 'warning', 8_000);
+    };
     let warningId;
     const onQuotaExceeded = (e) => { warningId = toast(e.detail, 'error', 0); };
     const onQuotaRecovered = () => { if (warningId) dismissToast(warningId); };
     window.addEventListener('vc:quota-warning',  onQuotaWarning);
     window.addEventListener('vc:quota-exceeded', onQuotaExceeded);
     window.addEventListener('vc:quota-recovered', onQuotaRecovered);
+    window.addEventListener('vc:account-write-blocked', onForeignWriteBlocked);
     return () => {
       window.removeEventListener('vc:quota-warning',  onQuotaWarning);
       window.removeEventListener('vc:quota-exceeded', onQuotaExceeded);
       window.removeEventListener('vc:quota-recovered', onQuotaRecovered);
+      window.removeEventListener('vc:account-write-blocked', onForeignWriteBlocked);
     };
   }, [toast, dismissToast]);
 
@@ -5242,6 +5274,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             initialEmail={paywallEmail}
             loginHint={loginHint}
             onBack={reopenLanding}
+            onLogin={() => setLoginOpen(true)}
           />
           <LoginModal
             open={loginOpen}

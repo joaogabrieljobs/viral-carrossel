@@ -613,6 +613,9 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await expect.poll(() => page.evaluate(() => {
       const library = JSON.parse(localStorage.getItem('vc_library') || '[]');
       return library.map(entry => ({ id: entry.id, count: entry.doc.slides.length }));
+    }).catch((error) => {
+      if (/Execution context was destroyed/.test(error.message)) return [];
+      throw error;
     })).toEqual([{ id: janine.id, count: 23 }]);
     await goHome(page);
     await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();

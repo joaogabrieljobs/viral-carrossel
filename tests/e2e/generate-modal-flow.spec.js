@@ -81,6 +81,12 @@ test('apresentação abre um fluxo próprio com caminhos e padrões 16:9', async
   await useProfessionalControls(page);
   await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
 
+  // Ao trocar de Carrossel para Apresentação, o produto cria um projeto
+  // próprio antes de abrir o assistente de geração.
+  await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
+  await page.getByPlaceholder('Ex.: Pitch clínica').fill('Plano de expansão 2027');
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+
   const modal = page.locator('.modal-panel');
   await expect(modal.getByText('Configurar apresentação', { exact: true })).toBeVisible();
   await expect(modal.getByLabel('Qual é o tema da apresentação?', { exact: true })).toBeVisible();

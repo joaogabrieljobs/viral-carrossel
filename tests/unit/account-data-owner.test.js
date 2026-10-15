@@ -182,7 +182,7 @@ describe('account-data-owner', () => {
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toBe(vaultBefore);
     expect(remove).not.toHaveBeenCalled();
     expect(removeSession).not.toHaveBeenCalled();
-    expect(write.mock.calls.map(([key]) => key)).toEqual([ACCOUNT_VAULT_KEY]);
+    expect(write.mock.calls.map(([key]) => key)).toEqual(['vc_account_write_lock', ACCOUNT_VAULT_KEY]);
     expect(globalThis.location.replace).not.toHaveBeenCalled();
     expect(areAccountDataWritesLocked()).toBe(true);
     expect(lsSet(SK.library, [{ id: 'proj-b' }])).toBe(false);

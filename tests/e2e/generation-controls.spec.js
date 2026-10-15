@@ -377,8 +377,9 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   expect(saved.slides[0].logoImage).toBeUndefined();
   await page.getByLabel('Posição da logo neste card').selectOption('bl');
   await expect.poll(async () => (await doc(page))?.slides[0].logoPosition).toBe('bl');
-  const exportedLogos = page.locator('[data-vc-export-tree] div[style*="background-image"]');
-  await expect.poll(async () => exportedLogos.evaluateAll(nodes => nodes.filter(n => n.style.backgroundImage.includes('blob:')).length)).toBe(1);
+  // A camada de logo usa <img> para preservar a nitidez no preview e no export.
+  const exportedLogos = page.locator('[data-vc-export-tree] img[src^="blob:"]');
+  await expect.poll(async () => exportedLogos.evaluateAll(nodes => nodes.filter(img => img.complete && img.naturalWidth > 0).length)).toBe(1);
   await page.screenshot({ path: '/tmp/viral-project-logo.png' });
   const alpha = await page.getByRole('img', { name: 'Logo deste card', exact: true }).evaluate(img => {
     const canvas = document.createElement('canvas'); canvas.width = 20; canvas.height = 20;

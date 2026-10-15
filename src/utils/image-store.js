@@ -19,8 +19,10 @@
  *   - DB:    viral-carrossel-img
  *   - Store: images
  *   - Key:   imageId (string)
- *   - Value: { id, blob, mime, size, savedAt }
+ *   - Value: { id, blob, mime, size, savedAt, owner }
  */
+
+import { SK, isAccountDataWriteOwnerCurrent } from './storage.js';
 
 const DB_NAME = 'viral-carrossel-img';
 const STORE_NAME = 'images';
@@ -30,6 +32,40 @@ const IDB_OPEN_TIMEOUT_MS = 8_000;
 const IDB_WIPE_TIMEOUT_MS = 2_500;
 
 let _dbPromise = null;
+
+function activeMediaOwner() {
+  try {
+    const raw = localStorage.getItem(SK.dataOwner);
+    if (!raw) return null;
+    try { return JSON.parse(raw) || null; } catch { return raw; }
+  } catch { return null; }
+}
+
+function activeMediaOwnerAliases() {
+  const owner = activeMediaOwner();
+  if (!owner) return [];
+  try {
+    const raw = localStorage.getItem(SK.dataOwnerAliases)
+      || sessionStorage.getItem(SK.dataOwnerAliases) || '[]';
+    const ids = JSON.parse(raw);
+    return [owner, ...(Array.isArray(ids) ? ids : [])];
+  } catch { return [owner]; }
+}
+
+// Arquivos anteriores à separação por conta não têm owner. Só continuam
+// visíveis se a biblioteca ativa desta conta realmente os referencia.
+function legacyImageReferenced(id) {
+  try {
+    const library = JSON.parse(localStorage.getItem('vc_library') || '[]');
+    const brands = JSON.parse(localStorage.getItem('vc_brands') || '[]');
+    return idsDeImagemEmUso(library, brands).includes(id);
+  } catch { return false; }
+}
+
+function imageBelongsToActiveAccount(entry) {
+  if (!entry || !isAccountDataWriteOwnerCurrent()) return false;
+  return entry.owner ? activeMediaOwnerAliases().includes(entry.owner) : legacyImageReferenced(entry.id);
+}
 
 function openDB() {
   if (_dbPromise) return _dbPromise;
@@ -97,19 +133,40 @@ export function newImageId() {
 
 export async function imagePut(id, blob, meta = {}) {
   if (!id || !blob) throw new Error('imagePut: id e blob obrigatórios.');
+  if (!isAccountDataWriteOwnerCurrent()) throw new Error('A conta mudou antes de guardar a imagem.');
+  const owner = activeMediaOwner();
   const db = await openDB();
+  if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
+    throw new Error('A conta mudou antes de guardar a imagem.');
+  }
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const req = transaction.objectStore(STORE_NAME).put({
-      id,
-      blob,
-      mime: meta.mime || blob.type || 'image/png',
-      size: blob.size,
-      savedAt: Date.now(),
-    });
+    const store = transaction.objectStore(STORE_NAME);
+    const read = store.get(id);
+    read.onsuccess = () => {
+      // IDs antigos e hashes de assets da nuvem podem coincidir entre contas.
+      // Nunca tomar posse do blob de outra conta ao importar a mesma chave.
+      if (read.result && (!read.result.owner || !imageBelongsToActiveAccount(read.result))) {
+        reject(Object.assign(new Error('Este ID de imagem pertence a outra conta.'), { code: 'MEDIA_OWNER_CONFLICT' }));
+        return;
+      }
+      if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
+        reject(new Error('A conta mudou antes de guardar a imagem.'));
+        return;
+      }
+      const req = store.put({
+        id,
+        blob,
+        mime: meta.mime || blob.type || 'image/png',
+        size: blob.size,
+        savedAt: Date.now(),
+        owner,
+      });
+      req.onerror = () => reject(req.error || new Error('Falha ao gravar a imagem.'));
+    };
+    read.onerror = () => reject(read.error || new Error('Falha ao verificar o ID da imagem.'));
     transaction.oncomplete = () => resolve(id);
     transaction.onabort = () => reject(transaction.error || new Error('Gravação da imagem interrompida.'));
-    req.onerror = () => reject(req.error || new Error('Falha ao gravar a imagem.'));
   });
 }
 
@@ -118,7 +175,7 @@ export async function imageGet(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const req = tx(db, 'readonly').get(id);
-    req.onsuccess = () => resolve(req.result || null);
+    req.onsuccess = () => resolve(imageBelongsToActiveAccount(req.result) ? req.result : null);
     req.onerror = () => reject(req.error || new Error('Falha ao ler a imagem.'));
   });
 }
@@ -127,13 +184,19 @@ export async function imageDelete(id) {
   if (!id) return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = tx(db, 'readwrite').delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error || new Error('Falha ao apagar a imagem.'));
+    const store = tx(db, 'readwrite');
+    const read = store.get(id);
+    read.onsuccess = () => {
+      if (!imageBelongsToActiveAccount(read.result)) { resolve(); return; }
+      const removed = store.delete(id);
+      removed.onsuccess = () => resolve();
+      removed.onerror = () => reject(removed.error || new Error('Falha ao apagar a imagem.'));
+    };
+    read.onerror = () => reject(read.error || new Error('Falha ao ler a imagem antes de apagar.'));
   });
 }
 
-/** Apaga a base inteira (logout / troca de conta). Best-effort. */
+/** Apaga a base inteira apenas em limpeza explícita, nunca na troca de conta. */
 export async function imageWipeDatabase() {
   try {
     if (_dbPromise) {
@@ -188,8 +251,9 @@ export async function imageStorageUsage() {
     const req = tx(db, 'readonly').getAll();
     req.onsuccess = () => {
       const all = req.result || [];
-      const totalBytes = all.reduce((n, e) => n + (e.size || 0), 0);
-      resolve({ count: all.length, totalBytes, totalMB: totalBytes / (1024 * 1024) });
+      const visible = all.filter(imageBelongsToActiveAccount);
+      const totalBytes = visible.reduce((n, e) => n + (e.size || 0), 0);
+      resolve({ count: visible.length, totalBytes, totalMB: totalBytes / (1024 * 1024) });
     };
     req.onerror = () => reject(req.error || new Error('Falha ao calcular o uso.'));
   });
@@ -234,8 +298,13 @@ export async function guardarImagemDoSlide(src, meta = {}) {
   const blob = await origemParaBlob(src);
   if (!blob) return { bgImage: null, bgImageId: null };
   try {
-    const id = meta.id || newImageId();
-    await imagePut(id, blob, meta);
+    let id = meta.id || newImageId();
+    try { await imagePut(id, blob, meta); }
+    catch (error) {
+      if (error?.code !== 'MEDIA_OWNER_CONFLICT') throw error;
+      id = newImageId();
+      await imagePut(id, blob, meta);
+    }
     return { bgImage: URL.createObjectURL(blob), bgImageId: id };
   } catch (e) {
     console.warn('[image-store] sem IndexedDB, imagem fica só em memória:', e?.message || e);

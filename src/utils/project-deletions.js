@@ -1,4 +1,4 @@
-import { SK } from './storage.js';
+import { SK, areAccountDataWritesLocked, lsSet } from './storage.js';
 
 export const PROJECT_DELETIONS_FALLBACK_KEY = 'vc_project_deletions_fallback';
 let memoryStore;
@@ -33,9 +33,16 @@ export function readDeletedProjectIds() {
 /** Síncrono antes de remover o card da UI, inclusive quando localStorage está cheio. */
 export function rememberDeletedProjectIds(ids = []) {
   const { store, owner } = scope();
+  // Uma aba que ainda mostra A depois de outra trocar a conta para B não pode
+  // deixar um tombstone em B só porque os projetos partilham o mesmo ID.
+  if (areAccountDataWritesLocked()) return null;
   const next = mergeDeletedProjectIds(readDeletedProjectIds(), Array.isArray(ids) ? ids : [ids]);
+  if (scope().owner !== owner || areAccountDataWritesLocked()) return null;
+  // lsSet repete o guard de owner/lease no instante da escrita.
+  const persisted = lsSet(SK.libraryDeletedIds, next);
+  if (!persisted && areAccountDataWritesLocked()) return null;
   memoryByOwner.set(owner, next);
-  try { store?.setItem(SK.libraryDeletedIds, JSON.stringify(next)); } catch { /* cofre/sync recebem snapshot */ }
+  if (!store) return next;
   try { sessionStorage.setItem(PROJECT_DELETIONS_FALLBACK_KEY, JSON.stringify({ owner, ids: next })); } catch { /* memória mantém intenção */ }
   return next;
 }

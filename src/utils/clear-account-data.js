@@ -17,7 +17,12 @@ const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
  * Meta de sync NÃO fica órfã sem biblioteca (causava pull/push errado).
  * Tour/modesIntro e meta vão no cofre por owner.
  */
-const PRESERVE_KEYS = new Set([PENDING_SHARE_KEY, ACCOUNT_VAULT_KEY]);
+const PRESERVE_KEYS = new Set([
+  PENDING_SHARE_KEY,
+  ACCOUNT_VAULT_KEY,
+  'vc_account_write_lock',
+  'vc_account_write_lock_token',
+]);
 
 function removeKnownKeys(store) {
   if (!store) return;
@@ -42,9 +47,9 @@ function removeKnownKeys(store) {
 /**
  * Best-effort: nunca lança. Chamar antes de redirecionar no logout.
  * @param {{ timeoutMs?: number, wipeMedia?: boolean }} [opts]
- *   wipeMedia: apaga IndexedDB de imagens/vídeos. Default false — os bytes
- *   ficam referenciados pelo cofre da conta ao reentrar. true só se quiser
- *   limpeza forense / troca de computador partilhado agressiva.
+ *   wipeMedia: limpeza explícita de TODAS as contas deste browser. No logout e
+ *   na troca de conta fica false: o cofre usa IDs que apontam para estes blobs.
+ *   A leitura e a limpeza de órfãos são isoladas por owner nos stores.
  */
 export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = false } = {}) {
   // Trava ANTES de apagar — pagehide/beforeunload não podem repor a biblioteca.
