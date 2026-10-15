@@ -481,19 +481,23 @@ export async function pushLibraryToCloud(opts = {}) {
     replace,
   };
   let result;
-  try {
-    result = await syncRequest(pushBody, { signal: opts.signal });
-  } catch (e) {
-    if (e?.code === 'library_conflict') {
-      // Conflito: ainda MERGE (nunca replace cego) para não apagar a nuvem.
-      result = await syncRequest({
-        action: 'push',
-        manifest,
-        force: true,
-        replace: false,
-      }, { signal: opts.signal });
-    } else {
-      throw e;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      // Uma disputa entre dispositivos é transitória. Reenviar o mesmo
+      // manifesto permite ao servidor reler e unir os projetos por ID.
+      // Depois do primeiro conflito nunca repetir um replace.
+      const body = attempt === 0 ? pushBody : {
+        action: 'push', manifest, force: true, replace: false,
+      };
+      // eslint-disable-next-line no-await-in-loop
+      result = await syncRequest(body, { signal: opts.signal });
+      break;
+    } catch (e) {
+      if (e?.code !== 'library_conflict' || attempt === 3) throw e;
+      assertSyncContext(context, { ...guardOpts, checkLibrary: true });
+      // eslint-disable-next-line no-await-in-loop
+      await waitForSyncRetry(120 * (2 ** attempt), opts.signal);
+      assertSyncContext(context, { ...guardOpts, checkLibrary: true });
     }
   }
 

@@ -15,6 +15,9 @@ const ASSET_CHUNK_CHARS = 2_000_000;
 const MAX_ORIGINAL_ASSET_CHARS = 48_000_000;
 const MAX_ASSET_CHUNKS = 24;
 const MAX_ASSETS = 800;
+const MAX_MANIFEST_WRITE_ATTEMPTS = 7;
+const MANIFEST_RETRY_BASE_MS = 45;
+const MANIFEST_RETRY_CAP_MS = 400;
 const memoryMeta = new Map();
 const memoryManifest = new Map();
 const memoryAssets = new Map();
@@ -367,16 +370,22 @@ export async function putLibraryManifest(customerId, manifest, opts = {}) {
     throw Object.assign(new Error('Manifesto inválido.'), { code: 'library_bad_manifest' });
   }
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_MANIFEST_WRITE_ATTEMPTS; attempt += 1) {
     try {
       return await putLibraryManifestAttempt(id, manifest, opts, attempt > 0);
     } catch (error) {
       if (error?.code !== 'library_write_conflict') throw error;
-      if (attempt === 2) {
+      if (attempt === MAX_MANIFEST_WRITE_ATTEMPTS - 1) {
         throw Object.assign(new Error('A biblioteca mudou durante o envio. Sincronize novamente.'), {
           code: 'library_conflict',
         });
       }
+      // Duas abas/dispositivos podem disputar o mesmo ETag. Espalhar as
+      // tentativas dá tempo ao outro save de terminar; a próxima tentativa
+      // relê a versão atual e refaz o merge antes de escrever com CAS.
+      const ceiling = Math.min(MANIFEST_RETRY_CAP_MS, MANIFEST_RETRY_BASE_MS * 2 ** attempt);
+      const delay = Math.round(ceiling * (0.75 + Math.random() * 0.5));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 }

@@ -36,12 +36,13 @@ function projectFixtures() {
 }
 
 /** API stateful sem conta, Stripe, Blob ou qualquer serviço externo real. */
-async function mockCloud(page, { offlineAtBoot = false, pushDelay = 0, pullDelay = 0, anonymous = false } = {}) {
+async function mockCloud(page, { offlineAtBoot = false, pushDelay = 0, pullDelay = 0, anonymous = false, pushConflicts = 0 } = {}) {
   const state = {
     online: !offlineAtBoot,
     session: { ...(anonymous ? SESSAO_ANONIMA : SESSAO_ATIVA) },
     loginCount: 0,
     pushCount: 0,
+    pushConflictsRemaining: pushConflicts,
     pullCount: 0,
     missingAssetCount: 0,
     logoutCount: 0,
@@ -98,6 +99,13 @@ async function mockCloud(page, { offlineAtBoot = false, pushDelay = 0, pullDelay
         if (body.action === 'push') {
           state.pushCount += 1;
           if (pushDelay) await new Promise((resolve) => setTimeout(resolve, pushDelay));
+          if (state.pushConflictsRemaining > 0) {
+            state.pushConflictsRemaining -= 1;
+            return route.fulfill({ status: 409, json: {
+              code: 'library_conflict',
+              error: 'A biblioteca mudou durante o envio. Sincronize novamente.',
+            } });
+          }
           // Mesmo contrato da store: união por id, versão mais recente vence.
           const docs = new Map(state.manifest.docs.map((entry) => [entry.id, entry]));
           for (const entry of body.manifest.docs || []) {
@@ -205,6 +213,17 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(cloud.pullCount).toBeGreaterThan(0);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await expectStoredProjects(page);
+  });
+
+  test('boot recupera os projetos da nuvem depois de duas disputas de gravação', async ({ page }) => {
+    const cloud = await mockCloud(page, { pushConflicts: 2 });
+    await seedOneProject(page);
+    await page.goto('/?app=1');
+    await expectHomeProjects(page);
+    expect(cloud.pushCount).toBe(3);
+    expect(cloud.pushConflictsRemaining).toBe(0);
+    await page.reload();
+    await expectHomeProjects(page);
   });
 
   test('Sync une 1 projeto local aos 5 da nuvem e pagehide/refresh conservam a lista', async ({ page }, testInfo) => {

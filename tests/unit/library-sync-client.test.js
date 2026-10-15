@@ -574,6 +574,46 @@ describe('library-sync client pack', () => {
     expect(requests.some((request) => request.body?.action === 'push')).toBe(false);
   });
 
+  it('celular com dois projetos locais recupera o projeto da nuvem após conflitos transitórios', async () => {
+    const cloud = cloudLibrary(1);
+    const phoneDocs = [
+      { id: 'phone-a', name: 'Carrossel', updatedAt: 900, doc: { slides: [{ id: 'a', title: 'Card A' }] } },
+      { id: 'phone-b', name: 'Novo carrossel', updatedAt: 901, doc: { slides: [{ id: 'b', title: 'Card B' }] } },
+    ];
+    local.setItem(SK.library, JSON.stringify(phoneDocs));
+    vi.stubGlobal('window', { location: { href: 'https://example.test/?app=1', replace: vi.fn() } });
+    let attempts = 0;
+    const pushBodies = [];
+    vi.stubGlobal('fetch', vi.fn(async (url, options = {}) => {
+      const body = options.body ? JSON.parse(options.body) : null;
+      if (body?.action === 'status') return response({ ok: true, empty: false, meta: {
+        revision: cloud.revision, projectCount: cloud.docs.length,
+      } });
+      if (body?.action === 'push') {
+        pushBodies.push(body);
+        attempts += 1;
+        if (attempts < 3) return response({
+          code: 'library_conflict', error: 'A biblioteca mudou durante o envio. Sincronize novamente.',
+        }, 409);
+        cloud.docs = [...cloud.docs, ...body.manifest.docs];
+        cloud.revision += 1;
+        return response({ ok: true, revision: cloud.revision, projectCount: cloud.docs.length });
+      }
+      if (url.includes('?full=1')) return response({ ok: true, manifest: cloud });
+      throw new Error(`Pedido inesperado: ${url}`);
+    }));
+    const onApplied = vi.fn((snapshot, result) => {
+      expect(snapshot.library.map((entry) => entry.id).sort()).toEqual(['p1', 'phone-a', 'phone-b']);
+      expect(result.projectCount).toBe(3);
+      unlockAccountDataWrites();
+    });
+    expect(await reconcileLibraryCloud({ onApplied })).toBe('ok');
+    expect(pushBodies).toHaveLength(3);
+    expect(pushBodies.slice(1).every((body) => body.force === true && body.replace === false)).toBe(true);
+    expect(onApplied).toHaveBeenCalledOnce();
+    expect(JSON.parse(local.getItem(SK.library))).toHaveLength(3);
+  });
+
   it('boot com cache cheio aplica a união ao React antes de liberar autosave, sem reload stale', async () => {
     const manifest = cloudLibrary();
     local.setItem(SK.library, JSON.stringify([manifest.docs[0]]));

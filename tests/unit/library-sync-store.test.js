@@ -332,15 +332,65 @@ describe('library-sync-store', () => {
       expect(stored.docs.map((doc) => doc.id)).toEqual(['first', 'second']);
     });
 
+    it('refaz o merge após vários conflitos CAS transitórios e preserva exclusões', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      let stored = { ...manifest(1, 2), deletedIds: [] };
+      let version = 1;
+      let writes = 0;
+      blob.get.mockImplementation(async () => ({
+        stream: new Response(JSON.stringify(stored)).body,
+        blob: { etag: `v${version}` },
+      }));
+      blob.put.mockImplementation(async (_path, body, options) => {
+        writes += 1;
+        expect(options.ifMatch).toBe(`v${version}`);
+        if (writes <= 4) {
+          stored = {
+            ...stored,
+            revision: stored.revision + 1,
+            docs: [...stored.docs, { id: `remote-${writes}`, doc: {} }],
+          };
+          version += 1;
+          throw new BlobPreconditionFailedError();
+        }
+        stored = JSON.parse(body);
+        version += 1;
+      });
+
+      vi.useFakeTimers();
+      try {
+        const saving = putLibraryManifest(customerId, {
+          docs: [{ id: 'local', doc: {} }],
+          deletedIds: ['p1'],
+        }, { force: true });
+        await vi.runAllTimersAsync();
+        const saved = await saving;
+        expect(writes).toBe(5);
+        expect(saved.meta).toMatchObject({ revision: 6, projectCount: 6 });
+        expect(saved.manifest.docs.map((doc) => doc.id))
+          .toEqual(['p0', 'remote-1', 'remote-2', 'remote-3', 'remote-4', 'local']);
+        expect(stored.deletedIds).toEqual(['p1']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('conflito CAS esgotado nunca tenta fallback Redis nem grava meta', async () => {
       setBlob(manifest(1, 2));
       setRedis(manifest(1, 2));
       const conflict = new BlobPreconditionFailedError();
       expect(conflict.name).toBe('Error');
       blob.put.mockRejectedValue(conflict);
-      await expect(putLibraryManifest(customerId, { docs: [], deletedIds: ['p1'] }, { force: true }))
-        .rejects.toMatchObject({ code: 'library_conflict' });
-      expect(blob.put).toHaveBeenCalledTimes(3);
+      vi.useFakeTimers();
+      try {
+        const saving = expect(putLibraryManifest(customerId, { docs: [], deletedIds: ['p1'] }, { force: true }))
+          .rejects.toMatchObject({ code: 'library_conflict' });
+        await vi.runAllTimersAsync();
+        await saving;
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(blob.put).toHaveBeenCalledTimes(7);
       expect(requests.filter(([operation]) => operation !== 'GET')).toEqual([]);
       expect(JSON.parse(redis.get(`${metaKey}:full`)).docs).toHaveLength(2);
     });
