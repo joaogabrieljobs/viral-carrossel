@@ -23,6 +23,7 @@ export const LIBRARY_CLOUD_META_FALLBACK_KEY = 'vc_library_cloud_meta_fallback';
 export const CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE = 'Não foi possível restaurar a versão mais recente dos seus projetos. A cópia deste navegador está desatualizada. Verifique sua conexão e tente novamente.';
 const SYNC_API = '/api/library-sync';
 const MAX_BODY_CHARS = 2_800_000;
+const AUTHORITATIVE_MANIFEST_TIMEOUT_MS = 30_000;
 
 function captureSyncContext() {
   return {
@@ -928,6 +929,38 @@ function assertAuthoritativeRead({ expectedOwnerId, localOwnerId, ownerAtStart, 
   }
 }
 
+async function readAuthoritativeManifest(signal) {
+  // Um GET ou corpo travado não pode manter o boot na tela de restauração para
+  // sempre. O race cobre também clientes/testes que ignoram AbortSignal; ao
+  // perder a corrida, a resposta tardia nunca chega a aplicar um snapshot.
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  const controller = new AbortController();
+  let timedOut = false;
+  let rejectCancelled;
+  const cancelled = new Promise((_, reject) => { rejectCancelled = reject; });
+  const onRequestAbort = () => rejectCancelled(new Error(timedOut
+    ? 'Tempo de restauração da biblioteca esgotado. Verifique sua conexão e tente novamente.'
+    : 'Sincronização cancelada.'));
+  const onCallerAbort = () => controller.abort();
+  controller.signal.addEventListener('abort', onRequestAbort, { once: true });
+  signal?.addEventListener('abort', onCallerAbort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, AUTHORITATIVE_MANIFEST_TIMEOUT_MS);
+  try {
+    return await Promise.race([
+      syncRequest(null, { method: 'GET', query: 'full=1', signal: controller.signal }),
+      cancelled,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onCallerAbort);
+    controller.signal.removeEventListener('abort', onRequestAbort);
+  }
+}
+
 /**
  * Leitura autoritativa para a biblioteca v2. Somente a nuvem determina quais
  * projetos estão vivos; tombstones locais legados não filtram a lista. O
@@ -947,7 +980,7 @@ export async function pullAccountLibraryAuthoritative({
     expectedOwnerId, localOwnerId, ownerAtStart, signal, manifest,
   });
   guard();
-  const data = await syncRequest(null, { method: 'GET', query: 'full=1', signal });
+  const data = await readAuthoritativeManifest(signal);
   guard();
   if (data.empty) {
     // O 404 vazio não traz manifesto com owner. Confirme a sessão antes de

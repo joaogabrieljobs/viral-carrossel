@@ -68,6 +68,7 @@ describe('leitura autoritativa da biblioteca v2', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -227,6 +228,72 @@ describe('leitura autoritativa da biblioteca v2', () => {
     await expect(pullAccountLibraryAuthoritative({ ...owner, onBeforeApply }))
       .rejects.toThrow('outra conta');
     expect(onBeforeApply).not.toHaveBeenCalled();
+  });
+
+  it('encerra um GET autoritativo travado, aborta a rede e ignora resposta tardia', async () => {
+    vi.useFakeTimers();
+    let resolveFetch;
+    let requestSignal;
+    vi.stubGlobal('fetch', vi.fn((_url, options) => {
+      requestSignal = options.signal;
+      return new Promise((resolve) => { resolveFetch = resolve; });
+    }));
+    const onBeforeApply = vi.fn();
+    const pending = pullAccountLibraryAuthoritative({
+      ...owner, hydrateImages: 'none', onBeforeApply,
+    });
+    const rejection = expect(pending).rejects.toThrow('Tempo de restauração da biblioteca esgotado');
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+    expect(requestSignal.aborted).toBe(true);
+    expect(onBeforeApply).not.toHaveBeenCalled();
+
+    resolveFetch(response({ ok: true, manifest: manifest() }));
+    await Promise.resolve();
+    expect(onBeforeApply).not.toHaveBeenCalled();
+  });
+
+  it('encerra uma leitura do corpo travada sem aplicar manifesto atrasado', async () => {
+    vi.useFakeTimers();
+    let resolveBody;
+    let requestSignal;
+    vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
+      requestSignal = options.signal;
+      return {
+        ok: true, status: 200,
+        text: () => new Promise((resolve) => { resolveBody = resolve; }),
+      };
+    }));
+    const onBeforeApply = vi.fn();
+    const pending = pullAccountLibraryAuthoritative({
+      ...owner, hydrateImages: 'none', onBeforeApply,
+    });
+    const rejection = expect(pending).rejects.toThrow('Tempo de restauração da biblioteca esgotado');
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+    expect(requestSignal.aborted).toBe(true);
+    expect(onBeforeApply).not.toHaveBeenCalled();
+
+    resolveBody(JSON.stringify({ ok: true, manifest: manifest() }));
+    await Promise.resolve();
+    expect(onBeforeApply).not.toHaveBeenCalled();
+  });
+
+  it('preserva o cancelamento externo do GET autoritativo', async () => {
+    const controller = new AbortController();
+    let requestSignal;
+    vi.stubGlobal('fetch', vi.fn((_url, options) => {
+      requestSignal = options.signal;
+      return new Promise(() => {});
+    }));
+    const pending = pullAccountLibraryAuthoritative({ ...owner, signal: controller.signal });
+    controller.abort();
+
+    await expect(pending).rejects.toThrow('Sincronização cancelada');
+    expect(requestSignal.aborted).toBe(true);
   });
 
   it('empacotamento v2 ignora exclusão local já refutada pela nuvem', async () => {
