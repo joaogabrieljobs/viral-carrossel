@@ -79,6 +79,35 @@ describe('card-overlays', () => {
     expect(normalizeOverlay(legacy)).toEqual(legacy);
   });
 
+  it.each(['text', 'cta'])('preserva a fonte individual do overlay %s ao salvar e reabrir', (type) => {
+    const fontFamily = '"Minha fonte importada", sans-serif';
+    const overlay = normalizeOverlay({ id: `font-${type}`, type, text: 'Texto com fonte própria', fontFamily });
+    const slide = addOverlayToSlide(mkSlide(1, DEFAULT_BRAND), overlay);
+    const saved = JSON.parse(JSON.stringify({ brand: DEFAULT_BRAND, slides: [slide] }));
+    const restored = ensureDocShape(saved).slides[0].overlays[0];
+    expect(restored.fontFamily).toBe(fontFamily);
+    expect(restored.text).toBe('Texto com fonte própria');
+  });
+
+  it('altera só a fonte do texto escolhido e permite voltar a herdar o estilo', () => {
+    const first = normalizeOverlay({ id: 'first', type: 'text', text: 'Primeiro', fontFamily: 'Georgia, serif' });
+    const second = normalizeOverlay({ id: 'second', type: 'text', text: 'Segundo', fontFamily: 'Arial, sans-serif' });
+    const original = { id: 'slide-fonts', overlays: [first, second] };
+    const edited = updateOverlayOnSlide(original, first.id, { fontFamily: '"Playfair Display", serif' });
+    expect(edited.overlays[0].fontFamily).toBe('"Playfair Display", serif');
+    expect(edited.overlays[1]).toEqual(second);
+    expect(original.overlays[0].fontFamily).toBe('Georgia, serif');
+    const inherited = updateOverlayOnSlide(edited, first.id, { fontFamily: '' });
+    expect(inherited.overlays[0]).not.toHaveProperty('fontFamily');
+    expect(inherited.overlays[1].fontFamily).toBe('Arial, sans-serif');
+  });
+
+  it.each([undefined, null, '', '   ', 42, {}])('não adiciona uma fonte inválida nem muda a herança: %s', (fontFamily) => {
+    for (const type of ['text', 'cta']) {
+      expect(normalizeOverlay({ id: 'inherited', type, fontFamily })).not.toHaveProperty('fontFamily');
+    }
+  });
+
   it('add/remove/update no slide', () => {
     const base = { id: 's1', overlays: [], elementsUnlocked: false };
     const cta = ELEMENT_CATALOG.find((e) => e.id === 'cta_filled').factory();

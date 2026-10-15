@@ -18,6 +18,7 @@ import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
+import { getTextFont, normalizeTextFont, resolveSlideTextFonts } from '../../utils/card-text-fonts.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
@@ -611,8 +612,9 @@ const ClassicCanvasInner = React.forwardRef(({
   const padYZn = canvasClassicTextPaddingYPx(f, slide);
   const titleTypography = presentationTypographyToken(slide, 'title');
   const subtitleTypography = presentationTypographyToken(slide, 'subtitle');
-  const resolvedTitleFF = titleTypography?.fontFamily || titleFF;
-  const resolvedSubtitleFF = subtitleTypography?.fontFamily || subtitleFF;
+  const resolvedTitleFF = getTextFont(slide, 'title', titleTypography?.fontFamily || titleFF);
+  const resolvedSubtitleFF = getTextFont(slide, 'subtitle', subtitleTypography?.fontFamily || subtitleFF);
+  const bodyAfterFF = getTextFont(slide, 'bodyAfterImage', bodyFF);
   const resolvedTitleWeight = finiteNumber(titleTypography?.weight) ?? slide.titleWeight ?? 800;
   const resolvedSubtitleWeight = finiteNumber(subtitleTypography?.weight) ?? brand.subtitleWeight ?? 400;
   const resolvedTitleTracking = finiteNumber(titleTypography?.tracking) ?? slide.titleTracking ?? 0;
@@ -851,6 +853,7 @@ const ClassicCanvasInner = React.forwardRef(({
           f.h,
           slide.subLeading,
           resolvedSubtitleFF,
+          bodyAfterFF,
           resolvedSubtitleSize,
           resolvedSubtitleLeading,
           resolvedSubtitleWeight,
@@ -927,7 +930,7 @@ const ClassicCanvasInner = React.forwardRef(({
             onCommit={(text) => onInlineTextChange?.('bodyAfterImage', text)}
             elementProps={movOu('bodyAfterImage', {
               color: bodyInk,
-              fontFamily: bodyFF,
+              fontFamily: bodyAfterFF,
               fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100) * subScale,
               lineHeight: bodyAfterLeading(slide, brand, 1.35),
               fontWeight: bodyAfterWeight(slide, brand, 500),
@@ -972,14 +975,14 @@ const ClassicCanvasInner = React.forwardRef(({
                 display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
               }}>
                 <span style={{
-                  fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+                  fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:400, letterSpacing:'-0.011em',
                   maxWidth:'34%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                 }}>{(brand.cultureHeaderLeft || '').trim()}</span>
                 <span style={{
-                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
+                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:600,
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                 }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
-                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
+                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF) }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>
               </div>
@@ -990,7 +993,7 @@ const ClassicCanvasInner = React.forwardRef(({
                 background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
                 color: onPhoto ? '#fff' : '#1d1d1f',
                 padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
-                fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+                fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
               }}>{num}/{total}</div>
             )}
           </>
@@ -1031,7 +1034,7 @@ const ClassicCanvasInner = React.forwardRef(({
               )}
             </div>
           </div>
-          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
+          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing:'-0.01em' }}>
             {vcHandleLabel(brand)}
           </span>
         </div>
@@ -1238,7 +1241,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       onCommit={(text) => onInlineTextChange?.('bodyAfterImage', text)}
       elementProps={movOu('bodyAfterImage', {
         color: displayBodyInk,
-        fontFamily: bodyFF,
+        fontFamily: getTextFont(slide, 'bodyAfterImage', bodyFF),
         fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100),
         lineHeight: bodyAfterLeading(slide, brand, 1.35),
         fontWeight: bodyAfterWeight(slide, brand, 500),
@@ -1441,14 +1444,14 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: f.w * 0.02,
               }}>
                 <span style={{
-                  fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF, fontWeight: 400, letterSpacing: '-0.011em',
+                  fontSize: f.w * 0.022, color: barMuted, fontFamily: getTextFont(slide, 'headerBar', bodyFF), fontWeight: 400, letterSpacing: '-0.011em',
                   maxWidth: '34%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{(brand.cultureHeaderLeft || '').trim()}</span>
                 <span style={{
-                  flex: 1, textAlign: 'center', fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF, fontWeight: 600,
+                  flex: 1, textAlign: 'center', fontSize: f.w * 0.022, color: barMuted, fontFamily: getTextFont(slide, 'headerBar', bodyFF), fontWeight: 600,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
-                <span style={{ fontSize: f.w * 0.022, color: barMuted, fontFamily: bodyFF }}>
+                <span style={{ fontSize: f.w * 0.022, color: barMuted, fontFamily: getTextFont(slide, 'headerBar', bodyFF) }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>
               </div>
@@ -1459,7 +1462,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
                 background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
                 color: onPhoto ? '#fff' : '#1d1d1f',
                 padding: `${f.h * 0.006}px ${f.w * 0.022}px`, borderRadius: 999,
-                fontSize: f.w * 0.026, fontWeight: 600, fontFamily: bodyFF, letterSpacing: '-0.02em',
+                fontSize: f.w * 0.026, fontWeight: 600, fontFamily: getTextFont(slide, 'pageBadge', bodyFF), letterSpacing: '-0.02em',
               }}>{num}/{total}</div>
             )}
           </>
@@ -1514,7 +1517,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
               )}
             </div>
           </div>
-          <span style={{ color: brand.titleColor, fontSize: f.w * 0.022, fontWeight: 600, fontFamily: bodyFF, letterSpacing: '-0.01em' }}>
+          <span style={{ color: brand.titleColor, fontSize: f.w * 0.022, fontWeight: 600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing: '-0.01em' }}>
             {vcHandleLabel(brand)}
           </span>
         </div>
@@ -1572,6 +1575,7 @@ const SlideCardInner = React.forwardRef(({
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
   // handle mesmo que o usuário configure depois de aplicar o padrão visual.
+  slide = React.useMemo(() => resolveSlideTextFonts(slide, brand), [slide, brand]);
   const brandRaw = React.useMemo(() => brandWithSlideLogo(brand, slide), [brand, slide.logoImageId, slide.logoImage, slide.logoHidden, slide.logoPosition, slide.logoSize, slide.logoOpacity]);
   brand = React.useMemo(() => {
     const campos = ['cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
@@ -1682,7 +1686,11 @@ const SlideCardInner = React.forwardRef(({
   }, [slideIdx]);
   const L = LAYOUTS.find(l=>l.id===slide.layout) || DEFAULT_LAYOUT;
   const bg = resolveSlideBrandBg(brand, slideIdx, slide);
-  const isBebas = brand.titleFont?.includes('Bebas');
+  const titleFF = getTextFont(slide, 'title', effectiveTitleFontFamily(brand));
+  const bodyFF = effectiveBodyFontFamily(brand);
+  const subtitleFF = getTextFont(slide, 'subtitle', effectiveSubtitleFontFamily(brand));
+  const bodyAfterFF = getTextFont(slide, 'bodyAfterImage', bodyFF);
+  const isBebas = titleFF?.includes('Bebas');
   const imgModeNorm = normalizeSlideImgMode(slide.imgMode);
   const bgFit = slide.bgFit ?? 'custom';
   // Arrastar a foto reenquadra em vez de deslocar a camada: um fundo `inset:0`
@@ -1741,10 +1749,6 @@ const SlideCardInner = React.forwardRef(({
   } else {
     effectivePresentationFilter = presentationImgFilter;
   }
-
-  const titleFF = effectiveTitleFontFamily(brand);
-  const bodyFF = effectiveBodyFontFamily(brand);
-  const subtitleFF = effectiveSubtitleFontFamily(brand);
 
   const culturePack = creativePreset === 'tendencia_cultura';
   const sandwichSkin = culturePack || !!slide.useCultureLayout;
@@ -1853,18 +1857,18 @@ const SlideCardInner = React.forwardRef(({
                   pointerEvents: movableElements ? 'auto' : 'none',
                 })}>
                   <span style={{
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hLeft}</span>
                   <span style={{
                     flex:1, textAlign:'center',
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>{hCenter}</span>
                   <span style={{
-                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:bodyFF,
+                    fontSize:f.w*0.020*escHeader, color:headerColor, fontFamily:getTextFont(slide, 'headerBar', bodyFF),
                     fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase',
                     maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right',
                   }}>{hRight}</span>
@@ -1875,7 +1879,7 @@ const SlideCardInner = React.forwardRef(({
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
-                  fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:bodyFF,
+                  fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
                   letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
                   pointerEvents: movableElements ? 'auto' : 'none',
@@ -1904,10 +1908,10 @@ const SlideCardInner = React.forwardRef(({
             const [label, value] = String(data).split('|');
             return (
               <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
-                <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: bodyFF, color: labelColor,
+                <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: labelColor,
                   letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
                 {value && (
-                  <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: bodyFF, color: valueColor,
+                  <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: valueColor,
                     fontWeight: 700 }}>{value}</span>
                 )}
               </div>
@@ -1944,7 +1948,7 @@ const SlideCardInner = React.forwardRef(({
                 padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
                 borderRadius: 9999,
                 display:'inline-flex', alignItems:'center', gap: f.w*0.018,
-                fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: bodyFF,
+                fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
                 letterSpacing:'-0.011em', whiteSpace:'nowrap',
                 textTransform: 'uppercase',
                 boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
@@ -2018,7 +2022,7 @@ const SlideCardInner = React.forwardRef(({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: Math.round(f.w * 0.014),
-                    fontFamily: bodyFF,
+                    fontFamily: normalizeTextFont(ov.fontFamily) || bodyFF,
                     fontSize: fontPx,
                     fontWeight: isOutline ? 600 : 700,
                     letterSpacing: ov.uppercase ? '0.08em' : '0.02em',
@@ -2077,7 +2081,7 @@ const SlideCardInner = React.forwardRef(({
                 zIndex: 27,
                 pointerEvents: movableElements ? 'auto' : 'none',
                 color: ov.color,
-                fontFamily: bodyFF,
+                fontFamily: normalizeTextFont(ov.fontFamily) || bodyFF,
                 fontSize: f.w * (ov.size / 100),
                 fontWeight: ov.weight,
                 letterSpacing: `${ov.tracking}em`,
@@ -2157,14 +2161,14 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           })}>
             <span style={{
-              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{(brand.cultureHeaderLeft || '').trim()}</span>
             <span style={{
-              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
-            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
           </div>
@@ -2175,7 +2179,7 @@ const SlideCardInner = React.forwardRef(({
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
-            fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+            fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
           })}>{num}/{total}</div>
         )}
 
@@ -2198,7 +2202,7 @@ const SlideCardInner = React.forwardRef(({
           }}
           deps={[
             slide.title, slide.subtitle, presentationTitleSizePercent(slide), slide.subSize,
-            topR.w, topR.h, f.w, f.h, elementsUnlocked,
+            topR.w, topR.h, f.w, f.h, elementsUnlocked, titleFF, subtitleFF,
             slide.presentationAutofit?.minScale,
           ]}
           minScale={presentationAutofitSoftFloor(slide, AUTOFIT_MIN_SCALE)}
@@ -2363,7 +2367,7 @@ const SlideCardInner = React.forwardRef(({
           }}
           deps={[
             bodyAfterCulture, slide.bodyAfterSize, slide.subSize,
-            botR.w, botR.h, f.w, f.h, slide.presentationAutofit?.minScale,
+            botR.w, botR.h, f.w, f.h, bodyAfterFF, slide.presentationAutofit?.minScale,
           ]}
           minScale={presentationAutofitSoftFloor(slide, AUTOFIT_MIN_SCALE)}
           strictMinScale={strictPresentationAutofit(slide)}
@@ -2375,7 +2379,7 @@ const SlideCardInner = React.forwardRef(({
             destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
             ink={cr.bodyInk}
             accentColor={cr.accentInk}
-            fontFamily={bodyFF}
+            fontFamily={bodyAfterFF}
             fontSize={f.w * 0.029 * (bodyAfterSizePercent(slide, brand) / 100) * botScale}
             lineHeight={bodyAfterLeading(slide, brand, (slide.subLeading ?? 145) / 100)}
             fontWeight={bodyAfterWeight(slide, brand, 600)}
@@ -2469,14 +2473,14 @@ const SlideCardInner = React.forwardRef(({
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           })}>
             <span style={{
-              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+              fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:400, letterSpacing:'-0.011em',
               maxWidth:'32%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{(brand.cultureHeaderLeft || '').trim()}</span>
             <span style={{
-              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, fontWeight:600,
+              flex:1, textAlign:'center', fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:600,
               letterSpacing:'-0.011em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
             }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
-            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:bodyFF, letterSpacing:'-0.011em' }}>
+            <span style={{ fontSize:f.w*0.022, color:cr.inkMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), letterSpacing:'-0.011em' }}>
               {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
             </span>
           </div>
@@ -2487,7 +2491,7 @@ const SlideCardInner = React.forwardRef(({
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
             padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
-            fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+            fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
           })}>{num}/{total}</div>
         )}
         {sandwich && (showPhotoSpinner || showAiGeneratingOverlay) && (
@@ -2533,7 +2537,7 @@ const SlideCardInner = React.forwardRef(({
           deps={[
             slide.title, slide.subtitle, bodyAfterCulture,
             f.w, f.h, presentationTitleSizePercent(slide), slide.subSize, slide.bodyAfterSize,
-            sandwich, !!slide.bgImage, elementsUnlocked,
+            sandwich, !!slide.bgImage, elementsUnlocked, titleFF, subtitleFF, bodyAfterFF,
             slide.presentationAutofit?.minScale,
           ]}
           minScale={presentationAutofitSoftFloor(slide, 0.78)}
@@ -2738,7 +2742,7 @@ const SlideCardInner = React.forwardRef(({
               destaqueSpans={slide.destaqueSpans?.bodyAfterImage}
               ink={cr.bodyInk}
               accentColor={cr.accentInk}
-              fontFamily={bodyFF}
+              fontFamily={bodyAfterFF}
               fontSize={f.w * 0.029 * (bodyAfterSizePercent(slide, brand) / 100) * scale}
               lineHeight={bodyAfterLeading(slide, brand, 1.45)}
               fontWeight={bodyAfterWeight(slide, brand, 600)}
@@ -2802,7 +2806,7 @@ const SlideCardInner = React.forwardRef(({
                 )}
               </div>
             </div>
-            <span style={{ color: cr.titleInk, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
+            <span style={{ color: cr.titleInk, fontSize:f.w*0.022, fontWeight:600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing:'-0.01em' }}>
               {vcHandleLabel(brand)}
             </span>
           </div>
@@ -3052,14 +3056,14 @@ const SlideCardInner = React.forwardRef(({
                 display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
               }}>
                 <span style={{
-                  fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:400, letterSpacing:'-0.011em',
+                  fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:400, letterSpacing:'-0.011em',
                   maxWidth:'34%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                 }}>{(brand.cultureHeaderLeft || '').trim()}</span>
                 <span style={{
-                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF, fontWeight:600,
+                  flex:1, textAlign:'center', fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF), fontWeight:600,
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                 }}>{headerCenterText(brand, slide, hideInstaBadge)}</span>
-                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:bodyFF }}>
+                <span style={{ fontSize:f.w*0.022, color:barMuted, fontFamily:getTextFont(slide, 'headerBar', bodyFF) }}>
                   {(brand.cultureHeaderYear || '').trim()}{(brand.cultureHeaderYear || '').trim() ? ' //' : ''}
                 </span>
               </div>
@@ -3070,7 +3074,7 @@ const SlideCardInner = React.forwardRef(({
                 background: onPhoto ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.07)',
                 color: onPhoto ? '#fff' : '#1d1d1f',
                 padding:`${f.h*0.006}px ${f.w*0.022}px`, borderRadius:999,
-                fontSize:f.w*0.026, fontWeight:600, fontFamily:bodyFF, letterSpacing:'-0.02em',
+                fontSize:f.w*0.026, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF), letterSpacing:'-0.02em',
               }}>{num}/{total}</div>
             )}
           </>
@@ -3112,7 +3116,7 @@ const SlideCardInner = React.forwardRef(({
               )}
             </div>
           </div>
-          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: bodyFF, letterSpacing:'-0.01em' }}>
+          <span style={{ color:brand.titleColor, fontSize:f.w*0.022, fontWeight:600, fontFamily: getTextFont(slide, 'handleBadge', bodyFF), letterSpacing:'-0.01em' }}>
             {vcHandleLabel(brand)}
           </span>
         </div>
@@ -3191,7 +3195,7 @@ const SlideCardInner = React.forwardRef(({
               {slide.eyebrowText && (
                 <span {...mov('eyebrow', {
                   fontSize: f.w*0.024,
-                  fontFamily: bodyFF,
+                  fontFamily: getTextFont(slide, 'eyebrow', bodyFF),
                   fontWeight: 600,
                   color: displayBodyInk,
                   letterSpacing: '0.04em',
@@ -3291,7 +3295,7 @@ const SlideCardInner = React.forwardRef(({
                   onCommit={(text) => commitInlineText('bodyAfterImage', text)}
                   elementProps={mov('bodyAfterImage', {
                     color: displayBodyInk,
-                    fontFamily: bodyFF,
+                    fontFamily: bodyAfterFF,
                     fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100),
                     lineHeight: bodyAfterLeading(slide, brand, 1.35),
                     fontWeight: bodyAfterWeight(slide, brand, 500),
@@ -3320,7 +3324,7 @@ const SlideCardInner = React.forwardRef(({
                   "DE R$99" riscado + "POR R$0,00 (100% GRATUITO)" intacto. */}
               {slide.afterTitleText && (
                 <div {...mov('offer', {
-                  color: displayTitleInk, fontFamily: titleFF,
+                  color: displayTitleInk, fontFamily: getTextFont(slide, 'offer', effectiveTitleFontFamily(brand)),
                   fontSize: f.w*0.034,
                   fontWeight: slide.titleWeight ?? 800,
                   letterSpacing: `${(-3 + (slide.titleTracking ?? 0)) / 100}em`,

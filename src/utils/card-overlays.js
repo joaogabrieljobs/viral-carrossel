@@ -242,9 +242,13 @@ export function normalizeOverlay(raw) {
     x: clamp(raw.x, 0, 100, type === 'cta' ? 50 : 12),
     y: clamp(raw.y, 0, 100, type === 'cta' ? 78 : 30),
   };
+  // Ausência de fonte mantém a herança do estilo, inclusive em projetos antigos.
+  const fontFamily = typeof raw.fontFamily === 'string' ? raw.fontFamily.trim() : '';
+  const typography = fontFamily ? { fontFamily } : {};
   if (type === 'cta') {
     return {
       ...base,
+      ...typography,
       variant: ['filled', 'outline', 'glass'].includes(raw.variant) ? raw.variant : 'filled',
       text: String(raw.text || 'AGENDE SUA AVALIAÇÃO').slice(0, 80),
       bg: String(raw.bg || '#6B5344'),
@@ -265,6 +269,7 @@ export function normalizeOverlay(raw) {
   }
   return {
     ...base,
+    ...typography,
     w: clamp(raw.w, 8, 90, 48),
     text: String(raw.text ?? ''),
     color: String(raw.color || '#3A322C'),
