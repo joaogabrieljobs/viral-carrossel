@@ -123,4 +123,44 @@ describe('conexões IndexedDB da biblioteca de imagens', () => {
     await next;
     expect(indexedDBMock.open).toHaveBeenCalledTimes(2);
   });
+
+  it('aborta uma gravação cuja transação nunca conclui, liberando a foto para o fallback', async () => {
+    const read = {};
+    const write = {};
+    const transaction = {
+      objectStore: () => ({ get: () => read, put: vi.fn(() => write) }),
+      abort: vi.fn(),
+    };
+    const db = { transaction: vi.fn(() => transaction), close: vi.fn() };
+    const pending = store.imagePut('foto-1', new Blob(['foto'], { type: 'image/png' }));
+    const rejected = expect(pending).rejects.toThrow(/não concluiu a gravação/);
+    succeed(0, db);
+    await Promise.resolve();
+    read.onsuccess();
+    // O request terminou, mas o browser nunca emitiu complete nem abort.
+    write.onsuccess?.();
+    await vi.advanceTimersByTimeAsync(8_000);
+    await rejected;
+    expect(transaction.abort).toHaveBeenCalledOnce();
+    // Eventos tardios não podem converter uma falha em sucesso.
+    transaction.oncomplete();
+    expect(transaction.abort).toHaveBeenCalledOnce();
+  });
+
+  it('cancela o prazo da gravação concluída e não aborta a transação', async () => {
+    const read = {};
+    const transaction = {
+      objectStore: () => ({ get: () => read, put: () => ({}) }),
+      abort: vi.fn(),
+    };
+    const db = { transaction: vi.fn(() => transaction), close: vi.fn() };
+    const pending = store.imagePut('foto-2', new Blob(['foto'], { type: 'image/png' }));
+    succeed(0, db);
+    await Promise.resolve();
+    read.onsuccess();
+    transaction.oncomplete();
+    await expect(pending).resolves.toBe('foto-2');
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(transaction.abort).not.toHaveBeenCalled();
+  });
 });

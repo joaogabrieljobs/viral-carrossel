@@ -29,6 +29,7 @@ const STORE_NAME = 'images';
 const DB_VERSION = 1;
 /** open/wipe nunca podem pendurar o logout nem o spinner do card. */
 const IDB_OPEN_TIMEOUT_MS = 8_000;
+const IDB_PUT_TIMEOUT_MS = 8_000;
 // Depois de uma abertura que não respondeu, não fazer todos os cards esperar
 // mais 8 s cada um. A próxima tentativa real continua possível em 3 s.
 const IDB_TIMEOUT_RETRY_MS = 3_000;
@@ -155,31 +156,51 @@ export async function imagePut(id, blob, meta = {}) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const read = store.get(id);
+    let settled = false;
+    const finish = (error = null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(id);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      // Um IndexedDB em limbo pode deixar a transação sem complete/abort.
+      // Desbloquear a hidratação; o chamador mantém a foto como object URL.
+      finish(new Error('O armazenamento não concluiu a gravação da imagem. Tente novamente.'));
+      try { transaction.abort(); } catch { /* a transação já pode estar encerrada */ }
+    }, IDB_PUT_TIMEOUT_MS);
+    let read;
+    try { read = store.get(id); }
+    catch (error) { finish(error); return; }
     read.onsuccess = () => {
+      if (settled) return;
       // IDs antigos e hashes de assets da nuvem podem coincidir entre contas.
       // Nunca tomar posse do blob de outra conta ao importar a mesma chave.
       if (read.result && (!read.result.owner || !imageBelongsToActiveAccount(read.result))) {
-        reject(Object.assign(new Error('Este ID de imagem pertence a outra conta.'), { code: 'MEDIA_OWNER_CONFLICT' }));
+        finish(Object.assign(new Error('Este ID de imagem pertence a outra conta.'), { code: 'MEDIA_OWNER_CONFLICT' }));
         return;
       }
       if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
-        reject(new Error('A conta mudou antes de guardar a imagem.'));
+        finish(new Error('A conta mudou antes de guardar a imagem.'));
         return;
       }
-      const req = store.put({
-        id,
-        blob,
-        mime: meta.mime || blob.type || 'image/png',
-        size: blob.size,
-        savedAt: Date.now(),
-        owner,
-      });
-      req.onerror = () => reject(req.error || new Error('Falha ao gravar a imagem.'));
+      try {
+        const req = store.put({
+          id,
+          blob,
+          mime: meta.mime || blob.type || 'image/png',
+          size: blob.size,
+          savedAt: Date.now(),
+          owner,
+        });
+        req.onerror = () => finish(req.error || new Error('Falha ao gravar a imagem.'));
+      } catch (error) { finish(error); }
     };
-    read.onerror = () => reject(read.error || new Error('Falha ao verificar o ID da imagem.'));
-    transaction.oncomplete = () => resolve(id);
-    transaction.onabort = () => reject(transaction.error || new Error('Gravação da imagem interrompida.'));
+    read.onerror = () => finish(read.error || new Error('Falha ao verificar o ID da imagem.'));
+    transaction.oncomplete = () => finish();
+    transaction.onabort = () => finish(transaction.error || new Error('Gravação da imagem interrompida.'));
   });
 }
 
