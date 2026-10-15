@@ -466,6 +466,9 @@ import {
   storeSlideLogo,
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
+import {
+  decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+} from './src/utils/project-sync-control.js';
 
 // A rota por projeto só é ativada depois do banco, importação e API estarem
 // prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
@@ -982,12 +985,17 @@ export default function App() {
   const v2VersionsRef = useRef(new Map());
   const v2BaselinesRef = useRef(new Map());
   const v2RecoveredProjectsRef = useRef(new Map());
+  const v2OutboxUnavailableRef = useRef(false);
   const v2MetaRevisionRef = useRef(null);
   const v2MetaBaselineRef = useRef(null);
   const v2RestoreGenerationRef = useRef(0);
   const v2UserProfileRef = useRef(null);
   const [profileRevision, setProfileRevision] = useState(0);
   const cloudAutoPushRef = useRef(null);
+  const cloudAutoPushTimerRef = useRef(null);
+  const cloudAutoPushLastKeyRef = useRef(null);
+  const cloudAutoPushAfterFlightRef = useRef(false);
+  const cloudAutoPushScheduleRef = useRef(null);
   const stopCloudAutoPush = useCallback(async () => {
     const pending = cloudAutoPushRef.current;
     if (!pending) return;
@@ -1505,6 +1513,30 @@ export default function App() {
   const editorSyncStateRef = useRef({ doc, activeDocId, activeBrandId });
   editorSyncStateRef.current = { doc, activeDocId, activeBrandId };
 
+  const cloudAutoPushSnapshot = useCallback(() => {
+    const owner = readDataOwner();
+    if (!PROJECTS_V2 || !owner || v2ObservedOwnerRef.current !== owner) {
+      return { key: '', dirty: false };
+    }
+    const editor = editorSyncStateRef.current;
+    const projects = (libraryPersistRef.current || []).map((entry) => {
+      const current = entry.id === editor.activeDocId ? { ...entry, doc: editor.doc } : entry;
+      return [entry.id, projectCacheFingerprint(current)];
+    });
+    const meta = accountMetaFingerprint({
+      brandRoster: brandRosterPersistRef.current,
+      libraryFolders: libraryFoldersPersistRef.current,
+      activeBrandId: editor.activeBrandId,
+      activeDocId: editor.activeDocId,
+      userProfile: v2UserProfileRef.current,
+    });
+    return {
+      key: JSON.stringify([owner, projects, meta]),
+      dirty: projects.some(([id, fingerprint]) => v2BaselinesRef.current.get(id) !== fingerprint)
+        || (Number.isSafeInteger(v2MetaRevisionRef.current) && meta !== v2MetaBaselineRef.current),
+    };
+  }, []);
+
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
   const flushPersistNow = useCallback(({ requireSaved = false, returnSnapshot = false } = {}) => {
     if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
@@ -1685,7 +1717,17 @@ export default function App() {
       import('./src/utils/library-sync.js'),
       import('./src/utils/projects-outbox.js'),
     ]);
-    const existing = await outbox.getPendingProjectOp(owner, entry.id);
+    let existing = null;
+    let outboxAvailable = !v2OutboxUnavailableRef.current;
+    if (outboxAvailable) {
+      try {
+        existing = await outbox.getPendingProjectOp(owner, entry.id);
+      } catch (error) {
+        if (!isProjectOutboxUnavailable(error)) throw error;
+        outboxAvailable = false;
+        v2OutboxUnavailableRef.current = true;
+      }
+    }
     if (v2BaselinesRef.current.get(entry.id) === fingerprint && !existing) {
       return { skipped: true, recoveredCopy: v2RecoveredProjectsRef.current.get(entry.id) };
     }
@@ -1707,11 +1749,47 @@ export default function App() {
     if (uploaded.failed) {
       throw new Error(`${uploaded.failed} imagem(ns) não foram enviadas. O projeto continua no editor; tente salvar novamente.`);
     }
-    await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
-    // A transação IndexedDB acima já protege a edição se a rede cair agora.
-    const flushed = await outbox.flushProjectOutbox(owner);
-    if (await outbox.getPendingProjectOp(owner, entry.id)) {
-      throw new Error('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+    let flushed = { recoveries: [] };
+    if (outboxAvailable) {
+      try {
+        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
+        // Com IndexedDB funcional, a fila protege a edição se a rede cair.
+        flushed = await outbox.flushProjectOutbox(owner);
+        const stillPending = await outbox.getPendingProjectOp(owner, entry.id);
+        if (stillPending?.kind === 'review_put_deleted') {
+          throw new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua neste navegador e precisa de revisão antes de salvar.');
+        }
+        if (stillPending) {
+          throw new Error('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+        }
+      } catch (error) {
+        if (!isProjectOutboxUnavailable(error)) throw error;
+        outboxAvailable = false;
+        v2OutboxUnavailableRef.current = true;
+      }
+    }
+    if (!outboxAvailable) {
+      // IndexedDB pode bloquear indefinidamente em Safari/Chrome. Nesse caso
+      // a confirmação passa a ser a resposta versionada da própria conta.
+      if (!pending.isCurrent() || readDataOwner() !== owner) {
+        throw new Error('O projeto mudou durante o envio. Salve novamente.');
+      }
+      const expectedOwnerId = accessSessionRef.current?.customerId;
+      if (!expectedOwnerId) throw new Error('Não foi possível confirmar a conta para salvar.');
+      const client = await import('./src/utils/projects-client.js');
+      const saved = await putProjectDirectly(prepared.entry, {
+        baseVersion: queuedBaseVersion, expectedOwnerId,
+        putProject: client.putProject, getProject: client.getProject,
+        isProjectConflict: client.isProjectConflict,
+        fingerprint: projectCacheFingerprint,
+      });
+      if (readDataOwner() !== owner) {
+        throw new Error('A conta mudou durante o envio. Sincronize novamente.');
+      }
+      v2VersionsRef.current.set(entry.id, saved.version);
+      v2BaselinesRef.current.set(entry.id, fingerprint);
+      v2RecoveredProjectsRef.current.delete(entry.id);
+      return { saved: true, direct: true, version: saved.version };
     }
     const recovery = flushed.recoveries?.find((item) => item.sourceProjectId === entry.id);
     if (recovery) {
@@ -1741,6 +1819,15 @@ export default function App() {
     v2MetaRevisionRef.current = saved.revision;
     v2MetaBaselineRef.current = fingerprint;
     return { saved: true };
+  }, []);
+
+  const finishCloudSync = useCallback(() => {
+    cloudSyncInFlightRef.current = false;
+    setCloudSyncBusy(false);
+    if (cloudAutoPushAfterFlightRef.current) {
+      cloudAutoPushAfterFlightRef.current = false;
+      queueMicrotask(() => cloudAutoPushScheduleRef.current?.());
+    }
   }, []);
 
   // Salvar e Sync usam a mesma transação: flush → merge → pull → React → toast.
@@ -1781,11 +1868,40 @@ export default function App() {
           if (result?.recoveredCopy) recoveredCopies.add(result.recoveredCopy);
         }
         await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
-        const { flushProjectOutbox } = await import('./src/utils/projects-outbox.js');
-        const outbox = await flushProjectOutbox(owner);
+        let outbox = { pending: 0, needsReview: [] };
+        let verifyWithoutOutbox = v2OutboxUnavailableRef.current;
+        if (!verifyWithoutOutbox) {
+          try {
+            const { flushProjectOutbox } = await import('./src/utils/projects-outbox.js');
+            outbox = await flushProjectOutbox(owner);
+          } catch (error) {
+            if (!isProjectOutboxUnavailable(error)) throw error;
+            v2OutboxUnavailableRef.current = true;
+            verifyWithoutOutbox = true;
+          }
+        }
+        if (verifyWithoutOutbox) {
+          // Sem acesso à fila, compare a lista da conta antes de anunciar
+          // sucesso. Em Sync/Logout, um projeto remoto extra pode ser uma
+          // exclusão pendente que não se deve ocultar.
+          const { listProjects } = await import('./src/utils/projects-client.js');
+          const remote = await listProjects({ expectedOwnerId });
+          const remoteById = new Map(remote.map((project) => [project.id, project]));
+          const exactListRequired = source === 'sync' || source === 'logout';
+          if ((exactListRequired && remote.length !== pending.snapshot.library.length)
+            || entries.some((entry) => {
+              const project = remoteById.get(entry.id);
+              return !project || project.version < (v2VersionsRef.current.get(entry.id) ?? 0);
+            })) {
+            throw new Error('A conta ainda não confirmou a lista completa. Suas edições continuam no editor; sincronize novamente.');
+          }
+        }
         const reviewCount = outbox.needsReview?.length || 0;
         if (outbox.pending > reviewCount) {
           throw new Error('Há projetos ainda aguardando envio. Sincronize novamente antes de sair da conta.');
+        }
+        if (source !== 'salvar' && outbox.needsReview?.some((item) => item.kind === 'put_deleted')) {
+          throw new Error('Uma edição local pertence a um projeto excluído em outro dispositivo. Revise essa edição antes de sincronizar ou sair da conta.');
         }
         if (!pending.isCurrent() || readDataOwner() !== owner) {
           throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; salve novamente.');
@@ -1834,23 +1950,23 @@ export default function App() {
           toast(recoveredCopies.size
             ? `Sua edição foi salva como cópia de conflito. Lista atualizada · ${count} projeto(s).`
             : reviewCount
-              ? `Lista atualizada · ${count} projeto(s). ${reviewCount} exclusão(ões) precisam de revisão.`
+              ? `Lista atualizada · ${count} projeto(s). ${reviewCount} alteração(ões) pendentes exigem revisão.`
               : `Lista sincronizada · ${count} projeto(s).`,
           recoveredCopies.size || reviewCount || restored.assetsMissing ? 'warning' : 'success', 5200);
         } else if (source !== 'auto' && source !== 'logout') {
           toast(recoveredCopies.size
             ? 'Sua edição foi salva como cópia de conflito na conta. Use “Sync na nuvem” para ver as duas versões.'
             : reviewCount
-              ? `${reviewCount} exclusão(ões) precisam de revisão. O projeto alterado não foi apagado.`
+              ? `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`
               : source === 'profile' ? 'Perfil salvo na sua conta.' : 'Projeto salvo na sua conta.',
           recoveredCopies.size || reviewCount ? 'warning' : 'success', 5200);
         } else if (recoveredCopies.size || reviewCount) {
           toast(recoveredCopies.size
             ? 'Sua edição foi salva como cópia de conflito na conta. Sincronize para ver as duas versões.'
-            : `${reviewCount} exclusão(ões) precisam de revisão. O projeto alterado não foi apagado.`,
+            : `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`,
           'warning', 6000);
         }
-        return { cloudSaved: true, outboxSaved: true };
+        return { cloudSaved: true, outboxSaved: !verifyWithoutOutbox && outbox.pending === 0 };
       } catch (error) {
         if (source !== 'auto' || error?.status === 409) {
           toast(
@@ -1860,8 +1976,7 @@ export default function App() {
         }
         return { cloudSaved, outboxSaved: false };
       } finally {
-        cloudSyncInFlightRef.current = false;
-        setCloudSyncBusy(false);
+        finishCloudSync();
       }
     }
     try {
@@ -1914,11 +2029,11 @@ export default function App() {
         7000,
       );
     } finally {
-      cloudSyncInFlightRef.current = false;
-      setCloudSyncBusy(false);
+      finishCloudSync();
     }
   }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast,
-    persistProjectV2, persistAccountMetadataV2, observeCloudProjectsV2, observeCloudMetadataV2]);
+    persistProjectV2, persistAccountMetadataV2, observeCloudProjectsV2, observeCloudMetadataV2,
+    finishCloudSync]);
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
@@ -2099,25 +2214,52 @@ export default function App() {
     }
     return syncProjectLibrary('sync');
   }, [access?.active, syncProjectLibrary, toast]);
-  // Auto-push na nuvem ~4s após editar a biblioteca (não depende só do logout).
-  const cloudAutoPushTimerRef = useRef(null);
+  // Auto-push na nuvem ~4s após uma edição real, inclusive durante outro envio.
   const cloudAutoPushSkipFirstRef = useRef(true);
+  const scheduleCloudAutoPush = useCallback(() => {
+    if (!accessSessionRef.current?.active || !accountLibraryReadyRef.current
+      || areAccountDataWritesLocked() || (PROJECTS_V2 && !cloudAutoPushSnapshot().dirty)) return;
+    if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    cloudAutoPushTimerRef.current = setTimeout(() => {
+      cloudAutoPushTimerRef.current = null;
+      if (areAccountDataWritesLocked()) return;
+      if (cloudSyncInFlightRef.current) {
+        cloudAutoPushAfterFlightRef.current = true;
+        return;
+      }
+      if (PROJECTS_V2 && !cloudAutoPushSnapshot().dirty) return;
+      void syncProjectLibrary('auto');
+    }, 4_000);
+  }, [cloudAutoPushSnapshot, syncProjectLibrary]);
+  cloudAutoPushScheduleRef.current = scheduleCloudAutoPush;
   useEffect(() => {
-    if (!access?.active || !accountLibraryReady || cloudSyncBusy) return undefined;
+    if (!access?.active || !accountLibraryReady) {
+      if (PROJECTS_V2 && cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+      return undefined;
+    }
+    if (PROJECTS_V2) {
+      const { key, dirty } = cloudAutoPushSnapshot();
+      if (!key) return undefined;
+      const decision = decideCloudAutoPush({
+        key, lastKey: cloudAutoPushLastKeyRef.current, dirty,
+        inFlight: cloudSyncInFlightRef.current,
+      });
+      cloudAutoPushLastKeyRef.current = decision.lastKey;
+      if (!dirty && cloudAutoPushTimerRef.current) {
+        clearTimeout(cloudAutoPushTimerRef.current);
+        cloudAutoPushTimerRef.current = null;
+      }
+      if (decision.defer) cloudAutoPushAfterFlightRef.current = true;
+      if (decision.schedule) scheduleCloudAutoPush();
+      return undefined;
+    }
+    if (cloudSyncBusy) return undefined;
     if (cloudAutoPushSkipFirstRef.current) {
       cloudAutoPushSkipFirstRef.current = false;
       return undefined;
     }
     if (areAccountDataWritesLocked()) return undefined;
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
-    if (PROJECTS_V2) {
-      cloudAutoPushTimerRef.current = setTimeout(() => {
-        if (!cloudSyncInFlightRef.current) syncProjectLibrary('auto');
-      }, 4_000);
-      return () => {
-        if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
-      };
-    }
     const controller = new AbortController();
     cloudAutoPushTimerRef.current = setTimeout(() => {
       import('./src/utils/library-sync.js')
@@ -2139,8 +2281,18 @@ export default function App() {
       controller.abort();
       if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     };
-  }, [library, libraryFolders, brandRoster, activeDocId, activeBrandId, profileRevision,
-    access?.active, accountLibraryReady, cloudSyncBusy, stopCloudAutoPush, syncProjectLibrary]);
+  }, [library, libraryFolders, brandRoster, activeDocId, activeBrandId, profileRevision, doc,
+    access?.active, accountLibraryReady, PROJECTS_V2 ? null : cloudSyncBusy,
+    stopCloudAutoPush, cloudAutoPushSnapshot, scheduleCloudAutoPush]);
+  useEffect(() => {
+    if (!PROJECTS_V2) return undefined;
+    const retryWhenOnline = () => cloudAutoPushScheduleRef.current?.();
+    window.addEventListener('online', retryWhenOnline);
+    return () => {
+      window.removeEventListener('online', retryWhenOnline);
+      if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    };
+  }, []);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
