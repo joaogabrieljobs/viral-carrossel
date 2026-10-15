@@ -201,12 +201,12 @@ export async function logoutWithProtectedLibrary({
 }
 
 export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied,
-  onCloudProjectsObserved, onCloudMetadataObserved, onCloudMediaHydrated,
+  onCloudProjectsObserved, onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia,
   onLibraryReady, onLibraryBlocked, toast } = {}) {
   const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onCloudMediaHydrated, onLibraryReady, onLibraryBlocked });
+    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked });
   libraryCallbacksRef.current = { onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onCloudMediaHydrated, onLibraryReady, onLibraryBlocked };
+    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -278,6 +278,13 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
   useEffect(() => {
     let cancelled = false;
+    let bootExpired = false;
+    let bootDeadlineTimer;
+    let bootDeadline;
+    const bootAbort = new AbortController();
+    const awaitBoot = (operation) => bootDeadline
+      ? Promise.race([operation, bootDeadline])
+      : operation;
     (async () => {
       try {
         const warning = sessionStorage.getItem('vc_logout_warning');
@@ -334,6 +341,15 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
       const session = await refreshAccess();
       if (cancelled) return;
+      if (PROJECTS_V2 && session.active) {
+        bootDeadline = new Promise((_, reject) => {
+          bootDeadlineTimer = setTimeout(() => {
+            bootExpired = true;
+            bootAbort.abort();
+            reject(new Error('A restauração está demorando demais. Seus projetos continuam protegidos na conta. Confira a conexão e tente novamente.'));
+          }, 45_000);
+        });
+      }
       // Se a resposta de confirm se perdeu mas o Set-Cookie chegou, a sessão
       // já está ativa. Caso contrário, preserve ?billing=success para retry.
       if (billing && (!confirmFailed || session.active || billing !== 'success')) {
@@ -356,11 +372,12 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         || billing === 'restored'
         || billing === 'success';
       const sessionOwners = dataOwnerAliases(session?.email, session?.customerId);
-      const sessionStillOwnsData = () => !cancelled && (!session?.active || !sessionOwners.size || sessionOwners.has(readDataOwner()));
+      const sessionStillOwnsData = () => !cancelled && !bootExpired
+        && (!session?.active || !sessionOwners.size || sessionOwners.has(readDataOwner()));
       let restoredSnapshot;
-      const ownerGate = await ensureAccountDataOwner(session, {
+      const ownerGate = await awaitBoot(ensureAccountDataOwner(session, {
         explicitLogin,
-        isCurrent: () => !cancelled,
+        isCurrent: () => !cancelled && !bootExpired,
         onRestored: typeof libraryCallbacksRef.current.onCloudLibraryApplied === 'function'
           ? async (snapshot, result) => {
             if (!sessionStillOwnsData()) throw new Error('A conta mudou durante a restauração.');
@@ -368,7 +385,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             restoredSnapshot = snapshot;
           }
           : undefined,
-      });
+      }));
       if (cancelled || ownerGate === 'reloading') return;
       if (ownerGate === 'blocked') {
         libraryCallbacksRef.current.onLibraryBlocked?.('Não foi possível proteger os projetos da conta anterior neste navegador. Mantenha esta aba aberta e tente novamente.');
@@ -388,34 +405,36 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             // A fila durável pertence à conta que a criou. Enviá-la antes do
             // pull evita que um GET antigo apague da UI uma edição pendente.
             const [{ flushProjectOutbox }, { listProjects },
-              { pullAccountLibraryAuthoritative }, { restoreAccountLibraryMetadata }] = await Promise.all([
+              { pullAccountLibraryAuthoritative }, { restoreAccountLibraryMetadata }] = await awaitBoot(Promise.all([
               import('../utils/projects-outbox.js'),
               import('../utils/projects-client.js'),
               import('../utils/library-sync.js'),
               import('../utils/account-library-meta.js'),
-            ]);
+            ]));
             const { receipt: outboxReceipt, unavailable: outboxUnavailable } =
-              await flushProjectOutboxForBoot(owner, flushProjectOutbox);
+              await awaitBoot(flushProjectOutboxForBoot(owner, flushProjectOutbox));
             if (!sessionStillOwnsData()) return;
-            const projects = await listProjects({ expectedOwnerId });
-            const restored = await pullAccountLibraryAuthoritative({
+            const projects = await awaitBoot(listProjects({ expectedOwnerId, signal: bootAbort.signal }));
+            const restored = await awaitBoot(pullAccountLibraryAuthoritative({
               expectedOwnerId,
               localOwnerId: owner,
               selectedProjectId: restoredSnapshot?.activeDocId,
               hydrateImages: 'none',
               localSnapshot: restoredSnapshot,
-            });
+              signal: bootAbort.signal,
+            }));
             if (!sessionStillOwnsData()) return;
             const remoteIds = new Set(projects.map((project) => project.id));
             if (projects.length !== restored.projectCount
               || (restored.snapshot?.library || []).some((entry) => !remoteIds.has(entry.id))) {
               throw new Error('A biblioteca mudou durante a restauração. Recarregue para tentar novamente.');
             }
-            const metadata = await restoreAccountLibraryMetadata({
+            const metadata = await awaitBoot(restoreAccountLibraryMetadata({
               expectedOwnerId, localOwnerId: owner,
               localBrands: restored.snapshot.brandRoster,
               hydrateImages: false,
-            });
+              signal: bootAbort.signal,
+            }));
             if (!sessionStillOwnsData()) return;
             const snapshot = {
               ...restored.snapshot,
@@ -438,7 +457,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               libraryCallbacksRef.current.onLibraryReady?.();
               toast?.('Há projetos apenas neste navegador. Use “Sync na nuvem” para enviá-los à conta.', 'warning', 7000);
             } else {
-              await libraryCallbacksRef.current.onCloudLibraryApplied?.(snapshot, restored);
+              await awaitBoot(libraryCallbacksRef.current.onCloudLibraryApplied?.(snapshot, restored));
               try {
                 if (metadata.metadata.userProfile) {
                   localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(metadata.metadata.userProfile));
@@ -455,24 +474,23 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               // IndexedDB lento não deve segurar a biblioteca no BootScreen.
               const selected = snapshot.library.find((entry) => entry.id === snapshot.activeDocId)
                 || snapshot.library[0];
-              if (selected || metadata.metadata.brands?.length) {
+              if (selected) {
+                void libraryCallbacksRef.current.onHydrateCloudProjectMedia?.(owner, selected, {
+                  localEntry: restoredSnapshot?.library?.find((entry) => entry.id === selected.id),
+                  version: projects.find((project) => project.id === selected.id)?.version,
+                })?.catch(() => { /* textos e projetos já estão disponíveis */ });
+              }
+              // Uma logo lenta não deve atrasar as fotos do projeto selecionado.
+              if (metadata.metadata.brands?.length) {
                 void (async () => {
-                  const { hydrateProjectEntryFromCloud, hydrateCloudBrandRoster } = await import('../utils/library-sync.js');
-                  const [project, brands] = await Promise.allSettled([
-                    selected ? hydrateProjectEntryFromCloud(selected, {
-                      localEntry: restoredSnapshot?.library?.find((entry) => entry.id === selected.id),
-                    }) : Promise.resolve(null),
-                    metadata.metadata.brands?.length
-                      ? hydrateCloudBrandRoster(metadata.metadata.brands, {
-                        localBrands: restoredSnapshot?.brandRoster || [],
-                      }) : Promise.resolve(null),
-                  ]);
-                  if (!sessionStillOwnsData()) return;
-                  libraryCallbacksRef.current.onCloudMediaHydrated?.(owner, {
-                    entry: project.status === 'fulfilled' ? project.value?.entry : null,
-                    brands: brands.status === 'fulfilled' ? brands.value?.brands : null,
+                  const { hydrateCloudBrandRoster } = await import('../utils/library-sync.js');
+                  const brands = await hydrateCloudBrandRoster(metadata.metadata.brands, {
+                    localBrands: restoredSnapshot?.brandRoster || [],
                   });
-                })().catch(() => { /* textos e projetos já estão disponíveis */ });
+                  if (sessionStillOwnsData()) {
+                    libraryCallbacksRef.current.onCloudMediaHydrated?.(owner, { brands: brands.brands });
+                  }
+                })().catch(() => { /* biblioteca já está disponível */ });
               }
             }
             if (outboxUnavailable) toast?.(OUTBOX_BOOT_WARNING, 'warning', 9000);
@@ -490,7 +508,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               toast?.(`${deletedProjectEdits.length} edição(ões) locais de projeto excluído em outro dispositivo foram preservadas neste navegador para revisão. Nada foi recriado na conta.`, 'warning', 9000);
             }
           } catch (error) {
-            if (sessionStillOwnsData()) {
+            if (!cancelled && (sessionStillOwnsData()
+              || (bootExpired && sessionOwners.has(readDataOwner())))) {
               libraryCallbacksRef.current.onLibraryBlocked?.(error?.message
                 || 'Não foi possível restaurar seus projetos. Verifique a conexão e tente novamente.');
             }
@@ -582,8 +601,17 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         setLoginHint('Não foi possível entrar com Google. Tente de novo.');
         setLoginOpen(true);
       }
-    })();
-    return () => { cancelled = true; };
+    })().catch((error) => {
+      if (!cancelled) libraryCallbacksRef.current.onLibraryBlocked?.(error?.message
+        || 'Não foi possível restaurar seus projetos. Confira a conexão e tente novamente.');
+    }).finally(() => {
+      if (bootDeadlineTimer) clearTimeout(bootDeadlineTimer);
+    });
+    return () => {
+      cancelled = true;
+      bootAbort.abort();
+      if (bootDeadlineTimer) clearTimeout(bootDeadlineTimer);
+    };
   }, [refreshAccess, enterStudio]);
 
   const completeLanding = useCallback(async () => {

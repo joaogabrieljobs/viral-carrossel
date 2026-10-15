@@ -469,15 +469,98 @@ import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
   decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
 } from './src/utils/project-sync-control.js';
+import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
 // A rota por projeto só é ativada depois do banco, importação e API estarem
 // prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 
+/** IDs locais de cache podem mudar enquanto o mesmo asset da conta é baixado. */
+function projectContentSnapshot(library) {
+  return semImagensDeRuntime(library).map((entry) => {
+    if (!entry?.doc) return entry;
+    const doc = entry.doc;
+    const slides = (doc.slides || []).map((slide) => {
+      if (!slide) return slide;
+      const next = { ...slide };
+      for (const [assetKey, idKey, imageKey, failedKey, errorKey] of [
+        ['bgImageAssetId', 'bgImageId', 'bgImage', 'bgImageFailed', 'bgImageError'],
+        ['logoImageAssetId', 'logoImageId', 'logoImage', 'logoImageFailed', 'logoImageError'],
+        ['refImageAssetId', 'refImageId', 'refImage', 'refImageFailed', 'refImageError'],
+      ]) {
+        if (!next[assetKey]) continue;
+        delete next[idKey];
+        delete next[failedKey];
+        delete next[errorKey];
+        if (typeof next[imageKey] === 'string' && /^(blob:|data:image\/)/.test(next[imageKey])) {
+          delete next[imageKey];
+        }
+      }
+      return next;
+    });
+    const brand = doc.brand ? { ...doc.brand } : doc.brand;
+    if (brand?.logoAssetId) {
+      delete brand.logoImageId;
+      if (typeof brand.logo === 'string' && /^(blob:|data:image\/)/.test(brand.logo)) delete brand.logo;
+    }
+    const styleKit = doc.styleKit ? { ...doc.styleKit } : doc.styleKit;
+    if (styleKit?.logo?.assetId) {
+      styleKit.logo = { ...styleKit.logo };
+      delete styleKit.logo.imageId;
+      delete styleKit.logo.dataUrl;
+    }
+    if (Array.isArray(styleKit?.refImages)) {
+      styleKit.refImages = styleKit.refImages.map((ref) => {
+        if (!ref?.assetId) return ref;
+        const clean = { ...ref };
+        delete clean.imageId;
+        delete clean.dataUrl;
+        return clean;
+      });
+    }
+    return { ...entry, doc: { ...doc, slides, brand, styleKit } };
+  });
+}
+
 function projectCacheFingerprint(entry) {
   if (!entry) return '';
-  const { updatedAt: _updatedAt, ...stable } = semImagensDeRuntime([entry])[0] || {};
+  const { updatedAt: _updatedAt, ...stable } = projectContentSnapshot([entry])[0] || {};
   return JSON.stringify(stable);
+}
+
+/** Uma troca feita pelo editor deixa de apontar para o asset antigo da conta. */
+function clearReplacedSlideAssets(before, after) {
+  if (!Array.isArray(after)) return after;
+  const previous = new Map((before || []).map((slide) => [slide?.id, slide]));
+  return after.map((slide) => {
+    const old = previous.get(slide?.id);
+    if (!old || !slide) return slide;
+    let next = slide;
+    for (const [assetKey, idKey, imageKey] of [
+      ['bgImageAssetId', 'bgImageId', 'bgImage'],
+      ['logoImageAssetId', 'logoImageId', 'logoImage'],
+      ['refImageAssetId', 'refImageId', 'refImage'],
+    ]) {
+      if (!old[assetKey] || slide[assetKey] !== old[assetKey]
+        || (slide[idKey] === old[idKey] && slide[imageKey] === old[imageKey])) continue;
+      next = { ...next, [assetKey]: null };
+    }
+    return next;
+  });
+}
+
+function accountBrandsContentSnapshot(brands) {
+  return semLogosDeRuntimeDasMarcas(brands).map((brand) => {
+    const next = { ...brand };
+    if (next.logoAssetId) {
+      delete next.logoImageId;
+      if (typeof next.logo === 'string' && /^(blob:|data:image\/)/.test(next.logo)) delete next.logo;
+    }
+    if (next.styleKit) {
+      next.styleKit = projectContentSnapshot([{ doc: { slides: [], styleKit: next.styleKit } }])[0].doc.styleKit;
+    }
+    return next;
+  });
 }
 
 function accountMetaFingerprint(snapshot) {
@@ -492,7 +575,7 @@ function accountMetaFingerprint(snapshot) {
     if (modesIntroDone === undefined) modesIntroDone = localStorage.getItem(SK.modesIntro) || null;
   } catch { /* cache bloqueada: a revisão remota continua protegida */ }
   return JSON.stringify({
-    brands: semLogosDeRuntimeDasMarcas(snapshot.brandRoster || []),
+    brands: accountBrandsContentSnapshot(snapshot.brandRoster || []),
     folders: snapshot.libraryFolders || [],
     activeBrandId: snapshot.activeBrandId || '',
     activeDocId: snapshot.activeDocId || '',
@@ -979,6 +1062,11 @@ export default function App() {
   }, []);
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
   const cloudSyncInFlightRef = useRef(false);
+  // Progresso de fotos é apenas de interface; nunca entra no documento/autosave.
+  const [photoLoad, setPhotoLoad] = useState(null);
+  const [openingDocId, setOpeningDocId] = useState(null);
+  const photoHydrationFlightsRef = useRef(new Map());
+  const hydrateProjectMediaRef = useRef(null);
   // Versões só vêm de uma leitura autenticada da conta. Uma versão ausente
   // significa criação (0) apenas depois dessa leitura ter sido confirmada.
   const v2ObservedOwnerRef = useRef(null);
@@ -1120,7 +1208,10 @@ export default function App() {
   const presentationPath = normalizePresentationPath(doc.presentationPath);
 
   // Helpers que aceitam value OU função, mantendo a API "useState-like"
-  const setSlides    = useCallback(next => history.set(d => ({ ...d, slides:    typeof next==='function' ? next(d.slides)   : next })), [history]);
+  const setSlides = useCallback(next => history.set((d) => ({
+    ...d,
+    slides: clearReplacedSlideAssets(d.slides, typeof next === 'function' ? next(d.slides) : next),
+  })), [history]);
   const setBrand = useCallback(
     (next) =>
       history.set((d) => {
@@ -1128,6 +1219,10 @@ export default function App() {
         const brandNextRaw =
           typeof next === 'function' ? next(cur) : { ...cur, ...next };
         const brandNext = hydrateBrandTextColors(brandNextRaw);
+        if (cur.logoAssetId && brandNext.logoAssetId === cur.logoAssetId
+          && (brandNext.logo !== cur.logo || brandNext.logoImageId !== cur.logoImageId)) {
+          brandNext.logoAssetId = null;
+        }
         return { ...d, brand: brandNext };
       }),
     [history],
@@ -1170,14 +1265,24 @@ export default function App() {
       ? next(d.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 })
       : next,
   })), [history]);
-  const setStyleKit = useCallback(next => history.set(d => ({
-    ...d,
-    styleKit: normalizeStyleKit(
-      typeof next === 'function'
-        ? next(normalizeStyleKit(d.styleKit))
-        : next,
-    ),
-  })), [history]);
+  const setStyleKit = useCallback(next => history.set((d) => {
+    const previous = normalizeStyleKit(d.styleKit);
+    const candidate = normalizeStyleKit(typeof next === 'function' ? next(previous) : next);
+    const logo = candidate.logo?.assetId && candidate.logo.assetId === previous.logo?.assetId
+      && (candidate.logo.imageId !== previous.logo.imageId
+        || candidate.logo.dataUrl !== previous.logo.dataUrl)
+      ? { ...candidate.logo, assetId: null }
+      : candidate.logo;
+    const refsBefore = new Map((previous.refImages || []).filter((ref) => ref?.assetId)
+      .map((ref) => [ref.assetId, ref]));
+    const refImages = (candidate.refImages || []).map((ref) => {
+      const old = ref?.assetId && refsBefore.get(ref.assetId);
+      return old && (ref.imageId !== old.imageId || ref.dataUrl !== old.dataUrl)
+        ? { ...ref, assetId: null }
+        : ref;
+    });
+    return { ...d, styleKit: { ...candidate, logo, refImages } };
+  }), [history]);
   const setMode      = useCallback(next => history.set(d => ({
     ...d,
     mode: typeof next==='function' ? next(d.mode || 'editorial') : next,
@@ -1336,17 +1441,45 @@ export default function App() {
     if (!PROJECTS_V2) return openDocLocal(docId);
     const owner = readDataOwner();
     const entry = libraryPersistRef.current.find((project) => project.id === docId);
-    if (!entry || !owner || v2ObservedOwnerRef.current !== owner) return false;
+    if (!entry) {
+      toast('Este projeto não está mais na lista. Atualize a biblioteca e tente novamente.', 'warning', 5000);
+      return false;
+    }
+    if (!owner || v2ObservedOwnerRef.current !== owner || !accountLibraryReadyRef.current) {
+      toast('A biblioteca desta conta ainda não está pronta. Aguarde ou atualize a página.', 'warning', 5000);
+      return false;
+    }
     const baseline = v2BaselinesRef.current.get(docId);
-    if (baseline && baseline !== projectCacheFingerprint(entry)) {
+    const editor = editorSyncStateRef.current;
+    if (baseline && (baseline !== projectCacheFingerprint(entry)
+      || (editor.activeDocId === docId
+        && baseline !== projectCacheFingerprint({ ...entry, doc: editor.doc })))) {
       toast('Salve as alterações deste projeto antes de abri-lo novamente.', 'warning', 5000);
       return false;
     }
+    setOpeningDocId(docId);
     try {
-      const [{ getProject }, { hydrateProjectEntryFromCloud }] = await Promise.all([
-        import('./src/utils/projects-client.js'), import('./src/utils/library-sync.js'),
-      ]);
-      const remote = await getProject(docId, { expectedOwnerId: accessSessionRef.current?.customerId });
+      const { getProject } = await import('./src/utils/projects-client.js');
+      const openingAbort = new AbortController();
+      const openingTimer = setTimeout(() => openingAbort.abort(), 15_000);
+      let remote;
+      try {
+        remote = await getProject(docId, {
+          expectedOwnerId: accessSessionRef.current?.customerId,
+          signal: openingAbort.signal,
+        });
+      } finally {
+        clearTimeout(openingTimer);
+      }
+      if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return false;
+      const current = libraryPersistRef.current.find((project) => project.id === docId);
+      const latestEditor = editorSyncStateRef.current;
+      if (!current || (baseline && (baseline !== projectCacheFingerprint(current)
+        || (latestEditor.activeDocId === docId
+          && baseline !== projectCacheFingerprint({ ...current, doc: latestEditor.doc }))))) {
+        toast('O projeto mudou enquanto abria. Salve as alterações e tente novamente.', 'warning', 5000);
+        return false;
+      }
       if (!remote) {
         if (v2VersionsRef.current.has(docId)) {
           toast('Este projeto foi excluído na nuvem. Sincronize para atualizar a lista.', 'warning', 5500);
@@ -1355,11 +1488,12 @@ export default function App() {
         openDocLocal(docId); // criação local ainda não enviada
         return true;
       }
-      const hydrated = await hydrateProjectEntryFromCloud(remote.entry, { localEntry: entry });
-      if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return false;
-      const readyEntry = normalizeLibraryEntry({
-        ...hydrated.entry, doc: ensureDocShape(hydrated.entry.doc || {}),
+      // O GET confirma textos e versão. Fotos são carregadas em segundo plano;
+      // esperar por 23 downloads fazia o clique parecer não funcionar.
+      const cloudEntry = normalizeLibraryEntry({
+        ...remote.entry, doc: ensureDocShape(remote.entry.doc || {}),
       }, libraryFoldersPersistRef.current);
+      const readyEntry = mergeHydratedProjectMedia(cloudEntry, current);
       v2VersionsRef.current.set(docId, remote.version);
       v2BaselinesRef.current.set(docId, projectCacheFingerprint(readyEntry));
       if (docId === activeDocId) {
@@ -1375,10 +1509,18 @@ export default function App() {
         setLibrary((current) => current.map((item) => item.id === docId ? readyEntry : item));
         openDocLocal(docId);
       }
+      void hydrateProjectMediaRef.current?.(owner, remote.entry, {
+        localEntry: current, version: remote.version,
+      }).catch(() => { /* textos já estão disponíveis no editor */ });
       return true;
     } catch (error) {
-      toast(error?.message || 'Não foi possível carregar este projeto. Tente novamente.', 'warning', 5500);
+      toast(error?.name === 'AbortError'
+        ? 'A abertura demorou demais. Verifique a conexão e tente abrir o projeto novamente.'
+        : (error?.message || 'Não foi possível carregar este projeto. Tente novamente.'),
+      'warning', 5500);
       return false;
+    } finally {
+      setOpeningDocId((current) => current === docId ? null : current);
     }
   }, [activeDocId, history.reset, openDocLocal, setShellView, toast]);
   const askPromptRef = useRef(null);
@@ -1563,10 +1705,10 @@ export default function App() {
     }
     if (saved) setLastSavedAt(agora);
     if (returnSnapshot) {
-      const documentFingerprint = JSON.stringify(semImagensDeRuntime([{ doc }])[0].doc);
-      const libraryFingerprint = JSON.stringify(semImagensDeRuntime(lib));
+      const documentFingerprint = JSON.stringify(projectContentSnapshot([{ doc }])[0].doc);
+      const libraryFingerprint = JSON.stringify(projectContentSnapshot(lib));
       const foldersFingerprint = JSON.stringify(libraryFoldersPersistRef.current);
-      const brandsFingerprint = JSON.stringify(semLogosDeRuntimeDasMarcas(brandRoster));
+      const brandsFingerprint = JSON.stringify(accountBrandsContentSnapshot(brandRoster));
       const profileFingerprint = PROJECTS_V2 ? accountMetaFingerprint({
         brandRoster, libraryFolders: libraryFoldersPersistRef.current,
         activeBrandId, activeDocId,
@@ -1581,10 +1723,10 @@ export default function App() {
           const current = editorSyncStateRef.current;
           return current.activeDocId === activeDocId
             && current.activeBrandId === activeBrandId
-            && JSON.stringify(semImagensDeRuntime([{ doc: current.doc }])[0].doc) === documentFingerprint
-            && JSON.stringify(semImagensDeRuntime(libraryPersistRef.current)) === libraryFingerprint
+            && JSON.stringify(projectContentSnapshot([{ doc: current.doc }])[0].doc) === documentFingerprint
+            && JSON.stringify(projectContentSnapshot(libraryPersistRef.current)) === libraryFingerprint
             && JSON.stringify(libraryFoldersPersistRef.current) === foldersFingerprint
-            && JSON.stringify(semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current)) === brandsFingerprint
+            && JSON.stringify(accountBrandsContentSnapshot(brandRosterPersistRef.current)) === brandsFingerprint
             && (!PROJECTS_V2 || accountMetaFingerprint({
               brandRoster: brandRosterPersistRef.current,
               libraryFolders: libraryFoldersPersistRef.current,
@@ -1634,12 +1776,17 @@ export default function App() {
     return restored.length;
   }, [history.reset]);
 
-  const applyCloudMediaAfterBoot = useCallback((owner, { entry, brands } = {}) => {
+  const applyCloudMediaAfterBoot = useCallback((owner, { entry, brands, expectedVersion } = {}) => {
     if (!PROJECTS_V2 || !owner || readDataOwner() !== owner
       || v2ObservedOwnerRef.current !== owner || !accountLibraryReadyRef.current) return;
     if (entry?.id) {
       const before = libraryPersistRef.current.find((project) => project.id === entry.id);
       const merged = mergeHydratedProjectMedia(before, entry);
+      // Uma edição textual pode elevar a versão enquanto as fotos antigas
+      // ainda chegam. Nesse caso só entram assets que continuam iguais no
+      // projeto atual; o merge por slide+assetId faz essa verificação.
+      if (expectedVersion != null && v2VersionsRef.current.get(entry.id) !== expectedVersion
+        && merged === before) return;
       const editor = editorSyncStateRef.current;
       const baseline = v2BaselinesRef.current.get(entry.id);
       const unchanged = baseline && baseline === projectCacheFingerprint(before)
@@ -1673,6 +1820,81 @@ export default function App() {
     }
   }, [history.setSilent]);
 
+  const hydrateProjectMediaForAccount = useCallback((owner, entry, { localEntry, version } = {}) => {
+    if (!entry?.id || !owner || readDataOwner() !== owner) return Promise.resolve(null);
+    const currentVersion = version ?? v2VersionsRef.current.get(entry.id);
+    const generation = v2RestoreGenerationRef.current;
+    const flightKey = `${owner}:${generation}:${entry.id}:${currentVersion ?? 'local'}`;
+    const existing = photoHydrationFlightsRef.current.get(flightKey);
+    if (existing) {
+      if (existing.progress) setPhotoLoad(existing.progress);
+      return existing.promise;
+    }
+    const total = (entry.doc?.slides || []).filter((slide) => slide?.bgImageAssetId).length;
+    const valid = () => readDataOwner() === owner
+      && v2ObservedOwnerRef.current === owner
+      && v2RestoreGenerationRef.current === generation
+      && libraryPersistRef.current.some((project) => project.id === entry.id);
+    const initial = total > 0 ? {
+      key: flightKey, projectId: entry.id, completed: 0, total, loaded: 0, missing: 0, status: 'loading',
+    } : null;
+    const flight = { progress: initial, promise: null };
+    photoHydrationFlightsRef.current.set(flightKey, flight);
+    if (initial) setPhotoLoad(initial);
+    else setPhotoLoad((current) => current?.projectId === entry.id ? null : current);
+    const finishProgress = (status, result) => {
+      if (!total || !valid()) return;
+      const finalProgress = {
+        ...(flight.progress || initial),
+        ...(result || {}),
+        status,
+      };
+      flight.progress = finalProgress;
+      setPhotoLoad((current) => current?.key === flightKey ? finalProgress : current);
+      setTimeout(() => {
+        setPhotoLoad((current) => current?.key === flightKey && current.status !== 'loading' ? null : current);
+      }, 4000);
+    };
+    flight.promise = (async () => {
+      const { hydrateProjectEntryFromCloud } = await import('./src/utils/library-sync.js');
+      const hydrated = await hydrateProjectEntryFromCloud(entry, {
+        localEntry,
+        onSlideHydrated: ({ projectId, slide }) => {
+          if (!valid() || projectId !== entry.id || !slide?.id) return;
+          // Só a mídia deste card entra; textos editados enquanto ela chegava
+          // e novas fotos escolhidas pelo usuário continuam prevalecendo.
+          applyCloudMediaAfterBoot(owner, {
+            entry: { id: entry.id, doc: { slides: [slide] } },
+            expectedVersion: currentVersion,
+          });
+        },
+        onProgress: (progress) => {
+          if (!valid()) return;
+          const next = { ...flight.progress, ...progress, key: flightKey, status: 'loading' };
+          flight.progress = next;
+          setPhotoLoad((current) => current?.key === flightKey ? next : current);
+        },
+      });
+      if (valid()) applyCloudMediaAfterBoot(owner, {
+        entry: hydrated.entry, expectedVersion: currentVersion,
+      });
+      finishProgress('complete', {
+        completed: total,
+        missing: Math.max(flight.progress?.missing || 0, total - (flight.progress?.loaded || 0)),
+      });
+      return hydrated;
+    })().catch((error) => {
+      finishProgress('error');
+      throw error;
+    }).finally(() => {
+      if (photoHydrationFlightsRef.current.get(flightKey) === flight) {
+        photoHydrationFlightsRef.current.delete(flightKey);
+      }
+    });
+    return flight.promise;
+  }, [applyCloudMediaAfterBoot]);
+  hydrateProjectMediaRef.current = hydrateProjectMediaForAccount;
+
   const observeCloudProjectsV2 = useCallback((owner, projects, snapshot, { preserveLocal = false } = {}) => {
     if (!PROJECTS_V2 || !owner || readDataOwner() !== owner || !Array.isArray(projects)) return;
     const ids = new Set((snapshot?.library || []).map((entry) => entry?.id));
@@ -1686,6 +1908,7 @@ export default function App() {
     v2ObservedOwnerRef.current = owner;
     v2RecoveredProjectsRef.current.clear();
     v2RestoreGenerationRef.current += 1;
+    setPhotoLoad(null);
   }, []);
 
   const observeCloudMetadataV2 = useCallback((owner, metadata, snapshot) => {
@@ -2202,6 +2425,7 @@ export default function App() {
     onCloudProjectsObserved: observeCloudProjectsV2,
     onCloudMetadataObserved: observeCloudMetadataV2,
     onCloudMediaHydrated: applyCloudMediaAfterBoot,
+    onHydrateCloudProjectMedia: hydrateProjectMediaForAccount,
     onLibraryReady: markAccountLibraryReady,
     onLibraryBlocked: setAccountRestoreError,
     toast,
@@ -5930,6 +6154,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onLogout={handleLogout}
           onSyncCloud={access.active ? handleSyncCloud : null}
           cloudSyncBusy={cloudSyncBusy || !accountLibraryReady}
+          photoLoad={photoLoad}
+          openingDocId={openingDocId}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
           currentPeriodEnd={access.currentPeriodEnd}
@@ -6148,6 +6374,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
           </>
         )}
       </header>
+
+      {photoLoad?.projectId === activeDocId && (
+        <div style={{ padding: '6px 16px', flexShrink: 0, background: 'var(--bg-sidebar)' }}>
+          <CloudPhotoProgress progress={photoLoad} compact />
+        </div>
+      )}
 
       <ProjectContextBanner
         styleKit={styleKit}

@@ -5,6 +5,7 @@ import AccountProfile from './AccountProfile.jsx';
 import AccountUsage from './AccountUsage.jsx';
 import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
 import BrandLogo from './BrandLogo.jsx';
+import CloudPhotoProgress from './CloudPhotoProgress.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
@@ -60,6 +61,8 @@ function AccountHomeShell({
   onLogout,
   onSyncCloud = null,
   cloudSyncBusy = false,
+  photoLoad = null,
+  openingDocId = null,
   onOpenBrands,
   accessEmail,
   currentPeriodEnd,
@@ -563,6 +566,7 @@ function AccountHomeShell({
                   : 'No editor: Contexto → Narrativa → Visual → Exportar'}
               </p>
             </div>
+            {photoLoad?.projectId === activeProject?.id && <CloudPhotoProgress progress={photoLoad} />}
             <div style={{ display: 'grid', gap: 8 }}>
               {creationTypeSelector(false)}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -757,6 +761,7 @@ function AccountHomeShell({
                 <button
                   type="button"
                   onClick={() => openDoc(entry.id)}
+                  aria-busy={openingDocId === entry.id}
                   aria-label={`Abrir ${entry.name}`}
                   style={{
                     width: isPresentation ? 88 : 56,
@@ -796,6 +801,7 @@ function AccountHomeShell({
                     <button
                       type="button"
                       onClick={() => openDoc(entry.id)}
+                      aria-busy={openingDocId === entry.id}
                       title="Abrir projeto no editor"
                       style={{
                         background: 'none',
@@ -862,8 +868,13 @@ function AccountHomeShell({
                     {product.name} · {product.format} · {product.singular} · {slides.length} {slides.length === 1 ? product.unit : product.plural}
                     {entry.updatedAt ? ` · ${fmtDate(entry.updatedAt)}` : ''}
                   </div>
+                  {openingDocId === entry.id && (
+                    <span role="status" style={{ fontSize: 11, color: 'var(--accent)' }}>Abrindo projeto…</span>
+                  )}
                 </div>
                 </div>
+                {photoLoad?.projectId === entry.id && !(isMobile && activeProject?.id === entry.id)
+                  && <CloudPhotoProgress progress={photoLoad} compact announce={false} />}
                 <div style={{
                   display: 'flex',
                   flexWrap: 'wrap',
