@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SK } from '../../src/utils/storage.js';
+import { semImagensDeRuntime } from '../../src/utils/image-store.js';
+import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import { rememberDeletedProjectIds } from '../../src/utils/project-deletions.js';
 import {
   packLibraryForCloud, pullAccountLibraryAuthoritative, hydrateProjectEntryFromCloud,
@@ -108,6 +110,43 @@ describe('leitura autoritativa da biblioteca v2', () => {
     expect(result.entry.doc.slides[0].title).toBe('Outro');
     expect(result.assetsMissing).toBe(1);
     expect(requests.filter(({ url }) => url.includes('?asset='))).toHaveLength(1);
+  });
+
+  it('mostra foto baixada sem IndexedDB, mas persiste só a referência do asset remoto', async () => {
+    const photo = 'data:image/jpeg;base64,YQ==';
+    imageMocks.store.mockResolvedValue({ bgImage: photo, bgImageId: null });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:cloud-photo');
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.includes('?asset=')) return response({ asset: { dataUrl: photo } });
+      throw new Error(`Pedido inesperado: ${url}`);
+    }));
+
+    const { entry } = await hydrateProjectEntryFromCloud(manifest().docs[0]);
+    const slide = entry.doc.slides[0];
+    expect(slide).toMatchObject({ bgImage: 'blob:cloud-photo', bgImageId: null,
+      bgImageAssetId: 'missing-photo' });
+    const persisted = semImagensDeRuntime([entry]);
+    expect(persisted[0].doc.slides[0].bgImage).toBeUndefined();
+    expect(JSON.stringify(persisted)).not.toContain('data:image');
+    const packed = await packLibraryForCloud({ library: [entry], brandRoster: [], libraryFolders: [] });
+    expect(packed.manifest.docs[0].doc.slides[0].bgImageAssetId).toBe('missing-photo');
+    expect(packed.assets.size).toBe(0);
+  });
+
+  it('preserva a única cópia local quando o asset ainda não foi baixado da nuvem', async () => {
+    const photo = 'data:image/jpeg;base64,YQ==';
+    const assetId = await originalImageAssetId(photo);
+    const project = manifest().docs[0];
+    project.doc.slides[0].bgImageAssetId = assetId;
+    imageMocks.store.mockResolvedValue({ bgImage: photo, bgImageId: null });
+
+    const { entry } = await hydrateProjectEntryFromCloud(project, {
+      localAssets: new Map([[assetId, photo]]),
+    });
+
+    expect(entry.doc.slides[0].bgImage).toBe(photo);
+    expect(semImagensDeRuntime([entry])[0].doc.slides[0].bgImage).toBe(photo);
+    expect(requests.filter(({ url }) => url.includes('?asset='))).toHaveLength(0);
   });
 
   it('vazio confirmado pela mesma conta substitui a lista stale por zero', async () => {

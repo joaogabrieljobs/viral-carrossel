@@ -5,7 +5,8 @@
 import { SK, lsSet, areAccountDataWritesLocked, lockAccountDataWrites, lockOtherAccountTabs, unlockAccountDataWrites, waitForAccountWriteLockProbe } from './storage.js';
 import { lsGet } from './telemetry.js';
 import {
-  imagemComoDataUrl, guardarImagemDoSlide, newImageId, semImagensDeRuntime, semLogosDeRuntimeDasMarcas,
+  dataUrlParaBlob, imagemComoDataUrl, guardarImagemDoSlide, newImageId,
+  semImagensDeRuntime, semLogosDeRuntimeDasMarcas,
 } from './image-store.js';
 import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
 import { importSlideReference } from './slide-reference.js';
@@ -650,7 +651,8 @@ async function resolveCachedAsset(assetId, assetCache) {
   const prepared = assetCache.localAssets?.get(assetId);
   if (prepared && isOriginalImageAsset(assetId)) return prepared;
   const pending = fetchAssetDataUrl(assetId, assetCache.signal).then((dataUrl) => {
-    if (!dataUrl) assetCache.missing.add(assetId);
+    if (dataUrl) assetCache.downloaded?.add(assetId);
+    else assetCache.missing.add(assetId);
     return dataUrl || null;
   });
   assetCache.set(assetId, pending);
@@ -688,7 +690,20 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
           const packed = await guardarImagemDoSlide(dataUrl, {
             id: (sameLocalPhoto && localSlide?.bgImageId) || bgAsset,
           });
-          sl = { ...sl, ...packed, bgImageFailed: false, bgImageError: null };
+          // Se o IndexedDB falhar, guardarImagemDoSlide devolve o data URL sem
+          // ID. Para um asset baixado e confirmado na nuvem, um object URL
+          // conserva a prévia sem levar megabytes para o localStorage.
+          let runtimePhoto = packed;
+          if (!packed.bgImageId && assetCache.downloaded?.has(bgAsset)
+            && typeof packed.bgImage === 'string' && packed.bgImage.startsWith('data:image/')) {
+            try {
+              const blob = dataUrlParaBlob(dataUrl);
+              runtimePhoto = { bgImage: blob ? URL.createObjectURL(blob) : null, bgImageId: null };
+            } catch {
+              runtimePhoto = { bgImage: null, bgImageId: null };
+            }
+          }
+          sl = { ...sl, ...runtimePhoto, bgImageFailed: false, bgImageError: null };
         } catch { /* */ }
       } else {
         // Uma falha remota não remove a cópia desta mesma foto no navegador.
@@ -783,6 +798,7 @@ export async function hydrateCloudBrandRoster(brands, { signal, localBrands = []
   const assetCache = new Map();
   assetCache.signal = signal;
   assetCache.missing = new Set();
+  assetCache.downloaded = new Set();
   assetCache.localAssets = localAssets;
   const result = [];
   for (const brand of (Array.isArray(brands) ? brands : [])) {
@@ -835,6 +851,7 @@ function cloudAssetCache(signal, localAssets) {
   const cache = new Map();
   cache.signal = signal;
   cache.missing = new Set();
+  cache.downloaded = new Set();
   cache.localAssets = localAssets;
   return cache;
 }
@@ -1002,6 +1019,7 @@ export async function applyCloudManifest(manifest, {
   const assetCache = new Map();
   assetCache.signal = signal;
   assetCache.missing = new Set();
+  assetCache.downloaded = new Set();
   assetCache.localAssets = localAssets;
   let localDocs = [];
   if (Array.isArray(localSnapshot?.library)) localDocs = localSnapshot.library;
