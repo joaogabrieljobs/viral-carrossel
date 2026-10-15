@@ -971,10 +971,10 @@
 }
 
 @media (max-width: 340px) {
-  .moont-lp-hero { padding-top: 28px; }
-  .moont-lp-kicker { margin-bottom: 10px; }
-  .moont-lp-hero h1 { margin-bottom: 14px; font-size: 46px; }
-  .moont-lp-hero__lead { margin-bottom: 16px; font-size: 16px; line-height: 1.4; }
+  .moont-lp-hero { padding-top: 16px; }
+  .moont-lp-kicker { margin-bottom: 8px; }
+  .moont-lp-hero h1 { margin-bottom: 12px; font-size: 46px; }
+  .moont-lp-hero__lead { margin-bottom: 12px; font-size: 16px; line-height: 1.4; }
   .moont-lp-section { padding: 64px 0; }
   .moont-lp-section-heading h2,
   .moont-lp-context h2,
