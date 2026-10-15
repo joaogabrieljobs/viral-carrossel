@@ -32,4 +32,57 @@ describe('mídia da nuvem após restaurar textos', () => {
     expect(mergeHydratedBrandMedia({ ...current, logoAssetId: 'logo-2' }, hydrated).logo).toBeNull();
     expect(mergeHydratedBrandMedia({ ...current, logo: 'blob:usuario' }, hydrated).logo).toBe('blob:usuario');
   });
+
+  it('recupera logo e referências do estilo sem reverter texto ou identidade visual', () => {
+    const current = { id: 'janine', doc: {
+      slides: [{ id: 'a', title: 'Texto editado' }],
+      styleKit: {
+        contextMd: 'Brief novo',
+        logo: { assetId: 'logo-1', name: 'Minha logo' },
+        refImages: [{ id: 'r1', name: 'Minha referência', assetId: 'ref-1' }],
+      },
+    } };
+    const hydrated = { id: 'janine', doc: {
+      slides: [{ id: 'a', title: 'Texto antigo' }],
+      styleKit: {
+        contextMd: 'Brief antigo',
+        logo: { assetId: 'logo-1', name: 'Nome antigo', imageId: 'stored-logo' },
+        refImages: [{ id: 'outro', name: 'Nome antigo', assetId: 'ref-1', imageId: 'stored-ref' }],
+      },
+    } };
+    const merged = mergeHydratedProjectMedia(current, hydrated);
+    expect(merged.doc.slides[0].title).toBe('Texto editado');
+    expect(merged.doc.styleKit).toMatchObject({
+      contextMd: 'Brief novo',
+      logo: { assetId: 'logo-1', name: 'Minha logo', imageId: 'stored-logo' },
+      refImages: [{ id: 'r1', name: 'Minha referência', assetId: 'ref-1', imageId: 'stored-ref' }],
+    });
+    expect(current.doc.styleKit.logo.imageId).toBeUndefined();
+    expect(current.doc.styleKit.refImages[0].imageId).toBeUndefined();
+  });
+
+  it('não ressuscita referências removidas nem substitui logo ou referência editada durante o download', () => {
+    const current = { id: 'janine', doc: {
+      slides: [{ id: 'a' }],
+      styleKit: {
+        logo: { assetId: 'logo-1', imageId: 'logo-editada' },
+        refImages: [
+          { id: 'r1', assetId: 'ref-1', imageId: 'ref-editada' },
+          { id: 'r2', assetId: 'ref-nova' },
+        ],
+      },
+    } };
+    const hydrated = { id: 'janine', doc: {
+      slides: [{ id: 'a' }],
+      styleKit: {
+        logo: { assetId: 'logo-1', imageId: 'logo-antiga' },
+        refImages: [
+          { id: 'r1', assetId: 'ref-1', imageId: 'ref-antiga' },
+          { id: 'removida', assetId: 'ref-removida', imageId: 'ref-removida-antiga' },
+          { id: 'r2', assetId: 'ref-antiga-2', imageId: 'ref-antiga-2' },
+        ],
+      },
+    } };
+    expect(mergeHydratedProjectMedia(current, hydrated)).toBe(current);
+  });
 });
