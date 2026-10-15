@@ -24,10 +24,12 @@ import { ACCOUNT_VAULT_KEY, snapshotAccountVaultForOwners } from '../utils/accou
 import { PENDING_SHARE_KEY, captureShareInviteFromLocation } from '../utils/project-share.js';
 import { USER_PROFILE_KEY } from '../utils/user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from '../utils/custom-visual-presets.js';
+import { isProjectOutboxUnavailable } from '../utils/project-sync-control.js';
 
 const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais neste navegador. Vamos terminar a limpeza antes de abrir outra conta.';
+const OUTBOX_BOOT_WARNING = 'A biblioteca abriu, mas não foi possível verificar as alterações pendentes neste navegador. Edições ainda não enviadas podem não aparecer; mantenha este navegador e tente salvar novamente antes de sair.';
 const LOGOUT_PRESERVED_KEYS = new Set([
   ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY,
   'vc_account_write_lock', 'vc_account_write_lock_token',
@@ -68,6 +70,23 @@ function readLoginHintEmail() {
   document.cookie = 'vc_login_hint=; Max-Age=0; Path=/';
   try { return decodeURIComponent(match[1]); }
   catch { return ''; }
+}
+
+/** Falha no IndexedDB não é recibo de fila vazia; outros erros ainda bloqueiam o boot. */
+export async function flushProjectOutboxForBoot(owner, flush) {
+  try {
+    const receipt = await flush(owner);
+    if (!Number.isSafeInteger(receipt?.pending) || receipt.pending < 0) {
+      throw new Error('Não foi possível confirmar as alterações pendentes deste navegador.');
+    }
+    if (receipt.pending > (receipt.needsReview?.length || 0)) {
+      throw new Error('Ainda há projetos aguardando envio. Recarregue para continuar a sincronização antes de abrir a biblioteca.');
+    }
+    return { receipt, unavailable: false };
+  } catch (error) {
+    if (!isProjectOutboxUnavailable(error)) throw error;
+    return { receipt: null, unavailable: true };
+  }
 }
 
 /** Só descarta a edição ativa depois de uma cópia confirmada desta mesma edição. */
@@ -375,10 +394,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               import('../utils/library-sync.js'),
               import('../utils/account-library-meta.js'),
             ]);
-            const outboxReceipt = await flushProjectOutbox(owner);
-            if (outboxReceipt.pending > (outboxReceipt.needsReview?.length || 0)) {
-              throw new Error('Ainda há projetos aguardando envio. Recarregue para continuar a sincronização antes de abrir a biblioteca.');
-            }
+            const { receipt: outboxReceipt, unavailable: outboxUnavailable } =
+              await flushProjectOutboxForBoot(owner, flushProjectOutbox);
             if (!sessionStillOwnsData()) return;
             const projects = await listProjects({ expectedOwnerId });
             const restored = await pullAccountLibraryAuthoritative({
@@ -458,13 +475,14 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
                 })().catch(() => { /* textos e projetos já estão disponíveis */ });
               }
             }
-            if (outboxReceipt.recoveries?.length) {
+            if (outboxUnavailable) toast?.(OUTBOX_BOOT_WARNING, 'warning', 9000);
+            if (outboxReceipt?.recoveries?.length) {
               toast?.(`${outboxReceipt.recoveries.length} edição(ões) em conflito foram preservadas como cópias na sua conta.`, 'warning', 7500);
             }
-            const deletedProjectEdits = outboxReceipt.needsReview?.filter(
+            const deletedProjectEdits = outboxReceipt?.needsReview?.filter(
               (review) => review.kind === 'put_deleted',
             ) || [];
-            const deleteReviews = (outboxReceipt.needsReview?.length || 0) - deletedProjectEdits.length;
+            const deleteReviews = (outboxReceipt?.needsReview?.length || 0) - deletedProjectEdits.length;
             if (deleteReviews) {
               toast?.(`${deleteReviews} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
             }
