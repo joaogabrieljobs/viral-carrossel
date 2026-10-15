@@ -102,10 +102,11 @@ function AccountHomeShell({
       <button
         key={id}
         type="button"
+        className="vc-pressable"
         onClick={() => setAccountTab?.(id)}
         aria-current={active ? 'page' : undefined}
         style={{
-          height: isMobile ? 36 : 36,
+          minHeight: 44,
           padding: '0 12px',
           borderRadius: 9999,
           border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
@@ -144,18 +145,19 @@ function AccountHomeShell({
           <button
             key={id}
             type="button"
+            className="vc-pressable"
             aria-pressed={active}
             aria-label={id === 'apresentacao' ? 'Apresentação' : 'Carrossel'}
             title={`${name}: ${eyebrow}. ${format}. ${flow}.`}
             onClick={() => setCreationType(id)}
             style={{
-              minHeight: compact ? 34 : 76,
+              minHeight: compact ? 44 : 76,
               padding: compact ? '0 10px' : '12px 14px',
               borderRadius: compact ? 9999 : 12,
               border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
               background: active ? 'var(--accent-surface)' : 'transparent',
               color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer', fontSize: compact ? 11 : 12, fontWeight: 650,
+              cursor: 'pointer', fontSize: compact ? 12 : 12, fontWeight: 650,
               fontFamily: 'var(--font-ui)', display: 'flex',
               alignItems: compact ? 'center' : 'flex-start', justifyContent: compact ? 'center' : 'flex-start',
               gap: compact ? 6 : 9, whiteSpace: compact ? 'nowrap' : 'normal', textAlign: 'left',
@@ -195,13 +197,13 @@ function AccountHomeShell({
   const generateBtn = (fullWidth = false) => (
     <button
       type="button"
+      className="vc-pressable"
       data-vc-tour="generate"
       onClick={() => onGenerate?.(creationType)}
       aria-label={`Gerar ${creationType === 'apresentacao' ? 'apresentação' : 'carrossel'} com IA`}
       style={{
         width: fullWidth ? '100%' : 'auto',
-        height: fullWidth ? 48 : 40,
-        minHeight: fullWidth ? 48 : 40,
+        minHeight: fullWidth ? 48 : 44,
         padding: '0 22px',
         borderRadius: 9999,
         border: 'none',
@@ -218,8 +220,6 @@ function AccountHomeShell({
         gap: 8,
         boxShadow: '0 0 0 1px rgba(91,83,232,0.25)',
       }}
-      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.95)'; }}
-      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
     >
       <Sparkles size={fullWidth ? 15 : 14} />
       {creationType === 'apresentacao' ? 'Gerar com Moont Apresenta' : 'Gerar com Moont Comunica'}
@@ -244,7 +244,7 @@ function AccountHomeShell({
   const projectName = activeEntryName || 'Sem título';
 
   const headerBtn = {
-    height: isMobile ? 40 : 36,
+    minHeight: 44,
     padding: '0 12px',
     borderRadius: 9999,
     border: '1px solid var(--border)',
@@ -271,8 +271,9 @@ function AccountHomeShell({
       onClick={fecharConta}
       aria-label="Fechar"
       title="Fechar"
+      className="vc-pressable"
       style={{
-        width: 40, height: 40, borderRadius: 9999,
+        width: 44, height: 44, borderRadius: 9999,
         border: '1px solid var(--border)', background: 'var(--bg-card)',
         color: 'var(--text-secondary)', cursor: 'pointer',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -368,6 +369,7 @@ function AccountHomeShell({
           {isMobile ? (
             <button
               type="button"
+              className="vc-pressable"
               onClick={() => onOpenSettings()}
               aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
               style={{
@@ -389,15 +391,16 @@ function AccountHomeShell({
           ) : (
             <>
               <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
-                <button type="button" onClick={() => onOpenTemplates()} style={headerBtn}>
+                <button type="button" className="vc-pressable" onClick={() => onOpenTemplates()} style={headerBtn}>
                   <Layout size={13} /> Padrões visuais
                 </button>
-                <button type="button" onClick={() => onOpenResearch()} style={headerBtn}>
+                <button type="button" className="vc-pressable" onClick={() => onOpenResearch()} style={headerBtn}>
                   <TrendingUp size={13} /> Pesquisa
                 </button>
-                <button type="button" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
+                <button type="button" className="vc-pressable" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
                 <button
                   type="button"
+                  className="vc-pressable"
                   onClick={() => onOpenSettings()}
                   aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
                   style={{
@@ -560,9 +563,10 @@ function AccountHomeShell({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button
                 type="button"
+                className="vc-pressable"
                 onClick={onContinueEditor}
                 style={{
-                  height: 40, padding: '0 18px', borderRadius: 9999, border: 'none',
+                  minHeight: 44, padding: '0 18px', borderRadius: 9999, border: 'none',
                   background: 'var(--accent)', color: '#fff', cursor: 'pointer',
                   fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -572,9 +576,10 @@ function AccountHomeShell({
               </button>
               <button
                 type="button"
+                className="vc-pressable"
                 onClick={createSelectedProject}
                 style={{
-                  height: 40, padding: '0 16px', borderRadius: 9999,
+                  minHeight: 44, padding: '0 16px', borderRadius: 9999,
                   border: '1px solid var(--border)', background: 'var(--bg-base)',
                   color: 'var(--text-primary)', cursor: 'pointer',
                   fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
@@ -645,10 +650,11 @@ function AccountHomeShell({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <button
                   type="button"
+                  className="vc-pressable"
                   onClick={() => onOpenLibrary()}
                   data-vc-tour="library"
                   style={{
-                    height: 36, padding: '0 14px', borderRadius: 9999,
+                    minHeight: 44, padding: '0 14px', borderRadius: 9999,
                     border: '1px solid var(--border)', background: 'var(--bg-base)',
                     cursor: 'pointer', color: 'var(--text-secondary)',
                     fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
@@ -659,12 +665,14 @@ function AccountHomeShell({
                 {typeof onSyncCloud === 'function' ? (
                   <button
                     type="button"
+                    className="vc-pressable"
                     onClick={() => onSyncCloud()}
                     disabled={cloudSyncBusy}
+                    aria-busy={cloudSyncBusy}
                     data-vc-tour="cloud-sync"
                     title="Guardar e restaurar os seus projetos nesta conta, em qualquer browser"
                     style={{
-                      height: 36, padding: '0 14px', borderRadius: 9999,
+                      minHeight: 44, padding: '0 14px', borderRadius: 9999,
                       border: '1px solid var(--border)', background: 'var(--bg-base)',
                       cursor: cloudSyncBusy ? 'wait' : 'pointer',
                       color: 'var(--text-secondary)',
@@ -677,9 +685,10 @@ function AccountHomeShell({
                 ) : null}
                 <button
                   type="button"
+                  className="vc-pressable"
                   onClick={createSelectedProject}
                   style={{
-                    height: 36, padding: '0 14px', borderRadius: 9999, border: 'none',
+                    minHeight: 44, padding: '0 14px', borderRadius: 9999, border: 'none',
                     cursor: 'pointer', background: 'var(--accent)', color: '#fff',
                     fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -862,14 +871,14 @@ function AccountHomeShell({
                     value={entry.status}
                     onChange={e => setDocStatus(entry.id, e.target.value)}
                     style={{
-                      fontSize: 11,
+                      fontSize: 12,
                       padding: '6px 8px',
                       borderRadius: 8,
                       background: 'var(--bg-card)',
                       color: 'var(--text-secondary)',
                       border: '1px solid var(--border)',
                       cursor: 'pointer',
-                      minHeight: 32,
+                      minHeight: 44,
                       flex: '1 1 120px',
                       maxWidth: 160,
                       fontFamily: 'var(--font-ui)',
@@ -1020,10 +1029,11 @@ function AccountHomeShell({
               <button
                 key={id}
                 type="button"
+                className="vc-pressable"
                 onClick={onClick}
                 aria-current={active ? 'page' : undefined}
                 style={{
-                  minHeight: 48,
+                  minHeight: 56,
                   borderRadius: 12,
                   border: primary
                     ? 'none'
@@ -1042,13 +1052,13 @@ function AccountHomeShell({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 2,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: 600,
                   fontFamily: 'var(--font-ui)',
                   letterSpacing: '-0.011em',
                 }}
               >
-                <Icon size={16} strokeWidth={active || primary ? 2.35 : 2} />
+                <Icon size={18} strokeWidth={active || primary ? 2.35 : 2} />
                 {label}
               </button>
             );

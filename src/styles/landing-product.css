@@ -93,6 +93,17 @@
   text-decoration: none;
 }
 
+.moont-lp-header nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.moont-product-landing :is(a, button):focus-visible {
+  outline: 2px solid var(--lp-orbit);
+  outline-offset: 3px;
+}
+
 .moont-lp-header nav a:hover { color: var(--lp-orbit); }
 
 .moont-lp-header__actions {
@@ -129,8 +140,8 @@
 }
 
 .moont-lp-button svg { width: 17px; height: 17px; }
-.moont-lp-button:hover { transform: translateY(-2px); }
-.moont-lp-button:active { transform: translateY(0); }
+.moont-lp-button:hover { transform: translateY(-1px); }
+.moont-lp-button:active { transform: scale(0.98); }
 .moont-lp-button:focus-visible { outline: 2px solid var(--lp-orbit); outline-offset: 3px; }
 .moont-lp-button--primary { background: var(--lp-orbit); color: #fff; }
 .moont-lp-button--primary:hover { background: var(--lp-orbit-dark); }

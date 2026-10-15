@@ -30,16 +30,16 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
   const overlay = overlays.find(item => item.id === overlayId);
   const fontFamily = overlay ? (overlay.fontFamily || '') : getTextFont(slide, target.key, '');
   return (
-    <section aria-label="Fonte de cada texto" style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+    <section className="vc-type-inspector" aria-label="Tipografia do card">
       <div style={{ display: 'grid', gap: 4 }}>
-        <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>Fonte de cada texto</strong>
-        <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-          Clique em um texto no card ou escolha abaixo. Para repetir a fonte no mesmo tipo de texto dos outros cards, use Aplicar em todos.
+        <strong className="vc-type-inspector__heading">Tipografia do card</strong>
+        <p className="vc-type-inspector__help">
+          Clique no texto do card ou escolha o campo aqui. A fonte muda na hora.
         </p>
       </div>
-      <label style={{ display: 'grid', gap: 7, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-        Texto do card
-        <select className="vc-input" aria-label="Texto do card" value={target.key} onChange={event => onSelect(event.target.value)} style={{ minHeight: 42, width: '100%', fontSize: 13 }}>
+      <label className="vc-type-inspector__label">
+        Texto que você quer editar
+        <select className="vc-input" aria-label="Texto do card" value={target.key} onChange={event => onSelect(event.target.value)}>
           {targets.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
         </select>
       </label>
@@ -50,19 +50,22 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
           ? { overlays: updateOverlayOnSlide(slide, overlay.id, { fontFamily: value }).overlays }
           : textFontPatch(slide, target.key, value))}
       />
-      <button
-        type="button"
-        className="vc-btn vc-btn-ghost"
-        disabled={cardCount < 2}
-        onClick={() => onApplyAll?.(target.key, fontFamily, slide.id)}
-        title={`Usar esta fonte em ${target.label.toLowerCase()} de todos os cards`}
-        style={{ minHeight: 40, width: '100%', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}
-      >
-        Aplicar em todos
-      </button>
-      {target.text && <p style={{ margin: 0, fontSize: 16, lineHeight: 1.4, fontFamily: fontFamily || 'inherit', color: 'var(--text-primary)', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-        {String(target.text).slice(0, 90)}
-      </p>}
+      {target.text && <div className="vc-type-inspector__preview" aria-label="Prévia da fonte selecionada">
+        <span className="vc-type-inspector__caption">PRÉVIA · {target.label}</span>
+        <p style={{ fontFamily: fontFamily || 'inherit' }}>{String(target.text).slice(0, 90)}</p>
+      </div>}
+      <div className="vc-type-inspector__scope">
+        <button
+          type="button"
+          className="vc-btn vc-btn-ghost"
+          disabled={cardCount < 2}
+          onClick={() => onApplyAll?.(target.key, fontFamily, slide.id)}
+          title={`Usar esta fonte em ${target.label.toLowerCase()} de todos os cards`}
+        >
+          Aplicar em todos
+        </button>
+        <span>{cardCount < 2 ? 'Adicione outro card para repetir esta fonte.' : `Repete só “${target.label.toLowerCase()}” nos ${cardCount} cards.`}</span>
+      </div>
     </section>
   );
 }

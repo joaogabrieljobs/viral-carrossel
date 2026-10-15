@@ -6393,11 +6393,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   <button
                     key={id}
                     type="button"
+                    className="vc-pressable"
                     onClick={() => { setTab(id); setDrawerOpen(true); }}
                     style={{
                       flex:'1 0 auto',
                       minWidth:56,
-                      minHeight:52,
+                      minHeight:56,
                       padding:'6px 8px',
                       borderRadius:12,
                       border: active
@@ -6407,17 +6408,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         ? 'var(--accent-surface)'
                         : 'transparent',
                       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-                      fontSize:10, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
+                      fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
                       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
                       letterSpacing:'-0.011em',
                       transition:'background 0.15s var(--ease-smooth), border-color 0.15s, color 0.15s',
                     }}
-                    onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.96)'; }}
-                    onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                     aria-label={`Abrir aba ${label}`}
                     aria-pressed={active}
                   >
-                    <Icon size={16} strokeWidth={active ? 2.35 : 2}/>
+                    <Icon size={18} strokeWidth={active ? 2.35 : 2}/>
                     <span style={{ lineHeight:1.1, whiteSpace:'nowrap' }}>{label}</span>
                   </button>
                 );
@@ -6426,11 +6425,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
               {!empty && (
               <button
                 type="button"
+                className="vc-pressable"
                 onClick={() => exportSlide(activeIdx)}
                 disabled={exporting}
                 style={{
                   alignSelf:'center',
-                  width:52, height:52, borderRadius:9999,
+                  width:56, height:56, borderRadius:9999,
                   border:'none', cursor: exporting ? 'wait' : 'pointer',
                   background:'var(--accent)', color:'var(--accent-on-dark, #fff)',
                   display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1,
@@ -6439,8 +6439,6 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   flexShrink:0,
                   transition:'transform 0.12s var(--ease-smooth), opacity 0.15s',
                 }}
-                onTouchStart={e => { if (!exporting) e.currentTarget.style.transform = 'scale(0.94)'; }}
-                onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 aria-label="Exportar card atual"
                 title="Exportar"
               >

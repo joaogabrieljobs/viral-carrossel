@@ -71,7 +71,7 @@ export const GLOBAL_STYLE = `
     /* Text on dark */
     --text-primary: #f3f0e7;
     --text-secondary: #bbb9c7;
-    --text-muted: rgba(243, 240, 231, 0.56);
+    --text-muted: rgba(243, 240, 231, 0.70);
     --text-on-dark: #ffffff;
     --text-on-dark-muted: rgba(255, 255, 255, 0.72);
     --text-on-accent: #ffffff;
@@ -214,8 +214,8 @@ export const GLOBAL_STYLE = `
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.32); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.24); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.40); }
 
   /* Dentro do editor a superfície é escura: um thumb preto a 18% ficava
      invisível — o quadro rolava e ninguém via que dava para rolar. */
@@ -601,7 +601,7 @@ export const GLOBAL_STYLE = `
     letter-spacing: -0.014em;
     font-feature-settings: 'cv11', 'ss01';
     -webkit-tap-highlight-color: transparent;
-    min-height: 40px;
+    min-height: 44px;
     padding: 0 16px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
@@ -610,14 +610,14 @@ export const GLOBAL_STYLE = `
     border-color: rgba(255, 255, 255, 0.34);
     color: var(--text-primary);
   }
-  .vc-btn:active { transform: scale(0.96); }
+  .vc-btn:active { transform: scale(0.98); }
   .vc-btn:focus-visible { outline: 2px solid var(--accent-focus); outline-offset: 3px; }
   .vc-btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
 
   /* Primary pill — gradiente Orbital Blue e brilho no hover */
   .vc-btn-primary {
     color: var(--text-on-accent);
-    padding: 0 22px; height: 40px; font-size: 14px; font-weight: 600;
+    padding: 0 22px; height: 44px; font-size: 14px; font-weight: 600;
     background: var(--gradient-accent);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
@@ -625,7 +625,7 @@ export const GLOBAL_STYLE = `
       inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
   .vc-btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow:
       0 16px 40px rgba(var(--accent-rgb), 0.32),
       0 0 24px rgba(var(--accent-rgb), 0.18),
@@ -645,7 +645,7 @@ export const GLOBAL_STYLE = `
     -webkit-backdrop-filter: blur(18px) saturate(180%);
     color: var(--text-secondary);
     border: 1px solid var(--glass-border-strong);
-    padding: 0 16px; height: 36px; font-size: 13px; font-weight: 500;
+    padding: 0 16px; height: 44px; font-size: 13px; font-weight: 500;
     border-radius: 9999px;
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.18),
@@ -705,6 +705,7 @@ export const GLOBAL_STYLE = `
     outline: none;
     transition: border-color 0.18s var(--ease-smooth), box-shadow 0.18s var(--ease-smooth), background 0.18s;
     -webkit-appearance: none; appearance: none;
+    min-height: 44px;
   }
   .vc-input::placeholder { color: var(--text-muted); }
   .vc-input:hover:not(:focus) {
@@ -717,6 +718,84 @@ export const GLOBAL_STYLE = `
     box-shadow:
       0 0 0 4px rgba(var(--accent-rgb), 0.10),
       0 8px 24px rgba(var(--accent-rgb), 0.18);
+  }
+
+  /* O mesmo feedback tátil nos controles da conta e do editor. */
+  .vc-pressable {
+    transition: transform var(--motion-press) var(--ease-out-press),
+      background-color var(--motion-fast) ease,
+      border-color var(--motion-fast) ease,
+      color var(--motion-fast) ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vc-pressable:active:not(:disabled) { transform: scale(0.98); }
+
+  .vc-type-inspector {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border-strong);
+    background: var(--gradient-surface), var(--bg-card);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  }
+  .vc-type-inspector__heading {
+    color: var(--text-primary);
+    font: 650 15px/1.3 var(--font-ui);
+    letter-spacing: -0.02em;
+  }
+  .vc-type-inspector__help {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .vc-type-inspector__label,
+  .vc-type-inspector > label {
+    display: grid;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .vc-type-inspector .vc-input {
+    width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    background-color: rgba(255,255,255,0.075);
+  }
+  .vc-type-inspector__preview {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(0,0,0,0.21);
+    border: 1px solid var(--border-muted);
+  }
+  .vc-type-inspector__caption {
+    display: block;
+    color: var(--text-muted);
+    font: 600 10px/1.2 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .vc-type-inspector__preview p {
+    margin: 8px 0 0;
+    color: var(--text-primary);
+    font-size: 19px;
+    line-height: 1.27;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .vc-type-inspector__scope { display: grid; gap: 8px; }
+  .vc-type-inspector__scope button {
+    width: 100%;
+    min-height: 44px;
+    color: var(--text-primary);
+    font-weight: 650;
+  }
+  .vc-type-inspector__scope span {
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.4;
   }
   @media (max-width: 767px) {
     .vc-input { font-size: 16px; padding: 12px 18px; }

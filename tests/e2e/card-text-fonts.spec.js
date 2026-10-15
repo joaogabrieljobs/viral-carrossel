@@ -69,7 +69,7 @@ function surface(page, cardId = FIRST_CARD, exported = false) {
 }
 
 function panel(page) {
-  return page.getByRole('region', { name: 'Fonte de cada texto', exact: true });
+  return page.getByRole('region', { name: 'Tipografia do card', exact: true });
 }
 
 async function openTextPanel(page, mobile) {

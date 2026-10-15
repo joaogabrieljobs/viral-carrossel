@@ -40,7 +40,7 @@ export function FontFamilySelect({ label = 'Fonte do texto selecionado', value =
         aria-label={label}
         value={value}
         onChange={event => onChange(event.target.value)}
-        style={{ width: '100%', minWidth: 0, minHeight: 42, fontSize: 13, fontFamily: value || 'var(--font-ui)' }}
+        style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: 13, fontFamily: value || 'var(--font-ui)' }}
       >
         <option value="">Usar fonte do estilo</option>
         {value && !known && <option value={value}>{value.split(',')[0].replace(/["']/g, '')}</option>}

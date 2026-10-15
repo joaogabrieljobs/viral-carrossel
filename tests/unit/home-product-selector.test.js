@@ -11,7 +11,7 @@ describe('seletor de produto na Home e na Biblioteca', () => {
     expect(code).toContain("onNewProject(homeCreationType)");
     expect(code).toContain("onGenerateProject(homeCreationType)");
     expect(code).toContain("entry?.doc?.fmt === 'apresentacao'");
-    expect(code).toContain("{productLabel} · {itemLabel}");
+    expect(code).toContain("const itemLabel = isPresentationProject ? 'slide' : 'card'");
     expect(code).toContain("width: isPresentation ? 72 : 48");
   });
 
@@ -22,7 +22,7 @@ describe('seletor de produto na Home e na Biblioteca', () => {
     expect(code).toContain("entry?.doc?.productKind === 'apresentacao'");
     expect(code).toContain('setCreationType(projectKindOf(activeProject))');
     expect(code).toContain("onGenerate?.(creationType)");
-    expect(code).toContain("newDoc?.(creationType)");
+    expect(code).toContain("newDoc?.(creationType, name)");
     expect(code).toContain("{product.singular} · {slides.length}");
     expect(code).toContain("width: isPresentation ? 88 : 56");
     expect(code).not.toContain("newDoc(\n                  {");
