@@ -21,6 +21,7 @@ export default function LoginModal({
   const [email, setEmail] = useState(initialEmail || '');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
+  const [checkoutReady, setCheckoutReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hint || '');
 
@@ -30,13 +31,14 @@ export default function LoginModal({
     setEmail(initialEmail || '');
     setPassword('');
     setNotice('');
+    setCheckoutReady(false);
     setMode('login');
   }, [open, hint, initialEmail]);
 
   if (!open) return null;
 
   const changeMode = next => {
-    setMode(next); setError(''); setNotice(''); setPassword('');
+    setMode(next); setError(''); setNotice(''); setCheckoutReady(false); setPassword('');
   };
 
   const submit = async (event) => {
@@ -54,7 +56,9 @@ export default function LoginModal({
         : await loginWithPassword(email, password);
 
       if (data.needCheckout) {
-        setError(data.message || 'Conta ok — escolha um plano para continuar.');
+        setEmail(data.email || email);
+        setNotice(data.message || 'Conta confirmada. Escolha um plano para continuar.');
+        setCheckoutReady(true);
         return;
       }
       if (data.active) {
@@ -123,7 +127,7 @@ export default function LoginModal({
               color: 'var(--text-muted)',
             }}>
               {mode === 'forgot' ? 'Informe o e-mail da sua conta para receber o link de recuperação.' : mode === 'register'
-                ? 'Cria com e-mail e senha. Se já assinou com este e-mail, entra directo.'
+                ? 'Crie uma conta nova com e-mail e senha. Se você já assinou, entre na conta existente.'
                 : 'Usa o e-mail da assinatura + senha, ou Google.'}
             </p>
           </div>
@@ -171,6 +175,10 @@ export default function LoginModal({
             <p role="alert" style={{ margin: 0, fontSize: 12, color: '#ff6b8a', lineHeight: 1.4 }}>{error}</p>
           )}
           {notice && <p role="status" style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: '#a4e8c0' }}>{notice}</p>}
+          {checkoutReady && <button type="button" className="vc-btn" onClick={() => {
+            dismissOnboardingLanding();
+            window.location.assign('/?app=1&login=no_subscription');
+          }} style={{ minHeight: 44 }}>Escolher plano</button>}
 
           {!notice && <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
             <label style={{ display: 'grid', gap: 6 }}>

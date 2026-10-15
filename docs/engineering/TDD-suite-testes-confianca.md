@@ -53,11 +53,11 @@ Fonte: `api/lib/billing-handlers.js`, `api/lib/access.js`, `api/stripe/webhook.j
 | Endpoint | Casos |
 |---|---|
 | `GET /api/auth/session` | anônimo→`{active:false,status:'anonymous'}`; cookie válido+sub ativa→`{active:true,status,currentPeriodEnd}`; cookie válido sem sub→`inactive`; cookie adulterado→anonymous |
-| `POST /api/stripe/checkout` | e-mail inválido→400; novo cliente→`{url,sessionId}`; sub já ativa→`{alreadyActive:true,requireLogin:true}` **sem** cookie (login = Google) |
-| `POST /api/stripe/confirm` | paga→`{active:true}`+Set-Cookie; não paga→402; `mode!=='subscription'`→400; sem sessionId→400 |
+| `POST /api/stripe/checkout` | e-mail inválido→400; novo cliente→`{url,sessionId}`; cliente existente sem prova da conta→`{requireLogin:true}` sem checkout; senha ou Google verificado podem vincular a renovação ao customer existente |
+| `POST /api/stripe/confirm` | paga e com cookie de checkout assinado→`{active:true}`+Set-Cookie; não paga→402; `mode!=='subscription'`→400; sem cookie válido→401; ID enviado diferente do cookie→403; retorno de checkout em `?billing=success`, sem ID na URL |
 | `POST /api/stripe/webhook` | assinatura válida→200; inválida→400 |
 | `POST /api/stripe/portal` | sem cookie→401; com cookie→`{url}` |
-| `POST /api/auth/logout` | limpa cookie (Max-Age=0) |
+| `POST /api/auth/logout` | limpa cookie (Max-Age=0); revoga sessões e provas de checkout anteriores ao rotacionar a identidade da conta; informa `sessionsRevoked:false` se a revogação falhar |
 | `GET /api/auth/google` + callback | state inválido→redirect `?login=invalid_state`; assinante→cookie+`?billing=restored&login=google`; sem sub→`?login=no_subscription` |
 | `POST /api/anthropic/v1/messages` | sem chave própria + sem sessão→401; com sessão→usa env key; OPTIONS de origin fora da allowlist→sem `Access-Control-Allow-Origin` |
 

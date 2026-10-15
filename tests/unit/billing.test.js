@@ -38,6 +38,24 @@ describe('fetchAccessSession', () => {
 });
 
 describe('startCheckout / confirmCheckoutSession / openBillingPortal', () => {
+  it('guarda o checkout na aba e confirma sem expor id na URL', async () => {
+    const values = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key) => values.get(key) || null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    });
+    const spy = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ url: 'https://checkout.stripe.com/x', sessionId: 'cs_aba_1' }))
+      .mockResolvedValueOnce(jsonResponse({ active: true }));
+    vi.stubGlobal('fetch', spy);
+    await startCheckout('user1@teste.exemplo');
+    expect(values.get('vc_pending_checkout')).toBe('cs_aba_1');
+    await confirmCheckoutSession();
+    expect(JSON.parse(spy.mock.calls[1][1].body)).toEqual({ sessionId: 'cs_aba_1' });
+    expect(values.has('vc_pending_checkout')).toBe(false);
+  });
+
   it('checkout ok devolve url; erro lança a mensagem do servidor', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ url: 'https://checkout.stripe.com/x' })));
     await expect(startCheckout('user1@teste.exemplo')).resolves.toEqual({ url: 'https://checkout.stripe.com/x' });
@@ -52,6 +70,11 @@ describe('startCheckout / confirmCheckoutSession / openBillingPortal', () => {
     await confirmCheckoutSession('cs_teste_1');
     expect(JSON.parse(spy.mock.calls[0][1].body)).toEqual({ sessionId: 'cs_teste_1' });
 
+    const bare = vi.fn().mockResolvedValue(jsonResponse({ active: true }));
+    vi.stubGlobal('fetch', bare);
+    await confirmCheckoutSession();
+    expect(JSON.parse(bare.mock.calls[0][1].body)).toEqual({});
+
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, false)));
     await expect(confirmCheckoutSession('cs_x')).rejects.toThrow('Não foi possível confirmar a assinatura');
   });
@@ -63,8 +86,20 @@ describe('startCheckout / confirmCheckoutSession / openBillingPortal', () => {
 });
 
 describe('logoutAccess', () => {
-  it('nunca lança, mesmo com rede fora', async () => {
+  it('propaga falha de rede para não fingir que o cookie saiu', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
-    await expect(logoutAccess()).resolves.toBeUndefined();
+    await expect(logoutAccess()).rejects.toThrow('offline');
+  });
+
+  it('retorna aviso quando apenas o cookie local foi limpo', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      ok: true, localCookieCleared: true, sessionsRevoked: false, warning: 'revocation_failed',
+    })));
+    await expect(logoutAccess()).resolves.toMatchObject({ sessionsRevoked: false, warning: 'revocation_failed' });
+  });
+
+  it('resposta inválida não confirma logout', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false }, false)));
+    await expect(logoutAccess()).rejects.toThrow('Não foi possível confirmar a saída');
   });
 });

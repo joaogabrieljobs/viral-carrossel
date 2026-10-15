@@ -23,17 +23,16 @@ export function googleAuthConfigured() {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
-export function getGoogleRedirectUri(req) {
-  // Preferir o host da request (domínio customizado vs *.vercel.app) —
-  // GOOGLE_REDIRECT_URI fixo quebrava login quando APP_URL ≠ site actual.
-  const proto = req?.headers?.['x-forwarded-proto'] || 'https';
-  const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
-  if (host) {
-    return `${String(proto).split(',')[0].trim()}://${String(host).split(',')[0].trim()}/api/auth/google/callback`;
-  }
+export function getGoogleRedirectUri(_req) {
+  // Host / X-Forwarded-Host não entram no redirect_uri (open redirect / OAuth mix-up).
   const fromEnv = cleanEnv(process.env.GOOGLE_REDIRECT_URI);
   if (fromEnv) return fromEnv;
-  return `${getAppUrl(req)}/api/auth/google/callback`;
+  return `${getAppUrl()}/api/auth/google/callback`;
+}
+
+/** A origem do callback também deve receber o cookie de state no início. */
+export function getGoogleCanonicalOrigin() {
+  return new URL(getGoogleRedirectUri()).origin;
 }
 
 function b64url(buf) {
@@ -136,14 +135,15 @@ export async function exchangeGoogleCode(req, code) {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
   const profile = await profileRes.json().catch(() => ({}));
-  if (!profileRes.ok || !profile.email) {
+  if (!profileRes.ok || !profile.email || typeof profile.sub !== 'string' || !profile.sub) {
     throw new Error('Não foi possível ler o e-mail da conta Google');
   }
-  if (profile.email_verified === false) {
+  if (profile.email_verified !== true) {
     throw new Error('Confirme o e-mail da conta Google e tente de novo');
   }
 
   return {
+    sub: profile.sub,
     email: String(profile.email).trim().toLowerCase(),
     name: profile.name || null,
     picture: profile.picture || null,

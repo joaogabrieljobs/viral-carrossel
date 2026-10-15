@@ -1,14 +1,14 @@
 import { applyCors } from '../lib/cors.js';
-import { createAccessToken, setAccessCookie } from '../lib/access.js';
+import { setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import {
   normalizeEmail,
   isValidEmail,
   isValidPassword,
   getAuthRecord,
-  upsertPassword,
+  hashPassword,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
-import { findActiveSubscription } from '../lib/stripe.js';
+import { getStripe } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 
 function readBody(req) {
@@ -21,7 +21,8 @@ function readBody(req) {
 
 /**
  * POST /api/auth/register — cria conta e-mail+senha.
- * Se já tiver assinatura Stripe ativa → cookie. Senão → needCheckout.
+ * Cliente preexistente só pode ser associado após autenticação; o cadastro
+ * público cria sempre uma identidade Stripe nova, sem acesso imediato.
  */
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
@@ -46,36 +47,28 @@ export default async function handler(req, res) {
 
   try {
     const existing = await getAuthRecord(cleanEmail);
-    if (existing?.hash) {
-      return res.status(409).json({ error: 'Já existe conta com este e-mail. Entre com a senha.' });
-    }
-
-    const saved = await upsertPassword(cleanEmail, password, {
-      customerId: existing?.customerId || null,
-      overwrite: false,
-    });
-
-    const customerId = saved.customerId;
-    let active = false;
-    if (customerId) {
-      try {
-        const sub = await findActiveSubscription(customerId);
-        active = !!sub;
-      } catch (e) {
-        console.warn('[auth/register] sub lookup', e?.message || e);
-      }
-    }
-
-    if (active && customerId) {
-      const token = createAccessToken({ customerId, email: cleanEmail });
-      setAccessCookie(res, token);
-      return res.status(200).json({
-        active: true,
-        email: cleanEmail,
-        customerId,
-        login: 'password',
+    if (existing) {
+      return res.status(409).json({
+        error: 'Este e-mail já tem conta. Entre com Google ou sua senha para continuar.',
+        requireLogin: true,
       });
     }
+
+    const { salt, hash } = hashPassword(password);
+    const customer = await getStripe().customers.create({
+      email: cleanEmail,
+      metadata: {
+        product: 'viral-carrossel',
+        vc_pw_salt: salt,
+        vc_pw_hash: hash,
+      },
+    });
+    setCheckoutIdentityCookie(res, {
+      email: cleanEmail,
+      customerId: customer.id,
+      source: 'new_registration',
+    });
+    setLoginHintCookie(res, cleanEmail);
 
     return res.status(200).json({
       active: false,

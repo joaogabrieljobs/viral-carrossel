@@ -5,6 +5,7 @@
  */
 import crypto from 'crypto';
 import { getStripe } from './stripe.js';
+import { getLibrarySyncMeta } from './library-sync-store.js';
 
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
@@ -47,27 +48,83 @@ export function verifyPassword(password, record) {
   return crypto.timingSafeEqual(a, b);
 }
 
-async function findCustomerByEmail(email) {
+async function customersByEmail(email) {
   const stripe = getStripe();
   const clean = normalizeEmail(email);
-  const list = await stripe.customers.list({ email: clean, limit: 5 });
-  return list.data.find((c) => !c.deleted) || list.data[0] || null;
+  const customers = [];
+  let startingAfter;
+  for (let page = 0; page < 10; page += 1) {
+    const result = await stripe.customers.list({
+      email: clean,
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+    customers.push(...result.data.filter((customer) =>
+      !customer.deleted && normalizeEmail(customer.email) === clean));
+    if (!result.has_more) break;
+    startingAfter = result.data.at(-1)?.id;
+    if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
+  }
+  return customers.sort((a, b) => {
+    const left = Number.isFinite(a.created) ? a.created : Number.MAX_SAFE_INTEGER;
+    const right = Number.isFinite(b.created) ? b.created : Number.MAX_SAFE_INTEGER;
+    return left - right;
+  });
+}
+
+async function findCustomerByEmail(email) {
+  const customers = await customersByEmail(email);
+  return customers.find((customer) => customer.metadata?.vc_pw_salt && customer.metadata?.vc_pw_hash)
+    || customers[0]
+    || null;
+}
+
+function authRecord(customer, email) {
+  return {
+    customerId: customer.id,
+    email: normalizeEmail(email),
+    salt: customer.metadata?.vc_pw_salt || null,
+    hash: customer.metadata?.vc_pw_hash || null,
+    identityEpoch: customer.metadata?.vc_identity_epoch || '',
+  };
 }
 
 export async function getAuthRecord(email) {
   const customer = await findCustomerByEmail(email);
-  if (!customer) return null;
-  const salt = customer.metadata?.vc_pw_salt;
-  const hash = customer.metadata?.vc_pw_hash;
-  if (!salt || !hash) {
-    return { customerId: customer.id, email: normalizeEmail(email), salt: null, hash: null };
+  return customer ? authRecord(customer, email) : null;
+}
+
+/** Recuperação nunca pode definir uma senha em outra conta duplicada do e-mail. */
+export async function getPasswordRecoveryRecord(email) {
+  const customers = await customersByEmail(email);
+  if (customers.length < 2) return customers[0] ? authRecord(customers[0], email) : null;
+
+  const linked = customers.filter((customer) => customer.metadata?.vc_google_sub);
+  if (linked.length === 1) return authRecord(linked[0], email);
+  if (linked.length > 1) return null;
+
+  let counts;
+  try {
+    counts = await Promise.all(customers.map(async (customer) =>
+      Number((await getLibrarySyncMeta(customer.id))?.projectCount || 0)));
+  } catch {
+    return null;
   }
-  return {
-    customerId: customer.id,
-    email: normalizeEmail(email),
-    salt,
-    hash,
-  };
+  const withProjects = customers.filter((_, index) => counts[index] > 0);
+  if (withProjects.length === 1) return authRecord(withProjects[0], email);
+  if (withProjects.length > 1) return null;
+
+  const withPassword = customers.filter((customer) =>
+    customer.metadata?.vc_pw_salt && customer.metadata?.vc_pw_hash);
+  return withPassword.length === 1 ? authRecord(withPassword[0], email) : null;
+}
+
+/** A senha deve conferir no customer exato; e-mail igual não prova que sejam a mesma conta. */
+export async function getAuthRecordsMatchingPassword(email, password) {
+  const customers = await customersByEmail(email);
+  return customers
+    .map((customer) => authRecord(customer, email))
+    .filter((record) => record.salt && record.hash && verifyPassword(password, record));
 }
 
 export async function setAuthRecord(email, record) {

@@ -7,6 +7,7 @@ import {
 } from '../../api/lib/image-quota.js';
 import {
   resolveTierFromPriceId,
+  resolveTierFromSubscription,
   imageQuotaForTier,
   getPlan,
 } from '../../api/lib/plans.js';
@@ -28,6 +29,17 @@ describe('plans resolve', () => {
     expect(resolveTierFromPriceId('price_test_fake')).toBe('creator');
     expect(imageQuotaForTier('creator')).toBe(50);
     expect(getPlan('essential').priceBRL).toBe(19.9);
+  });
+
+  it('price mapeado vence metadata de tier desatualizada', () => {
+    expect(resolveTierFromSubscription({
+      metadata: { tier: 'max' },
+      items: { data: [{ price: { id: 'price_test_fake', metadata: { tier: 'max' } } }] },
+    })).toBe('creator');
+    expect(resolveTierFromSubscription({
+      metadata: { tier: 'pro' },
+      items: { data: [{ price: { id: 'price_sem_mapa' } }] },
+    })).toBe('pro');
   });
 });
 

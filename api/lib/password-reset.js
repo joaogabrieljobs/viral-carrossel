@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { getStripe } from './stripe.js';
-import { getAuthRecord, hashPassword, normalizeEmail } from './password-auth.js';
+import { getPasswordRecoveryRecord, hashPassword, normalizeEmail } from './password-auth.js';
 
 export const RESET_TTL_MS = 30 * 60_000;
 const MAIL_WINDOW_MS = 3 * 60_000;
@@ -18,14 +18,14 @@ function equal(a, b) {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-function version(customerId, email, salt, hash) {
-  return digest(JSON.stringify([customerId, normalizeEmail(email), salt || '', hash || '']));
+function version(customerId, email, salt, hash, identityEpoch) {
+  return digest(JSON.stringify([customerId, normalizeEmail(email), salt || '', hash || '', identityEpoch || '']));
 }
 
 export function createPasswordResetToken(record, now = Date.now()) {
   const body = Buffer.from(JSON.stringify({
     purpose: 'password-reset', customerId: record.customerId,
-    version: version(record.customerId, record.email, record.salt, record.hash),
+    version: version(record.customerId, record.email, record.salt, record.hash, record.identityEpoch),
     exp: now + RESET_TTL_MS, nonce: crypto.randomBytes(32).toString('base64url'),
   })).toString('base64url');
   return `${body}.${digest(body)}`;
@@ -72,7 +72,7 @@ async function sendMail({ to, subject, text, idempotencyKey, allowDuplicate = fa
 }
 
 export async function sendPasswordReset(email) {
-  const record = await getAuthRecord(email);
+  const record = await getPasswordRecoveryRecord(email);
   if (!record) return 'no_account';
   const token = createPasswordResetToken(record);
   return sendMail({
@@ -93,12 +93,14 @@ export async function resetPassword(token, password) {
   catch (error) { if (error.code === 'resource_missing') throw invalid(); throw error; }
   if (!customer || customer.deleted || !customer.email) throw invalid();
   const metadata = customer.metadata || {};
-  const current = version(customer.id, customer.email, metadata.vc_pw_salt, metadata.vc_pw_hash);
+  const current = version(customer.id, customer.email, metadata.vc_pw_salt,
+    metadata.vc_pw_hash, metadata.vc_identity_epoch);
   if (!equal(current, data.version)) throw invalid();
   const { salt, hash } = hashPassword(password);
   try {
     await stripe.customers.update(customer.id, { metadata: {
       vc_pw_salt: salt, vc_pw_hash: hash, vc_session_revoked_before: String(Date.now()),
+      vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
     } }, {
       // Todos os links da mesma versão da senha competem pela mesma operação.
       // Stripe rejeita parâmetros diferentes e conflitos simultâneos da chave.

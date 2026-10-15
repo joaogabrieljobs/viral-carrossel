@@ -1,10 +1,9 @@
 import { applyCors } from '../lib/cors.js';
-import { createAccessToken, setAccessCookie } from '../lib/access.js';
+import { createAccessToken, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
 import {
   normalizeEmail,
   isValidEmail,
-  getAuthRecord,
-  verifyPassword,
+  getAuthRecordsMatchingPassword,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
 import { getStripe, findActiveSubscription } from '../lib/stripe.js';
@@ -40,23 +39,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const record = await getAuthRecord(cleanEmail);
-    if (!record?.hash || !verifyPassword(password, record)) {
+    const matches = await getAuthRecordsMatchingPassword(cleanEmail, password);
+    if (!matches.length) {
       return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
     }
+    if (matches.length > 1) {
+      return res.status(409).json({ error: 'Há mais de uma conta com esta senha. Entre em contato com o suporte para identificar a conta certa.' });
+    }
+    const record = matches[0];
 
     const stripe = getStripe();
     const customer = await stripe.customers.retrieve(record.customerId);
-    if (!customer || customer.deleted) {
-      return res.status(402).json({
-        error: 'Conta sem assinatura. Assine para entrar no studio.',
-        needCheckout: true,
-        email: cleanEmail,
-      });
+    if (!customer || customer.deleted || normalizeEmail(customer.email) !== cleanEmail) {
+      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+    }
+    if (record.identityEpoch !== String(customer.metadata?.vc_identity_epoch || '')) {
+      return res.status(401).json({ error: 'A conta mudou. Entre novamente para continuar.' });
     }
 
     const sub = await findActiveSubscription(customer.id);
     if (!sub) {
+      setCheckoutIdentityCookie(res, {
+        email: cleanEmail,
+        customerId: customer.id,
+        source: 'verified_login',
+        identityEpoch: record.identityEpoch,
+      });
+      setLoginHintCookie(res, cleanEmail);
       return res.status(402).json({
         error: 'Assinatura inativa. Renove o plano para entrar.',
         needCheckout: true,
@@ -64,7 +73,11 @@ export default async function handler(req, res) {
       });
     }
 
-    const token = createAccessToken({ customerId: customer.id, email: cleanEmail });
+    const token = createAccessToken({
+      customerId: customer.id,
+      email: cleanEmail,
+      identityEpoch: record.identityEpoch,
+    });
     setAccessCookie(res, token);
     return res.status(200).json({
       active: true,

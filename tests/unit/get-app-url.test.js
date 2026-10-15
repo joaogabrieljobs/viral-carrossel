@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { getAppUrl } from '../../api/lib/stripe.js';
+import { getGoogleRedirectUri } from '../../api/lib/google-auth.js';
 
 const ORIG = {
   APP_URL: process.env.APP_URL,
@@ -61,5 +62,22 @@ describe('getAppUrl (WEB-001/006)', () => {
     delete process.env.VERCEL_ENV;
     process.env.NODE_ENV = 'development';
     expect(getAppUrl({ headers: { host: 'evil.example' } })).toBe('http://localhost:5173');
+  });
+
+  it('redirect OAuth ignora X-Forwarded-Host', () => {
+    const prev = process.env.GOOGLE_REDIRECT_URI;
+    delete process.env.GOOGLE_REDIRECT_URI;
+    process.env.APP_URL = 'https://viralcarrossel.com.br';
+    const uri = getGoogleRedirectUri({
+      headers: {
+        host: 'evil.example',
+        'x-forwarded-host': 'evil.example',
+        'x-forwarded-proto': 'https',
+      },
+    });
+    if (prev === undefined) delete process.env.GOOGLE_REDIRECT_URI;
+    else process.env.GOOGLE_REDIRECT_URI = prev;
+    expect(uri).toBe('https://viralcarrossel.com.br/api/auth/google/callback');
+    expect(uri).not.toContain('evil');
   });
 });

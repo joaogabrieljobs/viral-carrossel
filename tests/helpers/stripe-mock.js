@@ -11,7 +11,7 @@ import { vi } from 'vitest';
 export const stripeMock = {
   customers: { list: vi.fn(), create: vi.fn(), retrieve: vi.fn(), update: vi.fn() },
   subscriptions: { list: vi.fn() },
-  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
+  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn(), update: vi.fn() } },
   billingPortal: { sessions: { create: vi.fn() } },
   webhooks: { constructEvent: vi.fn() },
 };
@@ -38,6 +38,7 @@ export function resetStripeMock() {
     url: 'https://checkout.stripe.com/c/pay/cs_test_fake',
   });
   stripeMock.checkout.sessions.retrieve.mockReset().mockResolvedValue({});
+  stripeMock.checkout.sessions.update.mockReset().mockImplementation(async (id, data) => ({ id, ...data }));
   stripeMock.billingPortal.sessions.create.mockReset().mockResolvedValue({
     url: 'https://billing.stripe.com/p/session_fake',
   });

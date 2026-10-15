@@ -7,7 +7,7 @@ import { stripeMock, resetStripeMock, subAtiva } from '../helpers/stripe-mock.js
 vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; } } }));
 
 import { makeReq, makeRes, cookieValue } from '../helpers/http.js';
-import { verifyAccessToken, COOKIE_NAME } from '../../api/lib/access.js';
+import { verifyAccessToken, COOKIE_NAME, checkoutCookieName } from '../../api/lib/access.js';
 import checkoutHandler from '../../api/stripe/checkout.js';
 import confirmHandler from '../../api/stripe/confirm.js';
 import sessionHandler from '../../api/auth/session.js';
@@ -61,9 +61,17 @@ async function fluxoCompleto(u) {
   expect(rCheckout.statusCode).toBe(200);
   expect(rCheckout.body.sessionId).toBe(u.sessionId);
 
-  // 2. confirm (volta do Stripe)
+  const checkoutName = checkoutCookieName(u.sessionId);
+  const checkoutCookie = cookieValue(rCheckout, checkoutName);
+  expect(checkoutCookie).toMatch(/^v1\./);
+
+  // 2. confirm (volta do Stripe, só no browser que abriu o checkout)
   const rConfirm = makeRes();
-  await confirmHandler(makeReq({ method: 'POST', body: { sessionId: u.sessionId } }), rConfirm);
+  await confirmHandler(makeReq({
+    method: 'POST',
+    body: { sessionId: u.sessionId },
+    cookie: `${checkoutName}=${encodeURIComponent(checkoutCookie)}`,
+  }), rConfirm);
   expect(rConfirm.statusCode).toBe(200);
   const token = cookieValue(rConfirm, COOKIE_NAME);
 

@@ -8,13 +8,16 @@ vi.mock('../../src/lib/billing.js', () => ({
   fetchAccessSession: vi.fn(), confirmCheckoutSession: vi.fn(), openBillingPortal: vi.fn(), logoutAccess: mocks.logout,
 }));
 vi.mock('../../src/utils/storage.js', () => ({
-  SK: { landingDismissed: 'vc_landing_dismissed' },
+  SK: {
+    landingDismissed: 'vc_landing_dismissed', library: 'vc_library', brands: 'vc_brands',
+    dataOwner: 'vc_data_owner', aiKeys: 'vc_ai_keys', openaiKey: 'vc_openai_key', anthropicKey: 'vc_anthropic_key',
+  },
   areAccountDataWritesLocked: () => mocks.state.locked,
   lockAccountDataWrites: () => { mocks.state.locked = true; },
   unlockAccountDataWrites: () => { mocks.state.locked = false; },
 }));
 vi.mock('../../src/utils/clear-account-data.js', () => ({ clearAccountLocalData: mocks.clear }));
-vi.mock('../../src/utils/account-vault.js', () => ({ snapshotAccountVaultForOwners: mocks.vault }));
+vi.mock('../../src/utils/account-vault.js', () => ({ ACCOUNT_VAULT_KEY: 'vc_account_vault', snapshotAccountVaultForOwners: mocks.vault }));
 vi.mock('../../src/utils/library-sync.js', () => ({ pushLibraryToCloudBestEffort: mocks.push }));
 vi.mock('../../src/utils/account-data-owner.js', () => ({
   ensureAccountDataOwner: vi.fn(), readDataOwner: () => mocks.state.owner,
@@ -22,7 +25,7 @@ vi.mock('../../src/utils/account-data-owner.js', () => ({
   dataOwnerAliases: (email, customerId) => new Set([email && `email:${email}`, customerId && `id:${customerId}`].filter(Boolean)),
 }));
 vi.mock('../../src/utils/landing-gate.js', () => ({ shouldShowOnboardingLanding: () => false, dismissOnboardingLanding: vi.fn() }));
-vi.mock('../../src/utils/project-share.js', () => ({ captureShareInviteFromLocation: vi.fn() }));
+vi.mock('../../src/utils/project-share.js', () => ({ PENDING_SHARE_KEY: 'vc_pending_share', captureShareInviteFromLocation: vi.fn() }));
 vi.mock('../../src/utils/telemetry.js', () => ({ trackEvent: mocks.track }));
 
 import { logoutWithProtectedLibrary } from '../../src/hooks/useAccess.js';
@@ -51,11 +54,13 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     mocks.vault.mockReset().mockReturnValue(false);
     mocks.push.mockReset().mockResolvedValue({ ok: false, cloudSaved: false, pushError: 'offline' });
     mocks.clear.mockReset().mockResolvedValue(undefined);
-    mocks.logout.mockReset().mockResolvedValue(undefined);
+    mocks.logout.mockReset().mockResolvedValue({ ok: true, localCookieCleared: true, sessionsRevoked: true });
     assign = vi.fn();
     toast = vi.fn();
     inFlightRef = { current: false };
     vi.stubGlobal('window', { location: { assign } });
+    vi.stubGlobal('localStorage', { getItem: () => null });
+    vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -84,6 +89,7 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(mocks.push).toHaveBeenCalledWith(5_000, { snapshot });
     expect(mocks.vault.mock.invocationCallOrder[0]).toBeLessThan(mocks.push.mock.invocationCallOrder[0]);
     expect(mocks.push.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
+    expect(mocks.logout.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
     expect(mocks.clear).toHaveBeenCalledWith({ timeoutMs: 1_200, wipeMedia: false });
     expect(mocks.logout).toHaveBeenCalledTimes(1);
     expect(assign).toHaveBeenCalledWith('/');
@@ -151,6 +157,48 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(await run()).toBe(true);
     expect(mocks.clear).toHaveBeenCalledTimes(1);
     expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('falha de rede no logout não afirma saída e libera o editor para tentar novamente', async () => {
+    mocks.vault.mockReturnValue(true);
+    mocks.logout.mockRejectedValue(new Error('rede indisponível'));
+    const values = new Map([['vc_library', JSON.stringify(snapshot.library)]]);
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => values.get(key) || null,
+      removeItem: (key) => values.delete(key),
+    });
+    expect(await run()).toBe(false);
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(values.get('vc_library')).toBe(JSON.stringify(snapshot.library));
+    expect(assign).not.toHaveBeenCalled();
+    expect(mocks.state.locked).toBe(false);
+    expect(toast).toHaveBeenCalledWith('rede indisponível', 'warning', 6500);
+  });
+
+  it('limpeza local falha após logout confirmado: força gate e mantém isolamento', async () => {
+    mocks.vault.mockReturnValue(true);
+    mocks.clear.mockRejectedValue(new Error('storage indisponível'));
+    const values = new Map([['vc_library', JSON.stringify(snapshot.library)], ['vc_data_owner', 'email:conta@example.test']]);
+    const sessionValues = new Map();
+    vi.stubGlobal('localStorage', { getItem: (key) => values.get(key) || null });
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key) => sessionValues.get(key) || null,
+      setItem: (key, value) => sessionValues.set(key, value),
+      removeItem: (key) => sessionValues.delete(key),
+    });
+    expect(await run()).toBe(true);
+    expect(mocks.logout.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
+    expect(assign).toHaveBeenCalledWith('/?landing=1');
+    expect(sessionValues.get('vc_logout_cleanup_pending')).toBe('1');
+    expect(mocks.state.locked).toBe(true);
+  });
+
+  it('não considera limpeza completa se só o perfil pessoal ficou no navegador', async () => {
+    mocks.vault.mockReturnValue(true);
+    const values = new Map([['vc_user_profile', '{"name":"Pessoa A"}']]);
+    vi.stubGlobal('localStorage', { getItem: (key) => values.get(key) || null });
+    expect(await run()).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/?landing=1');
   });
 
   it('novas edições durante a rede bloqueiam limpeza mesmo com cofre e nuvem confirmados', async () => {

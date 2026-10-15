@@ -25,5 +25,5 @@ export default async function handler(req, res) {
     .catch(error => console.error('[auth/forgot-password] delivery_failed', {
       code: /^email_http_\d{3}$/.test(error?.message) ? error.message : 'service_error',
     })));
-  return res.status(200).json({ ok: true, message: 'Se houver uma conta com esse e-mail, você receberá um link para redefinir a senha. Confira também o spam. Para pedir outro link, aguarde 3 minutos.' });
+  return res.status(200).json({ ok: true, message: 'Se houver uma conta com esse e-mail, você receberá um link para redefinir a senha. Confira também o spam. Para pedir outro link, aguarde 3 minutos. Se o link não chegar ou houver contas duplicadas, fale com o suporte para recuperar seus projetos.' });
 }

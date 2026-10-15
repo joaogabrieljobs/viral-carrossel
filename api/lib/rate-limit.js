@@ -8,14 +8,31 @@
 
 const buckets = new Map();
 
+function headerValue(headers, name) {
+  const value = headers?.[name] || headers?.[name.toLowerCase()];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function clientIp(req) {
-  const xf = req.headers?.['x-forwarded-for'] || req.headers?.['X-Forwarded-For'];
-  if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0].trim();
-  return req.socket?.remoteAddress || req.headers?.['x-real-ip'] || 'unknown';
+  const headers = req.headers || {};
+  const trusted = headerValue(headers, 'x-real-ip') || headerValue(headers, 'x-vercel-forwarded-for');
+  if (trusted) return trusted.split(',')[0].trim();
+  const xf = headerValue(headers, 'x-forwarded-for');
+  if (xf) {
+    const parts = xf.split(',').map((part) => part.trim()).filter(Boolean);
+    return parts[parts.length - 1] || 'unknown';
+  }
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function productionRateLimit() {
+  return process.env.VERCEL_ENV === 'production'
+    || (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production');
 }
 
 function hasUpstash() {
-  if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
+  const testing = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  if (testing && process.env.RATE_LIMIT_TEST_UPSTASH !== '1') return false;
   return !!(
     process.env.UPSTASH_REDIS_REST_URL?.trim()
     && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -97,7 +114,8 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
     try {
       return await consumeUpstash(req, { limit, windowMs, keyPrefix });
     } catch (e) {
-      console.warn('[rate-limit] Upstash falhou, memória local:', e?.message || e);
+      console.warn('[rate-limit] Upstash falhou:', e?.message || e);
+      if (productionRateLimit()) return { retryAfterSec: 30 };
     }
   }
   return consumeMemory(req, { limit, windowMs, keyPrefix });

@@ -40,6 +40,8 @@ export function resolveTierFromSubscription(sub) {
   if (!sub) return 'creator';
   const item = sub.items?.data?.[0];
   const priceId = typeof item?.price === 'string' ? item.price : item?.price?.id;
+  const mapped = priceId && buildPriceIdToTierMap().has(cleanEnv(priceId));
+  if (mapped) return resolveTierFromPriceId(priceId);
   const fromMeta = sub.metadata?.tier || item?.price?.metadata?.tier;
   if (fromMeta && PLAN_TIERS[fromMeta]) return fromMeta;
   return resolveTierFromPriceId(priceId);

@@ -2,19 +2,25 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import crypto from 'node:crypto';
 import { stripeMock, resetStripeMock } from '../helpers/stripe-mock.js';
 vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; } } }));
+vi.mock('../../api/lib/library-sync-store.js', () => ({
+  getLibrarySyncMeta: vi.fn().mockResolvedValue(null),
+}));
 const tasks = vi.hoisted(() => []);
 vi.mock('@vercel/functions', () => ({ waitUntil: promise => tasks.push(promise) }));
 import { makeReq, makeRes, setCookies } from '../helpers/http.js';
 import { hashPassword, verifyPassword } from '../../api/lib/password-auth.js';
 import { createPasswordResetToken, readPasswordResetToken, RESET_TTL_MS, passwordResetUrl } from '../../api/lib/password-reset.js';
-import { createAccessToken, readCurrentAccessCookie, COOKIE_NAME } from '../../api/lib/access.js';
+import { createAccessToken, readCurrentAccessCookie, COOKIE_NAME, setCheckoutCookie } from '../../api/lib/access.js';
+import confirm from '../../api/stripe/confirm.js';
 import forgot from '../../api/auth/forgot-password.js';
 import reset from '../../api/auth/reset-password.js';
+import { getLibrarySyncMeta } from '../../api/lib/library-sync-store.js';
 
 let customer;
 let mail;
 beforeEach(() => {
   resetStripeMock(); tasks.length = 0;
+  getLibrarySyncMeta.mockReset().mockResolvedValue(null);
   vi.stubEnv('RESEND_API_KEY', 're_test_not_real');
   vi.stubEnv('AUTH_EMAIL_FROM', 'Viral <acesso@teste.exemplo>');
   const old = hashPassword('SenhaAnterior123!');
@@ -32,7 +38,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', mail);
 });
 afterEach(async () => { await Promise.all(tasks); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); vi.restoreAllMocks(); });
-const record = () => ({ customerId: customer.id, email: customer.email, salt: customer.metadata.vc_pw_salt, hash: customer.metadata.vc_pw_hash });
+const record = () => ({ customerId: customer.id, email: customer.email, salt: customer.metadata.vc_pw_salt,
+  hash: customer.metadata.vc_pw_hash, identityEpoch: customer.metadata.vc_identity_epoch });
 async function request(handler, body, overrides = {}) {
   const res = makeRes();
   await handler(makeReq({ method: 'POST', body, ...overrides }), res);
@@ -41,6 +48,40 @@ async function request(handler, body, overrides = {}) {
 const change = token => request(reset, { token, password: 'SenhaNova123!', confirmPassword: 'SenhaNova123!' });
 
 describe('recuperação por e-mail', () => {
+  it('após vínculo Google recupera a conta dos projetos, não o customer duplicado com senha antiga', async () => {
+    const linked = { id: 'cus_googleowner', email: customer.email,
+      metadata: { vc_google_sub: 'google-sub-owner', vc_identity_epoch: 'a'.repeat(32) } };
+    stripeMock.customers.list.mockResolvedValue({ data: [customer, linked] });
+    await request(forgot, { email: customer.email });
+    await Promise.all(tasks);
+    expect(mail).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(mail.mock.calls[0][1].body);
+    const token = new URLSearchParams(new URL(sent.text.match(/https:\/\/\S+/)[0]).hash.slice(1)).get('token');
+    expect(readPasswordResetToken(token).customerId).toBe(linked.id);
+  });
+
+  it('bibliotecas duplicadas ambíguas não enviam link que redefine a conta errada', async () => {
+    const duplicate = { ...customer, id: 'cus_duplicate', metadata: { ...customer.metadata } };
+    stripeMock.customers.list.mockResolvedValue({ data: [customer, duplicate] });
+    getLibrarySyncMeta.mockResolvedValue({ projectCount: 2 });
+    const response = await request(forgot, { email: customer.email });
+    await Promise.all(tasks);
+    expect(response.statusCode).toBe(200);
+    expect(mail).not.toHaveBeenCalled();
+  });
+  it('customer novo sem senha não mascara o antigo com senha ao enviar recuperação', async () => {
+    stripeMock.customers.list.mockResolvedValue({ data: [
+      { id: 'cus_newer', email: customer.email, created: 2, metadata: {} },
+      { ...customer, created: 1 },
+    ] });
+    await request(forgot, { email: customer.email });
+    await Promise.all(tasks);
+    expect(mail).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(mail.mock.calls[0][1].body);
+    const token = new URLSearchParams(new URL(sent.text.match(/https:\/\/\S+/)[0]).hash.slice(1)).get('token');
+    expect(readPasswordResetToken(token).customerId).toBe(customer.id);
+  });
+
   it('envia link de 30 minutos no domínio configurado sem expor token na resposta', async () => {
     const response = await request(forgot, { email: ' PESSOA@TESTE.EXEMPLO ' }, { headers: { host: 'evil.invalid', 'x-forwarded-host': 'evil.invalid' } });
     expect(response.statusCode).toBe(200);
@@ -96,6 +137,16 @@ describe('recuperação por e-mail', () => {
 });
 
 describe('redefinição da senha', () => {
+  it('vínculo Google invalida link de reset emitido antes dele, mesmo se a conta não tinha senha', async () => {
+    customer.metadata.vc_pw_salt = '';
+    customer.metadata.vc_pw_hash = '';
+    const beforeClaim = createPasswordResetToken(record());
+    customer.metadata.vc_google_sub = 'google-sub-owner';
+    customer.metadata.vc_identity_epoch = 'e'.repeat(32);
+    const result = await change(beforeClaim);
+    expect(result.statusCode).toBe(400);
+    expect(result.body.code).toBe('invalid_reset_link');
+  });
   it('altera só a senha da conta do link, preserva quota e invalida todos os links anteriores', async () => {
     const token = createPasswordResetToken(record());
     const second = createPasswordResetToken(record());
@@ -151,8 +202,33 @@ describe('redefinição da senha', () => {
     expect(await readCurrentAccessCookie(makeReq({ cookie }))).toBeNull();
     expect(await readCurrentAccessCookie(makeReq({ cookie: legacyCookie }))).toBeNull();
     vi.setSystemTime(Date.now() + 1000);
-    const newCookie = `${COOKIE_NAME}=${createAccessToken({ customerId: customer.id, email: customer.email })}`;
+    const newCookie = `${COOKIE_NAME}=${createAccessToken({ customerId: customer.id,
+      email: customer.email, identityEpoch: customer.metadata.vc_identity_epoch })}`;
     expect(await readCurrentAccessCookie(makeReq({ cookie: newCookie }))).toBeTruthy();
+  });
+
+  it('reset impede repetir confirmação antiga do checkout, mesmo com cookie original', async () => {
+    const checkout = makeRes();
+    setCheckoutCookie(checkout, 'cs_pre_reset');
+    const oldCookie = setCookies(checkout).at(-1).split(';')[0];
+    const session = {
+      id: 'cs_pre_reset', mode: 'subscription', payment_status: 'paid',
+      customer: customer.id, customer_details: { email: customer.email },
+      subscription: { id: 'sub_reset', status: 'active' }, metadata: {},
+    };
+    stripeMock.checkout.sessions.retrieve.mockImplementation(async () => structuredClone(session));
+    stripeMock.checkout.sessions.update.mockImplementation(async (_, data) => {
+      session.metadata = { ...session.metadata, ...data.metadata };
+      return structuredClone(session);
+    });
+    const requestConfirm = () => request(confirm, { sessionId: session.id }, { cookie: oldCookie });
+    const first = await requestConfirm();
+    expect(first.statusCode).toBe(200);
+    await change(createPasswordResetToken(record()));
+    expect(customer.metadata.vc_identity_epoch).toMatch(/^[a-f0-9]{32}$/);
+    const replay = await requestConfirm();
+    expect(replay.statusCode).toBe(403);
+    expect(setCookies(replay).join()).not.toContain(`${COOKIE_NAME}=ey`);
   });
 
   it('troca de e-mail ou senha fora do fluxo invalida o link; falha Stripe não vaza detalhes', async () => {

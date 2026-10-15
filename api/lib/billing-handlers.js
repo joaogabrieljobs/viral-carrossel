@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   getStripe,
   getAppUrl,
@@ -10,6 +11,12 @@ import {
   setAccessCookie,
   readCurrentAccessCookie,
   clearAccessCookie,
+  setCheckoutCookie,
+  readCheckoutCookies,
+  clearCheckoutCookie,
+  CHECKOUT_MAX_AGE_SEC,
+  readCheckoutIdentityCookie,
+  clearCheckoutIdentityCookie,
   billingDisabled,
 } from '../lib/access.js';
 import {
@@ -159,12 +166,51 @@ export async function handleCheckout(req, res) {
     }
     const appUrl = getAppUrl(req);
 
-    const existing = await stripe.customers.list({ email: cleanEmail, limit: 1 });
-    const customer = existing.data[0]
-      || await stripe.customers.create({
+    // O e-mail do formulário não prova titularidade de um customer existente.
+    // Só login anterior ou prova curta emitida após Google/senha/cadastro novo
+    // podem vincular este checkout a uma conta que já possui projetos.
+    const identity = readCheckoutIdentityCookie(req);
+    const proofMatches = identity?.email === cleanEmail;
+    // O Google pode identificar o customer com os projetos mesmo quando este
+    // browser ainda tem acesso a outro customer duplicado do mesmo e-mail.
+    const access = proofMatches ? null : await readCurrentAccessCookie(req);
+    const accessMatches = !proofMatches && String(access?.email || '').trim().toLowerCase() === cleanEmail;
+    const boundCustomerId = proofMatches ? identity.customerId
+      : accessMatches ? access.customerId : null;
+    let customer;
+    if (boundCustomerId) {
+      customer = await stripe.customers.retrieve(boundCustomerId);
+      if (!customer || customer.deleted || String(customer.email || '').trim().toLowerCase() !== cleanEmail) {
+        return res.status(403).json({ error: 'A conta mudou. Entre novamente antes de assinar.' });
+      }
+      if (proofMatches && String(identity.identityEpoch || '') !== String(customer.metadata?.vc_identity_epoch || '')) {
+        return res.status(403).json({ error: 'Sua sessão de assinatura mudou. Entre novamente antes de assinar.' });
+      }
+    } else {
+      let existingCustomer = null;
+      let startingAfter;
+      for (let page = 0; page < 10; page += 1) {
+        const result = await stripe.customers.list({
+          email: cleanEmail,
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+        existingCustomer = result.data.find((entry) => !entry.deleted);
+        if (existingCustomer || !result.has_more) break;
+        startingAfter = result.data.at(-1)?.id;
+        if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
+      }
+      if (existingCustomer) {
+        return res.status(200).json({
+          requireLogin: true,
+          message: 'Este e-mail já tem conta. Entre com Google ou sua senha antes de escolher o plano.',
+        });
+      }
+      customer = await stripe.customers.create({
         email: cleanEmail,
         metadata: { product: 'viral-carrossel' },
       });
+    }
 
     const active = await findActiveSubscription(customer.id);
     if (active) {
@@ -173,7 +219,7 @@ export async function handleCheckout(req, res) {
       return res.status(200).json({
         alreadyActive: true,
         requireLogin: true,
-        message: 'Este e-mail já tem assinatura ativa. Entre com Google para aceder ao studio.',
+        message: 'Este e-mail já tem assinatura ativa. Entre na sua conta para acessar o studio.',
       });
     }
 
@@ -181,8 +227,9 @@ export async function handleCheckout(req, res) {
       mode: 'subscription',
       customer: customer.id,
       client_reference_id: customer.id,
+      expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_MAX_AGE_SEC - 60,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/?billing=success`,
       cancel_url: `${appUrl}/?billing=cancel`,
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
@@ -197,9 +244,13 @@ export async function handleCheckout(req, res) {
         product: 'viral-carrossel',
         email: cleanEmail,
         tier,
+        ...(customer.metadata?.vc_identity_epoch
+          ? { vc_identity_epoch: customer.metadata.vc_identity_epoch } : {}),
       },
     });
 
+    clearCheckoutIdentityCookie(res);
+    setCheckoutCookie(res, session.id);
     return res.status(200).json({ url: session.url, sessionId: session.id, tier });
   } catch (e) {
     console.error('[stripe/checkout]', e);
@@ -217,20 +268,43 @@ export async function handleConfirm(req, res) {
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   try {
-    const { sessionId } = readJson(req);
-    if (!sessionId) return res.status(400).json({ error: 'sessionId obrigatório' });
+    const boundSessions = readCheckoutCookies(req);
+    if (!boundSessions.length) {
+      return res.status(401).json({
+        error: 'Confirme a compra neste browser, a partir do checkout que você iniciou.',
+      });
+    }
+    const { sessionId: bodySession } = readJson(req);
+    const selected = bodySession
+      ? boundSessions.find(({ sessionId }) => sessionId === String(bodySession))
+      : boundSessions.length === 1 ? boundSessions[0] : null;
+    if (!selected) {
+      if (!bodySession) {
+        return res.status(409).json({ error: 'Há mais de um checkout neste browser. Volte à aba onde iniciou esta compra.' });
+      }
+      return res.status(403).json({
+        error: 'Esta confirmação não corresponde ao checkout deste browser.',
+      });
+    }
+    const sessionId = selected.sessionId;
 
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(String(sessionId), {
       expand: ['subscription', 'customer'],
     });
+    // A marcação é idempotente para o mesmo browser. Se a resposta HTTP se
+    // perder depois do update no Stripe, a aba original ainda pode repetir.
+    if (session.metadata?.vc_confirmed_at
+      && session.metadata?.vc_confirmed_binding !== selected.binding) {
+      return res.status(409).json({ error: 'Este checkout já foi confirmado.' });
+    }
 
     if (session.mode !== 'subscription') {
       return res.status(400).json({ error: 'Sessão inválida' });
     }
 
     const paid = session.payment_status === 'paid'
-      || session.status === 'complete';
+      || session.payment_status === 'no_payment_required';
     if (!paid) {
       return res.status(402).json({ error: 'Pagamento ainda não confirmado' });
     }
@@ -247,6 +321,17 @@ export async function handleConfirm(req, res) {
       return res.status(400).json({ error: 'Cliente Stripe incompleto' });
     }
 
+    // Primeiro login Google troca a versão da identidade. Checkout anterior
+    // (inclusive retry idempotente com cookie guardado) nunca reabre a conta.
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer || customer.deleted) {
+      return res.status(403).json({ error: 'Esta conta já não está disponível.' });
+    }
+    const identityEpoch = String(customer.metadata?.vc_identity_epoch || '');
+    if (String(session.metadata?.vc_identity_epoch || '') !== identityEpoch) {
+      return res.status(403).json({ error: 'Esta compra pertence a uma sessão antiga da conta. Entre novamente.' });
+    }
+
     const sub = typeof session.subscription === 'object'
       ? session.subscription
       : await findActiveSubscription(customerId);
@@ -255,7 +340,19 @@ export async function handleConfirm(req, res) {
       return res.status(402).json({ error: 'Assinatura inativa' });
     }
 
-    const token = createAccessToken({ customerId, email });
+    if (!session.metadata?.vc_confirmed_at) {
+      await stripe.checkout.sessions.update(sessionId, {
+        metadata: {
+          ...(session.metadata || {}),
+          vc_confirmed_at: String(Date.now()),
+          vc_confirmed_binding: selected.binding,
+        },
+      });
+    }
+
+    const token = createAccessToken({ customerId, email, identityEpoch });
+    clearCheckoutCookie(res, sessionId);
+    clearCheckoutIdentityCookie(res);
     setAccessCookie(res, token);
 
     return res.status(200).json({
@@ -302,10 +399,42 @@ export async function handleLogout(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  let sessionsRevoked = false;
+  let revocationError = null;
   try {
     const access = await readCurrentAccessCookie(req);
-    if (access?.customerId) invalidateActiveAccessForCustomer(access.customerId);
-  } catch { /* cookie já inválido */ }
+    if (access?.customerId) {
+      invalidateActiveAccessForCustomer(access.customerId);
+      try {
+        await getStripe().customers.update(access.customerId, {
+          metadata: {
+            vc_session_revoked_before: String(Date.now()),
+            vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
+          },
+        });
+        sessionsRevoked = true;
+      } catch (e) {
+        console.error('[auth/logout] revoke', e?.message || e);
+        revocationError = 'revocation_failed';
+      }
+    }
+  } catch (e) {
+    console.error('[auth/logout] current access', e?.message || e);
+    revocationError = 'revocation_unverified';
+  }
+  try {
+    for (const checkout of readCheckoutCookies(req)) clearCheckoutCookie(res, checkout.sessionId);
+  } catch (e) {
+    // Mesmo com configuração de assinatura indisponível, o cookie de acesso
+    // local precisa ser removido antes da resposta.
+    console.error('[auth/logout] checkout cookies', e?.message || e);
+  }
   clearAccessCookie(res);
-  return res.status(200).json({ ok: true });
+  clearCheckoutIdentityCookie(res);
+  return res.status(200).json({
+    ok: true,
+    localCookieCleared: true,
+    sessionsRevoked,
+    ...(revocationError ? { warning: revocationError } : {}),
+  });
 }

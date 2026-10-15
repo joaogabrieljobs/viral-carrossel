@@ -11,6 +11,12 @@ import { findActiveSubscription } from './stripe.js';
 const activeAccessCache = new Map();
 const ACTIVE_ACCESS_CACHE_MS = 2_000;
 
+function cacheAllowed() {
+  // Revogações de identidade precisam valer na próxima requisição em produção.
+  if (process.env.VERCEL_ENV) return process.env.VERCEL_ENV !== 'production';
+  return process.env.NODE_ENV !== 'production';
+}
+
 function cachedAccessKey(req) {
   try {
     const token = readAccessCookie(req);
@@ -50,7 +56,7 @@ export async function requireActiveSubscription(req, res, opts = {}) {
     return { billingDisabled: true };
   }
 
-  const cacheKey = cachedAccessKey(req);
+  const cacheKey = cacheAllowed() ? cachedAccessKey(req) : '';
   const cached = cacheKey ? activeAccessCache.get(cacheKey) : null;
   if (cached && cached.expiresAt > Date.now()) return cached.access;
 

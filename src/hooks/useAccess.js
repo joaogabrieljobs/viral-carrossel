@@ -9,6 +9,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   fetchAccessSession,
   confirmCheckoutSession,
+  clearPendingCheckoutSessionId,
   openBillingPortal,
   logoutAccess,
 } from '../lib/billing.js';
@@ -19,8 +20,54 @@ import { clearAccountLocalData } from '../utils/clear-account-data.js';
 import {
   ensureAccountDataOwner, readDataOwner, normalizeDataOwnerId, dataOwnerAliases,
 } from '../utils/account-data-owner.js';
-import { snapshotAccountVaultForOwners } from '../utils/account-vault.js';
-import { captureShareInviteFromLocation } from '../utils/project-share.js';
+import { ACCOUNT_VAULT_KEY, snapshotAccountVaultForOwners } from '../utils/account-vault.js';
+import { PENDING_SHARE_KEY, captureShareInviteFromLocation } from '../utils/project-share.js';
+import { USER_PROFILE_KEY } from '../utils/user-profile.js';
+import { CUSTOM_VISUAL_PRESETS_KEY } from '../utils/custom-visual-presets.js';
+
+const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
+const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais neste navegador. Vamos terminar a limpeza antes de abrir outra conta.';
+const LOGOUT_PRESERVED_KEYS = new Set([
+  ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY,
+  'vc_account_write_lock', 'vc_account_write_lock_token',
+  'vc_logout_warning', LOGOUT_CLEANUP_PENDING_KEY,
+]);
+
+function hasAccountDataResidue() {
+  try {
+    const stores = [
+      typeof localStorage !== 'undefined' ? localStorage : null,
+      typeof sessionStorage !== 'undefined' ? sessionStorage : null,
+    ];
+    const knownKeys = [...Object.values(SK), USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
+    return stores.some((store) => {
+      if (!store) return false;
+      if (knownKeys.some((key) => key && !LOGOUT_PRESERVED_KEYS.has(key) && store.getItem(key) != null)) return true;
+      if (typeof store.length !== 'number' || typeof store.key !== 'function') return false;
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i);
+        if (key?.startsWith('vc_') && !LOGOUT_PRESERVED_KEYS.has(key)) return true;
+      }
+      return false;
+    });
+  } catch { return true; }
+}
+
+function rememberLogoutWarning(message, cleanupPending = false) {
+  try {
+    sessionStorage.setItem('vc_logout_warning', message);
+    if (cleanupPending) sessionStorage.setItem(LOGOUT_CLEANUP_PENDING_KEY, '1');
+  } catch { /* isolamento por owner continua no boot */ }
+}
+
+function readLoginHintEmail() {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|; )vc_login_hint=([^;]*)/);
+  if (!match) return '';
+  document.cookie = 'vc_login_hint=; Max-Age=0; Path=/';
+  try { return decodeURIComponent(match[1]); }
+  catch { return ''; }
+}
 
 /** Só descarta a edição ativa depois de uma cópia confirmada desta mesma edição. */
 export async function logoutWithProtectedLibrary({
@@ -29,7 +76,9 @@ export async function logoutWithProtectedLibrary({
   if (!inFlightRef || inFlightRef.current) return false;
   inFlightRef.current = true;
   let lockedHere = false;
-  let cleared = false;
+  let remoteLogoutConfirmed = false;
+  let logoutCompleted = false;
+  let revocationWarning = false;
   try {
     if (areAccountDataWritesLocked()) {
       throw new Error('Aguarde a sincronização terminar antes de sair da conta.');
@@ -79,24 +128,45 @@ export async function logoutWithProtectedLibrary({
     if (!vaultSaved && !cloudSaved) {
       throw new Error('As últimas alterações ainda não estão protegidas. Você continua na conta; salve ou sincronize antes de sair.');
     }
-    await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
-    cleared = true;
     let logoutTimer;
+    const logoutController = new AbortController();
     try {
-      await Promise.race([
-        logoutAccess(),
-        new Promise((resolve) => { logoutTimer = setTimeout(resolve, 1_500); }),
+      const result = await Promise.race([
+        logoutAccess({ signal: logoutController.signal }),
+        new Promise((_, reject) => { logoutTimer = setTimeout(() => {
+          logoutController.abort();
+          reject(new Error('Não foi possível confirmar a saída da conta. Tente novamente.'));
+        }, 10_000); }),
       ]);
-    } catch { /* a edição já tem cópia confirmada; a navegação conclui a saída */ }
+      if (result?.ok !== true || result?.localCookieCleared === false) {
+        throw new Error('Não foi possível confirmar a saída da conta. Tente novamente.');
+      }
+      remoteLogoutConfirmed = true;
+      revocationWarning = !!result.warning;
+    } catch (error) {
+      throw new Error(error?.message || 'Não foi possível confirmar a saída da conta. Tente novamente.');
+    }
     finally { clearTimeout(logoutTimer); }
+    // Só remove o cache ativo depois de o servidor confirmar a saída. Se a
+    // limpeza local falhar, mantém o lock e recarrega no gate antes de outra conta.
+    let cleanupFailed = false;
+    try { await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false }); }
+    catch (error) {
+      console.error('[auth/logout] local cleanup', error);
+      cleanupFailed = true;
+    }
+    if (hasAccountDataResidue()) cleanupFailed = true;
+    if (cleanupFailed) rememberLogoutWarning(LOGOUT_CLEANUP_WARNING, true);
+    else if (revocationWarning) rememberLogoutWarning('Você saiu deste navegador, mas não foi possível confirmar o encerramento das outras sessões.');
     try { trackEvent('logout'); } catch { /* */ }
-    window.location.assign('/');
+    window.location.assign(cleanupFailed ? '/?landing=1' : '/');
+    logoutCompleted = true;
     return true;
   } catch (error) {
     toast?.(error?.message || 'As últimas alterações ainda não estão protegidas. Você continua na conta; tente sincronizar novamente.', 'warning', 6500);
     return false;
   } finally {
-    if (lockedHere && !cleared) unlockAccountDataWrites();
+    if (lockedHere && !remoteLogoutConfirmed && !logoutCompleted) unlockAccountDataWrites();
     inFlightRef.current = false;
   }
 }
@@ -176,34 +246,47 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      try {
+        const warning = sessionStorage.getItem('vc_logout_warning');
+        if (warning) {
+          sessionStorage.removeItem('vc_logout_warning');
+          toast?.(warning, 'warning', 8000);
+        }
+      } catch { /* */ }
+      try {
+        if (sessionStorage.getItem(LOGOUT_CLEANUP_PENDING_KEY) === '1') {
+          await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
+          if (hasAccountDataResidue()) {
+            sessionStorage.setItem(LOGOUT_CLEANUP_PENDING_KEY, '1');
+            libraryCallbacksRef.current.onLibraryBlocked?.(LOGOUT_CLEANUP_WARNING);
+            return;
+          }
+          sessionStorage.removeItem(LOGOUT_CLEANUP_PENDING_KEY);
+          unlockAccountDataWrites();
+        }
+      } catch {
+        libraryCallbacksRef.current.onLibraryBlocked?.(LOGOUT_CLEANUP_WARNING);
+        return;
+      }
       const q = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search)
         : null;
       const sessionId = q?.get('session_id');
       const billing = q?.get('billing');
+      let confirmFailed = false;
 
-      if (billing === 'success' && sessionId) {
+      if (billing === 'success') {
         try {
-          await confirmCheckoutSession(sessionId);
+          await confirmCheckoutSession(sessionId || undefined);
           trackEvent('billing_success');
         } catch (e) {
           console.warn('[billing] confirm failed', e);
+          confirmFailed = true;
         }
-      }
-      // Limpa TODO param de billing da URL (success/restored/cancel) — sem isso,
-      // reload em ?billing=cancel reabre o paywall e ?billing=restored re-entra
-      // no studio indefinidamente.
-      if (billing) {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('billing');
-          url.searchParams.delete('session_id');
-          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-        } catch { /* */ }
       }
 
       const loginStatus = q?.get('login');
-      const loginEmail = q?.get('email') || '';
+      const loginEmail = q?.get('email') || readLoginHintEmail();
       if (loginStatus) {
         try {
           const url = new URL(window.location.href);
@@ -218,6 +301,20 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
       const session = await refreshAccess();
       if (cancelled) return;
+      // Se a resposta de confirm se perdeu mas o Set-Cookie chegou, a sessão
+      // já está ativa. Caso contrário, preserve ?billing=success para retry.
+      if (billing && (!confirmFailed || session.active || billing !== 'success')) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('billing');
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch { /* */ }
+      }
+      if (billing === 'success' && session.active) clearPendingCheckoutSessionId();
+      if (billing === 'success' && confirmFailed && !session.active) {
+        toast?.('Não foi possível confirmar a assinatura agora. Recarregue esta página para tentar novamente.', 'warning', 8000);
+      }
 
       // Isolamento por conta: projetos vivem no localStorage deste browser.
       // Trocar de Google/password sem logout deixava a biblioteca do outro.
@@ -324,6 +421,10 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       } else if (loginStatus === 'google_unconfigured') {
         setLoginHint('Login Google ainda não configurado neste ambiente.');
         setLoginOpen(true);
+      } else if (loginStatus === 'account_conflict') {
+        setLoginHint('Encontramos mais de uma conta com este e-mail e não foi seguro escolher uma. Entre com sua senha ou procure o suporte para recuperar seus projetos.');
+        setLoginOpen(true);
+        setPaywallOpen(false);
       } else if (loginStatus === 'invalid_state' || loginStatus === 'error') {
         setLoginHint('Não foi possível entrar com Google. Tente de novo.');
         setLoginOpen(true);

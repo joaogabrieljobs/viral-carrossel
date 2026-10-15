@@ -1,6 +1,16 @@
 /**
  * Client helpers — assinatura Stripe / acesso ao studio.
  */
+const PENDING_CHECKOUT_KEY = 'vc_pending_checkout';
+
+export function readPendingCheckoutSessionId() {
+  try { return sessionStorage.getItem(PENDING_CHECKOUT_KEY) || ''; }
+  catch { return ''; }
+}
+
+export function clearPendingCheckoutSessionId() {
+  try { sessionStorage.removeItem(PENDING_CHECKOUT_KEY); } catch { /* armazenamento indisponível */ }
+}
 
 export async function fetchAccessSession() {
   try {
@@ -32,18 +42,25 @@ export async function startCheckout(email, { tier = 'creator' } = {}) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Não foi possível iniciar o checkout');
+  // sessionStorage pertence à aba: o retorno do Stripe não expõe o id na URL
+  // e outro checkout aberto ao lado não troca a sessão desta compra.
+  if (data.url && data.sessionId) {
+    try { sessionStorage.setItem(PENDING_CHECKOUT_KEY, data.sessionId); } catch { /* cookie assinado ainda permite uma aba */ }
+  }
   return data;
 }
 
 export async function confirmCheckoutSession(sessionId) {
+  const pendingId = sessionId || readPendingCheckoutSessionId();
   const r = await fetch('/api/stripe/confirm', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify(pendingId ? { sessionId: pendingId } : {}),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Não foi possível confirmar a assinatura');
+  clearPendingCheckoutSessionId();
   return data;
 }
 
@@ -57,11 +74,17 @@ export async function openBillingPortal() {
   return data;
 }
 
-export async function logoutAccess() {
-  await fetch('/api/auth/logout', {
+export async function logoutAccess({ signal } = {}) {
+  const r = await fetch('/api/auth/logout', {
     method: 'POST',
     credentials: 'include',
-  }).catch(() => {});
+    signal,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || data.ok !== true || data.localCookieCleared === false) {
+    throw new Error(data.error || 'Não foi possível confirmar a saída da conta. Tente novamente.');
+  }
+  return data;
 }
 
 export async function loginWithPassword(email, password) {
@@ -72,7 +95,7 @@ export async function loginWithPassword(email, password) {
     body: JSON.stringify({ email, password }),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Não foi possível entrar');
+  if (!r.ok && !data.needCheckout) throw new Error(data.error || 'Não foi possível entrar');
   return data;
 }
 

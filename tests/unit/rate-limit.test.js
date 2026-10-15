@@ -10,6 +10,8 @@ describe('consumeRateLimit', () => {
   afterEach(() => {
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.RATE_LIMIT_TEST_UPSTASH;
+    delete process.env.VERCEL_ENV;
     vi.unstubAllGlobals();
   });
 
@@ -28,5 +30,33 @@ describe('consumeRateLimit', () => {
     expect(await consumeRateLimit(req('10.0.0.1'), { limit: 1, windowMs: 60_000, keyPrefix: 'a' })).toMatchObject({
       retryAfterSec: expect.any(Number),
     });
+  });
+
+  it('usa o IP real da plataforma e, sem ele, o último hop de X-Forwarded-For', async () => {
+    const opts = { limit: 1, windowMs: 60_000, keyPrefix: 'hop' };
+    expect(await consumeRateLimit({
+      headers: { 'x-forwarded-for': '1.1.1.1, 8.8.8.8', 'x-real-ip': '9.9.9.9' },
+    }, opts)).toBeNull();
+    expect(await consumeRateLimit({
+      headers: { 'x-forwarded-for': '1.1.1.1, 8.8.8.8' },
+    }, opts)).toBeNull();
+    expect(await consumeRateLimit({
+      headers: { 'x-real-ip': '9.9.9.9' },
+    }, opts)).toMatchObject({ retryAfterSec: expect.any(Number) });
+    expect(await consumeRateLimit({
+      headers: { 'x-forwarded-for': '4.4.4.4, 8.8.8.8' },
+    }, opts)).toMatchObject({ retryAfterSec: expect.any(Number) });
+  });
+
+  it('em produção, falha do Upstash recusa o pedido em vez de abrir a memória', async () => {
+    process.env.RATE_LIMIT_TEST_UPSTASH = '1';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://upstash.example';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
+    process.env.VERCEL_ENV = 'production';
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
+    const limited = await consumeRateLimit(req('7.7.7.7'), { limit: 100, windowMs: 60_000, keyPrefix: 'prod' });
+    expect(limited).toEqual({ retryAfterSec: 30 });
+    delete process.env.RATE_LIMIT_TEST_UPSTASH;
+    delete process.env.VERCEL_ENV;
   });
 });

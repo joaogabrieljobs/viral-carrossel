@@ -12,6 +12,7 @@ import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 export default function Paywall({
   isMobile,
   onBack,
+  onLogin,
   initialEmail = '',
   loginHint = '',
 }) {
@@ -36,7 +37,7 @@ export default function Paywall({
     setLoading(true);
     try {
       const data = await startCheckout(email, { tier });
-      if (data.alreadyActive) {
+      if (data.requireLogin || data.alreadyActive) {
         setError(data.message || 'Este e-mail já tem assinatura. Entre com Google para aceder.');
         return;
       }
@@ -202,6 +203,16 @@ export default function Paywall({
 
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <GoogleSignInButton />
+          {onLogin && <button type="button" onClick={onLogin} style={{
+            minHeight: 44,
+            borderRadius: 9999,
+            border: '1px solid rgba(255,255,255,0.22)',
+            background: 'transparent',
+            color: 'var(--text-primary, #fff)',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: 13,
+          }}>Entrar com senha</button>}
           <p style={{
             margin: 0,
             fontSize: 11,

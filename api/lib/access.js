@@ -42,11 +42,13 @@ function sign(payloadB64) {
 
 /** @param {{ customerId: string, email: string }} data */
 export function createAccessToken(data) {
+  const iatMs = Number.isSafeInteger(data.iatMs) ? data.iatMs : Date.now();
   const payload = {
     customerId: data.customerId,
     email: data.email,
-    iat: Math.floor(Date.now() / 1000),
-    iatMs: Date.now(),
+    iat: Math.floor(iatMs / 1000),
+    iatMs,
+    ...(data.identityEpoch ? { identityEpoch: data.identityEpoch } : {}),
   };
   const body = b64urlJson(payload);
   return `${body}.${sign(body)}`;
@@ -64,6 +66,7 @@ export function verifyAccessToken(token) {
     const payload = JSON.parse(fromB64url(body));
     if (!payload.customerId || !payload.email) return null;
     if (payload.iat && Date.now() / 1000 - payload.iat > MAX_AGE_SEC) return null;
+    if (payload.iatMs && payload.iatMs > Date.now() + 60_000) return null;
     return payload;
   } catch {
     return null;
@@ -80,7 +83,10 @@ export function parseCookies(req) {
       if (idx === -1) return;
       const k = part.slice(0, idx).trim();
       const v = part.slice(idx + 1).trim();
-      if (k) out[k] = decodeURIComponent(v);
+      if (k) {
+        try { out[k] = decodeURIComponent(v); }
+        catch { /* cookie malformado não pode derrubar a autenticação */ }
+      }
     });
   return out;
 }
@@ -98,6 +104,8 @@ export async function readCurrentAccessCookie(req) {
   try { customer = await getStripe().customers.retrieve(access.customerId); }
   catch (error) { if (error.code === 'resource_missing') return null; throw error; }
   if (!customer || customer.deleted) return null;
+  const identityEpoch = String(customer.metadata?.vc_identity_epoch || '');
+  if (identityEpoch && access.identityEpoch !== identityEpoch) return null;
   const revokedBefore = Number(customer.metadata?.vc_session_revoked_before || 0);
   const issuedAt = Number(access.iatMs || access.iat * 1000 || 0);
   if (revokedBefore && issuedAt <= revokedBefore) return null;
@@ -139,6 +147,143 @@ export function clearAccessCookie(res) {
   ];
   if (secure) parts.push('Secure');
   appendSetCookie(res, parts.join('; '));
+}
+
+export const CHECKOUT_COOKIE = 'vc_checkout';
+export const CHECKOUT_MAX_AGE_SEC = 60 * 60 * 24;
+const CHECKOUT_COOKIE_PREFIX = `${CHECKOUT_COOKIE}_`;
+export const LOGIN_HINT_COOKIE = 'vc_login_hint';
+export const CHECKOUT_IDENTITY_COOKIE = 'vc_identity_checkout';
+const CHECKOUT_IDENTITY_MAX_AGE_SEC = 60 * 10;
+
+function browserCookie(name, value, { maxAge, httpOnly }) {
+  const secure = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    `Max-Age=${maxAge}`,
+    'SameSite=Lax',
+  ];
+  if (httpOnly) parts.push('HttpOnly');
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+/** Um cookie independente por sessão evita que duas abas sobrescrevam o checkout uma da outra. */
+export function checkoutCookieName(sessionId) {
+  return `${CHECKOUT_COOKIE_PREFIX}${crypto.createHmac('sha256', getSecret()).update(String(sessionId)).digest('hex').slice(0, 20)}`;
+}
+
+export function setCheckoutCookie(res, sessionId) {
+  const body = b64urlJson({
+    v: 1,
+    sessionId,
+    nonce: crypto.randomBytes(16).toString('hex'),
+    iat: Math.floor(Date.now() / 1000),
+  });
+  appendSetCookie(res, browserCookie(checkoutCookieName(sessionId), `v1.${body}.${sign(body)}`, {
+    maxAge: CHECKOUT_MAX_AGE_SEC,
+    httpOnly: true,
+  }));
+}
+
+export function clearCheckoutCookie(res, sessionId) {
+  appendSetCookie(res, browserCookie(checkoutCookieName(sessionId), '', {
+    maxAge: 0,
+    httpOnly: true,
+  }));
+}
+
+/** Só aceita id + nonce protegidos pelo HMAC, ainda dentro do prazo. */
+export function readCheckoutCookies(req) {
+  const now = Math.floor(Date.now() / 1000);
+  return Object.entries(parseCookies(req))
+    .filter(([name]) => name.startsWith(CHECKOUT_COOKIE_PREFIX))
+    .flatMap(([name, value]) => {
+      const [version, body, signature, extra] = String(value).split('.');
+      if (version !== 'v1' || !body || !signature || extra) return [];
+      const expected = sign(body);
+      const a = Buffer.from(signature);
+      const b = Buffer.from(expected);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return [];
+      try {
+        const data = JSON.parse(fromB64url(body));
+        if (data.v !== 1 || !/^cs_[A-Za-z0-9_]+$/.test(data.sessionId)
+          || !/^[a-f0-9]{32}$/.test(data.nonce)
+          || name !== checkoutCookieName(data.sessionId)
+          || !Number.isSafeInteger(data.iat)
+          || data.iat > now + 60
+          || now - data.iat > CHECKOUT_MAX_AGE_SEC) return [];
+        const binding = crypto.createHmac('sha256', getSecret())
+          .update(`${data.sessionId}:${data.nonce}`).digest('hex');
+        return [{ sessionId: data.sessionId, cookieName: name, binding }];
+      } catch { return []; }
+    });
+}
+
+export function readCheckoutCookie(req) {
+  const matches = readCheckoutCookies(req);
+  return matches.length === 1 ? matches[0].sessionId : '';
+}
+
+/** Liga temporariamente o checkout a um customer após login verificado ou cadastro novo. */
+export function setCheckoutIdentityCookie(res, { email, customerId, source, identityEpoch = '' }) {
+  if (!['verified_login', 'new_registration'].includes(source)
+    || !/^cus_[A-Za-z0-9_]+$/.test(String(customerId || ''))) {
+    throw new Error('Identidade do checkout inválida');
+  }
+  const body = b64urlJson({
+    v: 1,
+    email: String(email || '').trim().toLowerCase(),
+    customerId,
+    source,
+    identityEpoch: String(identityEpoch || ''),
+    iat: Math.floor(Date.now() / 1000),
+  });
+  const signature = sign(`checkout-identity:${body}`);
+  appendSetCookie(res, browserCookie(CHECKOUT_IDENTITY_COOKIE, `v1.${body}.${signature}`, {
+    maxAge: CHECKOUT_IDENTITY_MAX_AGE_SEC,
+    httpOnly: true,
+  }));
+}
+
+export function readCheckoutIdentityCookie(req) {
+  const value = parseCookies(req)[CHECKOUT_IDENTITY_COOKIE];
+  const [version, body, signature, extra] = String(value || '').split('.');
+  if (version !== 'v1' || !body || !signature || extra) return null;
+  const expected = sign(`checkout-identity:${body}`);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const data = JSON.parse(fromB64url(body));
+    const now = Math.floor(Date.now() / 1000);
+    if (data.v !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)
+      || data.email !== data.email.trim().toLowerCase()
+      || !/^cus_[A-Za-z0-9_]+$/.test(data.customerId)
+      || !['verified_login', 'new_registration'].includes(data.source)
+      || (data.identityEpoch != null && !/^[a-f0-9]{0,64}$/.test(data.identityEpoch))
+      || !Number.isSafeInteger(data.iat)
+      || data.iat > now + 60
+      || now - data.iat > CHECKOUT_IDENTITY_MAX_AGE_SEC) return null;
+    return { email: data.email, customerId: data.customerId, source: data.source,
+      ...(data.identityEpoch ? { identityEpoch: data.identityEpoch } : {}) };
+  } catch { return null; }
+}
+
+export function clearCheckoutIdentityCookie(res) {
+  appendSetCookie(res, browserCookie(CHECKOUT_IDENTITY_COOKIE, '', {
+    maxAge: 0,
+    httpOnly: true,
+  }));
+}
+
+/** E-mail do Google sem plano: preenche o paywall sem ir para a URL (logs/Referer). */
+export function setLoginHintCookie(res, email) {
+  appendSetCookie(res, browserCookie(LOGIN_HINT_COOKIE, email, {
+    maxAge: 300,
+    httpOnly: false,
+  }));
 }
 
 export { COOKIE_NAME, MAX_AGE_SEC };

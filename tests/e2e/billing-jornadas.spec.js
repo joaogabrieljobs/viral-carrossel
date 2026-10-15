@@ -17,7 +17,7 @@ test.describe('Jornadas de billing', () => {
       if (path === '/api/auth/session') return route.fulfill({ json: sessaoAtual });
       if (path === '/api/stripe/checkout') {
         // simula volta do Stripe com URL same-origin
-        return route.fulfill({ json: { url: '/?billing=success&session_id=cs_e2e_compra', sessionId: 'cs_e2e_compra' } });
+        return route.fulfill({ json: { url: '/?billing=success', sessionId: 'cs_e2e_compra' } });
       }
       if (path === '/api/stripe/confirm') {
         confirmChamado = true;
@@ -88,13 +88,28 @@ test.describe('Jornadas de billing', () => {
 
     // logout dispara e o gate volta (landing ou paywall — sem sessão)
     await expect.poll(() => logoutChamado, { timeout: 10_000 }).toBe(true);
-    await expect.poll(async () => page.evaluate(() => ({
-      library: localStorage.getItem('vc_library'),
-      keys: localStorage.getItem('vc_ai_keys'),
-      profile: localStorage.getItem('vc_user_profile'),
-      // Cofre por conta deve existir para a mesma pessoa recuperar ao reentrar
-      vault: !!localStorage.getItem('vc_account_vault'),
-    })), { timeout: 10_000 }).toEqual({
+    await expect.poll(async () => page.evaluate(async (email) => {
+      const vault = await new Promise((resolve) => {
+        const request = indexedDB.open('viral-carrossel-account-vault', 1);
+        request.onerror = () => resolve(false);
+        request.onsuccess = () => {
+          const db = request.result;
+          const entry = db.transaction('accounts', 'readonly').objectStore('accounts').get('vault');
+          entry.onsuccess = () => {
+            const hasOwner = Boolean(entry.result?.[`email:${email}`]);
+            db.close();
+            resolve(hasOwner);
+          };
+          entry.onerror = () => { db.close(); resolve(false); };
+        };
+      });
+      return {
+        library: localStorage.getItem('vc_library'),
+        keys: localStorage.getItem('vc_ai_keys'),
+        profile: localStorage.getItem('vc_user_profile'),
+        vault,
+      };
+    }, SESSAO_ATIVA.email), { timeout: 10_000 }).toEqual({
       library: null,
       keys: null,
       profile: null,
@@ -112,5 +127,49 @@ test.describe('Jornadas de billing', () => {
     const email = page.locator('input[type="email"]').first();
     await expect(email).toBeVisible({ timeout: 10_000 });
     await expect(email).toHaveValue('sem@teste.exemplo');
+  });
+
+  test('contas duplicadas abrem login com orientação de recuperação', async ({ page }) => {
+    await mockApi(page, { session: SESSAO_ANONIMA });
+    await page.goto('/?app=1&login=account_conflict');
+    await expect(page.getByRole('alert').filter({ hasText: 'Encontramos mais de uma conta com este e-mail' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: /continuar com google/i })).toBeVisible();
+  });
+
+  test('CA-06 conta existente pede login e senha inativa conduz ao plano', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/auth/session') return route.fulfill({ json: SESSAO_ANONIMA });
+      if (path === '/api/stripe/checkout') {
+        return route.fulfill({ json: {
+          requireLogin: true,
+          message: 'Este e-mail já tem conta. Entre antes de escolher o plano.',
+        } });
+      }
+      if (path === '/api/auth/login') {
+        return route.fulfill({
+          status: 402,
+          headers: { 'Set-Cookie': 'vc_login_hint=dona%40teste.exemplo; Path=/; SameSite=Lax' },
+          json: { needCheckout: true, email: 'dona@teste.exemplo', message: 'Renove o plano para entrar.' },
+        });
+      }
+      return route.fulfill({ status: 404, json: { error: `não mockado: ${path}` } });
+    });
+    await page.goto('/?app=1');
+    const paywallEmail = page.locator('input[type="email"]').first();
+    await expect(paywallEmail).toBeVisible();
+    await paywallEmail.fill('dona@teste.exemplo');
+    await paywallEmail.press('Enter');
+    await expect(page.getByText('Este e-mail já tem conta. Entre antes de escolher o plano.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Entrar com senha' }).click();
+    await expect(page.getByRole('dialog', { name: 'Entrar no studio' })).toBeVisible();
+    await page.getByRole('dialog').locator('input[type="email"]').fill('dona@teste.exemplo');
+    await page.getByRole('dialog').locator('input[type="password"]').fill('SenhaCorreta123!');
+    await page.getByRole('dialog').locator('button[type="submit"]').click();
+    await expect(page.getByRole('button', { name: 'Escolher plano' })).toBeVisible();
+    await page.getByRole('button', { name: 'Escolher plano' }).click();
+    await expect(page.locator('input[type="email"]').first()).toHaveValue('dona@teste.exemplo');
   });
 });
