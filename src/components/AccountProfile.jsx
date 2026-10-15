@@ -352,6 +352,8 @@ export default function AccountProfile({
   planTier,
   imageQuota,
   onOpenUsage,
+  onProfileSaved,
+  cloudProfile,
 }) {
   const [profile, setProfile] = useState(() => loadUserProfile());
   const [editing, setEditing] = useState(false);
@@ -359,8 +361,10 @@ export default function AccountProfile({
   const [draft, setDraft] = useState(DEFAULT_USER_PROFILE);
 
   useEffect(() => {
-    setProfile(loadUserProfile());
-  }, []);
+    setProfile(cloudProfile === undefined
+      ? loadUserProfile()
+      : normalizeUserProfile(cloudProfile || {}));
+  }, [cloudProfile]);
 
   const name = profileDisplayName(profile, email);
   const textProvider = TEXT_PROVIDERS[aiSettings?.textProvider] || TEXT_PROVIDERS.openai;
@@ -380,9 +384,12 @@ export default function AccountProfile({
   };
 
   const saveEdit = () => {
-    const next = saveUserProfile(draft);
+    let next;
+    try { next = saveUserProfile(draft); }
+    catch { next = normalizeUserProfile(draft); } // a cópia em nuvem ainda pode ser salva
     setProfile(next);
     setEditing(false);
+    onProfileSaved?.(next);
   };
 
   const socialLinks = SOCIAL_FIELDS

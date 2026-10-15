@@ -14,6 +14,7 @@ import { USER_PROFILE_KEY } from './user-profile.js';
 import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, isOriginalImageAsset, imageContentType } from './cloud-image-assets.js';
 import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './cloud-upload-receipts.js';
 import { readDeletedProjectIds, rememberDeletedProjectIds, mergeDeletedProjectIds } from './project-deletions.js';
+import { readDataOwner } from './account-data-owner.js';
 export { rememberDeletedProjectIds } from './project-deletions.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
@@ -235,7 +236,11 @@ export async function packLibraryForCloud(snapshot) {
 
   const assets = new Map();
   const docs = [];
-  const deletedIds = mergeDeletedProjectIds(readDeletedProjectIds(), snapshot?.deletedIds);
+  // A API de projetos v2 decide exclusões por tombstone versionado no servidor.
+  // Uma exclusão antiga deste browser não pode esconder um projeto vivo na nuvem.
+  const deletedIds = snapshot?.ignoreLocalDeletedIds === true
+    ? mergeDeletedProjectIds(snapshot?.deletedIds)
+    : mergeDeletedProjectIds(readDeletedProjectIds(), snapshot?.deletedIds);
   const deleted = new Set(deletedIds);
   for (const entry of docsRaw) {
     if (deleted.has(String(entry?.id))) continue;
@@ -308,6 +313,7 @@ async function syncRequest(payload, { method = 'POST', query = '', signal, rateL
     res = await fetch(url, {
       method,
       credentials: 'include',
+      cache: method === 'GET' ? 'no-store' : undefined,
       headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
       body,
       signal,
@@ -358,7 +364,7 @@ export async function fetchLibraryCloudStatus(opts = {}) {
 }
 
 /** Upload de fotos — 1 a 1 com retry; nunca bloqueia o save da estrutura. */
-async function uploadAssetsBestEffort(assets, { owner, signal, assertCurrent } = {}) {
+export async function uploadAssetsBestEffort(assets, { owner, signal, assertCurrent } = {}) {
   let uploaded = 0;
   let skipped = 0;
   let failed = 0;
@@ -771,6 +777,26 @@ async function hydrateBrandFromCloud(brand, assetCache, localBrand) {
   }
 }
 
+/** Reutiliza a hidratação de logos sem carregar documentos da biblioteca. */
+export async function hydrateCloudBrandRoster(brands, { signal, localBrands = [], localAssets } = {}) {
+  const locals = Array.isArray(localBrands) ? localBrands : [];
+  const assetCache = new Map();
+  assetCache.signal = signal;
+  assetCache.missing = new Set();
+  assetCache.localAssets = localAssets;
+  const result = [];
+  for (const brand of (Array.isArray(brands) ? brands : [])) {
+    try {
+      result.push(await hydrateBrandFromCloud(brand, assetCache,
+        locals.find((item) => item?.id === brand?.id)));
+    } catch {
+      // Uma logo indisponível não pode impedir o restore dos dados da conta.
+      result.push(brand);
+    }
+  }
+  return { brands: result, assetsMissing: assetCache.missing.size };
+}
+
 async function hydrateStyleKitFromCloud(styleKit, assetCache, localStyleKit) {
   try {
     let kit = { ...(styleKit || {}) };
@@ -803,6 +829,162 @@ async function hydrateStyleKitFromCloud(styleKit, assetCache, localStyleKit) {
   } catch {
     return { ...(styleKit || {}) };
   }
+}
+
+function cloudAssetCache(signal, localAssets) {
+  const cache = new Map();
+  cache.signal = signal;
+  cache.missing = new Set();
+  cache.localAssets = localAssets;
+  return cache;
+}
+
+async function hydrateProjectEntry(entry, assetCache, localEntry) {
+  if (!entry?.doc || typeof entry.doc !== 'object') return entry;
+  const localDoc = localEntry?.doc;
+  try {
+    const localSlides = Array.isArray(localDoc?.slides) ? localDoc.slides : [];
+    const slides = Array.isArray(entry.doc.slides)
+      ? await Promise.all(entry.doc.slides.map((slide) => hydrateSlideFromCloud(
+        slide, assetCache, localSlides.find((item) => item?.id === slide?.id),
+      )))
+      : [];
+    return {
+      ...entry,
+      doc: {
+        ...entry.doc,
+        slides,
+        brand: await hydrateBrandFromCloud(entry.doc.brand, assetCache, localDoc?.brand),
+        styleKit: await hydrateStyleKitFromCloud(entry.doc.styleKit, assetCache, localDoc?.styleKit),
+      },
+    };
+  } catch {
+    // A estrutura e os textos continuam disponíveis quando uma foto falha.
+    return { ...entry, doc: { ...entry.doc, slides: Array.isArray(entry.doc.slides)
+      ? entry.doc.slides.map((slide) => ({ ...slide })) : [] } };
+  }
+}
+
+/** Hidrata apenas o detalhe aberto, sem buscar fotos de todos os projetos. */
+export async function hydrateProjectEntryFromCloud(entry, { signal, localEntry, localAssets } = {}) {
+  if (!entry || typeof entry !== 'object' || !entry.id) {
+    throw new Error('Projeto da nuvem inválido.');
+  }
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  const assetCache = cloudAssetCache(signal, localAssets);
+  const hydrated = await hydrateProjectEntry(entry, assetCache, localEntry);
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  return { entry: hydrated, assetsMissing: assetCache.missing.size };
+}
+
+function assertAuthoritativeRead({ expectedOwnerId, localOwnerId, ownerAtStart, signal, manifest }) {
+  if (signal?.aborted) throw new Error('Sincronização cancelada.');
+  if (!expectedOwnerId || !localOwnerId || localStorage.getItem(SK.dataOwner) !== ownerAtStart
+    || readDataOwner() !== localOwnerId) {
+    throw new Error('A conta mudou durante a sincronização. Entre novamente para atualizar a biblioteca.');
+  }
+  if (manifest && manifest.customerId !== expectedOwnerId) {
+    throw new Error('A nuvem respondeu para outra conta. A biblioteca atual foi preservada.');
+  }
+}
+
+/**
+ * Leitura autoritativa para a biblioteca v2. Somente a nuvem determina quais
+ * projetos estão vivos; tombstones locais legados não filtram a lista. O
+ * retorno é um snapshot para React, sem gravar localStorage ou fazer push.
+ * `selected` hidrata imagens só do projeto aberto; `none` carrega a estrutura
+ * imediatamente; `all` serve para importações explícitas, não para o boot.
+ */
+export async function pullAccountLibraryAuthoritative({
+  signal, expectedOwnerId, localOwnerId = readDataOwner(), selectedProjectId,
+  hydrateImages = 'selected', localSnapshot, localAssets, onBeforeApply,
+} = {}) {
+  if (!['none', 'selected', 'all'].includes(hydrateImages)) {
+    throw new Error('Modo de hidratação inválido.');
+  }
+  const ownerAtStart = localStorage.getItem(SK.dataOwner);
+  const guard = (manifest) => assertAuthoritativeRead({
+    expectedOwnerId, localOwnerId, ownerAtStart, signal, manifest,
+  });
+  guard();
+  const data = await syncRequest(null, { method: 'GET', query: 'full=1', signal });
+  guard();
+  if (data.empty) {
+    // O 404 vazio não traz manifesto com owner. Confirme a sessão antes de
+    // substituir uma lista local por zero projetos.
+    const status = await fetchLibraryCloudStatus({ signal });
+    guard();
+    if (status.customerId !== expectedOwnerId || !status.empty) {
+      throw new Error('Não foi possível confirmar a biblioteca vazia desta conta.');
+    }
+    const snapshot = {
+      library: [], deletedIds: [], libraryFolders: [], brandRoster: [],
+      activeDocId: '', activeBrandId: '',
+    };
+    onBeforeApply?.(snapshot);
+    guard();
+    return { ok: true, empty: true, snapshot, projectCount: 0,
+      revision: 0, updatedAt: 0, assetsMissing: 0, localPersisted: false, warnings: [] };
+  }
+  const manifest = data.manifest;
+  if (!manifest || !Array.isArray(manifest.docs)) {
+    throw new Error('A nuvem não devolveu uma biblioteca válida.');
+  }
+  guard(manifest);
+  const remoteDeletedIds = mergeDeletedProjectIds(manifest.deletedIds);
+  const remotelyDeleted = new Set(remoteDeletedIds);
+  const liveDocs = manifest.docs.filter((entry) => entry?.id && !remotelyDeleted.has(String(entry.id)));
+  const activeDocId = liveDocs.some((entry) => entry.id === manifest.activeDocId)
+    ? manifest.activeDocId : liveDocs[0]?.id || '';
+  const selectedId = liveDocs.some((entry) => entry.id === selectedProjectId)
+    ? selectedProjectId : activeDocId;
+  const localDocs = Array.isArray(localSnapshot?.library) ? localSnapshot.library : [];
+  const assetCache = cloudAssetCache(signal, localAssets);
+  const docs = [];
+  for (const entry of liveDocs) {
+    guard();
+    if (hydrateImages === 'all' || (hydrateImages === 'selected' && entry.id === selectedId)) {
+      // eslint-disable-next-line no-await-in-loop
+      docs.push(await hydrateProjectEntry(entry, assetCache,
+        localDocs.find((item) => item?.id === entry.id)));
+    } else {
+      docs.push(entry);
+    }
+  }
+  const remoteBrands = Array.isArray(manifest.brands) ? manifest.brands : [];
+  const localBrands = Array.isArray(localSnapshot?.brandRoster) ? localSnapshot.brandRoster : [];
+  const brands = [];
+  for (const brand of remoteBrands) {
+    guard();
+    if (hydrateImages === 'none') {
+      brands.push(brand);
+    } else {
+      // eslint-disable-next-line no-await-in-loop
+      brands.push(await hydrateBrandFromCloud(brand, assetCache,
+        localBrands.find((item) => item?.id === brand?.id)));
+    }
+  }
+  const snapshot = {
+    library: docs,
+    deletedIds: remoteDeletedIds,
+    libraryFolders: Array.isArray(manifest.folders) ? manifest.folders : [],
+    brandRoster: brands,
+    activeDocId,
+    activeBrandId: manifest.activeBrandId ?? brands[0]?.id ?? '',
+    userProfile: manifest.userProfile || null,
+    onboardingDone: manifest.onboardingDone || null,
+    modesIntroDone: manifest.modesIntroDone || null,
+  };
+  onBeforeApply?.(snapshot);
+  guard();
+  const assetsMissing = assetCache.missing.size;
+  return {
+    ok: true, empty: false, snapshot, projectCount: docs.length,
+    revision: Number(manifest.revision || 0), updatedAt: Number(manifest.updatedAt || 0),
+    assetsMissing, localPersisted: false,
+    warnings: assetsMissing
+      ? [`${assetsMissing} imagem(ns) indisponível(is); todos os projetos foram restaurados.`] : [],
+  };
 }
 
 /**

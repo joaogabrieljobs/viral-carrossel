@@ -65,6 +65,8 @@ function AccountHomeShell({
   currentPeriodEnd,
   currentPeriodStart,
   onRefreshUsage,
+  onProfileSaved,
+  cloudProfile,
   planTier = null,
   imageQuota = null,
   useOwnImageKey = false,
@@ -82,6 +84,7 @@ function AccountHomeShell({
   const [search, setSearch] = useState('');
   const [creationType, setCreationType] = useState(() => projectKindOf(activeProject));
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const PAGE_SIZE = 48;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
@@ -506,6 +509,8 @@ function AccountHomeShell({
                 planTier={planTier}
                 imageQuota={imageQuota}
                 onOpenUsage={() => setAccountTab?.('usage')}
+                onProfileSaved={onProfileSaved}
+                cloudProfile={cloudProfile}
               />
             </>
           )}
@@ -919,7 +924,15 @@ function AccountHomeShell({
                     ><Download size={13} /></button>
                     {confirmDeleteId === entry.id ? (
                       <>
-                        <button type="button" onClick={() => { deleteDoc(entry.id); setConfirmDeleteId(null); }}
+                        <button type="button" disabled={deletingId === entry.id}
+                          aria-busy={deletingId === entry.id}
+                          onClick={async () => {
+                            setDeletingId(entry.id);
+                            try {
+                              const deleted = await deleteDoc(entry.id);
+                              if (deleted !== false) setConfirmDeleteId(null);
+                            } finally { setDeletingId(null); }
+                          }}
                           style={{
                             padding: '0 10px',
                             height: 36,
@@ -932,7 +945,7 @@ function AccountHomeShell({
                             background: 'rgba(255,59,48,0.08)',
                           }}
                         >
-                          Confirmar eliminação
+                          {deletingId === entry.id ? 'Excluindo…' : 'Confirmar eliminação'}
                         </button>
                         <button type="button" onClick={() => setConfirmDeleteId(null)} aria-label="Cancelar eliminação" style={{
                           width: 44,

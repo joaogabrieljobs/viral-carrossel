@@ -26,6 +26,7 @@ import { USER_PROFILE_KEY } from '../utils/user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from '../utils/custom-visual-presets.js';
 
 const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
+const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais neste navegador. Vamos terminar a limpeza antes de abrir outra conta.';
 const LOGOUT_PRESERVED_KEYS = new Set([
   ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY,
@@ -110,17 +111,26 @@ export async function logoutWithProtectedLibrary({
     // O cofre recebe a edição em memória, mesmo se o cache pequeno estiver
     // cheio. Só a transação durável concluída autoriza a limpeza da conta.
     let vaultSaved = false;
-    try { vaultSaved = await snapshotAccountVaultForOwners(aliases, { snapshot: prepared.snapshot }) === true; }
-    catch { /* exige confirmação da nuvem abaixo */ }
+    if (!PROJECTS_V2 || prepared.v2CloudSaved !== true) {
+      try { vaultSaved = await snapshotAccountVaultForOwners(aliases, { snapshot: prepared.snapshot }) === true; }
+      catch { /* exige confirmação da nuvem abaixo */ }
+    }
     if (!stillCurrent()) {
       throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
     }
-    // O timeout cancela pedidos antes da limpeza; o recibo inclui as imagens.
+    // O novo fluxo já salvou linhas versionadas e imagens antes deste lock.
+    // Reenviar o manifesto legado no logout poderia ressuscitar exclusões.
     let cloudResult = null;
-    try {
-      const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
-      cloudResult = await pushLibraryToCloudBestEffort(vaultSaved ? 5_000 : 30_000, { snapshot: prepared.snapshot });
-    } catch { /* o cofre só vale quando contém a edição atual confirmada */ }
+    if (PROJECTS_V2) {
+      cloudResult = prepared.v2CloudSaved === true
+        ? { ok: true, cloudSaved: true, assetsFailed: 0 }
+        : null;
+    } else {
+      try {
+        const { pushLibraryToCloudBestEffort } = await import('../utils/library-sync.js');
+        cloudResult = await pushLibraryToCloudBestEffort(vaultSaved ? 5_000 : 30_000, { snapshot: prepared.snapshot });
+      } catch { /* o cofre só vale quando contém a edição atual confirmada */ }
+    }
     if (!stillCurrent()) {
       throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
     }
@@ -171,9 +181,12 @@ export async function logoutWithProtectedLibrary({
   }
 }
 
-export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied, onLibraryReady, onLibraryBlocked, toast } = {}) {
-  const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onLibraryReady, onLibraryBlocked });
-  libraryCallbacksRef.current = { onCloudLibraryApplied, onLibraryReady, onLibraryBlocked };
+export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied,
+  onCloudProjectsObserved, onCloudMetadataObserved, onLibraryReady, onLibraryBlocked, toast } = {}) {
+  const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onCloudProjectsObserved,
+    onCloudMetadataObserved, onLibraryReady, onLibraryBlocked });
+  libraryCallbacksRef.current = { onCloudLibraryApplied, onCloudProjectsObserved,
+    onCloudMetadataObserved, onLibraryReady, onLibraryBlocked };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -345,6 +358,95 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
       // Multiutilizador: biblioteca na nuvem por conta (após isolamento local).
       if (session?.active) {
+        if (PROJECTS_V2) {
+          try {
+            const owner = readDataOwner();
+            const expectedOwnerId = session.customerId;
+            if (!owner || !expectedOwnerId || !sessionStillOwnsData()) {
+              throw new Error('Não foi possível confirmar a conta desta biblioteca. Entre novamente.');
+            }
+            // A fila durável pertence à conta que a criou. Enviá-la antes do
+            // pull evita que um GET antigo apague da UI uma edição pendente.
+            const [{ flushProjectOutbox }, { listProjects },
+              { pullAccountLibraryAuthoritative }, { restoreAccountLibraryMetadata }] = await Promise.all([
+              import('../utils/projects-outbox.js'),
+              import('../utils/projects-client.js'),
+              import('../utils/library-sync.js'),
+              import('../utils/account-library-meta.js'),
+            ]);
+            const outboxReceipt = await flushProjectOutbox(owner);
+            if (outboxReceipt.pending > (outboxReceipt.needsReview?.length || 0)) {
+              throw new Error('Ainda há projetos aguardando envio. Recarregue para continuar a sincronização antes de abrir a biblioteca.');
+            }
+            if (!sessionStillOwnsData()) return;
+            const projects = await listProjects({ expectedOwnerId });
+            const restored = await pullAccountLibraryAuthoritative({
+              expectedOwnerId,
+              localOwnerId: owner,
+              selectedProjectId: restoredSnapshot?.activeDocId,
+              hydrateImages: 'selected',
+              localSnapshot: restoredSnapshot,
+            });
+            if (!sessionStillOwnsData()) return;
+            const remoteIds = new Set(projects.map((project) => project.id));
+            if (projects.length !== restored.projectCount
+              || (restored.snapshot?.library || []).some((entry) => !remoteIds.has(entry.id))) {
+              throw new Error('A biblioteca mudou durante a restauração. Recarregue para tentar novamente.');
+            }
+            const metadata = await restoreAccountLibraryMetadata({
+              expectedOwnerId, localOwnerId: owner,
+              localBrands: restored.snapshot.brandRoster,
+            });
+            if (!sessionStillOwnsData()) return;
+            const snapshot = {
+              ...restored.snapshot,
+              libraryFolders: metadata.metadata.folders || restored.snapshot.libraryFolders,
+              brandRoster: metadata.metadata.brands || restored.snapshot.brandRoster,
+              activeBrandId: metadata.metadata.activeBrandId || restored.snapshot.activeBrandId,
+              activeDocId: metadata.metadata.activeDocId || restored.snapshot.activeDocId,
+            };
+            let localLibrary = restoredSnapshot?.library;
+            if (!Array.isArray(localLibrary)) {
+              try { localLibrary = JSON.parse(localStorage.getItem(SK.library) || '[]'); }
+              catch { localLibrary = []; }
+            }
+            // Conta de teste com trabalho ainda só neste navegador: o banco
+            // vazio não é autorização para apagar essa única cópia. O Sync
+            // seguinte cria as linhas com versão 0 depois de enviar as fotos.
+            if (restored.empty && Array.isArray(localLibrary) && localLibrary.length) {
+              libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot, { preserveLocal: true });
+              libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, null);
+              libraryCallbacksRef.current.onLibraryReady?.();
+              toast?.('Há projetos apenas neste navegador. Use “Sync na nuvem” para enviá-los à conta.', 'warning', 7000);
+            } else {
+              await libraryCallbacksRef.current.onCloudLibraryApplied?.(snapshot, restored);
+              try {
+                if (metadata.metadata.userProfile) {
+                  localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(metadata.metadata.userProfile));
+                } else {
+                  localStorage.removeItem(USER_PROFILE_KEY);
+                }
+                if (metadata.metadata.onboardingDone) localStorage.setItem(SK.onboarding, '1');
+                if (metadata.metadata.modesIntroDone) localStorage.setItem(SK.modesIntro, '1');
+              } catch { /* perfil continua na nuvem se o navegador estiver cheio */ }
+              libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot);
+              libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, snapshot);
+              libraryCallbacksRef.current.onLibraryReady?.();
+            }
+            if (outboxReceipt.recoveries?.length) {
+              toast?.(`${outboxReceipt.recoveries.length} edição(ões) em conflito foram preservadas como cópias na sua conta.`, 'warning', 7500);
+            }
+            if (outboxReceipt.needsReview?.length) {
+              toast?.(`${outboxReceipt.needsReview.length} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
+            }
+          } catch (error) {
+            if (sessionStillOwnsData()) {
+              libraryCallbacksRef.current.onLibraryBlocked?.(error?.message
+                || 'Não foi possível restaurar seus projetos. Verifique a conexão e tente novamente.');
+            }
+            return;
+          }
+        } else {
         try {
           const { reconcileLibraryCloud, CLOUD_LIBRARY_RESTORE_BLOCKED_MESSAGE } = await import('../utils/library-sync.js');
           if (!sessionStillOwnsData()) return;
@@ -362,6 +464,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
           }
         } catch { /* rede / Blob — cofre local continua */ }
         if (sessionStillOwnsData()) libraryCallbacksRef.current.onLibraryReady?.();
+        }
       }
 
       // `?app=1` (usado, entre outros, pelo return_url do portal Stripe) pula a

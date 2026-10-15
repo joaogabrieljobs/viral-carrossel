@@ -50,6 +50,7 @@ import { storeSlideReference, importSlideReference } from './src/utils/slide-ref
 import { makeTextOverlay, addOverlayToSlide, updateOverlayOnSlide, normalizeOverlays, MAX_CARD_OVERLAYS } from './src/utils/card-overlays.js';
 import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
 import { readDataOwner, dataOwnerAliases } from './src/utils/account-data-owner.js';
+import { USER_PROFILE_KEY } from './src/utils/user-profile.js';
 import AutoFitText from './src/components/AutoFitText.jsx';
 import WcagBadge from './src/components/WcagBadge.jsx';
 import VisualStylePicker from './src/components/VisualStylePicker.jsx';
@@ -84,6 +85,7 @@ import PromptDialog from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
+
 import { FORMATS } from './src/utils/formats.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
@@ -463,6 +465,38 @@ import {
   storeSlideLogo,
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
+
+// A rota por projeto só é ativada depois do banco, importação e API estarem
+// prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
+const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
+
+function projectCacheFingerprint(entry) {
+  if (!entry) return '';
+  const { updatedAt: _updatedAt, ...stable } = semImagensDeRuntime([entry])[0] || {};
+  return JSON.stringify(stable);
+}
+
+function accountMetaFingerprint(snapshot) {
+  let userProfile = snapshot.userProfile;
+  try {
+    if (userProfile === undefined) userProfile = JSON.parse(localStorage.getItem(USER_PROFILE_KEY) || 'null');
+  } catch { userProfile = null; }
+  let onboardingDone = snapshot.onboardingDone;
+  let modesIntroDone = snapshot.modesIntroDone;
+  try {
+    if (onboardingDone === undefined) onboardingDone = localStorage.getItem(SK.onboarding) || null;
+    if (modesIntroDone === undefined) modesIntroDone = localStorage.getItem(SK.modesIntro) || null;
+  } catch { /* cache bloqueada: a revisão remota continua protegida */ }
+  return JSON.stringify({
+    brands: semLogosDeRuntimeDasMarcas(snapshot.brandRoster || []),
+    folders: snapshot.libraryFolders || [],
+    activeBrandId: snapshot.activeBrandId || '',
+    activeDocId: snapshot.activeDocId || '',
+    userProfile: userProfile || null,
+    onboardingDone: onboardingDone || null,
+    modesIntroDone: modesIntroDone || null,
+  });
+}
 
 const OnboardingLanding = lazy(() => import('./src/components/OnboardingLandingProduct.jsx'));
 const Paywall = lazy(() => import('./src/components/Paywall.jsx'));
@@ -941,6 +975,17 @@ export default function App() {
   }, []);
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
   const cloudSyncInFlightRef = useRef(false);
+  // Versões só vêm de uma leitura autenticada da conta. Uma versão ausente
+  // significa criação (0) apenas depois dessa leitura ter sido confirmada.
+  const v2ObservedOwnerRef = useRef(null);
+  const v2VersionsRef = useRef(new Map());
+  const v2BaselinesRef = useRef(new Map());
+  const v2RecoveredProjectsRef = useRef(new Map());
+  const v2MetaRevisionRef = useRef(null);
+  const v2MetaBaselineRef = useRef(null);
+  const v2RestoreGenerationRef = useRef(0);
+  const v2UserProfileRef = useRef(null);
+  const [profileRevision, setProfileRevision] = useState(0);
   const cloudAutoPushRef = useRef(null);
   const stopCloudAutoPush = useCallback(async () => {
     const pending = cloudAutoPushRef.current;
@@ -1227,7 +1272,8 @@ export default function App() {
   const {
     renameDoc, setDocStatus, setDocFolder, setDocPublicationDate,
     createFolder, renameFolder, deleteFolder,
-    openDoc, newDoc, duplicateDoc, newFromContext, createSeriesDrafts, deleteDoc,
+    openDoc: openDocLocal, newDoc, duplicateDoc, newFromContext, createSeriesDrafts,
+    deleteDoc: deleteDocLocal,
     exportDoc, exportAllDocs, handleImportFile,
     shellView, setShellView, importDocRef,
   } = useLibrary({
@@ -1235,6 +1281,97 @@ export default function App() {
     history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
     setLibraryOpen, toast, setError, visualPresets,
   });
+  const deleteDoc = useCallback(async (docId) => {
+    if (!PROJECTS_V2) return deleteDocLocal(docId);
+    if (!docId || !accountLibraryReadyRef.current || areAccountDataWritesLocked()) return false;
+    const owner = readDataOwner();
+    if (!owner || v2ObservedOwnerRef.current !== owner) {
+      toast('A biblioteca desta conta ainda não foi confirmada. Sincronize antes de excluir.', 'warning', 5500);
+      return false;
+    }
+    try {
+      const { queueProjectDelete, flushProjectOutbox, getPendingProjectOp } = await import('./src/utils/projects-outbox.js');
+      const projectName = libraryPersistRef.current.find((entry) => entry.id === docId)?.name || '';
+      await queueProjectDelete(owner, docId, {
+        baseVersion: v2VersionsRef.current.get(docId) ?? 0, projectName,
+      });
+      try {
+        await flushProjectOutbox(owner);
+        const pending = await getPendingProjectOp(owner, docId);
+        if (pending?.kind === 'review_delete') {
+          toast('Este projeto mudou em outro dispositivo. A exclusão não foi feita. Revise a versão atual e exclua novamente se desejar.', 'warning', 7000);
+          return false;
+        }
+        if (pending) {
+          toast('Exclusão pendente. O projeto permanece visível até a conta confirmar.', 'warning', 5500);
+          return false;
+        }
+        deleteDocLocal(docId);
+        v2BaselinesRef.current.delete(docId);
+        v2VersionsRef.current.delete(docId);
+        toast('Projeto excluído da sua conta.', 'success', 3500);
+      } catch (error) {
+        toast(error?.status === 409
+          ? 'Este projeto mudou na nuvem. Revise a versão atual antes de excluir novamente.'
+          : 'Exclusão pendente. O projeto permanece visível até a conta confirmar.',
+        'warning', 7000);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      toast(error?.message || 'Não foi possível proteger esta exclusão. O projeto foi mantido.', 'warning', 6000);
+      return false;
+    }
+  }, [deleteDocLocal, toast]);
+  const openDoc = useCallback(async (docId) => {
+    if (!PROJECTS_V2) return openDocLocal(docId);
+    const owner = readDataOwner();
+    const entry = libraryPersistRef.current.find((project) => project.id === docId);
+    if (!entry || !owner || v2ObservedOwnerRef.current !== owner) return false;
+    const baseline = v2BaselinesRef.current.get(docId);
+    if (baseline && baseline !== projectCacheFingerprint(entry)) {
+      toast('Salve as alterações deste projeto antes de abri-lo novamente.', 'warning', 5000);
+      return false;
+    }
+    try {
+      const [{ getProject }, { hydrateProjectEntryFromCloud }] = await Promise.all([
+        import('./src/utils/projects-client.js'), import('./src/utils/library-sync.js'),
+      ]);
+      const remote = await getProject(docId, { expectedOwnerId: accessSessionRef.current?.customerId });
+      if (!remote) {
+        if (v2VersionsRef.current.has(docId)) {
+          toast('Este projeto foi excluído na nuvem. Sincronize para atualizar a lista.', 'warning', 5500);
+          return false;
+        }
+        openDocLocal(docId); // criação local ainda não enviada
+        return true;
+      }
+      const hydrated = await hydrateProjectEntryFromCloud(remote.entry, { localEntry: entry });
+      if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return false;
+      const readyEntry = normalizeLibraryEntry({
+        ...hydrated.entry, doc: ensureDocShape(hydrated.entry.doc || {}),
+      }, libraryFoldersPersistRef.current);
+      v2VersionsRef.current.set(docId, remote.version);
+      v2BaselinesRef.current.set(docId, projectCacheFingerprint(readyEntry));
+      if (docId === activeDocId) {
+        // `openDocLocal` inclui um flush do doc em edição. Para o projeto que já
+        // estava ativo, esse flush reporia a versão anterior sobre o GET novo.
+        flushSync(() => {
+          setLibrary((current) => current.map((item) => item.id === docId ? readyEntry : item));
+          history.reset(readyEntry.doc);
+        });
+        setLibraryOpen(false);
+        setShellView('project');
+      } else {
+        setLibrary((current) => current.map((item) => item.id === docId ? readyEntry : item));
+        openDocLocal(docId);
+      }
+      return true;
+    } catch (error) {
+      toast(error?.message || 'Não foi possível carregar este projeto. Tente novamente.', 'warning', 5500);
+      return false;
+    }
+  }, [activeDocId, history.reset, openDocLocal, setShellView, toast]);
   const askPromptRef = useRef(null);
   const createProjectByKind = useCallback(async (kind = 'carrossel', projectName) => {
     const isPresentation = kind === 'apresentacao';
@@ -1397,8 +1534,15 @@ export default function App() {
       const libraryFingerprint = JSON.stringify(semImagensDeRuntime(lib));
       const foldersFingerprint = JSON.stringify(libraryFoldersPersistRef.current);
       const brandsFingerprint = JSON.stringify(semLogosDeRuntimeDasMarcas(brandRoster));
+      const profileFingerprint = PROJECTS_V2 ? accountMetaFingerprint({
+        brandRoster, libraryFolders: libraryFoldersPersistRef.current,
+        activeBrandId, activeDocId,
+        ...(v2UserProfileRef.current ? { userProfile: v2UserProfileRef.current } : {}),
+      }) : '';
       return {
-        snapshot: { library: lib, deletedIds: readDeletedProjectIds(), brandRoster, libraryFolders: libraryFoldersPersistRef.current, activeDocId, activeBrandId },
+        snapshot: { library: lib, deletedIds: readDeletedProjectIds(), brandRoster, libraryFolders: libraryFoldersPersistRef.current, activeDocId, activeBrandId,
+          ...(PROJECTS_V2 && v2UserProfileRef.current ? { userProfile: v2UserProfileRef.current } : {}),
+        },
         localPersisted: saved,
         isCurrent: () => {
           const current = editorSyncStateRef.current;
@@ -1407,7 +1551,14 @@ export default function App() {
             && JSON.stringify(semImagensDeRuntime([{ doc: current.doc }])[0].doc) === documentFingerprint
             && JSON.stringify(semImagensDeRuntime(libraryPersistRef.current)) === libraryFingerprint
             && JSON.stringify(libraryFoldersPersistRef.current) === foldersFingerprint
-            && JSON.stringify(semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current)) === brandsFingerprint;
+            && JSON.stringify(semLogosDeRuntimeDasMarcas(brandRosterPersistRef.current)) === brandsFingerprint
+            && (!PROJECTS_V2 || accountMetaFingerprint({
+              brandRoster: brandRosterPersistRef.current,
+              libraryFolders: libraryFoldersPersistRef.current,
+              activeBrandId: current.activeBrandId,
+              activeDocId: current.activeDocId,
+              ...(v2UserProfileRef.current ? { userProfile: v2UserProfileRef.current } : {}),
+            }) === profileFingerprint);
         },
       };
     }
@@ -1419,7 +1570,7 @@ export default function App() {
     if (!Array.isArray(snapshot?.library) || snapshot.library.length !== Number(result?.projectCount)) {
       throw new Error('A lista recebida não corresponde à biblioteca da nuvem. Tente sincronizar novamente.');
     }
-    rememberDeletedProjectIds(snapshot.deletedIds || []);
+    if (!PROJECTS_V2) rememberDeletedProjectIds(snapshot.deletedIds || []);
     const folders = normalizeLibraryFolders(snapshot.libraryFolders || []);
     const restored = snapshot.library.map((entry) => normalizeLibraryEntry({
       ...entry, doc: ensureDocShape(entry.doc || {}),
@@ -1450,6 +1601,108 @@ export default function App() {
     return restored.length;
   }, [history.reset]);
 
+  const observeCloudProjectsV2 = useCallback((owner, projects, snapshot, { preserveLocal = false } = {}) => {
+    if (!PROJECTS_V2 || !owner || readDataOwner() !== owner || !Array.isArray(projects)) return;
+    const ids = new Set((snapshot?.library || []).map((entry) => entry?.id));
+    if (ids.size !== projects.length || projects.some((project) => !ids.has(project.id))) {
+      throw new Error('A lista da conta mudou durante a restauração. Sincronize novamente.');
+    }
+    v2VersionsRef.current = new Map(projects.map((project) => [project.id, project.version]));
+    v2BaselinesRef.current = new Map((preserveLocal ? [] : (libraryPersistRef.current || [])).map((entry) => [
+      entry.id, projectCacheFingerprint(entry),
+    ]));
+    v2ObservedOwnerRef.current = owner;
+    v2RecoveredProjectsRef.current.clear();
+    v2RestoreGenerationRef.current += 1;
+  }, []);
+
+  const observeCloudMetadataV2 = useCallback((owner, metadata, snapshot) => {
+    if (!PROJECTS_V2 || !owner || readDataOwner() !== owner) return;
+    v2MetaRevisionRef.current = Number.isSafeInteger(metadata?.revision) ? metadata.revision : null;
+    if (snapshot) {
+      v2UserProfileRef.current = metadata.metadata.userProfile || null;
+      setProfileRevision((value) => value + 1);
+    }
+    v2MetaBaselineRef.current = snapshot ? accountMetaFingerprint({
+      brandRoster: brandRosterPersistRef.current,
+      libraryFolders: libraryFoldersPersistRef.current,
+      activeBrandId: snapshot.activeBrandId,
+      activeDocId: snapshot.activeDocId,
+      userProfile: metadata.metadata.userProfile,
+      onboardingDone: metadata.metadata.onboardingDone,
+      modesIntroDone: metadata.metadata.modesIntroDone,
+    }) : null;
+  }, []);
+
+  const persistProjectV2 = useCallback(async (entry, pending, { owner } = {}) => {
+    if (!entry?.id || v2ObservedOwnerRef.current !== owner || readDataOwner() !== owner) {
+      throw new Error('Confirme a biblioteca desta conta antes de salvar. Sincronize novamente.');
+    }
+    const baseVersion = v2VersionsRef.current.get(entry.id) ?? 0;
+    const fingerprint = projectCacheFingerprint(entry);
+    const [{ prepareProjectCloudPayload }, { uploadAssetsBestEffort }, outbox] = await Promise.all([
+      import('./src/utils/projects-cloud-sync.js'),
+      import('./src/utils/library-sync.js'),
+      import('./src/utils/projects-outbox.js'),
+    ]);
+    const existing = await outbox.getPendingProjectOp(owner, entry.id);
+    if (v2BaselinesRef.current.get(entry.id) === fingerprint && !existing) {
+      return { skipped: true, recoveredCopy: v2RecoveredProjectsRef.current.get(entry.id) };
+    }
+    const queuedBaseVersion = existing?.baseVersion ?? baseVersion;
+    const prepared = await prepareProjectCloudPayload(entry, {
+      snapshot: pending.snapshot, ownerId: owner, isCurrent: pending.isCurrent,
+    });
+    if (!pending.isCurrent() || readDataOwner() !== owner) {
+      throw new Error('O projeto mudou durante o envio. As alterações continuam no editor; salve novamente.');
+    }
+    const uploaded = await uploadAssetsBestEffort(prepared.assets, {
+      owner,
+      assertCurrent: () => {
+        if (!pending.isCurrent() || readDataOwner() !== owner) {
+          throw new Error('O projeto mudou durante o envio. Salve novamente.');
+        }
+      },
+    });
+    if (uploaded.failed) {
+      throw new Error(`${uploaded.failed} imagem(ns) não foram enviadas. O projeto continua no editor; tente salvar novamente.`);
+    }
+    await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
+    // A transação IndexedDB acima já protege a edição se a rede cair agora.
+    const flushed = await outbox.flushProjectOutbox(owner);
+    if (await outbox.getPendingProjectOp(owner, entry.id)) {
+      throw new Error('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
+    }
+    const recovery = flushed.recoveries?.find((item) => item.sourceProjectId === entry.id);
+    if (recovery) {
+      v2BaselinesRef.current.set(entry.id, fingerprint);
+      v2RecoveredProjectsRef.current.set(entry.id, recovery.copyName);
+      return { recoveredCopy: recovery.copyName };
+    }
+    v2VersionsRef.current.set(entry.id, queuedBaseVersion + 1);
+    v2BaselinesRef.current.set(entry.id, fingerprint);
+    v2RecoveredProjectsRef.current.delete(entry.id);
+    return { saved: true, version: queuedBaseVersion + 1 };
+  }, []);
+
+  const persistAccountMetadataV2 = useCallback(async (pending, { owner, expectedOwnerId } = {}) => {
+    if (v2ObservedOwnerRef.current !== owner || !Number.isSafeInteger(v2MetaRevisionRef.current)) {
+      return { skipped: true };
+    }
+    const fingerprint = accountMetaFingerprint(pending.snapshot);
+    if (fingerprint === v2MetaBaselineRef.current) return { skipped: true };
+    const { saveAccountLibraryMetadata } = await import('./src/utils/account-library-meta.js');
+    const saved = await saveAccountLibraryMetadata(pending.snapshot, {
+      baseRevision: v2MetaRevisionRef.current,
+      expectedOwnerId,
+      localOwnerId: owner,
+      isCurrent: pending.isCurrent,
+    });
+    v2MetaRevisionRef.current = saved.revision;
+    v2MetaBaselineRef.current = fingerprint;
+    return { saved: true };
+  }, []);
+
   // Salvar e Sync usam a mesma transação: flush → merge → pull → React → toast.
   // O ref bloqueia também dois cliques antes de o estado busy renderizar.
   const syncProjectLibrary = useCallback(async (source = 'sync') => {
@@ -1457,6 +1710,120 @@ export default function App() {
     cloudSyncInFlightRef.current = true;
     setCloudSyncBusy(true);
     let localSaved = false;
+    if (PROJECTS_V2) {
+      let cloudSaved = false;
+      try {
+        const pending = flushPersistNow({ returnSnapshot: true });
+        // O flush já contém a edição ativa. Alinhe também o estado React antes
+        // de qualquer await, para um render pendente não repor a lista antiga
+        // sobre a referência que o envio está a validar.
+        flushSync(() => setLibrary(pending.snapshot.library));
+        const owner = readDataOwner();
+        const session = accessSessionRef.current;
+        const expectedOwnerId = session?.customerId;
+        if (!session?.active || !expectedOwnerId || v2ObservedOwnerRef.current !== owner) {
+          throw new Error('Confirme a biblioteca desta conta antes de salvar. Recarregue e tente novamente.');
+        }
+        localSaved = pending.localPersisted;
+        const selectedId = pending.snapshot.activeDocId || pending.snapshot.library[0]?.id;
+        const entries = source === 'salvar'
+          ? pending.snapshot.library.filter((entry) => entry.id === selectedId)
+          : pending.snapshot.library;
+        if (source === 'salvar' && entries.length !== 1) {
+          throw new Error('Selecione um projeto antes de salvar.');
+        }
+        const recoveredCopies = new Set();
+        for (const entry of entries) {
+          // Cada card é salvo com a versão que esta aba observou no último pull.
+          // O servidor devolve 409 se outro dispositivo o alterou primeiro.
+          // eslint-disable-next-line no-await-in-loop
+          const result = await persistProjectV2(entry, pending, { owner });
+          if (result?.recoveredCopy) recoveredCopies.add(result.recoveredCopy);
+        }
+        await persistAccountMetadataV2(pending, { owner, expectedOwnerId });
+        const { flushProjectOutbox } = await import('./src/utils/projects-outbox.js');
+        const outbox = await flushProjectOutbox(owner);
+        const reviewCount = outbox.needsReview?.length || 0;
+        if (outbox.pending > reviewCount) {
+          throw new Error('Há projetos ainda aguardando envio. Sincronize novamente antes de sair da conta.');
+        }
+        if (!pending.isCurrent() || readDataOwner() !== owner) {
+          throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; salve novamente.');
+        }
+        cloudSaved = true;
+        if (source === 'sync') {
+          const [{ listProjects }, { pullAccountLibraryAuthoritative },
+            { restoreAccountLibraryMetadata }] = await Promise.all([
+            import('./src/utils/projects-client.js'),
+            import('./src/utils/library-sync.js'),
+            import('./src/utils/account-library-meta.js'),
+          ]);
+          const projects = await listProjects({ expectedOwnerId });
+          const restored = await pullAccountLibraryAuthoritative({
+            expectedOwnerId, localOwnerId: owner,
+            selectedProjectId: pending.snapshot.activeDocId,
+            hydrateImages: 'selected', localSnapshot: pending.snapshot,
+            onBeforeApply: () => {
+              if (!pending.isCurrent() || readDataOwner() !== owner) {
+                throw new Error('Um projeto mudou durante a sincronização. Salve novamente antes de atualizar a lista.');
+              }
+            },
+          });
+          const ids = new Set(projects.map((project) => project.id));
+          if (restored.projectCount !== projects.length
+            || (restored.snapshot?.library || []).some((entry) => !ids.has(entry.id))) {
+            throw new Error('A lista mudou durante a sincronização. Tente novamente.');
+          }
+          const metadata = await restoreAccountLibraryMetadata({
+            expectedOwnerId, localOwnerId: owner,
+            localBrands: restored.snapshot.brandRoster,
+          });
+          if (!pending.isCurrent() || readDataOwner() !== owner) {
+            throw new Error('Um projeto mudou durante a sincronização. Salve novamente.');
+          }
+          const snapshot = {
+            ...restored.snapshot,
+            brandRoster: metadata.metadata.brands || restored.snapshot.brandRoster,
+            libraryFolders: metadata.metadata.folders || restored.snapshot.libraryFolders,
+            activeBrandId: metadata.metadata.activeBrandId || restored.snapshot.activeBrandId,
+            activeDocId: metadata.metadata.activeDocId || restored.snapshot.activeDocId,
+          };
+          const count = applyCloudLibrarySnapshot(snapshot, restored);
+          observeCloudProjectsV2(owner, projects, snapshot);
+          observeCloudMetadataV2(owner, metadata, snapshot);
+          toast(recoveredCopies.size
+            ? `Sua edição foi salva como cópia de conflito. Lista atualizada · ${count} projeto(s).`
+            : reviewCount
+              ? `Lista atualizada · ${count} projeto(s). ${reviewCount} exclusão(ões) precisam de revisão.`
+              : `Lista sincronizada · ${count} projeto(s).`,
+          recoveredCopies.size || reviewCount || restored.assetsMissing ? 'warning' : 'success', 5200);
+        } else if (source !== 'auto' && source !== 'logout') {
+          toast(recoveredCopies.size
+            ? 'Sua edição foi salva como cópia de conflito na conta. Use “Sync na nuvem” para ver as duas versões.'
+            : reviewCount
+              ? `${reviewCount} exclusão(ões) precisam de revisão. O projeto alterado não foi apagado.`
+              : source === 'profile' ? 'Perfil salvo na sua conta.' : 'Projeto salvo na sua conta.',
+          recoveredCopies.size || reviewCount ? 'warning' : 'success', 5200);
+        } else if (recoveredCopies.size || reviewCount) {
+          toast(recoveredCopies.size
+            ? 'Sua edição foi salva como cópia de conflito na conta. Sincronize para ver as duas versões.'
+            : `${reviewCount} exclusão(ões) precisam de revisão. O projeto alterado não foi apagado.`,
+          'warning', 6000);
+        }
+        return { cloudSaved: true, outboxSaved: true };
+      } catch (error) {
+        if (source !== 'auto' || error?.status === 409) {
+          toast(
+            `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'Edição mantida neste navegador. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`,
+            'warning', 7000,
+          );
+        }
+        return { cloudSaved, outboxSaved: false };
+      } finally {
+        cloudSyncInFlightRef.current = false;
+        setCloudSyncBusy(false);
+      }
+    }
     try {
       await stopCloudAutoPush();
       const pending = flushPersistNow({ returnSnapshot: true });
@@ -1510,7 +1877,8 @@ export default function App() {
       cloudSyncInFlightRef.current = false;
       setCloudSyncBusy(false);
     }
-  }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast]);
+  }, [flushPersistNow, applyCloudLibrarySnapshot, stopCloudAutoPush, toast,
+    persistProjectV2, persistAccountMetadataV2, observeCloudProjectsV2, observeCloudMetadataV2]);
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
 
@@ -1665,11 +2033,19 @@ export default function App() {
     onLeaveEditor: () => setDrawerOpen(false),
     onBeforeLogout: async () => {
       await stopCloudAutoPush();
+      if (PROJECTS_V2) {
+        const receipt = await syncProjectLibrary('logout');
+        if (receipt?.cloudSaved !== true) {
+          throw new Error('As últimas alterações ainda não foram confirmadas na sua conta. Salve ou sincronize antes de sair.');
+        }
+      }
       const pending = flushPersistRef.current({ returnSnapshot: true });
       setLibrary(pending.snapshot.library);
-      return pending;
+      return PROJECTS_V2 ? { ...pending, v2CloudSaved: true } : pending;
     },
     onCloudLibraryApplied: applyCloudLibrarySnapshot,
+    onCloudProjectsObserved: observeCloudProjectsV2,
+    onCloudMetadataObserved: observeCloudMetadataV2,
     onLibraryReady: markAccountLibraryReady,
     onLibraryBlocked: setAccountRestoreError,
     toast,
@@ -1693,6 +2069,14 @@ export default function App() {
     }
     if (areAccountDataWritesLocked()) return undefined;
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+    if (PROJECTS_V2) {
+      cloudAutoPushTimerRef.current = setTimeout(() => {
+        if (!cloudSyncInFlightRef.current) syncProjectLibrary('auto');
+      }, 4_000);
+      return () => {
+        if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
+      };
+    }
     const controller = new AbortController();
     cloudAutoPushTimerRef.current = setTimeout(() => {
       import('./src/utils/library-sync.js')
@@ -1714,7 +2098,8 @@ export default function App() {
       controller.abort();
       if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     };
-  }, [library, access?.active, accountLibraryReady, cloudSyncBusy, stopCloudAutoPush]);
+  }, [library, libraryFolders, brandRoster, activeDocId, activeBrandId, profileRevision,
+    access?.active, accountLibraryReady, cloudSyncBusy, stopCloudAutoPush, syncProjectLibrary]);
   const [tourOpen, setTourOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
@@ -5042,9 +5427,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
       if (!id) return;
       const entry = library.find((e) => e.id === id);
       const name = (entry?.name || 'este projeto').trim() || 'este projeto';
-      if (!window.confirm(`Apagar o projeto «${name}» por completo?\n\nTodos os cards serão removidos da biblioteca deste navegador.`)) return;
-      deleteDoc(id);
-      toast('Projeto apagado.', 'success', 3000);
+      if (!window.confirm(`Apagar o projeto «${name}» por completo?\n\nTodos os cards serão removidos da biblioteca ${PROJECTS_V2 ? 'da sua conta' : 'deste navegador'}.`)) return;
+      void deleteDoc(id);
+      if (!PROJECTS_V2) toast('Projeto apagado.', 'success', 3000);
     },
     selectedCardElement,
     onSelectCardElement: (key) => setSelectedCardElement({ slideId: slide.id, key }),
@@ -5351,6 +5736,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
           currentPeriodStart={access.currentPeriodStart}
           planTier={access.tier || null}
           onRefreshUsage={refreshImageUsage}
+          onProfileSaved={(profile) => {
+            if (!PROJECTS_V2) return;
+            v2UserProfileRef.current = profile;
+            setProfileRevision((value) => value + 1);
+            if (!cloudSyncInFlightRef.current) void syncProjectLibrary('profile');
+          }}
+          cloudProfile={PROJECTS_V2 ? v2UserProfileRef.current : undefined}
           imageQuota={access.imageQuota}
           accountTab={accountTab}
           setAccountTab={setAccountTab}
