@@ -129,8 +129,10 @@ describe('leitura autoritativa da biblioteca v2', () => {
       pending.set(assetId, resolve);
     })));
     const events = [];
+    const hydratedCards = [];
     const resultPromise = hydrateProjectEntryFromCloud(entry, {
       onProgress: (progress) => events.push(progress),
+      onSlideHydrated: (event) => hydratedCards.push(event),
     });
     await vi.waitFor(() => expect(pending.size).toBe(3));
 
@@ -146,6 +148,11 @@ describe('leitura autoritativa da biblioteca v2', () => {
       { projectId: 'janine', completed: 2, total: 3, loaded: 1, missing: 1 },
       { projectId: 'janine', completed: 3, total: 3, loaded: 2, missing: 1 },
     ]);
+    expect(hydratedCards.map(({ projectId, slide }) => [projectId, slide.id])).toEqual([
+      ['janine', 's2'], ['janine', 's4'], ['janine', 's1'],
+    ]);
+    expect(hydratedCards[0].slide.bgImageId).toBe('stored-photo');
+    expect(hydratedCards[1].slide.bgImage).toBeUndefined();
     expect(result.assetsMissing).toBe(1);
     expect(result.entry.doc.slides.map((slide) => slide.title)).toEqual(
       original.doc.slides.map((slide) => slide.title));
@@ -154,18 +161,29 @@ describe('leitura autoritativa da biblioteca v2', () => {
 
   it('ignora falha do observador de progresso e não emite eventos sem fotos', async () => {
     const onProgress = vi.fn(() => { throw new Error('falha na interface'); });
-    const withPhoto = await hydrateProjectEntryFromCloud(manifest().docs[0], { onProgress });
+    const source = manifest().docs[0];
+    const onSlideHydrated = vi.fn(({ slide }) => {
+      slide.title = 'Alterado apenas no callback';
+      throw new Error('falha na prévia');
+    });
+    const withPhoto = await hydrateProjectEntryFromCloud(source, { onProgress, onSlideHydrated });
     expect(withPhoto.entry.doc.slides[0].title).toBe('Cuidados');
+    expect(source.doc.slides[0].title).toBe('Cuidados');
     expect(onProgress).toHaveBeenCalledWith({
       projectId: 'janine', completed: 1, total: 1, loaded: 0, missing: 1,
     });
+    expect(onSlideHydrated).toHaveBeenCalledWith({
+      projectId: 'janine', slide: expect.objectContaining({ id: 's1' }),
+    });
 
     onProgress.mockClear();
+    onSlideHydrated.mockClear();
     const withoutPhoto = await hydrateProjectEntryFromCloud({
       id: 'empty', doc: { slides: [{ id: 'text-only', title: 'Texto' }] },
-    }, { onProgress });
+    }, { onProgress, onSlideHydrated });
     expect(withoutPhoto.entry.doc.slides[0].title).toBe('Texto');
     expect(onProgress).not.toHaveBeenCalled();
+    expect(onSlideHydrated).not.toHaveBeenCalled();
   });
 
   it('mostra foto baixada sem IndexedDB, mas persiste só a referência do asset remoto', async () => {

@@ -863,7 +863,7 @@ function cloudAssetCache(signal, localAssets) {
   return cache;
 }
 
-async function hydrateProjectEntry(entry, assetCache, localEntry, onProgress) {
+async function hydrateProjectEntry(entry, assetCache, localEntry, onProgress, onSlideHydrated) {
   if (!entry?.doc || typeof entry.doc !== 'object') return entry;
   const localDoc = localEntry?.doc;
   try {
@@ -883,6 +883,8 @@ async function hydrateProjectEntry(entry, assetCache, localEntry, onProgress) {
           if (imageResult.loaded) loaded += 1;
           try { onProgress?.({ projectId: entry.id, completed, total, loaded, missing: completed - loaded }); }
           catch { /* observação de progresso não pode interromper a restauração */ }
+          try { onSlideHydrated?.({ projectId: entry.id, slide: { ...hydrated } }); }
+          catch { /* a prévia progressiva não pode interromper a restauração */ }
         }
         return hydrated;
       }))
@@ -906,14 +908,17 @@ async function hydrateProjectEntry(entry, assetCache, localEntry, onProgress) {
 /** Hidrata apenas o detalhe aberto, sem buscar fotos de todos os projetos.
  * onProgress acompanha os fundos com bgImageAssetId por card, inclusive 404;
  * projetos sem fundos remotos não emitem eventos. Logos não entram na contagem.
+ * onSlideHydrated entrega a prévia de cada card após sua foto ser resolvida.
  */
-export async function hydrateProjectEntryFromCloud(entry, { signal, localEntry, localAssets, onProgress } = {}) {
+export async function hydrateProjectEntryFromCloud(entry, {
+  signal, localEntry, localAssets, onProgress, onSlideHydrated,
+} = {}) {
   if (!entry || typeof entry !== 'object' || !entry.id) {
     throw new Error('Projeto da nuvem inválido.');
   }
   if (signal?.aborted) throw new Error('Sincronização cancelada.');
   const assetCache = cloudAssetCache(signal, localAssets);
-  const hydrated = await hydrateProjectEntry(entry, assetCache, localEntry, onProgress);
+  const hydrated = await hydrateProjectEntry(entry, assetCache, localEntry, onProgress, onSlideHydrated);
   if (signal?.aborted) throw new Error('Sincronização cancelada.');
   return { entry: hydrated, assetsMissing: assetCache.missing.size };
 }
