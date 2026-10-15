@@ -1,9 +1,12 @@
 import { applyCors } from './lib/cors.js';
 import { requireActiveSubscription } from './lib/require-access.js';
+import { billingDisabled, readAccessCookie } from './lib/access.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
+import { getStripe } from './lib/stripe.js';
 import {
   getSharedProject,
   putSharedProject,
+  mutateSharedProject,
   makeCode,
 } from './lib/project-share-store.js';
 
@@ -15,6 +18,46 @@ function parseBody(req) {
     try { return JSON.parse(req.body); } catch { return {}; }
   }
   return req.body && typeof req.body === 'object' ? req.body : {};
+}
+
+function sameIdentity(a, b) {
+  const left = String(a || '').trim().toLowerCase();
+  const right = String(b || '').trim().toLowerCase();
+  return !!left && left === right;
+}
+
+async function hasVerifiedEmail(access) {
+  if (!access?.customerId || !access?.email) return false;
+  try {
+    const customer = await getStripe().customers.retrieve(access.customerId);
+    return !!customer && !customer.deleted
+      && !!customer.metadata?.vc_google_sub
+      && sameIdentity(customer.email, access.email);
+  } catch {
+    // Um erro ao consultar a identidade nunca autoriza escrita por e-mail.
+    return false;
+  }
+}
+
+async function callerCanWrite(share, access) {
+  // Partilhas antigas sem dono foram criadas pelo bypass de desenvolvimento.
+  // A exceção nunca vale em produção nem para partilhas com dono real.
+  if (access?.billingDisabled && billingDisabled() && !share?.ownerId && !share?.ownerEmail) return true;
+  if (sameIdentity(access?.customerId, share?.ownerId)) return true;
+  if (access?.billingDisabled && billingDisabled()
+    && sameIdentity(share?.ownerId, 'dev:billing-disabled')) return true;
+  const members = Array.isArray(share?.members) ? share.members : [];
+  if (members.some((member) => sameIdentity(member, access?.customerId))) return true;
+  // E-mail é apenas fallback para partilhas antigas sem ID, após prova Google.
+  const legacyEmailMatch = (!share?.ownerId && sameIdentity(access?.email, share?.ownerEmail))
+    || members.some((member) => sameIdentity(member, access?.email)
+      && !(share?.ownerId && sameIdentity(member, share?.ownerEmail)));
+  return legacyEmailMatch && hasVerifiedEmail(access);
+}
+
+function writableIdentity(access) {
+  return access.customerId || access.email
+    || (access.billingDisabled && billingDisabled() ? 'dev:billing-disabled' : '');
 }
 
 export default async function handler(req, res) {
@@ -34,6 +77,11 @@ export default async function handler(req, res) {
 
   const access = await requireActiveSubscription(req, res, { asJson: true });
   if (!access) return;
+  let signedAccess = null;
+  if (access.billingDisabled && billingDisabled()) {
+    try { signedAccess = readAccessCookie(req); } catch { /* dev sem secret */ }
+  }
+  const actor = signedAccess ? { ...access, ...signedAccess } : access;
 
   try {
     if (req.method === 'GET') {
@@ -56,19 +104,19 @@ export default async function handler(req, res) {
     const action = String(body.action || 'create').toLowerCase();
 
     if (action === 'join' || action === 'pull') {
-      const share = await getSharedProject(body.code);
-      if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
-      const email = access.email || access.customerId || 'membro';
-      const members = Array.isArray(share.members) ? [...share.members] : [];
-      if (email && !members.includes(email)) {
-        members.push(email);
-        await putSharedProject({
-          ...share,
-          members,
-          revision: share.revision || 1,
+      const identity = writableIdentity(actor);
+      const share = await mutateSharedProject(body.code, (current) => {
+        const members = Array.isArray(current.members) ? current.members : [];
+        if (!identity || members.some((member) => sameIdentity(member, identity))) {
+          return current;
+        }
+        return {
+          ...current,
+          members: [...members, identity],
           keepRevision: true,
-        });
-      }
+        };
+      });
+      if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
       return res.status(200).json({
         ok: true,
         code: share.code,
@@ -76,26 +124,32 @@ export default async function handler(req, res) {
         revision: share.revision,
         updatedAt: share.updatedAt,
         ownerEmail: share.ownerEmail || null,
-        members,
+        members: share.members || [],
         doc: share.doc,
       });
     }
 
     if (action === 'push' || action === 'update') {
-      const existing = await getSharedProject(body.code);
-      if (!existing) return res.status(404).json({ error: 'Código inválido ou expirado.' });
       if (!body.doc || typeof body.doc !== 'object') {
         return res.status(400).json({ error: 'Documento em falta.' });
       }
-      const saved = await putSharedProject({
-        ...existing,
-        doc: body.doc,
-        name: typeof body.name === 'string' && body.name.trim()
-          ? body.name.trim().slice(0, 120)
-          : existing.name,
-        ownerEmail: existing.ownerEmail || access.email || null,
-        revision: existing.revision || 1,
+      const saved = await mutateSharedProject(body.code, async (existing) => {
+        if (!(await callerCanWrite(existing, actor))) {
+          throw Object.assign(new Error('Sem permissão para alterar este projeto.'), {
+            code: 'share_forbidden',
+          });
+        }
+        return {
+          ...existing,
+          doc: body.doc,
+          name: typeof body.name === 'string' && body.name.trim()
+            ? body.name.trim().slice(0, 120)
+            : existing.name,
+          ownerEmail: existing.ownerEmail || actor.email || null,
+          revision: existing.revision || 1,
+        };
       });
+      if (!saved) return res.status(404).json({ error: 'Código inválido ou expirado.' });
       return res.status(200).json({
         ok: true,
         code: saved.code,
@@ -120,9 +174,9 @@ export default async function handler(req, res) {
       name: typeof body.name === 'string' && body.name.trim()
         ? body.name.trim().slice(0, 120)
         : 'Projeto partilhado',
-      ownerEmail: access.email || null,
-      ownerId: access.customerId || null,
-      members: access.email ? [access.email] : [],
+      ownerEmail: actor.email || null,
+      ownerId: actor.customerId || (actor.billingDisabled && billingDisabled() ? 'dev:billing-disabled' : null),
+      members: writableIdentity(actor) ? [writableIdentity(actor)] : [],
       revision: 0,
     });
     return res.status(201).json({
@@ -133,9 +187,10 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     const msg = e?.message || 'Falha na partilha.';
-    const status = e?.code === 'share_too_large' || e?.code === 'share_storage_unconfigured'
-      ? (e?.code === 'share_too_large' ? 413 : 503)
-      : 500;
+    const status = e?.code === 'share_forbidden' ? 403
+      : e?.code === 'share_busy' ? 409
+        : e?.code === 'share_too_large' ? 413
+          : e?.code === 'share_storage_unconfigured' ? 503 : 500;
     console.error('[project-share]', msg, e?.code || '', e?.stack?.slice?.(0, 200) || '');
     return res.status(status).json({ error: msg });
   }

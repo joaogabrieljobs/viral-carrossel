@@ -4,6 +4,7 @@
  * O store Blob do projeto é privado — `access: 'public'` falhava com "fetch failed".
  */
 
+import { randomBytes } from 'crypto';
 import { put, get, head } from '@vercel/blob';
 
 const SHARE_PREFIX = 'vc:project-share:';
@@ -14,6 +15,7 @@ const MAX_REDIS_CHARS = 450_000;
 const MAX_BLOB_CHARS = 12_000_000;
 const MAX_PAYLOAD_CHARS = MAX_BLOB_CHARS;
 const memory = new Map();
+const localMutations = new Map();
 
 function hasUpstash() {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
@@ -59,11 +61,17 @@ async function upstash(command) {
 
 function makeCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = randomBytes(8);
   let out = '';
   for (let i = 0; i < 8; i += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    out += alphabet[bytes[i] % alphabet.length];
   }
   return out;
+}
+
+export function resetShareMemory() {
+  memory.clear();
+  localMutations.clear();
 }
 
 export function assertSharePayloadSize(serialized) {
@@ -95,7 +103,7 @@ function stripDocImages(doc) {
   return { ...doc, slides, brand };
 }
 
-async function putBlobPrivate(pathname, serialized) {
+async function putBlobPrivate(pathname, serialized, ifMatch) {
   const signal = AbortSignal.timeout(45_000);
   await put(pathname, serialized, {
     access: 'private',
@@ -104,12 +112,14 @@ async function putBlobPrivate(pathname, serialized) {
     contentType: 'application/json',
     cacheControlMaxAge: 60,
     abortSignal: signal,
+    ...(ifMatch ? { ifMatch } : {}),
   });
 }
 
-async function readBlobPrivate(pathname) {
+async function readBlobPrivateVersioned(pathname) {
   const result = await get(pathname, { access: 'private', useCache: false });
-  if (!result?.stream) return null;
+  if (result === null) return null; // 404 legítimo do SDK.
+  if (!result?.stream) throw new Error('Blob sem conteúdo ao ler a partilha.');
   const chunks = [];
   const reader = result.stream.getReader();
   while (true) {
@@ -118,18 +128,24 @@ async function readBlobPrivate(pathname) {
     chunks.push(value);
   }
   const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-  try {
-    return JSON.parse(buf.toString('utf8'));
-  } catch {
-    return null;
-  }
+  return { record: JSON.parse(buf.toString('utf8')), etag: result.blob?.etag || null };
+}
+
+async function readBlobPrivate(pathname) {
+  return (await readBlobPrivateVersioned(pathname))?.record || null;
 }
 
 async function putRedis(key, serialized) {
-  await upstash(['SET', key, serialized, 'EX', String(SHARE_TTL_SEC)]);
+  const result = await upstash(['SET', key, serialized, 'EX', String(SHARE_TTL_SEC)]);
+  if (result !== 'OK') throw new Error('Redis não confirmou a gravação.');
 }
 
-export async function putSharedProject(record) {
+export async function putSharedProject(record, {
+  blobIfMatch = null,
+  blobOnly = false,
+  allowImageStripping = true,
+  failClosedOnRedisError = false,
+} = {}) {
   const code = String(record.code || makeCode()).toUpperCase();
   const payload = {
     ...record,
@@ -148,11 +164,15 @@ export async function putSharedProject(record) {
   const errors = [];
 
   // 1) Redis quando cabe — mais fiável e barato.
-  if (hasUpstash() && !tooBigForRedis) {
+  if (!blobOnly && hasUpstash() && !tooBigForRedis) {
     try {
       await putRedis(key, serialized);
       return payload;
     } catch (e) {
+      // Uma mutação que leu a versão vigente no Redis não pode mudar de
+      // armazenamento após uma escrita falhada: a versão antiga continuaria
+      // a ser lida e poderia mascarar a atualização salva no Blob.
+      if (failClosedOnRedisError) throw e;
       errors.push(`redis: ${e?.message || e}`);
     }
   }
@@ -160,27 +180,34 @@ export async function putSharedProject(record) {
   // 2) Blob privado (store do projeto não aceita public).
   if (hasBlob()) {
     try {
-      await putBlobPrivate(pathname, serialized);
+      await putBlobPrivate(pathname, serialized, blobIfMatch);
       // Ponteiro leve no Redis (se existir) para descoberta rápida.
-      if (hasUpstash()) {
-        try {
-          await putRedis(key, JSON.stringify({
-            code,
-            blobPath: pathname,
-            revision: payload.revision,
-            updatedAt: payload.updatedAt,
-            name: payload.name,
-          }));
-        } catch { /* blob já tem o doc */ }
+      if (!blobOnly && hasUpstash()) {
+        // Se falhar, não anunciar sucesso: um Redis antigo poderia servir
+        // a versão anterior apesar de o Blob já conter a nova.
+        await putRedis(key, JSON.stringify({
+          code,
+          blobPath: pathname,
+          revision: payload.revision,
+          updatedAt: payload.updatedAt,
+          name: payload.name,
+        }));
       }
       return payload;
     } catch (e) {
+      if (blobOnly) throw e;
       errors.push(`blob: ${e?.message || e}`);
     }
   }
 
+  if (blobOnly) {
+    throw Object.assign(new Error('Blob indisponível para atualizar a partilha.'), {
+      code: 'share_storage_unconfigured',
+    });
+  }
+
   // 3) Fallback: texto sem fotos no Redis.
-  if (hasUpstash()) {
+  if (allowImageStripping && hasUpstash()) {
     try {
       const strippedDoc = stripDocImages(payload.doc);
       const light = {
@@ -223,9 +250,183 @@ export async function putSharedProject(record) {
   );
 }
 
-export async function getSharedProject(code) {
+function validCode(code) {
   const normalized = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z0-9]{6,12}$/.test(normalized)) return null;
+  return /^[A-Z0-9]{6,12}$/.test(normalized) ? normalized : '';
+}
+
+function storageReadUnavailable() {
+  return Object.assign(new Error('Não foi possível confirmar a versão atual da partilha.'), {
+    code: 'share_storage_unconfigured',
+  });
+}
+
+function blobNotFound(error) {
+  return error?.name === 'BlobNotFoundError'
+    || error?.status === 404 || error?.statusCode === 404;
+}
+
+async function readBlobForMutation(pathname) {
+  let versioned;
+  try {
+    versioned = await readBlobPrivateVersioned(pathname);
+  } catch (error) {
+    if (blobNotFound(error)) return null;
+    // Blobs públicos antigos podem ser lidos pelo URL devolvido por head.
+    // Erros de rede/parse na leitura privada nunca caem em outro snapshot.
+    if (error?.name !== 'BlobAccessError') throw storageReadUnavailable();
+  }
+  if (versioned) {
+    if (!versioned.etag || !versioned.record?.doc) throw storageReadUnavailable();
+    return versioned;
+  }
+
+  let meta;
+  try { meta = await head(pathname); }
+  catch (error) {
+    if (blobNotFound(error)) return null;
+    throw storageReadUnavailable();
+  }
+  if (!meta) return null;
+  if (!meta.etag || !meta.url) throw storageReadUnavailable();
+  try {
+    const response = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
+    if (!response.ok) throw new Error('Blob público inacessível.');
+    const record = await response.json();
+    if (!record?.doc) throw new Error('Documento inválido.');
+    return { record, etag: meta.etag };
+  } catch {
+    throw storageReadUnavailable();
+  }
+}
+
+async function readCurrentForMutation(code) {
+  const key = `${SHARE_PREFIX}${code}`;
+  const pathname = `${BLOB_PREFIX}${code}.json`;
+  if (hasUpstash()) {
+    let raw;
+    try { raw = await upstash(['GET', key]); }
+    catch { throw storageReadUnavailable(); }
+    if (raw) {
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch { throw storageReadUnavailable(); }
+      if (parsed?.blobPath) {
+        if (!hasBlob()) throw storageReadUnavailable();
+        const versioned = await readBlobForMutation(parsed.blobPath);
+        if (!versioned) throw storageReadUnavailable();
+        return { ...versioned, source: 'blob' };
+      }
+      if (!parsed?.doc) throw storageReadUnavailable();
+      return { record: parsed, source: 'redis' };
+    }
+    // Sem chave Redis, apenas um Blob realmente legível pode recuperar uma
+    // partilha antiga que não chegou a receber ponteiro.
+    if (hasBlob()) {
+      const versioned = await readBlobForMutation(pathname);
+      return versioned ? { ...versioned, source: 'blob' } : null;
+    }
+    return null;
+  }
+  if (hasBlob()) {
+    const versioned = await readBlobForMutation(pathname);
+    return versioned ? { ...versioned, source: 'blob' } : null;
+  }
+  // Somente dev/test sem armazenamento remoto usam o mapa em memória.
+  const record = await getSharedProject(code);
+  return record ? { record } : null;
+}
+
+async function withLocalMutationLock(code, fn) {
+  const previous = localMutations.get(code) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => { release = resolve; });
+  localMutations.set(code, current);
+  await previous;
+  try { return await fn(); }
+  finally {
+    release();
+    if (localMutations.get(code) === current) localMutations.delete(code);
+  }
+}
+
+async function withRedisMutationLock(code, fn) {
+  const key = `${SHARE_PREFIX}${code}:mutation-lock`;
+  const token = randomBytes(20).toString('hex');
+  // A função serverless expira em 60 s; o lock sobrevive por mais 10 s.
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    // SET NX é atómico entre instâncias, inclusive quando o documento está no Blob.
+    // eslint-disable-next-line no-await-in-loop
+    let acquired;
+    try { acquired = await upstash(['SET', key, token, 'NX', 'PX', '70000']); }
+    catch {
+      throw Object.assign(new Error('Não foi possível coordenar a partilha agora.'), {
+        code: 'share_storage_unconfigured',
+      });
+    }
+    if (acquired === 'OK') {
+      try { return await fn(); }
+      finally {
+        const release = 'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end';
+        await upstash(['EVAL', release, '1', key, token]).catch(() => {});
+      }
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw Object.assign(new Error('Projeto ocupado. Tente novamente em alguns segundos.'), {
+    code: 'share_busy',
+  });
+}
+
+/**
+ * Aplica uma mudança à versão atual. Redis serializa entre instâncias; sem Redis,
+ * o ETag do Blob impede overwrite de outra instância e permite tentar de novo.
+ */
+export async function mutateSharedProject(code, change) {
+  const normalized = validCode(code);
+  if (!normalized) return null;
+
+  const mutate = async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const versioned = await readCurrentForMutation(normalized);
+      const current = versioned?.record;
+      if (!current) return null;
+      const next = await change(current);
+      if (!next || next === current) return current;
+      try {
+        if (versioned.source === 'blob' && hasBlob()) {
+          // ETag e documento vêm da mesma leitura. Nunca buscar ETag novo com
+          // head() para combinar com um snapshot potencialmente antigo.
+          if (!versioned.etag) throw storageReadUnavailable();
+          return await putSharedProject(next, { blobOnly: true, blobIfMatch: versioned.etag });
+        }
+        if (hasUpstash()) return await putSharedProject(next, {
+          allowImageStripping: false,
+          failClosedOnRedisError: true,
+        });
+        return await putSharedProject(next);
+      } catch (error) {
+        const conflict = error?.name === 'BlobPreconditionFailedError'
+          || error?.statusCode === 412 || error?.status === 412;
+        if (!conflict) throw error;
+        if (attempt === 4) {
+          throw Object.assign(new Error('A partilha mudou durante a gravação. Tente novamente.'), {
+            code: 'share_busy',
+          });
+        }
+      }
+    }
+    return null;
+  };
+
+  if (hasUpstash()) return withRedisMutationLock(normalized, mutate);
+  return withLocalMutationLock(normalized, mutate);
+}
+
+export async function getSharedProject(code) {
+  const normalized = validCode(code);
+  if (!normalized) return null;
   const key = `${SHARE_PREFIX}${normalized}`;
   const pathname = `${BLOB_PREFIX}${normalized}.json`;
 
