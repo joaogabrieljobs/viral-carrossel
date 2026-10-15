@@ -4,7 +4,7 @@ import { normalizeOverlays, parseOverlayMoveKey, updateOverlayOnSlide } from '..
 import { getTextFont, textFontPatch } from '../../utils/card-text-fonts.js';
 
 /** Escolhas locais do card, independentes da combinação tipográfica da marca. */
-export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdate }) {
+export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdate, onApplyAll, cardCount = 1 }) {
   if (!slide) return null;
   const hidden = new Set(slide.hiddenElements || []);
   const targets = [
@@ -34,7 +34,7 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
       <div style={{ display: 'grid', gap: 4 }}>
         <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>Fonte de cada texto</strong>
         <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-          Clique em um texto no card ou escolha abaixo. A mudança vale só para ele.
+          Clique em um texto no card ou escolha abaixo. Para repetir a fonte no mesmo tipo de texto dos outros cards, use Aplicar em todos.
         </p>
       </div>
       <label style={{ display: 'grid', gap: 7, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -50,6 +50,16 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
           ? { overlays: updateOverlayOnSlide(slide, overlay.id, { fontFamily: value }).overlays }
           : textFontPatch(slide, target.key, value))}
       />
+      <button
+        type="button"
+        className="vc-btn vc-btn-ghost"
+        disabled={cardCount < 2}
+        onClick={() => onApplyAll?.(target.key, fontFamily, slide.id)}
+        title={`Usar esta fonte em ${target.label.toLowerCase()} de todos os cards`}
+        style={{ minHeight: 40, width: '100%', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}
+      >
+        Aplicar em todos
+      </button>
       {target.text && <p style={{ margin: 0, fontSize: 16, lineHeight: 1.4, fontFamily: fontFamily || 'inherit', color: 'var(--text-primary)', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
         {String(target.text).slice(0, 90)}
       </p>}

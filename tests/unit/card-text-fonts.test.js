@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { getTextFont, normalizeTextFont, textFontPatch, resolveSlideTextFonts } from '../../src/utils/card-text-fonts.js';
+import { getTextFont, normalizeTextFont, textFontPatch, resolveSlideTextFonts, applyTextFontToAllCards } from '../../src/utils/card-text-fonts.js';
 import { SlideCardInner } from '../../src/components/card/SlideCardInner.jsx';
 import { DEFAULT_BRAND, ensureDocShape, mkSlide } from '../../src/utils/doc-schema.js';
 import {
@@ -58,6 +58,41 @@ function fontAtText(html, marker) {
 }
 
 describe('fontes individuais do card', () => {
+  it('aplicar em todos altera só títulos, inclusive onde havia fonte antiga, e preserva os demais textos', () => {
+    const first = { id: 'a', textFonts: { title: 'Antiga', subtitle: 'Sub A' } };
+    const second = { id: 'b', textFonts: { title: 'Outra', subtitle: 'Sub B' } };
+    const updated = applyTextFontToAllCards([first, second], 'a', 'title', '"Spectral", serif');
+    expect(updated.map(slide => slide.textFonts)).toEqual([
+      { title: '"Spectral", serif', subtitle: 'Sub A' },
+      { title: '"Spectral", serif', subtitle: 'Sub B' },
+    ]);
+    expect(first.textFonts.title).toBe('Antiga');
+    expect(second.textFonts.title).toBe('Outra');
+    expect(applyTextFontToAllCards(updated, 'a', 'title', '')[1].textFonts).toEqual({ subtitle: 'Sub B' });
+  });
+
+  it('aplicar em todos encontra a área extra correspondente sem criar textos em cards vazios', () => {
+    const slides = [
+      { id: 'a', overlays: [
+        { id: 'a1', type: 'text', fontFamily: 'Antes' },
+        { id: 'ac', type: 'cta', fontFamily: 'Chamada' },
+        { id: 'a2', type: 'text', fontFamily: 'Escolhida' },
+      ] },
+      { id: 'b', overlays: [
+        { id: 'b1', type: 'text', fontFamily: 'Primeira' },
+        { id: 'bc', type: 'cta', fontFamily: 'Outra chamada' },
+        { id: 'b2', type: 'text', fontFamily: 'Segunda' },
+      ] },
+      { id: 'c', overlays: [] },
+    ];
+    const updated = applyTextFontToAllCards(slides, 'a', 'ov_a2', '"Outfit", sans-serif');
+    expect(updated[1].overlays.map(overlay => overlay.fontFamily)).toEqual([
+      'Primeira', 'Outra chamada', '"Outfit", sans-serif',
+    ]);
+    expect(updated[2]).toBe(slides[2]);
+    expect(updated[0].overlays[0].fontFamily).toBe('Antes');
+    expect(slides[1].overlays[2].fontFamily).toBe('Segunda');
+  });
   it('usa reserva ao remover arquivo importado sem perder a escolha nem mascarar falha de arquivo existente', () => {
     const family = 'VCBrandTitle-marca, Georgia, serif';
     const slide = { textFonts: { title: family }, overlays: [{ type: 'text', fontFamily: family }] };

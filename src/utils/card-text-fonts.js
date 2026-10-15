@@ -63,3 +63,38 @@ export function textFontPatch(slide, key, fontFamily) {
   }
   return { textFonts };
 }
+
+/** Replica a fonte apenas no mesmo tipo de texto dos outros cards. */
+export function applyTextFontToAllCards(slides, sourceSlideId, key, fontFamily) {
+  if (!Array.isArray(slides) || !slides.length) return slides;
+  const font = normalizeTextFont(fontFamily);
+  if (FONT_KEYS.has(key)) {
+    return slides.map(slide => {
+      if ((slide?.textFonts?.[key] || '') === font) return slide;
+      return { ...slide, ...textFontPatch(slide, key, font) };
+    });
+  }
+  if (typeof key !== 'string' || !key.startsWith('ov_')) return slides;
+  const source = slides.find(slide => slide?.id === sourceSlideId);
+  const sourceOverlay = source?.overlays?.find(overlay => overlay?.id === key.slice(3));
+  if (!['text', 'cta'].includes(sourceOverlay?.type)) return slides;
+  // Os IDs das áreas extras são únicos por card. A posição entre áreas do
+  // mesmo tipo representa a correspondente nos demais cards.
+  const ordinal = source.overlays.filter(overlay => overlay?.type === sourceOverlay.type)
+    .findIndex(overlay => overlay.id === sourceOverlay.id);
+  return slides.map(slide => {
+    let index = -1;
+    let changed = false;
+    const overlays = slide.overlays?.map(overlay => {
+      if (overlay?.type !== sourceOverlay.type) return overlay;
+      index += 1;
+      if (index !== ordinal || (overlay.fontFamily || '') === font) return overlay;
+      changed = true;
+      const next = { ...overlay };
+      if (font) next.fontFamily = font;
+      else delete next.fontFamily;
+      return next;
+    });
+    return changed ? { ...slide, overlays } : slide;
+  });
+}

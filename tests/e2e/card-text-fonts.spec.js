@@ -197,3 +197,18 @@ for (const width of [1680, 390]) {
     }
   });
 }
+
+test('Aplicar em todos replica apenas a fonte do título e persiste após recarregar', async ({ page }) => {
+  await openProject(page, 1680);
+  await openTextPanel(page, false);
+  await selectFont(page, 'title', TITLE_FONT);
+  await panel(page).getByRole('button', { name: 'Aplicar em todos' }).click();
+  await expectFont(page, 'IDEIA 1', 'Playfair Display');
+  await expectFont(page, 'IDEIA 2', 'Playfair Display', SECOND_CARD);
+  await expectFont(page, 'Detalhe 2', 'Arial', SECOND_CARD);
+  await expect.poll(async () => (await savedDoc(page))?.slides?.map(slide => slide.textFonts?.title))
+    .toEqual([TITLE_FONT, TITLE_FONT]);
+  await page.reload();
+  await expectFont(page, 'IDEIA 2', 'Playfair Display', SECOND_CARD);
+  await expectFont(page, 'Detalhe 2', 'Arial', SECOND_CARD);
+});

@@ -25,6 +25,7 @@ import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
 import { ElementsPanel } from './panels/ElementsPanel.jsx';
 import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
+import { applyTextFontToAllCards } from '../utils/card-text-fonts.js';
 import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
 import { addOverlayToSlide, removeOverlayFromSlide, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
@@ -762,9 +763,14 @@ function SidebarContent({
           <CardTextFontPanel
             slide={slide}
             brand={brand}
+            cardCount={slides.length}
             selectedKey={selectedCardElement?.slideId === slide?.id ? selectedCardElement.key : null}
             onSelect={onSelectCardElement}
             onUpdate={updateSlide}
+            onApplyAll={(key, fontFamily, sourceSlideId) => {
+              setSlides(current => applyTextFontToAllCards(current, sourceSlideId, key, fontFamily));
+              toast?.('Fonte aplicada aos cards correspondentes.', 'success', 2500);
+            }}
           />
         )}
 
