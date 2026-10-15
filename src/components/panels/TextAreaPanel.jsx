@@ -1,10 +1,12 @@
 import React from 'react';
 import { AlignLeft, AlignCenter, AlignRight, Trash2, Type } from 'lucide-react';
 import { normalizeOverlays, updateOverlayOnSlide } from '../../utils/card-overlays.js';
+import { FontFamilySelect } from '../ui/font-pickers.jsx';
 
 /** Criação e edição de textos livres, independentes do título e do subtítulo. */
 export function TextAreaPanel({
   slide = null,
+  brand = null,
   selectedOverlayId = null,
   onCreate = null,
   onUpdate = () => {},
@@ -36,6 +38,7 @@ export function TextAreaPanel({
       {selected ? (
         <TextOverlayEditor
           overlay={selected}
+          brand={brand}
           onChange={(patch) => onUpdate(updateOverlayOnSlide(slide, selected.id, patch).overlays)}
           onRemove={() => onRemove(selected.id)}
         />
@@ -48,7 +51,7 @@ export function TextAreaPanel({
   );
 }
 
-export function TextOverlayEditor({ overlay, onChange, onRemove }) {
+export function TextOverlayEditor({ overlay, onChange, onRemove, brand = null }) {
   return (
     <div style={{
       display: 'grid', gap: 12, padding: 12, borderRadius: 12,
@@ -65,6 +68,12 @@ export function TextOverlayEditor({ overlay, onChange, onRemove }) {
           style={{ minHeight: 96, fontSize: 13, lineHeight: 1.5, resize: 'vertical' }}
         />
       </label>
+      <FontFamilySelect
+        label="Fonte deste texto"
+        value={overlay.fontFamily || ''}
+        onChange={(fontFamily) => onChange({ fontFamily })}
+        brand={brand}
+      />
       <label style={fieldLabel}>
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           Tamanho

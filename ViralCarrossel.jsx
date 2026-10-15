@@ -1539,7 +1539,11 @@ export default function App() {
   useEffect(() => {
     setActiveIdx((index) => Math.min(index, Math.max(0, slides.length - 1)));
   }, [slides.length]);
-  useEffect(() => { setSelectedCardElement(null); }, [activeIdx]);
+  const activeCardId = slides[activeIdx]?.id;
+  useEffect(() => {
+    // Clicar em um texto de outro card ativa o card e seleciona o texto juntos.
+    setSelectedCardElement(current => current?.slideId === activeCardId ? current : null);
+  }, [activeCardId]);
   const saveCustomVisualPreset = useCallback((label) => {
     const preset = createCustomVisualPreset({
       label,
@@ -4997,6 +5001,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       toast('Projeto apagado.', 'success', 3000);
     },
     selectedCardElement,
+    onSelectCardElement: (key) => setSelectedCardElement({ slideId: slide.id, key }),
     onCreateText: () => createTextAreaAt(activeIdx),
     onGenerateProject: generateProjectByKind,
     onPickVideo: () => videoFileInputRef.current?.click(),

@@ -25,6 +25,7 @@ import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
 import { ElementsPanel } from './panels/ElementsPanel.jsx';
 import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
+import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
 import { addOverlayToSlide, removeOverlayFromSlide, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
@@ -256,6 +257,7 @@ function SidebarContent({
   onDeleteProject = null,
   onGenerateProject = null,
   selectedCardElement = null,
+  onSelectCardElement = () => {},
   onCreateText = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
@@ -757,8 +759,19 @@ function SidebarContent({
       <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
 
         {tab === 'texto' && (
+          <CardTextFontPanel
+            slide={slide}
+            brand={brand}
+            selectedKey={selectedCardElement?.slideId === slide?.id ? selectedCardElement.key : null}
+            onSelect={onSelectCardElement}
+            onUpdate={updateSlide}
+          />
+        )}
+
+        {tab === 'texto' && (
           <TextAreaPanel
             slide={slide}
+            brand={brand}
             onCreate={onCreateText}
             selectedOverlayId={
               selectedCardElement?.slideId === slide?.id
@@ -2267,6 +2280,7 @@ function SidebarContent({
             </S>
             <S title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do seleccionado.">
               <ElementsPanel
+                brand={brand}
                 slide={slide}
                 toast={toast}
                 selectedOverlayId={

@@ -2,6 +2,9 @@
 import React, { useState, useMemo } from 'react';
 import { SectionLabel as S } from './SectionLabel.jsx';
 import { FONT_PAIRINGS, pairingMatchesBrand } from '../../utils/slide-design-system.js';
+import { TITLE_FONTS } from '../../utils/design-data.js';
+import { BODY_FONTS } from '../../utils/brand-visuals.js';
+import { vcCustomTitleFace } from '../../utils/brand-helpers.js';
 
 // Section wrapper
 // Agrupador de fontes por categoria com filtro lateral.
@@ -15,11 +18,51 @@ const FONT_CAT_LABELS = {
   editorial: 'Editorial',
   mono:      'Mono',
 };
+
+/** A mesma lista para qualquer texto; a opção vazia volta a herdar o estilo. */
+export function FontFamilySelect({ label = 'Fonte do texto selecionado', value = '', onChange, brand = {} }) {
+  const fonts = [...new Map([...TITLE_FONTS, ...BODY_FONTS].map(font => [font.val, font])).values()];
+  const custom = [];
+  if (brand?.customTitleFont?.dataUrl) custom.push({
+    name: brand.customTitleFont.fileName || 'Fonte importada de títulos',
+    val: `${vcCustomTitleFace(brand.id)}, ${brand.titleFont}`,
+  });
+  if (brand?.customBodyFont?.dataUrl) custom.push({
+    name: brand.customBodyFont.fileName || 'Fonte importada de corpo',
+    val: `VCBrandBody-${brand.id || 'default'}, ${brand.bodyFont}`,
+  });
+  const known = [...fonts, ...custom].some(font => font.val === value);
+  return (
+    <label style={{ display: 'grid', gap: 7, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+      {label}
+      <select
+        className="vc-input"
+        aria-label={label}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        style={{ width: '100%', minWidth: 0, minHeight: 42, fontSize: 13, fontFamily: value || 'var(--font-ui)' }}
+      >
+        <option value="">Usar fonte do estilo</option>
+        {value && !known && <option value={value}>{value.split(',')[0].replace(/["']/g, '')}</option>}
+        {custom.length > 0 && <optgroup label="Fontes importadas">
+          {custom.map(font => <option key={font.val} value={font.val}>{font.name}</option>)}
+        </optgroup>}
+        {['sans', 'display', 'serif', 'editorial', 'mono'].map(cat => (
+          <optgroup key={cat} label={FONT_CAT_LABELS[cat]}>
+            {fonts.filter(font => (font.cat || 'sans') === cat).map(font => (
+              <option key={font.val} value={font.val} style={{ fontFamily: font.val }}>{font.name}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
+  );
+}
 const FontPairingPicker = ({ brand, onApply, children }) => {
   const [showAll, setShowAll] = React.useState(false);
   return (
     <>
-      <S title="Pairings tipográficos" hint="Combinações curadas para carrosséis virais. “Todas as fontes” abre os pickers individuais.">
+      <S title="Fontes do projeto" hint="Combinações para o estilo geral. As fontes escolhidas para cada texto continuam preservadas.">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
           {FONT_PAIRINGS.map((p) => {
             const active = pairingMatchesBrand(brand, p);

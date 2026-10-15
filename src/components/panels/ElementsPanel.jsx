@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { TextOverlayEditor } from './TextAreaPanel.jsx';
+import { FontFamilySelect } from '../ui/font-pickers.jsx';
 import {
   ELEMENT_CATALOG,
   normalizeOverlays,
@@ -12,6 +13,7 @@ import {
  */
 export function ElementsPanel({
   slide = null,
+  brand = {},
   selectedOverlayId = null,
   onInsert = () => {},
   onRemove = () => {},
@@ -95,6 +97,7 @@ export function ElementsPanel({
       {selected ? (
         <OverlayEditor
           overlay={selected}
+          brand={brand}
           onChange={(patch) => {
             const next = updateOverlayOnSlide(slide, selected.id, patch);
             onUpdate(next.overlays);
@@ -155,9 +158,9 @@ export function ElementsPanel({
   );
 }
 
-function OverlayEditor({ overlay, onChange, onRemove }) {
+function OverlayEditor({ overlay, onChange, onRemove, brand }) {
   if (overlay.type === 'text') {
-    return <TextOverlayEditor overlay={overlay} onChange={onChange} onRemove={onRemove} />;
+    return <TextOverlayEditor overlay={overlay} brand={brand} onChange={onChange} onRemove={onRemove} />;
   }
   if (overlay.type === 'rule') {
     return (
@@ -182,6 +185,7 @@ function OverlayEditor({ overlay, onChange, onRemove }) {
   return (
     <div style={editorBox}>
       <div style={editorTitle}>Editar CTA</div>
+      <FontFamilySelect label="Fonte da chamada" value={overlay.fontFamily || ''} brand={brand} onChange={fontFamily => onChange({ fontFamily })} />
       <label style={fieldLabel}>
         Texto
         <input
