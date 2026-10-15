@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getStripe, findActiveSubscription } from '../../lib/stripe.js';
-import { getLibrarySyncMeta } from '../../lib/library-sync-store.js';
+import { getLibrarySyncMeta as getLegacyLibrarySyncMeta } from '../../lib/library-sync-store.js';
+import { getLibrarySyncMeta as getPostgresLibrarySyncMeta } from '../../lib/library-sync-postgres.js';
 import { invalidateActiveAccessForCustomer } from '../../lib/require-access.js';
 import {
   createAccessToken,
@@ -16,6 +17,11 @@ import {
   exchangeGoogleCode,
   getGoogleCanonicalOrigin,
 } from '../../lib/google-auth.js';
+import {
+  accountIdentityBackendEnabled,
+  getAccountByGoogleSubject,
+  linkVerifiedGoogleIdentity,
+} from '../../lib/account-identity-postgres.js';
 
 const normalizedEmail = (value) => String(value || '').trim().toLowerCase();
 
@@ -32,6 +38,8 @@ async function chooseCustomer(customers, googleSub) {
   let projectCounts;
   try {
     projectCounts = await Promise.all(customers.map(async (customer) => {
+      const getLibrarySyncMeta = process.env.LIBRARY_SYNC_BACKEND === 'postgres'
+        ? getPostgresLibrarySyncMeta : getLegacyLibrarySyncMeta;
       const meta = await getLibrarySyncMeta(customer.id);
       return Number(meta?.projectCount || 0);
     }));
@@ -83,29 +91,41 @@ export default async function handler(req, res) {
   try {
     const profile = await exchangeGoogleCode(req, code);
     const stripe = getStripe();
-    const customers = [];
-    let startingAfter;
-    for (let page = 0; page < 10; page += 1) {
-      const result = await stripe.customers.list({
-        email: profile.email,
-        limit: 100,
-        ...(startingAfter ? { starting_after: startingAfter } : {}),
-      });
-      customers.push(...result.data.filter((customer) =>
-        !customer.deleted && normalizedEmail(customer.email) === normalizedEmail(profile.email)));
-      if (!result.has_more) break;
-      startingAfter = result.data.at(-1)?.id;
-      if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
+    const dbIdentity = accountIdentityBackendEnabled();
+    const linkedAccount = dbIdentity ? await getAccountByGoogleSubject(profile.sub) : null;
+    let customer = linkedAccount?.stripeCustomerId
+      ? await stripe.customers.retrieve(linkedAccount.stripeCustomerId) : null;
+    if (customer?.deleted) customer = null;
+    if (!customer) {
+      const customers = [];
+      let startingAfter;
+      for (let page = 0; page < 10; page += 1) {
+        const result = await stripe.customers.list({
+          email: profile.email,
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+        customers.push(...result.data.filter((item) =>
+          !item.deleted && normalizedEmail(item.email) === normalizedEmail(profile.email)));
+        if (!result.has_more) break;
+        startingAfter = result.data.at(-1)?.id;
+        if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
+      }
+      if (!customers.length) {
+        setLoginHintCookie(res, profile.email);
+        return res.redirect(302, `${appUrl}/?login=no_subscription`);
+      }
+      customer = await chooseCustomer(customers, profile.sub);
     }
-    if (!customers.length) {
-      setLoginHintCookie(res, profile.email);
-      return res.redirect(302, `${appUrl}/?login=no_subscription`);
-    }
-
-    let customer = await chooseCustomer(customers, profile.sub);
     if (!customer) return res.redirect(302, `${appUrl}/?login=account_conflict`);
 
-    if (!customer.metadata?.vc_google_sub) {
+    let account = null;
+    if (dbIdentity) {
+      account = await linkVerifiedGoogleIdentity(customer.id, {
+        sub: profile.sub, email: profile.email,
+      });
+      invalidateActiveAccessForCustomer(customer.id);
+    } else if (!customer.metadata?.vc_google_sub) {
       const identityEpoch = crypto.randomBytes(16).toString('hex');
       const revokedBefore = Date.now();
       customer = await stripe.customers.update(customer.id, {
@@ -124,14 +144,20 @@ export default async function handler(req, res) {
       invalidateActiveAccessForCustomer(customer.id);
     }
 
-    const identityEpoch = customer.metadata?.vc_identity_epoch || '';
+    const identityEpoch = dbIdentity
+      ? String(account.identityEpoch || '')
+      : String(customer.metadata?.vc_identity_epoch || '');
+    const revokedBefore = dbIdentity
+      ? Number(account.sessionRevokedBefore || 0)
+      : Number(customer.metadata?.vc_session_revoked_before || 0);
     const sub = await findActiveSubscription(customer.id);
     if (sub) {
       const token = createAccessToken({
         customerId: customer.id,
         email: profile.email,
         identityEpoch,
-        iatMs: Math.max(Date.now(), Number(customer.metadata?.vc_session_revoked_before || 0) + 1),
+        ...(account ? { accountId: account.id } : {}),
+        iatMs: Math.max(Date.now(), revokedBefore + 1),
       });
       setAccessCookie(res, token);
       return res.redirect(302, `${appUrl}/?billing=restored&login=google`);

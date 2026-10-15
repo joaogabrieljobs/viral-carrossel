@@ -1,6 +1,12 @@
 import crypto from 'node:crypto';
 import { getStripe } from './stripe.js';
 import { getPasswordRecoveryRecord, hashPassword, normalizeEmail } from './password-auth.js';
+import {
+  accountIdentityBackendEnabled,
+  getOrCreateAccountForStripeCustomer,
+  getPasswordRecordByStripeCustomerId,
+  setAccountPassword,
+} from './account-identity-postgres.js';
 
 export const RESET_TTL_MS = 30 * 60_000;
 const MAIL_WINDOW_MS = 3 * 60_000;
@@ -87,6 +93,29 @@ export async function resetPassword(token, password) {
   const data = readPasswordResetToken(token);
   const invalid = () => Object.assign(new Error(INVALID_LINK), { code: 'invalid_reset_link' });
   if (!data) throw invalid();
+  if (accountIdentityBackendEnabled()) {
+    await getOrCreateAccountForStripeCustomer(data.customerId);
+    const record = await getPasswordRecordByStripeCustomerId(data.customerId);
+    if (!record?.email) throw invalid();
+    const current = version(data.customerId, record.email,
+      record.salt, record.hash, record.identityEpoch);
+    if (!equal(current, data.version)) throw invalid();
+    const { salt, hash } = hashPassword(password);
+    try {
+      await setAccountPassword(data.customerId, {
+        salt, hash,
+        expectedHash: record.hash,
+        expectedEpoch: record.identityEpoch,
+      });
+    } catch (error) {
+      if (error?.code === 'identity_credential_conflict') throw invalid();
+      throw error;
+    }
+    return {
+      email: normalizeEmail(record.email),
+      notificationKey: `password-changed-${digest(token)}`,
+    };
+  }
   const stripe = getStripe();
   let customer;
   try { customer = await stripe.customers.retrieve(data.customerId); }

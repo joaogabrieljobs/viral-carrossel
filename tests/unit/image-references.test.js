@@ -24,9 +24,19 @@ it('plano envia todos os uploads locais na mesma geração, sem descartá-los', 
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(fetchMock.mock.calls[0][0]).toBe('/api/ai/sjinn-image');
   const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(body.operationId).toMatch(/^[A-Za-z0-9._:-]{1,160}$/);
   expect(body.imageList).toEqual(refs);
   expect(body.prompt).toContain('REFERENCE IMAGES ARE ATTACHED');
   expect(body.prompt).not.toContain('photorealistic real-photograph rendering');
+});
+it('reusa o identificador fornecido para a mesma tentativa de geração', async () => {
+  setAIRuntimeSettings({ useOwnImageKey: false });
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ b64_json: 'result' }) });
+  vi.stubGlobal('fetch', fetchMock);
+  await generateDALLE('world', '', null, { operationId: 'retry-safe-123' });
+  await generateDALLE('world', '', null, { operationId: 'retry-safe-123' });
+  expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).operationId))
+    .toEqual(['retry-safe-123', 'retry-safe-123']);
 });
 it('plano rejeita referências não suportadas antes da requisição', async () => {
   setAIRuntimeSettings({ useOwnImageKey: false });

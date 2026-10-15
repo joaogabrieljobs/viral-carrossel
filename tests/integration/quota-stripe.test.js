@@ -102,6 +102,37 @@ describe('contador de imagens nos metadados do Stripe', () => {
 });
 
 describe('encadeamento do armazenamento de quota', () => {
+  it('migra o maior uso persistente entre Redis e Stripe sem conceder créditos de novo', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_fake');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
+    clienteStateful({ [CHAVE]: '7' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ result: '3' }))));
+    const { getLegacyQuotaUsage } = await import('../../api/lib/image-quota.js');
+    expect(await getLegacyQuotaUsage({ customerId: CUS, periodStartSec: PERIODO }))
+      .toEqual({ used: 7 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ result: '9' }))));
+    expect(await getLegacyQuotaUsage({ customerId: CUS, periodStartSec: PERIODO }))
+      .toEqual({ used: 9 });
+  });
+
+  it('falha fechado se uma fonte legada configurada não responde', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_fake');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.test');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
+    clienteStateful({ [CHAVE]: '7' });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Redis indisponível')));
+    const { getLegacyQuotaUsage } = await import('../../api/lib/image-quota.js');
+    await expect(getLegacyQuotaUsage({ customerId: CUS, periodStartSec: PERIODO }))
+      .rejects.toMatchObject({ code: 'quota_store_unavailable' });
+  });
+
   it.each(['network', 'command'])('Redis %s inválido consulta o saldo persistente no Stripe', async (failure) => {
     vi.stubEnv('VITEST', 'false');
     vi.stubEnv('NODE_ENV', 'production');

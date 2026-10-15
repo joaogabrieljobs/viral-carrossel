@@ -6,6 +6,13 @@
 import crypto from 'crypto';
 import { getStripe } from './stripe.js';
 import { getLibrarySyncMeta } from './library-sync-store.js';
+import {
+  accountIdentityBackendEnabled,
+  findAccountsByEmail,
+  findPasswordCandidatesByEmail,
+  getOrCreateAccountForStripeCustomer,
+  setAccountPassword,
+} from './account-identity-postgres.js';
 
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
@@ -72,6 +79,24 @@ async function customersByEmail(email) {
   });
 }
 
+async function importStripeIdentitiesForEmail(email) {
+  const customers = await customersByEmail(email);
+  await Promise.all(customers.map((customer) => getOrCreateAccountForStripeCustomer(customer.id)));
+  return customers;
+}
+
+function dbAuthRecord(account) {
+  return account ? {
+    customerId: account.stripeCustomerId,
+    accountId: account.id,
+    email: account.email,
+    salt: account.salt,
+    hash: account.hash,
+    identityEpoch: account.identityEpoch,
+    sessionRevokedBefore: account.sessionRevokedBefore,
+  } : null;
+}
+
 async function findCustomerByEmail(email) {
   const customers = await customersByEmail(email);
   return customers.find((customer) => customer.metadata?.vc_pw_salt && customer.metadata?.vc_pw_hash)
@@ -90,12 +115,23 @@ function authRecord(customer, email) {
 }
 
 export async function getAuthRecord(email) {
+  if (accountIdentityBackendEnabled()) {
+    await importStripeIdentitiesForEmail(email);
+    return dbAuthRecord((await findAccountsByEmail(email))[0]);
+  }
   const customer = await findCustomerByEmail(email);
   return customer ? authRecord(customer, email) : null;
 }
 
 /** Recuperação nunca pode definir uma senha em outra conta duplicada do e-mail. */
 export async function getPasswordRecoveryRecord(email) {
+  if (accountIdentityBackendEnabled()) {
+    await importStripeIdentitiesForEmail(email);
+    const accounts = await findAccountsByEmail(email);
+    // Duas contas com o mesmo email não podem receber um reset por escolha
+    // implícita; mesmo endereço não prova qual customer é o titular.
+    return accounts.length === 1 ? dbAuthRecord(accounts[0]) : null;
+  }
   const customers = await customersByEmail(email);
   if (customers.length < 2) return customers[0] ? authRecord(customers[0], email) : null;
 
@@ -121,6 +157,12 @@ export async function getPasswordRecoveryRecord(email) {
 
 /** A senha deve conferir no customer exato; e-mail igual não prova que sejam a mesma conta. */
 export async function getAuthRecordsMatchingPassword(email, password) {
+  if (accountIdentityBackendEnabled()) {
+    await importStripeIdentitiesForEmail(email);
+    return (await findPasswordCandidatesByEmail(email))
+      .filter((record) => record.salt && record.hash && verifyPassword(password, record))
+      .map(dbAuthRecord);
+  }
   const customers = await customersByEmail(email);
   return customers
     .map((customer) => authRecord(customer, email))
@@ -130,6 +172,22 @@ export async function getAuthRecordsMatchingPassword(email, password) {
 export async function setAuthRecord(email, record) {
   const stripe = getStripe();
   const clean = normalizeEmail(email);
+  if (accountIdentityBackendEnabled()) {
+    let customerId = record.customerId;
+    if (!customerId) {
+      const created = await stripe.customers.create({
+        email: clean, metadata: { product: 'viral-carrossel' },
+      });
+      customerId = created.id;
+    }
+    const account = await getOrCreateAccountForStripeCustomer(customerId);
+    const saved = await setAccountPassword(customerId, { salt: record.salt, hash: record.hash });
+    return {
+      email: clean, customerId, accountId: account.id,
+      salt: record.salt, hash: record.hash, identityEpoch: saved.identityEpoch,
+      updatedAt: Math.floor(Date.now() / 1000),
+    };
+  }
   let customerId = record.customerId;
   let customer = null;
 
@@ -205,5 +263,7 @@ export function generatePassword(length = 14) {
 }
 
 export function passwordAuthConfigured() {
-  return Boolean(String(process.env.STRIPE_SECRET_KEY || '').trim());
+  return Boolean(String(process.env.STRIPE_SECRET_KEY || '').trim())
+    && (!accountIdentityBackendEnabled()
+      || Boolean(String(process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim()));
 }

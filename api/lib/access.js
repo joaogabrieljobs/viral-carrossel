@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 import { getStripe } from './stripe.js';
+import {
+  accountIdentityBackendEnabled,
+  getOrCreateAccountForStripeCustomer,
+} from './account-identity-postgres.js';
 
 const COOKIE_NAME = 'vc_access';
 const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 dias
@@ -49,6 +53,7 @@ export function createAccessToken(data) {
     iat: Math.floor(iatMs / 1000),
     iatMs,
     ...(data.identityEpoch ? { identityEpoch: data.identityEpoch } : {}),
+    ...(data.accountId ? { accountId: data.accountId } : {}),
   };
   const body = b64urlJson(payload);
   return `${body}.${sign(body)}`;
@@ -65,6 +70,8 @@ export function verifyAccessToken(token) {
   try {
     const payload = JSON.parse(fromB64url(body));
     if (!payload.customerId || !payload.email) return null;
+    if (payload.accountId
+      && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(payload.accountId)) return null;
     if (payload.iat && Date.now() / 1000 - payload.iat > MAX_AGE_SEC) return null;
     if (payload.iatMs && payload.iatMs > Date.now() + 60_000) return null;
     return payload;
@@ -100,6 +107,21 @@ export function readAccessCookie(req) {
 export async function readCurrentAccessCookie(req) {
   const access = readAccessCookie(req);
   if (!access) return null;
+  if (accountIdentityBackendEnabled()) {
+    let account;
+    try { account = await getOrCreateAccountForStripeCustomer(access.customerId); }
+    catch (error) {
+      if (error?.code === 'identity_customer_not_found'
+        || error?.code === 'identity_customer_not_verified'
+        || error?.code === 'identity_bad_customer') return null;
+      throw error;
+    }
+    if (!account || (access.accountId && access.accountId !== account.id)
+      || String(access.identityEpoch || '') !== String(account.identityEpoch || '')) return null;
+    const issuedAt = Number(access.iatMs || access.iat * 1000 || 0);
+    if (account.sessionRevokedBefore && issuedAt <= account.sessionRevokedBefore) return null;
+    return { ...access, accountId: account.id };
+  }
   let customer;
   try { customer = await getStripe().customers.retrieve(access.customerId); }
   catch (error) { if (error.code === 'resource_missing') return null; throw error; }

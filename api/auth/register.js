@@ -10,6 +10,7 @@ import {
 } from '../lib/password-auth.js';
 import { getStripe } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { accountIdentityBackendEnabled, setAccountPassword } from '../lib/account-identity-postgres.js';
 
 function readBody(req) {
   if (!req.body) return {};
@@ -55,18 +56,21 @@ export default async function handler(req, res) {
     }
 
     const { salt, hash } = hashPassword(password);
+    const dbIdentity = accountIdentityBackendEnabled();
     const customer = await getStripe().customers.create({
       email: cleanEmail,
-      metadata: {
-        product: 'viral-carrossel',
-        vc_pw_salt: salt,
-        vc_pw_hash: hash,
-      },
+      metadata: dbIdentity
+        ? { product: 'viral-carrossel' }
+        : { product: 'viral-carrossel', vc_pw_salt: salt, vc_pw_hash: hash },
     });
+    const identity = dbIdentity
+      ? await setAccountPassword(customer.id, { salt, hash })
+      : null;
     setCheckoutIdentityCookie(res, {
       email: cleanEmail,
       customerId: customer.id,
       source: 'new_registration',
+      ...(identity ? { identityEpoch: identity.identityEpoch } : {}),
     });
     setLoginHintCookie(res, cleanEmail);
 

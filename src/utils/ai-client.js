@@ -656,6 +656,11 @@ async function generateDALLEEdits(refBlob, prompt, apiKey, signal, options = {})
 
 const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => {
   const { imgExtraPrompt, signal } = options || {};
+  const operationId = typeof options.operationId === 'string'
+    && /^[A-Za-z0-9._:-]{1,160}$/.test(options.operationId)
+    ? options.operationId
+    : (globalThis.crypto?.randomUUID?.()
+      || `img_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`);
   const requestedAspectRatio = normalizeImageAspectRatio(options.aspectRatio);
   const aspectRatio = resolveSjinnAspectRatio(requestedAspectRatio);
   const refs = await prepareImageReferencesForUpload(options.refImages || (options.refImage ? [options.refImage] : []));
@@ -673,6 +678,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        operationId,
         prompt: prompt.slice(0, 4000),
         aspectRatio,
         resolution: '1K',

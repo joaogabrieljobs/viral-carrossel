@@ -10,6 +10,7 @@ import {
 } from '../lib/password-auth.js';
 import { getStripe, findActiveSubscription } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { accountIdentityBackendEnabled } from '../lib/account-identity-postgres.js';
 
 function readBody(req) {
   if (!req.body) return {};
@@ -62,7 +63,11 @@ export default async function handler(req, res) {
   try {
     const stripe = getStripe();
     const list = await stripe.customers.list({ email: cleanEmail, limit: 5 });
-    const customer = list.data.find((c) => !c.deleted) || list.data[0];
+    const matches = list.data.filter((c) => !c.deleted && normalizeEmail(c.email) === cleanEmail);
+    if (accountIdentityBackendEnabled() && (matches.length > 1 || list.has_more)) {
+      return res.status(409).json({ error: 'Mais de uma conta usa este e-mail. Informe o customer exato ao suporte.' });
+    }
+    const customer = matches[0] || (accountIdentityBackendEnabled() ? null : list.data[0]);
     if (!customer && !force) {
       return res.status(404).json({ error: 'Cliente Stripe não encontrado' });
     }

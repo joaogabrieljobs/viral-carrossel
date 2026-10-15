@@ -5,6 +5,7 @@
  * Body: { prompt: string, aspectRatio?: '2:3'|'1:1'|..., imageList?: (HTTPS | data URL)[] }
  * Resposta: { b64_json, mime, quota: { used, limit, remaining, tier } }
  */
+import { randomUUID } from 'node:crypto';
 import { applyCors } from '../lib/cors.js';
 import { requireActiveSubscription } from '../lib/require-access.js';
 import { findActiveSubscription } from '../lib/stripe.js';
@@ -17,6 +18,7 @@ import {
 import {
   consumeImageCredit,
   refundImageCredit,
+  settleImageCredit,
   getQuotaUsage,
 } from '../lib/image-quota.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
@@ -67,6 +69,17 @@ export default async function handler(req, res) {
   if (prompt.length < 8) {
     return res.status(400).json({ error: 'Prompt de imagem demasiado curto.' });
   }
+
+  const suppliedOperationId = body.operationId ?? req.headers?.['x-idempotency-key'];
+  if (suppliedOperationId != null
+    && (typeof suppliedOperationId !== 'string'
+      || suppliedOperationId.length > 160
+      || !/^[A-Za-z0-9._:-]+$/.test(suppliedOperationId))) {
+    return res.status(400).json({ error: 'Identificador da geração inválido.', code: 'invalid_operation_id' });
+  }
+  // Browsers antigos continuam utilizáveis, mas novos clientes enviam o mesmo
+  // ID em cada tentativa de rede para não descontar duas vezes.
+  const operationId = suppliedOperationId || randomUUID();
 
   let references;
   try {
@@ -138,6 +151,7 @@ export default async function handler(req, res) {
       periodStartSec,
       periodEndSec,
       limit,
+      operationId,
     });
   } catch (e) {
     console.error('[sjinn-image] quota', e?.message || e);
@@ -149,6 +163,17 @@ export default async function handler(req, res) {
   }
 
   if (!consumed.allowed) {
+    if (consumed.replayed) {
+      return res.status(409).json({
+        error: consumed.reason === 'already_reserved'
+          ? 'Esta imagem já está sendo gerada. Aguarde o resultado da primeira tentativa.'
+          : 'Esta tentativa de geração já foi concluída. Inicie uma nova geração para outra imagem.',
+        code: 'image_operation_replayed',
+        operationId,
+        quota: { used: consumed.used, limit: consumed.limit, remaining: consumed.remaining,
+          tier, status: 'available', available: true, allowed: consumed.remaining > 0 },
+      });
+    }
     return res.status(402).json({
       error: 'Quota de imagens esgotada neste ciclo. Faça upgrade ou aguarde a renovação.',
       code: 'quota_exhausted',
@@ -177,10 +202,19 @@ export default async function handler(req, res) {
     if (!url) throw new Error('A geração de imagem não devolveu resultado.');
     const { b64_json, mime } = await downloadImageAsBase64(url);
 
+    // A reserva já descontou o crédito. Se apenas esta anotação falhar, a
+    // imagem e o débito permanecem válidos; não refazer a geração nem devolver.
+    try {
+      await settleImageCredit({ customerId, periodStartSec, operationId });
+    } catch (settleError) {
+      console.error('[sjinn-image] settle', settleError?.message || settleError);
+    }
+
     return res.status(200).json({
       b64_json,
       mime,
       taskId,
+      operationId,
       tier,
       quota: {
         used: consumed.used,
@@ -196,7 +230,7 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('[sjinn-image]', e?.message || e);
     try {
-      await refundImageCredit({ customerId, periodStartSec });
+      await refundImageCredit({ customerId, periodStartSec, operationId });
     } catch (refundErr) {
       console.error('[sjinn-image] refund', refundErr?.message || refundErr);
     }

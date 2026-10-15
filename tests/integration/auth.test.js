@@ -6,6 +6,9 @@ vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; }
 vi.mock('../../api/lib/library-sync-store.js', () => ({
   getLibrarySyncMeta: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('../../api/lib/library-sync-postgres.js', () => ({
+  getLibrarySyncMeta: vi.fn().mockResolvedValue(null),
+}));
 
 import { makeReq, makeRes, setCookies, cookieValue } from '../helpers/http.js';
 import {
@@ -22,6 +25,7 @@ import registerHandler from '../../api/auth/register.js';
 import checkoutHandler from '../../api/stripe/checkout.js';
 import confirmHandler from '../../api/stripe/confirm.js';
 import { getLibrarySyncMeta } from '../../api/lib/library-sync-store.js';
+import { getLibrarySyncMeta as getPostgresLibrarySyncMeta } from '../../api/lib/library-sync-postgres.js';
 import { requireActiveSubscription, resetActiveAccessCacheForTests } from '../../api/lib/require-access.js';
 
 const APP = 'https://viralcarrossel.com.br';
@@ -35,6 +39,7 @@ const checkoutIdentityFrom = (res) => {
 beforeEach(() => {
   resetStripeMock();
   getLibrarySyncMeta.mockReset().mockResolvedValue(null);
+  getPostgresLibrarySyncMeta.mockReset().mockResolvedValue(null);
   resetActiveAccessCacheForTests();
 });
 afterEach(() => {
@@ -67,6 +72,7 @@ describe('GET /api/auth/session (RF-04)', () => {
     await sessionHandler(makeReq(), res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ active: false, status: 'anonymous' });
+    expect(res.body.customerId).toBeUndefined();
   });
 
   it('cookie válido + assinatura ativa → active com currentPeriodEnd', async () => {
@@ -74,7 +80,7 @@ describe('GET /api/auth/session (RF-04)', () => {
     const res = makeRes();
     await sessionHandler(makeReq({ cookie: cookieFor('cus_1', 'user1@teste.exemplo') }), res);
     expect(res.body).toMatchObject({ active: true, email: 'user1@teste.exemplo', status: 'active' });
-    expect(res.body.customerId).toBeUndefined();
+    expect(res.body.customerId).toBe('cus_1');
     expect(typeof res.body.currentPeriodEnd).toBe('string');
   });
 
@@ -404,6 +410,23 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
       cookie: 'vc_google_oauth=S' }), conflict);
     expect(conflict.redirectUrl).toBe(`${APP}/?login=account_conflict`);
     expect(cookieValue(conflict, COOKIE_NAME)).toBeNull();
+  });
+
+  it('Google escolhe a conta com projetos no Postgres após a migração', async () => {
+    vi.stubEnv('LIBRARY_SYNC_BACKEND', 'postgres');
+    stubGoogleFetch('dona@teste.exemplo');
+    stripeMock.customers.list.mockResolvedValue({ data: [
+      { id: 'cus_antigo', email: 'dona@teste.exemplo', metadata: {} },
+      { id: 'cus_projetos', email: 'dona@teste.exemplo', metadata: {} },
+    ] });
+    getPostgresLibrarySyncMeta.mockImplementation(async (id) => ({
+      projectCount: id === 'cus_projetos' ? 1 : 0,
+    }));
+    const response = makeRes();
+    await googleCallbackHandler(makeReq({ url: '/api/auth/google/callback?code=abc&state=S',
+      cookie: 'vc_google_oauth=S' }), response);
+    expect(checkoutIdentityFrom(response)?.customerId).toBe('cus_projetos');
+    expect(getLibrarySyncMeta).not.toHaveBeenCalled();
   });
 
   it('prova Google recente prevalece sobre sessão antiga de outro customer com o mesmo e-mail', async () => {

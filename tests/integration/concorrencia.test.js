@@ -98,7 +98,7 @@ describe(`RF-11 — ${N} usuários simultâneos (3 rodadas)`, () => {
         expect(confirm).toMatchObject({ active: true, email: u.email });
         expect(confirm.customerId).toBeUndefined();
         expect(session).toMatchObject({ active: true, email: u.email });
-        expect(session.customerId).toBeUndefined();
+        expect(session.customerId).toBe(u.customerId);
       }
 
       // varredura cruzada N×N: nenhuma resposta contém dado de OUTRO usuário
@@ -109,7 +109,7 @@ describe(`RF-11 — ${N} usuários simultâneos (3 rodadas)`, () => {
           expect(blob).not.toContain(other.email);
           expect(blob).not.toContain(other.customerId);
         }
-        expect(blob).not.toContain(u.customerId);
+        expect(session.customerId).toBe(u.customerId);
       }
     });
   }

@@ -35,6 +35,10 @@ function quotaKey(customerId, periodStartSec) {
   return `vc:imgquota:${customerId}:${periodStartSec || 'nop'}`;
 }
 
+function usesPostgresQuota() {
+  return process.env.IMAGE_QUOTA_BACKEND === 'postgres';
+}
+
 async function upstash(command) {
   const base = process.env.UPSTASH_REDIS_REST_URL.replace(/\/$/, '');
   const token = process.env.UPSTASH_REDIS_REST_TOKEN.trim();
@@ -137,9 +141,42 @@ async function memoryDecr(key) {
 }
 
 /**
+ * Leitura de migração: toma o maior contador persistente entre Upstash e Stripe.
+ * Se qualquer fonte configurada não responder, não presume que o saldo é zero.
+ * Não passa pelo router Postgres para evitar recursão durante a importação.
+ */
+export async function getLegacyQuotaUsage({ customerId, periodStartSec }) {
+  const key = quotaKey(customerId, periodStartSec);
+  const counts = [];
+  try {
+    if (hasUpstash()) {
+      const value = await upstash(['GET', key]);
+      if (value == null) counts.push(0);
+      else if (/^\d+$/.test(String(value))) counts.push(Number(value));
+      else throw new Error('Contador Upstash inválido.');
+    }
+    if (podeUsarStripe(customerId)) counts.push(await stripeQuotaGet({ customerId, periodStartSec }));
+    if (counts.length === 0) {
+      if (isProductionQuotaStrict()) throw new Error('Nenhum contador persistente disponível.');
+      counts.push(await memoryGet(key));
+    }
+    const used = Math.max(...counts);
+    if (!Number.isSafeInteger(used) || used < 0) throw new Error('Contador legado inválido.');
+    return { used };
+  } catch (error) {
+    console.error('[image-quota] migração do contador falhou:', error?.message || error);
+    throw Object.assign(new Error('quota_store_unavailable'), { code: 'quota_store_unavailable' });
+  }
+}
+
+/**
  * @returns {{ used: number, remaining: number, limit: number, allowed: boolean }}
  */
-export async function getQuotaUsage({ customerId, periodStartSec, limit }) {
+export async function getQuotaUsage({ customerId, periodStartSec, periodEndSec, limit }) {
+  if (usesPostgresQuota()) {
+    const { getQuotaUsagePostgres } = await import('./image-quota-postgres.js');
+    return getQuotaUsagePostgres({ customerId, periodStartSec, periodEndSec, limit });
+  }
   const key = quotaKey(customerId, periodStartSec);
   const used = Number(await withQuotaStore(
     async () => upstash(['GET', key]),
@@ -159,7 +196,11 @@ export async function getQuotaUsage({ customerId, periodStartSec, limit }) {
 /**
  * Consome 1 crédito. Se ultrapassar o limite, reverte e devolve allowed:false.
  */
-export async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit }) {
+export async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId }) {
+  if (usesPostgresQuota()) {
+    const { consumeImageCreditPostgres } = await import('./image-quota-postgres.js');
+    return consumeImageCreditPostgres({ customerId, periodStartSec, periodEndSec, limit, operationId });
+  }
   const cap = Math.max(0, Number(limit) || 0);
   if (cap <= 0) {
     return { allowed: false, used: 0, limit: 0, remaining: 0, reason: 'no_quota' };
@@ -213,7 +254,11 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
 }
 
 /** Reembolsa 1 crédito (falha SJinn após consumo). */
-export async function refundImageCredit({ customerId, periodStartSec }) {
+export async function refundImageCredit({ customerId, periodStartSec, operationId }) {
+  if (usesPostgresQuota()) {
+    const { refundImageCreditPostgres } = await import('./image-quota-postgres.js');
+    return refundImageCreditPostgres({ customerId, periodStartSec, operationId });
+  }
   const key = quotaKey(customerId, periodStartSec);
   return withQuotaStore(
     async () => {
@@ -225,6 +270,13 @@ export async function refundImageCredit({ customerId, periodStartSec }) {
     async () => stripeQuotaRefund({ customerId, periodStartSec }),
     customerId,
   );
+}
+
+/** Regista o sucesso; o backend legado já considera a reserva consumida. */
+export async function settleImageCredit({ customerId, periodStartSec, operationId }) {
+  if (!usesPostgresQuota()) return { status: 'consumed' };
+  const { settleImageCreditPostgres } = await import('./image-quota-postgres.js');
+  return settleImageCreditPostgres({ customerId, periodStartSec, operationId });
 }
 
 /** Só testes. */

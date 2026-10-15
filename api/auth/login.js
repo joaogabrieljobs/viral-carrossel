@@ -8,6 +8,7 @@ import {
 } from '../lib/password-auth.js';
 import { getStripe, findActiveSubscription } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { accountIdentityBackendEnabled, getAccountByStripeCustomerId } from '../lib/account-identity-postgres.js';
 
 function readBody(req) {
   if (!req.body) return {};
@@ -48,20 +49,31 @@ export default async function handler(req, res) {
     }
     const record = matches[0];
 
-    const stripe = getStripe();
-    const customer = await stripe.customers.retrieve(record.customerId);
-    if (!customer || customer.deleted || normalizeEmail(customer.email) !== cleanEmail) {
-      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
-    }
-    if (record.identityEpoch !== String(customer.metadata?.vc_identity_epoch || '')) {
-      return res.status(401).json({ error: 'A conta mudou. Entre novamente para continuar.' });
+    const dbIdentity = accountIdentityBackendEnabled();
+    let customerId = record.customerId;
+    if (dbIdentity) {
+      const account = await getAccountByStripeCustomerId(customerId);
+      if (!account || account.id !== record.accountId || account.email !== cleanEmail
+        || account.identityEpoch !== record.identityEpoch) {
+        return res.status(401).json({ error: 'A conta mudou. Entre novamente para continuar.' });
+      }
+    } else {
+      const stripe = getStripe();
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer || customer.deleted || normalizeEmail(customer.email) !== cleanEmail) {
+        return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+      }
+      if (record.identityEpoch !== String(customer.metadata?.vc_identity_epoch || '')) {
+        return res.status(401).json({ error: 'A conta mudou. Entre novamente para continuar.' });
+      }
+      customerId = customer.id;
     }
 
-    const sub = await findActiveSubscription(customer.id);
+    const sub = await findActiveSubscription(customerId);
     if (!sub) {
       setCheckoutIdentityCookie(res, {
         email: cleanEmail,
-        customerId: customer.id,
+        customerId,
         source: 'verified_login',
         identityEpoch: record.identityEpoch,
       });
@@ -74,15 +86,17 @@ export default async function handler(req, res) {
     }
 
     const token = createAccessToken({
-      customerId: customer.id,
+      customerId,
       email: cleanEmail,
       identityEpoch: record.identityEpoch,
+      ...(dbIdentity ? { accountId: record.accountId } : {}),
+      ...(dbIdentity ? { iatMs: Math.max(Date.now(), Number(record.sessionRevokedBefore || 0) + 1) } : {}),
     });
     setAccessCookie(res, token);
     return res.status(200).json({
       active: true,
       email: cleanEmail,
-      customerId: customer.id,
+      customerId,
       login: 'password',
     });
   } catch (e) {

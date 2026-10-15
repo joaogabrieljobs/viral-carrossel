@@ -28,6 +28,11 @@ import {
   periodBoundsFromSubscription,
 } from './plans.js';
 import { getQuotaUsage } from './image-quota.js';
+import {
+  accountIdentityBackendEnabled,
+  getOrCreateAccountForStripeCustomer,
+  revokeAccountSessions,
+} from './account-identity-postgres.js';
 import { invalidateActiveAccessForCustomer } from './require-access.js';
 import { consumeRateLimit, rateLimitResponse } from './rate-limit.js';
 
@@ -125,6 +130,7 @@ export async function handleSession(req, res) {
     return res.status(200).json({
       active: true,
       email: access.email,
+      customerId: access.customerId,
       status: sub.status,
       currentPeriodEnd: bounds.periodEnd,
       currentPeriodStart: bounds.periodStart,
@@ -183,9 +189,6 @@ export async function handleCheckout(req, res) {
       if (!customer || customer.deleted || String(customer.email || '').trim().toLowerCase() !== cleanEmail) {
         return res.status(403).json({ error: 'A conta mudou. Entre novamente antes de assinar.' });
       }
-      if (proofMatches && String(identity.identityEpoch || '') !== String(customer.metadata?.vc_identity_epoch || '')) {
-        return res.status(403).json({ error: 'Sua sessão de assinatura mudou. Entre novamente antes de assinar.' });
-      }
     } else {
       let existingCustomer = null;
       let startingAfter;
@@ -223,6 +226,16 @@ export async function handleCheckout(req, res) {
       });
     }
 
+    const account = accountIdentityBackendEnabled()
+      ? await getOrCreateAccountForStripeCustomer(customer.id)
+      : null;
+    const identityEpoch = account
+      ? String(account.identityEpoch || '')
+      : String(customer.metadata?.vc_identity_epoch || '');
+    if (proofMatches && String(identity.identityEpoch || '') !== identityEpoch) {
+      return res.status(403).json({ error: 'Sua sessão de assinatura mudou. Entre novamente antes de assinar.' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customer.id,
@@ -244,8 +257,7 @@ export async function handleCheckout(req, res) {
         product: 'viral-carrossel',
         email: cleanEmail,
         tier,
-        ...(customer.metadata?.vc_identity_epoch
-          ? { vc_identity_epoch: customer.metadata.vc_identity_epoch } : {}),
+        ...(identityEpoch ? { vc_identity_epoch: identityEpoch } : {}),
       },
     });
 
@@ -327,7 +339,12 @@ export async function handleConfirm(req, res) {
     if (!customer || customer.deleted) {
       return res.status(403).json({ error: 'Esta conta já não está disponível.' });
     }
-    const identityEpoch = String(customer.metadata?.vc_identity_epoch || '');
+    const account = accountIdentityBackendEnabled()
+      ? await getOrCreateAccountForStripeCustomer(customerId)
+      : null;
+    const identityEpoch = account
+      ? String(account.identityEpoch || '')
+      : String(customer.metadata?.vc_identity_epoch || '');
     if (String(session.metadata?.vc_identity_epoch || '') !== identityEpoch) {
       return res.status(403).json({ error: 'Esta compra pertence a uma sessão antiga da conta. Entre novamente.' });
     }
@@ -350,7 +367,13 @@ export async function handleConfirm(req, res) {
       });
     }
 
-    const token = createAccessToken({ customerId, email, identityEpoch });
+    const token = createAccessToken({
+      customerId, email, identityEpoch,
+      ...(account ? {
+        accountId: account.id,
+        iatMs: Math.max(Date.now(), account.sessionRevokedBefore + 1),
+      } : {}),
+    });
     clearCheckoutCookie(res, sessionId);
     clearCheckoutIdentityCookie(res);
     setAccessCookie(res, token);
@@ -406,12 +429,16 @@ export async function handleLogout(req, res) {
     if (access?.customerId) {
       invalidateActiveAccessForCustomer(access.customerId);
       try {
-        await getStripe().customers.update(access.customerId, {
-          metadata: {
-            vc_session_revoked_before: String(Date.now()),
-            vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
-          },
-        });
+        if (accountIdentityBackendEnabled()) {
+          await revokeAccountSessions(access.customerId);
+        } else {
+          await getStripe().customers.update(access.customerId, {
+            metadata: {
+              vc_session_revoked_before: String(Date.now()),
+              vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
+            },
+          });
+        }
         sessionsRevoked = true;
       } catch (e) {
         console.error('[auth/logout] revoke', e?.message || e);
