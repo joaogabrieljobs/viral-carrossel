@@ -2398,23 +2398,31 @@ export default function App() {
     // Usar <link> em vez de @import evita bloqueio de render e é mais rápido.
     const FONTS_URL =
       'https://fonts.googleapis.com/css2?' +
+      'family=Abril+Fatface&' +
       'family=Anton&' +
       'family=Archivo:wght@400;500;600;700;800&' +
       'family=Archivo+Black&' +
+      'family=Barlow+Condensed:wght@400;500;600;700&' +
       'family=Bebas+Neue&' +
       'family=Big+Shoulders+Display:wght@400;500;600;700;800;900&' +
+      'family=Bodoni+Moda:wght@400;500;600;700&' +
       'family=Bricolage+Grotesque:wght@300;400;500;600;700&' +
       'family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
       'family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&' +
       'family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600&' +
       'family=DM+Sans:wght@300;400;500;600;700&' +
+      'family=DM+Mono:wght@300;400;500&' +
+      'family=DM+Serif+Display&' +
       'family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&' +
       'family=Familjen+Grotesk:wght@400;500;600;700&' +
+      'family=Figtree:wght@300;400;500;600;700&' +
       'family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
       'family=Funnel+Display:wght@300;400;500;600;700&' +
+      'family=Gloock&' +
       'family=IBM+Plex+Mono:wght@300;400;500;600;700&' +
       'family=IBM+Plex+Sans:wght@300;400;500;600;700&' +
       'family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&' +
+      'family=IBM+Plex+Serif:wght@300;400;500;600;700&' +
       'family=Instrument+Serif:ital@0;1&' +
       'family=Inter:wght@300;400;500;600;700&' +
       'family=Inter+Tight:wght@300;400;500;600;700&' +
@@ -2423,15 +2431,19 @@ export default function App() {
       'family=Jost:wght@300;400;500;600;700&' +
       'family=Libre+Caslon+Display&' +
       'family=Libre+Franklin:wght@300;400;500;600;700&' +
+      'family=Lilita+One&' +
       'family=Major+Mono+Display&' +
       'family=Manrope:wght@300;400;500;600;700&' +
       'family=Montserrat:wght@300;400;500;600;700&' +
+      'family=Newsreader:wght@300;400;500;600;700&' +
       'family=Oswald:wght@300;400;500;600;700&' +
       'family=Outfit:wght@300;400;500;600;700&' +
       'family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&' +
       'family=Plus+Jakarta+Sans:wght@300;400;500;600;700&' +
       'family=Poppins:wght@300;400;500;600;700&' +
       'family=Raleway:wght@300;400;500;600;700&' +
+      'family=Righteous&' +
+      'family=Rubik:wght@300;400;500;600;700&' +
       'family=Sora:wght@300;400;500;600;700&' +
       'family=Source+Sans+3:wght@300;400;500;600;700&' +
       'family=Source+Serif+4:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
@@ -2440,6 +2452,8 @@ export default function App() {
       'family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&' +
       'family=Syne:wght@400;500;600;700;800&' +
       'family=Unbounded:wght@300;400;500;600;700&' +
+      'family=Urbanist:wght@300;400;500;600;700&' +
+      'family=Work+Sans:wght@300;400;500;600;700&' +
       'family=Yeseva+One&' +
       'display=swap';
 

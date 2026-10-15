@@ -22,6 +22,8 @@ describe('tipografia pronta antes de exportar', () => {
   it('não confunde uma família web ausente com fonte de sistema', async () => {
     const { node, doc } = setup({ faces: [] });
     await expect(waitForExportFonts([node], { doc })).rejects.toThrow('Não foi possível carregar a fonte “Outfit”');
+    const newFont = setup({ family: '"Bodoni Moda", serif', faces: [] });
+    await expect(waitForExportFonts([newFont.node], { doc: newFont.doc })).rejects.toThrow('Não foi possível carregar a fonte “Bodoni Moda”');
     const system = setup({ family: 'Arial, sans-serif', faces: [] });
     await expect(waitForExportFonts([system.node], { doc: system.doc })).resolves.toBeUndefined();
   });

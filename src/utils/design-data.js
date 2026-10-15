@@ -57,6 +57,10 @@ export const TITLE_FONTS = [
   { name:'Funnel',         val:'"Funnel Display", sans-serif',        cat:'sans' },
   { name:'Archivo',        val:'"Archivo", sans-serif',               cat:'sans' },
   { name:'IBM Plex Sans',  val:'"IBM Plex Sans", sans-serif',         cat:'sans' },
+  { name:'Figtree',        val:'"Figtree", sans-serif',               cat:'sans' },
+  { name:'Urbanist',       val:'"Urbanist", sans-serif',              cat:'sans' },
+  { name:'Rubik',          val:'"Rubik", sans-serif',                 cat:'sans' },
+  { name:'Work Sans',      val:'"Work Sans", sans-serif',             cat:'sans' },
   // Display (impacto, headlines bombásticos)
   { name:'Bebas Neue',     val:'"Bebas Neue", sans-serif',            cat:'display' },
   { name:'Anton',          val:'"Anton", sans-serif',                 cat:'display' },
@@ -65,6 +69,10 @@ export const TITLE_FONTS = [
   { name:'Big Shoulders',  val:'"Big Shoulders Display", sans-serif', cat:'display' },
   { name:'Syne',           val:'"Syne", sans-serif',                  cat:'display' },
   { name:'Unbounded',      val:'"Unbounded", sans-serif',             cat:'display' },
+  { name:'Barlow Condensed', val:'"Barlow Condensed", sans-serif',     cat:'display' },
+  { name:'Righteous',      val:'"Righteous", sans-serif',             cat:'display' },
+  { name:'Abril Fatface',  val:'"Abril Fatface", serif',              cat:'display' },
+  { name:'Lilita One',     val:'"Lilita One", sans-serif',            cat:'display' },
   // Serif (autoridade, editorial)
   { name:'Playfair',       val:'"Playfair Display", serif',           cat:'serif' },
   { name:'Fraunces',       val:'"Fraunces", serif',                   cat:'serif' },
@@ -75,10 +83,16 @@ export const TITLE_FONTS = [
   { name:'Yeseva',         val:'"Yeseva One", serif',                 cat:'serif' },
   { name:'Italiana',       val:'"Italiana", serif',                   cat:'serif' },
   { name:'Caslon',         val:'"Libre Caslon Display", serif',       cat:'serif' },
+  { name:'Newsreader',     val:'"Newsreader", serif',                 cat:'serif' },
+  { name:'Bodoni Moda',    val:'"Bodoni Moda", serif',                cat:'serif' },
+  { name:'DM Serif Display', val:'"DM Serif Display", serif',         cat:'serif' },
+  { name:'IBM Plex Serif', val:'"IBM Plex Serif", serif',             cat:'serif' },
   // Editorial / Mono
   { name:'Instrument',     val:'"Instrument Serif", serif',           cat:'editorial' },
+  { name:'Gloock',         val:'"Gloock", serif',                     cat:'editorial' },
   { name:'Major Mono',     val:'"Major Mono Display", monospace',     cat:'mono' },
   { name:'JetBrains Mono', val:'"JetBrains Mono", monospace',         cat:'mono' },
+  { name:'DM Mono',        val:'"DM Mono", monospace',               cat:'mono' },
 ];
 
 /**

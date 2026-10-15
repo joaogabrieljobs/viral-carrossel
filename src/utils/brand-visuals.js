@@ -120,15 +120,22 @@ const BODY_FONTS = [
   { name:'Jost',          val:'"Jost", sans-serif',          cat:'sans' },
   { name:'Libre Franklin', val:'"Libre Franklin", sans-serif', cat:'sans' },
   { name:'Montserrat',    val:'"Montserrat", sans-serif',    cat:'sans' },
+  { name:'Figtree',       val:'"Figtree", sans-serif',        cat:'sans' },
+  { name:'Urbanist',      val:'"Urbanist", sans-serif',       cat:'sans' },
+  { name:'Rubik',         val:'"Rubik", sans-serif',          cat:'sans' },
+  { name:'Work Sans',     val:'"Work Sans", sans-serif',      cat:'sans' },
   // Serif body (estilo magazine)
   { name:'EB Garamond',   val:'"EB Garamond", serif',        cat:'serif' },
   { name:'Crimson',       val:'"Crimson Text", serif',       cat:'serif' },
   { name:'Spectral',      val:'"Spectral", serif',           cat:'serif' },
   { name:'Fraunces',      val:'"Fraunces", serif',           cat:'serif' },
   { name:'Source Serif 4', val:'"Source Serif 4", serif',     cat:'serif' },
+  { name:'Newsreader',    val:'"Newsreader", serif',          cat:'serif' },
+  { name:'IBM Plex Serif', val:'"IBM Plex Serif", serif',     cat:'serif' },
   // Mono
   { name:'Space Mono',    val:'"Space Mono", monospace',     cat:'mono' },
   { name:'IBM Plex Mono', val:'"IBM Plex Mono", monospace',  cat:'mono' },
+  { name:'DM Mono',       val:'"DM Mono", monospace',        cat:'mono' },
 ];
 
 function vcBgPatternDivStyle(pattern) {
