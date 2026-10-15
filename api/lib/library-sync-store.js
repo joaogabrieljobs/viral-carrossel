@@ -182,7 +182,11 @@ async function readBlobPrivate(pathname, { withVersion = false } = {}) {
     }
     stage = 'blob_decode';
     const buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-    return withVersion ? { buffer, etag: result.blob?.etag } : buffer;
+    // Blob.get devolve W/"…" mesmo quando o objeto tem um ETag forte.
+    // O If-Match de put exige a forma forte; sem isto todo save entra em 412.
+    const etag = typeof result.blob?.etag === 'string'
+      ? result.blob.etag.replace(/^W\/(?=")/, '') : result.blob?.etag;
+    return withVersion ? { buffer, etag } : buffer;
   } catch (error) {
     error.libraryReadStage = stage;
     throw error;
@@ -258,6 +262,13 @@ function readFailureDiagnostic(source, error) {
  */
 export async function getLibraryManifest(customerId) {
   return (await readLibraryState(customerId)).manifest;
+}
+
+// A migração para Postgres precisa ler o manifesto Blob original sem passar
+// pela seleção do novo backend. Mantenha esta leitura até todas as contas de
+// teste terem sido importadas e conferidas.
+export async function readLegacyLibraryManifest(customerId) {
+  return getLibraryManifest(customerId);
 }
 
 async function readLibraryState(customerId) {

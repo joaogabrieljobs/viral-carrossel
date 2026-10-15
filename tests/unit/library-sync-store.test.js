@@ -403,6 +403,18 @@ describe('library-sync-store', () => {
       expect(requests.filter(([operation]) => operation !== 'GET')).toEqual([]);
     });
 
+    it('converte ETag fraco do Blob.get antes do If-Match do save', async () => {
+      vi.stubEnv('LIBRARY_SYNC_STORAGE', 'blob');
+      blob.get.mockResolvedValue({
+        stream: new Response(JSON.stringify(manifest(1, 2))).body,
+        blob: { etag: 'W/"manifest-v1"' },
+      });
+      blob.put.mockResolvedValue({});
+      await putLibraryManifest(customerId, { docs: [{ id: 'novo', doc: {} }] }, { baseRevision: 1 });
+      expect(blob.put).toHaveBeenCalledWith(expect.any(String), expect.any(String),
+        expect.objectContaining({ ifMatch: '"manifest-v1"' }));
+    });
+
     it('fallback Redis usa CAS atômico e preserva exclusões contra push simultâneo antigo', async () => {
       const original = manifest(1, 3);
       original.docs[0].doc.slides = Array.from({ length: 23 }, (_, i) => ({ id: `s${i}` }));

@@ -7,14 +7,19 @@ import { applyCors } from './lib/cors.js';
 import { requireActiveSubscription } from './lib/require-access.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import {
-  getLibrarySyncMeta,
-  getLibraryManifest,
-  putLibraryManifest,
+  getLibrarySyncMeta as getLegacyLibrarySyncMeta,
+  getLibraryManifest as getLegacyLibraryManifest,
+  putLibraryManifest as putLegacyLibraryManifest,
   putLibraryAsset,
   putLibraryAssetChunk,
   getLibraryAsset,
   resolveLibraryOwnerId,
 } from './lib/library-sync-store.js';
+import {
+  getLibrarySyncMeta as getPostgresLibrarySyncMeta,
+  getLibraryManifest as getPostgresLibraryManifest,
+  putLibraryManifest as putPostgresLibraryManifest,
+} from './lib/library-sync-postgres.js';
 
 export const config = { maxDuration: 60 };
 
@@ -27,6 +32,21 @@ function parseBody(req) {
 
 function ownerId(access) {
   return resolveLibraryOwnerId(access || {});
+}
+
+function libraryMetadataStore() {
+  if (process.env.LIBRARY_SYNC_BACKEND === 'postgres') {
+    return {
+      getLibrarySyncMeta: getPostgresLibrarySyncMeta,
+      getLibraryManifest: getPostgresLibraryManifest,
+      putLibraryManifest: putPostgresLibraryManifest,
+    };
+  }
+  return {
+    getLibrarySyncMeta: getLegacyLibrarySyncMeta,
+    getLibraryManifest: getLegacyLibraryManifest,
+    putLibraryManifest: putLegacyLibraryManifest,
+  };
 }
 
 function mapStoreError(e) {
@@ -81,6 +101,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    const { getLibrarySyncMeta, getLibraryManifest, putLibraryManifest } = libraryMetadataStore();
     if (req.method === 'GET') {
       const assetId = req.query?.asset || req.query?.a || '';
       if (assetId) {
@@ -150,7 +171,12 @@ export default async function handler(req, res) {
           baseRevision: body.baseRevision,
           force: body.force === true,
           // replace=true só quando o cliente pede encolher de propósito
-          replace: body.replace === true || body.allowShrink === true,
+          // Um bundle antigo no telemóvel ainda pode enviar um manifesto
+          // incompleto com allowShrink. No banco, exclusões passam pela rota
+          // versionada por ID; nunca permita que esse push varra outros projetos.
+          replace: process.env.LIBRARY_SYNC_BACKEND === 'postgres'
+            ? false : (body.replace === true || body.allowShrink === true),
+          preserveAccountMetadata: process.env.LIBRARY_SYNC_BACKEND === 'postgres',
         },
       );
       return res.status(200).json({
