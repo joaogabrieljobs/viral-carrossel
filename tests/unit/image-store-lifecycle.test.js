@@ -163,4 +163,63 @@ describe('conexões IndexedDB da biblioteca de imagens', () => {
     await vi.advanceTimersByTimeAsync(8_000);
     expect(transaction.abort).not.toHaveBeenCalled();
   });
+
+  it('aborta uma leitura que nunca responde e ignora sucesso tardio', async () => {
+    const read = {};
+    const transaction = {
+      objectStore: () => ({ get: () => read }),
+      abort: vi.fn(),
+    };
+    const db = { transaction: vi.fn(() => transaction), close: vi.fn() };
+    const pending = store.imageGet('foto-travada');
+    const rejected = expect(pending).rejects.toThrow(/não concluiu a leitura/);
+    succeed(0, db);
+    await Promise.resolve();
+    expect(db.transaction).toHaveBeenCalledWith('images', 'readonly');
+    await vi.advanceTimersByTimeAsync(8_000);
+    await rejected;
+    expect(transaction.abort).toHaveBeenCalledOnce();
+    read.result = { id: 'foto-travada' };
+    read.onsuccess();
+    transaction.onabort();
+    expect(transaction.abort).toHaveBeenCalledOnce();
+  });
+
+  it('devolve a imagem da conta e cancela o prazo quando a leitura responde', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => key === 'vc_data_owner' ? '"owner-1"' : null,
+    });
+    const read = {};
+    const transaction = {
+      objectStore: () => ({ get: () => read }),
+      abort: vi.fn(),
+    };
+    const db = { transaction: vi.fn(() => transaction), close: vi.fn() };
+    const pending = store.imageGet('foto-boa');
+    succeed(0, db);
+    await Promise.resolve();
+    const entry = { id: 'foto-boa', owner: 'owner-1', blob: new Blob(['foto']) };
+    read.result = entry;
+    read.onsuccess();
+    await expect(pending).resolves.toBe(entry);
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(transaction.abort).not.toHaveBeenCalled();
+  });
+
+  it('mantém o erro original quando o request de leitura falha', async () => {
+    const read = {};
+    const transaction = {
+      objectStore: () => ({ get: () => read }),
+      abort: vi.fn(),
+    };
+    const pending = store.imageGet('foto-com-erro');
+    const failed = expect(pending).rejects.toThrow('Falha original do navegador');
+    succeed(0, { transaction: () => transaction, close: vi.fn() });
+    await Promise.resolve();
+    read.error = new Error('Falha original do navegador');
+    read.onerror();
+    await failed;
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(transaction.abort).not.toHaveBeenCalled();
+  });
 });

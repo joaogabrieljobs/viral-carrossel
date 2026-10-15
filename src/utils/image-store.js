@@ -30,6 +30,7 @@ const DB_VERSION = 1;
 /** open/wipe nunca podem pendurar o logout nem o spinner do card. */
 const IDB_OPEN_TIMEOUT_MS = 8_000;
 const IDB_PUT_TIMEOUT_MS = 8_000;
+const IDB_GET_TIMEOUT_MS = 8_000;
 // Depois de uma abertura que não respondeu, não fazer todos os cards esperar
 // mais 8 s cada um. A próxima tentativa real continua possível em 3 s.
 const IDB_TIMEOUT_RETRY_MS = 3_000;
@@ -208,9 +209,33 @@ export async function imageGet(id) {
   if (!id) return null;
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = tx(db, 'readonly').get(id);
-    req.onsuccess = () => resolve(imageBelongsToActiveAccount(req.result) ? req.result : null);
-    req.onerror = () => reject(req.error || new Error('Falha ao ler a imagem.'));
+    let transaction;
+    let req;
+    try {
+      transaction = db.transaction(STORE_NAME, 'readonly');
+      req = transaction.objectStore(STORE_NAME).get(id);
+    } catch (error) { reject(error); return; }
+    let settled = false;
+    const finish = (error = null, entry = null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(entry);
+    };
+    const timer = setTimeout(() => {
+      // Há browsers que abrem a base, mas deixam uma transação readonly sem
+      // success/error/abort. Não prender o restore inteiro à espera dela.
+      finish(new Error('O armazenamento não concluiu a leitura da imagem. Tente novamente.'));
+      try { transaction.abort(); } catch { /* a transação já pode estar encerrada */ }
+    }, IDB_GET_TIMEOUT_MS);
+    req.onsuccess = () => {
+      if (settled) return;
+      try { finish(null, imageBelongsToActiveAccount(req.result) ? req.result : null); }
+      catch (error) { finish(error); }
+    };
+    req.onerror = () => finish(req.error || new Error('Falha ao ler a imagem.'));
+    transaction.onabort = () => finish(transaction.error || new Error('Leitura da imagem interrompida.'));
   });
 }
 
