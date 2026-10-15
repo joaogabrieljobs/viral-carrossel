@@ -328,6 +328,13 @@ function conflict(row, state) {
   });
 }
 
+function deletedConflict(row, state) {
+  return fail('Este projeto foi excluído em outro dispositivo. Revise a edição local antes de criar outro projeto.', 'project_deleted', {
+    cloudVersion: integer(row.version),
+    cloudRevision: integer(state.revision),
+  });
+}
+
 /** Factory injetável para testes; a instância de produção usa DATABASE_URL/POSTGRES_URL. */
 export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifest = defaultLegacyReader, now = Date.now } = {}) {
   async function connection() { return injectedSql || defaultSql(); }
@@ -540,7 +547,8 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
         const state = (await run(tx, 'lockedState', [owner]))[0];
         const previousRaw = (await run(tx, 'oneProject', [owner, id]))[0];
         const previous = previousRaw ? toRow(previousRaw) : null;
-        if ((previous?.version || 0) !== base || previous?.deleted_at != null) throw conflict(previous, state);
+        if (previous?.deleted_at != null) throw deletedConflict(previous, state);
+        if ((previous?.version || 0) !== base) throw conflict(previous, state);
         const timestamp = now();
         const stored = { ...entry, updatedAt: timestamp };
         const nextOrder = previous ? integer(state.next_order) : integer(state.next_order) + 1;

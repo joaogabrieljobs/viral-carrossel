@@ -227,7 +227,9 @@ describe('biblioteca Postgres por conta', () => {
     const deleted = await adapter.deleteAccountProject('cus_a', 'one', { baseVersion: 2 });
     expect(deleted).toMatchObject({ version: 3, deleted: true, entry: null });
     await expect(adapter.putAccountProject('cus_a', { id: 'one', name: 'Voltou' }, { baseVersion: 0 }))
-      .rejects.toMatchObject({ code: 'project_conflict', cloudVersion: 3 });
+      .rejects.toMatchObject({ code: 'project_deleted', cloudVersion: 3 });
+    await expect(adapter.putAccountProject('cus_a', { id: 'one', name: 'Voltou' }, { baseVersion: 3 }))
+      .rejects.toMatchObject({ code: 'project_deleted', cloudVersion: 3 });
     expect((await adapter.getLibraryManifest('cus_a')).deletedIds).toContain('one');
     expect((await adapter.listAccountProjects('cus_a')).total).toBe(2);
   });

@@ -136,3 +136,7 @@ export async function deleteProject(id, { baseVersion, signal, expectedOwnerId, 
 export function isProjectConflict(error) {
   return error?.status === 409 && error?.code === 'project_conflict';
 }
+
+export function isProjectDeletedConflict(error) {
+  return error?.status === 409 && error?.code === 'project_deleted';
+}

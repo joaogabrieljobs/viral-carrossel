@@ -218,6 +218,64 @@ describe('outbox durável por projeto', () => {
     expect(await listPendingProjectOps(ALICE)).toHaveLength(0);
   });
 
+  it('não recria projeto tombstonado: preserva a edição local para revisão e libera o boot', async () => {
+    const entry = { id: 'janine', name: 'Clínica', doc: { title: 'Edição do celular' } };
+    await queueProjectPut(ALICE, entry, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 3 }, 409));
+    const receipt = await flushProjectOutbox(ALICE);
+    expect(receipt).toEqual({ sent: 0, pending: 1, needsReview: [{
+      kind: 'put_deleted', projectId: 'janine', projectName: 'Clínica', reviewVersion: 3,
+    }] });
+    expect(fetch).toHaveBeenCalledTimes(2); // sessão e PUT; nunca cria cópia
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+      kind: 'review_put_deleted', entry, baseVersion: 2,
+    });
+
+    fetch.mockResolvedValueOnce(session());
+    expect(await flushProjectOutbox(ALICE)).toEqual(receipt);
+    expect(fetch).toHaveBeenCalledTimes(3); // no próximo boot só confirma a conta
+    await queueProjectPut(ALICE, { ...entry, doc: { title: 'Revisão mais recente' } }, { baseVersion: 3 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+      kind: 'review_put_deleted', entry: { doc: { title: 'Revisão mais recente' } },
+    });
+    fetch.mockResolvedValueOnce(session());
+    expect((await flushProjectOutbox(ALICE)).needsReview).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('servidor antigo com 409 genérico e GET 404 também não cria cópia de projeto excluído', async () => {
+    const entry = { id: 'janine', doc: { title: 'Local' } };
+    await queueProjectPut(ALICE, entry, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+      .mockResolvedValueOnce(json({ error: 'Não encontrado', code: 'project_not_found' }, 404));
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 0, pending: 1, needsReview: [{
+      kind: 'put_deleted', projectId: 'janine', projectName: '', reviewVersion: 3,
+    }] });
+    expect(fetch).toHaveBeenCalledTimes(3); // nenhum PUT para conflict-*
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+      kind: 'review_put_deleted', entry,
+    });
+  });
+
+  it('preserva a edição mais nova se o tombstone chegar durante o envio', async () => {
+    await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Antes' } }, { baseVersion: 2 });
+    let finishPut;
+    fetch.mockResolvedValueOnce(session()).mockImplementationOnce(() => new Promise((resolve) => {
+      finishPut = resolve;
+    }));
+    const sending = flushProjectOutbox(ALICE);
+    await vi.waitFor(() => expect(finishPut).toBeTypeOf('function'));
+    await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Depois' } }, { baseVersion: 2 });
+    finishPut(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 3 }, 409));
+    expect(await sending).toMatchObject({ sent: 0, pending: 1, needsReview: [{ kind: 'put_deleted' }] });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+      kind: 'review_put_deleted', entry: { doc: { title: 'Depois' } },
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('reconhece a mesma cópia se a confirmação de rede se perder', async () => {
     const op = await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local' } }, { baseVersion: 2 });
     const copyId = `conflict-${op.opId.replace(/[^A-Za-z0-9]/g, '')}`;

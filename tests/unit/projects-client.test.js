@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  ProjectApiError, deleteProject, getProject, isProjectConflict,
+  ProjectApiError, deleteProject, getProject, isProjectConflict, isProjectDeletedConflict,
   listProjects, listProjectsPage, putProject,
 } from '../../src/utils/projects-client.js';
 
@@ -61,6 +61,11 @@ describe('cliente de projetos por conta', () => {
     expect(conflict).toBeInstanceOf(ProjectApiError);
     expect(conflict).toMatchObject({ status: 409, code: 'project_conflict', cloudVersion: 12 });
     expect(isProjectConflict(conflict)).toBe(true);
+    expect(isProjectDeletedConflict(conflict)).toBe(false);
+    fetch.mockResolvedValueOnce(json({ error: 'Excluído', code: 'project_deleted', cloudVersion: 13 }, 409));
+    await expect(putProject({ id: 'a' }, { baseVersion: 12 })).rejects.toMatchObject({
+      status: 409, code: 'project_deleted', cloudVersion: 13,
+    });
     fetch.mockResolvedValueOnce(json({ error: 'Outra conta', code: 'project_owner_changed' }, 409));
     await expect(deleteProject('a', { baseVersion: 1 })).rejects.toMatchObject({
       code: 'project_owner_changed', status: 409,

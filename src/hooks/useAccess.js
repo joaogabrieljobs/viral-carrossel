@@ -461,8 +461,15 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             if (outboxReceipt.recoveries?.length) {
               toast?.(`${outboxReceipt.recoveries.length} edição(ões) em conflito foram preservadas como cópias na sua conta.`, 'warning', 7500);
             }
-            if (outboxReceipt.needsReview?.length) {
-              toast?.(`${outboxReceipt.needsReview.length} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
+            const deletedProjectEdits = outboxReceipt.needsReview?.filter(
+              (review) => review.kind === 'put_deleted',
+            ) || [];
+            const deleteReviews = (outboxReceipt.needsReview?.length || 0) - deletedProjectEdits.length;
+            if (deleteReviews) {
+              toast?.(`${deleteReviews} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
+            }
+            if (deletedProjectEdits.length) {
+              toast?.(`${deletedProjectEdits.length} edição(ões) locais de projeto excluído em outro dispositivo foram preservadas neste navegador para revisão. Nada foi recriado na conta.`, 'warning', 9000);
             }
           } catch (error) {
             if (sessionStillOwnsData()) {

@@ -53,6 +53,10 @@ function mapStoreError(cause) {
       return error(409, 'Este projeto mudou na nuvem. Atualize antes de salvar.', cause.code, {
         cloudVersion: cause.cloudVersion,
       });
+    case 'project_deleted':
+      return error(409, 'Este projeto foi excluído em outro dispositivo. Revise a edição local antes de criar outro projeto.', cause.code, {
+        cloudVersion: cause.cloudVersion,
+      });
     case 'project_bad_id':
     case 'project_bad_entry':
     case 'project_bad_cursor':

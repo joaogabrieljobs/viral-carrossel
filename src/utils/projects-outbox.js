@@ -5,7 +5,8 @@
 import { dataOwnerAliases, readDataOwner } from './account-data-owner.js';
 import { isAccountDataWriteOwnerCurrent } from './storage.js';
 import {
-  ProjectApiError, deleteProject, getProject, isProjectConflict, putProject,
+  ProjectApiError, deleteProject, getProject, isProjectConflict,
+  isProjectDeletedConflict, putProject,
 } from './projects-client.js';
 
 export const PROJECTS_OUTBOX_DB = 'viral-carrossel-project-outbox';
@@ -133,16 +134,25 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         assertActiveOwner(ownerId);
         const previous = read.result;
         const now = Date.now();
+        // Uma edição de projeto já excluído só pode voltar à nuvem como um
+        // projeto novo após uma escolha explícita da pessoa. Salvar de novo
+        // atualiza a cópia durável, mas não a retira da revisão.
+        const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
+          ? 'review_put_deleted' : kind;
         const op = {
-          key, owner: ownerId, projectId, kind,
-          entry: kind === 'put' ? entry : null,
+          key, owner: ownerId, projectId, kind: effectiveKind,
+          entry: effectiveKind === 'put' || effectiveKind === 'review_put_deleted' ? entry : null,
           // Edits sucessivos conservam a versão do primeiro envio ainda pendente.
           // Uma exclusão em revisão só pode ser repetida por escolha explícita
           // do usuário, com a versão atual que a UI acabou de observar.
           baseVersion: previous?.kind === 'review_delete'
             ? baseVersion : (previous?.baseVersion ?? baseVersion),
           projectName: kind === 'delete'
-            ? String(projectName || previous?.projectName || '').slice(0, 160) : '',
+            ? String(projectName || previous?.projectName || '').slice(0, 160)
+            : effectiveKind === 'review_put_deleted'
+              ? String(entry?.name || previous?.projectName || '').slice(0, 160) : '',
+          ...(effectiveKind === 'review_put_deleted'
+            ? { reviewVersion: previous.reviewVersion } : {}),
           opId: operationId(),
           createdAt: previous?.createdAt ?? now,
           updatedAt: now,
@@ -258,6 +268,31 @@ function markDeleteForReview(ownerId, sentOp, remote) {
   });
 }
 
+/** Um tombstone não autoriza recriar o projeto como cópia automaticamente. */
+function markPutForReview(ownerId, sentOp, cloudVersion) {
+  assertActiveOwner(ownerId);
+  return transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(operationKey(ownerId, sentOp.projectId));
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        const current = read.result;
+        if (!current || (current.kind !== 'put' && current.kind !== 'review_put_deleted')) {
+          setResult(false);
+          return;
+        }
+        store.put({
+          ...current, kind: 'review_put_deleted',
+          reviewVersion: Number.isSafeInteger(cloudVersion) ? cloudVersion : null,
+          projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
+          updatedAt: Date.now(),
+        });
+        setResult(true);
+      } catch (error) { fail(error); }
+    };
+  });
+}
+
 function canonicalJson(value) {
   const normalize = (item) => {
     if (Array.isArray(item)) return item.map(normalize);
@@ -347,6 +382,9 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
       ? await putProject(op.entry, { baseVersion: op.baseVersion, signal, expectedOwnerId, opId: op.opId })
       : await deleteProject(op.projectId, { baseVersion: op.baseVersion, signal, expectedOwnerId, opId: op.opId });
   } catch (error) {
+    if (op.kind === 'put' && isProjectDeletedConflict(error)) {
+      return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
+    }
     if (!isProjectConflict(error)) throw error;
     assertActiveOwner(ownerId);
     const remote = await getProject(op.projectId, { signal, expectedOwnerId });
@@ -359,6 +397,11 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
     if (op.kind === 'delete' && !remote) {
       return { id: op.projectId, deleted: true,
         version: Number.isSafeInteger(error.cloudVersion) ? error.cloudVersion : op.baseVersion + 1 };
+    }
+    // Compatibilidade com servidores que ainda devolvem 409 genérico para
+    // um tombstone: GET 404 nunca permite recuperar o PUT como cópia.
+    if (op.kind === 'put' && !remote) {
+      return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
     }
     if (op.kind === 'put') {
       const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
@@ -390,7 +433,7 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
     assertActiveOwner(ownerId);
     const op = await getPendingProjectOp(ownerId, snapshot.projectId);
     if (!op || op.opId !== snapshot.opId) continue;
-    if (op.kind === 'review_delete') continue;
+    if (op.kind === 'review_delete' || op.kind === 'review_put_deleted') continue;
     const result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
     assertActiveOwner(ownerId);
     if (result.recoveredCopy) {
@@ -403,6 +446,10 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
       await markDeleteForReview(ownerId, op, result.needsReview);
       continue;
     }
+    if (result.needsReviewPut) {
+      await markPutForReview(ownerId, op, result.cloudVersion);
+      continue;
+    }
     if (!Number.isSafeInteger(result?.version) || result.version < 0) {
       throw outboxError('A nuvem não confirmou a versão do projeto.', 'project_bad_response');
     }
@@ -410,9 +457,11 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
     sent += 1;
   }
   const remaining = await listPendingProjectOps(ownerId);
-  const needsReview = remaining.filter((op) => op.kind === 'review_delete').map((op) => ({
+  const needsReview = remaining.filter((op) => op.kind === 'review_delete'
+    || op.kind === 'review_put_deleted').map((op) => ({
     projectId: op.projectId, projectName: op.projectName || '',
     reviewVersion: op.reviewVersion,
+    ...(op.kind === 'review_put_deleted' ? { kind: 'put_deleted' } : {}),
   }));
   return {
     sent, pending: remaining.length,

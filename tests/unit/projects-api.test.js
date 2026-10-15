@@ -115,6 +115,17 @@ describe('/api/projects', () => {
     });
   });
 
+  it('distingue projeto excluído de edição concorrente sem recriá-lo', async () => {
+    pg.put.mockRejectedValue(Object.assign(new Error('deleted'), {
+      code: 'project_deleted', cloudVersion: 8,
+    }));
+    const result = await request('PUT', { body: { entry: { id: 'a' }, baseVersion: 7 } });
+    expect(result).toMatchObject({
+      status: 409,
+      body: { code: 'project_deleted', cloudVersion: 8 },
+    });
+  });
+
   it('bloqueia escrita pendente de outra conta pelo header X-Project-Owner', async () => {
     const entry = { id: 'project-1', doc: { slides: [] } };
     const oldOwner = await request('PUT', {
