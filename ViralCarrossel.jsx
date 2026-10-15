@@ -85,6 +85,7 @@ import PromptDialog from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
+import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
@@ -1601,6 +1602,45 @@ export default function App() {
     return restored.length;
   }, [history.reset]);
 
+  const applyCloudMediaAfterBoot = useCallback((owner, { entry, brands } = {}) => {
+    if (!PROJECTS_V2 || !owner || readDataOwner() !== owner
+      || v2ObservedOwnerRef.current !== owner || !accountLibraryReadyRef.current) return;
+    if (entry?.id) {
+      const before = libraryPersistRef.current.find((project) => project.id === entry.id);
+      const merged = mergeHydratedProjectMedia(before, entry);
+      const editor = editorSyncStateRef.current;
+      const baseline = v2BaselinesRef.current.get(entry.id);
+      const unchanged = baseline && baseline === projectCacheFingerprint(before)
+        && (editor.activeDocId !== entry.id
+          || baseline === projectCacheFingerprint({ ...before, doc: editor.doc }));
+      // Bytes que terminaram de chegar não são uma nova edição. Só mover a
+      // baseline quando o usuário ainda não alterou este projeto.
+      if (unchanged && merged !== before) {
+        v2BaselinesRef.current.set(entry.id, projectCacheFingerprint(merged));
+      }
+      setLibrary((current) => current.map((project) => mergeHydratedProjectMedia(project, entry)));
+      if (editorSyncStateRef.current.activeDocId === entry.id) {
+        history.setSilent((currentDoc) => mergeHydratedProjectMedia({ id: entry.id, doc: currentDoc }, entry).doc);
+      }
+    }
+    if (Array.isArray(brands)) {
+      const hydrated = new Map(brands.map((brand) => [brand?.id, brand]));
+      const currentBrands = brandRosterPersistRef.current;
+      const mergedBrands = currentBrands.map((brand) => mergeHydratedBrandMedia(brand, hydrated.get(brand?.id)));
+      const metadata = (brandRoster) => accountMetaFingerprint({
+        brandRoster,
+        libraryFolders: libraryFoldersPersistRef.current,
+        activeBrandId: editorSyncStateRef.current.activeBrandId,
+        activeDocId: editorSyncStateRef.current.activeDocId,
+        userProfile: v2UserProfileRef.current,
+      });
+      if (v2MetaBaselineRef.current === metadata(currentBrands)) {
+        v2MetaBaselineRef.current = metadata(mergedBrands);
+      }
+      setBrandRoster((current) => current.map((brand) => mergeHydratedBrandMedia(brand, hydrated.get(brand?.id))));
+    }
+  }, [history.setSilent]);
+
   const observeCloudProjectsV2 = useCallback((owner, projects, snapshot, { preserveLocal = false } = {}) => {
     if (!PROJECTS_V2 || !owner || readDataOwner() !== owner || !Array.isArray(projects)) return;
     const ids = new Set((snapshot?.library || []).map((entry) => entry?.id));
@@ -2046,6 +2086,7 @@ export default function App() {
     onCloudLibraryApplied: applyCloudLibrarySnapshot,
     onCloudProjectsObserved: observeCloudProjectsV2,
     onCloudMetadataObserved: observeCloudMetadataV2,
+    onCloudMediaHydrated: applyCloudMediaAfterBoot,
     onLibraryReady: markAccountLibraryReady,
     onLibraryBlocked: setAccountRestoreError,
     toast,
@@ -2416,7 +2457,10 @@ export default function App() {
     (async () => {
       const alvo = (slidesLiveRef.current || []).map((sl) => ({ sl, id: sl.id }));
       const paraMigrar = alvo.filter(({ sl }) => typeof sl.bgImage === 'string' && sl.bgImage.startsWith('data:') && !sl.bgImageId);
-      const paraHidratar = alvo.filter(({ sl }) => sl.bgImageId && !sl.bgImage);
+      // O asset da nuvem será carregado depois do boot. Não tratar o ID de
+      // outro navegador como uma falha local nem reabrir o cache para 23 cards.
+      const paraHidratar = alvo.filter(({ sl }) => sl.bgImageId && !sl.bgImage
+        && !sl.bgImageFailed && !(PROJECTS_V2 && sl.bgImageAssetId));
       if (!paraMigrar.length && !paraHidratar.length) return;
 
       const patches = [];
@@ -2429,11 +2473,12 @@ export default function App() {
           }
         } catch (e) { console.warn('[imagem] migração falhou:', e?.message || e); }
       }
-      for (const { sl, id } of paraHidratar) {
+      const imageReadErrors = [];
+      await Promise.all(paraHidratar.map(async ({ sl, id }) => {
         const cache = imagemUrlsRef.current.get(sl.bgImageId);
         if (cache) {
           patches.push({ id, expectedImageId: sl.bgImageId, patch: { bgImage: cache, bgImageFailed: false, bgImageError: null } });
-          continue;
+          return;
         }
         try {
           const entry = await Promise.race([
@@ -2459,7 +2504,7 @@ export default function App() {
             });
           }
         } catch (e) {
-          console.warn('[imagem] leitura falhou:', e?.message || e);
+          imageReadErrors.push(e?.message || String(e));
           // Timeout/bloqueio: tirar do spinner eterno. O utilizador reimporta.
           patches.push({
             id,
@@ -2470,6 +2515,9 @@ export default function App() {
             },
           });
         }
+      }));
+      if (imageReadErrors.length) {
+        console.warn(`[imagem] ${imageReadErrors.length} leitura(s) do cache falharam:`, imageReadErrors[0]);
       }
       if (cancelado || !patches.length) return;
       // `setSilent`: hidratar não é edição do utilizador, não entra no undo.

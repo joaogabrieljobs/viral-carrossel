@@ -125,6 +125,20 @@ describe('metadados globais por conta no cliente', () => {
     expect(restored.metadata.userProfile.name).toBe('João');
   });
 
+  it('devolve metadados imediatamente no boot mesmo se o cache da logo nunca responder', async () => {
+    fetch.mockResolvedValue(response(200, {
+      ok: true, revision: 2, metadata: {
+        brands: [{ id: 'janine', name: 'Clínica Janine', logoAssetId: 'logo-1' }],
+        folders: [{ id: 'clientes' }],
+      },
+    }));
+    cloud.hydrate.mockImplementation(() => new Promise(() => {}));
+    const restored = await restoreAccountLibraryMetadata({ ...opts, hydrateImages: false });
+    expect(restored.metadata.brands[0].name).toBe('Clínica Janine');
+    expect(restored.metadata.folders).toEqual([{ id: 'clientes' }]);
+    expect(cloud.hydrate).not.toHaveBeenCalled();
+  });
+
   it('bloqueia troca de conta, lock de logout e versão desconhecida', async () => {
     await expect(saveAccountLibraryMetadata({}, opts))
       .rejects.toMatchObject({ code: 'account_meta_bad_revision' });

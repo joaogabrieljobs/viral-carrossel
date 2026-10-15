@@ -171,8 +171,12 @@ export async function saveAccountLibraryMetadata(snapshot, {
  */
 export async function restoreAccountLibraryMetadata({
   expectedOwnerId, localOwnerId, signal, localBrands = [], localAssets, isCurrent,
+  hydrateImages = true,
 } = {}) {
   const remote = await getAccountLibraryMetadata({ expectedOwnerId, localOwnerId, signal, isCurrent });
+  // No boot, a lista e os textos precisam aparecer mesmo quando o cache de
+  // imagens do browser bloqueia. O caller pode hidratar logos depois.
+  if (!hydrateImages) return { ...remote, assetsMissing: 0 };
   const hydrated = await hydrateCloudBrandRoster(remote.metadata.brands, {
     signal, localBrands, localAssets,
   });

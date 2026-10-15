@@ -89,6 +89,11 @@ describe('conexões IndexedDB da biblioteca de imagens', () => {
     const rejected = expect(first).rejects.toThrow(/não respondeu/);
     await vi.advanceTimersByTimeAsync(8_000);
     await rejected;
+    // Cards seguintes falham rápido; a primeira abertura travada não cria 23
+    // novas esperas de 8 segundos durante a restauração.
+    await expect(store.imageListIds()).rejects.toThrow(/não respondeu/);
+    expect(indexedDBMock.open).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(3_000);
     const next = store.imageListIds();
     succeed(1);
     await next;

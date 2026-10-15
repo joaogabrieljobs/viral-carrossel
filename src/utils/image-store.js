@@ -29,9 +29,14 @@ const STORE_NAME = 'images';
 const DB_VERSION = 1;
 /** open/wipe nunca podem pendurar o logout nem o spinner do card. */
 const IDB_OPEN_TIMEOUT_MS = 8_000;
+// Depois de uma abertura que não respondeu, não fazer todos os cards esperar
+// mais 8 s cada um. A próxima tentativa real continua possível em 3 s.
+const IDB_TIMEOUT_RETRY_MS = 3_000;
 const IDB_WIPE_TIMEOUT_MS = 2_500;
 
 let _dbPromise = null;
+let _dbRetryAfter = 0;
+let _dbRetryError = null;
 
 function activeMediaOwner() {
   try {
@@ -69,20 +74,26 @@ function imageBelongsToActiveAccount(entry) {
 
 function openDB() {
   if (_dbPromise) return _dbPromise;
+  if (_dbRetryAfter > Date.now()) return Promise.reject(_dbRetryError);
   let resolveOpen;
   let rejectOpen;
   const pending = new Promise((resolve, reject) => { resolveOpen = resolve; rejectOpen = reject; });
   _dbPromise = pending;
   let settled = false;
   const resetCurrent = () => { if (_dbPromise === pending) _dbPromise = null; };
-  const fail = (error) => {
+  const fail = (error, retryAfterMs = 0) => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
+    _dbRetryAfter = retryAfterMs ? Date.now() + retryAfterMs : 0;
+    _dbRetryError = retryAfterMs ? error : null;
     resetCurrent();
     rejectOpen(error);
   };
-  const timer = setTimeout(() => fail(new Error('O armazenamento de imagens não respondeu. Tente novamente.')), IDB_OPEN_TIMEOUT_MS);
+  const timer = setTimeout(() => fail(
+    new Error('O armazenamento de imagens não respondeu. Tente novamente.'),
+    IDB_TIMEOUT_RETRY_MS,
+  ), IDB_OPEN_TIMEOUT_MS);
   try {
     if (typeof indexedDB === 'undefined') {
       throw new Error('IndexedDB não disponível neste ambiente.');
@@ -100,6 +111,8 @@ function openDB() {
       }
       settled = true;
       clearTimeout(timer);
+      _dbRetryAfter = 0;
+      _dbRetryError = null;
       db.onversionchange = () => {
         resetCurrent();
         db.close();
@@ -208,6 +221,8 @@ export async function imageWipeDatabase() {
     }
   } catch { /* */ }
   _dbPromise = null;
+  _dbRetryAfter = 0;
+  _dbRetryError = null;
   if (typeof indexedDB === 'undefined') return;
   await Promise.race([
     new Promise((resolve) => {

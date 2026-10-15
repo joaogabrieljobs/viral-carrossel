@@ -104,6 +104,12 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
       '/api/library-sync': (route) => {
         const request = route.request();
         const url = new URL(request.url());
+        if (request.method() === 'GET' && url.searchParams.has('asset')) {
+          const dataUrl = cloud.assets?.get(url.searchParams.get('asset'));
+          return dataUrl
+            ? route.fulfill({ json: { ok: true, asset: { dataUrl } } })
+            : route.fulfill({ status: 404, json: { error: 'Asset não encontrado.' } });
+        }
         if (request.method() === 'GET' && url.searchParams.get('full') === '1') {
           return route.fulfill({ json: { ok: true, manifest: {
             vcVersion: 3, customerId: session.customerId, revision: cloud.revision,
@@ -225,4 +231,32 @@ test('DELETE em conflito mantém o projeto e a revisão pendente não bloqueia o
   await home(page);
   await expect(page.getByText('Versão revista', { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/exclusão\(ões\) precisam de revisão/)).toBeVisible();
+});
+
+test('abre projetos e textos antes de um cache de imagens travado responder', async ({ page }) => {
+  const cloud = accountSeed();
+  const janine = entry('p-a', 'Projeto A');
+  janine.doc.slides = Array.from({ length: 23 }, (_, index) => ({
+    id: `card-${index + 1}`, num: index + 1,
+    title: `Texto ${index + 1}`, bgImageAssetId: 'photo-shared', bgImageId: `old-${index + 1}`,
+  }));
+  cloud.rows.set('p-a', { entry: janine, version: 1 });
+  cloud.assets = new Map([['photo-shared', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==']]);
+  await page.addInitScript(() => {
+    const native = window.indexedDB;
+    Object.defineProperty(window, 'indexedDB', {
+      configurable: true,
+      value: {
+        open(name, ...args) {
+          if (name === 'viral-carrossel-img') return {}; // nunca dispara success/error
+          return native.open(name, ...args);
+        },
+        deleteDatabase(name) { return native.deleteDatabase(name); },
+      },
+    });
+  });
+  await mockV2(page, cloud);
+  await page.goto('/?app=1');
+  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByText('23 cards').first()).toBeVisible({ timeout: 6_000 });
 });

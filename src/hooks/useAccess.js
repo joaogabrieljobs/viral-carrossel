@@ -182,11 +182,12 @@ export async function logoutWithProtectedLibrary({
 }
 
 export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied,
-  onCloudProjectsObserved, onCloudMetadataObserved, onLibraryReady, onLibraryBlocked, toast } = {}) {
+  onCloudProjectsObserved, onCloudMetadataObserved, onCloudMediaHydrated,
+  onLibraryReady, onLibraryBlocked, toast } = {}) {
   const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onLibraryReady, onLibraryBlocked });
+    onCloudMetadataObserved, onCloudMediaHydrated, onLibraryReady, onLibraryBlocked });
   libraryCallbacksRef.current = { onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onLibraryReady, onLibraryBlocked };
+    onCloudMetadataObserved, onCloudMediaHydrated, onLibraryReady, onLibraryBlocked };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -384,7 +385,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               expectedOwnerId,
               localOwnerId: owner,
               selectedProjectId: restoredSnapshot?.activeDocId,
-              hydrateImages: 'selected',
+              hydrateImages: 'none',
               localSnapshot: restoredSnapshot,
             });
             if (!sessionStillOwnsData()) return;
@@ -396,6 +397,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             const metadata = await restoreAccountLibraryMetadata({
               expectedOwnerId, localOwnerId: owner,
               localBrands: restored.snapshot.brandRoster,
+              hydrateImages: false,
             });
             if (!sessionStillOwnsData()) return;
             const snapshot = {
@@ -432,6 +434,29 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot);
               libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, snapshot);
               libraryCallbacksRef.current.onLibraryReady?.();
+              // A foto selecionada e a logo são enriquecimento visual: um
+              // IndexedDB lento não deve segurar a biblioteca no BootScreen.
+              const selected = snapshot.library.find((entry) => entry.id === snapshot.activeDocId)
+                || snapshot.library[0];
+              if (selected || metadata.metadata.brands?.length) {
+                void (async () => {
+                  const { hydrateProjectEntryFromCloud, hydrateCloudBrandRoster } = await import('../utils/library-sync.js');
+                  const [project, brands] = await Promise.allSettled([
+                    selected ? hydrateProjectEntryFromCloud(selected, {
+                      localEntry: restoredSnapshot?.library?.find((entry) => entry.id === selected.id),
+                    }) : Promise.resolve(null),
+                    metadata.metadata.brands?.length
+                      ? hydrateCloudBrandRoster(metadata.metadata.brands, {
+                        localBrands: restoredSnapshot?.brandRoster || [],
+                      }) : Promise.resolve(null),
+                  ]);
+                  if (!sessionStillOwnsData()) return;
+                  libraryCallbacksRef.current.onCloudMediaHydrated?.(owner, {
+                    entry: project.status === 'fulfilled' ? project.value?.entry : null,
+                    brands: brands.status === 'fulfilled' ? brands.value?.brands : null,
+                  });
+                })().catch(() => { /* textos e projetos já estão disponíveis */ });
+              }
             }
             if (outboxReceipt.recoveries?.length) {
               toast?.(`${outboxReceipt.recoveries.length} edição(ões) em conflito foram preservadas como cópias na sua conta.`, 'warning', 7500);
