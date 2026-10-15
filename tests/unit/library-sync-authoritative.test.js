@@ -112,6 +112,61 @@ describe('leitura autoritativa da biblioteca v2', () => {
     expect(requests.filter(({ url }) => url.includes('?asset='))).toHaveLength(1);
   });
 
+  it('informa progresso monotônico quando fotos terminam fora de ordem e uma retorna 404', async () => {
+    const entry = {
+      id: 'janine', doc: { slides: [
+        { id: 's1', title: 'Primeiro', bgImageAssetId: 'photo-1' },
+        { id: 's2', title: 'Segundo', bgImageAssetId: 'photo-2' },
+        { id: 's3', title: 'Sem foto remota' },
+        { id: 's4', title: 'Quarto', bgImageAssetId: 'photo-4' },
+      ] },
+    };
+    const original = structuredClone(entry);
+    const pending = new Map();
+    vi.stubGlobal('fetch', vi.fn((url) => new Promise((resolve) => {
+      const assetId = new URL(url, 'https://moont.test').searchParams.get('asset');
+      pending.set(assetId, resolve);
+    })));
+    const events = [];
+    const resultPromise = hydrateProjectEntryFromCloud(entry, {
+      onProgress: (progress) => events.push(progress),
+    });
+    await vi.waitFor(() => expect(pending.size).toBe(3));
+
+    pending.get('photo-2')(response({ asset: { dataUrl: 'data:image/jpeg;base64,YQ==' } }));
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    pending.get('photo-4')(response({ error: 'Asset não encontrado.' }, 404));
+    await vi.waitFor(() => expect(events).toHaveLength(2));
+    pending.get('photo-1')(response({ asset: { dataUrl: 'data:image/jpeg;base64,YQ==' } }));
+    const result = await resultPromise;
+
+    expect(events).toEqual([
+      { projectId: 'janine', completed: 1, total: 3, loaded: 1, missing: 0 },
+      { projectId: 'janine', completed: 2, total: 3, loaded: 1, missing: 1 },
+      { projectId: 'janine', completed: 3, total: 3, loaded: 2, missing: 1 },
+    ]);
+    expect(result.assetsMissing).toBe(1);
+    expect(result.entry.doc.slides.map((slide) => slide.title)).toEqual(
+      original.doc.slides.map((slide) => slide.title));
+    expect(entry).toEqual(original);
+  });
+
+  it('ignora falha do observador de progresso e não emite eventos sem fotos', async () => {
+    const onProgress = vi.fn(() => { throw new Error('falha na interface'); });
+    const withPhoto = await hydrateProjectEntryFromCloud(manifest().docs[0], { onProgress });
+    expect(withPhoto.entry.doc.slides[0].title).toBe('Cuidados');
+    expect(onProgress).toHaveBeenCalledWith({
+      projectId: 'janine', completed: 1, total: 1, loaded: 0, missing: 1,
+    });
+
+    onProgress.mockClear();
+    const withoutPhoto = await hydrateProjectEntryFromCloud({
+      id: 'empty', doc: { slides: [{ id: 'text-only', title: 'Texto' }] },
+    }, { onProgress });
+    expect(withoutPhoto.entry.doc.slides[0].title).toBe('Texto');
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+
   it('mostra foto baixada sem IndexedDB, mas persiste só a referência do asset remoto', async () => {
     const photo = 'data:image/jpeg;base64,YQ==';
     imageMocks.store.mockResolvedValue({ bgImage: photo, bgImageId: null });

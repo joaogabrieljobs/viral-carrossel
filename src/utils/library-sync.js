@@ -678,8 +678,9 @@ async function resolveCloudLogo(assetId, assetCache, local = {}) {
   return remote;
 }
 
-async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
+async function hydrateSlideFromCloud(slide, assetCache, localSlide, imageResult) {
   try {
+    if (imageResult) imageResult.loaded = false;
     let sl = { ...slide };
     const bgAsset = sl.bgImageAssetId;
     if (bgAsset) {
@@ -704,6 +705,7 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
             }
           }
           sl = { ...sl, ...runtimePhoto, bgImageFailed: false, bgImageError: null };
+          if (imageResult) imageResult.loaded = !!(runtimePhoto.bgImageId || runtimePhoto.bgImage);
         } catch { /* */ }
       } else {
         // Uma falha remota não remove a cópia desta mesma foto no navegador.
@@ -713,7 +715,10 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
         const localId = (sameLocalPhoto && localSlide?.bgImageId) || sl.bgImageId || bgAsset;
         try {
           const localPhoto = await imagemComoDataUrl(localId);
-          if (localPhoto) sl = { ...sl, bgImage: localPhoto, bgImageId: localId, bgImageFailed: false, bgImageError: null };
+          if (localPhoto) {
+            sl = { ...sl, bgImage: localPhoto, bgImageId: localId, bgImageFailed: false, bgImageError: null };
+            if (imageResult) imageResult.loaded = true;
+          }
         } catch { /* continua com os textos e a referência remota */ }
       }
     }
@@ -772,6 +777,7 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide) {
     }
     return sl;
   } catch {
+    if (imageResult) imageResult.loaded = false;
     return { ...slide };
   }
 }
@@ -856,15 +862,29 @@ function cloudAssetCache(signal, localAssets) {
   return cache;
 }
 
-async function hydrateProjectEntry(entry, assetCache, localEntry) {
+async function hydrateProjectEntry(entry, assetCache, localEntry, onProgress) {
   if (!entry?.doc || typeof entry.doc !== 'object') return entry;
   const localDoc = localEntry?.doc;
   try {
     const localSlides = Array.isArray(localDoc?.slides) ? localDoc.slides : [];
+    const sourceSlides = Array.isArray(entry.doc.slides) ? entry.doc.slides : [];
+    const total = sourceSlides.filter((slide) => !!slide?.bgImageAssetId).length;
+    let completed = 0;
+    let loaded = 0;
     const slides = Array.isArray(entry.doc.slides)
-      ? await Promise.all(entry.doc.slides.map((slide) => hydrateSlideFromCloud(
-        slide, assetCache, localSlides.find((item) => item?.id === slide?.id),
-      )))
+      ? await Promise.all(sourceSlides.map(async (slide) => {
+        const imageResult = slide?.bgImageAssetId ? { loaded: false } : null;
+        const hydrated = await hydrateSlideFromCloud(
+          slide, assetCache, localSlides.find((item) => item?.id === slide?.id), imageResult,
+        );
+        if (imageResult) {
+          completed += 1;
+          if (imageResult.loaded) loaded += 1;
+          try { onProgress?.({ projectId: entry.id, completed, total, loaded, missing: completed - loaded }); }
+          catch { /* observação de progresso não pode interromper a restauração */ }
+        }
+        return hydrated;
+      }))
       : [];
     return {
       ...entry,
@@ -882,14 +902,17 @@ async function hydrateProjectEntry(entry, assetCache, localEntry) {
   }
 }
 
-/** Hidrata apenas o detalhe aberto, sem buscar fotos de todos os projetos. */
-export async function hydrateProjectEntryFromCloud(entry, { signal, localEntry, localAssets } = {}) {
+/** Hidrata apenas o detalhe aberto, sem buscar fotos de todos os projetos.
+ * onProgress acompanha os fundos com bgImageAssetId por card, inclusive 404;
+ * projetos sem fundos remotos não emitem eventos. Logos não entram na contagem.
+ */
+export async function hydrateProjectEntryFromCloud(entry, { signal, localEntry, localAssets, onProgress } = {}) {
   if (!entry || typeof entry !== 'object' || !entry.id) {
     throw new Error('Projeto da nuvem inválido.');
   }
   if (signal?.aborted) throw new Error('Sincronização cancelada.');
   const assetCache = cloudAssetCache(signal, localAssets);
-  const hydrated = await hydrateProjectEntry(entry, assetCache, localEntry);
+  const hydrated = await hydrateProjectEntry(entry, assetCache, localEntry, onProgress);
   if (signal?.aborted) throw new Error('Sincronização cancelada.');
   return { entry: hydrated, assetsMissing: assetCache.missing.size };
 }
