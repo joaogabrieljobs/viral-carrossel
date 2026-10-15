@@ -1,10 +1,11 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { SectionLabel as S } from './SectionLabel.jsx';
 import { FONT_PAIRINGS, pairingMatchesBrand } from '../../utils/slide-design-system.js';
 import { TITLE_FONTS } from '../../utils/design-data.js';
 import { BODY_FONTS } from '../../utils/brand-visuals.js';
 import { vcCustomTitleFace } from '../../utils/brand-helpers.js';
+import './font-family-select.css';
 
 // Section wrapper
 // Agrupador de fontes por categoria com filtro lateral.
@@ -17,45 +18,163 @@ const FONT_CAT_LABELS = {
   serif:     'Serif',
   editorial: 'Editorial',
   mono:      'Mono',
+  imported:  'Importadas',
 };
 
 /** A mesma lista para qualquer texto; a opção vazia volta a herdar o estilo. */
 export function FontFamilySelect({ label = 'Fonte do texto selecionado', value = '', onChange, brand = {} }) {
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState('all');
+  const [query, setQuery] = useState('');
+  const panelId = useId();
+  const triggerRef = useRef(null);
+  const searchRef = useRef(null);
+  const choicesRef = useRef(null);
   const fonts = [...new Map([...TITLE_FONTS, ...BODY_FONTS].map(font => [font.val, font])).values()];
   const custom = [];
   if (brand?.customTitleFont?.dataUrl) custom.push({
     name: brand.customTitleFont.fileName || 'Fonte importada de títulos',
     val: `${vcCustomTitleFace(brand.id)}, ${brand.titleFont}`,
+    cat: 'imported',
   });
   if (brand?.customBodyFont?.dataUrl) custom.push({
     name: brand.customBodyFont.fileName || 'Fonte importada de corpo',
     val: `VCBrandBody-${brand.id || 'default'}, ${brand.bodyFont}`,
+    cat: 'imported',
   });
   const known = [...fonts, ...custom].some(font => font.val === value);
+  const unlisted = value && !known ? [{
+    name: value.split(',')[0].replace(/["']/g, '').trim(), val: value, cat: 'imported',
+  }] : [];
+  const allFonts = [...unlisted, ...custom, ...fonts];
+  const selected = allFonts.find(font => font.val === value);
+  const categories = ['all', ...['imported', 'sans', 'display', 'serif', 'editorial', 'mono']
+    .filter(cat => allFonts.some(font => (font.cat || 'sans') === cat))];
+  const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+  const visibleFonts = allFonts.filter(font => (
+    (category === 'all' || (font.cat || 'sans') === category)
+    && (!normalizedQuery || font.name.toLocaleLowerCase('pt-BR').includes(normalizedQuery))
+  ));
+  const groups = categories.slice(1).map(cat => ({
+    cat, fonts: visibleFonts.filter(font => (font.cat || 'sans') === cat),
+  })).filter(group => group.fonts.length);
+
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  const choose = (fontValue) => {
+    onChange(fontValue);
+    setOpen(false);
+    setCategory('all');
+    setQuery('');
+    triggerRef.current?.focus();
+  };
+  const focusChoice = (direction, origin = null) => {
+    const choices = [...(choicesRef.current?.querySelectorAll('.vc-font-choice') || [])];
+    if (!choices.length) return;
+    const index = origin ? choices.indexOf(origin) : -1;
+    const next = direction > 0
+      ? (index + 1) % choices.length
+      : (index < 0 ? choices.length - 1 : (index - 1 + choices.length) % choices.length);
+    choices[next]?.focus();
+  };
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape' && open) {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      setCategory('all');
+      setQuery('');
+      triggerRef.current?.focus();
+    } else if (event.key === 'ArrowDown' && open && (event.target === searchRef.current || event.target.classList?.contains('vc-font-choice'))) {
+      event.preventDefault();
+      focusChoice(1, event.target.classList?.contains('vc-font-choice') ? event.target : null);
+    } else if (event.key === 'ArrowUp' && open && event.target.classList?.contains('vc-font-choice')) {
+      event.preventDefault();
+      focusChoice(-1, event.target);
+    }
+  };
   return (
-    <label style={{ display: 'grid', gap: 7, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-      {label}
-      <select
-        className="vc-input"
+    <div className="vc-font-select" onKeyDown={handleKeyDown}>
+      <span className="vc-font-select__label">{label}</span>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="vc-font-select__trigger"
         aria-label={label}
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: 13, fontFamily: value || 'var(--font-ui)' }}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => {
+          if (open) {
+            setCategory('all');
+            setQuery('');
+          }
+          setOpen(!open);
+        }}
+        onKeyDown={event => {
+          if (!open && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
       >
-        <option value="">Usar fonte do estilo</option>
-        {value && !known && <option value={value}>{value.split(',')[0].replace(/["']/g, '')}</option>}
-        {custom.length > 0 && <optgroup label="Fontes importadas">
-          {custom.map(font => <option key={font.val} value={font.val}>{font.name}</option>)}
-        </optgroup>}
-        {['sans', 'display', 'serif', 'editorial', 'mono'].map(cat => (
-          <optgroup key={cat} label={FONT_CAT_LABELS[cat]}>
-            {fonts.filter(font => (font.cat || 'sans') === cat).map(font => (
-              <option key={font.val} value={font.val} style={{ fontFamily: font.val }}>{font.name}</option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-    </label>
+        <span className="vc-font-select__selected" style={{ fontFamily: value || 'var(--font-ui)' }}>
+          {selected?.name || 'Usar fonte do estilo'}
+        </span>
+        <span className="vc-font-select__chevron" aria-hidden="true">{open ? '⌃' : '⌄'}</span>
+      </button>
+      {open && <div id={panelId} className="vc-font-select__panel">
+        <div className="vc-font-select__search-wrap">
+          <input
+            ref={searchRef}
+            type="search"
+            className="vc-font-select__search"
+            aria-label="Buscar fonte"
+            placeholder="Buscar fonte"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+        </div>
+        <div className="vc-font-select__categories" role="group" aria-label="Categorias de fontes">
+          {categories.map(cat => <button
+            key={cat}
+            type="button"
+            className="vc-font-select__category"
+            aria-pressed={category === cat}
+            onClick={() => setCategory(cat)}
+          >{FONT_CAT_LABELS[cat]}</button>)}
+        </div>
+        <div ref={choicesRef} className="vc-font-select__choices" role="group" aria-label="Fontes disponíveis">
+          {category === 'all' && !normalizedQuery && <button
+            type="button"
+            className="vc-font-choice vc-font-choice--inherit"
+            aria-label="Usar fonte do estilo"
+            aria-pressed={!value}
+            onClick={() => choose('')}
+          >
+            <span className="vc-font-choice__sample" aria-hidden="true">Aa · Padrão do projeto</span>
+            <span className="vc-font-choice__name">Usar fonte do estilo</span>
+          </button>}
+          {groups.map(({ cat, fonts: groupFonts }) => <div key={cat} className="vc-font-select__group">
+            <span className="vc-font-select__group-title">{FONT_CAT_LABELS[cat]}</span>
+            {groupFonts.map(font => <button
+              key={font.val}
+              type="button"
+              className="vc-font-choice"
+              aria-label={font.name}
+              aria-pressed={value === font.val}
+              data-font-value={font.val}
+              onClick={() => choose(font.val)}
+            >
+              <span className="vc-font-choice__sample" style={{ fontFamily: font.val }} aria-hidden="true">Ideia viva.</span>
+              <span className="vc-font-choice__name">{font.name}</span>
+            </button>)}
+          </div>)}
+          {!groups.length && <p className="vc-font-select__empty">Nenhuma fonte encontrada.</p>}
+        </div>
+      </div>}
+    </div>
   );
 }
 const FontPairingPicker = ({ brand, onApply, children }) => {
@@ -140,19 +259,20 @@ const FontPicker = ({ title, fonts, active, onChange }) => {
           >{FONT_CAT_LABELS[c] || c}</button>
         ))}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, maxHeight:240, overflowY:'auto', paddingRight:4 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, maxHeight:320, overflowY:'auto', paddingRight:4 }}>
         {filtered.map(f => (
-          <button key={f.name} onClick={()=>onChange(f.val)}
-            style={{
-              padding:'9px 8px', borderRadius:6, fontSize:13, fontWeight:700, cursor:'pointer',
-              fontFamily:f.val, transition:'all 0.12s', textAlign:'left',
-              background: active===f.val ? 'var(--text-primary)' : 'var(--bg-card)',
-              border: `1px solid ${active===f.val ? 'transparent' : 'var(--border)'}`,
-              color: active===f.val ? 'var(--bg-base)' : 'var(--text-secondary)',
-              minHeight:36, display:'flex', alignItems:'center',
-            }}
+          <button
+            key={f.val}
+            type="button"
+            className="vc-font-choice"
+            aria-label={f.name}
+            aria-pressed={active===f.val}
+            onClick={()=>onChange(f.val)}
             title={f.name}
-          >{f.name}</button>
+          >
+            <span className="vc-font-choice__sample" style={{ fontFamily: f.val }} aria-hidden="true">Ideia viva.</span>
+            <span className="vc-font-choice__name">{f.name}</span>
+          </button>
         ))}
       </div>
     </S>

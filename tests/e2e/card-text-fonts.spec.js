@@ -8,6 +8,13 @@ const TITLE_FONT = '"Playfair Display", serif';
 const SUBTITLE_FONT = '"Montserrat", sans-serif';
 const EXTRA_FONT = '"Outfit", sans-serif';
 const CTA_FONT = '"Space Grotesk", sans-serif';
+const FONT_LABELS = new Map([
+  [TITLE_FONT, 'Playfair'],
+  [SUBTITLE_FONT, 'Montserrat'],
+  [EXTRA_FONT, 'Outfit'],
+  [CTA_FONT, 'Space Grotesk'],
+  ['', 'Usar fonte do estilo'],
+]);
 
 function mockFontCss(url) {
   return new URL(url).searchParams.getAll('family').map(value => value.split(':')[0]).map(family => (
@@ -91,7 +98,14 @@ async function closeMobilePanel(page, mobile) {
 
 async function selectFont(page, key, fontFamily) {
   await panel(page).getByRole('combobox', { name: 'Texto do card', exact: true }).selectOption(key);
-  await panel(page).getByRole('combobox', { name: 'Fonte do texto selecionado', exact: true }).selectOption(fontFamily);
+  await chooseFont(page, fontFamily);
+}
+
+async function chooseFont(page, fontFamily) {
+  const inspector = panel(page);
+  await inspector.getByRole('button', { name: 'Fonte do texto selecionado', exact: true }).click();
+  await inspector.getByRole('group', { name: 'Fontes disponíveis' })
+    .getByRole('button', { name: FONT_LABELS.get(fontFamily), exact: true }).click();
 }
 
 async function savedDoc(page) {
@@ -125,7 +139,7 @@ for (const width of [1680, 390]) {
     await surface(page).getByText('Detalhe 1', { exact: true }).click();
     await openTextPanel(page, mobile);
     await expect(panel(page).getByRole('combobox', { name: 'Texto do card', exact: true })).toHaveValue('subtitle');
-    await panel(page).getByRole('combobox', { name: 'Fonte do texto selecionado', exact: true }).selectOption(SUBTITLE_FONT);
+    await chooseFont(page, SUBTITLE_FONT);
     await expectFont(page, 'Detalhe 1', 'Montserrat');
     await expectFont(page, 'IDEIA 1', 'Playfair Display');
     await expectFont(page, 'Detalhe 2', 'Arial', SECOND_CARD);
@@ -142,7 +156,7 @@ for (const width of [1680, 390]) {
       await surface(page, SECOND_CARD).getByText('Detalhe 2', { exact: true }).click();
       await expect(page.getByRole('button', { name: 'Card 2 de 2', exact: true })).toHaveClass(/active/);
       await expect(panel(page).getByRole('combobox', { name: 'Texto do card', exact: true })).toHaveValue('subtitle');
-      await panel(page).getByRole('combobox', { name: 'Fonte do texto selecionado', exact: true }).selectOption(EXTRA_FONT);
+      await chooseFont(page, EXTRA_FONT);
       await expectFont(page, 'Detalhe 2', 'Outfit', SECOND_CARD);
       await expectFont(page, 'IDEIA 2', 'Arial', SECOND_CARD);
       await expectFont(page, 'Detalhe 1', 'Montserrat');
@@ -197,6 +211,41 @@ for (const width of [1680, 390]) {
     }
   });
 }
+
+test('galeria mostra a identidade de cada fonte e permite busca e teclado', async ({ page }) => {
+  await openProject(page, 1680);
+  await openTextPanel(page, false);
+  const inspector = panel(page);
+  const trigger = inspector.getByRole('button', { name: 'Fonte do texto selecionado', exact: true });
+  await trigger.click();
+  const choices = inspector.getByRole('group', { name: 'Fontes disponíveis' });
+  const playfair = choices.getByRole('button', { name: 'Playfair', exact: true });
+  const outfit = choices.getByRole('button', { name: 'Outfit', exact: true });
+  await expect(playfair.locator('.vc-font-choice__sample')).toHaveCSS('font-family', /Playfair Display/);
+  await expect(outfit.locator('.vc-font-choice__sample')).toHaveCSS('font-family', /Outfit/);
+  await expect(playfair).not.toHaveAttribute('aria-pressed', 'true');
+  await inspector.getByRole('searchbox', { name: 'Buscar fonte' }).fill('Playfair');
+  await expect(playfair).toBeVisible();
+  await expect(outfit).toHaveCount(0);
+  await inspector.getByRole('searchbox', { name: 'Buscar fonte' }).press('ArrowDown');
+  await expect(playfair).toBeFocused();
+  await playfair.press('Enter');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expectFont(page, 'IDEIA 1', 'Playfair Display');
+  await trigger.click();
+  await expect(playfair).toHaveAttribute('aria-pressed', 'true');
+  await inspector.getByRole('group', { name: 'Categorias de fontes' })
+    .getByRole('button', { name: 'Serif', exact: true }).click();
+  await expect(playfair).toBeVisible();
+  await expect(outfit).toHaveCount(0);
+  await inspector.getByRole('searchbox', { name: 'Buscar fonte' }).press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+  await inspector.getByRole('searchbox', { name: 'Buscar fonte' }).fill('Bodoni Moda');
+  await choices.getByRole('button', { name: 'Bodoni Moda', exact: true }).click();
+  await expectFont(page, 'IDEIA 1', 'Bodoni Moda');
+});
 
 test('Aplicar em todos replica apenas a fonte do título e persiste após recarregar', async ({ page }) => {
   await openProject(page, 1680);
