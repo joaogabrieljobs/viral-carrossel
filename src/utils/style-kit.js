@@ -34,18 +34,28 @@ function normalizeStyleKit(raw) {
   const refs = Array.isArray(src.refImages) ? src.refImages : [];
   return {
     ...(asString(src.name).trim() ? { name: asString(src.name).trim().slice(0, 60) } : {}),
-    ...(src.logo && (asString(src.logo.imageId) || asString(src.logo.dataUrl).startsWith('data:image/png;base64,'))
-      ? { logo: { name: asString(src.logo.name).slice(0, 80) || 'Logo do projeto', ...(src.logo.imageId ? { imageId: src.logo.imageId } : { dataUrl: src.logo.dataUrl }) } } : {}),
+    ...(src.logo && (asString(src.logo.imageId) || asString(src.logo.assetId)
+      || asString(src.logo.dataUrl).startsWith('data:image/png;base64,'))
+      ? { logo: {
+        name: asString(src.logo.name).slice(0, 80) || 'Logo do projeto',
+        ...(asString(src.logo.assetId) ? { assetId: src.logo.assetId } : {}),
+        ...(asString(src.logo.imageId) ? { imageId: src.logo.imageId }
+          : asString(src.logo.dataUrl).startsWith('data:image/png;base64,')
+            ? { dataUrl: src.logo.dataUrl } : {}),
+      } } : {}),
     stylePrompt: asString(src.stylePrompt).slice(0, STYLE_PROMPT_MAX),
     contextMd: asString(src.contextMd).slice(0, CONTEXT_MD_MAX),
     logoOnGenerate: src.logoOnGenerate === false ? false : true,
     refImages: refs
-      .filter((r) => r && typeof r === 'object' && ((typeof r.imageId === 'string' && r.imageId) || (typeof r.dataUrl === 'string' && r.dataUrl.startsWith('data:image/'))))
+      .filter((r) => r && typeof r === 'object' && (asString(r.imageId) || asString(r.assetId)
+        || asString(r.dataUrl).startsWith('data:image/')))
       .slice(0, MAX_REF_IMAGES)
       .map((r) => ({
         id: typeof r.id === 'string' && r.id ? r.id : uid(),
         name: asString(r.name).slice(0, REF_NAME_MAX) || 'referência',
-        ...(r.imageId ? { imageId: r.imageId } : { dataUrl: r.dataUrl }),
+        ...(asString(r.assetId) ? { assetId: r.assetId } : {}),
+        ...(asString(r.imageId) ? { imageId: r.imageId }
+          : asString(r.dataUrl).startsWith('data:image/') ? { dataUrl: r.dataUrl } : {}),
       })),
   };
 }

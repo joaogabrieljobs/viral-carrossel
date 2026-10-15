@@ -95,6 +95,27 @@ describe('doc-schema styleKit', () => {
     expect(withKit.styleKit.stylePrompt).toBe('noir');
     expect(withKit.styleKit.contextMd).toBe('# X');
   });
+
+  it('mantém IDs remotos de logo e referências até as imagens chegarem', () => {
+    const doc = ensureDocShape({
+      ...DEFAULT_DOC,
+      styleKit: {
+        logo: { name: 'Marca', assetId: 'logo-cloud' },
+        refImages: [{ id: 'ref-1', name: 'Direção', assetId: 'reference-cloud' }],
+      },
+    });
+    expect(doc.styleKit.logo).toEqual({ name: 'Marca', assetId: 'logo-cloud' });
+    expect(doc.styleKit.refImages).toEqual([
+      { id: 'ref-1', name: 'Direção', assetId: 'reference-cloud' },
+    ]);
+    expect(normalizeStyleKit({
+      logo: { assetId: 'logo-cloud', imageId: 'logo-local' },
+      refImages: [{ id: 'ref-1', assetId: 'reference-cloud', imageId: 'reference-local' }],
+    })).toMatchObject({
+      logo: { assetId: 'logo-cloud', imageId: 'logo-local' },
+      refImages: [{ id: 'ref-1', assetId: 'reference-cloud', imageId: 'reference-local' }],
+    });
+  });
 });
 
 import { resolveQuickGenerationRequest, buildGenerationTaskBlock, CONTEXT_MD_MAX } from '../../src/utils/style-kit.js';
