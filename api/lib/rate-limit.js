@@ -7,6 +7,8 @@
  */
 
 const buckets = new Map();
+const UPSTASH_RETRY_MS = 30_000;
+let upstashUnavailableUntil = 0;
 
 function headerValue(headers, name) {
   const value = headers?.[name] || headers?.[name.toLowerCase()];
@@ -23,11 +25,6 @@ function clientIp(req) {
     return parts[parts.length - 1] || 'unknown';
   }
   return req.socket?.remoteAddress || 'unknown';
-}
-
-function productionRateLimit() {
-  return process.env.VERCEL_ENV === 'production'
-    || (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production');
 }
 
 function hasUpstash() {
@@ -110,12 +107,14 @@ async function consumeUpstash(req, { limit, windowMs, keyPrefix }) {
  * @returns {Promise<null | { retryAfterSec: number }>} null = ok
  */
 export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, keyPrefix = 'api' } = {}) {
-  if (hasUpstash()) {
+  if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {
-      return await consumeUpstash(req, { limit, windowMs, keyPrefix });
+      const result = await consumeUpstash(req, { limit, windowMs, keyPrefix });
+      upstashUnavailableUntil = 0;
+      return result;
     } catch (e) {
-      console.warn('[rate-limit] Upstash falhou:', e?.message || e);
-      if (productionRateLimit()) return { retryAfterSec: 30 };
+      upstashUnavailableUntil = Date.now() + UPSTASH_RETRY_MS;
+      console.warn('[rate-limit] Upstash falhou; usando limite local temporário:', e?.message || e);
     }
   }
   return consumeMemory(req, { limit, windowMs, keyPrefix });
@@ -132,4 +131,5 @@ export function rateLimitResponse(res, retryAfterSec, nested = false) {
 /** Só para testes — limpa buckets em memória. */
 export function resetRateLimits() {
   buckets.clear();
+  upstashUnavailableUntil = 0;
 }

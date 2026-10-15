@@ -12,6 +12,7 @@ describe('consumeRateLimit', () => {
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     delete process.env.RATE_LIMIT_TEST_UPSTASH;
     delete process.env.VERCEL_ENV;
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -48,15 +49,24 @@ describe('consumeRateLimit', () => {
     }, opts)).toMatchObject({ retryAfterSec: expect.any(Number) });
   });
 
-  it('em produção, falha do Upstash recusa o pedido em vez de abrir a memória', async () => {
+  it('em produção, falha do Upstash usa limite local e tenta recuperar após 30 segundos', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-15T00:00:00Z'));
     process.env.RATE_LIMIT_TEST_UPSTASH = '1';
     process.env.UPSTASH_REDIS_REST_URL = 'https://upstash.example';
     process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
     process.env.VERCEL_ENV = 'production';
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
-    const limited = await consumeRateLimit(req('7.7.7.7'), { limit: 100, windowMs: 60_000, keyPrefix: 'prod' });
-    expect(limited).toEqual({ retryAfterSec: 30 });
-    delete process.env.RATE_LIMIT_TEST_UPSTASH;
-    delete process.env.VERCEL_ENV;
+    const fetchMock = vi.fn().mockRejectedValue(new Error('down'));
+    vi.stubGlobal('fetch', fetchMock);
+    const options = { limit: 2, windowMs: 60_000, keyPrefix: 'prod' };
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toMatchObject({ retryAfterSec: expect.any(Number) });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(30_001);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ result: 1 }) });
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3); // INCR + EXPIRE após o cooldown
   });
 });
