@@ -153,7 +153,7 @@ export function FontFamilySelect({ label = 'Fonte do texto selecionado', value =
             aria-pressed={!value}
             onClick={() => choose('')}
           >
-            <span className="vc-font-choice__sample" aria-hidden="true">Aa · Padrão do projeto</span>
+            <span className="vc-font-choice__sample" aria-hidden="true">Moont</span>
             <span className="vc-font-choice__name">Usar fonte do estilo</span>
           </button>}
           {groups.map(({ cat, fonts: groupFonts }) => <div key={cat} className="vc-font-select__group">
@@ -167,7 +167,7 @@ export function FontFamilySelect({ label = 'Fonte do texto selecionado', value =
               data-font-value={font.val}
               onClick={() => choose(font.val)}
             >
-              <span className="vc-font-choice__sample" style={{ fontFamily: font.val }} aria-hidden="true">Ideia viva.</span>
+              <span className="vc-font-choice__sample" style={{ fontFamily: font.val }} aria-hidden="true">Moont</span>
               <span className="vc-font-choice__name">{font.name}</span>
             </button>)}
           </div>)}
@@ -270,7 +270,7 @@ const FontPicker = ({ title, fonts, active, onChange }) => {
             onClick={()=>onChange(f.val)}
             title={f.name}
           >
-            <span className="vc-font-choice__sample" style={{ fontFamily: f.val }} aria-hidden="true">Ideia viva.</span>
+            <span className="vc-font-choice__sample" style={{ fontFamily: f.val }} aria-hidden="true">Moont</span>
             <span className="vc-font-choice__name">{f.name}</span>
           </button>
         ))}
