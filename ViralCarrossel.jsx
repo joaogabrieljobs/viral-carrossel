@@ -1452,9 +1452,19 @@ export default function App() {
     }
     const baseline = v2BaselinesRef.current.get(docId);
     const editor = editorSyncStateRef.current;
-    if (baseline && (baseline !== projectCacheFingerprint(entry)
-      || (editor.activeDocId === docId
-        && baseline !== projectCacheFingerprint({ ...entry, doc: editor.doc })))) {
+    const entryFingerprint = projectCacheFingerprint(entry);
+    const editorFingerprint = projectCacheFingerprint({ ...entry, doc: editor.doc });
+    const unsavedInEditor = editor.activeDocId === docId
+      && baseline
+      && (baseline !== entryFingerprint || baseline !== editorFingerprint);
+    if (unsavedInEditor) {
+      // O projeto já está no editor. Reabrir pela biblioteca não pode
+      // descartar a edição nem exigir um salvamento que ainda não terminou.
+      setLibraryOpen(false);
+      setShellView('project');
+      return true;
+    }
+    if (baseline && baseline !== entryFingerprint) {
       toast('Salve as alterações deste projeto antes de abri-lo novamente.', 'warning', 5000);
       return false;
     }
@@ -1478,6 +1488,11 @@ export default function App() {
       if (!current || (baseline && (baseline !== projectCacheFingerprint(current)
         || (latestEditor.activeDocId === docId
           && baseline !== projectCacheFingerprint({ ...current, doc: latestEditor.doc }))))) {
+        if (latestEditor.activeDocId === docId) {
+          setLibraryOpen(false);
+          setShellView('project');
+          return true;
+        }
         toast('O projeto mudou enquanto abria. Salve as alterações e tente novamente.', 'warning', 5000);
         return false;
       }
