@@ -215,7 +215,9 @@ export async function packDocWithImagesForShare(doc) {
     if (dataUrl) {
       const compact = await compactDataUrlForShare(dataUrl);
       if (compact) {
-        next = forgetForeignAsset({ ...next, bgImage: compact, bgImageId: undefined });
+        // O id da nuvem de quem publica permanece. Se o JSON não couber
+        // todas as fotos, a outra conta ainda lê esses bytes pelo código.
+        next = { ...next, bgImage: compact, bgImageId: undefined };
         packedImages += 1;
       } else {
         next = { ...next, bgImage: null };
@@ -260,7 +262,7 @@ export async function packDocWithImagesForShare(doc) {
           dropped = true;
           imagesOmitted += 1;
           packedImages = Math.max(0, packedImages - 1);
-          return { ...s, bgImage: null };
+          return { ...s, bgImage: null, bgImageAssetId: s.bgImageAssetId };
         }
         return s;
       }),

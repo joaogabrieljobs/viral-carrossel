@@ -58,9 +58,12 @@ class RootErrorBoundary extends React.Component {
 
 // Landing first paint sem o monólito do studio; quem já passou pela intro
 // vai direto ao editor principal.
+const path = window.location.pathname.replace(/\/+$/, '') || '/';
 const App = lazy(() => (
-  window.location.pathname === '/redefinir-senha'
+  path === '/redefinir-senha'
     ? import('./PasswordRecoveryPage.jsx')
+    : path === '/privacidade' || path === '/termos'
+    ? import('./LegalPage.jsx')
     : shouldShowOnboardingLanding()
     ? import('./LandingFirst.jsx')
     : import('../ViralCarrossel.jsx')

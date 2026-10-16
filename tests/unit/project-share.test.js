@@ -89,8 +89,33 @@ describe('packDocWithImagesForShare', () => {
     });
     expect(packedImages).toBe(1);
     expect(doc.slides[0].bgImage).toBe('data:image/png;base64,AAAA');
-    expect(doc.slides[0].bgImageAssetId).toBeUndefined();
+    expect(doc.slides[0].bgImageAssetId).toBe('photo-1');
     vi.unstubAllGlobals();
+  });
+
+  it('mantém o id da nuvem quando a foto não cabe no pedido', async () => {
+    const huge = `data:image/png;base64,${'A'.repeat(2_000_000)}`;
+    const { doc, imagesOmitted } = await packDocWithImagesForShare({
+      slides: [
+        { title: 'A', bgImage: huge, bgImageAssetId: 'photo-a' },
+        { title: 'B', bgImage: huge, bgImageAssetId: 'photo-b' },
+      ],
+    });
+    expect(imagesOmitted).toBeGreaterThan(0);
+    expect(doc.slides.map((slide) => slide.bgImageAssetId)).toEqual(['photo-a', 'photo-b']);
+    expect(doc.slides.every((slide) => !String(slide.bgImage || '').startsWith('data:'))).toBe(true);
+  });
+
+  it('mantém o id mesmo das fotos retiradas para o pedido caber', async () => {
+    const medium = `data:image/jpeg;base64,${'B'.repeat(200_000)}`;
+    const slides = Array.from({ length: 16 }, (_, index) => ({
+      title: `Card ${index}`,
+      bgImage: medium,
+      bgImageAssetId: `photo-${index}`,
+    }));
+    const { doc, imagesOmitted } = await packDocWithImagesForShare({ slides });
+    expect(imagesOmitted).toBeGreaterThan(0);
+    expect(doc.slides.map((slide) => slide.bgImageAssetId)).toEqual(slides.map((slide) => slide.bgImageAssetId));
   });
 
   it('quem entra pelo código lê a foto do dono e não guarda o id da outra conta', async () => {

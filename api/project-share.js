@@ -88,7 +88,7 @@ export default async function handler(req, res) {
 
   const readingShareAsset = req.method === 'GET' && !!(req.query?.asset || req.query?.a);
   const limited = await consumeRateLimit(req, {
-    limit: readingShareAsset ? 240 : 40,
+    limit: readingShareAsset ? 800 : 40,
     windowMs: 60_000,
     keyPrefix: readingShareAsset ? 'project-share-asset' : 'project-share',
   });

@@ -246,13 +246,13 @@ export default function LoginModal({
 
           <p style={{
             margin: 0,
-            fontSize: 11,
+            fontSize: 13,
             lineHeight: 1.45,
             color: 'var(--text-muted)',
             textAlign: 'center',
           }}>
-            Novo e ainda sem plano? Cria a conta e depois escolhe o plano em{' '}
-            <strong style={{ color: 'var(--text-secondary)' }}>Começar agora</strong>.
+            Ao criar a conta, você aceita os <a href="/termos" style={{ color: 'inherit' }}>termos</a> e a <a href="/privacidade" style={{ color: 'inherit' }}>política de privacidade</a>.
+            {' '}Novo e ainda sem plano? Crie a conta e depois escolha o plano em Começar agora.
           </p>
           </>}
         </div>

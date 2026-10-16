@@ -542,6 +542,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
         <div className="moont-lp-container">
           <BrandLogo height={26} />
           <p>Carrosséis e apresentações que começam com contexto.</p>
+          <a href="/privacidade">Privacidade</a>
+          <a href="/termos">Termos</a>
           <button type="button" onClick={onLogin}>Entrar</button>
         </div>
       </footer>

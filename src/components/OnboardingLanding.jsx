@@ -2010,7 +2010,10 @@ export default function OnboardingLanding({ onEnter, onEnterProfessional, onLogi
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
           }}>
-            © {new Date().getFullYear()} Moont. Todos os direitos reservados.
+            © {new Date().getFullYear()} Moont. Todos os direitos reservados.{' '}
+            <a href="/privacidade" style={{ color: 'inherit' }}>Privacidade</a>
+            {' · '}
+            <a href="/termos" style={{ color: 'inherit' }}>Termos</a>
           </p>
         </div>
       </footer>

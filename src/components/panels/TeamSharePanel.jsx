@@ -120,11 +120,14 @@ export function TeamSharePanel({
                 });
                 setLocalCode(res.code);
                 return res;
-              }, (res) => (
-                res?.packedImages
+              }, (res) => {
+                if (res?.imagesOmitted) {
+                  return `Publicado. ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} grande${res.imagesOmitted === 1 ? '' : 's'} a outra conta lê ao puxar.`;
+                }
+                return res?.packedImages
                   ? `Publicado com ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} para a equipa.`
-                  : 'Alterações publicadas para a equipa.'
-              ))}
+                  : 'Alterações publicadas para a equipa.';
+              })}
               style={{
                 minHeight: 40, padding: '0 14px', borderRadius: 9999, border: 'none',
                 background: 'var(--accent)', color: '#fff', fontWeight: 600, fontSize: 12,
@@ -179,11 +182,14 @@ export function TeamSharePanel({
               await copyInviteLink(res.code, { announce: false });
               return res;
             }, (res) => {
+              const omitted = res?.imagesOmitted
+                ? ` ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} grande${res.imagesOmitted === 1 ? '' : 's'} entra${res.imagesOmitted === 1 ? '' : 'm'} quando a outra conta puxar.`
+                : '';
               if (res?.packedImages) {
-                return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}. Envie à equipa.`;
+                return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}.${omitted} Envie à equipa.`;
               }
               if (res?.imagesOmitted) {
-                return 'Link copiado (só texto — fotos grandes omitidas). Envie à equipa; pode Publicar depois com imagens mais leves.';
+                return `Link copiado.${omitted} Envie à equipa e peça para puxar as alterações.`;
               }
               return 'Link de convite copiado. Envie à equipa.';
             })}
