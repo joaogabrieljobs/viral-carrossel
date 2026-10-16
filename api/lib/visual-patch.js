@@ -24,8 +24,10 @@ export const SLIDE_VISUAL_FIELDS = Object.freeze({
   titleTracking: number(-20, 60), subTracking: number(-20, 60), bodyTracking: number(-20, 60),
   titleLeading: number(60, 250), subLeading: number(60, 250), bodyLeading: number(60, 250),
   titleWeight: number(100, 900), bodyWeight: number(100, 900),
+  titleColor: color, subtitleColor: color,
   logoHidden: boolean, logoPosition,
   logoSize: number(48, 900), logoOpacity: number(0, 100),
+  logoTone: choice(['original', 'dark']),
   elementsUnlocked: boolean,
   textFonts: { type: 'textFonts' }, elementOffsets: { type: 'elementOffsets' },
   canvas: { type: 'canvasZones' }, overlayStyles: { type: 'overlayStyles' },
@@ -66,6 +68,7 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
     'A patch is a flat slide style object; patch.brand is an explicit project-wide style object.',
     'patch.brand requires brandScope="project" even when a subset of slideIds is selected.',
     'Text, image, logo asset and reference fields cannot be written by this API.',
+    'slide.titleColor and slide.subtitleColor override brand ink for selected cards, including photo cards.',
     'A project is applied atomically. Repeat requestId to resume safely after a network failure.',
   ],
 });

@@ -287,6 +287,7 @@ function BrandLogoLayer({
   src,
   sizePx,
   opacity = 1,
+  tone = 'original',
   pos = 'tr',
   margin,
   topOffset,
@@ -328,6 +329,7 @@ function BrandLogoLayer({
           objectFit: 'contain',
           objectPosition: 'center',
           display: 'block',
+          filter: tone === 'dark' ? 'brightness(0)' : undefined,
           pointerEvents: 'none',
           userSelect: 'none',
         }}
@@ -578,6 +580,7 @@ const ClassicCanvasInner = React.forwardRef(({
   titleInk,
   /** Corpo: subtítulo «texto», parágrafos, etc. */
   bodyInk,
+  subtitleInk = bodyInk,
   imgModeNorm,
   effectivePresentationFilter,
   bgFit,
@@ -893,7 +896,7 @@ const ClassicCanvasInner = React.forwardRef(({
               <CultureRichParagraphs
                 text={slide.subtitle}
                 destaqueSpans={slide.destaqueSpans?.subtitle}
-                ink={bodyInk}
+                ink={subtitleInk}
                 accentColor={cultureAccentCol}
                 fontFamily={resolvedSubtitleFF}
                 fontSize={f.w * 0.028 * (resolvedSubtitleSize / 100) * subScale}
@@ -905,7 +908,7 @@ const ClassicCanvasInner = React.forwardRef(({
             </div>
           ) : (
             <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => onInlineTextChange?.('subtitle', text)} elementProps={{ style: {
-              color: bodyInk,
+              color: subtitleInk,
               fontFamily: resolvedSubtitleFF,
               fontSize: f.w * 0.028 * (resolvedSubtitleSize / 100) * subScale,
               lineHeight: resolvedSubtitleLeading / 100,
@@ -1049,6 +1052,7 @@ const ClassicCanvasInner = React.forwardRef(({
         return (
           <BrandLogoLayer
             src={brand.logo}
+            tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}
@@ -1094,6 +1098,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   subtitleFF,
   displayTitleInk,
   displayBodyInk,
+  displaySubtitleInk = displayBodyInk,
   cultureRichText,
   cultureAccentCol,
   sandwichSkin,
@@ -1209,7 +1214,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         <CultureRichParagraphs
           text={slide.subtitle}
           destaqueSpans={slide.destaqueSpans?.subtitle}
-          ink={displayBodyInk}
+          ink={displaySubtitleInk}
           accentColor={cultureAccentCol}
           fontFamily={subtitleFF}
           fontSize={f.w * 0.028 * (slide.subSize / 100)}
@@ -1221,7 +1226,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       </div>
     ) : (
       <p style={{
-        color: displayBodyInk, fontFamily: subtitleFF,
+        color: displaySubtitleInk, fontFamily: subtitleFF,
         fontSize: f.w * 0.028 * (slide.subSize / 100),
         lineHeight: (slide.subLeading ?? 150) / 100,
         fontWeight: brand.subtitleWeight ?? 400, margin: 0,
@@ -1532,6 +1537,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         return (
           <BrandLogoLayer
             src={brand.logo}
+            tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}
@@ -1807,6 +1813,11 @@ const SlideCardInner = React.forwardRef(({
     displayTitleInk = '#ffffff';
     displayBodyInk = '#f5f5f7';
   }
+
+  // Uma escolha explícita neste card vence a paleta e os ajustes automáticos de
+  // legibilidade. A cor de apoio continua independente da cor do subtítulo.
+  displayTitleInk = slide.titleColor || displayTitleInk;
+  const displaySubtitleInk = slide.subtitleColor || displayBodyInk;
 
   /**
    * Assinatura da marca (barra editorial no topo, contador N/M, barra do rodapé
@@ -2238,7 +2249,7 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={cr.titleInk}
+                baseColor={slide.titleColor || cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * topScale}
@@ -2251,7 +2262,7 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={slide.subtitle}
             destaqueSpans={slide.destaqueSpans?.subtitle}
-            ink={cr.subtitleInk}
+            ink={slide.subtitleColor || cr.subtitleInk}
             accentColor={cr.accentInk}
             fontFamily={subtitleFF}
             fontSize={f.w * 0.031 * (slide.subSize / 100) * topScale}
@@ -2416,6 +2427,7 @@ const SlideCardInner = React.forwardRef(({
           return (
             <BrandLogoLayer
               src={brand.logo}
+              tone={slide.logoTone}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
               pos={pos}
@@ -2559,7 +2571,7 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={cr.titleInk}
+                baseColor={slide.titleColor || cr.titleInk}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * scale}
@@ -2579,7 +2591,7 @@ const SlideCardInner = React.forwardRef(({
             <CultureRichParagraphs
               text={slide.subtitle}
               destaqueSpans={slide.destaqueSpans?.subtitle}
-              ink={cr.subtitleInk}
+              ink={slide.subtitleColor || cr.subtitleInk}
               accentColor={cr.accentInk}
               fontFamily={subtitleFF}
               fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
@@ -2761,6 +2773,7 @@ const SlideCardInner = React.forwardRef(({
           return (
             <BrandLogoLayer
               src={brand.logo}
+              tone={slide.logoTone}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
               pos={pos}
@@ -2834,6 +2847,7 @@ const SlideCardInner = React.forwardRef(({
         hideInstaBadge={hideInstaBadge}
         titleInk={displayTitleInk}
         bodyInk={displayBodyInk}
+        subtitleInk={displaySubtitleInk}
         imgModeNorm={imgModeNorm}
         effectivePresentationFilter={effectivePresentationFilter}
         bgFit={bgFit}
@@ -2874,6 +2888,7 @@ const SlideCardInner = React.forwardRef(({
         subtitleFF={subtitleFF}
         displayTitleInk={displayTitleInk}
         displayBodyInk={displayBodyInk}
+        displaySubtitleInk={displaySubtitleInk}
         cultureRichText={cultureRichText}
         cultureAccentCol={cultureAccentCol}
         sandwichSkin={sandwichSkin}
@@ -3261,7 +3276,7 @@ const SlideCardInner = React.forwardRef(({
                     <CultureRichParagraphs
                       text={slide.subtitle}
                       destaqueSpans={slide.destaqueSpans?.subtitle}
-                      ink={displayBodyInk}
+                      ink={displaySubtitleInk}
                       accentColor={cultureAccentCol}
                       fontFamily={subtitleFF}
                       fontSize={f.w*0.028*(slide.subSize/100)}
@@ -3273,7 +3288,7 @@ const SlideCardInner = React.forwardRef(({
                   </InlineEditableText>
                 ) : (
                 <InlineEditableText as="p" value={slide.subtitle} onCommit={(text) => commitInlineText('subtitle', text)} elementProps={mov('subtitle', {
-                  color: displayBodyInk, fontFamily: subtitleFF,
+                  color: displaySubtitleInk, fontFamily: subtitleFF,
                   fontSize:f.w*0.028*(slide.subSize/100),
                   lineHeight:(slide.subLeading ?? 150)/100,
                   fontWeight: brand.subtitleWeight ?? 400,
@@ -3371,6 +3386,7 @@ const SlideCardInner = React.forwardRef(({
         return (
           <BrandLogoLayer
             src={brand.logo}
+            tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}

@@ -59,6 +59,22 @@ describe('visual-only agent patch', () => {
     expect(result.changes).toEqual([]);
   });
 
+  it('muda as cores de apenas um card sem alterar a paleta da marca ou outros cards', () => {
+    const before = sampleEntry();
+    const result = applyVisualPatchToEntry(before, {
+      titleColor: '#49382D', subtitleColor: '#665447', logoTone: 'dark',
+    }, ['s1']);
+    expect(result.entry.doc.slides[0]).toMatchObject({
+      titleColor: '#49382D', subtitleColor: '#665447', logoTone: 'dark',
+      title: 'Texto final', subtitle: 'Subtítulo final', bgImageAssetId: 'asset-photo',
+    });
+    expect(result.entry.doc.slides[1]).toBe(before.doc.slides[1]);
+    expect(result.entry.doc.brand).toBe(before.doc.brand);
+    expect(result.changes).toEqual([{ slideId: 's1', index: 0, fields: ['titleColor', 'subtitleColor', 'logoTone'] }]);
+    expect(projectDesignView({ id: 'janine', version: 1, entry: result.entry }).slides[0].visual)
+      .toMatchObject({ titleColor: '#49382D', subtitleColor: '#665447', logoTone: 'dark' });
+  });
+
   it('aceita só posições de logo renderizadas, inclusive o centro c', () => {
     const supported = ['tl', 'tr', 'c', 'bl', 'br'];
     for (const position of supported) {
@@ -83,6 +99,9 @@ describe('visual-only agent patch', () => {
       { brand: { logo: DATA_URL } }, { canvas: { media: DATA_URL } },
       { overlayStyles: { cta1: { text: 'Reescrito' } } },
       { textFonts: { title: 'Bad; background:url(data:image)' } },
+      { titleColor: 'url(https://example.com)' },
+      { subtitleColor: '#12' },
+      { logoTone: 'invert(1)' },
       { elementOffsets: { title: { x: 999, y: 0 } } },
       JSON.parse('{"__proto__":{"polluted":true}}'),
     ]) expect(() => applyVisualPatchToEntry(before, patch)).toThrow();
