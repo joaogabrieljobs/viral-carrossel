@@ -13,7 +13,7 @@ Implementação e publicação em 28/09/2026, commit `450e84d`. Domínio `viralc
 
 1. No Resend, verificar um domínio de envio controlado pelo projeto e configurar os registros DNS solicitados.
 2. Na Vercel, neste projeto, definir **RESEND_API_KEY** como segredo de servidor com permissão de envio e **AUTH_EMAIL_FROM** como `Viral Carrossel <remetente@dominio-verificado>`. Não usar prefixo `VITE_` nem colocar a chave no chat/repositório.
-3. Manter `APP_URL=https://viralcarrossel.com.br`, `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`, já utilizados pelo app.
+3. Configurar `APP_URL=https://moont.ai`; manter `STRIPE_SECRET_KEY` e `ACCESS_COOKIE_SECRET`. O remetente verificado no Resend pode continuar no domínio anterior até que um novo domínio de envio seja verificado.
 4. Publicar e solicitar um link para uma conta de teste controlada. Confirmar recebimento (inclusive spam), redefinição, login novo, rejeição da senha antiga e do link usado. Não alterar senha de cliente durante smoke tests.
 
 Sem as duas configurações de e-mail, o endpoint responde indisponibilidade explícita; a UI não diz que enviou. Os testes automatizados usam credenciais sintéticas e Resend simulado. O smoke de envio em produção foi feito separadamente, com autorização, sem consumir o link para alterar a senha.

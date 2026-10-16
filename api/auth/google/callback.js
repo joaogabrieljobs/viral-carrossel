@@ -61,7 +61,7 @@ async function chooseCustomer(customers, googleSub) {
  * GET /api/auth/google/callback — troca code, restaura cookie se assinatura ativa.
  */
 export default async function handler(req, res) {
-  const appUrl = getGoogleCanonicalOrigin();
+  const appUrl = getGoogleCanonicalOrigin(req);
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });

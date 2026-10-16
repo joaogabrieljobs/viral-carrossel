@@ -1,6 +1,6 @@
 # Guia de projetos, contexto e geração
 
-Atualizado em 29/09/2026. Aplicável ao [Viral. Carrossel Studio](https://viralcarrossel.com.br).
+Atualizado em 29/09/2026. Aplicável ao [Moont](https://moont.ai).
 
 ## Preparar um projeto
 

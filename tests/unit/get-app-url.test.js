@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { getAppUrl } from '../../api/lib/stripe.js';
+import { getAppUrl, getBillingReturnUrl } from '../../api/lib/stripe.js';
 import { getGoogleRedirectUri } from '../../api/lib/google-auth.js';
 
 const ORIG = {
@@ -79,5 +79,17 @@ describe('getAppUrl (WEB-001/006)', () => {
     else process.env.GOOGLE_REDIRECT_URI = prev;
     expect(uri).toBe('https://viralcarrossel.com.br/api/auth/google/callback');
     expect(uri).not.toContain('evil');
+  });
+
+  it('Checkout volta ao host antigo somente quando o Host é um domínio próprio conhecido', () => {
+    process.env.APP_URL = 'https://moont.ai';
+    expect(getBillingReturnUrl({ headers: { host: 'viralcarrossel.com.br' } }))
+      .toBe('https://viralcarrossel.com.br');
+    expect(getBillingReturnUrl({ headers: { host: 'www.viralcarrossel.com.br:443' } }))
+      .toBe('https://www.viralcarrossel.com.br');
+    expect(getBillingReturnUrl({ headers: { host: 'evil.example', 'x-forwarded-host': 'viralcarrossel.com.br' } }))
+      .toBe('https://moont.ai');
+    expect(getBillingReturnUrl({ headers: { host: 'viralcarrossel.com.br.evil.example' } }))
+      .toBe('https://moont.ai');
   });
 });

@@ -1,8 +1,9 @@
 /**
- * Força o domínio oficial: hosts *.vercel.app → viralcarrossel.com.br.
- * URLs de deploy da Vercel não ficam como entrada pública do produto.
+ * Encaminha domínios alternativos ao endereço principal do Moont.
+ * O domínio antigo continua servindo o app durante a migração dos dados locais.
  */
-const CANONICAL_ORIGIN = 'https://viralcarrossel.com.br';
+const CANONICAL_ORIGIN = 'https://moont.ai';
+const ALTERNATE_HOSTS = new Set(['www.moont.ai', 'moont.com.br', 'www.moont.com.br']);
 
 export const config = { runtime: 'nodejs' };
 
@@ -11,7 +12,7 @@ export default function middleware(request) {
     .split(':')[0]
     .toLowerCase();
 
-  if (!host.endsWith('.vercel.app')) return;
+  if (!host.endsWith('.vercel.app') && !ALTERNATE_HOSTS.has(host)) return;
 
   const incoming = new URL(request.url);
   // O cron da Vercel não segue redirects; a própria rota exige CRON_SECRET.

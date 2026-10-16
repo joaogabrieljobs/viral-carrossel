@@ -13,7 +13,7 @@ import { resolveTierFromPriceId } from '../../api/lib/plans.js';
 import { PLATFORM_MAX_TOKENS } from '../../shared/ai-models.js';
 import { resetMemoryQuotas } from '../../api/lib/image-quota.js';
 
-const APP = 'https://viralcarrossel.com.br';
+const APP = 'https://moont.ai';
 const cookieFor = (customerId) =>
   `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email: 'x@teste.exemplo' }))}`;
 

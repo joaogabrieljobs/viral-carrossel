@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.redirect(302, `${appUrl}/?login=google_unconfigured`);
   }
 
-  const canonicalOrigin = getGoogleCanonicalOrigin();
+  const canonicalOrigin = getGoogleCanonicalOrigin(req);
   const canonicalUrl = new URL(canonicalOrigin);
   const canonicalHost = canonicalUrl.host.toLowerCase();
   // Host serve só para detectar um domínio alternativo; nunca compõe o destino.

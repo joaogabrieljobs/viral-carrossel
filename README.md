@@ -2,7 +2,7 @@
 
 Studio de narrativas visuais com IA. **Moont Comunica** transforma conteúdo em carrosséis e formatos sociais; **Moont Apresenta** organiza pitches, aulas, propostas, relatórios e keynotes em slides 16:9.
 
-**Produção:** [viralcarrossel.com.br](https://viralcarrossel.com.br) · Vite + React 18 · API serverless na Vercel.
+**Produção:** [moont.ai](https://moont.ai) · Vite + React 18 · API serverless na Vercel. Durante a migração, `viralcarrossel.com.br` continua acessível para recuperar dados salvos nesse navegador.
 
 ## Criar com a Moont
 

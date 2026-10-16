@@ -187,5 +187,16 @@ it('o domínio técnico deixa o cron chegar à autenticação sem redirecionar o
   expect(middleware(request('/api/cron/cleanup-image-references'))).toBeUndefined();
   const page = middleware(request('/?app=1'));
   expect(page.status).toBe(308);
-  expect(page.headers.get('location')).toBe('https://viralcarrossel.com.br/?app=1');
+  expect(page.headers.get('location')).toBe('https://moont.ai/?app=1');
+});
+
+it('aliases novos redirecionam ao endereço principal e o domínio antigo continua acessível', () => {
+  for (const host of ['www.moont.ai', 'moont.com.br', 'www.moont.com.br']) {
+    const request = new Request(`https://${host}/?app=1&card=2`, { headers: { host } });
+    expect(middleware(request).headers.get('location')).toBe('https://moont.ai/?app=1&card=2');
+  }
+  const legacy = new Request('https://viralcarrossel.com.br/?app=1', {
+    headers: { host: 'viralcarrossel.com.br' },
+  });
+  expect(middleware(legacy)).toBeUndefined();
 });

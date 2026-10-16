@@ -93,7 +93,7 @@ describe('recuperação por e-mail', () => {
     const sent = JSON.parse(options.body);
     expect(sent.to).toEqual([customer.email]);
     const link = sent.text.match(/https:\/\/\S+/)[0];
-    expect(link).toMatch(/^https:\/\/viralcarrossel.com.br\/redefinir-senha#token=/);
+    expect(link).toMatch(/^https:\/\/moont.ai\/redefinir-senha#token=/);
     const token = new URLSearchParams(new URL(link).hash.slice(1)).get('token');
     const parsed = readPasswordResetToken(token);
     expect(parsed.exp - Date.now()).toBeGreaterThan(RESET_TTL_MS - 1000);

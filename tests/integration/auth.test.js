@@ -28,7 +28,7 @@ import { getLibrarySyncMeta } from '../../api/lib/library-sync-store.js';
 import { getLibrarySyncMeta as getPostgresLibrarySyncMeta } from '../../api/lib/library-sync-postgres.js';
 import { requireActiveSubscription, resetActiveAccessCacheForTests } from '../../api/lib/require-access.js';
 
-const APP = 'https://viralcarrossel.com.br';
+const APP = 'https://moont.ai';
 const cookieFor = (customerId, email) =>
   `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email }))}`;
 const checkoutIdentityFrom = (res) => {

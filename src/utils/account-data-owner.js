@@ -99,7 +99,7 @@ function reloadAccountSwitch() {
   lockAccountDataWrites();
   const loc = typeof globalThis !== 'undefined' ? globalThis.location : null;
   try {
-    const href = loc?.href || 'https://viralcarrossel.com.br/';
+    const href = loc?.href || 'https://moont.ai/';
     const url = new URL(href);
     url.searchParams.delete('login');
     url.searchParams.delete('email');

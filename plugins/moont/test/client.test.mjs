@@ -12,7 +12,7 @@ test('client sends a Bearer token only to the fixed HTTPS Moont endpoint', async
     },
   });
   await client.listProjects();
-  assert.equal(captured.url.origin, 'https://viralcarrossel.com.br');
+  assert.equal(captured.url.origin, 'https://moont.ai');
   assert.equal(captured.url.pathname, '/api/agent-visual-batch');
   assert.equal(captured.options.headers.Authorization, 'Bearer moont_pat_secret-test');
   assert.equal(captured.options.redirect, 'error');

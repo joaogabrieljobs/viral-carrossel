@@ -38,12 +38,24 @@ describe('POST /api/stripe/checkout (RF-07)', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'subscription',
-        success_url: 'https://viralcarrossel.com.br/?billing=success',
+        success_url: 'https://moont.ai/?billing=success',
       }),
     );
     const signed = cookieValue(res, checkoutCookieName('cs_test_fake'));
     expect(signed).toMatch(/^v1\.[^.]+\.[^.]+$/);
     expect(signed).not.toContain('cs_test_fake');
+  });
+
+  it('checkout no domínio antigo retorna ao mesmo host para confirmar seu cookie', async () => {
+    const res = makeRes();
+    await checkoutHandler(post({ email: 'legado@teste.exemplo' }, {
+      headers: { host: 'viralcarrossel.com.br' },
+    }), res);
+    expect(res.statusCode).toBe(200);
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      success_url: 'https://viralcarrossel.com.br/?billing=success',
+      cancel_url: 'https://viralcarrossel.com.br/?billing=cancel',
+    }));
   });
 
   it('e-mail preexistente ativo ou inativo exige login e nunca reutiliza o customer sem prova', async () => {
@@ -349,5 +361,15 @@ describe('POST /api/stripe/portal (RF-10)', () => {
     expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_8' }),
     );
+  });
+
+  it('portal iniciado no domínio antigo volta ao mesmo host', async () => {
+    const cookie = `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId: 'cus_legacy', email: 'legacy@teste.exemplo' }))}`;
+    const res = makeRes();
+    await portalHandler(post(undefined, { cookie, headers: { host: 'viralcarrossel.com.br' } }), res);
+    expect(res.statusCode).toBe(200);
+    expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      return_url: 'https://viralcarrossel.com.br/?app=1',
+    }));
   });
 });

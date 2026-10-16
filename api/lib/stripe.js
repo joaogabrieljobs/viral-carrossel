@@ -44,6 +44,20 @@ export function getAppUrl(_req) {
   return 'http://localhost:5173';
 }
 
+/**
+ * Durante a migração, o Checkout iniciado no domínio antigo precisa voltar ao
+ * mesmo host para que o cookie HttpOnly de confirmação esteja disponível.
+ * A escolha é feita somente entre hosts próprios conhecidos, nunca a partir
+ * de um Host arbitrário fornecido pelo pedido.
+ */
+export function getBillingReturnUrl(req) {
+  const host = String(req?.headers?.host || '').trim().toLowerCase().replace(/:443$/, '');
+  if (host === 'viralcarrossel.com.br' || host === 'www.viralcarrossel.com.br') {
+    return `https://${host}`;
+  }
+  return getAppUrl();
+}
+
 export function getPriceId() {
   const id = cleanEnv(process.env.STRIPE_PRICE_ID)
     || cleanEnv(process.env.STRIPE_PRICE_ID_CREATOR);

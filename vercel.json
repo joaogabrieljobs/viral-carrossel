@@ -13,13 +13,31 @@
     {
       "source": "/((?!api/cron/cleanup-image-references$).*)",
       "has": [{ "type": "host", "value": "viral-carrossel.vercel.app" }],
-      "destination": "https://viralcarrossel.com.br/$1",
+      "destination": "https://moont.ai/$1",
       "permanent": true
     },
     {
       "source": "/((?!api/cron/cleanup-image-references$).*)",
       "has": [{ "type": "host", "value": "viral-carrossel-elevessy-s-projects.vercel.app" }],
-      "destination": "https://viralcarrossel.com.br/$1",
+      "destination": "https://moont.ai/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "has": [{ "type": "host", "value": "www.moont.ai" }],
+      "destination": "https://moont.ai/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "has": [{ "type": "host", "value": "moont.com.br" }],
+      "destination": "https://moont.ai/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "has": [{ "type": "host", "value": "www.moont.com.br" }],
+      "destination": "https://moont.ai/$1",
       "permanent": true
     }
   ],

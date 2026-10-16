@@ -49,4 +49,4 @@ O servidor MCP usa apenas Node.js padrão e o transporte `stdio`; não requer `n
 node --test plugins/moont/test/*.test.mjs
 ```
 
-O endpoint HTTPS utilizado é `https://viralcarrossel.com.br/api/agent-visual-batch`. As respostas de erro não exibem o token. Requisições são espaçadas abaixo do limite da API; respostas 429 respeitam `Retry-After` e o lote pode ser retomado.
+O endpoint HTTPS utilizado é `https://moont.ai/api/agent-visual-batch`. O serviço do Chaves do macOS conserva o identificador anterior para não perder a credencial já instalada. As respostas de erro não exibem o token. Requisições são espaçadas abaixo do limite da API; respostas 429 respeitam `Retry-After` e o lote pode ser retomado.

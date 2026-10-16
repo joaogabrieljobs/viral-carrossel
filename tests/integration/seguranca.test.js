@@ -10,7 +10,7 @@ import { createAccessToken, billingDisabled, COOKIE_NAME } from '../../api/lib/a
 import sessionHandler from '../../api/auth/session.js';
 import anthropicProxy from '../../api/anthropic/v1/messages.js';
 
-const APP = 'https://viralcarrossel.com.br';
+const APP = 'https://moont.ai';
 
 beforeEach(resetStripeMock);
 
@@ -39,11 +39,19 @@ describe('RF-12 — CORS allowlist nos endpoints de billing', () => {
     expect(res.headers.vary).toBe('Origin');
   });
 
-  it('domínio próprio viralcarrossel.com.br está na allowlist', async () => {
+  it('domínio antigo permanece na allowlist durante a migração', async () => {
     const origin = 'https://viralcarrossel.com.br';
     const res = makeRes();
     await sessionHandler(makeReq({ headers: { origin } }), res);
     expect(res.headers['access-control-allow-origin']).toBe(origin);
+  });
+
+  it('domínios novos aceitam pedidos autenticados enquanto o alias redireciona', async () => {
+    for (const origin of ['https://moont.ai', 'https://www.moont.ai', 'https://moont.com.br', 'https://www.moont.com.br']) {
+      const res = makeRes();
+      await sessionHandler(makeReq({ headers: { origin } }), res);
+      expect(res.headers['access-control-allow-origin']).toBe(origin);
+    }
   });
 
   it('host legado *.vercel.app NÃO entra na allowlist', async () => {

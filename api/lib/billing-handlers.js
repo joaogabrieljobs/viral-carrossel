@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import {
   getStripe,
-  getAppUrl,
+  getBillingReturnUrl,
   getPriceId,
   findActiveSubscription,
   isSubscriptionActive,
@@ -170,7 +170,7 @@ export async function handleCheckout(req, res) {
     if (!priceId) {
       return res.status(500).json({ error: `Price Stripe não configurado para o plano ${tier}` });
     }
-    const appUrl = getAppUrl(req);
+    const appUrl = getBillingReturnUrl(req);
 
     // O e-mail do formulário não prova titularidade de um customer existente.
     // Só login anterior ou prova curta emitida após Google/senha/cadastro novo
@@ -404,7 +404,7 @@ export async function handlePortal(req, res) {
     }
 
     const stripe = getStripe();
-    const appUrl = getAppUrl(req);
+    const appUrl = getBillingReturnUrl(req);
     const portal = await stripe.billingPortal.sessions.create({
       customer: access.customerId,
       return_url: `${appUrl}/?app=1`,

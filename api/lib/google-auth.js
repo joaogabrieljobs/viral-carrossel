@@ -23,16 +23,22 @@ export function googleAuthConfigured() {
   return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
-export function getGoogleRedirectUri(_req) {
+export function getGoogleRedirectUri(req) {
   // Host / X-Forwarded-Host não entram no redirect_uri (open redirect / OAuth mix-up).
+  // O domínio antigo continua aceitando login enquanto dados locais são migrados;
+  // ele já possui um callback próprio autorizado no Google.
+  const host = String(req?.headers?.host || '').trim().toLowerCase().replace(/:443$/, '');
+  if (host === 'viralcarrossel.com.br' || host === 'www.viralcarrossel.com.br') {
+    return 'https://viralcarrossel.com.br/api/auth/google/callback';
+  }
   const fromEnv = cleanEnv(process.env.GOOGLE_REDIRECT_URI);
   if (fromEnv) return fromEnv;
   return `${getAppUrl()}/api/auth/google/callback`;
 }
 
 /** A origem do callback também deve receber o cookie de state no início. */
-export function getGoogleCanonicalOrigin() {
-  return new URL(getGoogleRedirectUri()).origin;
+export function getGoogleCanonicalOrigin(req) {
+  return new URL(getGoogleRedirectUri(req)).origin;
 }
 
 function b64url(buf) {

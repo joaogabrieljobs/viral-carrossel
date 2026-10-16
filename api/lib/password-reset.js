@@ -57,7 +57,7 @@ export function passwordResetConfigured() {
 
 // Nunca construir o link a partir de Host/X-Forwarded-Host fornecidos pelo cliente.
 export function passwordResetUrl(token) {
-  const origin = new URL(process.env.APP_URL || 'https://viralcarrossel.com.br');
+  const origin = new URL(process.env.APP_URL || 'https://moont.ai');
   if (origin.protocol !== 'https:' || origin.username || origin.password) throw new Error('reset_origin_invalid');
   const url = new URL('/redefinir-senha', origin.origin);
   // Fragmento não vai para access logs nem para o cabeçalho Referer.
@@ -145,7 +145,7 @@ export async function resetPassword(token, password) {
 
 export function sendPasswordChanged({ email, notificationKey }) {
   return sendMail({ to: email, subject: 'Sua senha foi alterada — Moont',
-    text: 'Sua senha da Moont foi alterada. As sessões anteriores foram encerradas.\n\nSe não foi você, solicite uma nova recuperação de senha em https://viralcarrossel.com.br/redefinir-senha.',
+    text: `Sua senha da Moont foi alterada. As sessões anteriores foram encerradas.\n\nSe não foi você, solicite uma nova recuperação de senha em ${new URL('/redefinir-senha', process.env.APP_URL || 'https://moont.ai').href}.`,
     idempotencyKey: notificationKey,
   });
 }

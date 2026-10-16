@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export const MOONT_ORIGIN = 'https://viralcarrossel.com.br';
+export const MOONT_ORIGIN = 'https://moont.ai';
 export const KEYCHAIN_SERVICE = 'br.com.viralcarrossel.moont.agent';
 export const KEYCHAIN_ACCOUNT = 'default';
 

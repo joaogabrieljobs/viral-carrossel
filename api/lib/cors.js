@@ -4,6 +4,11 @@
 export function allowedOrigins() {
   const origins = [
     (process.env.APP_URL || process.env.VITE_APP_URL || '').replace(/\/$/, ''),
+    'https://moont.ai',
+    'https://www.moont.ai',
+    'https://moont.com.br',
+    'https://www.moont.com.br',
+    // Enquanto o acesso aos dados locais ainda depende do domínio anterior.
     'https://viralcarrossel.com.br',
     'https://www.viralcarrossel.com.br',
   ];

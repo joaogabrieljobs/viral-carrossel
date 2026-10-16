@@ -8,7 +8,7 @@
 - Monólito de orquestração: `ViralCarrossel.jsx` + módulos em `src/`.
 - Serverless Vercel em `api/` (auth Stripe/Google, proxies IA, SJinn imagem).
 - Sem framework de agentes (LangGraph/Crew/etc.): “agentes” = **fluxos de chamada** (`callAI` / handlers) + builders de prompt.
-- Produção: Vercel / `viralcarrossel.com.br`. Fonte de verdade de acesso: cookie `vc_access` + Stripe.
+- Produção: Vercel / `moont.ai` (`viralcarrossel.com.br` ativo durante a migração). Fonte de verdade de acesso: cookie `vc_access` + Stripe.
 
 **Raiz do app (trabalhar daqui):**
 `viral-carrossel/viral-carrossel/`  

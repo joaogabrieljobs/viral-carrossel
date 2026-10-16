@@ -455,7 +455,7 @@ export function buildTeamShareInviteUrl(code, origin) {
   if (!base && typeof globalThis !== 'undefined' && globalThis.location?.origin) {
     base = globalThis.location.origin;
   }
-  if (!base) base = 'https://viralcarrossel.com.br';
+  if (!base) base = 'https://moont.ai';
   const url = new URL('/', base);
   url.searchParams.set('share', normalized);
   url.searchParams.set('app', '1');

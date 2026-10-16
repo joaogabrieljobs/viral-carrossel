@@ -1,12 +1,12 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "moont",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Inspecione projetos do Moont e aplique ajustes visuais em lote com prévia e reversão.",
   "author": {
     "name": "Moont"
   },
-  "homepage": "https://viralcarrossel.com.br",
+  "homepage": "https://moont.ai",
   "keywords": ["design", "moont", "cards", "batch editing"],
   "extensions": {
     "com.openai": {
@@ -18,7 +18,7 @@
         "developerName": "Moont",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],
-        "websiteURL": "https://viralcarrossel.com.br",
+        "websiteURL": "https://moont.ai",
         "defaultPrompt": [
           "Mostre meus projetos do Moont.",
           "Pré-visualize ajustes de layout em todos os cards deste projeto antes de aplicar."
