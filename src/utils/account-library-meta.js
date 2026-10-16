@@ -141,6 +141,7 @@ export async function prepareAccountLibraryMetadata(snapshot = {}, {
  */
 export async function saveAccountLibraryMetadata(snapshot, {
   baseRevision, expectedOwnerId, localOwnerId, signal, isCurrent,
+  resolveRevisionConflict = false,
 } = {}) {
   if (!Number.isSafeInteger(baseRevision) || baseRevision < 0) {
     throw error('Confirme a revisão dos dados da conta antes de salvar.', 'account_meta_bad_revision');
@@ -155,11 +156,24 @@ export async function saveAccountLibraryMetadata(snapshot, {
   if (uploaded.failed) {
     throw error(`Não foi possível enviar ${uploaded.failed} logo(s). Tente novamente.`, 'account_meta_asset_upload_failed');
   }
-  const saved = await request('PUT', {
-    metadata: prepared.metadata, baseRevision,
+  const put = (revision) => request('PUT', {
+    metadata: prepared.metadata, baseRevision: revision,
   }, { expectedOwnerId, localOwnerId, signal, isCurrent });
+  let saved;
+  let attempted = baseRevision;
+  try {
+    saved = await put(attempted);
+  } catch (cause) {
+    // Um projeto salvo neste mesmo navegador avança a revisão da conta.
+    // Sem esta segunda tentativa, Sync e Sair ficam presos no 409.
+    const nextRevision = cause?.cloudRevision;
+    if (!resolveRevisionConflict || cause?.status !== 409 || cause?.code !== 'account_meta_conflict'
+      || !Number.isSafeInteger(nextRevision) || nextRevision === baseRevision) throw cause;
+    attempted = nextRevision;
+    saved = await put(attempted);
+  }
   guard();
-  if (saved.revision <= baseRevision) {
+  if (saved.revision <= attempted) {
     throw error('A nuvem não confirmou a nova revisão dos dados da conta.', 'account_meta_bad_response');
   }
   return { ...saved, assetsUploaded: uploaded.uploaded, assetsReused: uploaded.skipped };

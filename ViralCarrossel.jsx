@@ -2038,6 +2038,7 @@ export default function App() {
       expectedOwnerId,
       localOwnerId: owner,
       isCurrent: pending.isCurrent,
+      resolveRevisionConflict: true,
     });
     v2MetaRevisionRef.current = saved.revision;
     v2MetaBaselineRef.current = fingerprint;

@@ -99,6 +99,22 @@ describe('metadados globais por conta no cliente', () => {
     expect(fetch.mock.calls[0][1].headers['X-Account-Owner']).toBe('cus_janine');
   });
 
+  it('na saída, regrava uma vez com a revisão que a nuvem acabou de confirmar', async () => {
+    fetch.mockResolvedValueOnce(response(409, {
+      error: 'Esses dados mudaram em outro dispositivo. Atualize antes de salvar.',
+      code: 'account_meta_conflict', cloudRevision: 8,
+    })).mockResolvedValueOnce(response(200, {
+      ok: true, revision: 9, updatedAt: 130, metadata: { brands: [{ id: 'janine' }] },
+    }));
+    const saved = await saveAccountLibraryMetadata({
+      brandRoster: [{ id: 'janine' }],
+    }, { ...opts, baseRevision: 3, resolveRevisionConflict: true });
+    expect(saved.revision).toBe(9);
+    expect(JSON.parse(fetch.mock.calls[0][1].body).baseRevision).toBe(3);
+    expect(JSON.parse(fetch.mock.calls[1][1].body).baseRevision).toBe(8);
+    expect(cloud.upload).toHaveBeenCalledTimes(1);
+  });
+
   it('não sobrescreve a nuvem quando recebe 409; reporta a revisão atual', async () => {
     fetch.mockResolvedValue(response(409, {
       error: 'Dados mais recentes na nuvem.', code: 'account_meta_conflict', cloudRevision: 8,
