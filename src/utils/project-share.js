@@ -12,7 +12,6 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { exportSlideReference, importSlideReference } from './slide-reference.js';
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
-const SHARE_API = '/api/library-sync';
 const TEAM_SHARE_API = '/api/project-share';
 /**
  * Folga abaixo do FUNCTION_PAYLOAD_TOO_LARGE (~4,5 MB).
@@ -130,24 +129,6 @@ async function assembleAssetDataUrl(load) {
   return typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') ? dataUrl : null;
 }
 
-/** Bytes da foto na biblioteca de quem está a publicar. */
-async function fetchOwnLibraryAsset(assetId) {
-  if (!assetId) return null;
-  try {
-    return await assembleAssetDataUrl(async (part) => {
-      const query = part === undefined
-        ? `asset=${encodeURIComponent(assetId)}`
-        : `asset=${encodeURIComponent(assetId)}&part=${part}`;
-      const res = await fetch(`${SHARE_API}?${query}`, { credentials: 'include' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'asset');
-      return data;
-    });
-  } catch {
-    return null;
-  }
-}
-
 function stripEmbeddedImages(doc) {
   const slides = Array.isArray(doc?.slides)
     ? doc.slides.map((s) => ({
@@ -201,27 +182,28 @@ export async function packDocWithImagesForShare(doc) {
   working.slides = await Promise.all((working.slides || []).map(async (slide) => {
     let next = await exportSlideLogo(slide);
     next = await exportSlideReference(next);
-    let dataUrl = typeof next.bgImage === 'string' && next.bgImage.startsWith('data:')
-      ? next.bgImage
-      : null;
-    if (!dataUrl && next.bgImageId) {
-      try {
-        dataUrl = await imagemComoDataUrl(next.bgImageId);
-      } catch { /* mantém sem imagem */ }
-    }
-    if (!dataUrl && next.bgImageAssetId) {
-      dataUrl = await fetchOwnLibraryAsset(next.bgImageAssetId);
-    }
-    if (dataUrl) {
-      const compact = await compactDataUrlForShare(dataUrl);
-      if (compact) {
-        // O id da nuvem de quem publica permanece. Se o JSON não couber
-        // todas as fotos, a outra conta ainda lê esses bytes pelo código.
-        next = { ...next, bgImage: compact, bgImageId: undefined };
-        packedImages += 1;
-      } else {
-        next = { ...next, bgImage: null };
-        imagesOmitted += 1;
+    // A foto já está na nuvem de quem publica. Embutir aqui a reduziria a
+    // 720 px. A outra conta lê o arquivo original pelo código.
+    if (next.bgImageAssetId) {
+      next = { ...next, bgImage: null, bgImageId: undefined };
+    } else {
+      let dataUrl = typeof next.bgImage === 'string' && next.bgImage.startsWith('data:')
+        ? next.bgImage
+        : null;
+      if (!dataUrl && next.bgImageId) {
+        try {
+          dataUrl = await imagemComoDataUrl(next.bgImageId);
+        } catch { /* mantém sem imagem */ }
+      }
+      if (dataUrl) {
+        const compact = await compactDataUrlForShare(dataUrl);
+        if (compact) {
+          next = { ...next, bgImage: compact, bgImageId: undefined };
+          packedImages += 1;
+        } else {
+          next = { ...next, bgImage: null };
+          imagesOmitted += 1;
+        }
       }
     }
     if (typeof next.bgImage === 'string' && next.bgImage.startsWith('blob:')) {
@@ -232,9 +214,17 @@ export async function packDocWithImagesForShare(doc) {
 
   try {
     working.brand = await exportBrandLogo(working.brand);
-    if (typeof working.brand?.logo === 'string' && working.brand.logo.startsWith('data:')) {
-      const logo = await compactDataUrlForShare(working.brand.logo);
-      working.brand = { ...working.brand, logo };
+    // JPEG apaga a transparência e o import só aceita PNG. Logo grande fica
+    // só com o id, para a outra conta ler o PNG original.
+    if (working.brand && typeof working.brand === 'object') {
+      const logo = working.brand.logo;
+      const portablePng = typeof logo === 'string'
+        && logo.startsWith('data:image/png;')
+        && logo.length <= SHARE_IMAGE_MAX_CHARS;
+      working.brand = {
+        ...working.brand,
+        logo: portablePng ? logo : null,
+      };
     }
   } catch { /* ignore */ }
   // Moodboard / refs de estilo incham o pedido — partilha leva só o brief em texto.
@@ -243,7 +233,11 @@ export async function packDocWithImagesForShare(doc) {
       ...working.styleKit,
       refImages: [],
       logo: working.styleKit.logo
-        ? { imageId: working.styleKit.logo.imageId, name: working.styleKit.logo.name }
+        ? {
+          imageId: working.styleKit.logo.imageId,
+          assetId: working.styleKit.logo.assetId,
+          name: working.styleKit.logo.name,
+        }
         : working.styleKit.logo,
     };
   }
@@ -337,7 +331,8 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
     next.styleKit = await migrateProjectReferences(next.styleKit);
   } catch { /* ignore */ }
   try {
-    if (!next.brand?.logo && next.brand?.logoAssetId && shareCode) {
+    const brandLogoIsPng = typeof next.brand?.logo === 'string' && next.brand.logo.startsWith('data:image/png;');
+    if (shareCode && next.brand?.logoAssetId && !brandLogoIsPng) {
       const logo = await fetchShareAssetDataUrl(shareCode, next.brand.logoAssetId);
       if (logo?.startsWith('data:image/png;')) {
         next.brand = { ...next.brand, logo, logoAssetId: undefined };
@@ -352,9 +347,10 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
     let sl = await importSlideLogo(slide);
     try { sl = await importSlideReference(sl); } catch { /* a referência em data URL é o caminho normal */ }
 
-    if (shareCode && sl?.logoImageAssetId && !(typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:'))) {
+    const slideLogoIsPng = typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:image/png;');
+    if (shareCode && sl?.logoImageAssetId && !slideLogoIsPng) {
       const logo = await fetchShareAssetDataUrl(shareCode, sl.logoImageAssetId);
-      if (logo) {
+      if (logo?.startsWith('data:image/png;')) {
         sl = { ...sl, logoImage: logo, logoImageAssetId: undefined };
         try { sl = await importSlideLogo(sl); } catch { /* */ }
       }
@@ -367,10 +363,11 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
       }
     }
 
-    let src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
-    if ((!src || src.startsWith('blob:')) && sl?.bgImageAssetId && shareCode) {
+    let src = '';
+    if (sl?.bgImageAssetId && shareCode) {
       src = await fetchShareAssetDataUrl(shareCode, sl.bgImageAssetId) || '';
     }
+    if (!src) src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
     if (!src || src.startsWith('blob:')) {
       return forgetForeignAsset({ ...sl, bgImage: null });
     }

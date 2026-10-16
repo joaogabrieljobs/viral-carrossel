@@ -76,19 +76,15 @@ describe('packDocWithImagesForShare', () => {
     expect(doc.shareMeta.includesImages).toBe(true);
   });
 
-  it('embute a foto da nuvem da conta que publica quando o card só tem o id remoto', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
-      expect(String(url)).toContain('/api/library-sync?asset=photo-1');
-      return {
-        ok: true,
-        json: async () => ({ asset: { dataUrl: 'data:image/png;base64,AAAA' } }),
-      };
-    }));
+  it('não reduz a foto que já tem id na nuvem; a outra conta lê o original', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     const { doc, packedImages } = await packDocWithImagesForShare({
-      slides: [{ title: 'A', bgImage: null, bgImageAssetId: 'photo-1' }],
+      slides: [{ title: 'A', bgImage: 'data:image/jpeg;base64,LOW', bgImageAssetId: 'photo-1' }],
     });
-    expect(packedImages).toBe(1);
-    expect(doc.slides[0].bgImage).toBe('data:image/png;base64,AAAA');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(packedImages).toBe(0);
+    expect(doc.slides[0].bgImage).toBeNull();
     expect(doc.slides[0].bgImageAssetId).toBe('photo-1');
     vi.unstubAllGlobals();
   });
@@ -101,7 +97,6 @@ describe('packDocWithImagesForShare', () => {
         { title: 'B', bgImage: huge, bgImageAssetId: 'photo-b' },
       ],
     });
-    expect(imagesOmitted).toBeGreaterThan(0);
     expect(doc.slides.map((slide) => slide.bgImageAssetId)).toEqual(['photo-a', 'photo-b']);
     expect(doc.slides.every((slide) => !String(slide.bgImage || '').startsWith('data:'))).toBe(true);
   });
@@ -113,8 +108,8 @@ describe('packDocWithImagesForShare', () => {
       bgImage: medium,
       bgImageAssetId: `photo-${index}`,
     }));
-    const { doc, imagesOmitted } = await packDocWithImagesForShare({ slides });
-    expect(imagesOmitted).toBeGreaterThan(0);
+    const { doc } = await packDocWithImagesForShare({ slides });
+    expect(doc.slides.every((slide) => slide.bgImage == null)).toBe(true);
     expect(doc.slides.map((slide) => slide.bgImageAssetId)).toEqual(slides.map((slide) => slide.bgImageAssetId));
   });
 
@@ -138,6 +133,19 @@ describe('packDocWithImagesForShare', () => {
       title: 'Equipa',
     });
     expect(imported.slides[0].bgImageAssetId).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it('ignora o JPEG reduzido do envio quando o original ainda tem id', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ asset: { dataUrl: 'data:image/png;base64,FULL' } }),
+    })));
+    const imported = await hydrateSharedDocImages({
+      slides: [{ id: 's1', bgImage: 'data:image/jpeg;base64,LOW', bgImageAssetId: 'photo-1' }],
+    }, { code: 'AB12CD34' });
+    expect(imported.slides[0].bgImage).toBe('blob:x');
+    expect(String(fetch.mock.calls[0][0])).toContain('asset=photo-1');
     vi.unstubAllGlobals();
   });
 
