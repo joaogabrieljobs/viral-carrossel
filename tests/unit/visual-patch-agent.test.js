@@ -217,7 +217,10 @@ describe('visual-only agent patch', () => {
     expect(view).toMatchObject({ id: 'janine', version: 7, slideCount: 2 });
     expect(JSON.stringify(view)).not.toContain(DATA_URL);
     expect(view.slides[0].hasPhoto).toBe(true);
-    expect(view.slides[0].overlays[0].text).toBe('Agende sua avaliação');
+    expect(view.slides[0].title).toBeUndefined();
+    expect(view.slides[0].overlays[0].text).toBeUndefined();
+    const withText = projectDesignView(project, { includeText: true });
+    expect(withText.slides[0].overlays[0].text).toBe('Agende sua avaliação');
   });
 
   it('não aceita áreas extras ausentes em cards selecionados', () => {

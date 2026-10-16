@@ -4,7 +4,7 @@ import { isGenerationCancelled, startAIJob, runAIJob, throwIfGenerationCancelled
 import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
-import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal, FolderPlus } from 'lucide-react';
+import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal, FolderPlus } from 'lucide-react';
 import { extractDominantColor } from '../utils/color-extraction.js';
 import { saveHookToLibrary } from '../utils/hooks-library.js';
 import VisualStylePicker from './VisualStylePicker.jsx';
@@ -767,11 +767,53 @@ function SidebarContent({
             selectedKey={selectedCardElement?.slideId === slide?.id ? selectedCardElement.key : null}
             onSelect={onSelectCardElement}
             onUpdate={updateSlide}
+            onUpdateBrand={setBrand}
             onApplyAll={(key, fontFamily, sourceSlideId) => {
               setSlides(current => applyTextFontToAllCards(current, sourceSlideId, key, fontFamily));
               toast?.('Fonte aplicada aos cards correspondentes.', 'success', 2500);
             }}
           />
+        )}
+
+        {tab === 'texto' && (
+          <S title="Cor do texto" hint={`Título = primeira e última folha · Subtítulo = linha curta nos ${itemsLabel} do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor. A cor dentro de Tipografia vale só neste card.`}>
+            {(() => {
+              const bh = hydrateBrandTextColors(brand);
+              const activeBgImage = slides[activeIdx]?.bgImage;
+              return (
+                <>
+                  <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="large"/>
+                  <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
+                  <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
+                  <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
+                  {activeBgImage ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const hex = await extractDominantColor(activeBgImage);
+                        if (hex) {
+                          setBrand({ ...brand, accent: hex, visualIdentityLocked: true });
+                          toast(`Cor de destaque extraída da foto: ${hex}`, 'success');
+                        } else {
+                          toast('Não consegui extrair cor dominante (imagem muito uniforme?).', 'warning');
+                        }
+                      }}
+                      style={{
+                        marginTop: 6, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: 'var(--bg-card)', border: '1px solid var(--border)',
+                        color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
+                        letterSpacing: '-0.011em', textAlign: 'left',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}
+                    >
+                      <Sparkles size={14} style={{ color: 'var(--accent)' }} aria-hidden/>
+                      <span>Usar cor dominante da foto do {itemLabel} atual como «Destaques»</span>
+                    </button>
+                  ) : null}
+                </>
+              );
+            })()}
+          </S>
         )}
 
         {tab === 'texto' && (
@@ -1920,49 +1962,6 @@ function SidebarContent({
                     })}
                   </div>
                 </div>
-                <div>
-                  <div style={{
-                    fontFamily:'var(--font-mono)',
-                    fontSize:10,
-                    letterSpacing:'0.06em',
-                    fontWeight:600,
-                    color:'var(--text-muted)',
-                    textTransform:'uppercase',
-                    marginBottom:6,
-                  }}>Alinhamento</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4 }}>
-                    {[
-                      { id:'left', icon:AlignLeft, title:'Esquerda', short:'ESQ.' },
-                      { id:'center', icon:AlignCenter, title:'Centro', short:'CENTRO' },
-                      { id:'right', icon:AlignRight, title:'Direita', short:'DIR.' },
-                      { id:'justify', icon:AlignJustify, title:'Justificar', short:'JUST.' },
-                    ].map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => updateSlide({ align: a.id })}
-                        style={{
-                          ...btnStyle(slide.align === a.id),
-                          flexDirection: 'column',
-                          gap: 4,
-                          padding: '8px 2px',
-                          minHeight: 52,
-                        }}
-                        title={a.title}
-                        aria-label={a.title}
-                      >
-                        <a.icon size={13} />
-                        <span style={{
-                          fontSize:8,
-                          fontWeight:600,
-                          fontFamily:'var(--font-mono)',
-                          letterSpacing:'0.03em',
-                          color: slide.align === a.id ? '#fff' : 'var(--text-muted)',
-                        }}>{a.short}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <Toggle label="Glass ao redor do conteúdo" value={!!slide.textBg} onChange={(v) => updateSlide({ textBg: v })} />
                 {slide.textBg && (
                   <Slider label="Opacidade do glass" value={slide.textBgOpacity ?? 55} min={10} max={90} onChange={(v) => updateSlide({ textBgOpacity: v })} />
@@ -2987,6 +2986,7 @@ function SidebarContent({
                     key={p.name}
                     type="button"
                     className="palette-swatch"
+                    aria-label={`Paleta ${p.name}`}
                     onClick={() =>
                       setBrand((b) => ({
                         ...b,
@@ -3018,7 +3018,7 @@ function SidebarContent({
               </div>
             </S>
 
-            <S title="Cores manuais" hint={`Título = primeira e última folha · Subtítulo = linha curta nos ${itemsLabel} do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor.`}>
+            <S title="Cores manuais" hint={`Fundo de cada ${itemLabel}. A cor do texto fica na aba Texto.`}>
               <ColorRow label="Fundo" value={brand.bg} onChange={v=>setBrand({...brand,bg:v,visualIdentityLocked:true})}/>
               <Toggle
                 label={`Intercalar fundo entre ${itemsLabel}`}
@@ -3045,42 +3045,6 @@ function SidebarContent({
                   onChange={v=>setBrand({ ...brand, bgAlternate: v, visualIdentityLocked: true })}
                 />
               ) : null}
-              {(() => {
-                const bh = hydrateBrandTextColors(brand);
-                const activeBgImage = slides[activeIdx]?.bgImage;
-                return (
-                  <>
-                    <ColorRow label="Título" value={bh.titleColor} onChange={v=>setBrand({...brand,titleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="large"/>
-                    <ColorRow label="Subtítulo (meio)" value={bh.subtitleColor} onChange={v=>setBrand({...brand,subtitleColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
-                    <ColorRow label="Texto" value={bh.textColor} onChange={v=>setBrand({...brand,textColor:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
-                    <ColorRow label="Destaques" value={brand.accent} onChange={v=>setBrand({...brand,accent:v,visualIdentityLocked:true})} contrastBg={brand.bg} contrastKind="body"/>
-                    {activeBgImage ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const hex = await extractDominantColor(activeBgImage);
-                          if (hex) {
-                            setBrand({ ...brand, accent: hex, visualIdentityLocked: true });
-                            toast(`Cor de destaque extraída da foto: ${hex}`, 'success');
-                          } else {
-                            toast('Não consegui extrair cor dominante (imagem muito uniforme?).', 'warning');
-                          }
-                        }}
-                        style={{
-                          marginTop: 6, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
-                          background: 'var(--bg-card)', border: '1px solid var(--border)',
-                          color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--font-ui)',
-                          letterSpacing: '-0.011em', textAlign: 'left',
-                          display: 'flex', alignItems: 'center', gap: 8,
-                        }}
-                      >
-                        <Sparkles size={14} style={{ color: 'var(--accent)' }} aria-hidden/>
-                        <span>Usar cor dominante da foto do {itemLabel} atual como «Destaques»</span>
-                      </button>
-                    ) : null}
-                  </>
-                );
-              })()}
             </S>
             </>)}
 

@@ -1131,6 +1131,7 @@ export default function App() {
   // Persiste os 3 stores (debounced — sincronização imediata acima nos eventos do sistema)
   // Auto-save da biblioteca + tracking do último save pro indicador no header
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [remoteProjectNotice, setRemoteProjectNotice] = useState(null);
   const firstSaveRef = useRef(true);
   useEffect(() => {
     if (!accountLibraryReady) return undefined;
@@ -2098,6 +2099,9 @@ export default function App() {
           try {
             const { flushProjectOutbox } = await import('./src/utils/projects-outbox.js');
             outbox = await flushProjectOutbox(owner);
+            for (const recovery of outbox.recoveries || []) {
+              if (recovery?.copyName) recoveredCopies.add(recovery.copyName);
+            }
           } catch (error) {
             if (!isProjectOutboxUnavailable(error)) throw error;
             v2OutboxUnavailableRef.current = true;
@@ -2129,6 +2133,9 @@ export default function App() {
         }
         if (!pending.isCurrent() || readDataOwner() !== owner) {
           throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; salve novamente.');
+        }
+        if (recoveredCopies.size) {
+          setRemoteProjectNotice({ kind: 'copy', copyName: [...recoveredCopies][0] });
         }
         cloudSaved = true;
         if (source === 'sync') {
@@ -2172,21 +2179,21 @@ export default function App() {
           observeCloudProjectsV2(owner, projects, snapshot);
           observeCloudMetadataV2(owner, metadata, snapshot);
           toast(recoveredCopies.size
-            ? `Sua edição foi salva como cópia de conflito. Lista atualizada · ${count} projeto(s).`
+            ? `Este projeto mudou em outro lugar. Sua edição ficou na cópia “${[...recoveredCopies][0]}”. Lista atualizada · ${count} projeto(s).`
             : reviewCount
               ? `Lista atualizada · ${count} projeto(s). ${reviewCount} alteração(ões) pendentes exigem revisão.`
               : `Lista sincronizada · ${count} projeto(s).`,
           recoveredCopies.size || reviewCount || restored.assetsMissing ? 'warning' : 'success', 5200);
         } else if (source !== 'auto' && source !== 'logout') {
           toast(recoveredCopies.size
-            ? 'Sua edição foi salva como cópia de conflito na conta. Use “Sync na nuvem” para ver as duas versões.'
+            ? `Este projeto mudou em outro lugar. Sua edição ficou na cópia “${[...recoveredCopies][0]}”. Toque em Atualizar para ver as duas versões.`
             : reviewCount
               ? `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`
               : source === 'profile' ? 'Perfil salvo na sua conta.' : 'Projeto salvo na sua conta.',
           recoveredCopies.size || reviewCount ? 'warning' : 'success', 5200);
         } else if (recoveredCopies.size || reviewCount) {
           toast(recoveredCopies.size
-            ? 'Sua edição foi salva como cópia de conflito na conta. Sincronize para ver as duas versões.'
+            ? `Este projeto mudou em outro lugar. Sua edição ficou na cópia “${[...recoveredCopies][0]}”. Toque em Atualizar para ver as duas versões.`
             : `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`,
           'warning', 6000);
         }
@@ -3120,11 +3127,10 @@ export default function App() {
     setNiche(String(activeEntry?.doc?.editorialContext?.niche || ''));
   }, [activeEntry?.id]);
 
-  // Tour guiado — uma única vez por conta (1.ª geração). Depois só pela Ajuda.
+  // Tour guiado — uma única vez, no primeiro projeto ainda vazio, antes do pedido.
   const tourScheduledRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined' || landingOpen || !accountLibraryReady || modesIntroOpen) return undefined;
-    if (isDefault(slides)) return undefined;
     try {
       if (localStorage.getItem(SK.onboarding)) return undefined;
       // Reentrada com projetos salvos ou restaurados → não interromper.
@@ -3148,6 +3154,37 @@ export default function App() {
     } catch { /* ignore */ }
     return undefined;
   }, [landingOpen, accountLibraryReady, hadProjectsAtRestore, modesIntroOpen, slides, tourOpen]);
+  useEffect(() => {
+    if (!PROJECTS_V2 || !accountLibraryReady || !activeDocId) return undefined;
+    let cancelled = false;
+    const check = async () => {
+      if (cancelled || cloudSyncInFlightRef.current || document.visibilityState === 'hidden') return;
+      const known = v2VersionsRef.current.get(activeDocId);
+      const expectedOwnerId = accessSessionRef.current?.customerId;
+      if (!Number.isSafeInteger(known) || !expectedOwnerId) return;
+      try {
+        const { getProject } = await import('./src/utils/projects-client.js');
+        const remote = await getProject(activeDocId, { expectedOwnerId });
+        if (cancelled || !remote) return;
+        const remoteVersion = Number(remote.version);
+        if (remoteVersion > known) {
+          setRemoteProjectNotice((current) => (current?.kind === 'copy' ? current : { kind: 'newer' }));
+        } else if (remoteVersion === known) {
+          setRemoteProjectNotice((current) => (current?.kind === 'newer' ? null : current));
+        }
+      } catch { /* a verificação só oferece o botão de atualizar */ }
+    };
+    const onFocus = () => { check(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    const timer = window.setInterval(check, 20000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.clearInterval(timer);
+    };
+  }, [accountLibraryReady, activeDocId]);
   const [prefilledTopic, setPrefilledTopic] = useState('');
   const [refining, setRefining] = useState(false);
   const [genCaption, setGenCaption] = useState(false);
@@ -3450,19 +3487,23 @@ export default function App() {
       type="button"
       data-vc-tour="generate"
       onClick={() => {
-        // Criar rápido: foca a sidebar (mesmo fluxo do canvas vazio) — UX-003R.
         if (appMode === 'criador') {
-          setTab('home');
-          if (isMobile) setDrawerOpen(true);
-          requestAnimationFrame(() => {
-            document.querySelector('[data-vc-quick-prompt]')?.focus?.();
+          const topic = String(quickPrompt || '').trim();
+          if (!topic) {
+            requestAnimationFrame(() => {
+              document.querySelector('[data-vc-center-prompt], [data-vc-quick-prompt]')?.focus?.();
+            });
+            return;
+          }
+          handleQuickGenerateFromNarrativa(topic, {
+            productKind: activeProductKind === 'apresentacao' ? 'apresentacao' : 'carrossel',
           });
           return;
         }
         openGenerationSetup(activeProductKind);
       }}
       aria-label={appMode === 'criador'
-        ? 'Escrever o pedido na sidebar'
+        ? 'Escrever o pedido e gerar'
         : `Gerar ${activeProductKind === 'apresentacao' ? 'apresentação' : 'carrossel'} com IA`}
       style={{
         height: isMobile ? 40 : 40,
@@ -4762,7 +4803,7 @@ ${buildCaptionVoiceRules(cp, effectiveMode)}
 JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;
 
-    setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Escrevendo texto dos slides…' });
+    setGenProgress({ phase: 'text', current: 1, total: 3, label: 'Etapa 1 de 3 · Escrevendo o texto' });
     // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
     const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
     const { result, reviewStatus } = await generateReviewedCarousel({
@@ -4774,18 +4815,20 @@ ${jsonShapeLine}`;
         presentationTextLimits,
       },
       aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
-      onReview: () => { checkActive(); setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Revisando clareza e coerência…' }); },
+      onReview: () => { checkActive(); setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Revisando clareza e coerência' }); },
     }, callAI);
     checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
-    setGenProgress({ phase: 'text', current: 1, total: 1, label: 'Texto pronto, preparando cards…' });
+    setGenProgress({ phase: 'text', current: 3, total: 3, label: 'Etapa 3 de 3 · Montando os cards' });
 
     // O modal aplica o preset e dispara a geração no mesmo gesto. Não dependemos
     // do próximo render do React: a marca efetiva já nasce com a paleta/fontes
     // escolhidas, evitando que o primeiro lote use o preset anterior.
-    const presetBrand = effectiveVisualPreset
-      ? applyVisualPreset(brand, effectiveVisualPreset, visualPresets)
+    const textOnlyPlan = imageGenerationAvailability.reason === 'plan_without_images' && !isPresentationGeneration;
+    const generationPresetId = effectiveVisualPreset || (textOnlyPlan ? 'minimal_clean' : null);
+    const presetBrand = generationPresetId
+      ? applyVisualPreset(brand, generationPresetId, visualPresets)
       : brand;
     const generationBrand = {
       ...presetBrand,
@@ -4806,13 +4849,13 @@ ${jsonShapeLine}`;
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
 
-    const visualSlideOverrides = effectiveVisualPreset
-      ? getSlideOverridesForPreset(effectiveVisualPreset, visualPresets)
+    const visualSlideOverrides = generationPresetId
+      ? getSlideOverridesForPreset(generationPresetId, visualPresets)
       : {};
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
-      let q = ((s.imageQuery ?? s.image_query) || '').trim();
+      let q = textOnlyPlan ? '' : ((s.imageQuery ?? s.image_query) || '').trim();
       const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
       const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
       const stageIndex = presentationStages.length <= 1 || nSlides <= 1
@@ -4838,7 +4881,7 @@ ${jsonShapeLine}`;
       const isFullBleedSlot =
         (isTendenciaCulturaPreset(cp) && (i === 0 || i === nSlides - 1)) ||
         (isPersoHybridDensity(cp, td) && i <= 1);
-      if (!q && isFullBleedSlot && (title || subtitle)) {
+      if (!textOnlyPlan && !q && isFullBleedSlot && (title || subtitle)) {
         const seed = `${title} ${subtitle}`.trim().slice(0, 120);
         q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
@@ -4846,7 +4889,8 @@ ${jsonShapeLine}`;
       // Só composições que declaram uma imagem obrigatória recebem fallback.
       // Capas/divisores tipográficos continuam intencionalmente sem imagem.
       if (
-        !q
+        !textOnlyPlan
+        && !q
         && isPresentationGeneration
         && compositionOverrides.presentationRequiresImage === true
         && (title || subtitle)
@@ -4988,7 +5032,7 @@ ${jsonShapeLine}`;
             fmt: fmt && fmt !== 'apresentacao' ? fmt : 'carrossel',
             productKind: 'carrossel',
           }),
-      visualPreset: effectiveVisualPreset || null,
+      visualPreset: generationPresetId || null,
       presentationDesignSystemId: isPresentationGeneration
         ? (effectiveVisualPresetDef?.sourceId || null)
         : undefined,
@@ -6328,7 +6372,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 >
                   {activeEntry.name || 'Sem título'}
                 </button>
-                {!headerTight && <SavedIndicator savedAt={lastSavedAt} />}
+                {!headerTight && (
+                  <SavedIndicator
+                    savedAt={lastSavedAt}
+                    notice={remoteProjectNotice}
+                    onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={salvarProjeto}
@@ -6554,7 +6604,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               }}>
                 <div style={{
                   textAlign:'center',
-                  maxWidth: isMobile ? 'min(100%, 360px)' : 360,
+                  maxWidth: isMobile ? 'min(100%, 440px)' : 520,
                   width: '100%',
                   padding: '0 12px',
                   boxSizing: 'border-box',
@@ -6581,8 +6631,36 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     padding: '0 4px',
                     wordBreak: 'break-word',
                   }}>
-                    Escolha como sua ideia<br/><span style={{ color:'var(--accent)' }}>vai avançar.</span>
+                    {appMode === 'criador' ? 'Descreva a ideia.' : <>Escolha como sua ideia<br/><span style={{ color:'var(--accent)' }}>vai avançar.</span></>}
                   </div>
+                  {appMode === 'criador' ? (
+                    <textarea
+                      data-vc-center-prompt=""
+                      aria-label={activeProductKind === 'apresentacao' ? 'Pedido para gerar a apresentação' : 'Pedido para gerar o carrossel'}
+                      value={quickPrompt}
+                      onChange={(event) => setQuickPrompt(event.target.value)}
+                      rows={4}
+                      placeholder={activeProductKind === 'apresentacao'
+                        ? 'O que a apresentação precisa explicar.'
+                        : 'O que os cards precisam dizer.'}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: 120,
+                        margin: '0 0 16px',
+                        padding: 16,
+                        borderRadius: 16,
+                        border: '1px solid var(--hairline)',
+                        background: 'var(--bg-base)',
+                        color: 'var(--text-primary)',
+                        fontSize: 16,
+                        lineHeight: 1.45,
+                        fontFamily: 'var(--font-ui)',
+                        resize: 'vertical',
+                        textAlign: 'left',
+                      }}
+                    />
+                  ) : (
                   <p style={{
                     fontSize:15,
                     color:'var(--text-secondary)',
@@ -6596,23 +6674,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     Comunicação transforma uma ideia em sequência de cards.<br/>
                     Apresentação organiza contexto, argumento e evidência em slides.
                   </p>
+                  )}
                   <div style={{ display:'flex', flexDirection:'column', gap:10, width: '100%' }}>
                     <button
                       type="button"
                       onClick={() => {
                         if (appMode === 'criador') {
                           if (activeProductKind === 'apresentacao') setCreativePreset('livre');
-                          setTab('home');
-                          if (isMobile) setDrawerOpen(true);
-                          requestAnimationFrame(() => {
-                            const el = document.querySelector('[data-vc-quick-prompt]');
-                            el?.focus?.();
-                          });
+                          const topic = String(quickPrompt || '').trim();
+                          if (!topic) {
+                            document.querySelector('[data-vc-center-prompt]')?.focus?.();
+                            return;
+                          }
+                          handleQuickGenerateFromNarrativa(topic, { productKind: 'carrossel' });
                           return;
                         }
                         generateProjectByKind('carrossel');
                       }}
-                      aria-label={appMode === 'criador' ? 'Escrever o pedido na sidebar' : 'Gerar carrossel com IA'}
+                      aria-label={appMode === 'criador' ? 'Gerar o carrossel com o pedido do centro' : 'Gerar carrossel com IA'}
                       style={{
                       minHeight:56,
                       width: '100%',
@@ -6637,7 +6716,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       <Sparkles size={16} style={{ flexShrink: 0 }}/>
                       <span style={{ display:'grid', gap:2, textAlign:'left', minWidth: 0 }}>
                         <strong style={{ fontSize:15, lineHeight:1.1 }}>Moont Comunica</strong>
-                        <span style={{ fontSize:11, lineHeight:1.2, opacity:0.82, fontWeight:500 }}>Ideia → sequência de cards</span>
+                        <span style={{ fontSize:12, lineHeight:1.2, opacity:0.82, fontWeight:500 }}>Ideia → sequência de cards</span>
                       </span>
                     </button>
                     <button
@@ -6645,11 +6724,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onClick={() => {
                         if (appMode === 'criador') {
                           setCreativePreset(APRESENTACAO_PRESET_ID);
-                          setTab('home');
-                          if (isMobile) setDrawerOpen(true);
-                          requestAnimationFrame(() => {
-                            document.querySelector('[data-vc-quick-prompt]')?.focus?.();
-                          });
+                          const topic = String(quickPrompt || '').trim();
+                          if (!topic) {
+                            document.querySelector('[data-vc-center-prompt]')?.focus?.();
+                            return;
+                          }
+                          handleQuickGenerateFromNarrativa(topic, { productKind: 'apresentacao' });
                           return;
                         }
                         generateProjectByKind('apresentacao');
@@ -7025,6 +7105,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   </span>
                 </div>
 
+                {imageGenerationAvailability.reason === 'plan_without_images' && (
+                  <p role="status" style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.45, color: 'var(--text-primary)', textAlign: 'center' }}>
+                    Seu plano não inclui imagens. Os cards saem com um padrão visual de texto. Faça upgrade ou use sua chave em Configurar IA.
+                  </p>
+                )}
                 <PerSlideImageRefBlock
                   collapsible
                   key={`img-ref-m-${slide.id}`}
@@ -7041,7 +7126,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
               </div>
             ) : (
               // Desktop: all slides row
-              <div style={{ padding:'28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%' }}>
+              <div style={{ padding:'28px 48px', display:'flex', gap:20, alignItems:'flex-start', minHeight:'100%', flexWrap:'wrap' }}>
+                {imageGenerationAvailability.reason === 'plan_without_images' && (
+                  <p role="status" style={{ flex: '1 0 100%', margin: 0, fontSize: 14, lineHeight: 1.45, color: 'var(--text-primary)' }}>
+                    Seu plano não inclui imagens. Os cards saem com um padrão visual de texto. Faça upgrade ou use sua chave em Configurar IA.
+                  </p>
+                )}
                 {slides.map((s,i)=>(
                   <div
                     key={s.id}

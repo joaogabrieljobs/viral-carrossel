@@ -68,6 +68,10 @@ export default async function handler(req, res) {
     }
     const scope = req.method === 'POST' && body.action !== 'preview' ? 'projects:write' : 'projects:read';
     const agent = await authenticateAgentRequest(req, { scope });
+    const byAccount = await consumeRateLimit(req, {
+      limit: 120, windowMs: 60_000, keyPrefix: 'agent-visual-account', subject: agent.tokenId,
+    });
+    if (byAccount) return rateLimitResponse(res, byAccount.retryAfterSec);
 
     if (req.method === 'GET') {
       const op = req.query?.op || 'projects';
@@ -79,7 +83,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, ...result });
       }
       if (op === 'project') {
-        const project = await getAgentProject(agent.ownerId, req.query?.id);
+        const includeText = req.query?.includeText === '1' || req.query?.includeText === 'true';
+        const project = await getAgentProject(agent.ownerId, req.query?.id, { includeText });
         return res.status(200).json({ ok: true, project });
       }
       if (op === 'job') {

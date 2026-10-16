@@ -60,6 +60,7 @@ function fakeDatabase() {
             .map(([, row]) => copy(row))
             .sort((a, b) => a.sort_order - b.sort_order || a.project_id.localeCompare(b.project_id));
         }
+        if (operation === 'moont_delete_agent_visual_jobs') return [];
         if (operation === 'moont_one_project') {
           const row = currentProjects.get(keyFor(owner, params[1]));
           return row ? [copy(row)] : [];

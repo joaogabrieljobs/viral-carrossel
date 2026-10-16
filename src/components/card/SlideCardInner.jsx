@@ -720,7 +720,8 @@ const ClassicCanvasInner = React.forwardRef(({
         {(showCanvasChrome || pendingPhotoZone || photoFailed) && (!slide.bgImage || imgErr) && !imgLoading && !generateImageBusy && !forExport && (
           <div style={{
             position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-            color:'rgba(255,255,255,0.45)', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
+            background:'rgba(0,0,0,0.45)',
+            color:'#fff', fontSize:f.w*0.026, fontWeight:600, textAlign:'center', padding:f.w*0.06,
           }}>
             {photoFailed
               ? 'Imagem indisponível — toque para substituir'
@@ -2992,10 +2993,10 @@ const SlideCardInner = React.forwardRef(({
             top: f.h*0.1, height: f.h*0.24,
             display:'flex', alignItems:'center', justifyContent:'center',
             padding: f.w*0.03, textAlign:'center',
-            border:`${Math.max(1, f.w*0.002)}px dashed rgba(255,255,255,0.28)`,
+            border:`${Math.max(1, f.w*0.002)}px dashed rgba(255,255,255,0.85)`,
             borderRadius: f.w*0.02,
-            background:'rgba(255,255,255,0.04)',
-            color:'rgba(255,255,255,0.5)', fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
+            background:'rgba(0,0,0,0.55)',
+            color:'#fff', fontSize:f.w*0.024, fontWeight:600, fontFamily:bodyFF,
             cursor: onPhotoZoneClick ? 'pointer' : undefined,
           }}
         >

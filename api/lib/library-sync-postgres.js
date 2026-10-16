@@ -68,6 +68,8 @@ const SQL = {
     SET entry = EXCLUDED.entry, version = EXCLUDED.version,
       updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at,
       sort_order = EXCLUDED.sort_order`,
+  deleteAgentVisualJobs: `/* moont_delete_agent_visual_jobs */
+    DELETE FROM moont.agent_visual_jobs WHERE owner_id = $1 AND project_id = $2`,
 };
 
 function fail(message, code, extra = {}) {
@@ -589,6 +591,7 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
           sort_order: previous ? previous.sort_order : integer(state.next_order),
         };
         await run(tx, 'upsertProjects', [owner, JSON.stringify([row])]);
+        await run(tx, 'deleteAgentVisualJobs', [owner, id]);
         await run(tx, 'updateState', [
           owner, integer(state.revision) + 1, timestamp,
           integer(state.project_count) - (previous ? 1 : 0), nextOrder,

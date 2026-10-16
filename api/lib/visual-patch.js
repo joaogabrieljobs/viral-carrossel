@@ -86,8 +86,9 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
   ],
 });
 
-function bad(path, message = 'Campo visual inválido.') {
-  throw Object.assign(new Error(message), { code: 'visual_patch_invalid', path, status: 400 });
+function bad(path, message) {
+  const detail = message || `Campo visual inválido: ${path}.`;
+  throw Object.assign(new Error(detail), { code: 'visual_patch_invalid', path, status: 400 });
 }
 
 function validatePrimitive(value, spec, path) {
@@ -98,7 +99,10 @@ function validatePrimitive(value, spec, path) {
   } else if (spec.type === 'enum') {
     if (!spec.values.includes(value)) bad(path);
   } else if (spec.type === 'font') {
-    if (typeof value !== 'string' || value.length > 300 || /[;{}<>\u0000-\u001f\u007f]/.test(value)) bad(path);
+    if (typeof value !== 'string' || value.length > 80
+      || /[()\\]|url\s*\(|[;{}<>\u0000-\u001f\u007f]/i.test(value)) {
+      bad(path, `Fonte inválida em ${path}.`);
+    }
   } else if (spec.type === 'color') {
     if (typeof value !== 'string' || value.length > 100 || !/^(?:#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s+-]+\)|transparent)$/.test(value)) bad(path);
   }
@@ -355,7 +359,7 @@ export function applyVisualPatchToEntry(entry, rawPatch, slideIds, { brandScope 
   };
 }
 
-export function projectDesignView(project) {
+export function projectDesignView(project, { includeText = false } = {}) {
   const entry = project?.entry || {};
   const doc = entry.doc || {};
   const safeText = value => {
@@ -405,11 +409,16 @@ export function projectDesignView(project) {
     slideCount: Array.isArray(doc.slides) ? doc.slides.length : 0,
     brand,
     slides: (Array.isArray(doc.slides) ? doc.slides : []).map((slide, index) => ({
-      id: safeText(slide.id), index, title: safeText(slide.title), subtitle: safeText(slide.subtitle),
-      bodyAfterImage: safeText(slide.bodyAfterImage),
+      id: safeText(slide.id), index,
+      ...(includeText ? {
+        title: safeText(slide.title),
+        subtitle: safeText(slide.subtitle),
+        bodyAfterImage: safeText(slide.bodyAfterImage),
+      } : {}),
       visual: pickVisual(slide, SLIDE_VISUAL_FIELDS),
       overlays: Array.isArray(slide.overlays) ? slide.overlays.map(overlay => ({
-        id: safeText(overlay.id), type: safeText(overlay.type), text: safeText(overlay.text),
+        id: safeText(overlay.id), type: safeText(overlay.type),
+        ...(includeText ? { text: safeText(overlay.text) } : {}),
         visual: pickVisual(overlay, OVERLAY_STYLE_FIELDS),
       })) : [],
       hasPhoto: Boolean(slide.bgImageAssetId || slide.bgImageId || slide.bgImage),

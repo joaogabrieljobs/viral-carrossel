@@ -12,7 +12,8 @@ export function GenerationStatus({ progress, onCancel }) {
   const genericOperation = !progress?.phase;
   const total = Number(progress?.total) || 0;
   const current = Math.min(total, Math.max(0, Number(progress?.current) || 0));
-  const showBar = (isImport || progress?.phase === 'images') && total > 0;
+  const stepped = progress?.phase === 'text' && total > 1;
+  const showBar = ((isImport || progress?.phase === 'images') && total > 0) || stepped;
   const pct = showBar ? Math.round((current / total) * 100) : null;
 
   const regionLabel = toneAnalysis
@@ -76,7 +77,7 @@ export function GenerationStatus({ progress, onCancel }) {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pct}
-            aria-label={isImport ? 'Progresso da importação' : 'Progresso das imagens'}
+            aria-label={isImport ? 'Progresso da importação' : stepped ? 'Etapa da geração' : 'Progresso das imagens'}
             style={{
               marginTop: 10,
               height: 6,

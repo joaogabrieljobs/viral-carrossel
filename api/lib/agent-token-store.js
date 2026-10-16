@@ -27,6 +27,23 @@ function fail(status, code, message) {
   throw new AgentTokenError(status, code, message);
 }
 
+const subscriptionCache = new Map();
+const SUBSCRIPTION_CACHE_MS = 45_000;
+
+async function cachedActiveSubscription(ownerId) {
+  const hit = subscriptionCache.get(ownerId);
+  if (hit && hit.until > Date.now()) return hit.active;
+  const active = await findActiveSubscription(ownerId);
+  subscriptionCache.set(ownerId, { active: Boolean(active), until: Date.now() + SUBSCRIPTION_CACHE_MS });
+  if (subscriptionCache.size > 500) {
+    const now = Date.now();
+    for (const [key, value] of subscriptionCache) {
+      if (value.until <= now) subscriptionCache.delete(key);
+    }
+  }
+  return Boolean(active);
+}
+
 function validateOwner(ownerId) {
   if (typeof ownerId !== 'string' || !OWNER_PATTERN.test(ownerId)) {
     fail(401, 'agent_account_missing', 'Conta não identificada. Entre novamente.');
@@ -176,7 +193,7 @@ export async function authenticateAgentRequest(req, { scope } = {}) {
     fail(503, 'agent_token_storage_unavailable', 'Não foi possível verificar a integração agora.');
   }
   const row = rows[0];
-  if (!row) fail(401, 'agent_token_invalid', 'Integração inválida, vencida ou revogada.');
+  if (!row) fail(401, 'agent_token_invalid', 'Integração inválida, vencida ou revogada. Crie outra chave em Perfil → Integração Codex.');
   if (!Array.isArray(row.scopes) || !row.scopes.includes(scope)) {
     fail(403, 'agent_scope_denied', 'Esta integração não permite essa operação.');
   }
@@ -190,7 +207,7 @@ export async function authenticateAgentRequest(req, { scope } = {}) {
       fail(401, 'agent_token_revoked_by_recovery', 'Esta integração foi encerrada após uma alteração de segurança na conta.');
     }
     let active;
-    try { active = await findActiveSubscription(row.owner_id); }
+    try { active = await cachedActiveSubscription(row.owner_id); }
     catch { fail(503, 'agent_subscription_unavailable', 'Não foi possível verificar a assinatura agora.'); }
     if (!active) fail(402, 'agent_subscription_inactive', 'Assinatura inativa.');
   }

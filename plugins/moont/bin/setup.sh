@@ -4,8 +4,16 @@ set -eu
 service='br.com.viralcarrossel.moont.agent'
 account='default'
 
+if [ -n "${MOONT_TOKEN:-}" ]; then
+  printf 'MOONT_TOKEN está definido. O plugin usa essa variável e não grava a chave no Chaves.\n'
+  printf 'Reinicie o Codex neste terminal para a variável valer.\n'
+  exit 0
+fi
+
 if [ "$(uname -s)" != 'Darwin' ]; then
-  printf 'A configuração local deste plugin requer o Chaves do macOS.\n' >&2
+  printf 'Fora do macOS, exporte a chave criada em Perfil → Integração Codex:\n' >&2
+  printf '  export MOONT_TOKEN="cole-a-chave"\n' >&2
+  printf 'O plugin lê essa variável. O Chaves do macOS é opcional.\n' >&2
   exit 1
 fi
 

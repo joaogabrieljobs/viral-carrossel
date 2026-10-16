@@ -70,6 +70,7 @@ function fakeQuery(sql, params) {
     jobs.get(params[0]).set(params[1], row);
     return [clone(row)];
   }
+  if (sql.includes('DELETE FROM moont.agent_visual_jobs')) return [];
   if (sql.includes('UPDATE moont.agent_visual_jobs')) {
     const job = jobs.get(params[0]).get(params[1]);
     job.status = 'undone';

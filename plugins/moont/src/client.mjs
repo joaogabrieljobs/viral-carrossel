@@ -19,8 +19,10 @@ export class MoontApiError extends Error {
 }
 
 export async function readKeychainToken() {
+  const fromEnv = String(process.env.MOONT_TOKEN || '').trim();
+  if (fromEnv) return fromEnv;
   if (process.platform !== 'darwin') {
-    throw new MoontApiError('Este plugin local usa o Chaves do macOS. Execute-o em um Mac.', { code: 'macos_required' });
+    throw new MoontApiError('Defina MOONT_TOKEN com a chave criada em Perfil → Integração Codex. O Chaves do macOS é opcional.', { code: 'connection_required' });
   }
 
   try {
@@ -78,6 +80,7 @@ export class MoontApiClient {
 
     const token = await this.authToken();
     let response;
+    const rateLimitStarted = Date.now();
     for (let attempt = 0; attempt < 8; attempt += 1) {
       await this.paceRequests();
       try {
@@ -96,15 +99,19 @@ export class MoontApiClient {
         throw new MoontApiError('Não foi possível conectar ao Moont. Verifique a conexão e tente novamente.', { code: 'network_error' });
       }
       if (response.status !== 429) break;
-      if (attempt === 7) throw new MoontApiError('O Moont limitou temporariamente as requisições. Retome o lote em alguns instantes.', { status: 429, code: 'rate_limited' });
+      const waited = Date.now() - rateLimitStarted;
+      if (attempt === 7 || waited >= 60_000) {
+        throw new MoontApiError('O Moont limitou temporariamente as requisições. Retome o lote em alguns instantes.', { status: 429, code: 'rate_limited' });
+      }
       const retryAfter = response.headers?.get?.('retry-after');
       const retrySeconds = Number(retryAfter);
       const retryDate = retryAfter && !Number.isFinite(retrySeconds) ? Date.parse(retryAfter) : NaN;
-      const waitMs = Number.isFinite(retrySeconds)
+      const requestedWait = Number.isFinite(retrySeconds)
         ? Math.max(1000, retrySeconds * 1000)
         : Number.isFinite(retryDate)
           ? Math.max(1000, retryDate - Date.now())
           : Math.min(30000, 1000 * 2 ** attempt);
+      const waitMs = Math.min(requestedWait, 60_000 - waited);
       let remaining = waitMs;
       while (remaining > 0) {
         const segment = Math.min(30000, remaining);
@@ -143,8 +150,8 @@ export class MoontApiClient {
     return this.request('GET', { op: 'projects', limit, cursor });
   }
 
-  getProject(id) {
-    return this.request('GET', { op: 'project', id });
+  getProject(id, { includeText = false } = {}) {
+    return this.request('GET', { op: 'project', id, includeText: includeText ? '1' : undefined });
   }
 
   getVisualSchema() {

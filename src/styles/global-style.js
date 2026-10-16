@@ -802,9 +802,11 @@ export const GLOBAL_STYLE = `
   }
 
   .vc-textarea {
-    resize: none; line-height: 1.45;
+    resize: vertical;
+    line-height: 1.45;
     border-radius: var(--radius-md);
     padding: 12px 16px;
+    min-height: 96px;
   }
 
   /* Section labels — taxonomy mono. Polish: peso 600 (era 400) + traço mais

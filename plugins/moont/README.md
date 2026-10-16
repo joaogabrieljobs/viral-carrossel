@@ -26,6 +26,16 @@ sh plugins/moont/bin/setup.sh remove
 
 Revogue o token também em **Perfil → Integração Codex** quando não quiser mais acesso ao Moont. A credencial é vinculada à conta autenticada e expira conforme indicado nessa página.
 
+## Instalação sem ficar dentro do app
+
+A pasta `plugins/moont` é o plugin. No Codex, adicione o marketplace a partir do diretório que contém `.codex-plugin` (a raiz deste repositório, ou uma cópia só da pasta do plugin se ela estiver empacotada com o manifesto). A chave não depende do código do app:
+
+```sh
+export MOONT_TOKEN="cole-a-chave-criada-em-Perfil"
+```
+
+No macOS, `sh plugins/moont/bin/setup.sh add` grava a mesma chave no Chaves. Em Linux ou Windows, `MOONT_TOKEN` é o caminho. Sem a variável e sem o Chaves, o plugin explica como conectar em vez de exigir um Mac.
+
 ## Fluxo de edição
 
 1. `get_visual_schema` mostra os campos permitidos.

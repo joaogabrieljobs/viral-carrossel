@@ -129,7 +129,7 @@ export default async function handler(req, res) {
 
   if (limit <= 0) {
     return res.status(402).json({
-      error: 'O plano Essencial não inclui geração de imagem. Faça upgrade para o Criador ou active a sua chave em Configurações → Avançado.',
+      error: 'O plano Essencial não inclui geração de imagem. Faça upgrade para o Criador ou ative sua chave em Configurações → Avançado.',
       code: 'plan_no_images',
       tier,
       quota: { used: 0, limit: 0, remaining: 0, tier, status: 'available', available: true, allowed: false },

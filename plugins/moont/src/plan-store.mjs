@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,6 +31,7 @@ export class FilePlanStore {
   async set(planId, plan) {
     const path = this.pathFor(planId);
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    try { await chmod(this.directory, 0o700); } catch { /* o diretório já pode existir sem permitir chmod */ }
     const temporaryPath = `${path}.${randomUUID()}.tmp`;
     await writeFile(temporaryPath, JSON.stringify(plan), { mode: 0o600, flag: 'wx' });
     await rename(temporaryPath, path);

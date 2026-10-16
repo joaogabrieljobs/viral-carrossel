@@ -85,9 +85,9 @@ function ExportMoreFormats({
           }}
         >
           <p style={{
-            margin: '4px 10px 8px', fontSize: 10, lineHeight: 1.4, color: 'var(--text-muted)',
+            margin: '4px 10px 8px', fontSize: 12, lineHeight: 1.4, color: 'var(--text-muted)',
           }}>
-            Baixa os ficheiros. A publicação é no Instagram.
+            Baixa os arquivos. A publicação é no Instagram.
           </p>
           {!hideSlideOption && onExportSlide && (
             <button

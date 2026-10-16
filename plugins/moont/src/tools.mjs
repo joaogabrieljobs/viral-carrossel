@@ -299,7 +299,9 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
           previewedProjectCount: plan.items.length,
           pendingProjectCount: plan.projectIds.length - plan.items.length,
           failed: { projectId, code: error.code || 'request_failed', message: error.message },
-          instruction: 'Retome com preview_visual_batch({resumePlanId: planId}); nenhum projeto foi alterado.',
+          instruction: error.code === 'visual_patch_invalid'
+            ? `Campo recusado (${error.message}). Não retome com resumePlanId: o mesmo ajuste será recusado de novo. Marque os projetos pendentes como não aplicáveis.`
+            : 'Retome com preview_visual_batch({resumePlanId: planId}); nenhum projeto foi alterado.',
         };
       }
     }
@@ -332,7 +334,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
     await plans.set(planId, plan);
     const results = [];
     for (const item of plan.items) {
-      if (item.result?.status === 'applied') {
+      if (item.result?.status === 'applied' || item.result?.status === 'not_applicable') {
         results.push(item.result);
         continue;
       }
@@ -364,6 +366,31 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
           };
         }
       } catch (error) {
+        if (error.code === 'visual_patch_invalid') {
+          item.result = {
+            projectId: item.projectId,
+            requestId: item.requestId,
+            status: 'not_applicable',
+            code: error.code,
+            message: error.message,
+          };
+          await plans.set(planId, plan);
+          results.push(item.result);
+          if (results.length < plan.items.length && Date.now() - startedAt >= timeBudgetMs) {
+            const resultPage = paged(results, {});
+            return {
+              ok: true,
+              status: 'in_progress',
+              planId,
+              appliedCount: results.filter((entry) => entry.status !== 'not_applicable').length,
+              pendingProjectCount: plan.items.length - results.length,
+              applied: resultPage.items,
+              nextOffset: resultPage.nextOffset,
+              instruction: 'Continue com apply_visual_batch({planId}). Projetos recusados por campo inválido não serão tentados de novo.',
+            };
+          }
+          continue;
+        }
         const resultPage = paged(results, {});
         return {
           ok: false,
@@ -409,7 +436,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
         }
         case 'get_project_design': {
           const projectId = requireString(args.projectId, 'projectId');
-          const data = await client.getProject(projectId);
+          const data = await client.getProject(projectId, { includeText: args.includeText === true });
           if (args.includeText === true) return data;
           return { ...data, project: {
             ...data.project,
@@ -479,17 +506,18 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
               ? `plan:${args.planId}`
               : `requests:${requestIds.join(',')}`;
             const undoPlanId = stableUndoPlanId(source);
-            undoPlan = await plans.get(undoPlanId);
-            if (!undoPlan) {
-              undoPlan = {
-                kind: 'undo',
-                planId: undoPlanId,
-                status: 'undoing',
-                createdAt: new Date().toISOString(),
-                items: requestIds.map((requestId) => ({ requestId, undoRequestId: undoId(requestId), result: null })),
-              };
-              await plans.set(undoPlanId, undoPlan);
-            }
+            const previous = await plans.get(undoPlanId);
+            const previousByRequest = new Map((previous?.items || []).map((item) => [item.requestId, item]));
+            undoPlan = {
+              kind: 'undo',
+              planId: undoPlanId,
+              status: 'undoing',
+              createdAt: previous?.createdAt || new Date().toISOString(),
+              items: requestIds.map((requestId) => previousByRequest.get(requestId) || ({
+                requestId, undoRequestId: undoId(requestId), result: null,
+              })),
+            };
+            await plans.set(undoPlanId, undoPlan);
           }
           for (const item of undoPlan.items) {
             if (item.result?.status === 'undone') continue;

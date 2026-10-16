@@ -35,7 +35,7 @@ export default function VisualStylePicker({
       {title ? (
         <div style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 600,
           letterSpacing: '0.06em',
           textTransform: 'uppercase',
@@ -66,6 +66,7 @@ export default function VisualStylePicker({
               type="button"
               onClick={() => onChange(p.id)}
               aria-pressed={isActive}
+              aria-label={`${p.label}. ${p.desc}`}
               title={`${p.label} — ${p.desc}`}
               style={{
                 position: 'relative',
@@ -104,7 +105,7 @@ export default function VisualStylePicker({
                   top: 8,
                   left: 8,
                   zIndex: 2,
-                  fontSize: 9,
+                  fontSize: 12,
                   fontWeight: 600,
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',

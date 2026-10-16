@@ -83,13 +83,38 @@ const ColorRow = ({ label, value, onChange, contrastBg, contrastKind }) => (
 // Reduz ansiedade do user ("vou perder?") sem ser intrusivo. Atualiza
 // progressivamente: agora → "agora mesmo", < 60s → "Xs", < 1h → "Xmin",
 // > 1h → "Xh". Re-renderiza a cada 30s pra refrescar o texto.
-function SavedIndicator({ savedAt }) {
+function SavedIndicator({ savedAt, notice, onUpdate }) {
   const [, force] = React.useReducer(x => x + 1, 0);
   React.useEffect(() => {
-    if (!savedAt) return;
+    if (!savedAt || notice) return;
     const id = setInterval(force, 30000);
     return () => clearInterval(id);
-  }, [savedAt]);
+  }, [savedAt, notice]);
+  if (notice) {
+    const text = notice.kind === 'copy'
+      ? 'Sua edição foi para uma cópia. Este projeto mudou em outro lugar.'
+      : 'Este projeto mudou em outro lugar.';
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+      }}>
+        <span>{text}</span>
+        {onUpdate ? (
+          <button
+            type="button"
+            onClick={onUpdate}
+            style={{
+              minHeight: 28, padding: '0 12px', borderRadius: 9999, border: '1px solid var(--text-primary)',
+              background: 'var(--text-primary)', color: 'var(--bg-base)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Atualizar
+          </button>
+        ) : null}
+      </span>
+    );
+  }
   if (!savedAt) return null;
   const diff = Date.now() - savedAt;
   let label;
@@ -102,7 +127,7 @@ function SavedIndicator({ savedAt }) {
       title="Auto-save: alterações são gravadas automaticamente. Clique no botão 'Meus projetos' pra gerenciar versões."
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+        fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
         letterSpacing: '-0.005em', opacity: 0.7,
         cursor: 'help',
       }}

@@ -59,9 +59,10 @@ function PerSlideImageRefBlock({
   }, [refImageId, refSource]);
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
   const disabled = (generationState ? !generationState.canGenerate : false) || Boolean(refError);
-  const disabledReason = disabled && !generateImageBusy
-    ? (generationState?.message || refError || `Abra Direção e descreva a imagem deste ${itemLabel}.`)
-    : '';
+  const planWithoutImages = generationState?.reason === 'plan_without_images';
+  const disabledReason = planWithoutImages || !(disabled && !generateImageBusy)
+    ? ''
+    : (generationState?.message || refError || `Abra Direção e descreva a imagem deste ${itemLabel}.`);
   const reasonId = useId();
   const promptId = useId();
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao

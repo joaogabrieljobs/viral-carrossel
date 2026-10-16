@@ -87,10 +87,35 @@ export async function listAgentProjects(ownerValue, { cursor, limit = 25 } = {})
   };
 }
 
-export async function getAgentProject(ownerValue, idValue) {
+export async function getAgentProject(ownerValue, idValue, { includeText = false } = {}) {
   const project = await getAccountProject(ownerId(ownerValue), projectId(idValue));
   if (!project || project.deleted) fail(404, 'visual_project_not_found', 'Projeto não encontrado.');
-  return projectDesignView(project);
+  return projectDesignView(project, { includeText });
+}
+
+function snapshotForUndo(entry) {
+  const clone = structuredClone(entry);
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (typeof value === 'string' && (value.startsWith('data:') || value.startsWith('blob:'))) node[key] = null;
+      else if (value && typeof value === 'object') walk(value);
+    }
+  };
+  walk(clone);
+  return clone;
+}
+
+async function forgetExpiredVisualJobs(tx, owner) {
+  await tx.unsafe(
+    `DELETE FROM moont.agent_visual_jobs
+     WHERE owner_id = $1 AND created_at < now() - interval '30 days'`,
+    [owner],
+  );
 }
 
 export async function previewAgentVisualBatch(ownerValue, input) {
@@ -176,6 +201,7 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
   // Ensure legacy libraries are migrated before taking our own transaction.
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
+    await forgetExpiredVisualJobs(tx, owner);
     const row = await lockAccountAndProject(tx, owner, id);
     const existing = await tx.unsafe(
       `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
@@ -204,7 +230,7 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
          changed_slide_count, changed_brand_fields, created_at, undone_at,
          undo_request_id, undo_version`,
       [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
-        result.changes.length, JSON.stringify(result.brandChanges), JSON.stringify(row.entry)],
+        result.changes.length, JSON.stringify(result.brandChanges), JSON.stringify(snapshotForUndo(row.entry))],
     );
     return safeJob(jobs[0]);
   });
@@ -218,6 +244,7 @@ export async function undoAgentVisualBatch(ownerValue, input) {
   const found = await getAgentVisualJob(owner, rid);
   await getAccountProject(owner, found.projectId); // ensure account migration
   return getPostgresConnection().begin(async tx => {
+    await forgetExpiredVisualJobs(tx, owner);
     const row = await lockAccountAndProject(tx, owner, found.projectId);
     const priorUndo = await tx.unsafe(
       `SELECT request_id FROM moont.agent_visual_jobs
@@ -231,7 +258,7 @@ export async function undoAgentVisualBatch(ownerValue, input) {
       [owner, rid],
     );
     const job = jobs[0];
-    if (!job) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
+    if (!job) fail(410, 'visual_undo_expired', 'O prazo de 30 dias para desfazer esta alteração acabou.');
     if (job.status === 'undone') {
       if (job.undo_request_id !== undoId) fail(409, 'visual_already_undone', 'Esta alteração já foi desfeita.');
       return safeJob(job);

@@ -64,8 +64,8 @@ async function upstash(command) {
   }
 }
 
-function consumeMemory(req, { limit, windowMs, keyPrefix }) {
-  const ip = clientIp(req);
+function consumeMemory(req, { limit, windowMs, keyPrefix, identity }) {
+  const ip = identity || clientIp(req);
   const key = `${keyPrefix}:${ip}`;
   const now = Date.now();
   let bucket = buckets.get(key);
@@ -86,8 +86,8 @@ function consumeMemory(req, { limit, windowMs, keyPrefix }) {
   return null;
 }
 
-async function consumeUpstash(req, { limit, windowMs, keyPrefix }) {
-  const ip = clientIp(req);
+async function consumeUpstash(req, { limit, windowMs, keyPrefix, identity }) {
+  const ip = identity || clientIp(req);
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
   // Janela fixa alinhada ao epoch — partilhada entre lambdas.
   const slot = Math.floor(Date.now() / windowMs);
@@ -108,7 +108,14 @@ async function consumeUpstash(req, { limit, windowMs, keyPrefix }) {
  * @param {number} windowMs Janela em ms
  * @returns {Promise<null | { retryAfterSec: number }>} null = ok
  */
-export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, keyPrefix = 'api' } = {}) {
+function rateIdentity(req, subject) {
+  const id = typeof subject === 'string' ? subject.trim() : '';
+  if (id && id.length <= 120 && /^[A-Za-z0-9_.:-]+$/.test(id)) return `id:${id}`;
+  return clientIp(req);
+}
+
+export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, keyPrefix = 'api', subject } = {}) {
+  const identity = rateIdentity(req, subject);
   if (process.env.RATE_LIMIT_BACKEND === 'postgres') {
     if (Date.now() >= postgresUnavailableUntil) {
       try {
@@ -116,7 +123,7 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
         // é cacheado pelo runtime após a primeira requisição da instância.
         const { consumePostgresRateLimit } = await import('./rate-limit-postgres.js');
         const result = await consumePostgresRateLimit({
-          ip: clientIp(req), keyPrefix, limit, windowMs,
+          ip: identity, keyPrefix, limit, windowMs,
         });
         postgresUnavailableUntil = 0;
         return result;
@@ -125,11 +132,11 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
         console.warn('[rate-limit] Postgres falhou; usando limite local temporário:', error?.message || error);
       }
     }
-    return consumeMemory(req, { limit, windowMs, keyPrefix });
+    return consumeMemory(req, { limit, windowMs, keyPrefix, identity });
   }
   if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {
-      const result = await consumeUpstash(req, { limit, windowMs, keyPrefix });
+      const result = await consumeUpstash(req, { limit, windowMs, keyPrefix, identity });
       upstashUnavailableUntil = 0;
       return result;
     } catch (e) {
@@ -137,7 +144,7 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
       console.warn('[rate-limit] Upstash falhou; usando limite local temporário:', e?.message || e);
     }
   }
-  return consumeMemory(req, { limit, windowMs, keyPrefix });
+  return consumeMemory(req, { limit, windowMs, keyPrefix, identity });
 }
 
 export function rateLimitResponse(res, retryAfterSec, nested = false) {
