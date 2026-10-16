@@ -101,6 +101,8 @@ const mkSlide = (n = 1, brand = null) => {
   textBg: false,      // pill/box background behind text block
   textBgOpacity: 55,  // opacity of that box (0-100)
   textInset: DEFAULT_SLIDE_TEXT_INSET, // padding multiplier — how far from edges (1-20)
+  /** Destaca apenas quando ativado para este card o rótulo inicial em maiúsculas do subtítulo. */
+  procedureLabelEmphasis: false,
   // typography controls (valores iniciais da marca; por slide em Cards)
   titleTracking: t.titleTracking,
   subTracking: t.subTracking,

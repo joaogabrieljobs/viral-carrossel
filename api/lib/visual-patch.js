@@ -22,6 +22,7 @@ export const SLIDE_VISUAL_FIELDS = Object.freeze({
   bgX: number(0, 100), bgY: number(0, 100), bgZoom: number(50, 300),
   bgMirror: boolean, bgOpacity: number(0, 100), overlay: number(0, 100),
   textShadow: boolean, textBg: boolean, textBgOpacity: number(0, 100), textInset: number(0, 30),
+  procedureLabelEmphasis: boolean,
   textBlockWidth: number(20, 90),
   titleSize: number(30, 250), subSize: number(30, 250), bodyAfterSize: number(30, 250),
   titleTracking: number(-20, 60), subTracking: number(-20, 60), bodyTracking: number(-20, 60),
@@ -80,6 +81,7 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
     'patch.copyCtaFrom copies one existing CTA from another card in this project to the selected cards; optional style sets shared CTA colors and position, and the source card is never changed.',
     'slide.titleColor and slide.subtitleColor override brand ink for selected cards, including photo cards.',
     'slide.textBlockWidth narrows the main full-bleed text group in percent of the available card width.',
+    'slide.procedureLabelEmphasis highlights a leading uppercase category in that card subtitle without changing its stored text or other projects.',
     'A project is applied atomically. Repeat requestId to resume safely after a network failure.',
   ],
 });

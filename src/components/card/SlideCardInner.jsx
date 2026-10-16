@@ -19,6 +19,7 @@ import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
 import { getTextFont, normalizeTextFont, resolveSlideTextFonts } from '../../utils/card-text-fonts.js';
+import { splitLeadingUppercaseLabel } from '../../utils/subtitle-label.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
@@ -3310,7 +3311,42 @@ const SlideCardInner = React.forwardRef(({
                   padding: slide.textBg ? `${f.h*0.018}px ${f.w*0.026}px` : 0,
                   borderRadius: slide.textBg ? f.w*0.025 : 0,
                   width: 'fit-content', maxWidth: '100%',
-                })}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
+                })}>{(() => {
+                  // A hierarquia é só visual: a edição inline recebe sempre o
+                  // subtítulo original, inclusive quebras e espaços digitados.
+                  // Destaques manuais continuam com prioridade sobre o automático.
+                  const parts = slide.procedureLabelEmphasis !== true || slide.destaqueSpans?.subtitle?.length
+                    ? null
+                    : splitLeadingUppercaseLabel(slide.subtitle);
+                  if (!parts) return textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700);
+                  const hasTitle = !!String(slide.title || '').trim();
+                  return (
+                    <>
+                      <span data-vc-subtitle-label style={{
+                        display: 'block',
+                        fontFamily: hasTitle ? subtitleFF : titleFF,
+                        fontSize: hasTitle ? '1.28em' : '1.7em',
+                        fontWeight: hasTitle ? 600 : 400,
+                        lineHeight: hasTitle ? 1.15 : 1.05,
+                        letterSpacing: hasTitle ? '0.06em' : '-0.025em',
+                        textTransform: 'none',
+                      }}>{parts.label}</span>
+                      {parts.support && (
+                        <span data-vc-subtitle-support style={{
+                          display: 'block',
+                          marginTop: f.h * 0.009,
+                          fontFamily: subtitleFF,
+                          fontSize: '1em',
+                          fontWeight: 400,
+                          lineHeight: 1.35,
+                          letterSpacing: '0.005em',
+                          textTransform: 'none',
+                          opacity: 0.86,
+                        }}>{parts.support}</span>
+                      )}
+                    </>
+                  );
+                })()}</InlineEditableText>
               ))}
               {presentationMode && bodyAfterCulture && (
                 <InlineEditableText

@@ -39,6 +39,8 @@ Um lote interrompido pode ser retomado: uma prévia parcial retorna `planId`, us
 
 Textos dos cards, fotos, referências de mídia e conteúdo narrativo não são editáveis pelo endpoint deste plugin. A exceção `patch.copyCtaFrom` copia um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem: `{ "copyCtaFrom": { "slideId": "origem", "overlayId": "botao", "style": { "x": 30, "y": 84 } } }`. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Prévia e aplicação usam controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
 
+O ajuste visual `{ "procedureLabelEmphasis": true }` destaca o rótulo inicial em maiúsculas do subtítulo apenas nos cards selecionados, mantendo o texto salvo e a edição intactos. Novos cards começam com esse ajuste desligado.
+
 ## Desenvolvimento
 
 O servidor MCP usa apenas Node.js padrão e o transporte `stdio`; não requer `npm install` próprio. Para validar:
