@@ -5,7 +5,7 @@ description: Ajusta o layout de muitos cards e projetos no Moont sem alterar tex
 
 # Edição visual em lote no Moont
 
-Use as ferramentas do MCP Moont para ler o projeto e a lista de campos visuais permitidos. Preserve os textos, a ordem dos cards, fotos e referências de mídia. Descreva o resultado desejado em campos visuais específicos, sem inventar uma alteração narrativa.
+Use as ferramentas do MCP Moont para ler o projeto e a lista de campos visuais permitidos. Preserve os textos, a ordem dos cards, fotos e referências de mídia. Descreva o resultado desejado em campos visuais específicos, sem inventar uma alteração narrativa. Quando a pessoa pedir explicitamente para repetir um botão existente, `copyCtaFrom` pode copiar apenas o CTA de origem para os cards selecionados; revise o texto e o estilo da origem antes da prévia.
 
 Antes de gravar, execute `preview_visual_batch`. Examine o total de cards afetados e consulte `get_batch_preview` nas páginas seguintes quando necessário. Depois execute `apply_visual_batch` com o `planId` da mesma prévia se a tarefa do usuário já autoriza a edição. Não limite artificialmente a quantidade de cards ou projetos solicitados.
 

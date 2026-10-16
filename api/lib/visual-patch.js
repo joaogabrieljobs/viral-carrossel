@@ -1,4 +1,6 @@
 /** A small, explicit vocabulary for visual-only edits made by the Moont agent. */
+import { createHash } from 'node:crypto';
+import { MAX_CARD_OVERLAYS, normalizeOverlay } from '../../src/utils/card-overlays.js';
 
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value)
   && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
@@ -60,15 +62,22 @@ const OVERLAY_STYLE_FIELDS = Object.freeze({
   variant: choice(['filled', 'outline', 'glass']),
   uppercase: boolean, blur: boolean, arrow: boolean,
 });
+const CTA_COPY_STYLE_FIELDS = Object.freeze(Object.fromEntries(
+  ['x', 'y', 'bg', 'fg', 'border', 'variant', 'uppercase', 'blur', 'arrow', 'fontFamily']
+    .map(key => [key, OVERLAY_STYLE_FIELDS[key]]),
+));
 
 export const VISUAL_PATCH_SCHEMA = Object.freeze({
   slide: SLIDE_VISUAL_FIELDS,
   brand: BRAND_VISUAL_FIELDS,
   overlayStyles: OVERLAY_STYLE_FIELDS,
+  copyCtaFrom: { slideId: 'ID do card de origem', overlayId: 'ID do botão CTA existente',
+    style: CTA_COPY_STYLE_FIELDS },
   notes: [
     'A patch is a flat slide style object; patch.brand is an explicit project-wide style object.',
     'patch.brand requires brandScope="project" even when a subset of slideIds is selected.',
-    'Text, image, logo asset and reference fields cannot be written by this API.',
+    'Text, image, logo asset and reference fields cannot be written by this API. The sole exception is copyCtaFrom, which duplicates an existing CTA without changing other text.',
+    'patch.copyCtaFrom copies one existing CTA from another card in this project to the selected cards; optional style sets shared CTA colors and position, and the source card is never changed.',
     'slide.titleColor and slide.subtitleColor override brand ink for selected cards, including photo cards.',
     'slide.textBlockWidth narrows the main full-bleed text group in percent of the available card width.',
     'A project is applied atomically. Repeat requestId to resume safely after a network failure.',
@@ -154,11 +163,35 @@ function validateOverlayStyles(value, path) {
   return styles;
 }
 
+function validateCopyCtaFrom(value) {
+  const path = 'patch.copyCtaFrom';
+  if (!record(value) || Object.keys(value).some(key => dangerous(key)
+    || !['slideId', 'overlayId', 'style'].includes(key))) bad(path);
+  for (const key of ['slideId', 'overlayId']) {
+    if (typeof value[key] !== 'string' || dangerous(value[key])
+      || !/^[A-Za-z0-9_-]{1,80}$/.test(value[key])) bad(`${path}.${key}`);
+  }
+  let style;
+  if (own(value, 'style')) {
+    if (!record(value.style) || !Object.keys(value.style).length) bad(path + '.style');
+    style = {};
+    for (const [key, item] of Object.entries(value.style)) {
+      if (dangerous(key) || !own(CTA_COPY_STYLE_FIELDS, key)) bad(path + '.style.' + key);
+      style[key] = validatePrimitive(item, CTA_COPY_STYLE_FIELDS[key], path + '.style.' + key);
+    }
+  }
+  return { slideId: value.slideId, overlayId: value.overlayId, ...(style ? { style } : {}) };
+}
+
 export function validateVisualPatch(value, { brandScope } = {}) {
   if (!record(value)) bad('patch');
   const patch = {};
   for (const [key, item] of Object.entries(value)) {
     if (dangerous(key)) bad(`patch.${key}`);
+    if (key === 'copyCtaFrom') {
+      patch.copyCtaFrom = validateCopyCtaFrom(item);
+      continue;
+    }
     if (key === 'brand') {
       if (brandScope !== 'project' || !record(item)) bad('patch.brand', 'A alteração da marca exige brandScope="project".');
       const brand = {};
@@ -196,11 +229,37 @@ export function validateSlideIds(value) {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-function applySlidePatch(slide, patch) {
+function applySlidePatch(slide, patch, sourceCta) {
   const next = { ...slide };
   const changes = [];
+  if (sourceCta) {
+    const id = `cta_${createHash('sha256')
+      .update(`${patch.copyCtaFrom.slideId}\0${patch.copyCtaFrom.overlayId}\0${slide.id}`)
+      .digest('hex').slice(0, 20)}`;
+    const overlays = Array.isArray(slide.overlays) ? slide.overlays : [];
+    const existing = overlays.find(item => record(item) && item.id === id);
+    if (existing && existing.type !== 'cta') {
+      bad('patch.copyCtaFrom', 'Este card já contém uma área com o ID reservado para o botão.');
+    }
+    // Keep an already copied (and possibly subsequently edited) CTA untouched on retries.
+    const sameTextCta = overlays.some(item => record(item) && item.type === 'cta' && item.text === sourceCta.text);
+    if (!existing && !sameTextCta) {
+      if (overlays.length >= MAX_CARD_OVERLAYS) {
+        bad('patch.copyCtaFrom', 'Um dos cards selecionados já atingiu o limite de áreas adicionais.');
+      }
+      next.overlays = [...overlays, normalizeOverlay({ ...sourceCta, ...patch.copyCtaFrom.style, id })];
+      next.elementsUnlocked = true;
+      const offsetKey = `ov_${id}`;
+      if (record(slide.elementOffsets) && own(slide.elementOffsets, offsetKey)) {
+        next.elementOffsets = { ...slide.elementOffsets };
+        delete next.elementOffsets[offsetKey];
+        changes.push('elementOffsets');
+      }
+      changes.push('copyCtaFrom');
+    }
+  }
   for (const [key, value] of Object.entries(patch)) {
-    if (key === 'brand') continue;
+    if (key === 'brand' || key === 'copyCtaFrom') continue;
     if (key === 'textFonts') {
       const merged = { ...(record(slide.textFonts) ? slide.textFonts : {}) };
       for (const [slot, family] of Object.entries(value)) {
@@ -209,12 +268,12 @@ function applySlidePatch(slide, patch) {
       }
       if (!same(merged, slide.textFonts || {})) { next.textFonts = merged; changes.push('textFonts'); }
     } else if (key === 'elementOffsets') {
-      const merged = { ...(record(slide.elementOffsets) ? slide.elementOffsets : {}) };
+      const merged = { ...(record(next.elementOffsets) ? next.elementOffsets : {}) };
       for (const [slot, offset] of Object.entries(value)) {
         if (offset) merged[slot] = offset;
         else delete merged[slot];
       }
-      if (!same(merged, slide.elementOffsets || {})) { next.elementOffsets = merged; changes.push('elementOffsets'); }
+      if (!same(merged, next.elementOffsets || {})) { next.elementOffsets = merged; changes.push('elementOffsets'); }
     } else if (key === 'canvas') {
       if (!record(slide.canvas) || (slide.canvas.enabled !== true && slide.canvas.applied !== true)
         || !record(slide.canvas.zones)) {
@@ -228,14 +287,14 @@ function applySlidePatch(slide, patch) {
       if (!same(merged, canvas)) { next.canvas = merged; changes.push('canvas.zones'); }
     } else if (key === 'overlayStyles') {
       const seen = new Set();
-      const overlays = Array.isArray(slide.overlays) ? slide.overlays.map(item => {
+      const overlays = Array.isArray(next.overlays) ? next.overlays.map(item => {
         if (!record(item) || !own(value, item.id)) return item;
         seen.add(item.id);
         const updated = { ...item, ...value[item.id] };
         return same(updated, item) ? item : updated;
       }) : [];
       if (seen.size !== Object.keys(value).length) bad('patch.overlayStyles', 'Área adicional não encontrada em um dos cards selecionados.');
-      if (!same(overlays, slide.overlays || [])) { next.overlays = overlays; changes.push('overlayStyles'); }
+      if (!same(overlays, next.overlays || [])) { next.overlays = overlays; changes.push('overlayStyles'); }
     } else if (!same(slide[key], value)) {
       next[key] = value;
       changes.push(key);
@@ -250,12 +309,26 @@ export function applyVisualPatchToEntry(entry, rawPatch, slideIds, { brandScope 
   }
   const patch = validateVisualPatch(rawPatch, { brandScope });
   const selected = validateSlideIds(slideIds);
+  let sourceCta = null;
+  if (patch.copyCtaFrom) {
+    const sourceSlide = entry.doc.slides.find(slide => record(slide) && slide.id === patch.copyCtaFrom.slideId);
+    const sourceOverlay = Array.isArray(sourceSlide?.overlays)
+      ? sourceSlide.overlays.find(item => record(item) && item.id === patch.copyCtaFrom.overlayId) : null;
+    if (!sourceOverlay || sourceOverlay.type !== 'cta'
+      || typeof sourceOverlay.text !== 'string' || !sourceOverlay.text.trim()) {
+      bad('patch.copyCtaFrom', 'O botão CTA de origem não foi encontrado neste projeto.');
+    }
+    sourceCta = normalizeOverlay({ ...sourceOverlay,
+      ...(record(sourceOverlay.visual) ? sourceOverlay.visual : {}),
+      type: 'cta', text: sourceOverlay.text });
+  }
   const found = new Set();
   const changes = [];
   const slides = entry.doc.slides.map((slide, index) => {
     if (!record(slide) || (selected && !selected.has(slide.id))) return slide;
     if (selected) found.add(slide.id);
-    const result = applySlidePatch(slide, patch);
+    if (sourceCta && slide.id === patch.copyCtaFrom.slideId) return slide;
+    const result = applySlidePatch(slide, patch, sourceCta);
     if (result.changes.length) changes.push({ slideId: slide.id, index, fields: result.changes });
     return result.slide;
   });

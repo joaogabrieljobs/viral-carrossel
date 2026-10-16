@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyVisualPatchToEntry, projectDesignView, validateVisualPatch } from '../../api/lib/visual-patch.js';
+import { applyVisualPatchToEntry, projectDesignView, validateVisualPatch, VISUAL_PATCH_SCHEMA } from '../../api/lib/visual-patch.js';
 
 const DATA_URL = `data:image/png;base64,${'A'.repeat(200)}`;
 
@@ -57,6 +57,95 @@ describe('visual-only agent patch', () => {
     const result = applyVisualPatchToEntry(before, { titleSize: 100, textFonts: { title: 'Inter' } }, ['s1']);
     expect(result.entry).toBe(before);
     expect(result.changes).toEqual([]);
+  });
+
+  it('copia somente o CTA existente para os cards escolhidos, sem alterar o card de origem, os textos ou a mídia', () => {
+    const before = sampleEntry();
+    before.doc.slides[0].elementOffsets.ov_cta1 = { x: 4, y: 17 };
+    before.doc.slides[0].overlays[0] = {
+      id: 'cta1', type: 'cta', text: 'Agende sua avaliação', variant: 'outline',
+      x: 50, y: 78, bg: 'transparent', fg: '#5D4B42', border: '#5D4B42',
+      uppercase: false, blur: false, arrow: true,
+    };
+    const frozen = JSON.stringify(before);
+    const patch = { copyCtaFrom: { slideId: 's1', overlayId: 'cta1' } };
+    const result = applyVisualPatchToEntry(before, patch, ['s1', 's2']);
+    expect(JSON.stringify(before)).toBe(frozen);
+    expect(result.entry.doc.slides[0]).toBe(before.doc.slides[0]);
+    const target = result.entry.doc.slides[1];
+    expect(target).toMatchObject({
+      title: 'Outro título', subtitle: 'Outro subtítulo', bgImageAssetId: 'asset-photo-2',
+      elementsUnlocked: true,
+    });
+    expect(target.overlays).toHaveLength(1);
+    expect(target.overlays[0]).toMatchObject({
+      type: 'cta', text: 'Agende sua avaliação', variant: 'outline',
+      x: 50, y: 78, bg: 'transparent', fg: '#5D4B42', border: '#5D4B42',
+      uppercase: false, blur: false, arrow: true,
+    });
+    expect(target.overlays[0].id).toMatch(/^cta_[a-f0-9]{20}$/);
+    expect(target.elementOffsets).toBeUndefined();
+    expect(result.changes).toEqual([{ slideId: 's2', index: 1, fields: ['copyCtaFrom'] }]);
+    expect(VISUAL_PATCH_SCHEMA.copyCtaFrom).toBeTruthy();
+
+    const repeated = applyVisualPatchToEntry(result.entry, patch, ['s2']);
+    expect(repeated.entry).toBe(result.entry);
+    expect(repeated.changes).toEqual([]);
+    expect(repeated.entry.doc.slides[1].overlays).toHaveLength(1);
+  });
+
+  it('respeita um CTA já criado, sem duplicar nem sobrescrever o botão personalizado', () => {
+    const before = sampleEntry();
+    before.doc.slides[1].overlays = [{ id: 'custom', type: 'cta', text: 'Agende sua avaliação',
+      variant: 'filled', bg: '#123456', x: 20, y: 80 }];
+    const result = applyVisualPatchToEntry(before, { copyCtaFrom: { slideId: 's1', overlayId: 'cta1' } }, ['s2']);
+    expect(result.entry).toBe(before);
+    expect(result.entry.doc.slides[1].overlays).toEqual(before.doc.slides[1].overlays);
+  });
+
+  it('posiciona e colore a cópia do CTA em um único lote sem mudar o botão de origem', () => {
+    const before = sampleEntry();
+    const patch = { copyCtaFrom: {
+      slideId: 's1', overlayId: 'cta1',
+      style: { x: 28, y: 72, bg: 'transparent', fg: '#5D4B42',
+        border: '#5D4B42', variant: 'outline', uppercase: false,
+        blur: false, arrow: true, fontFamily: 'Inter, sans-serif' },
+    } };
+    const result = applyVisualPatchToEntry(before, patch, ['s1', 's2']);
+    expect(result.entry.doc.slides[0]).toBe(before.doc.slides[0]);
+    expect(result.entry.doc.slides[1].overlays[0]).toMatchObject({
+      text: 'Agende sua avaliação', x: 28, y: 72, bg: 'transparent',
+      fg: '#5D4B42', border: '#5D4B42', variant: 'outline',
+      uppercase: false, blur: false, arrow: true, fontFamily: 'Inter, sans-serif',
+    });
+    const rerun = applyVisualPatchToEntry(result.entry, patch, ['s2']);
+    expect(rerun.entry).toBe(result.entry);
+    expect(rerun.changes).toEqual([]);
+    for (const style of [{ x: 101 }, { text: 'Trocado' }, { bg: 'url(https://example.com)' }]) {
+      expect(() => validateVisualPatch({ copyCtaFrom: { slideId: 's1', overlayId: 'cta1', style } })).toThrow();
+    }
+  });
+
+  it('rejeita origem inválida, não CTA e limite de áreas para impedir cópias parciais', () => {
+    const before = sampleEntry();
+    for (const copyCtaFrom of [
+      { slideId: 'missing', overlayId: 'cta1' },
+      { slideId: 's1', overlayId: 'missing' },
+    ]) expect(() => applyVisualPatchToEntry(before, { copyCtaFrom }, ['s2'])).toThrow(/origem/);
+    before.doc.slides[0].overlays[0].type = 'text';
+    expect(() => applyVisualPatchToEntry(before, {
+      copyCtaFrom: { slideId: 's1', overlayId: 'cta1' },
+    }, ['s2'])).toThrow(/origem/);
+    before.doc.slides[0].overlays[0].type = 'cta';
+    before.doc.slides[1].overlays = Array.from({ length: 12 }, (_, i) => ({ id: `text${i}`, type: 'text', text: String(i) }));
+    expect(() => applyVisualPatchToEntry(before, {
+      copyCtaFrom: { slideId: 's1', overlayId: 'cta1' },
+    }, ['s2'])).toThrow(/limite/);
+    for (const copyCtaFrom of [
+      { slideId: '../s1', overlayId: 'cta1' },
+      { slideId: 's1', overlayId: 'cta1', text: 'Troca' },
+      { slideId: 's1', overlayId: '__proto__' },
+    ]) expect(() => validateVisualPatch({ copyCtaFrom })).toThrow();
   });
 
   it('muda as cores de apenas um card sem alterar a paleta da marca ou outros cards', () => {

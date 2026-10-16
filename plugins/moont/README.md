@@ -37,7 +37,7 @@ Revogue o token também em **Perfil → Integração Codex** quando não quiser 
 
 Um lote interrompido pode ser retomado: uma prévia parcial retorna `planId`, usado como `resumePlanId` na próxima chamada; uma aplicação parcial conserva o mesmo `planId` e os mesmos IDs idempotentes; uma reversão parcial retorna `undoPlanId`, usado como `resumeUndoPlanId` para prosseguir. Os planos ficam em `PLUGIN_DATA/plans` (ou `~/.local/share/moont-codex/plans` fora do Codex) com acesso restrito ao usuário. Eles guardam apenas metadados e ajustes visuais; o token fica somente no Chaves.
 
-Textos, fotos, referências de mídia e conteúdo narrativo não são editáveis pelo endpoint deste plugin. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Prévia e aplicação usam controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
+Textos dos cards, fotos, referências de mídia e conteúdo narrativo não são editáveis pelo endpoint deste plugin. A exceção `patch.copyCtaFrom` copia um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem: `{ "copyCtaFrom": { "slideId": "origem", "overlayId": "botao", "style": { "x": 30, "y": 84 } } }`. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Prévia e aplicação usam controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
 
 ## Desenvolvimento
 

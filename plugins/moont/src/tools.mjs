@@ -42,7 +42,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'preview_visual_batch',
-    description: 'Faz prévia de alterações visuais em um, vários ou todos os projetos. Nenhum projeto é alterado. Retorna planId, necessário para aplicar a mesma mudança; títulos, legendas e fotos permanecem intocados. Se interrompida, use resumePlanId.',
+    description: 'Faz prévia de alterações visuais em um, vários ou todos os projetos. Nenhum projeto é alterado. Retorna planId, necessário para aplicar a mesma mudança; títulos, legendas e fotos permanecem intocados. copyCtaFrom pode repetir um CTA existente quando solicitado. Se interrompida, use resumePlanId.',
     inputSchema: {
       type: 'object',
       properties: {
