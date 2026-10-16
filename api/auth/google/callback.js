@@ -132,6 +132,7 @@ export default async function handler(req, res) {
         metadata: {
           vc_google_sub: profile.sub,
           vc_identity_epoch: identityEpoch,
+          vc_agent_epoch: crypto.randomBytes(16).toString('hex'),
           vc_session_revoked_before: String(revokedBefore),
           vc_pw_salt: '',
           vc_pw_hash: '',

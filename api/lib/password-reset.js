@@ -130,6 +130,7 @@ export async function resetPassword(token, password) {
     await stripe.customers.update(customer.id, { metadata: {
       vc_pw_salt: salt, vc_pw_hash: hash, vc_session_revoked_before: String(Date.now()),
       vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
+      vc_agent_epoch: crypto.randomBytes(16).toString('hex'),
     } }, {
       // Todos os links da mesma versão da senha competem pela mesma operação.
       // Stripe rejeita parâmetros diferentes e conflitos simultâneos da chave.

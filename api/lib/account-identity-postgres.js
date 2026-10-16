@@ -9,20 +9,20 @@ import crypto from 'node:crypto';
 
 const SQL = {
   accountByStripe: `/* identity_account_by_stripe */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id, s.verified_at
     FROM moont.account_stripe_customers s
     JOIN moont.accounts a ON a.id = s.account_id
     WHERE s.stripe_customer_id = $1`,
   accountByGoogle: `/* identity_account_by_google */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id, s.verified_at
     FROM moont.account_identities i
     JOIN moont.accounts a ON a.id = i.account_id
     LEFT JOIN moont.account_stripe_customers s ON s.account_id = a.id
     WHERE i.provider = 'google' AND i.provider_subject = $1`,
   passwordCandidates: `/* identity_password_candidates */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id, c.password_salt, c.password_hash, c.algorithm
     FROM moont.account_identities i
     JOIN moont.accounts a ON a.id = i.account_id
@@ -30,21 +30,21 @@ const SQL = {
     LEFT JOIN moont.account_stripe_customers s ON s.account_id = a.id
     WHERE i.provider = 'password' AND i.email_normalized = $1`,
   accountsByEmail: `/* identity_accounts_by_email */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id, c.password_salt, c.password_hash
     FROM moont.accounts a
     JOIN moont.account_stripe_customers s ON s.account_id = a.id
     LEFT JOIN moont.account_password_credentials c ON c.account_id = a.id
     WHERE a.primary_email = $1 ORDER BY a.created_at, a.id`,
   passwordByStripe: `/* identity_password_by_stripe */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id, c.password_salt, c.password_hash
     FROM moont.account_stripe_customers s
     JOIN moont.accounts a ON a.id = s.account_id
     LEFT JOIN moont.account_password_credentials c ON c.account_id = a.id
     WHERE s.stripe_customer_id = $1`,
   lockedAccount: `/* identity_locked_account */
-    SELECT a.id, a.primary_email, a.identity_epoch, a.session_revoked_before,
+    SELECT a.id, a.primary_email, a.identity_epoch, a.agent_epoch, a.session_revoked_before,
       s.stripe_customer_id
     FROM moont.account_stripe_customers s
     JOIN moont.accounts a ON a.id = s.account_id
@@ -53,8 +53,8 @@ const SQL = {
     SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`,
   insertAccount: `/* identity_insert_account */
     INSERT INTO moont.accounts
-      (primary_email, identity_epoch, session_revoked_before)
-    VALUES ($1, $2, $3)
+      (primary_email, identity_epoch, agent_epoch, session_revoked_before)
+    VALUES ($1, $2, $3, $4)
     RETURNING id`,
   insertStripe: `/* identity_insert_stripe */
     INSERT INTO moont.account_stripe_customers
@@ -90,7 +90,8 @@ const SQL = {
     WHERE account_id = $1::uuid AND provider = 'google'`,
   updateSecurity: `/* identity_update_security */
     UPDATE moont.accounts
-    SET identity_epoch = $2, session_revoked_before = $3, updated_at = now()
+    SET identity_epoch = $2, session_revoked_before = $3,
+      agent_epoch = COALESCE($4::text, agent_epoch), updated_at = now()
     WHERE id = $1::uuid`,
 };
 
@@ -125,15 +126,16 @@ function legacyMetadata(customer) {
   const hash = String(metadata.vc_pw_hash || '');
   const googleSub = String(metadata.vc_google_sub || '');
   const identityEpoch = String(metadata.vc_identity_epoch || '');
+  const agentEpoch = String(metadata.vc_agent_epoch || '');
   const revokedRaw = String(metadata.vc_session_revoked_before || '0');
   const revokedBefore = Number(revokedRaw);
 
   if (Boolean(salt) !== Boolean(hash) || salt.length > 500 || hash.length > 500
-    || googleSub.length > 255 || identityEpoch.length > 255
+    || googleSub.length > 255 || identityEpoch.length > 255 || agentEpoch.length > 255
     || !Number.isSafeInteger(revokedBefore) || revokedBefore < 0) {
     throw fail('Metadados de autenticação legados inválidos.', 'identity_invalid_legacy_metadata');
   }
-  return { salt, hash, googleSub, identityEpoch, revokedBefore };
+  return { salt, hash, googleSub, identityEpoch, agentEpoch, revokedBefore };
 }
 
 function accountFromRow(row) {
@@ -143,6 +145,7 @@ function accountFromRow(row) {
     email: row.primary_email || null,
     stripeCustomerId: row.stripe_customer_id || null,
     identityEpoch: row.identity_epoch || '',
+    agentEpoch: row.agent_epoch || '',
     sessionRevokedBefore: Number(row.session_revoked_before || 0),
     stripeVerifiedAt: row.verified_at || null,
   };
@@ -277,7 +280,7 @@ export function createAccountIdentityStore({ sql: injectedSql, retrieveCustomer 
         if (current) return accountFromRow(current);
 
         const accountId = (await query(tx, 'insertAccount', [
-          email, legacy.identityEpoch, legacy.revokedBefore,
+          email, legacy.identityEpoch, legacy.agentEpoch, legacy.revokedBefore,
         ]))[0].id;
         await query(tx, 'insertStripe', [id, accountId]);
 
@@ -319,6 +322,7 @@ export function createAccountIdentityStore({ sql: injectedSql, retrieveCustomer 
           throw fail('A credencial mudou durante a operação.', 'identity_credential_conflict');
         }
         const epoch = crypto.randomBytes(16).toString('hex');
+        const agentEpoch = crypto.randomBytes(16).toString('hex');
         const revokedBefore = Date.now();
         await query(tx, 'upsertCredential', [account.id, String(salt), String(hash)]);
         const inserted = await query(tx, 'insertIdentity', [account.id, 'password', id, account.primary_email]);
@@ -328,8 +332,8 @@ export function createAccountIdentityStore({ sql: injectedSql, retrieveCustomer 
             throw fail('Esta identidade já pertence a outra conta.', 'identity_provider_conflict');
           }
         }
-        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore]);
-        return { ...accountFromRow(account), identityEpoch: epoch, sessionRevokedBefore: revokedBefore };
+        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore, agentEpoch]);
+        return { ...accountFromRow(account), identityEpoch: epoch, agentEpoch, sessionRevokedBefore: revokedBefore };
       });
     });
   }
@@ -364,9 +368,10 @@ export function createAccountIdentityStore({ sql: injectedSql, retrieveCustomer 
         await query(tx, 'clearCredential', [account.id]);
         await query(tx, 'clearPasswordIdentity', [account.id]);
         const epoch = crypto.randomBytes(16).toString('hex');
+        const agentEpoch = crypto.randomBytes(16).toString('hex');
         const revokedBefore = Date.now();
-        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore]);
-        return { ...accountFromRow(account), identityEpoch: epoch, sessionRevokedBefore: revokedBefore };
+        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore, agentEpoch]);
+        return { ...accountFromRow(account), identityEpoch: epoch, agentEpoch, sessionRevokedBefore: revokedBefore };
       });
     });
   }
@@ -381,7 +386,7 @@ export function createAccountIdentityStore({ sql: injectedSql, retrieveCustomer 
         if (!account) throw fail('Conta não encontrada.', 'identity_customer_not_found');
         const epoch = crypto.randomBytes(16).toString('hex');
         const revokedBefore = Date.now();
-        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore]);
+        await query(tx, 'updateSecurity', [account.id, epoch, revokedBefore, null]);
         return { ...accountFromRow(account), identityEpoch: epoch, sessionRevokedBefore: revokedBefore };
       });
     });

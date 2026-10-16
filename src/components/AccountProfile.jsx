@@ -12,6 +12,7 @@ import {
 } from '../utils/user-profile.js';
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
 import { normalizeAccountUsage } from '../utils/account-usage.js';
+import AgentAccessPanel from './AgentAccessPanel.jsx';
 
 const SOCIAL_FIELDS = [
   { id: 'instagram', prefix: 'instagram.com/', placeholder: 'seuhandle' },
@@ -675,6 +676,8 @@ export default function AccountProfile({
           </button>
         ))}
       </section>
+
+      <AgentAccessPanel />
 
       <section style={{
         padding: 18,

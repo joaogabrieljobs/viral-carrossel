@@ -75,7 +75,7 @@ function fakeDatabase() {
           const id = `00000000-0000-4000-8000-${String(state.nextId++).padStart(12, '0')}`;
           state.accounts.set(id, {
             id, primary_email: params[0], identity_epoch: params[1],
-            session_revoked_before: params[2],
+            agent_epoch: params[2], session_revoked_before: params[3],
           });
           return [{ id }];
         }
@@ -124,6 +124,7 @@ function fakeDatabase() {
           const account = state.accounts.get(params[0]);
           state.accounts.set(params[0], {
             ...account, identity_epoch: params[1], session_revoked_before: params[2],
+            agent_epoch: params[3] ?? account.agent_epoch,
           });
           return [];
         }
@@ -255,9 +256,11 @@ describe('account-identity-postgres', () => {
     const original = hashPassword('SenhaOriginal1');
     const customer = { id: 'cus_a', email: 'a@example.com', metadata: {
       vc_pw_salt: original.salt, vc_pw_hash: original.hash, vc_identity_epoch: 'old',
+      vc_agent_epoch: 'agent-old',
     } };
     const { store, snapshot, retrieveCustomer } = makeStore(new Map([['cus_a', customer]]));
     const first = await store.getOrCreateAccountForStripeCustomer('cus_a');
+    expect(first.agentEpoch).toBe('agent-old');
     customer.metadata = { vc_identity_epoch: 'different' };
     const second = await store.getOrCreateAccountForStripeCustomer('cus_a');
     expect(second).toEqual(first);
@@ -277,6 +280,7 @@ describe('account-identity-postgres', () => {
       ...next, expectedHash: original.hash, expectedEpoch: 'before',
     });
     expect(changed.identityEpoch).not.toBe(before.identityEpoch);
+    expect(changed.agentEpoch).not.toBe(before.agentEpoch);
     expect(changed.sessionRevokedBefore).toBeGreaterThan(0);
     const record = await store.getPasswordRecordByStripeCustomerId('cus_a');
     expect(verifyPassword('SenhaNovaForte2', record)).toBe(true);
@@ -296,6 +300,7 @@ describe('account-identity-postgres', () => {
       sub: 'google-1', email: 'a@example.com',
     });
     expect(linked.identityEpoch).not.toBe(before.identityEpoch);
+    expect(linked.agentEpoch).not.toBe(before.agentEpoch);
     expect(await store.findPasswordCandidatesByEmail('a@example.com')).toEqual([]);
     expect((await store.getAccountByGoogleSubject('google-1')).id).toBe(before.id);
     await expect(store.linkVerifiedGoogleIdentity('cus_a', {
@@ -312,6 +317,7 @@ describe('account-identity-postgres', () => {
     const before = await store.getOrCreateAccountForStripeCustomer('cus_a');
     const after = await store.revokeAccountSessions('cus_a');
     expect(after.identityEpoch).not.toBe(before.identityEpoch);
+    expect(after.agentEpoch).toBe(before.agentEpoch);
     expect(after.sessionRevokedBefore).toBeGreaterThan(0);
     expect((await store.getPasswordRecordByStripeCustomerId('cus_a')).hash).toBe(secret.hash);
   });

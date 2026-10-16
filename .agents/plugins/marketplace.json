@@ -1,0 +1,17 @@
+{
+  "name": "moont-local",
+  "plugins": [
+    {
+      "name": "moont",
+      "source": {
+        "source": "local",
+        "path": "./plugins/moont"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

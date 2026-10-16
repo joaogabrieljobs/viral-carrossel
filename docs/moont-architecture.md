@@ -1,12 +1,14 @@
 # Arquitetura do Moont para crescer por conta
 
-Estado do código em 15/10/2026. Este documento descreve o que está implementado no repositório e separa a ativação em produção dos passos que ainda são necessários para atender milhares de usuários. A existência de uma tabela ou rota não prova que uma flag já foi ligada no deploy.
+Estado do código em 16/10/2026. Este documento descreve o que está implementado no repositório e separa a ativação em produção dos passos que ainda são necessários para atender milhares de usuários. A existência de uma tabela ou rota não prova que uma flag já foi ligada no deploy.
 
 ## Visão geral
 
 ```mermaid
 flowchart LR
     U[Browser: React e editor] -->|cookie vc_access| API[Vercel: APIs do Moont]
+    C[Codex: plugin local] -->|chave pessoal via HTTPS| API
+    C -->|credencial| K[Chaves do macOS]
     U -->|cache e fila de alterações| IDB[IndexedDB/localStorage]
     API -->|conta, projetos, metadados, quota| PG[(Supabase Postgres)]
     API -->|fotos e logos privados| BLOB[(Vercel Blob)]
@@ -20,10 +22,11 @@ flowchart LR
 - **Mídia:** Vercel Blob privado mantém os bytes de fotos e logos. O banco guarda referências, não data URLs grandes. A API de assets ainda é `/api/library-sync`.
 - **Cobrança:** Stripe continua sendo a fonte para customer, plano, período e estado da assinatura. O Postgres guarda a identidade própria da conta e a quota operacional de imagens quando as flags correspondentes estão ativas.
 - **Navegador:** IndexedDB guarda mídia/cache e, quando disponível, uma fila durável por projeto/conta; `localStorage` continua como cache de interface. Nenhum dos dois decide sozinho quais projetos existem na conta. Se o IndexedDB falhar, o app ainda abre a biblioteca da nuvem e salva online por PUT versionado, mas não promete uma fila offline que não conseguiu gravar.
+- **Codex:** o plugin local `moont@moont-local` usa um token pessoal revogável, guardado no Chaves do macOS. A API recebe apenas alterações visuais permitidas; o plugin não recebe credenciais do banco nem pode escrever texto ou substituir fotos. Uma prévia antecede a aplicação; cada projeto é gravado atomicamente e o lote pode ser retomado.
 
 ## Modelo de dados
 
-As migrações estão em `db/migrations/001_account_library.sql` a `005_request_limits.sql`.
+As migrações estão em `db/migrations/001_account_library.sql` a `007_agent_visual_jobs.sql`.
 
 | Tabela | Função | Chave e proteção principal |
 | --- | --- | --- |
@@ -37,6 +40,8 @@ As migrações estão em `db/migrations/001_account_library.sql` a `005_request_
 | `moont.image_quota_operations` | Reserva, confirmação ou devolução de um crédito por geração | `(owner_id, period_start_sec, operation_id)` |
 | `moont.rate_limit_buckets` | Limite de pedidos partilhado entre funções | Hash de IP/rota e janela; limpeza limitada de janelas vencidas |
 | `moont.ocr_daily_quotas` e `moont.ocr_daily_operations` | Teto diário de OCR por conta e reembolso idempotente | `(owner_id, quota_day)` e identificador de operação |
+| `moont.agent_tokens` | Chaves pessoais da integração Codex; somente hash, escopo, vencimento e revogação | `token_hash` único; vinculadas à revisão de segurança da conta |
+| `moont.agent_visual_jobs` | Histórico privado para desfazer uma alteração visual | `(owner_id, request_id)` único; snapshot anterior e versões antes/depois |
 
 **Distinção atual de IDs:** a identidade já possui UUID próprio, mas a biblioteca, os assets e a quota ainda usam preferencialmente o `customerId` Stripe como `owner_id`, preservando as chaves legadas. O UUID ainda não substitui essa chave em todos os dados. O cliente local também usa aliases de owner; uma futura troca para UUID exige migração explícita desses aliases e dos caminhos do Blob. Dois customers com o mesmo e-mail não devem ser mesclados automaticamente.
 
@@ -50,6 +55,7 @@ As migrações estão em `db/migrations/001_account_library.sql` a `005_request_
 6. **Gerar imagem.** Com `IMAGE_QUOTA_BACKEND=postgres`, o primeiro uso do ciclo importa o maior contador legado persistente disponível (Upstash/Stripe); com `UPSTASH_DISABLED=1`, importa somente o Stripe. Erro de leitura da fonte habilitada não cria saldo zero. Cada operação reserva um crédito em transação, confirma no sucesso e devolve em falha. A tela de Uso lê `used`, `limit` e `remaining` dessa quota; o limite continua ligado ao plano Stripe.
 7. **Sair.** O cliente tenta proteger a edição atual antes de limpar dados locais. Na V2, não envia um manifesto legado no logout, pois isso poderia desfazer exclusões. A revogação do cookie e da época de sessão ocorre no servidor quando o backend de identidade está ativo.
 8. **OCR e proteção de rotas.** `OCR_QUOTA_BACKEND=postgres` guarda o contador diário por conta, com reserva e reembolso por operação. `RATE_LIMIT_BACKEND=postgres` usa contadores por IP/rota/janela, partilhados entre funções. Se o banco falhar, o OCR recusa novas leituras; o limitador de pedidos volta por 30 segundos ao limite local. Este último modo é apenas uma degradação de disponibilidade, não uma proteção distribuída.
+9. **Editar em lote pelo Codex.** O Perfil emite uma chave exibida uma única vez. A API confere hash, escopo, assinatura e revisão de segurança da conta em cada pedido; recuperação de senha ou troca de provedor invalida chaves antigas, mas sair da conta no navegador não desfaz o pareamento. O plugin lê listas paginadas, prepara prévias e aplica apenas campos visuais por projeto, com versão-base e ID de operação repetível. Textos, fotos e referências de mídia permanecem como estavam. O histórico permite desfazer se nenhuma outra edição alterou a versão do projeto depois. O lote entre projetos não é uma transação única: se um projeto falhar, os já aplicados permanecem identificados e podem ser retomados ou desfeitos separadamente.
 
 ## Migração e ativação
 
@@ -78,6 +84,7 @@ Ainda há gargalos antes de prometer uma biblioteca com milhares de projetos **e
 - A autorização consulta Stripe durante os acessos protegidos em produção. Monitorar latência e falhas da dependência; uma futura projeção local do estado de assinatura requer webhooks confiáveis, reconciliação e política clara para atraso na revogação.
 - As funções mantêm pools pequenos por instância, mas a quantidade de instâncias pode crescer. Acompanhar conexões ativas, saturação do pooler, tempo de query e custo de egress/armazenamento de imagens.
 - O limite distribuído por IP grava uma linha no Postgres a cada pedido. Isto remove a dependência de Redis avariado, mas não é a solução final se o tráfego crescer muito: monitorar o Micro e migrar esta proteção para Redis funcional ou WAF gerido antes de aumentar substancialmente o volume de requisições.
+- O plugin não impõe teto total de projetos ou cards, mas usa páginas e uma transação por projeto para caber no tempo das funções. Os snapshots de desfazer guardam o JSON anterior inteiro; medir crescimento da tabela e definir uma política explícita de retenção antes de uso intensivo. Limpar snapshots sem política publicada eliminaria a possibilidade de desfazer lotes antigos.
 
 ## Operação e indicadores
 

@@ -152,6 +152,7 @@ describe('redefinição da senha', () => {
     const second = createPasswordResetToken(record());
     const result = await change(token);
     expect(result.statusCode).toBe(200);
+    expect(customer.metadata.vc_agent_epoch).toMatch(/^[a-f0-9]{32}$/);
     expect(customer.metadata.vc_img_periodo).toBe('7');
     expect(verifyPassword('SenhaNova123!', { salt: customer.metadata.vc_pw_salt, hash: customer.metadata.vc_pw_hash })).toBe(true);
     expect(verifyPassword('SenhaAnterior123!', { salt: customer.metadata.vc_pw_salt, hash: customer.metadata.vc_pw_hash })).toBe(false);

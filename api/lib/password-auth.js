@@ -221,6 +221,7 @@ export async function setAuthRecord(email, record) {
       ...customer.metadata,
       vc_pw_salt: record.salt,
       vc_pw_hash: record.hash,
+      vc_agent_epoch: crypto.randomBytes(16).toString('hex'),
     },
   });
 
