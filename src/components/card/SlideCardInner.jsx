@@ -320,6 +320,8 @@ function BrandLogoLayer({
     <div {...handlers} style={style} aria-hidden={movable ? undefined : true}>
       <img
         src={src}
+        data-vc-brand-logo=""
+        data-vc-logo-tone={tone === 'dark' ? 'dark' : undefined}
         alt=""
         draggable={false}
         decoding="async"

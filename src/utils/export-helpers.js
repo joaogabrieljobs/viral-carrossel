@@ -61,6 +61,28 @@ function positionedExportImage(clonedDoc, src, geometry) {
   return image;
 }
 
+/**
+ * html2canvas 1.4 ignora `filter: brightness(0)` da logo. Desenha a imagem
+ * original em resolução nativa e troca apenas o RGB por preto, mantendo cada
+ * pixel de alfa. O bitmap original e a árvore do editor não são modificados.
+ */
+function darkLogoSource(clonedDoc, source) {
+  const canvas = clonedDoc.createElement('canvas');
+  canvas.width = source.naturalWidth;
+  canvas.height = source.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Não foi possível preparar a logo escura para exportar.');
+  ctx.drawImage(source, 0, 0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  try {
+    return canvas.toDataURL('image/png');
+  } catch {
+    throw new Error('Não foi possível preparar a logo escura para exportar. Verifique o acesso à imagem da logo.');
+  }
+}
+
 /** Resolve object-fit no clone sem converter logos/fotos em um background de baixa resolução. */
 async function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
   if (!clonedSlideRoot?.querySelectorAll) return;
@@ -75,6 +97,9 @@ async function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
 
     const computed = view.getComputedStyle(img);
     const source = await exportImageSource(clonedDoc, src);
+    const renderSrc = img.getAttribute('data-vc-logo-tone') === 'dark'
+      ? darkLogoSource(clonedDoc, source)
+      : src;
     const geometry = vcExportImageGeometry(source.naturalWidth, source.naturalHeight,
       parseFloat(computed.width), parseFloat(computed.height),
       (computed.objectFit || 'fill').trim(), computed.objectPosition || '50% 50%');
@@ -103,7 +128,7 @@ async function vcFixHtml2CanvasImages(clonedDoc, clonedSlideRoot) {
     stub.style.borderRadius = computed.borderRadius;
     stub.style.pointerEvents = 'none';
     stub.style.overflow = 'hidden';
-    stub.appendChild(positionedExportImage(clonedDoc, src, geometry));
+    stub.appendChild(positionedExportImage(clonedDoc, renderSrc, geometry));
     parent.replaceChild(stub, img);
   }));
 }
