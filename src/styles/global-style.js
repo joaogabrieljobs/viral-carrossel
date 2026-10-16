@@ -803,11 +803,25 @@ export const GLOBAL_STYLE = `
 
   .vc-textarea {
     resize: vertical;
+    appearance: auto;
+    -webkit-appearance: textarea;
     line-height: 1.45;
-    border-radius: var(--radius-md);
+    border-radius: 8px;
     padding: 12px 16px;
     min-height: 96px;
+    overflow: auto;
   }
+  .vc-text-box-size {
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font: 600 12px/1 var(--font-ui);
+    cursor: pointer;
+  }
+  .vc-text-box-size:active { transform: scale(0.95); }
 
   /* Section labels — taxonomy mono. Polish: peso 600 (era 400) + traço mais
      presente (2px largo, 18px comprimento) + cor de texto secondary em

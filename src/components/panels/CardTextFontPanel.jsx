@@ -12,6 +12,11 @@ const CARD_ALIGN = [
   { id: 'justify', label: 'Justificar', short: 'Just.', Icon: AlignJustify },
 ];
 
+function clampTextBox(height) {
+  const next = Number(height) || 160;
+  return Math.min(640, Math.max(160, next));
+}
+
 function hexColor(value, fallback) {
   const color = String(value || '').trim();
   if (/^#[0-9a-f]{6}$/i.test(color)) return color;
@@ -74,6 +79,7 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
   const overlayId = target ? parseOverlayMoveKey(target.key) : null;
   const overlay = overlays.find(item => item.id === overlayId);
   const color = slide && target ? readColor(slide, brand, target.key, overlay) : '#111111';
+  const [boxHeight, setBoxHeight] = React.useState(160);
   const [colorDraft, setColorDraft] = React.useState(color);
   React.useEffect(() => { setColorDraft(color); }, [color, target?.key]);
   if (!slide || !target) return null;
@@ -143,7 +149,7 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
       <div style={{ display: 'grid', gap: 4 }}>
         <strong className="vc-type-inspector__heading">Tipografia do card</strong>
         <p className="vc-type-inspector__help">
-          Escolha o texto, edite na caixa e puxe o canto para aumentar a área. Alinhamento e cor ficam aqui.
+          Escolha o texto e edite na caixa. Maior abre mais espaço. Alinhamento e cor ficam aqui.
         </p>
       </div>
       <label className="vc-type-inspector__label">
@@ -152,24 +158,35 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
           {targets.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
         </select>
       </label>
-      <label className="vc-type-inspector__label">
-        {canEdit ? 'Caixa de texto' : 'Número do card'}
+      <div className="vc-type-inspector__label">
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <label htmlFor="vc-card-text-box">{canEdit ? 'Caixa de texto' : 'Número do card'}</label>
+          {canEdit ? (
+            <span style={{ display: 'flex', gap: 6 }}>
+              <button type="button" className="vc-text-box-size" onClick={() => setBoxHeight(height => clampTextBox(height - 80))} aria-label="Diminuir a caixa de texto">Menor</button>
+              <button type="button" className="vc-text-box-size" onClick={() => setBoxHeight(height => clampTextBox(height + 120))} aria-label="Aumentar a caixa de texto">Maior</button>
+            </span>
+          ) : null}
+        </span>
         <textarea
+          id="vc-card-text-box"
           className="vc-input vc-textarea"
           aria-label={canEdit ? 'Caixa de texto' : 'Número do card'}
           value={draft}
           readOnly={!canEdit}
-          rows={5}
+          rows={6}
           onChange={event => writeDraft(event.target.value)}
+          onMouseUp={event => setBoxHeight(clampTextBox(event.currentTarget.offsetHeight))}
           style={{
-            minHeight: 140,
+            minHeight: 160,
+            height: boxHeight,
             resize: canEdit ? 'vertical' : 'none',
             fontFamily: fontFamily || 'inherit',
             fontSize: 16,
             lineHeight: 1.45,
           }}
         />
-      </label>
+      </div>
       <div>
         <span className="vc-type-inspector__label">Alinhamento</span>
         <div role="group" aria-label="Alinhamento" style={{ display: 'grid', gridTemplateColumns: `repeat(${alignOptions.length}, 1fr)`, gap: 4, marginTop: 7 }}>
