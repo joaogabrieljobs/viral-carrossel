@@ -3160,6 +3160,9 @@ const SlideCardInner = React.forwardRef(({
         // Com glass (textBg) ou arrasto: não clipar ascenders do título.
         // O card root já tem overflow:hidden para a foto.
         const textoSemClip = textoDeslocado || !!slide.textBg;
+        const textBlockWidth = Number.isFinite(slide.textBlockWidth)
+          ? Math.max(20, Math.min(90, slide.textBlockWidth))
+          : null;
         return (
           <div style={{
             position:'absolute', inset:0,
@@ -3174,11 +3177,12 @@ const SlideCardInner = React.forwardRef(({
             pointerEvents: 'none',
             ...VC_TEXT_ZONE_STYLE,
           }}>
-            <div {...mov('text', {
+            <div data-vc-text-block="main" {...mov('text', {
               pointerEvents: movableElements ? 'auto' : 'none',
               background:'transparent',
               padding: 0,
               display:'inline-flex', flexDirection:'column',
+              width: textBlockWidth == null ? undefined : `${textBlockWidth}%`,
               alignItems:
                 slide.align==='center'  ? 'center'   :
                 slide.align==='right'   ? 'flex-end' :
@@ -3235,6 +3239,9 @@ const SlideCardInner = React.forwardRef(({
                   presentationTitleLeadingPercent(slide),
                 ),
                 boxSizing: 'content-box',
+                ...(textBlockWidth == null ? {} : {
+                  width: '100%', maxWidth: '100%', overflowWrap: 'break-word',
+                }),
                 fontWeight:slide.titleWeight ?? 800,
                 // tracking em centi-em: default -3 (-0.03em). User pode ir de -10 a +30 → -0.13em a +0.27em
                 letterSpacing:`${(-3 + (slide.titleTracking ?? 0)) / 100}em`,

@@ -11,7 +11,7 @@ const brand = {
   logo: 'data:image/png;base64,AAAA',
 };
 
-function render(overrides = {}) {
+function render(overrides = {}, forExport = false) {
   const slide = {
     ...mkSlide(1, brand),
     title: 'TITLE_MARKER', subtitle: 'SUBTITLE_MARKER',
@@ -19,7 +19,7 @@ function render(overrides = {}) {
     ...overrides,
   };
   return renderToStaticMarkup(React.createElement(SlideCardInner, {
-    slide, brand, fmt: 'carrossel', num: 1, total: 2,
+    slide, brand, fmt: 'carrossel', num: 1, total: 2, forExport,
   }));
 }
 
@@ -45,5 +45,17 @@ describe('cores individuais do card', () => {
     });
     expect(html).toMatch(/<h1[^>]*style="[^"]*color:#49382D/);
     expect(html).toMatch(/<p[^>]*style="[^"]*color:#665447/);
+  });
+
+  it('usa uma coluna editorial estreita na prévia e na exportação sem alterar o texto', () => {
+    for (const forExport of [false, true]) {
+      const html = render({ textBlockWidth: 56, align: 'left' }, forExport);
+      const block = html.match(/<div data-vc-text-block="main"[^>]*>/)?.[0];
+      expect(block).toContain('width:56%');
+      expect(html).toContain('TITLE_MARKER');
+      expect(html).toContain('SUBTITLE_MARKER');
+    }
+    const defaultBlock = render().match(/<div data-vc-text-block="main"[^>]*>/)?.[0];
+    expect(defaultBlock).not.toContain(';width:');
   });
 });

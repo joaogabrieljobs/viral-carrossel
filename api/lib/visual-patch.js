@@ -20,6 +20,7 @@ export const SLIDE_VISUAL_FIELDS = Object.freeze({
   bgX: number(0, 100), bgY: number(0, 100), bgZoom: number(50, 300),
   bgMirror: boolean, bgOpacity: number(0, 100), overlay: number(0, 100),
   textShadow: boolean, textBg: boolean, textBgOpacity: number(0, 100), textInset: number(0, 30),
+  textBlockWidth: number(20, 90),
   titleSize: number(30, 250), subSize: number(30, 250), bodyAfterSize: number(30, 250),
   titleTracking: number(-20, 60), subTracking: number(-20, 60), bodyTracking: number(-20, 60),
   titleLeading: number(60, 250), subLeading: number(60, 250), bodyLeading: number(60, 250),
@@ -69,6 +70,7 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
     'patch.brand requires brandScope="project" even when a subset of slideIds is selected.',
     'Text, image, logo asset and reference fields cannot be written by this API.',
     'slide.titleColor and slide.subtitleColor override brand ink for selected cards, including photo cards.',
+    'slide.textBlockWidth narrows the main full-bleed text group in percent of the available card width.',
     'A project is applied atomically. Repeat requestId to resume safely after a network failure.',
   ],
 });

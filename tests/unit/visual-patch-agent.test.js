@@ -75,6 +75,19 @@ describe('visual-only agent patch', () => {
       .toMatchObject({ titleColor: '#49382D', subtitleColor: '#665447', logoTone: 'dark' });
   });
 
+  it('limita a largura do bloco principal apenas no card escolhido', () => {
+    const before = sampleEntry();
+    const result = applyVisualPatchToEntry(before, { textBlockWidth: 56 }, ['s1']);
+    expect(result.entry.doc.slides[0].textBlockWidth).toBe(56);
+    expect(result.entry.doc.slides[1]).toBe(before.doc.slides[1]);
+    expect(result.entry.doc.brand).toBe(before.doc.brand);
+    expect(result.changes).toEqual([{ slideId: 's1', index: 0, fields: ['textBlockWidth'] }]);
+    expect(projectDesignView({ id: 'janine', version: 1, entry: result.entry }).slides[0].visual.textBlockWidth).toBe(56);
+    for (const width of [0, 19.9, 90.1, '56', null, Infinity]) {
+      expect(() => validateVisualPatch({ textBlockWidth: width })).toThrow();
+    }
+  });
+
   it('aceita só posições de logo renderizadas, inclusive o centro c', () => {
     const supported = ['tl', 'tr', 'c', 'bl', 'br'];
     for (const position of supported) {
