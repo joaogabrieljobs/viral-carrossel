@@ -3695,6 +3695,11 @@ export default function App() {
   const finishTextAreaEdit = useCallback(() => setEditingTextArea(null), []);
 
   /** Novo deslocamento de um elemento do card (arrasto direto na pré-visualização). */
+  const patchTextBlockWidthAt = useCallback((idx, percent) => {
+    const width = Math.round(Math.max(24, Math.min(92, Number(percent) || 0)));
+    setSlides((prev) => prev.map((s, i) => (i === idx ? { ...s, textBlockWidth: width } : s)));
+  }, []);
+
   const patchElementOffsetAt = useCallback((idx, chave, offset) => {
     setSlides((prev) => prev.map((s, i) => (
       i === idx
@@ -6868,6 +6873,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     enableZoneSwapDrag={canvasEditMode}
                     movableElements={!canvasEditMode}
                     onElementOffsetChange={patchElementOffsetAt}
+                    onTextBlockWidthChange={patchTextBlockWidthAt}
                     onInlineTextChange={(field, text) => patchInlineTextAt(activeIdx, field, text)}
                     onCreateText={(position) => createTextAreaAt(activeIdx, position)}
                     autoEditOverlayId={editingTextArea?.slideId === slide.id ? editingTextArea.overlayId : null}
@@ -7181,6 +7187,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         enableZoneSwapDrag={canvasEditMode}
                         movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}
+                        onTextBlockWidthChange={patchTextBlockWidthAt}
                         onInlineTextChange={(field, text) => patchInlineTextAt(i, field, text)}
                         onCreateText={(position) => createTextAreaAt(i, position)}
                         autoEditOverlayId={editingTextArea?.slideId === s.id ? editingTextArea.overlayId : null}

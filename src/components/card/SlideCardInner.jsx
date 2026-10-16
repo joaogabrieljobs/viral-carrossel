@@ -1581,6 +1581,8 @@ const SlideCardInner = React.forwardRef(({
   /** Seleção do elemento para a ação de excluir da barra rápida. */
   onElementSelect = null,
   selectedElement = null,
+  /** `(slideIdx, percent) => void` — largura do bloco de texto, em % da área útil. */
+  onTextBlockWidthChange = null,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
@@ -1632,6 +1634,26 @@ const SlideCardInner = React.forwardRef(({
     enabled: !!(movableElements && onElementOffsetChange),
     interactionScale: scale,
   });
+  const textResize = React.useRef(null);
+  const onTextWidthRef = React.useRef(onTextBlockWidthChange);
+  onTextWidthRef.current = onTextBlockWidthChange;
+  const endTextResize = React.useCallback((ev) => {
+    const drag = textResize.current;
+    textResize.current = null;
+    if (!drag) return;
+    ev?.stopPropagation?.();
+    try { ev?.currentTarget?.releasePointerCapture?.(drag.pointerId); } catch { /* ignore */ }
+  }, []);
+  const moveTextResize = React.useCallback((ev) => {
+    const drag = textResize.current;
+    if (!drag) return;
+    ev.stopPropagation();
+    if (ev.cancelable) ev.preventDefault();
+    const esc = Math.max(0.05, scale || 1);
+    const dx = (ev.clientX - drag.startX) / esc;
+    const next = Math.round(Math.max(24, Math.min(92, drag.basePct + (dx / drag.parentW) * 100)));
+    onTextWidthRef.current?.(slideIdx, next);
+  }, [scale, slideIdx]);
   /** Props de arrasto + deslocamento gravado, prontas para espalhar. */
   const mov = React.useCallback((chave, estiloBase) => {
     const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
@@ -3181,10 +3203,13 @@ const SlideCardInner = React.forwardRef(({
             pointerEvents: 'none',
             ...VC_TEXT_ZONE_STYLE,
           }}>
-            <div data-vc-text-block="main" {...mov('text', {
+            <div
+              data-vc-text-block="main"
+              {...mov('text', {
               pointerEvents: movableElements ? 'auto' : 'none',
               background:'transparent',
               padding: 0,
+              position: 'relative',
               display:'inline-flex', flexDirection:'column',
               width: textBlockWidth == null ? undefined : `${textBlockWidth}%`,
               alignItems:
@@ -3193,8 +3218,12 @@ const SlideCardInner = React.forwardRef(({
                 slide.align==='justify' ? 'stretch'  :
                                           'flex-start',
               gap: f.h*0.018,
-              maxWidth:'92%',
-            })}>
+              maxWidth: textBlockWidth == null ? '92%' : '100%',
+            })}
+              {...(selectedElement === 'text' && !forExport ? {
+                title: 'Arraste a alça da direita para aumentar a área do texto',
+              } : {})}
+            >
               {/* Star ornament (8-pontas) — usado em presets como Case Study Neon.
                   Centrado independente do align do título. */}
               {brand.showStarOrnament && (
@@ -3410,6 +3439,50 @@ const SlideCardInner = React.forwardRef(({
                   </InlineEditableText>
                 </div>
               )}
+              {!forExport && selectedElement === 'text' && movableElements ? (
+                <button
+                  type="button"
+                  aria-label="Aumentar a área do texto"
+                  title="Arraste para aumentar a área do texto"
+                  onPointerDown={(ev) => {
+                    if (ev.button != null && ev.button !== 0) return;
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    const block = ev.currentTarget.parentElement;
+                    const parent = block?.parentElement;
+                    const parentW = parent?.clientWidth || 1;
+                    const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
+                    const basePct = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
+                    textResize.current = {
+                      pointerId: ev.pointerId,
+                      startX: ev.clientX,
+                      basePct,
+                      parentW,
+                    };
+                    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
+                  }}
+                  onPointerMove={moveTextResize}
+                  onPointerUp={endTextResize}
+                  onPointerCancel={endTextResize}
+                  onClick={(ev) => ev.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    right: Math.round(-12 / Math.max(0.15, scale || 1)),
+                    top: '50%',
+                    width: Math.round(16 / Math.max(0.15, scale || 1)),
+                    height: Math.round(48 / Math.max(0.15, scale || 1)),
+                    marginTop: Math.round(-24 / Math.max(0.15, scale || 1)),
+                    padding: 0,
+                    borderRadius: 999,
+                    border: `${Math.max(2, Math.round(2 / Math.max(0.15, scale || 1)))}px solid #fff`,
+                    background: '#000',
+                    cursor: 'ew-resize',
+                    zIndex: 40,
+                    pointerEvents: 'auto',
+                    touchAction: 'none',
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         );

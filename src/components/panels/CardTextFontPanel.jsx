@@ -12,6 +12,10 @@ const CARD_ALIGN = [
   { id: 'justify', label: 'Justificar', short: 'Just.', Icon: AlignJustify },
 ];
 
+function clampCardTextWidth(width) {
+  return Math.round(Math.min(92, Math.max(24, Number(width) || 62)));
+}
+
 function clampTextBox(height) {
   const next = Number(height) || 160;
   return Math.min(640, Math.max(160, next));
@@ -222,6 +226,15 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
             );
           })}
         </div>
+      </div>
+      <div className="vc-type-inspector__label">
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          Área no card
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="vc-text-box-size" aria-label="Diminuir a área do texto no card" onClick={() => onUpdate({ textBlockWidth: clampCardTextWidth((slide.textBlockWidth ?? 62) - 8) })}>Estreito</button>
+            <button type="button" className="vc-text-box-size" aria-label="Aumentar a área do texto no card" onClick={() => onUpdate({ textBlockWidth: clampCardTextWidth((slide.textBlockWidth ?? 62) + 8) })}>Largo</button>
+          </span>
+        </span>
       </div>
       <label className="vc-type-inspector__label">
         Cor do texto
