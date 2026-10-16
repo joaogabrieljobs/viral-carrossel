@@ -25,9 +25,9 @@
       if (window.location.pathname !== '/redefinir-senha') {
         var analytics = document.createElement('script');
         analytics.defer = true;
-        analytics.dataset.domain = /(^|\.)viralcarrossel\.com\.br$/.test(window.location.hostname)
-          ? 'viralcarrossel.com.br'
-          : 'moont.ai';
+        // Identificador do painel Plausible existente; acompanha ambos os hosts
+        // até a alteração da propriedade no painel de analytics.
+        analytics.dataset.domain = 'viralcarrossel.com.br';
         analytics.src = 'https://plausible.io/js/script.tagged-events.js';
         document.head.appendChild(analytics);
       }
