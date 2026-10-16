@@ -7,6 +7,7 @@ import { makeReq, makeRes } from '../helpers/http.js';
 import { createAccessToken, COOKIE_NAME } from '../../api/lib/access.js';
 import { resetActiveAccessCacheForTests } from '../../api/lib/require-access.js';
 import { putSharedProject, resetShareMemory } from '../../api/lib/project-share-store.js';
+import * as librarySyncStore from '../../api/lib/library-sync-store.js';
 import handler from '../../api/project-share.js';
 
 const cookieFor = (customerId, email) =>
@@ -191,5 +192,36 @@ describe('POST /api/project-share', () => {
       action: 'push', code, doc: { slides: [{ title: 'Não autorizado' }] },
     } }), denied);
     expect(denied.statusCode).toBe(401);
+  });
+
+  it('outra conta lê só a foto citada na partilha, no Blob do dono', async () => {
+    const code = await createShare();
+    await putSharedProject({
+      code,
+      ownerId: 'cus_owner',
+      ownerEmail: 'dona@teste.exemplo',
+      members: ['cus_owner'],
+      doc: { slides: [{ id: 's1', title: 'Com foto', bgImageAssetId: 'photo-1' }] },
+      revision: 1,
+      keepRevision: true,
+    });
+    const spy = vi.spyOn(librarySyncStore, 'getLibraryAsset').mockResolvedValue({
+      dataUrl: 'data:image/jpeg;base64,AAAA',
+    });
+    const ok = makeRes();
+    const okReq = makeReq({ cookie: cookieFor('cus_other', 'outro@teste.exemplo') });
+    okReq.query = { code, asset: 'photo-1' };
+    await handler(okReq, ok);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.body.asset.dataUrl).toContain('data:image/jpeg');
+    expect(spy).toHaveBeenCalledWith('cus_owner', 'photo-1', { part: undefined });
+
+    const missing = makeRes();
+    const missingReq = makeReq({ cookie: cookieFor('cus_other', 'outro@teste.exemplo') });
+    missingReq.query = { code, asset: 'photo-alheia' };
+    await handler(missingReq, missing);
+    expect(missing.statusCode).toBe(404);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });

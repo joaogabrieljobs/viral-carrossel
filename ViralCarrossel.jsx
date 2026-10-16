@@ -3944,7 +3944,7 @@ export default function App() {
   const handleTeamDocPulled = useCallback(async (payload) => {
     if (!payload?.doc || typeof payload.doc !== 'object') return;
     const { hydrateSharedDocImages } = await import('./src/utils/project-share.js');
-    const hydrated = await hydrateSharedDocImages(payload.doc);
+    const hydrated = await hydrateSharedDocImages(payload.doc, { code: payload.code });
     const shaped = ensureDocShape({
       ...hydrated,
       shareCode: payload.code || hydrated.shareCode || '',
@@ -3963,7 +3963,7 @@ export default function App() {
   const handleTeamShareJoined = useCallback(async (payload) => {
     if (!payload?.doc || typeof payload.doc !== 'object') return;
     const { hydrateSharedDocImages, normalizeShareCode } = await import('./src/utils/project-share.js');
-    const hydrated = await hydrateSharedDocImages(payload.doc);
+    const hydrated = await hydrateSharedDocImages(payload.doc, { code: payload.code });
     const code = normalizeShareCode(payload.code || hydrated.shareCode || '');
     const shaped = ensureDocShape({
       ...hydrated,

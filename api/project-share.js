@@ -9,6 +9,7 @@ import {
   mutateSharedProject,
   makeCode,
 } from './lib/project-share-store.js';
+import { getLibraryAsset } from './lib/library-sync-store.js';
 
 /** Partilhas com fotos embutidas podem demorar a gravar no Blob. */
 export const config = { maxDuration: 60 };
@@ -60,6 +61,23 @@ function writableIdentity(access) {
     || (access.billingDisabled && billingDisabled() ? 'dev:billing-disabled' : '');
 }
 
+function referencedShareAssetIds(doc) {
+  const ids = new Set();
+  const add = (value) => {
+    const id = String(value || '').trim();
+    if (id) ids.add(id);
+  };
+  for (const slide of doc?.slides || []) {
+    add(slide?.bgImageAssetId);
+    add(slide?.logoImageAssetId);
+    add(slide?.refImageAssetId);
+  }
+  add(doc?.brand?.logoAssetId);
+  add(doc?.styleKit?.logo?.assetId);
+  for (const ref of doc?.styleKit?.refImages || []) add(ref?.assetId);
+  return ids;
+}
+
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -68,10 +86,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Use GET ou POST' });
   }
 
+  const readingShareAsset = req.method === 'GET' && !!(req.query?.asset || req.query?.a);
   const limited = await consumeRateLimit(req, {
-    limit: 40,
+    limit: readingShareAsset ? 240 : 40,
     windowMs: 60_000,
-    keyPrefix: 'project-share',
+    keyPrefix: readingShareAsset ? 'project-share-asset' : 'project-share',
   });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
@@ -88,6 +107,21 @@ export default async function handler(req, res) {
       const code = req.query?.code || req.query?.c || '';
       const share = await getSharedProject(code);
       if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
+      const assetId = String(req.query?.asset || req.query?.a || '').trim();
+      if (assetId) {
+        if (!referencedShareAssetIds(share.doc).has(assetId) || !share.ownerId) {
+          return res.status(404).json({ error: 'Asset não encontrado.' });
+        }
+        const rawPart = req.query?.part;
+        if (rawPart !== undefined && (typeof rawPart !== 'string' || !/^\d{1,2}$/.test(rawPart))) {
+          return res.status(400).json({ error: 'Índice da parte inválido.', code: 'library_bad_asset' });
+        }
+        const asset = await getLibraryAsset(share.ownerId, assetId, {
+          part: rawPart === undefined ? undefined : Number(rawPart),
+        });
+        if (!asset) return res.status(404).json({ error: 'Asset não encontrado.' });
+        return res.status(200).json({ ok: true, asset });
+      }
       return res.status(200).json({
         ok: true,
         code: share.code,

@@ -76,6 +76,46 @@ describe('packDocWithImagesForShare', () => {
     expect(doc.shareMeta.includesImages).toBe(true);
   });
 
+  it('embute a foto da nuvem da conta que publica quando o card só tem o id remoto', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      expect(String(url)).toContain('/api/library-sync?asset=photo-1');
+      return {
+        ok: true,
+        json: async () => ({ asset: { dataUrl: 'data:image/png;base64,AAAA' } }),
+      };
+    }));
+    const { doc, packedImages } = await packDocWithImagesForShare({
+      slides: [{ title: 'A', bgImage: null, bgImageAssetId: 'photo-1' }],
+    });
+    expect(packedImages).toBe(1);
+    expect(doc.slides[0].bgImage).toBe('data:image/png;base64,AAAA');
+    expect(doc.slides[0].bgImageAssetId).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it('quem entra pelo código lê a foto do dono e não guarda o id da outra conta', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const href = String(url);
+      expect(href).toContain('/api/project-share?');
+      expect(href).toContain('code=AB12CD34');
+      expect(href).toContain('asset=photo-1');
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ asset: { dataUrl: 'data:image/png;base64,BBBB' } }),
+      };
+    }));
+    const imported = await hydrateSharedDocImages({
+      slides: [{ id: 's1', title: 'Equipa', bgImage: null, bgImageAssetId: 'photo-1' }],
+    }, { code: 'AB12CD34' });
+    expect(imported.slides[0]).toMatchObject({
+      bgImage: 'blob:x',
+      bgImageId: 'new1',
+      title: 'Equipa',
+    });
+    expect(imported.slides[0].bgImageAssetId).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
   it('omite fotos se o payload ficar enorme (limite serverless)', async () => {
     const huge = `data:image/png;base64,${'A'.repeat(2_000_000)}`;
     const { doc, packedImages, imagesOmitted } = await packDocWithImagesForShare({

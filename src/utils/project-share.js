@@ -12,7 +12,8 @@ import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } fr
 import { exportSlideReference, importSlideReference } from './slide-reference.js';
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
-const SHARE_API = '/api/project-share';
+const SHARE_API = '/api/library-sync';
+const TEAM_SHARE_API = '/api/project-share';
 /**
  * Folga abaixo do FUNCTION_PAYLOAD_TOO_LARGE (~4,5 MB).
  * O envelope JSON ({action,name,doc}) também conta — por isso o tecto do doc
@@ -102,6 +103,51 @@ async function compactDataUrlForShare(dataUrl) {
   return src.length <= SHARE_IMAGE_MAX_CHARS ? src : null;
 }
 
+function forgetForeignAsset(slide) {
+  if (!slide || typeof slide !== 'object') return slide;
+  const next = { ...slide };
+  delete next.bgImageAssetId;
+  return next;
+}
+
+async function assembleAssetDataUrl(load) {
+  const data = await load();
+  let dataUrl = data?.asset?.dataUrl || null;
+  if (data?.asset?.chunked) {
+    const total = Number(data.asset.total);
+    const totalChars = Number(data.asset.totalChars);
+    if (!Number.isInteger(total) || total < 1 || !Number.isInteger(totalChars) || totalChars < 1) return null;
+    const parts = [];
+    for (let index = 0; index < total; index += 1) {
+      const part = await load(index);
+      const value = part?.asset?.data;
+      if (part?.asset?.index !== index || typeof value !== 'string' || !value) return null;
+      parts.push(value);
+    }
+    dataUrl = parts.join('');
+    if (dataUrl.length !== totalChars) return null;
+  }
+  return typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') ? dataUrl : null;
+}
+
+/** Bytes da foto na biblioteca de quem está a publicar. */
+async function fetchOwnLibraryAsset(assetId) {
+  if (!assetId) return null;
+  try {
+    return await assembleAssetDataUrl(async (part) => {
+      const query = part === undefined
+        ? `asset=${encodeURIComponent(assetId)}`
+        : `asset=${encodeURIComponent(assetId)}&part=${part}`;
+      const res = await fetch(`${SHARE_API}?${query}`, { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'asset');
+      return data;
+    });
+  } catch {
+    return null;
+  }
+}
+
 function stripEmbeddedImages(doc) {
   const slides = Array.isArray(doc?.slides)
     ? doc.slides.map((s) => ({
@@ -163,10 +209,13 @@ export async function packDocWithImagesForShare(doc) {
         dataUrl = await imagemComoDataUrl(next.bgImageId);
       } catch { /* mantém sem imagem */ }
     }
+    if (!dataUrl && next.bgImageAssetId) {
+      dataUrl = await fetchOwnLibraryAsset(next.bgImageAssetId);
+    }
     if (dataUrl) {
       const compact = await compactDataUrlForShare(dataUrl);
       if (compact) {
-        next = { ...next, bgImage: compact };
+        next = forgetForeignAsset({ ...next, bgImage: compact, bgImageId: undefined });
         packedImages += 1;
       } else {
         next = { ...next, bgImage: null };
@@ -273,16 +322,25 @@ export function sanitizeDocForShare(doc) {
 }
 
 /**
- * Depois de puxar da equipa: data URLs / https → IndexedDB local + object URLs.
+ * Depois de puxar da equipa: data URLs / fotos do dono da partilha → IndexedDB local.
+ * O ID do asset fica na conta de quem publicou; nesta conta ele é apagado
+ * para o editor não o procurar no Blob errado.
  */
-export async function hydrateSharedDocImages(doc) {
+export async function hydrateSharedDocImages(doc, { code } = {}) {
   if (!doc || typeof doc !== 'object') return doc;
+  const shareCode = normalizeShareCode(code || doc.shareCode || '');
   const next = { ...doc };
 
   try {
     next.styleKit = await migrateProjectReferences(next.styleKit);
   } catch { /* ignore */ }
   try {
+    if (!next.brand?.logo && next.brand?.logoAssetId && shareCode) {
+      const logo = await fetchShareAssetDataUrl(shareCode, next.brand.logoAssetId);
+      if (logo?.startsWith('data:image/png;')) {
+        next.brand = { ...next.brand, logo, logoAssetId: undefined };
+      }
+    }
     next.brand = await importBrandLogo(next.brand);
   } catch { /* ignore */ }
 
@@ -290,20 +348,41 @@ export async function hydrateSharedDocImages(doc) {
 
   next.slides = await Promise.all(next.slides.map(async (slide) => {
     let sl = await importSlideLogo(slide);
-    sl = await importSlideReference(sl);
-    const src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
-    if (!src) return { ...sl, bgImage: null };
+    try { sl = await importSlideReference(sl); } catch { /* a referência em data URL é o caminho normal */ }
+
+    if (shareCode && sl?.logoImageAssetId && !(typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:'))) {
+      const logo = await fetchShareAssetDataUrl(shareCode, sl.logoImageAssetId);
+      if (logo) {
+        sl = { ...sl, logoImage: logo, logoImageAssetId: undefined };
+        try { sl = await importSlideLogo(sl); } catch { /* */ }
+      }
+    }
+    if (shareCode && sl?.refImageAssetId && !(typeof sl.refImage === 'string' && sl.refImage.startsWith('data:'))) {
+      const ref = await fetchShareAssetDataUrl(shareCode, sl.refImageAssetId);
+      if (ref) {
+        sl = { ...sl, refImage: ref, refImageAssetId: undefined, refImageId: undefined };
+        try { sl = await importSlideReference(sl); } catch { /* */ }
+      }
+    }
+
+    let src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
+    if ((!src || src.startsWith('blob:')) && sl?.bgImageAssetId && shareCode) {
+      src = await fetchShareAssetDataUrl(shareCode, sl.bgImageAssetId) || '';
+    }
+    if (!src || src.startsWith('blob:')) {
+      return forgetForeignAsset({ ...sl, bgImage: null });
+    }
 
     if (src.startsWith('data:')) {
       try {
         return {
-          ...sl,
+          ...forgetForeignAsset(sl),
           ...(await guardarImagemDoSlide(src)),
           bgImageFailed: false,
           bgImageError: null,
         };
       } catch {
-        return { ...sl, bgImage: null };
+        return forgetForeignAsset({ ...sl, bgImage: null });
       }
     }
 
@@ -321,14 +400,14 @@ export async function hydrateSharedDocImages(doc) {
         const blob = await res.blob();
         const packed = await guardarImagemDoSlide(blob);
         return {
-          ...sl,
+          ...forgetForeignAsset(sl),
           ...packed,
           bgImageFailed: false,
           bgImageError: null,
         };
       } catch {
         return {
-          ...sl,
+          ...forgetForeignAsset(sl),
           bgImage: null,
           bgImageFailed: true,
           bgImageError: 'Falha ao abrir imagem da equipa',
@@ -345,10 +424,14 @@ export async function hydrateSharedDocImages(doc) {
   return next;
 }
 
-async function shareRequest(payload, { method = 'POST', code } = {}) {
+async function shareRequest(payload, { method = 'POST', code, asset, part } = {}) {
+  const params = new URLSearchParams();
+  if (code) params.set('code', code);
+  if (asset) params.set('asset', asset);
+  if (part !== undefined) params.set('part', String(part));
   const url = method === 'GET'
-    ? `${SHARE_API}?code=${encodeURIComponent(code || '')}`
-    : SHARE_API;
+    ? `${TEAM_SHARE_API}?${params.toString()}`
+    : TEAM_SHARE_API;
   const body = method === 'GET' ? undefined : JSON.stringify(payload);
   if (body && body.length > MAX_SHARE_BODY_CHARS) {
     throw new Error(
@@ -404,6 +487,17 @@ async function shareRequest(payload, { method = 'POST', code } = {}) {
     throw new Error(errMsg);
   }
   return data;
+}
+
+async function fetchShareAssetDataUrl(code, assetId) {
+  if (!code || !assetId) return null;
+  try {
+    return await assembleAssetDataUrl(async (part) => shareRequest(null, {
+      method: 'GET', code, asset: assetId, part,
+    }));
+  } catch {
+    return null;
+  }
 }
 
 export async function createProjectShare({ doc, name }) {
