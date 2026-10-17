@@ -218,6 +218,22 @@ describe('outbox durável por projeto', () => {
     expect(await listPendingProjectOps(ALICE)).toHaveLength(0);
   });
 
+  it('assinatura vencida vai para revisão e não trava o restante da fila', async () => {
+    await queueProjectPut(ALICE, { id: 'bloqueado', doc: { title: 'A' } });
+    await queueProjectPut(ALICE, { id: 'livre', doc: { title: 'B' } });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Assinatura necessária' }, 402))
+      .mockResolvedValueOnce(json({ ok: true, project: {
+        id: 'livre', entry: { id: 'livre', doc: { title: 'B' } }, version: 1,
+      } }));
+    const receipt = await flushProjectOutbox(ALICE);
+    expect(receipt.sent).toBe(1);
+    expect(receipt.needsReview).toEqual([{
+      kind: 'put_deleted', projectId: 'bloqueado', projectName: '', reviewVersion: 0,
+    }]);
+    expect(await getPendingProjectOp(ALICE, 'livre')).toBeNull();
+  });
+
   it('não recria projeto tombstonado: preserva a edição local para revisão e libera o boot', async () => {
     const entry = { id: 'janine', name: 'Clínica', doc: { title: 'Edição do celular' } };
     await queueProjectPut(ALICE, entry, { baseVersion: 2 });

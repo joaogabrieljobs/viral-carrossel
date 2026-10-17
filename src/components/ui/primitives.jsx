@@ -83,13 +83,23 @@ const ColorRow = ({ label, value, onChange, contrastBg, contrastKind }) => (
 // Reduz ansiedade do user ("vou perder?") sem ser intrusivo. Atualiza
 // progressivamente: agora → "agora mesmo", < 60s → "Xs", < 1h → "Xmin",
 // > 1h → "Xh". Re-renderiza a cada 30s pra refrescar o texto.
-function SavedIndicator({ savedAt, notice, onUpdate }) {
+function SavedIndicator({ savedAt, notice, onUpdate, unsaved = false }) {
   const [, force] = React.useReducer(x => x + 1, 0);
   React.useEffect(() => {
     if (!savedAt || notice) return;
     const id = setInterval(force, 30000);
     return () => clearInterval(id);
   }, [savedAt, notice]);
+  if (unsaved && !notice) {
+    return (
+      <span role="status" style={{
+        display: 'inline-flex', alignItems: 'center',
+        fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+      }}>
+        Não salvo
+      </span>
+    );
+  }
   if (notice) {
     const text = notice.kind === 'copy'
       ? 'Sua edição foi para uma cópia. Este projeto mudou em outro lugar.'

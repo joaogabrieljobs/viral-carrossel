@@ -136,6 +136,24 @@ describe('packDocWithImagesForShare', () => {
     vi.unstubAllGlobals();
   });
 
+  it('marca a foto como falha e conserva o id quando o download da equipa volta vazio', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ asset: {} }),
+    })));
+    const imported = await hydrateSharedDocImages({
+      slides: [{ id: 's1', title: 'Equipa', bgImage: null, bgImageAssetId: 'photo-1' }],
+    }, { code: 'AB12CD34' });
+    expect(imported.slides[0]).toMatchObject({
+      title: 'Equipa',
+      bgImage: null,
+      bgImageAssetId: 'photo-1',
+      bgImageFailed: true,
+      bgImageForeign: true,
+    });
+    vi.unstubAllGlobals();
+  });
+
   it('ignora o JPEG reduzido do envio quando o original ainda tem id', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
@@ -164,19 +182,58 @@ describe('packDocWithImagesForShare', () => {
     expect(JSON.stringify(doc).length).toBeLessThan(2_800_000);
   });
 
-  it('partilha embute os bytes da referência e importa um ID novo independente da conta original', async () => {
+  it('não embute a referência que já tem id na nuvem', async () => {
     const { doc } = await packDocWithImagesForShare({ slides: [{
       id: 's1', title: 'Direção com referência', refImageId: 'id1', refImageAssetId: 'remote-original',
       imgExtraPrompt: 'Preserve a composição.',
     }] });
-    expect(doc.slides[0].refImage).toBe('data:image/png;base64,AAAA');
+    expect(doc.slides[0].refImage).toBeNull();
     expect(doc.slides[0].refImageId).toBeUndefined();
-    expect(doc.slides[0].refImageAssetId).toBeUndefined();
-    const imported = await hydrateSharedDocImages(doc);
+    expect(doc.slides[0].refImageAssetId).toBe('remote-original');
+    expect(doc.slides[0].imgExtraPrompt).toBe('Preserve a composição.');
+  });
+
+  it('importa uma referência já embutida para um ID novo desta conta', async () => {
+    const imported = await hydrateSharedDocImages({ slides: [{
+      id: 's1', title: 'Direção com referência', refImage: 'data:image/png;base64,AAAA',
+      imgExtraPrompt: 'Preserve a composição.',
+    }] });
     expect(imported.slides[0]).toMatchObject({
       refImage: null, refImageId: 'new-reference-id', imgExtraPrompt: 'Preserve a composição.',
     });
     expect(imported.slides[0].refImageAssetId).toBeFalsy();
+  });
+
+  it('publica um projeto de muitos cards sem repetir a logo em cada um', async () => {
+    const logo = `data:image/png;base64,${'C'.repeat(180_000)}`;
+    const slides = Array.from({ length: 23 }, (_, index) => ({
+      id: `s${index}`,
+      title: `Card ${index}`,
+      subtitle: 'Texto que precisa ir para a outra conta.',
+      logoImage: logo,
+      logoImageAssetId: 'logo-original',
+      bgImageAssetId: `photo-${index}`,
+    }));
+    const { doc, payloadChars } = await packDocWithImagesForShare({ slides, brand: { name: 'Clínica' } });
+    expect(payloadChars).toBeLessThan(2_500_000);
+    expect(doc.slides).toHaveLength(23);
+    expect(doc.slides.every((slide) => slide.logoImage == null)).toBe(true);
+    expect(doc.slides.every((slide) => slide.logoImageAssetId === 'logo-original')).toBe(true);
+    expect(doc.slides.map((slide) => slide.bgImageAssetId)).toEqual(slides.map((slide) => slide.bgImageAssetId));
+    expect(doc.slides[3].title).toBe('Card 3');
+  });
+
+  it('não deixa a mesma logo estourar o pedido quando ela ainda não tem id na nuvem', async () => {
+    const logo = `data:image/png;base64,${'D'.repeat(250_000)}`;
+    const slides = Array.from({ length: 23 }, (_, index) => ({
+      id: `s${index}`,
+      title: `Card ${index}`,
+      logoImage: logo,
+    }));
+    const { doc, payloadChars } = await packDocWithImagesForShare({ slides });
+    expect(payloadChars).toBeLessThan(2_500_000);
+    expect(doc.slides.every((slide) => slide.title?.startsWith('Card'))).toBe(true);
+    expect(doc.slides.every((slide) => !String(slide.logoImage || '').startsWith('data:'))).toBe(true);
   });
 
   it('partilha não confirma um documento portátil se a referência existir só como ID perdido', async () => {
@@ -204,6 +261,7 @@ describe('team share invite link', () => {
     expect(normalizeShareCode('xx')).toBe('');
     expect(buildTeamShareInviteUrl('ab12cd34', 'https://viralcarrossel.com.br'))
       .toBe('https://viralcarrossel.com.br/?share=AB12CD34&app=1');
+    expect(buildTeamShareInviteUrl('ab12cd34')).toBe('https://moont.ai/?share=AB12CD34&app=1');
     expect(readShareCodeFromSearch('?share=zz99yy88&utm=1')).toBe('ZZ99YY88');
   });
 

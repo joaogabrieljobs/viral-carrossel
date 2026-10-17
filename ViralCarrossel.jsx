@@ -1062,6 +1062,7 @@ export default function App() {
   }, []);
   const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
   const cloudSyncInFlightRef = useRef(false);
+  const unsavedGuardRef = useRef(() => false);
   // Progresso de fotos é apenas de interface; nunca entra no documento/autosave.
   const [photoLoad, setPhotoLoad] = useState(null);
   const [openingDocId, setOpeningDocId] = useState(null);
@@ -1118,12 +1119,18 @@ export default function App() {
     };
     // pagehide + beforeunload: Safari iOS por vezes não dispara visibilitychange
     // ao fechar o tab (auditoria FE-007).
+    const warnIfUnsaved = (event) => {
+      flushLibrary();
+      if (!unsavedGuardRef.current()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
     window.addEventListener('pagehide', flushLibrary);
-    window.addEventListener('beforeunload', flushLibrary);
+    window.addEventListener('beforeunload', warnIfUnsaved);
     document.addEventListener('visibilitychange', onHidden);
     return () => {
       window.removeEventListener('pagehide', flushLibrary);
-      window.removeEventListener('beforeunload', flushLibrary);
+      window.removeEventListener('beforeunload', warnIfUnsaved);
       document.removeEventListener('visibilitychange', onHidden);
     };
   }, []);
@@ -1131,6 +1138,7 @@ export default function App() {
   // Persiste os 3 stores (debounced — sincronização imediata acima nos eventos do sistema)
   // Auto-save da biblioteca + tracking do último save pro indicador no header
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [cloudUnsaved, setCloudUnsaved] = useState(false);
   const [remoteProjectNotice, setRemoteProjectNotice] = useState(null);
   const firstSaveRef = useRef(true);
   useEffect(() => {
@@ -1694,6 +1702,10 @@ export default function App() {
         || (Number.isSafeInteger(v2MetaRevisionRef.current) && meta !== v2MetaBaselineRef.current),
     };
   }, []);
+  unsavedGuardRef.current = () => {
+    if (cloudSyncInFlightRef.current) return true;
+    try { return cloudAutoPushSnapshot().dirty === true; } catch { return false; }
+  };
 
   /** Grava agora, sem esperar os debounces do autosave. Devolve a biblioteca gravada. */
   const flushPersistNow = useCallback(({ requireSaved = false, returnSnapshot = false } = {}) => {
@@ -1868,7 +1880,9 @@ export default function App() {
       flight.progress = finalProgress;
       setPhotoLoad((current) => current?.key === flightKey ? finalProgress : current);
       setTimeout(() => {
-        setPhotoLoad((current) => current?.key === flightKey && current.status !== 'loading' ? null : current);
+        setPhotoLoad((current) => (
+          current?.key === flightKey && current.status !== 'loading' && !(current.missing > 0) ? null : current
+        ));
       }, 4000);
     };
     flight.promise = (async () => {
@@ -1977,6 +1991,17 @@ export default function App() {
     if (!pending.isCurrent() || readDataOwner() !== owner) {
       throw new Error('O projeto mudou durante o envio. As alterações continuam no editor; salve novamente.');
     }
+    // A fila fica durável antes das fotos. Recarregar ou fechar a aba no meio
+    // do envio não devolve a revisão antiga da nuvem.
+    if (outboxAvailable) {
+      try {
+        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
+      } catch (error) {
+        if (!isProjectOutboxUnavailable(error)) throw error;
+        outboxAvailable = false;
+        v2OutboxUnavailableRef.current = true;
+      }
+    }
     const uploaded = await uploadAssetsBestEffort(prepared.assets, {
       owner,
       assertCurrent: () => {
@@ -1986,7 +2011,10 @@ export default function App() {
       },
     });
     if (uploaded.failed) {
-      throw new Error(`${uploaded.failed} imagem(ns) não foram enviadas. O projeto continua no editor; tente salvar novamente.`);
+      if (outboxAvailable && pending.isCurrent() && readDataOwner() === owner) {
+        try { await outbox.flushProjectOutbox(owner); } catch { /* a fila local segue no próximo boot */ }
+      }
+      throw new Error(`${uploaded.failed} imagem(ns) não foram enviadas. O texto ficou na fila desta conta; tente salvar novamente.`);
     }
     let flushed = { recoveries: [] };
     if (outboxAvailable) {
@@ -2212,11 +2240,13 @@ export default function App() {
             : `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`,
           'warning', 6000);
         }
+        setCloudUnsaved(false);
         return { cloudSaved: true, outboxSaved: !verifyWithoutOutbox && outbox.pending === 0 };
       } catch (error) {
-        if (source !== 'auto' || error?.status === 409) {
+        setCloudUnsaved(true);
+        if (source !== 'logout') {
           toast(
-            `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'Edição mantida neste navegador. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`,
+            `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`,
             'warning', 7000,
           );
         }
@@ -4009,6 +4039,23 @@ export default function App() {
     }));
   }, [history]);
 
+  const queueProjectForAccount = useCallback(async (entry) => {
+    if (!PROJECTS_V2 || !entry?.id) return;
+    const owner = readDataOwner();
+    if (!owner || v2ObservedOwnerRef.current !== owner || readDataOwner() !== owner) return;
+    const { prepareProjectCloudPayload } = await import('./src/utils/projects-cloud-sync.js');
+    const outbox = await import('./src/utils/projects-outbox.js');
+    const prepared = await prepareProjectCloudPayload(entry, {
+      snapshot: { library: libraryPersistRef.current || [] },
+      ownerId: owner,
+      isCurrent: () => readDataOwner() === owner,
+    });
+    if (readDataOwner() !== owner) return;
+    await outbox.queueProjectPut(owner, prepared.entry, {
+      baseVersion: v2VersionsRef.current.get(entry.id) ?? 0,
+    });
+  }, []);
+
   const handleTeamDocPulled = useCallback(async (payload) => {
     if (!payload?.doc || typeof payload.doc !== 'object') return;
     const { hydrateSharedDocImages } = await import('./src/utils/project-share.js');
@@ -4020,12 +4067,18 @@ export default function App() {
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
     history.reset(shaped);
+    const current = (libraryPersistRef.current || []).find((entry) => entry.id === activeDocId);
+    if (current) {
+      try {
+        await queueProjectForAccount({ ...current, doc: shaped, updatedAt: Date.now() });
+      } catch { /* o autosave confirma a fila se este enfileiramento falhar */ }
+    }
     setActiveIdx(0);
     const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
     if (withPhoto) {
       toast(`${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'} aberta${withPhoto === 1 ? '' : 's'} da equipa.`, 'success', 4000);
     }
-  }, [history, toast]);
+  }, [activeDocId, history, queueProjectForAccount, toast]);
 
   /** Entrar / link ?share=: cria projeto na lib ou reabre o que já tem o mesmo código. */
   const handleTeamShareJoined = useCallback(async (payload) => {
@@ -4042,6 +4095,7 @@ export default function App() {
     const name = String(payload.name || '').trim() || 'Projeto da equipa';
     let targetId = null;
     let created = false;
+    let queuedEntry = null;
     setLibrary((prev) => {
       const flushed = prev.map((e) => (
         e.id === activeDocId
@@ -4053,22 +4107,25 @@ export default function App() {
         : null;
       if (existing) {
         targetId = existing.id;
-        return flushed.map((e) => (
-          e.id === existing.id
-            ? {
-              ...e,
-              doc: shaped,
-              name: e.name || name,
-              updatedAt: Date.now(),
-            }
-            : e
-        ));
+        const updated = {
+          ...existing,
+          doc: shaped,
+          name: existing.name || name,
+          updatedAt: Date.now(),
+        };
+        queuedEntry = updated;
+        return flushed.map((e) => (e.id === existing.id ? updated : e));
       }
       const entry = mkLibEntry(shaped, name);
       targetId = entry.id;
+      queuedEntry = entry;
       created = true;
       return [entry, ...flushed];
     });
+    if (queuedEntry) {
+      try { await queueProjectForAccount(queuedEntry); }
+      catch { /* o autosave confirma a fila se este enfileiramento falhar */ }
+    }
     if (targetId) {
       if (targetId === activeDocId) {
         history.reset(shaped);
@@ -4088,7 +4145,7 @@ export default function App() {
       5000,
     );
     trackEvent('team_share_joined', { created: created ? '1' : '0' });
-  }, [activeDocId, history, toast]);
+  }, [activeDocId, history, queueProjectForAccount, toast]);
 
   // Link ?share=CÓDIGO (stash sobrevive ao login Google): entra e abre o projeto.
   const shareInviteInFlight = useRef('');
@@ -4717,7 +4774,8 @@ export default function App() {
     checkActive();
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
-    const langLayer = buildGenerationLanguageLayer(cp, tone, effectiveMode);
+    const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode)}
+Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()));
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
@@ -6401,6 +6459,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 {!headerTight && (
                   <SavedIndicator
                     savedAt={lastSavedAt}
+                    unsaved={cloudUnsaved}
                     notice={remoteProjectNotice}
                     onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }}
                   />

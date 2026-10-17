@@ -8,7 +8,7 @@
  */
 
 import { guardarImagemDoSlide, imagemComoDataUrl } from './image-store.js';
-import { exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
+import { ensurePngDataUrl, exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
 import { exportSlideReference, importSlideReference } from './slide-reference.js';
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
 
@@ -171,6 +171,59 @@ function countPackedDataImages(doc) {
   return n;
 }
 
+function isDataImage(value) {
+  return typeof value === 'string' && value.startsWith('data:image/');
+}
+
+/** A mesma logo em todos os cards não precisa viajar 23 vezes. */
+function dedupeRepeatedLogos(doc) {
+  const slides = Array.isArray(doc?.slides) ? doc.slides : [];
+  const logo = slides.find((slide) => isDataImage(slide?.logoImage))?.logoImage;
+  if (!logo) return doc;
+  const copies = slides.filter((slide) => slide?.logoImage === logo).length;
+  if (copies < 2) return doc;
+  const brand = doc.brand && typeof doc.brand === 'object' ? { ...doc.brand } : {};
+  if (!isDataImage(brand.logo) && logo.startsWith('data:image/png;') && logo.length <= SHARE_IMAGE_MAX_CHARS) {
+    brand.logo = logo;
+  }
+  return {
+    ...doc,
+    brand,
+    slides: slides.map((slide) => (
+      slide?.logoImage === logo
+        ? { ...slide, logoImage: null, logoImageId: undefined }
+        : slide
+    )),
+  };
+}
+
+function stripDataImages(value, depth = 0) {
+  if (depth > 12 || value == null) return { value, removed: 0 };
+  if (typeof value === 'string') {
+    return isDataImage(value) ? { value: null, removed: 1 } : { value, removed: 0 };
+  }
+  if (Array.isArray(value)) {
+    let removed = 0;
+    const next = value.map((item) => {
+      const stripped = stripDataImages(item, depth + 1);
+      removed += stripped.removed;
+      return stripped.value;
+    });
+    return { value: next, removed };
+  }
+  if (typeof value === 'object') {
+    let removed = 0;
+    const next = {};
+    for (const [key, item] of Object.entries(value)) {
+      const stripped = stripDataImages(item, depth + 1);
+      removed += stripped.removed;
+      next[key] = stripped.value;
+    }
+    return { value: next, removed };
+  }
+  return { value, removed: 0 };
+}
+
 /**
  * Prepara o documento para sync: texto + fotos embutidas em data URL compactas.
  */
@@ -180,8 +233,19 @@ export async function packDocWithImagesForShare(doc) {
   let imagesOmitted = 0;
 
   working.slides = await Promise.all((working.slides || []).map(async (slide) => {
-    let next = await exportSlideLogo(slide);
-    next = await exportSlideReference(next);
+    let next = slide;
+    // Logo e referência que já estão na nuvem não entram no JSON. A outra
+    // conta lê o arquivo original pelo código, um por vez.
+    if (next.logoImageAssetId) {
+      next = { ...next, logoImage: null, logoImageId: undefined };
+    } else {
+      try { next = await exportSlideLogo(next); } catch { /* logo local em falta não bloqueia o texto */ }
+    }
+    if (next.refImageAssetId) {
+      next = { ...next, refImage: null, refImageId: undefined };
+    } else {
+      next = await exportSlideReference(next);
+    }
     // A foto já está na nuvem de quem publica. Embutir aqui a reduziria a
     // 720 px. A outra conta lê o arquivo original pelo código.
     if (next.bgImageAssetId) {
@@ -242,7 +306,7 @@ export async function packDocWithImagesForShare(doc) {
     };
   }
 
-  let clean = stripRuntimeBlobs(working);
+  let clean = dedupeRepeatedLogos(stripRuntimeBlobs(working));
   let serialized = JSON.stringify(clean);
 
   // Remove fotos uma a uma até caber (em vez de tirar todas de uma vez).
@@ -271,6 +335,17 @@ export async function packDocWithImagesForShare(doc) {
     imagesOmitted += before;
     packedImages = 0;
     serialized = JSON.stringify(clean);
+  }
+
+  // Logo, referência ou outra imagem que o corte das fotos não alcança.
+  if (serialized.length > MAX_SHARE_DOC_CHARS) {
+    const stripped = stripDataImages(clean);
+    if (stripped.removed > 0) {
+      imagesOmitted += stripped.removed;
+      clean = stripped.value;
+      packedImages = countPackedDataImages(clean);
+      serialized = JSON.stringify(clean);
+    }
   }
 
   // Último recurso: material/referências longas.
@@ -317,6 +392,13 @@ export function sanitizeDocForShare(doc) {
   };
 }
 
+async function adoptShareLogo(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null;
+  const png = await ensurePngDataUrl(dataUrl);
+  if (png?.startsWith('data:image/png;') || png?.startsWith('data:image/jpeg')) return png;
+  return null;
+}
+
 /**
  * Depois de puxar da equipa: data URLs / fotos do dono da partilha → IndexedDB local.
  * O ID do asset fica na conta de quem publicou; nesta conta ele é apagado
@@ -333,10 +415,10 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
   try {
     const brandLogoIsPng = typeof next.brand?.logo === 'string' && next.brand.logo.startsWith('data:image/png;');
     if (shareCode && next.brand?.logoAssetId && !brandLogoIsPng) {
-      const logo = await fetchShareAssetDataUrl(shareCode, next.brand.logoAssetId);
-      if (logo?.startsWith('data:image/png;')) {
-        next.brand = { ...next.brand, logo, logoAssetId: undefined };
-      }
+      const logo = await adoptShareLogo(await fetchShareAssetDataUrl(shareCode, next.brand.logoAssetId));
+      next.brand = logo
+        ? { ...next.brand, logo, logoAssetId: undefined, logoForeign: undefined }
+        : { ...next.brand, logo: null, logoAssetId: undefined, logoForeign: true };
     }
     next.brand = await importBrandLogo(next.brand);
   } catch { /* ignore */ }
@@ -349,10 +431,12 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
 
     const slideLogoIsPng = typeof sl.logoImage === 'string' && sl.logoImage.startsWith('data:image/png;');
     if (shareCode && sl?.logoImageAssetId && !slideLogoIsPng) {
-      const logo = await fetchShareAssetDataUrl(shareCode, sl.logoImageAssetId);
-      if (logo?.startsWith('data:image/png;')) {
-        sl = { ...sl, logoImage: logo, logoImageAssetId: undefined };
+      const logo = await adoptShareLogo(await fetchShareAssetDataUrl(shareCode, sl.logoImageAssetId));
+      if (logo) {
+        sl = { ...sl, logoImage: logo, logoImageAssetId: undefined, logoImageForeign: undefined };
         try { sl = await importSlideLogo(sl); } catch { /* */ }
+      } else {
+        sl = { ...sl, logoImage: null, logoImageAssetId: undefined, logoImageForeign: true };
       }
     }
     if (shareCode && sl?.refImageAssetId && !(typeof sl.refImage === 'string' && sl.refImage.startsWith('data:'))) {
@@ -369,6 +453,15 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
     }
     if (!src) src = typeof sl?.bgImage === 'string' ? sl.bgImage : '';
     if (!src || src.startsWith('blob:')) {
+      if (sl?.bgImageAssetId) {
+        return {
+          ...sl,
+          bgImage: null,
+          bgImageFailed: true,
+          bgImageForeign: true,
+          bgImageError: 'A foto da equipa não chegou. Puxe as alterações novamente.',
+        };
+      }
       return forgetForeignAsset({ ...sl, bgImage: null });
     }
 
@@ -540,15 +633,11 @@ export function normalizeShareCode(raw) {
   return code.length >= 6 && code.length <= 12 ? code : '';
 }
 
-/** Link de convite: https://…/?share=AB12CD34&app=1 */
+/** Link de convite sempre no domínio da sessão: https://moont.ai/?share=AB12CD34&app=1 */
 export function buildTeamShareInviteUrl(code, origin) {
   const normalized = normalizeShareCode(code);
   if (!normalized) return '';
-  let base = origin;
-  if (!base && typeof globalThis !== 'undefined' && globalThis.location?.origin) {
-    base = globalThis.location.origin;
-  }
-  if (!base) base = 'https://moont.ai';
+  const base = origin || 'https://moont.ai';
   const url = new URL('/', base);
   url.searchParams.set('share', normalized);
   url.searchParams.set('app', '1');

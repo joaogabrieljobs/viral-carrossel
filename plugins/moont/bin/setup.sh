@@ -4,20 +4,23 @@ set -eu
 service='br.com.viralcarrossel.moont.agent'
 account='default'
 
-if [ -n "${MOONT_TOKEN:-}" ]; then
+command="${1:-add}"
+
+if [ "$command" = "add" ] && [ -n "${MOONT_TOKEN:-}" ]; then
   printf 'MOONT_TOKEN está definido. O plugin usa essa variável e não grava a chave no Chaves.\n'
   printf 'Reinicie o Codex neste terminal para a variável valer.\n'
   exit 0
 fi
 
 if [ "$(uname -s)" != 'Darwin' ]; then
-  printf 'Fora do macOS, exporte a chave criada em Perfil → Integração Codex:\n' >&2
-  printf '  export MOONT_TOKEN="cole-a-chave"\n' >&2
-  printf 'O plugin lê essa variável. O Chaves do macOS é opcional.\n' >&2
+  printf 'Fora do macOS, grave a chave num arquivo só seu, com permissão 600:\n' >&2
+  printf '  umask 077 && printf %%s "cole-a-chave" > "$HOME/.moont-token"\n' >&2
+  printf '  export MOONT_TOKEN="$(cat "$HOME/.moont-token")"\n' >&2
+  printf 'Não cole a chave direto no terminal: isso fica no histórico.\n' >&2
   exit 1
 fi
 
-case "${1:-add}" in
+case "$command" in
   add)
     printf 'Gere um token em Perfil > Integração Codex no Moont.\n'
     printf 'Cole o token no prompt seguro do Chaves abaixo. O valor não ficará no histórico do terminal.\n'

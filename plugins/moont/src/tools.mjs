@@ -411,6 +411,20 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
     return { ok: true, status: 'applied', planId, appliedCount: results.length, applied: resultPage.items, nextOffset: resultPage.nextOffset };
   }
 
+  async function undoRequestIds(args) {
+    if (args.planId !== undefined && args.requestIds !== undefined) {
+      throw new MoontApiError('Use planId ou requestIds, não ambos.', { code: 'invalid_selection' });
+    }
+    if (args.planId === undefined) return jobsFor(args, { includeAttempted: true });
+    const plan = await plans.get(requireString(args.planId, 'planId'));
+    if (!plan) throw new MoontApiError('Lote não encontrado nesta sessão. Use os requestIds retornados na aplicação.', { code: 'plan_not_found' });
+    return plan.items.filter((item) => {
+      if (item.result?.status === 'not_applicable') return false;
+      if (item.result?.status === 'applied') return true;
+      return item.attempted === true && !item.result;
+    }).map((item) => item.requestId);
+  }
+
   async function jobsFor(args, { includeAttempted = false } = {}) {
     if (args.planId !== undefined && args.requestIds !== undefined) {
       throw new MoontApiError('Use planId ou requestIds, não ambos.', { code: 'invalid_selection' });
@@ -501,7 +515,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
             undoPlan = await plans.get(requireString(args.resumeUndoPlanId, 'resumeUndoPlanId'));
             if (!undoPlan || undoPlan.kind !== 'undo') throw new MoontApiError('Reversão parcial não encontrada.', { code: 'undo_plan_not_found' });
           } else {
-            const requestIds = (await jobsFor(args)).reverse();
+            const requestIds = (await undoRequestIds(args)).reverse();
             const source = args.planId !== undefined
               ? `plan:${args.planId}`
               : `requests:${requestIds.join(',')}`;
@@ -520,7 +534,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
             await plans.set(undoPlanId, undoPlan);
           }
           for (const item of undoPlan.items) {
-            if (item.result?.status === 'undone') continue;
+            if (item.result?.status === 'undone' || item.result?.status === 'skipped') continue;
             try {
               const response = await client.undo({ requestId: item.requestId, undoRequestId: item.undoRequestId });
               item.result = response.job || { requestId: item.requestId, status: 'undone' };
@@ -537,6 +551,11 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
                 };
               }
             } catch (error) {
+              if (error.code === 'visual_job_not_found') {
+                item.result = { requestId: item.requestId, status: 'skipped', code: error.code };
+                await plans.set(undoPlan.planId, undoPlan);
+                continue;
+              }
               const completed = undoPlan.items.filter((entry) => entry.result);
               return {
                 ok: false,

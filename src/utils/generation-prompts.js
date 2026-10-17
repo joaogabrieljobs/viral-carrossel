@@ -849,7 +849,8 @@ REGRAS DE LEITURA E COMPOSIÇÃO — DECK 16:9:
 - Síntese/fecho: conclusão ou próximo passo claro, sem CTA de Instagram.
 - Varie a função visual dos ${slideCount} slides: capa, mapa/agenda, afirmação, explicação, dado/prova, comparação, síntese e fecho conforme o caminho escolhido.
 - Não escreva “slide N”, “arraste”, “salve”, “compartilhe”, hashtags ou instruções de feed.
-- bodyAfterImage fica vazio por padrão; use-o somente para fonte, unidade, período, ressalva ou instrução indispensável. Cada slide deve funcionar projetado em uma tela ampla.`;
+- bodyAfterImage fica vazio por padrão; use-o somente para fonte, unidade, período, ressalva ou instrução indispensável. Cada slide deve funcionar projetado em uma tela ampla.
+- Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
   }
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
     return buildPersoHybridLayoutBlock(slideCount, textDensityId);
@@ -1353,7 +1354,8 @@ Preferências do usuário para APRESENTAÇÃO 16:9 (viés suave — ${hasWeb ? '
   return `
 Preferências do usuário (viés suave — ${hasWeb ? 'pesquise fatos reais com fontes na web' : 'sugira hipóteses editoriais sem afirmar atualidade'}):
 - Modo narrativo alvo: "${m.label}" — ${m.desc}
-- Pacote criativo de referência: "${p.label}" — ${p.desc}
+- Pacote criativo de referência: "${p.label}".
+Não escreva no resultado nomes internos do Moont (paleta, arco, Decodificação de Marca) como se fossem tendência de mercado. Hipóteses continuam rotuladas como hipótese.
 Aplicação: em "carousel_ideas", favoreça ângulos que esse modo execute bem (ex.: storytelling → arco em cena; passo-a-passo → passos numerados; viral → tensão e payoff; profundo → padrão/mecanismo; pacote Tendência/Cultura → fenômeno de comportamento ou cultura já em curso que o público sente no feed, não “lista de dicas”). Em "viral_hooks", combine formatos estratégicos com variações compatíveis com o modo.
 `;
 }

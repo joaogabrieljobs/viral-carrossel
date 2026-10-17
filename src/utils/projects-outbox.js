@@ -385,6 +385,11 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
     if (op.kind === 'put' && isProjectDeletedConflict(error)) {
       return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
     }
+    // Assinatura vencida é permanente nesta sessão. Parar a fila aqui
+    // impediria o boot de enviar os outros projetos.
+    if (error?.status === 402) {
+      return { id: op.projectId, needsReviewPut: true, cloudVersion: op.baseVersion };
+    }
     if (!isProjectConflict(error)) throw error;
     assertActiveOwner(ownerId);
     const remote = await getProject(op.projectId, { signal, expectedOwnerId });

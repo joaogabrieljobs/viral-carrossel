@@ -176,7 +176,41 @@ export function applyLogoVisibilityOnSlides(slides = [], { ids = null, hidden = 
     : stampLogoVisibleOnSlides(slides, ids);
 }
 
+/** JPEG/WebP viram PNG no navegador. Sem canvas, a logo continua no formato original. */
+export async function ensurePngDataUrl(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return dataUrl;
+  if (dataUrl.startsWith('data:image/png;')) return dataUrl;
+  if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') return dataUrl;
+  const blob = dataUrlParaBlob(dataUrl);
+  if (!blob) return dataUrl;
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, bitmap.width);
+    canvas.height = Math.max(1, bitmap.height);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+    const png = canvas.toDataURL('image/png');
+    return png?.startsWith('data:image/png;') ? png : dataUrl;
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function rasterFileToPng(file) {
+  const dataUrl = await blobParaDataUrl(file);
+  const png = await ensurePngDataUrl(dataUrl);
+  if (!png?.startsWith('data:image/png;')) {
+    throw new Error('Escolha uma logo em PNG (fundo transparente) para máxima qualidade.');
+  }
+  const blob = dataUrlParaBlob(png);
+  if (!blob) throw new Error('Escolha uma logo em PNG (fundo transparente) para máxima qualidade.');
+  return new File([blob], 'logo.png', { type: 'image/png' });
+}
+
 export async function storeSlideLogo(file) {
+  if (file?.type === 'image/jpeg' || file?.type === 'image/webp') {
+    file = await rasterFileToPng(file);
+  }
   if (file.type !== 'image/png') throw new Error('Escolha uma logo em PNG (fundo transparente) para máxima qualidade.');
   if (file.size > 5 * 1024 * 1024) throw new Error('A logo deve ter no máximo 5 MB.');
   const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());

@@ -96,7 +96,6 @@ export default function AgentAccessPanel() {
   }
 
   const visibleTokens = credentials.filter((item) => !item.revokedAt && !item.invalidated);
-  const connectCommand = oneTimeToken ? `export MOONT_TOKEN='${oneTimeToken.replace(/'/g, '')}'` : '';
 
   function expiryNote(iso) {
     const ms = Date.parse(iso) - Date.now();
@@ -140,7 +139,7 @@ export default function AgentAccessPanel() {
         <div style={{ display: 'grid', gap: 9, padding: 14, border: '1px solid var(--accent)', borderRadius: 12, background: 'var(--accent-surface)' }}>
           <strong style={{ fontSize: 13 }}>Copie esta chave agora</strong>
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--text-secondary)' }}>
-            Por segurança, ela só aparece uma vez. No terminal, cole o comando abaixo antes de abrir o Codex. No Mac, o mesmo valor também pode ir para o Chaves com <span style={{ fontFamily: 'var(--font-mono)' }}>sh plugins/moont/bin/setup.sh add</span>. Ela vence em 90 dias.
+            Por segurança, ela só aparece uma vez. No Mac, rode <span style={{ fontFamily: 'var(--font-mono)' }}>sh plugins/moont/bin/setup.sh add</span> e cole a chave no prompt do Chaves — ele não grava o valor no histórico. Fora do Mac, grave a chave num arquivo com permissão 600 e exporte esse arquivo. Ela vence em 90 dias.
           </p>
           <input
             aria-label="Chave de integração Moont, exibida uma única vez"
@@ -152,16 +151,9 @@ export default function AgentAccessPanel() {
             style={{ minWidth: 0, width: '100%', boxSizing: 'border-box', padding: '9px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
           />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              aria-label="Comando para conectar o plugin"
-              value={connectCommand}
-              readOnly
-              onFocus={(event) => event.target.select()}
-              style={{ minWidth: 0, width: '100%', boxSizing: 'border-box', padding: '9px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
-            />
-            <button type="button" style={buttonStyle} onClick={() => copy(connectCommand)}>
+            <button type="button" style={buttonStyle} onClick={() => copy(oneTimeToken)}>
               {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-              {copied ? 'Comando copiado' : 'Copiar comando'}
+              {copied ? 'Chave copiada' : 'Copiar chave'}
             </button>
             <button type="button" style={buttonStyle} onClick={() => setOneTimeToken('')}>Já guardei</button>
           </div>

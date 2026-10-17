@@ -296,6 +296,7 @@ function BrandLogoLayer({
   elementProps = null,
   movable = false,
 }) {
+  if (!src || typeof src !== 'string') return null;
   const box = Math.max(1, Math.round(sizePx));
   const style = {
     position: 'absolute',

@@ -4,11 +4,12 @@ import React from 'react';
 export default function CloudPhotoProgress({ progress, compact = false, announce = true }) {
   if (!progress || !progress.total) return null;
   const completed = Math.min(progress.total, Math.max(0, progress.completed || 0));
-  const percent = Math.round((completed / progress.total) * 100);
+  const loaded = Math.min(progress.total, Math.max(0, Number.isFinite(progress.loaded) ? progress.loaded : completed));
+  const percent = Math.round((loaded / progress.total) * 100);
   const failed = Math.min(progress.total, Math.max(0, progress.missing || 0));
   const label = progress.status === 'error'
-    ? `Fotos: ${completed} de ${progress.total} · carregamento interrompido`
-    : `Fotos: ${completed} de ${progress.total}`;
+    ? `Fotos: ${loaded} de ${progress.total} · carregamento interrompido`
+    : `Fotos: ${loaded} de ${progress.total}`;
 
   return (
     <div role={announce ? 'status' : undefined} aria-live={announce ? 'polite' : 'off'} style={{
@@ -22,9 +23,13 @@ export default function CloudPhotoProgress({ progress, compact = false, announce
         <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{percent}%</span>
       </div>
       <div role="progressbar" aria-hidden={!announce} aria-label="Carregamento das fotos" aria-valuemin={0}
-        aria-valuemax={progress.total} aria-valuenow={completed}
+        aria-valuemax={progress.total} aria-valuenow={loaded}
         style={{ height: 4, borderRadius: 999, background: 'var(--hairline)', overflow: 'hidden' }}>
-        <div style={{ width: `${percent}%`, height: '100%', borderRadius: 'inherit', background: 'var(--accent)', transition: 'width 180ms ease-out' }} />
+        <div style={{
+          width: `${percent}%`, height: '100%', borderRadius: 'inherit',
+          background: failed > 0 ? 'var(--text-muted)' : 'var(--accent)',
+          transition: 'width 180ms ease-out',
+        }} />
       </div>
       {progress.status === 'complete' && failed > 0 && (
         <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>

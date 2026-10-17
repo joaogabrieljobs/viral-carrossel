@@ -352,7 +352,7 @@ export function CriarRapidoHome({
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label className="vc-label-sm">Identidade — logo</label>
-        <input ref={logoRef} type="file" accept="image/png" style={{ display: 'none' }} onChange={onLogoFile} />
+        <input ref={logoRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={onLogoFile} />
         <button
           type="button"
           className="vc-btn vc-btn-ghost"

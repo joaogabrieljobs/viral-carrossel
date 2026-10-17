@@ -131,7 +131,7 @@ function ProjectStyleKitPanel({
           projectName={projectName || kit.name}
         />
       ) : null}
-      <input ref={logoInputRef} type="file" accept="image/png" aria-label="Arquivo PNG da logo do projeto" style={{ display: 'none' }} onChange={async e => {
+      <input ref={logoInputRef} type="file" accept="image/png,image/jpeg" aria-label="Arquivo PNG ou JPEG da logo do projeto" style={{ display: 'none' }} onChange={async e => {
         const file = e.target.files?.[0]; e.target.value = ''; if (!file) return;
         const version = uploadVersion.current;
         setUploading(true);

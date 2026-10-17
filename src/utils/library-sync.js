@@ -156,8 +156,8 @@ async function packSlideForCloud(slide, assets) {
     bgImage: null,
     logoImage: null,
     refImage: typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage) ? sl.refImage : null,
-    bgImageAssetId: bgAssetId || sl.bgImageAssetId || undefined,
-    logoImageAssetId: logoAssetId || sl.logoImageAssetId || undefined,
+    bgImageAssetId: bgAssetId || (sl.bgImageForeign ? undefined : sl.bgImageAssetId) || undefined,
+    logoImageAssetId: logoAssetId || (sl.logoImageForeign ? undefined : sl.logoImageAssetId) || undefined,
     refImageAssetId: refIdentity,
   });
   return clean;
@@ -178,7 +178,7 @@ async function packBrandForCloud(brand, assets) {
   return stripRuntime({
     ...packed,
     logo: null,
-    logoAssetId: logoAssetId || packed?.logoAssetId || undefined,
+    logoAssetId: logoAssetId || (packed?.logoForeign ? undefined : packed?.logoAssetId) || undefined,
   });
 }
 
@@ -365,7 +365,24 @@ export async function fetchLibraryCloudStatus(opts = {}) {
   return syncRequest({ action: 'status' }, opts);
 }
 
-/** Upload de fotos — 1 a 1 com retry; nunca bloqueia o save da estrutura. */
+const ASSET_REQUEST_TIMEOUT_MS = 25_000;
+
+function requestSignal(parent, timeoutMs = ASSET_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onParent = () => controller.abort();
+  parent?.addEventListener('abort', onParent, { once: true });
+  return {
+    signal: controller.signal,
+    done() {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', onParent);
+    },
+    parentAborted: () => parent?.aborted === true,
+  };
+}
+
+/** Upload de fotos — 1 a 1 com retry e prazo por pedido. A fila do projeto não espera este retorno. */
 export async function uploadAssetsBestEffort(assets, { owner, signal, assertCurrent } = {}) {
   let uploaded = 0;
   let skipped = 0;
@@ -388,7 +405,14 @@ export async function uploadAssetsBestEffort(assets, { owner, signal, assertCurr
       try {
         // eslint-disable-next-line no-await-in-loop
         if (dataUrl.length <= CLOUD_IMAGE_PART_CHARS) {
-          const saved = await syncRequest({ action: 'putAsset', assetId, dataUrl, contentType: imageContentType(dataUrl) }, { signal });
+          const timed = requestSignal(signal);
+          let saved;
+          try {
+            saved = await syncRequest({ action: 'putAsset', assetId, dataUrl, contentType: imageContentType(dataUrl) }, { signal: timed.signal });
+          } finally {
+            timed.done();
+          }
+          if (timed.parentAborted()) throw new Error('Sincronização cancelada.');
           if (saved.ok !== true || (saved.assetId && saved.assetId !== assetId)) {
             throw new Error('A nuvem não confirmou o envio da imagem.');
           }
@@ -396,10 +420,17 @@ export async function uploadAssetsBestEffort(assets, { owner, signal, assertCurr
           const total = Math.ceil(dataUrl.length / CLOUD_IMAGE_PART_CHARS);
           for (let index = 0; index < total; index += 1) {
             assertCurrent?.();
-            const saved = await syncRequest({
-              action: 'putAssetChunk', assetId, index, total, totalChars: dataUrl.length,
-              data: dataUrl.slice(index * CLOUD_IMAGE_PART_CHARS, (index + 1) * CLOUD_IMAGE_PART_CHARS),
-            }, { signal });
+            const timed = requestSignal(signal);
+            let saved;
+            try {
+              saved = await syncRequest({
+                action: 'putAssetChunk', assetId, index, total, totalChars: dataUrl.length,
+                data: dataUrl.slice(index * CLOUD_IMAGE_PART_CHARS, (index + 1) * CLOUD_IMAGE_PART_CHARS),
+              }, { signal: timed.signal });
+            } finally {
+              timed.done();
+            }
+            if (timed.parentAborted()) throw new Error('Sincronização cancelada.');
             if (saved.ok !== true || (saved.assetId && saved.assetId !== assetId)
               || (index === total - 1 && saved.complete !== true)) {
               throw new Error('A nuvem não confirmou o envio completo da imagem.');
