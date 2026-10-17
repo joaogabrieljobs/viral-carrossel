@@ -2327,15 +2327,30 @@ export default function App() {
     trackEvent('custom_visual_preset_saved', { preset: preset.id });
   }, [activeIdx, activeProductKind, brand, creativePreset, setVisualPreset, slides, toast]);
   /**
-   * Quadro do desktop: os cards ficam numa fila que rola na horizontal. Clicar
-   * numa miniatura só mudava `activeIdx` — o quadro não andava, então a partir
-   * do 5.º card o slide selecionado ficava fora da janela sem nenhuma pista de
-   * como chegar lá. Aqui trazemos o card ativo para a vista.
+   * Quadro do desktop: os cards quebram em várias linhas. Clicar na miniatura
+   * só mudava o contorno — o card correspondente continuava fora da janela.
+   * Aqui trazemos esse card para a vista, na horizontal e na vertical.
    */
   const boardScrollRef = useRef(null);
   const boardCardRefs = useRef([]);
   const thumbnailStripRef = useRef(null);
   const thumbnailRefs = useRef([]);
+  const [boardJump, setBoardJump] = useState(0);
+  const revealBoardCard = useCallback((index) => {
+    const alvo = boardCardRefs.current[index];
+    const quadro = boardScrollRef.current;
+    if (!alvo || !quadro) return;
+    const rc = quadro.getBoundingClientRect();
+    const ra = alvo.getBoundingClientRect();
+    const foraX = ra.left < rc.left - 8 || ra.right > rc.right + 8;
+    const foraY = ra.top < rc.top - 8 || ra.bottom > rc.bottom + 8;
+    if (!foraX && !foraY) return;
+    quadro.scrollBy({
+      left: foraX ? (ra.left + ra.width / 2) - (rc.left + rc.width / 2) : 0,
+      top: foraY ? (ra.top + ra.height / 2) - (rc.top + rc.height / 2) : 0,
+      behavior: 'smooth',
+    });
+  }, []);
   const [tab, setTab] = useState('home');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [canvasEditMode, setCanvasEditMode] = useState(false);
@@ -2343,17 +2358,8 @@ export default function App() {
     try { return localStorage.getItem(SK.previewGrid) === '1'; } catch { return false; }
   });
   useEffect(() => {
-    const alvo = boardCardRefs.current[activeIdx];
-    const quadro = boardScrollRef.current;
-    if (!alvo || !quadro) return;
-    const rc = quadro.getBoundingClientRect();
-    const ra = alvo.getBoundingClientRect();
-    // Só mexe quando o card realmente está (parcialmente) fora — evita puxar o
-    // quadro a cada clique num card já visível.
-    if (ra.left >= rc.left - 1 && ra.right <= rc.right + 1) return;
-    const delta = (ra.left + ra.width / 2) - (rc.left + rc.width / 2);
-    quadro.scrollBy({ left: delta, behavior: 'smooth' });
-  }, [activeIdx]);
+    revealBoardCard(activeIdx);
+  }, [activeIdx, boardJump, revealBoardCard]);
 
   // Um projeto novo pode começar no mesmo índice do anterior (normalmente 0).
   // Nesse caso o efeito acima não dispara e a fila conserva o scrollLeft antigo,
@@ -6538,7 +6544,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 <button
                   key={s.id}
                   ref={(el) => { thumbnailRefs.current[i] = el; }}
-                  onClick={()=>setActiveIdx(i)}
+                  onClick={() => { setActiveIdx(i); setBoardJump((n) => n + 1); }}
                   draggable
                   onDragStart={e=>{
                     e.dataTransfer.setData('text/plain', String(i));
@@ -6889,6 +6895,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     movableElements={!canvasEditMode}
                     onElementOffsetChange={patchElementOffsetAt}
                     onTextBlockWidthChange={patchTextBlockWidthAt}
+                    showTextResize
                     onInlineTextChange={(field, text) => patchInlineTextAt(activeIdx, field, text)}
                     onCreateText={(position) => createTextAreaAt(activeIdx, position)}
                     autoEditOverlayId={editingTextArea?.slideId === slide.id ? editingTextArea.overlayId : null}
@@ -7203,6 +7210,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         movableElements={!canvasEditMode}
                         onElementOffsetChange={patchElementOffsetAt}
                         onTextBlockWidthChange={patchTextBlockWidthAt}
+                        showTextResize={i === activeIdx}
                         onInlineTextChange={(field, text) => patchInlineTextAt(i, field, text)}
                         onCreateText={(position) => createTextAreaAt(i, position)}
                         autoEditOverlayId={editingTextArea?.slideId === s.id ? editingTextArea.overlayId : null}

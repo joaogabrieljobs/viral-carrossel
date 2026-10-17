@@ -1583,6 +1583,8 @@ const SlideCardInner = React.forwardRef(({
   selectedElement = null,
   /** `(slideIdx, percent) => void` — largura do bloco de texto, em % da área útil. */
   onTextBlockWidthChange = null,
+  /** Mostra o botão Expandir neste card (o card ativo do quadro). */
+  showTextResize = false,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
@@ -1635,6 +1637,7 @@ const SlideCardInner = React.forwardRef(({
     interactionScale: scale,
   });
   const textResize = React.useRef(null);
+  const textBlockRef = React.useRef(null);
   const onTextWidthRef = React.useRef(onTextBlockWidthChange);
   onTextWidthRef.current = onTextBlockWidthChange;
   const endTextResize = React.useCallback((ev) => {
@@ -3204,6 +3207,7 @@ const SlideCardInner = React.forwardRef(({
             ...VC_TEXT_ZONE_STYLE,
           }}>
             <div
+              ref={textBlockRef}
               data-vc-text-block="main"
               {...mov('text', {
               pointerEvents: movableElements ? 'auto' : 'none',
@@ -3439,50 +3443,6 @@ const SlideCardInner = React.forwardRef(({
                   </InlineEditableText>
                 </div>
               )}
-              {!forExport && selectedElement === 'text' && movableElements ? (
-                <button
-                  type="button"
-                  aria-label="Aumentar a área do texto"
-                  title="Arraste para aumentar a área do texto"
-                  onPointerDown={(ev) => {
-                    if (ev.button != null && ev.button !== 0) return;
-                    ev.stopPropagation();
-                    ev.preventDefault();
-                    const block = ev.currentTarget.parentElement;
-                    const parent = block?.parentElement;
-                    const parentW = parent?.clientWidth || 1;
-                    const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
-                    const basePct = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
-                    textResize.current = {
-                      pointerId: ev.pointerId,
-                      startX: ev.clientX,
-                      basePct,
-                      parentW,
-                    };
-                    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
-                  }}
-                  onPointerMove={moveTextResize}
-                  onPointerUp={endTextResize}
-                  onPointerCancel={endTextResize}
-                  onClick={(ev) => ev.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    right: Math.round(-12 / Math.max(0.15, scale || 1)),
-                    top: '50%',
-                    width: Math.round(16 / Math.max(0.15, scale || 1)),
-                    height: Math.round(48 / Math.max(0.15, scale || 1)),
-                    marginTop: Math.round(-24 / Math.max(0.15, scale || 1)),
-                    padding: 0,
-                    borderRadius: 999,
-                    border: `${Math.max(2, Math.round(2 / Math.max(0.15, scale || 1)))}px solid #fff`,
-                    background: '#000',
-                    cursor: 'ew-resize',
-                    zIndex: 40,
-                    pointerEvents: 'auto',
-                    touchAction: 'none',
-                  }}
-                />
-              ) : null}
             </div>
           </div>
         );
@@ -3626,6 +3586,61 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
       </div>
+      {!forExport && showTextResize && movableElements ? (
+        <button
+          type="button"
+          aria-label="Expandir a caixa de texto"
+          title="Clique para alargar o texto. Arraste para ajustar."
+          onPointerDown={(ev) => {
+            if (ev.button != null && ev.button !== 0) return;
+            ev.stopPropagation();
+            ev.preventDefault();
+            const block = textBlockRef.current;
+            const parent = block?.parentElement;
+            const parentW = parent?.clientWidth || 1;
+            const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
+            const basePct = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
+            textResize.current = {
+              pointerId: ev.pointerId,
+              startX: ev.clientX,
+              basePct,
+              parentW,
+              moved: false,
+            };
+            try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
+          }}
+          onPointerMove={(ev) => {
+            if (textResize.current && Math.abs(ev.clientX - textResize.current.startX) > 3) {
+              textResize.current.moved = true;
+            }
+            moveTextResize(ev);
+          }}
+          onPointerUp={(ev) => {
+            const drag = textResize.current;
+            const tapped = drag && !drag.moved;
+            const basePct = drag?.basePct;
+            endTextResize(ev);
+            if (tapped && basePct != null) onTextBlockWidthChange?.(slideIdx, Math.min(92, Math.max(24, basePct + 8)));
+          }}
+          onPointerCancel={endTextResize}
+          onClick={(ev) => ev.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 12,
+            bottom: 12,
+            zIndex: 50,
+            height: 32,
+            padding: '0 14px',
+            borderRadius: 999,
+            border: '1px solid #000',
+            background: '#fff',
+            color: '#000',
+            font: '600 13px/1 Inter, sans-serif',
+            cursor: 'pointer',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+          }}
+        >Expandir</button>
+      ) : null}
     </div>
   );
 });
