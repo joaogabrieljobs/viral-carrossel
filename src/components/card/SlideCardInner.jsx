@@ -1,7 +1,7 @@
 import { brandWithSlideLogo, LOGO_SIZE_DEFAULT } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Layout, Video, User } from 'lucide-react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { Layout, Minus, Plus, Video, User } from 'lucide-react';
 import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
@@ -9,6 +9,7 @@ import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { resolveSlideBrandBg } from '../../utils/brand-helpers.js';
 import { needsLightPhotoText } from '../../utils/style-kit-design.js';
 import { FORMATS } from '../../utils/formats.js';
+import { logoRenderPx, presentationReadingSurface } from '../../utils/format-view.js';
 import { AUTOFIT_MIN_SCALE, DARK_CREAM, getComposition } from '../../utils/slide-design-system.js';
 import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentationAdjustIsNeutral } from './FullscreenViewer.jsx';
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
@@ -566,6 +567,7 @@ const ClassicCanvasInner = React.forwardRef(({
   brandHeaderChrome = null,
   brandFooterChrome = null,
   f,
+  fmt = 'carrossel',
   slide,
   brand,
   bg,
@@ -1052,7 +1054,7 @@ const ClassicCanvasInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
+        const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
@@ -1093,6 +1095,7 @@ const ClassicCanvasInner = React.forwardRef(({
 const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   forExport = false,
   f,
+  fmt = 'carrossel',
   slide,
   brand,
   bg,
@@ -1537,7 +1540,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
+        const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
@@ -1637,27 +1640,49 @@ const SlideCardInner = React.forwardRef(({
     enabled: !!(movableElements && onElementOffsetChange),
     interactionScale: scale,
   });
-  const textResize = React.useRef(null);
   const textBlockRef = React.useRef(null);
+  const cardSurfaceRef = React.useRef(null);
   const onTextWidthRef = React.useRef(onTextBlockWidthChange);
   onTextWidthRef.current = onTextBlockWidthChange;
-  const endTextResize = React.useCallback((ev) => {
-    const drag = textResize.current;
-    textResize.current = null;
-    if (!drag) return;
-    ev?.stopPropagation?.();
-    try { ev?.currentTarget?.releasePointerCapture?.(drag.pointerId); } catch { /* ignore */ }
-  }, []);
-  const moveTextResize = React.useCallback((ev) => {
-    const drag = textResize.current;
-    if (!drag) return;
-    ev.stopPropagation();
-    if (ev.cancelable) ev.preventDefault();
-    const esc = Math.max(0.05, scale || 1);
-    const dx = (ev.clientX - drag.startX) / esc;
-    const next = Math.round(Math.max(24, Math.min(92, drag.basePct + (dx / drag.parentW) * 100)));
-    onTextWidthRef.current?.(slideIdx, next);
-  }, [scale, slideIdx]);
+  const [textNudgeBox, setTextNudgeBox] = React.useState(null);
+  const nudgeTextWidth = React.useCallback((delta) => {
+    const block = textBlockRef.current;
+    const parent = block?.parentElement;
+    const parentW = parent?.clientWidth || 1;
+    const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
+    const base = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
+    onTextWidthRef.current?.(slideIdx, Math.round(Math.min(92, Math.max(24, base + delta))));
+  }, [slide.textBlockWidth, slideIdx]);
+  useLayoutEffect(() => {
+    if (forExport || !showTextResize || !movableElements) {
+      setTextNudgeBox(null);
+      return undefined;
+    }
+    const measure = () => {
+      const block = textBlockRef.current;
+      const card = cardSurfaceRef.current;
+      if (!block || !card) return;
+      const blockBox = block.getBoundingClientRect();
+      const cardBox = card.getBoundingClientRect();
+      if (!cardBox.width || !blockBox.height) return;
+      const gap = 6;
+      const size = 26;
+      const clusterW = size * 2 + 4;
+      let left = blockBox.right - cardBox.left + gap;
+      let top = blockBox.top - cardBox.top + (blockBox.height - size) / 2;
+      if (left + clusterW > cardBox.width - 4) left = blockBox.left - cardBox.left - clusterW - gap;
+      left = Math.max(4, Math.min(left, cardBox.width - clusterW - 4));
+      top = Math.max(4, Math.min(top, cardBox.height - size - 4));
+      setTextNudgeBox((prev) => (
+        prev && Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5 ? prev : { left, top }
+      ));
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    if (textBlockRef.current) observer?.observe(textBlockRef.current);
+    if (cardSurfaceRef.current) observer?.observe(cardSurfaceRef.current);
+    return () => observer?.disconnect();
+  }, [forExport, showTextResize, movableElements, slide, scale]);
   /** Props de arrasto + deslocamento gravado, prontas para espalhar. */
   const mov = React.useCallback((chave, estiloBase) => {
     const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
@@ -1722,6 +1747,12 @@ const SlideCardInner = React.forwardRef(({
   }, [slideIdx]);
   const L = LAYOUTS.find(l=>l.id===slide.layout) || DEFAULT_LAYOUT;
   const bg = resolveSlideBrandBg(brand, slideIdx, slide);
+  const fmtSurface = presentationReadingSurface(
+    fmt,
+    bg,
+    slide.titleColor || brand.titleColor,
+    !!(slide.bgImage || slide.bgImageAssetId),
+  );
   const titleFF = getTextFont(slide, 'title', effectiveTitleFontFamily(brand));
   const bodyFF = effectiveBodyFontFamily(brand);
   const subtitleFF = getTextFont(slide, 'subtitle', effectiveSubtitleFontFamily(brand));
@@ -2452,7 +2483,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
+          const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
@@ -2798,7 +2829,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
+          const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
@@ -2861,6 +2892,7 @@ const SlideCardInner = React.forwardRef(({
       <ClassicCanvasInner
         ref={ref}
         f={f}
+        fmt={fmt}
         slide={slide}
         brand={brand}
         bg={bg}
@@ -2907,6 +2939,7 @@ const SlideCardInner = React.forwardRef(({
       <ClassicLegadoInsetPhotoColumn
         ref={ref}
         f={f}
+        fmt={fmt}
         forExport={forExport}
         slide={slide}
         brand={brand}
@@ -3191,7 +3224,7 @@ const SlideCardInner = React.forwardRef(({
         // O card root já tem overflow:hidden para a foto.
         const textoSemClip = textoDeslocado || !!slide.textBg;
         const textBlockWidth = Number.isFinite(slide.textBlockWidth)
-          ? Math.max(20, Math.min(90, slide.textBlockWidth))
+          ? Math.max(24, Math.min(92, slide.textBlockWidth))
           : null;
         return (
           <div style={{
@@ -3461,7 +3494,7 @@ const SlideCardInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
+        const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
@@ -3486,7 +3519,7 @@ const SlideCardInner = React.forwardRef(({
   const lightCultureOuter = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
   const outerBg = surfaceQuick
     ? (surfaceQuick === 'dark' ? cultureDarkBackdropFromBrand(brand.bg) : surfaceQuick === 'accent' ? (brand.accent || '#000000') : lightCultureOuter)
-    : bg;
+    : (fmtSurface || bg);
 
   const showSwipe = slide.showSwipeCue !== false
     && brand.showSwipeCue !== false
@@ -3503,6 +3536,7 @@ const SlideCardInner = React.forwardRef(({
 
   return (
     <div
+      ref={cardSurfaceRef}
       data-vc-card-surface={slide.id}
       onPointerDownCapture={onCreateText && !forExport ? (event) => {
         if (!event.ctrlKey || event.button !== 0) return;
@@ -3587,60 +3621,52 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
       </div>
-      {!forExport && showTextResize && movableElements ? (
-        <button
-          type="button"
-          aria-label="Expandir a caixa de texto"
-          title="Clique para alargar o texto. Arraste para ajustar."
-          onPointerDown={(ev) => {
-            if (ev.button != null && ev.button !== 0) return;
-            ev.stopPropagation();
-            ev.preventDefault();
-            const block = textBlockRef.current;
-            const parent = block?.parentElement;
-            const parentW = parent?.clientWidth || 1;
-            const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
-            const basePct = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
-            textResize.current = {
-              pointerId: ev.pointerId,
-              startX: ev.clientX,
-              basePct,
-              parentW,
-              moved: false,
-            };
-            try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
-          }}
-          onPointerMove={(ev) => {
-            if (textResize.current && Math.abs(ev.clientX - textResize.current.startX) > 3) {
-              textResize.current.moved = true;
-            }
-            moveTextResize(ev);
-          }}
-          onPointerUp={(ev) => {
-            const drag = textResize.current;
-            const tapped = drag && !drag.moved;
-            const basePct = drag?.basePct;
-            endTextResize(ev);
-            if (tapped && basePct != null) onTextBlockWidthChange?.(slideIdx, Math.min(92, Math.max(24, basePct + 8)));
-          }}
-          onPointerCancel={endTextResize}
-          onClick={(ev) => ev.stopPropagation()}
+      {!forExport && showTextResize && movableElements && textNudgeBox ? (
+        <div
           style={{
             position: 'absolute',
-            right: 12,
-            bottom: 12,
+            left: textNudgeBox.left,
+            top: textNudgeBox.top,
             zIndex: 50,
-            height: 32,
-            padding: '0 14px',
-            borderRadius: 999,
-            border: '1px solid #000',
-            background: '#fff',
-            color: '#000',
-            font: '600 13px/1 Inter, sans-serif',
-            cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+            display: 'flex',
+            flexDirection: 'row',
+            gap: 4,
           }}
-        >Expandir</button>
+        >
+          {[
+            { delta: -8, label: 'Diminuir a caixa de texto', Icon: Minus },
+            { delta: 8, label: 'Aumentar a caixa de texto', Icon: Plus },
+          ].map(({ delta, label, Icon }) => (
+            <button
+              key={label}
+              type="button"
+              aria-label={label}
+              title={label}
+              onPointerDown={(ev) => { ev.stopPropagation(); }}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+                nudgeTextWidth(delta);
+              }}
+              style={{
+                width: 26,
+                height: 26,
+                padding: 0,
+                borderRadius: 999,
+                border: '1px solid #000',
+                background: '#fff',
+                color: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.28)',
+              }}
+            >
+              <Icon size={14} strokeWidth={2.4} aria-hidden />
+            </button>
+          ))}
+        </div>
       ) : null}
     </div>
   );

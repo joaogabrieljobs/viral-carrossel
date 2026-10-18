@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, SlidersHorizontal, AlignLeft } from 'lucide-react';
 import { useScrollLock } from '../../hooks/useScrollLock.js';
 import { FORMATS } from '../../utils/formats.js';
+import { slideForFormatDisplay } from '../../utils/format-view.js';
 import { FULLSCREEN_IMG_ADJ_ROWS, FullscreenImageAdjustBar } from './FullscreenImageAdjustBar.jsx';
 import { SlideCard } from './SlideCard.jsx';
 
@@ -72,6 +73,7 @@ function FullscreenViewer({
   caption = '',
   setCaption = null,
   captionLabel = 'Legenda deste card',
+  formatViews = null,
 }) {
   useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
@@ -244,7 +246,7 @@ function FullscreenViewer({
       {/* Slide */}
       <div style={{ pointerEvents:'none' }}>
         <SlideCard
-          slide={activeSlideFs} fmt={fmt} brand={brand}
+          slide={slideForFormatDisplay(activeSlideFs, fmt, formatViews)} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
           creativePreset={creativePreset}
           showCanvasChrome={false}

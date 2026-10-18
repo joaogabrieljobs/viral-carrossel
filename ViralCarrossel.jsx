@@ -88,6 +88,7 @@ import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/libr
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
+import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1232,33 +1233,19 @@ export default function App() {
           && (brandNext.logo !== cur.logo || brandNext.logoImageId !== cur.logoImageId)) {
           brandNext.logoAssetId = null;
         }
-        return { ...d, brand: brandNext };
+        return applyBrandEdit(d, brandNext);
       }),
     [history],
   );
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
-    if (nextFmt === 'apresentacao') {
-      if (d.productKind === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
-        return { ...d, fmt: nextFmt };
-      }
-      return applyPresentationVisualPresetToDoc(
-        d,
-        DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
-        PRESENTATION_VISUAL_PRESETS,
-        { initialize: true },
-      );
-    }
-    if (d.fmt === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
-      return applyCarouselVisualPresetToDoc(
-        d,
-        DEFAULT_CAROUSEL_VISUAL_PRESET_ID,
-        VISUAL_PRESETS,
-        { fmt: nextFmt },
-      );
-    }
-    return { ...d, fmt: nextFmt, productKind: 'carrossel' };
+    if (nextFmt === d.fmt) return d;
+    return {
+      ...d,
+      fmt: nextFmt,
+      productKind: nextFmt === 'apresentacao' ? 'apresentacao' : 'carrossel',
+    };
   }), [history]);
 
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
@@ -3466,6 +3453,18 @@ export default function App() {
   }, [isMobile, vw, f, fmt, thumbQaMode]);
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
+  const displaySlides = useMemo(
+    () => slides.map((item) => slideForFormatDisplay(item, fmt, doc.formatViews)),
+    [slides, fmt, doc.formatViews],
+  );
+  const panelSlide = useMemo(
+    () => slideForFormatDisplay(slide, fmt, doc.formatViews),
+    [slide, fmt, doc.formatViews],
+  );
+  const displayBrand = useMemo(
+    () => brandForFormatDisplay(brand, fmt, doc.formatViews),
+    [brand, fmt, doc.formatViews],
+  );
   const empty = isDefault(slides);
 
   useEffect(() => {
@@ -3698,23 +3697,28 @@ export default function App() {
   );
 
   const updateSlide = useCallback(patch => {
-    setSlides(s => s.map((sl, i) => {
-      if (i !== activeIdx) return sl;
-      const next = { ...sl, ...patch };
+    history.set((d) => {
+      const next = applyFormatEdit(d, activeIdx, patch);
+      const before = d.slides?.[activeIdx];
+      const after = next.slides?.[activeIdx];
       const mayScaleZones =
         (patch.titleSize != null || patch.subSize != null || patch.bodyAfterSize != null) &&
-        !!next.canvas?.enabled &&
-        next.canvas?.zones &&
-        typeof next.canvas.zones === 'object';
-      if (!mayScaleZones) return next;
-      const cz = canvasZonesFontScalePatch(sl, next);
-      return cz ? { ...next, ...cz } : next;
-    }));
-  }, [activeIdx]);
+        !!after?.canvas?.enabled &&
+        after.canvas?.zones &&
+        typeof after.canvas.zones === 'object';
+      if (!mayScaleZones || !before) return next;
+      const cz = canvasZonesFontScalePatch(before, after);
+      if (!cz) return next;
+      return {
+        ...next,
+        slides: next.slides.map((item, i) => (i === activeIdx ? { ...item, ...cz } : item)),
+      };
+    });
+  }, [history, activeIdx]);
 
   const updateSlideAt = useCallback((idx, patch) => {
-    setSlides(s => s.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)));
-  }, []);
+    history.set((d) => applyFormatEdit(d, idx, patch));
+  }, [history]);
 
   const patchInlineTextAt = useCallback((idx, field, text) => {
     if (!field) return;
@@ -3754,30 +3758,28 @@ export default function App() {
   /** Novo deslocamento de um elemento do card (arrasto direto na pré-visualização). */
   const patchTextBlockWidthAt = useCallback((idx, percent) => {
     const width = Math.round(Math.max(24, Math.min(92, Number(percent) || 0)));
-    setSlides((prev) => prev.map((s, i) => (i === idx ? { ...s, textBlockWidth: width } : s)));
-  }, []);
+    history.set((d) => applyFormatEdit(d, idx, { textBlockWidth: width }));
+  }, [history]);
 
   const patchElementOffsetAt = useCallback((idx, chave, offset) => {
-    setSlides((prev) => prev.map((s, i) => (
-      i === idx
-        ? { ...s, elementOffsets: { ...(s.elementOffsets || {}), [chave]: offset } }
-        : s
-    )));
-  }, []);
+    history.set((d) => applyFormatEdit(d, idx, { elementOffsets: { [chave]: offset } }));
+  }, [history]);
 
   const patchCanvasZonesAt = useCallback((idx, zonePatch) => {
-    setSlides((prev) => {
-      const sl = prev[idx];
-      if (!sl?.canvas?.enabled || !sl.canvas.zones) return prev;
-      const nextZones = { ...sl.canvas.zones };
-      for (const [k, rect] of Object.entries(zonePatch)) {
+    history.set((d) => {
+      const sl = d.slides?.[idx];
+      if (!sl) return d;
+      const fmtKey = d.fmt && d.fmt !== 'carrossel' ? d.fmt : 'carrossel';
+      const saved = fmtKey !== 'carrossel' ? d.formatViews?.[fmtKey]?.slides?.[sl.id]?.canvas : null;
+      const canvas = saved || sl.canvas;
+      if (!canvas?.enabled || !canvas.zones) return d;
+      const nextZones = { ...canvas.zones };
+      for (const [k, rect] of Object.entries(zonePatch || {})) {
         if (rect && typeof rect === 'object') nextZones[k] = clampRect(rect);
       }
-      return prev.map((s, i) =>
-        i === idx ? { ...s, canvas: { ...s.canvas, zones: nextZones } } : s,
-      );
+      return applyFormatEdit(d, idx, { canvas: { ...canvas, zones: nextZones } });
     });
-  }, []);
+  }, [history]);
 
   const consumePhotoZoneFileForSlide = useCallback((slideIdx, file) => {
     if (!file) return;
@@ -4419,9 +4421,9 @@ export default function App() {
 
   /** Replica tamanhos, espaçamento e legibilidade do card ativo para todos os slides. */
   const applyTypographyToAllCards = useCallback(() => {
-    setSlides((list) => {
-      const src = list[activeIdx];
-      if (!src) return list;
+    history.set((d) => {
+      const src = slideForFormatDisplay(d.slides?.[activeIdx], d.fmt, d.formatViews);
+      if (!src) return d;
       const patch = {
         titleSize: src.titleSize ?? 100,
         subSize: src.subSize ?? 100,
@@ -4437,10 +4439,12 @@ export default function App() {
         textBgOpacity: src.textBgOpacity ?? 55,
         textInset: src.textInset ?? DEFAULT_SLIDE_TEXT_INSET,
       };
-      return list.map((sl) => ({ ...sl, ...patch }));
+      let next = d;
+      for (let i = 0; i < (d.slides || []).length; i += 1) next = applyFormatEdit(next, i, patch);
+      return next;
     });
     toast('Tipografia deste card aplicada a todos os slides', 'success');
-  }, [activeIdx, setSlides, toast]);
+  }, [activeIdx, history, toast]);
 
   const applyBrandTypographyToAllSlides = useCallback(() => {
     const patch = typographyPatchFromBrand(brand);
@@ -5992,7 +5996,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     // hookLibrary em si só é lido pelo GenerateModal — não entra aqui.
     setHookLibrary, niche,
     onOpenResults: () => setResultsOpen(true),
-    slide, slides, activeIdx, brand, setBrand, updateSlide,
+    slide: panelSlide, slides, activeIdx, brand: displayBrand, setBrand, updateSlide,
     setSlides,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption,
@@ -6597,11 +6601,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
             html2canvas captura SEMPRE estes elementos — nunca os preview escalados,
             que distorcem o resultado por causa do `transform: scale()` aplicado. */}
         <div data-vc-export-tree style={{ position:'fixed', left:'-99999px', top:0, pointerEvents:'none', opacity:0, zIndex:-1 }} aria-hidden>
-          {slides.map((s,i)=>(
+          {displaySlides.map((s,i)=>(
             <SlideCard
               key={`exp-${s.id}`}
               ref={el=>slideRefs.current[s.id]=el}
-              slide={s} fmt={fmt} brand={brand} num={i+1} total={slides.length} scale={1}
+              slide={s} fmt={fmt} brand={displayBrand} num={i+1} total={slides.length} scale={1}
               creativePreset={creativePreset}
               showCanvasChrome={false}
               forExport
@@ -6979,15 +6983,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   }}
                 >
                   <SlideCard
-                    slide={slide}
+                    slide={displaySlides[activeIdx] || slide}
                     fmt={fmt}
-                    brand={brand}
+                    brand={displayBrand}
                     num={activeIdx+1}
                     total={slides.length}
                     scale={previewScale}
                     creativePreset={creativePreset}
                     slideIndex={activeIdx}
-                    showCanvasChrome={canvasEditMode && !!(slide.canvas?.enabled && slide.canvas?.zones)}
+                    showCanvasChrome={canvasEditMode && !!((displaySlides[activeIdx] || slide).canvas?.enabled && (displaySlides[activeIdx] || slide).canvas?.zones)}
                     onCanvasZonePatch={patchCanvasZonesAt}
                     onPhotoZoneRequest={openPhotoZoneImport}
                     onPhotoZoneNativeFile={handlePhotoZoneNativeFile}
@@ -7261,7 +7265,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     Seu plano não inclui imagens. Os cards saem com um padrão visual de texto. Faça upgrade ou use sua chave em Configurar IA.
                   </p>
                 )}
-                {slides.map((s,i)=>(
+                {displaySlides.map((s,i)=>(
                   <div
                     key={s.id}
                     ref={(el) => { boardCardRefs.current[i] = el; }}
@@ -7294,7 +7298,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       <SlideCard
                         slide={s}
                         fmt={fmt}
-                        brand={brand}
+                        brand={displayBrand}
                         num={i+1}
                         total={slides.length}
                         scale={previewScale}
@@ -7738,7 +7742,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       />
       <PhotoPositionModal
         open={photoPositionOpen}
-        slide={slide}
+        slide={panelSlide}
         fmt={fmt}
         onClose={() => setPhotoPositionOpen(false)}
         onChange={(patch) => updateSlide(patch)}
@@ -7768,7 +7772,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
       />
       <FullscreenViewer
         open={fullscreenOpen} onClose={()=>setFullscreenOpen(false)}
-        slides={slides} fmt={fmt} brand={brand}
+        slides={slides} fmt={fmt} brand={displayBrand}
+        formatViews={doc.formatViews}
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
         creativePreset={creativePreset}
