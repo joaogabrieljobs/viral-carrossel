@@ -1,7 +1,7 @@
 import { brandWithSlideLogo, LOGO_SIZE_DEFAULT } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { Layout, Minus, Plus, Video, User } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Layout, Video, User } from 'lucide-react';
 import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
@@ -1584,7 +1584,7 @@ const SlideCardInner = React.forwardRef(({
   selectedElement = null,
   /** `(slideIdx, percent) => void` — largura do bloco de texto, em % da área útil. */
   onTextBlockWidthChange = null,
-  /** Mostra − e + neste card (o card ativo do quadro). */
+  /** Mostra o botão Expandir neste card (o card ativo do quadro). */
   showTextResize = false,
 }, ref) => {
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
@@ -1637,54 +1637,27 @@ const SlideCardInner = React.forwardRef(({
     enabled: !!(movableElements && onElementOffsetChange),
     interactionScale: scale,
   });
+  const textResize = React.useRef(null);
   const textBlockRef = React.useRef(null);
-  const cardSurfaceRef = React.useRef(null);
   const onTextWidthRef = React.useRef(onTextBlockWidthChange);
   onTextWidthRef.current = onTextBlockWidthChange;
-  const [textNudgeBox, setTextNudgeBox] = React.useState(null);
-  const nudgeTextWidth = React.useCallback((delta) => {
-    const block = textBlockRef.current;
-    const parent = block?.parentElement;
-    const parentW = parent?.clientWidth || 1;
-    const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
-    const base = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
-    onTextWidthRef.current?.(slideIdx, Math.round(Math.min(92, Math.max(24, base + delta))));
-  }, [slide.textBlockWidth, slideIdx]);
-  useLayoutEffect(() => {
-    if (forExport || !showTextResize || !movableElements) {
-      setTextNudgeBox(null);
-      return undefined;
-    }
-    const measure = () => {
-      const block = textBlockRef.current;
-      const card = cardSurfaceRef.current;
-      if (!block || !card) return;
-      const blockBox = block.getBoundingClientRect();
-      const cardBox = card.getBoundingClientRect();
-      if (!cardBox.width || !blockBox.height) return;
-      const gap = 6;
-      const size = 26;
-      const clusterW = size * 2 + 4;
-      const clusterH = size;
-      let left = blockBox.right - cardBox.left + gap;
-      let top = blockBox.top - cardBox.top + (blockBox.height - clusterH) / 2;
-      if (left + clusterW > cardBox.width - 4) {
-        left = blockBox.left - cardBox.left - clusterW - gap;
-      }
-      left = Math.max(4, Math.min(left, cardBox.width - clusterW - 4));
-      top = Math.max(4, Math.min(top, cardBox.height - clusterH - 4));
-      setTextNudgeBox((prev) => (
-        prev && Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5
-          ? prev
-          : { left, top }
-      ));
-    };
-    measure();
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
-    if (textBlockRef.current) observer?.observe(textBlockRef.current);
-    if (cardSurfaceRef.current) observer?.observe(cardSurfaceRef.current);
-    return () => observer?.disconnect();
-  }, [forExport, showTextResize, movableElements, slide, scale]);
+  const endTextResize = React.useCallback((ev) => {
+    const drag = textResize.current;
+    textResize.current = null;
+    if (!drag) return;
+    ev?.stopPropagation?.();
+    try { ev?.currentTarget?.releasePointerCapture?.(drag.pointerId); } catch { /* ignore */ }
+  }, []);
+  const moveTextResize = React.useCallback((ev) => {
+    const drag = textResize.current;
+    if (!drag) return;
+    ev.stopPropagation();
+    if (ev.cancelable) ev.preventDefault();
+    const esc = Math.max(0.05, scale || 1);
+    const dx = (ev.clientX - drag.startX) / esc;
+    const next = Math.round(Math.max(24, Math.min(92, drag.basePct + (dx / drag.parentW) * 100)));
+    onTextWidthRef.current?.(slideIdx, next);
+  }, [scale, slideIdx]);
   /** Props de arrasto + deslocamento gravado, prontas para espalhar. */
   const mov = React.useCallback((chave, estiloBase) => {
     const hidden = Array.isArray(slide.hiddenElements) && slide.hiddenElements.includes(chave);
@@ -3253,7 +3226,7 @@ const SlideCardInner = React.forwardRef(({
               maxWidth: textBlockWidth == null ? '92%' : '100%',
             })}
               {...(selectedElement === 'text' && !forExport ? {
-                title: 'Use − e + ao lado da caixa para ajustar a área do texto',
+                title: 'Arraste a alça da direita para aumentar a área do texto',
               } : {})}
             >
               {/* Star ornament (8-pontas) — usado em presets como Case Study Neon.
@@ -3530,7 +3503,6 @@ const SlideCardInner = React.forwardRef(({
 
   return (
     <div
-      ref={cardSurfaceRef}
       data-vc-card-surface={slide.id}
       onPointerDownCapture={onCreateText && !forExport ? (event) => {
         if (!event.ctrlKey || event.button !== 0) return;
@@ -3615,54 +3587,60 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
       </div>
-      {!forExport && showTextResize && movableElements && textNudgeBox ? (
-        <div
+      {!forExport && showTextResize && movableElements ? (
+        <button
+          type="button"
+          aria-label="Expandir a caixa de texto"
+          title="Clique para alargar o texto. Arraste para ajustar."
+          onPointerDown={(ev) => {
+            if (ev.button != null && ev.button !== 0) return;
+            ev.stopPropagation();
+            ev.preventDefault();
+            const block = textBlockRef.current;
+            const parent = block?.parentElement;
+            const parentW = parent?.clientWidth || 1;
+            const measured = ((block?.offsetWidth || parentW) / parentW) * 100;
+            const basePct = Number.isFinite(slide.textBlockWidth) ? slide.textBlockWidth : measured;
+            textResize.current = {
+              pointerId: ev.pointerId,
+              startX: ev.clientX,
+              basePct,
+              parentW,
+              moved: false,
+            };
+            try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
+          }}
+          onPointerMove={(ev) => {
+            if (textResize.current && Math.abs(ev.clientX - textResize.current.startX) > 3) {
+              textResize.current.moved = true;
+            }
+            moveTextResize(ev);
+          }}
+          onPointerUp={(ev) => {
+            const drag = textResize.current;
+            const tapped = drag && !drag.moved;
+            const basePct = drag?.basePct;
+            endTextResize(ev);
+            if (tapped && basePct != null) onTextBlockWidthChange?.(slideIdx, Math.min(92, Math.max(24, basePct + 8)));
+          }}
+          onPointerCancel={endTextResize}
+          onClick={(ev) => ev.stopPropagation()}
           style={{
             position: 'absolute',
-            left: textNudgeBox.left,
-            top: textNudgeBox.top,
+            right: 12,
+            bottom: 12,
             zIndex: 50,
-            display: 'flex',
-            flexDirection: 'row',
-            gap: 4,
+            height: 32,
+            padding: '0 14px',
+            borderRadius: 999,
+            border: '1px solid #000',
+            background: '#fff',
+            color: '#000',
+            font: '600 13px/1 Inter, sans-serif',
+            cursor: 'pointer',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
           }}
-        >
-          {[
-            { delta: -8, label: 'Diminuir a caixa de texto', Icon: Minus },
-            { delta: 8, label: 'Aumentar a caixa de texto', Icon: Plus },
-          ].map(({ delta, label, Icon }) => (
-            <button
-              key={label}
-              type="button"
-              aria-label={label}
-              title={label}
-              onPointerDown={(ev) => {
-                ev.stopPropagation();
-              }}
-              onClick={(ev) => {
-                ev.stopPropagation();
-                ev.preventDefault();
-                nudgeTextWidth(delta);
-              }}
-              style={{
-                width: 26,
-                height: 26,
-                padding: 0,
-                borderRadius: 999,
-                border: '1px solid #000',
-                background: '#fff',
-                color: '#000',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.28)',
-              }}
-            >
-              <Icon size={14} strokeWidth={2.4} aria-hidden />
-            </button>
-          ))}
-        </div>
+        >Expandir</button>
       ) : null}
     </div>
   );

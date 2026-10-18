@@ -1239,12 +1239,26 @@ export default function App() {
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
-    if (nextFmt === d.fmt) return d;
-    return {
-      ...d,
-      fmt: nextFmt,
-      productKind: nextFmt === 'apresentacao' ? 'apresentacao' : 'carrossel',
-    };
+    if (nextFmt === 'apresentacao') {
+      if (d.productKind === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
+        return { ...d, fmt: nextFmt };
+      }
+      return applyPresentationVisualPresetToDoc(
+        d,
+        DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
+        PRESENTATION_VISUAL_PRESETS,
+        { initialize: true },
+      );
+    }
+    if (d.fmt === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
+      return applyCarouselVisualPresetToDoc(
+        d,
+        DEFAULT_CAROUSEL_VISUAL_PRESET_ID,
+        VISUAL_PRESETS,
+        { fmt: nextFmt },
+      );
+    }
+    return { ...d, fmt: nextFmt, productKind: 'carrossel' };
   }), [history]);
 
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
