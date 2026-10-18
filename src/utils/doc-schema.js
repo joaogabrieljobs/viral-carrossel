@@ -14,6 +14,7 @@ import { normalizeOverlays } from './card-overlays.js';
 import { LOGO_SIZE_DEFAULT, LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 import { normalizePresentationPath } from './presentation.js';
 import { resolvePresentationVisualPresetDefinition } from '../styles/presentation-presets.jsx';
+import { repairLeakedFormat } from './format-views.js';
 
 /** Logos ≤140px na escala 1080 ficavam ilegíveis / “fora” do preview. */
 function coerceReadableLogoSize(size) {
@@ -368,7 +369,7 @@ function ensureDocShape(d) {
   else out.shareCode = out.shareCode.trim().toUpperCase().slice(0, 12);
   out.shareRevision = Number.isFinite(Number(out.shareRevision)) ? Number(out.shareRevision) : 0;
   out.shareUpdatedAt = Number.isFinite(Number(out.shareUpdatedAt)) ? Number(out.shareUpdatedAt) : 0;
-  return out;
+  return repairLeakedFormat(out);
 }
 
 export {

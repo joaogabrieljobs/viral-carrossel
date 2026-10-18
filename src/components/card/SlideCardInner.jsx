@@ -1,4 +1,4 @@
-import { brandWithSlideLogo, logoBoxPx } from '../../utils/slide-logo.js';
+import { brandWithSlideLogo, LOGO_SIZE_DEFAULT } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Layout, Minus, Plus, Video, User } from 'lucide-react';
@@ -219,58 +219,6 @@ const LAYOUTS = [
 ];
 /** Fallback de layout quando o slide tem id inválido / legacy — middle-center é o mais neutro. */
 const DEFAULT_LAYOUT = LAYOUTS.find(l => l.id === 'mc') || LAYOUTS[4];
-
-function logoOverlapsZone(zone, f, pos, margin, sizePx) {
-  if (!zone) return false;
-  const zLeft = (zone.x / 100) * f.w;
-  const zRight = zLeft + ((zone.w || 0) / 100) * f.w;
-  let logoLeft = margin;
-  if (String(pos).endsWith('r')) logoLeft = f.w - margin - sizePx;
-  else if (String(pos).endsWith('c')) logoLeft = (f.w - sizePx) / 2;
-  const logoRight = logoLeft + sizePx;
-  return zLeft < logoRight - 8 && zRight > logoLeft + 8;
-}
-
-/** Empurra título e subtítulo para baixo da logo quando os dois ocupam o mesmo canto. */
-function clearClassicZonesForLogo(title, subtitle, f, brand) {
-  if (!brand?.logo) return { title, subtitle };
-  const pos = brand.logoPosition || 'tr';
-  if (!pos.startsWith('t')) return { title, subtitle };
-  const margin = f.w * 0.045;
-  const sizePx = logoBoxPx(f, brand.logoSize);
-  if (!logoOverlapsZone(title, f, pos, margin, sizePx)) return { title, subtitle };
-  const reservePct = ((margin + sizePx * 0.72 + f.h * 0.012) / f.h) * 100;
-  if (title.y >= reservePct - 0.4) return { title, subtitle };
-  const shift = reservePct - title.y;
-  const bottom = 92;
-  let nextTitle = { ...title, y: title.y + shift };
-  let nextSub = { ...subtitle, y: subtitle.y + shift };
-  let overflow = nextSub.y + nextSub.h - bottom;
-  if (overflow > 0) {
-    const takeSub = Math.min(overflow, Math.max(0, nextSub.h - 8));
-    nextSub = { ...nextSub, h: nextSub.h - takeSub };
-    overflow -= takeSub;
-    if (overflow > 0) nextTitle = { ...nextTitle, h: Math.max(8, nextTitle.h - overflow) };
-    nextSub = { ...nextSub, y: Math.min(nextSub.y, bottom - nextSub.h) };
-    if (nextTitle.y + nextTitle.h > nextSub.y - 1) {
-      nextTitle = { ...nextTitle, h: Math.max(8, nextSub.y - 1 - nextTitle.y) };
-    }
-  }
-  return { title: nextTitle, subtitle: nextSub };
-}
-
-/** Título no topo começa abaixo da logo, para os dois não dividirem a mesma linha. */
-function textTopPadPx(f, slide, brand, inset) {
-  const base = f.h * (0.09 + inset * 0.003);
-  if (!brand?.logo) return base;
-  const pos = brand.logoPosition || 'tr';
-  const layout = String(slide?.layout || '');
-  const side = (id) => (id.endsWith('l') ? 'l' : id.endsWith('r') ? 'r' : 'c');
-  if (!pos.startsWith('t') || !layout.startsWith('t')) return base;
-  if (side(layout) !== side(pos) && side(layout) !== 'c' && side(pos) !== 'c') return base;
-  const margin = f.w * 0.045;
-  return Math.max(base, margin + logoBoxPx(f, brand.logoSize) * 0.72 + f.h * 0.012);
-}
 
 /** Região da foto no layout clássico (sem canvas / sem sanduíche cultura). */
 const PHOTO_REGION_IDS = new Set(['full', 'inset_h_top', 'inset_h_middle', 'inset_h_bottom', 'inset_h_narrow_mid']);
@@ -693,14 +641,8 @@ const ClassicCanvasInner = React.forwardRef(({
     ? subtitleTypography.italic === true
     : brand.subtitleItalic === true;
   const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
-  const clearedType = clearClassicZonesForLogo(
-    clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title),
-    clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle),
-    f,
-    brand,
-  );
-  const tr = clampRect(clearedType.title);
-  const sr = clampRect(clearedType.subtitle);
+  const tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
+  const sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
   const shadow = slide.textShadow !== false
     ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
     : 'none';
@@ -1110,7 +1052,7 @@ const ClassicCanvasInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = logoBoxPx(f, brand.logoSize);
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
@@ -1595,7 +1537,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = logoBoxPx(f, brand.logoSize);
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
@@ -2537,7 +2479,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = logoBoxPx(f, brand.logoSize);
+          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
@@ -2883,7 +2825,7 @@ const SlideCardInner = React.forwardRef(({
         {brand.logo && (() => {
           const pos = brand.logoPosition || 'tr';
           const margin = f.w * 0.045;
-          const sizePx = logoBoxPx(f, brand.logoSize);
+          const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
@@ -3256,7 +3198,7 @@ const SlideCardInner = React.forwardRef(({
       {(() => {
         const inset = (slide.textInset ?? DEFAULT_SLIDE_TEXT_INSET);
         const padH = f.w * (0.04 + inset * 0.004);
-        const padVTop = textTopPadPx(f, slide, brand, inset);
+        const padVTop = f.h * (0.09 + inset * 0.003);
         const padVBot = Math.max(
           f.h * (0.06 + inset * 0.003),
           vcFooterOrnamentReservePx(brand, f),
@@ -3546,7 +3488,7 @@ const SlideCardInner = React.forwardRef(({
         const handleAtTop = brand.showHandle;
         const pos = brand.logoPosition || 'tr';
         const margin = f.w * 0.045;
-        const sizePx = logoBoxPx(f, brand.logoSize);
+        const sizePx = (brand.logoSize ?? LOGO_SIZE_DEFAULT) * (f.w / 1080);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer

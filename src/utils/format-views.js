@@ -145,6 +145,57 @@ function deriveCarouselFormat(doc, prevFmt, nextFmt) {
   };
 }
 
+function leakedSlide(slide) {
+  return slide?.canvas?.source === 'presentation-preset'
+    || !!slide?.presentationComposition
+    || !!slide?.presentationCompositionId;
+}
+
+function snapshotLeaked(view) {
+  return (view?.slides || []).some((item) => leakedSlide({
+    canvas: item?.visual?.canvas,
+    presentationComposition: item?.visual?.presentationComposition,
+    presentationCompositionId: item?.visual?.presentationCompositionId,
+  }));
+}
+
+function stripLeakedSlide(slide) {
+  if (!leakedSlide(slide)) return slide;
+  const next = { ...slide };
+  if (next.canvas?.source === 'presentation-preset') delete next.canvas;
+  for (const key of [
+    'presentationStageId', 'presentationStageLabel', 'presentationVisualRole',
+    'presentationPresetId', 'presentationComposition', 'presentationCompositionId',
+    'presentationLayout', 'titlePosition', 'imagePosition',
+  ]) delete next[key];
+  return next;
+}
+
+/**
+ * A troca de proporção chegou a gravar a composição da apresentação em cima
+ * dos cards do feed. Se ainda existe um retrato anterior sem essa composição,
+ * ele volta. Sem retrato, só sai o fundo que a apresentação encaixou.
+ */
+export function repairLeakedFormat(doc) {
+  if (!doc || doc.fmt === 'apresentacao') return doc;
+  const leaked = (doc.slides || []).some(leakedSlide);
+  if (!leaked && !doc.formatViews) return doc;
+  if (!leaked) return { ...doc, formatViews: undefined };
+  const views = doc.formatViews || {};
+  const candidates = [doc.fmt, 'carrossel', 'quadrado', 'stories']
+    .map((key) => views[key])
+    .filter((view) => view && !snapshotLeaked(view));
+  if (candidates[0]) {
+    const restored = applyFormatView(doc, candidates[0]);
+    return { ...restored, formatViews: undefined };
+  }
+  return {
+    ...doc,
+    formatViews: undefined,
+    slides: (doc.slides || []).map(stripLeakedSlide),
+  };
+}
+
 /** Troca a proporção e guarda o ajuste de cada uma. O outro formato volta como estava. */
 export function switchDocFormat(doc, nextFmt) {
   const source = doc && typeof doc === 'object' ? doc : {};

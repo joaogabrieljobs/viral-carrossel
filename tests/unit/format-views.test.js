@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FORMATS } from '../../src/utils/formats.js';
-import { logoBoxPx } from '../../src/utils/slide-logo.js';
-import { surfaceForReadableText, switchDocFormat } from '../../src/utils/format-views.js';
+import { repairLeakedFormat, surfaceForReadableText } from '../../src/utils/format-views.js';
 
 const doc = {
   fmt: 'carrossel',
@@ -24,52 +22,58 @@ const doc = {
   }],
 };
 
-describe('cada proporção guarda o próprio ajuste', () => {
+describe('o feed recupera o ajuste anterior', () => {
   it('escolhe fundo escuro quando o texto da marca é claro', () => {
     expect(surfaceForReadableText('#f7f7f5', '#f7f4ef')).toBe('#161616');
     expect(surfaceForReadableText('#f7f7f5', '#1a1a1a')).toBe('#f7f7f5');
   });
 
-  it('a apresentação não reescreve o carrossel', () => {
-    const presentation = switchDocFormat(doc, 'apresentacao');
-    expect(presentation.fmt).toBe('apresentacao');
-    expect(presentation.brand.bg).toBe('#161616');
-    expect(presentation.brand.titleColor).toBe('#f7f4ef');
-    expect(presentation.brand.name).toBe('Janine');
-    expect(presentation.slides[0].title).toBe(doc.slides[0].title);
-    expect(presentation.slides[0].bgImage).toBe('data:image/png,foto');
-    expect(presentation.slides[0].canvas?.zones?.title).toBeTruthy();
-
-    presentation.slides[0].titleSize = 64;
-    presentation.slides[0].title = 'Título editado na apresentação';
-
-    const back = switchDocFormat(presentation, 'carrossel');
-    expect(back.fmt).toBe('carrossel');
-    expect(back.brand.bg).toBe('#f4efe8');
-    expect(back.creativePreset).toBe('livre');
-    expect(back.slides[0].titleSize).toBe(100);
-    expect(back.slides[0].layout).toBe('tl');
-    expect(back.slides[0].title).toBe('Título editado na apresentação');
-    expect(back.slides[0].canvas).toBeUndefined();
-
-    const again = switchDocFormat(back, 'apresentacao');
-    expect(again.brand.bg).toBe('#161616');
-    expect(again.slides[0].titleSize).toBe(64);
-    expect(again.slides[0].title).toBe('Título editado na apresentação');
+  it('devolve layout, fundo e tamanho guardados antes da apresentação', () => {
+    const damaged = {
+      ...doc,
+      brand: { ...doc.brand, bg: '#f7f7f5' },
+      formatViews: {
+        carrossel: {
+          brand: { bg: '#f4efe8', logoSize: 260 },
+          creativePreset: 'livre',
+          productKind: 'carrossel',
+          slides: [{
+            id: 's1',
+            visual: { layout: 'tl', titleSize: 100, align: 'left' },
+            overlays: [{ id: 'cta', x: 22, y: 78 }],
+          }],
+        },
+      },
+      slides: [{
+        ...doc.slides[0],
+        layout: 'ml',
+        titleSize: 64,
+        canvas: { source: 'presentation-preset', variant: 'classic', zones: { title: { x: 6, y: 18, w: 40, h: 20 } } },
+        presentationComposition: 'cover',
+      }],
+    };
+    const restored = repairLeakedFormat(damaged);
+    expect(restored.brand.bg).toBe('#f4efe8');
+    expect(restored.slides[0].layout).toBe('tl');
+    expect(restored.slides[0].titleSize).toBe(100);
+    expect(restored.slides[0].canvas).toBeUndefined();
+    expect(restored.slides[0].title).toBe(doc.slides[0].title);
+    expect(restored.slides[0].bgImage).toBe('data:image/png,foto');
+    expect(restored.formatViews).toBeUndefined();
   });
 
-  it('o quadrado não altera o tamanho salvo no feed', () => {
-    const square = switchDocFormat(doc, 'quadrado');
-    expect(square.slides[0].titleSize).toBeLessThan(100);
-    const feed = switchDocFormat(square, 'carrossel');
-    expect(feed.slides[0].titleSize).toBe(100);
-    expect(feed.brand.bg).toBe('#f4efe8');
-  });
-});
-
-describe('logo na apresentação', () => {
-  it('fica pequena no 16:9 e no tamanho do feed no 4:5', () => {
-    expect(logoBoxPx(FORMATS.apresentacao, 260)).toBeLessThan(110);
-    expect(logoBoxPx(FORMATS.carrossel, 260)).toBe(260);
+  it('tira o fundo da apresentação mesmo sem retrato anterior', () => {
+    const damaged = {
+      ...doc,
+      slides: [{
+        ...doc.slides[0],
+        canvas: { source: 'presentation-preset', zones: { photo: { x: 50, y: 0, w: 50, h: 100 } } },
+        presentationCompositionId: 'executive-cover',
+      }],
+    };
+    const restored = repairLeakedFormat(damaged);
+    expect(restored.slides[0].canvas).toBeUndefined();
+    expect(restored.slides[0].presentationCompositionId).toBeUndefined();
+    expect(restored.slides[0].bgImage).toBe('data:image/png,foto');
   });
 });

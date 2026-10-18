@@ -88,7 +88,6 @@ import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/libr
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
-import { switchDocFormat } from './src/utils/format-views.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1240,7 +1239,12 @@ export default function App() {
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
-    return switchDocFormat(d, nextFmt);
+    if (nextFmt === d.fmt) return d;
+    return {
+      ...d,
+      fmt: nextFmt,
+      productKind: nextFmt === 'apresentacao' ? 'apresentacao' : 'carrossel',
+    };
   }), [history]);
 
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
