@@ -1,5 +1,5 @@
 /**
- * Cliente de partilha de projeto entre contas da equipa.
+ * Cliente de partilha de projeto entre contas da equipe.
  * Ao publicar: embute fotos (data URL) a partir do IndexedDB.
  * Ao entrar/puxar: grava essas fotos de volta no IndexedDB local.
  *
@@ -400,7 +400,7 @@ async function adoptShareLogo(dataUrl) {
 }
 
 /**
- * Depois de puxar da equipa: data URLs / fotos do dono da partilha → IndexedDB local.
+ * Depois de puxar da equipe: data URLs / fotos do dono da partilha → IndexedDB local.
  * O ID do asset fica na conta de quem publicou; nesta conta ele é apagado
  * para o editor não o procurar no Blob errado.
  */
@@ -459,7 +459,7 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
           bgImage: null,
           bgImageFailed: true,
           bgImageForeign: true,
-          bgImageError: 'A foto da equipa não chegou. Puxe as alterações novamente.',
+          bgImageError: 'A foto da equipe não chegou. Puxe as alterações novamente.',
         };
       }
       return forgetForeignAsset({ ...sl, bgImage: null });
@@ -502,7 +502,7 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
           ...forgetForeignAsset(sl),
           bgImage: null,
           bgImageFailed: true,
-          bgImageError: 'Falha ao abrir imagem da equipa',
+          bgImageError: 'Falha ao abrir imagem da equipe',
         };
       }
     }
@@ -569,8 +569,8 @@ async function shareRequest(payload, { method = 'POST', code, asset, part } = {}
     if (res.status === 404) {
       throw new Error(
         typeof data?.error === 'string'
-          ? `${data.error} Crie um link novo em «Criar link para a equipa» (códigos antigos podem ter falhado ao gravar).`
-          : 'Código inválido ou expirado. Peça um link novo à equipa.',
+          ? `${data.error} Crie um link novo em «Criar link para a equipe» (códigos antigos podem ter falhado ao gravar).`
+          : 'Código inválido ou expirado. Peça um link novo à equipe.',
       );
     }
     const errMsg = typeof data?.error === 'string'

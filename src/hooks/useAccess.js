@@ -553,9 +553,9 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         setLandingOpen(false);
         if (!session.active && !loginStatus && !billing && !pendingShare) setPaywallOpen(true);
       }
-      // Link de equipa sem sessão: pede login (não paywall genérico).
+      // Link de equipe sem sessão: pede login (não paywall genérico).
       if (pendingShare && !session.active) {
-        setLoginHint('Entre na sua conta Moont para abrir o projeto da equipa.');
+        setLoginHint('Entre na sua conta Moont para abrir o projeto da equipe.');
         setLoginOpen(true);
         setPaywallOpen(false);
         setLandingOpen(false);

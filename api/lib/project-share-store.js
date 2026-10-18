@@ -1,5 +1,5 @@
 /**
- * Armazenamento de projetos partilhados entre contas/equipas.
+ * Armazenamento de projetos partilhados entre contas/equipes.
  * Preferência: Upstash Redis (docs leves) → Vercel Blob privado (docs com fotos).
  * O store Blob do projeto é privado — `access: 'public'` falhava com "fetch failed".
  */

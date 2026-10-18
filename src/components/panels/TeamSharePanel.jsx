@@ -9,7 +9,7 @@ import {
 } from '../../utils/project-share.js';
 
 /**
- * Partilha o projeto actual com a equipa (código + link ?share=).
+ * Partilha o projeto actual com a equipe (código + link ?share=).
  * Requer sessão activa. Publicar inclui fotos dos cards; ao entrar/puxar abrem no browser.
  */
 export function TeamSharePanel({
@@ -42,7 +42,7 @@ export function TeamSharePanel({
       if (text) toast?.(text, tone, 4500);
       return result;
     } catch (e) {
-      toast?.(e?.message || 'Não foi possível sincronizar com a equipa.', 'error', 6000);
+      toast?.(e?.message || 'Não foi possível sincronizar com a equipe.', 'error', 6000);
       return null;
     } finally {
       setBusy(false);
@@ -54,7 +54,7 @@ export function TeamSharePanel({
     if (!url) return false;
     try {
       await navigator.clipboard.writeText(url);
-      if (announce) toast?.('Link de convite copiado. Envie à equipa.', 'success', 3500);
+      if (announce) toast?.('Link de convite copiado. Envie à equipe.', 'success', 3500);
       return true;
     } catch {
       if (announce) toast?.(url, 'info', 8000);
@@ -81,10 +81,10 @@ export function TeamSharePanel({
         fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
         letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
       }}>
-        Equipa · mesmo projeto
+        Equipe · mesmo projeto
       </div>
       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Envie o <strong>link</strong> à equipa. Quem abrir entra com a conta Moont e o projeto
+        Envie o <strong>link</strong> à equipe. Quem abrir entra com a conta Moont e o projeto
         aparece na biblioteca. Depois: <strong>Publicar</strong> / <strong>Puxar alterações</strong>.
       </p>
 
@@ -128,8 +128,8 @@ export function TeamSharePanel({
                   return `Publicado. ${n} foto${n === 1 ? '' : 's'} não entrou${n === 1 ? '' : 'ram'} nesta publicação.`;
                 }
                 return res?.packedImages
-                  ? `Publicado com ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} para a equipa.`
-                  : 'Alterações publicadas para a equipa.';
+                  ? `Publicado com ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} para a equipe.`
+                  : 'Alterações publicadas para a equipe.';
               })}
               style={{
                 minHeight: 40, padding: '0 14px', borderRadius: 9999, border: 'none',
@@ -163,7 +163,7 @@ export function TeamSharePanel({
                     tone: 'warning',
                   };
                 }
-                return 'Projeto e imagens actualizados a partir da equipa.';
+                return 'Projeto e imagens actualizados a partir da equipe.';
               })}
               style={{ minHeight: 40, fontSize: 12 }}
             >
@@ -201,12 +201,12 @@ export function TeamSharePanel({
                 ? ` ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} não entrou${res.imagesOmitted === 1 ? '' : 'ram'} nesta publicação.`
                 : '';
               if (res?.packedImages) {
-                return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}.${omitted} Envie à equipa.`;
+                return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}.${omitted} Envie à equipe.`;
               }
               if (res?.imagesOmitted) {
-                return `Link copiado.${omitted} Envie à equipa e peça para puxar as alterações.`;
+                return `Link copiado.${omitted} Envie à equipe e peça para puxar as alterações.`;
               }
-              return 'Link de convite copiado. Envie à equipa.';
+              return 'Link de convite copiado. Envie à equipe.';
             })}
             style={{
               minHeight: 44, borderRadius: 9999, border: 'none',
@@ -215,7 +215,7 @@ export function TeamSharePanel({
             }}
           >
             {busy ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Users size={14} />}
-            Criar link para a equipa
+            Criar link para a equipe
           </button>
         </div>
       )}
@@ -223,7 +223,7 @@ export function TeamSharePanel({
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           className="vc-input"
-          aria-label="Código da equipa para entrar"
+          aria-label="Código da equipe para entrar"
           placeholder="Ou cole o código (ex.: AB12CD34)"
           value={joinCode}
           disabled={busy}

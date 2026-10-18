@@ -3700,7 +3700,7 @@ function SidebarContent({
             </S>
 
             <S
-              title="Equipa"
+              title="Equipe"
               hint="Envie o link de convite; a outra conta abre e o projeto entra na biblioteca."
             >
               <TeamSharePanel

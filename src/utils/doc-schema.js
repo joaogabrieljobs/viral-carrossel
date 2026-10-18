@@ -253,7 +253,7 @@ const DEFAULT_DOC = {
   quickCardCount: 'auto',
   /** Mantém todo texto e toda foto dentro das áreas ao terminar uma geração. */
   autoAdjustOnGenerate: true,
-  /** Código de partilha com a equipa (sync servidor). */
+  /** Código de partilha com a equipe (sync servidor). */
   shareCode: '',
   shareRevision: 0,
   shareUpdatedAt: 0,

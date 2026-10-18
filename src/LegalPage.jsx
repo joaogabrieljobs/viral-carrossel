@@ -17,7 +17,7 @@ const PAGES = {
       },
       {
         heading: 'O que você cria',
-        body: 'Projetos, textos, briefing, marcas e logos ficam associados à sua conta. As fotos ficam num armazenamento privado dessa conta. Um código de equipa permite que outra conta com assinatura leia aquele projeto e as fotos referenciadas nele. A outra conta não passa a ver o resto da sua biblioteca.',
+        body: 'Projetos, textos, briefing, marcas e logos ficam associados à sua conta. As fotos ficam num armazenamento privado dessa conta. Um código de equipe permite que outra conta com assinatura leia aquele projeto e as fotos referenciadas nele. A outra conta não passa a ver o resto da sua biblioteca.',
       },
       {
         heading: 'Integração com o Codex',
@@ -29,7 +29,7 @@ const PAGES = {
       },
       {
         heading: 'Os seus pedidos',
-        body: 'Você pode pedir acesso, correção ou exclusão dos dados associados ao e-mail com que entra no Moont. O pedido identifica essa conta. Esta página não publica um e-mail de contato separado. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipa.',
+        body: 'Você pode pedir acesso, correção ou exclusão dos dados associados ao e-mail com que entra no Moont. O pedido identifica essa conta. Esta página não publica um e-mail de contato separado. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
       },
     ],
   },
@@ -44,11 +44,11 @@ const PAGES = {
       },
       {
         heading: 'A sua conta',
-        body: 'A conta é pessoal ou da organização que a contratou. Você é responsável pelo e-mail, pela senha e pelos tokens que criar. Não compartilhe a senha. Um código de equipa entrega o projeto ligado a esse código a quem o usar com uma assinatura ativa.',
+        body: 'A conta é pessoal ou da organização que a contratou. Você é responsável pelo e-mail, pela senha e pelos tokens que criar. Não compartilhe a senha. Um código de equipe entrega o projeto ligado a esse código a quem o usar com uma assinatura ativa.',
       },
       {
         heading: 'O que você publica',
-        body: 'Textos, marcas, logos e fotos que você envia continuam seus. Você confirma que tem o direito de usar esse material no Moont e de partilhá-lo com a equipa quando gera um código. O Moont não reivindica a autoria das peças.',
+        body: 'Textos, marcas, logos e fotos que você envia continuam seus. Você confirma que tem o direito de usar esse material no Moont e de partilhá-lo com a equipe quando gera um código. O Moont não reivindica a autoria das peças.',
       },
       {
         heading: 'Pagamento',

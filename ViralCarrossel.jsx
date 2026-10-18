@@ -4125,7 +4125,7 @@ export default function App() {
       shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
-    const name = String(payload.name || '').trim() || 'Projeto da equipa';
+    const name = String(payload.name || '').trim() || 'Projeto da equipe';
     let targetId = null;
     let created = false;
     let queuedEntry = null;
@@ -4180,8 +4180,8 @@ export default function App() {
     } else {
       toast(
         created
-          ? `Projeto da equipa adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`
-          : `Projeto da equipa actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`,
+          ? `Projeto da equipe adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`
+          : `Projeto da equipe actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`,
         failed ? 'warning' : 'success',
         5000,
       );
@@ -4213,7 +4213,7 @@ export default function App() {
       } catch (e) {
         shareInviteInFlight.current = '';
         if (!cancelled) {
-          toast(e?.message || 'Não foi possível abrir o link da equipa.', 'error', 6000);
+          toast(e?.message || 'Não foi possível abrir o link da equipe.', 'error', 6000);
         }
       }
     })();
