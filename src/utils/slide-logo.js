@@ -6,6 +6,15 @@ export const LOGO_SIZE_MIN = 48;
 export const LOGO_SIZE_MAX = 900;
 /** Default antigo (120) saía minúsculo no preview Stories / Feed. */
 export const LOGO_SIZE_DEFAULT = 260;
+
+/** Caixa da logo no card. No 16:9 a largura dobraria a marca; o limite usa a altura. */
+export function logoBoxPx(frame, logoSize) {
+  const w = frame?.w || 1080;
+  const h = frame?.h || 1350;
+  const raw = (logoSize ?? LOGO_SIZE_DEFAULT) * (w / 1080);
+  const cap = w > h ? h * 0.085 : h * 0.2;
+  return Math.min(raw, cap);
+}
 /** Tamanho forçado em todo import novo (não herda valor antigo minúsculo). */
 export const LOGO_SIZE_IMPORT = 300;
 /** Limita o custo do PNG portátil quando o IndexedDB está indisponível. */

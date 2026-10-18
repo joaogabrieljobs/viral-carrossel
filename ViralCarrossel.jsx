@@ -88,6 +88,7 @@ import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/libr
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
+import { switchDocFormat } from './src/utils/format-views.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1239,26 +1240,7 @@ export default function App() {
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
-    if (nextFmt === 'apresentacao') {
-      if (d.productKind === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
-        return { ...d, fmt: nextFmt };
-      }
-      return applyPresentationVisualPresetToDoc(
-        d,
-        DEFAULT_PRESENTATION_VISUAL_PRESET_ID,
-        PRESENTATION_VISUAL_PRESETS,
-        { initialize: true },
-      );
-    }
-    if (d.fmt === 'apresentacao' && isApresentacaoPreset(d.creativePreset)) {
-      return applyCarouselVisualPresetToDoc(
-        d,
-        DEFAULT_CAROUSEL_VISUAL_PRESET_ID,
-        VISUAL_PRESETS,
-        { fmt: nextFmt },
-      );
-    }
-    return { ...d, fmt: nextFmt, productKind: 'carrossel' };
+    return switchDocFormat(d, nextFmt);
   }), [history]);
 
   const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
