@@ -93,4 +93,24 @@ describe('image-quota memory', () => {
     expect(again.allowed).toBe(true);
     expect(again.used).toBe(1);
   });
+
+  it('repete o mesmo operationId sem descontar outro crédito', async () => {
+    const args = {
+      customerId: 'cus_d',
+      periodStartSec: 1000,
+      periodEndSec: 2000,
+      limit: 2,
+      operationId: 'generation-1',
+    };
+    const first = await consumeImageCredit(args);
+    const replay = await consumeImageCredit(args);
+    expect(first.allowed).toBe(true);
+    expect(first.used).toBe(1);
+    expect(replay).toMatchObject({ allowed: false, replayed: true, reason: 'already_reserved' });
+    const usage = await getQuotaUsage(args);
+    expect(usage.used).toBe(1);
+    await refundImageCredit({ customerId: 'cus_d', periodStartSec: 1000, operationId: 'generation-1' });
+    await refundImageCredit({ customerId: 'cus_d', periodStartSec: 1000, operationId: 'generation-1' });
+    expect((await getQuotaUsage(args)).used).toBe(0);
+  });
 });

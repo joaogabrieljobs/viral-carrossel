@@ -78,8 +78,12 @@ export async function consumeOcrCredit({ customerId, now = Date.now(), operation
     }
   }
 
-  // Último recurso: permite a função continuar com um teto conservador por
-  // instância. O rate limit do endpoint continua ativo e reduz abuso óbvio.
+  // Produção sem contador partilhado não pode contar 12 por instância.
+  if (production()) {
+    return { allowed: false, reason: 'unavailable', used: null, limit };
+  }
+
+  // Fora de produção, um teto local deixa o teste e o dev seguirem.
   const effectiveLimit = production() ? Math.min(limit, DEGRADED_OCR_DAILY_LIMIT) : limit;
   const used = (memory.get(key) || 0) + 1;
   if (used > effectiveLimit) return { allowed: false, reason: 'exhausted', used: effectiveLimit, limit: effectiveLimit, degraded: production() };

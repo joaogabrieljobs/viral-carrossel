@@ -359,13 +359,15 @@ const FETCH_SOURCE_API = '/api/fetch-source';
 
 /** Servidor (Vite dev ou Netlify) devolve JSON { text } — evita CORS do browser. */
 async function fetchPlainTextFromUrl(url) {
-  const qp = new URLSearchParams({ url });
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 22000);
   try {
-    const res = await fetch(`${FETCH_SOURCE_API}?${qp}`, {
-      signal: ctl.signal,
+    const res = await fetch(FETCH_SOURCE_API, {
+      method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: ctl.signal,
     });
     const ct = (res.headers.get('content-type') || '').toLowerCase();
     const j =

@@ -37,7 +37,9 @@ export function TeamSharePanel({
     try {
       const result = await fn();
       const msg = typeof okMsg === 'function' ? okMsg(result) : okMsg;
-      if (msg) toast?.(msg, 'success', 4500);
+      const text = msg && typeof msg === 'object' ? msg.text : msg;
+      const tone = msg && typeof msg === 'object' ? (msg.tone || 'success') : 'success';
+      if (text) toast?.(text, tone, 4500);
       return result;
     } catch (e) {
       toast?.(e?.message || 'Não foi possível sincronizar com a equipa.', 'error', 6000);
@@ -122,7 +124,8 @@ export function TeamSharePanel({
                 return res;
               }, (res) => {
                 if (res?.imagesOmitted) {
-                  return `Publicado. ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} grande${res.imagesOmitted === 1 ? '' : 's'} a outra conta lê ao puxar.`;
+                  const n = res.imagesOmitted;
+                  return `Publicado. ${n} foto${n === 1 ? '' : 's'} não entrou${n === 1 ? '' : 'ram'} nesta publicação.`;
                 }
                 return res?.packedImages
                   ? `Publicado com ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} para a equipa.`
@@ -142,14 +145,26 @@ export function TeamSharePanel({
               disabled={busy}
               onClick={() => run(async () => {
                 const res = await pullProjectShare(activeCode);
-                await onDocPulled(res);
+                const pulled = await onDocPulled(res);
                 onShareLinked({
                   code: res.code,
                   revision: res.revision,
                   updatedAt: res.updatedAt,
                 });
-                return res;
-              }, 'Projeto e imagens actualizados a partir da equipa.')}
+                return pulled || res;
+              }, (res) => {
+                const failed = Number(res?.failed) || 0;
+                if (res?.queued === false) {
+                  return { text: 'Projeto aberto neste editor. A fila da conta não confirmou. Salve para enviar.', tone: 'warning' };
+                }
+                if (failed) {
+                  return {
+                    text: `Projeto actualizado. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}. Puxe de novo.`,
+                    tone: 'warning',
+                  };
+                }
+                return 'Projeto e imagens actualizados a partir da equipa.';
+              })}
               style={{ minHeight: 40, fontSize: 12 }}
             >
               Puxar alterações
@@ -183,7 +198,7 @@ export function TeamSharePanel({
               return res;
             }, (res) => {
               const omitted = res?.imagesOmitted
-                ? ` ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} grande${res.imagesOmitted === 1 ? '' : 's'} entra${res.imagesOmitted === 1 ? '' : 'm'} quando a outra conta puxar.`
+                ? ` ${res.imagesOmitted} foto${res.imagesOmitted === 1 ? '' : 's'} não entrou${res.imagesOmitted === 1 ? '' : 'ram'} nesta publicação.`
                 : '';
               if (res?.packedImages) {
                 return `Link copiado · ${res.packedImages} foto${res.packedImages === 1 ? '' : 's'} incluída${res.packedImages === 1 ? '' : 's'}.${omitted} Envie à equipa.`;

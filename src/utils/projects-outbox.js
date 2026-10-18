@@ -139,9 +139,12 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         // atualiza a cópia durável, mas não a retira da revisão.
         const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
           ? 'review_put_deleted' : kind;
+        const keepsEntry = effectiveKind === 'put'
+          || effectiveKind === 'review_put_deleted'
+          || effectiveKind === 'review_put_billing';
         const op = {
           key, owner: ownerId, projectId, kind: effectiveKind,
-          entry: effectiveKind === 'put' || effectiveKind === 'review_put_deleted' ? entry : null,
+          entry: keepsEntry ? entry : null,
           // Edits sucessivos conservam a versão do primeiro envio ainda pendente.
           // Uma exclusão em revisão só pode ser repetida por escolha explícita
           // do usuário, com a versão atual que a UI acabou de observar.
@@ -277,13 +280,38 @@ function markPutForReview(ownerId, sentOp, cloudVersion) {
       try {
         assertActiveOwner(ownerId);
         const current = read.result;
-        if (!current || (current.kind !== 'put' && current.kind !== 'review_put_deleted')) {
+        if (!current || (current.kind !== 'put' && current.kind !== 'review_put_deleted' && current.kind !== 'review_put_billing')) {
           setResult(false);
           return;
         }
         store.put({
           ...current, kind: 'review_put_deleted',
           reviewVersion: Number.isSafeInteger(cloudVersion) ? cloudVersion : null,
+          projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
+          updatedAt: Date.now(),
+        });
+        setResult(true);
+      } catch (error) { fail(error); }
+    };
+  });
+}
+
+/** Assinatura recusada não é exclusão. O próximo envio tenta de novo. */
+function markPutForBilling(ownerId, sentOp) {
+  assertActiveOwner(ownerId);
+  return transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(operationKey(ownerId, sentOp.projectId));
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        const current = read.result;
+        if (!current || (current.kind !== 'put' && current.kind !== 'review_put_billing')) {
+          setResult(false);
+          return;
+        }
+        store.put({
+          ...current,
+          kind: 'review_put_billing',
           projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
           updatedAt: Date.now(),
         });
@@ -377,25 +405,25 @@ export async function verifyProjectOutboxOwner(ownerId, { signal } = {}) {
 
 async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
   assertActiveOwner(ownerId);
+  const isPut = op.kind === 'put' || op.kind === 'review_put_billing';
   try {
-    return op.kind === 'put'
+    return isPut
       ? await putProject(op.entry, { baseVersion: op.baseVersion, signal, expectedOwnerId, opId: op.opId })
       : await deleteProject(op.projectId, { baseVersion: op.baseVersion, signal, expectedOwnerId, opId: op.opId });
   } catch (error) {
-    if (op.kind === 'put' && isProjectDeletedConflict(error)) {
+    if (isPut && isProjectDeletedConflict(error)) {
       return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
     }
-    // Assinatura vencida é permanente nesta sessão. Parar a fila aqui
-    // impediria o boot de enviar os outros projetos.
+    // Assinatura recusada não pode parecer exclusão nem parar os outros projetos.
     if (error?.status === 402) {
-      return { id: op.projectId, needsReviewPut: true, cloudVersion: op.baseVersion };
+      return { id: op.projectId, billingDeferred: true };
     }
     if (!isProjectConflict(error)) throw error;
     assertActiveOwner(ownerId);
     const remote = await getProject(op.projectId, { signal, expectedOwnerId });
     // A resposta do primeiro envio pode ter se perdido. Comparar a versão
     // atual permite reconhecer o mesmo PUT/DELETE sem reenviar e duplicar.
-    if (op.kind === 'put' && remote && remote.version === op.baseVersion + 1
+    if (isPut && remote && remote.version === op.baseVersion + 1
       && sameSavedEntry(op.entry, remote.entry)) {
       return remote;
     }
@@ -405,10 +433,10 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
     }
     // Compatibilidade com servidores que ainda devolvem 409 genérico para
     // um tombstone: GET 404 nunca permite recuperar o PUT como cópia.
-    if (op.kind === 'put' && !remote) {
+    if (isPut && !remote) {
       return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
     }
-    if (op.kind === 'put') {
+    if (isPut) {
       const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
       assertActiveOwner(ownerId);
       return { id: op.projectId, recoveredCopy };
@@ -430,43 +458,55 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
     throw outboxError('Limite de sincronização inválido.', 'project_bad_limit');
   }
   const expectedOwnerId = await verifyProjectOutboxOwner(ownerId, { signal });
-  const operations = (await listPendingProjectOps(ownerId)).slice(0, maxOperations);
   let sent = 0;
   const recoveries = [];
-  for (const snapshot of operations) {
-    if (signal?.aborted) throw outboxError('Sincronização cancelada.', 'project_sync_aborted');
-    assertActiveOwner(ownerId);
-    const op = await getPendingProjectOp(ownerId, snapshot.projectId);
-    if (!op || op.opId !== snapshot.opId) continue;
-    if (op.kind === 'review_delete' || op.kind === 'review_put_deleted') continue;
-    const result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
-    assertActiveOwner(ownerId);
-    if (result.recoveredCopy) {
-      await settleRecoveredPut(ownerId, op);
-      recoveries.push(result.recoveredCopy);
+  let queue = (await listPendingProjectOps(ownerId))
+    .filter((op) => op.kind !== 'review_delete' && op.kind !== 'review_put_deleted');
+  for (let round = 0; round < 20 && queue.length; round += 1) {
+    const operations = queue.slice(0, maxOperations);
+    queue = queue.slice(maxOperations);
+    for (const snapshot of operations) {
+      if (signal?.aborted) throw outboxError('Sincronização cancelada.', 'project_sync_aborted');
+      assertActiveOwner(ownerId);
+      const op = await getPendingProjectOp(ownerId, snapshot.projectId);
+      if (!op || op.opId !== snapshot.opId) continue;
+      if (op.kind === 'review_delete' || op.kind === 'review_put_deleted') continue;
+      const result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
+      assertActiveOwner(ownerId);
+      if (result.billingDeferred) {
+        await markPutForBilling(ownerId, op);
+        queue = queue.filter((item) => item.projectId !== op.projectId);
+        continue;
+      }
+      if (result.recoveredCopy) {
+        await settleRecoveredPut(ownerId, op);
+        recoveries.push(result.recoveredCopy);
+        sent += 1;
+        continue;
+      }
+      if (result.needsReview) {
+        await markDeleteForReview(ownerId, op, result.needsReview);
+        continue;
+      }
+      if (result.needsReviewPut) {
+        await markPutForReview(ownerId, op, result.cloudVersion);
+        continue;
+      }
+      if (!Number.isSafeInteger(result?.version) || result.version < 0) {
+        throw outboxError('A nuvem não confirmou a versão do projeto.', 'project_bad_response');
+      }
+      await acknowledgeProjectOp(ownerId, op, result.version);
       sent += 1;
-      continue;
     }
-    if (result.needsReview) {
-      await markDeleteForReview(ownerId, op, result.needsReview);
-      continue;
-    }
-    if (result.needsReviewPut) {
-      await markPutForReview(ownerId, op, result.cloudVersion);
-      continue;
-    }
-    if (!Number.isSafeInteger(result?.version) || result.version < 0) {
-      throw outboxError('A nuvem não confirmou a versão do projeto.', 'project_bad_response');
-    }
-    await acknowledgeProjectOp(ownerId, op, result.version);
-    sent += 1;
   }
   const remaining = await listPendingProjectOps(ownerId);
   const needsReview = remaining.filter((op) => op.kind === 'review_delete'
-    || op.kind === 'review_put_deleted').map((op) => ({
+    || op.kind === 'review_put_deleted'
+    || op.kind === 'review_put_billing').map((op) => ({
     projectId: op.projectId, projectName: op.projectName || '',
-    reviewVersion: op.reviewVersion,
+    ...(op.reviewVersion != null ? { reviewVersion: op.reviewVersion } : {}),
     ...(op.kind === 'review_put_deleted' ? { kind: 'put_deleted' } : {}),
+    ...(op.kind === 'review_put_billing' ? { kind: 'put_billing' } : {}),
   }));
   return {
     sent, pending: remaining.length,

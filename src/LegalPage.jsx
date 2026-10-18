@@ -29,7 +29,7 @@ const PAGES = {
       },
       {
         heading: 'Os seus pedidos',
-        body: 'Você pode pedir acesso, correção ou exclusão dos dados da conta a partir do e-mail com que entra no Moont, pelo canal de suporte da assinatura. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipa.',
+        body: 'Você pode pedir acesso, correção ou exclusão dos dados associados ao e-mail com que entra no Moont. O pedido identifica essa conta. Esta página não publica um e-mail de contato separado. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipa.',
       },
     ],
   },

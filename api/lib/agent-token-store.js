@@ -30,6 +30,10 @@ function fail(status, code, message) {
 const subscriptionCache = new Map();
 const SUBSCRIPTION_CACHE_MS = 45_000;
 
+export function clearAgentSubscriptionCache() {
+  subscriptionCache.clear();
+}
+
 async function cachedActiveSubscription(ownerId) {
   const hit = subscriptionCache.get(ownerId);
   if (hit && hit.until > Date.now()) return hit.active;

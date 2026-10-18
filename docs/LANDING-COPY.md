@@ -57,7 +57,7 @@ Contexto por projeto; escolha texto/imagens; oito modos + Nenhum; oito tons; log
 
 **Headline:** Escolha pelo seu ritmo de criação.
 
-**Body:** Texto com IA incluso em todos os planos. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.
+**Body:** Texto com IA incluso em todos os planos, com limite de ritmo por minuto e sem uma cota mensal como a das imagens. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.
 
 | Plano | Preço mensal | Imagens inclusas |
 | --- | --- | --- |

@@ -14,6 +14,7 @@ import { stripeQuotaGet, stripeQuotaConsume, stripeQuotaRefund } from './quota-s
 import { isUpstashDisabled } from './upstash-config.js';
 
 const memory = new Map();
+const imageOps = new Map();
 
 /** Tecto por instância no último recurso (não-prod / testes). Em prod falha fechado. */
 export const DEGRADED_FALLBACK_CAP = 25;
@@ -142,6 +143,20 @@ async function memoryDecr(key) {
   return next;
 }
 
+function imageOperationKey(customerId, periodStartSec, operationId) {
+  const id = String(operationId || '');
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(id)) return '';
+  return `vc:imgop:${customerId}:${periodStartSec || 'nop'}:${id}`;
+}
+
+function replayResult(status, used) {
+  return {
+    replayed: true,
+    reason: `already_${status || 'reserved'}`,
+    used: Number(used) || 0,
+  };
+}
+
 /**
  * Leitura de migração: toma o maior contador persistente entre Upstash e Stripe.
  * Se qualquer fonte configurada não responder, não presume que o saldo é zero.
@@ -209,31 +224,56 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
   }
   const key = quotaKey(customerId, periodStartSec);
   const ttl = ttlSeconds(periodEndSec);
+  const opKey = imageOperationKey(customerId, periodStartSec, operationId);
 
   let degraded = false;
-  const used = Number(await withQuotaStore(
+  const raw = await withQuotaStore(
     async () => {
+      if (opKey) {
+        const reserved = await upstash(['SET', opKey, 'reserved', 'NX', 'EX', String(ttl)]);
+        if (reserved !== 'OK') {
+          const status = await upstash(['GET', opKey]);
+          const usedNow = Number(await upstash(['GET', key])) || 0;
+          return replayResult(status, usedNow);
+        }
+      }
       const next = Number(await upstash(['INCR', key])) || 0;
       if (next === 1) await upstash(['EXPIRE', key, ttl]);
       if (next > cap) {
         await upstash(['DECR', key]);
+        if (opKey) await upstash(['DEL', opKey]);
         return next; // caller vê > cap
       }
       return next;
     },
     async ({ degraded: isDegraded } = {}) => {
       degraded = !!isDegraded;
+      if (opKey && imageOps.has(opKey)) {
+        return replayResult(imageOps.get(opKey), memory.get(key) || 0);
+      }
       const effectiveCap = isDegraded ? Math.min(cap, DEGRADED_FALLBACK_CAP) : cap;
       const next = await memoryIncr(key);
       if (next > effectiveCap) {
         await memoryDecr(key);
         return cap + 1;
       }
+      if (opKey) imageOps.set(opKey, 'reserved');
       return next;
     },
-    async () => stripeQuotaConsume({ customerId, periodStartSec, cap }),
+    async () => stripeQuotaConsume({ customerId, periodStartSec, cap, operationId: opKey ? operationId : undefined }),
     customerId,
-  )) || 0;
+  );
+  if (raw && typeof raw === 'object' && raw.replayed) {
+    return {
+      allowed: false,
+      replayed: true,
+      reason: raw.reason,
+      used: raw.used,
+      limit: cap,
+      remaining: Math.max(0, cap - raw.used),
+    };
+  }
+  const used = Number(raw) || 0;
 
   if (used > cap) {
     return {
@@ -262,14 +302,25 @@ export async function refundImageCredit({ customerId, periodStartSec, operationI
     return refundImageCreditPostgres({ customerId, periodStartSec, operationId });
   }
   const key = quotaKey(customerId, periodStartSec);
+  const opKey = imageOperationKey(customerId, periodStartSec, operationId);
   return withQuotaStore(
     async () => {
+      if (opKey) {
+        const status = await upstash(['GET', opKey]);
+        if (status === 'refunded') return Number(await upstash(['GET', key])) || 0;
+      }
       const n = Number(await upstash(['DECR', key])) || 0;
       if (n < 0) await upstash(['SET', key, '0']);
+      if (opKey) await upstash(['SET', opKey, 'refunded', 'EX', String(ttlSeconds(0))]);
       return Math.max(0, n);
     },
-    async () => memoryDecr(key),
-    async () => stripeQuotaRefund({ customerId, periodStartSec }),
+    async () => {
+      if (opKey && imageOps.get(opKey) === 'refunded') return memory.get(key) || 0;
+      const next = await memoryDecr(key);
+      if (opKey && imageOps.has(opKey)) imageOps.set(opKey, 'refunded');
+      return next;
+    },
+    async () => stripeQuotaRefund({ customerId, periodStartSec, operationId: opKey ? operationId : undefined }),
     customerId,
   );
 }
@@ -284,6 +335,7 @@ export async function settleImageCredit({ customerId, periodStartSec, operationI
 /** Só testes. */
 export function resetMemoryQuotas() {
   memory.clear();
+  imageOps.clear();
 }
 
 export function isUpstashConfigured() {

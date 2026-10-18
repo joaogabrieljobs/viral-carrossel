@@ -50,11 +50,18 @@ export function getAppUrl(_req) {
  * A escolha é feita somente entre hosts próprios conhecidos, nunca a partir
  * de um Host arbitrário fornecido pelo pedido.
  */
+const BILLING_RETURN_HOSTS = new Set([
+  'moont.ai',
+  'www.moont.ai',
+  'moont.com.br',
+  'www.moont.com.br',
+  'viralcarrossel.com.br',
+  'www.viralcarrossel.com.br',
+]);
+
 export function getBillingReturnUrl(req) {
   const host = String(req?.headers?.host || '').trim().toLowerCase().replace(/:443$/, '');
-  if (host === 'viralcarrossel.com.br' || host === 'www.viralcarrossel.com.br') {
-    return `https://${host}`;
-  }
+  if (BILLING_RETURN_HOSTS.has(host)) return `https://${host}`;
   return getAppUrl();
 }
 

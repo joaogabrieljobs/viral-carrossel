@@ -473,7 +473,10 @@ export async function getSharedProject(code) {
         const res = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
         if (res.ok) {
           const legacy = await res.json();
-          if (!shareExpired(legacy)) return legacy;
+          if (!shareExpired(legacy)) {
+            try { await putBlobPrivate(pathname, JSON.stringify(legacy)); } catch { /* a leitura antiga continua válida */ }
+            return legacy;
+          }
         }
       }
     } catch { /* ignore */ }

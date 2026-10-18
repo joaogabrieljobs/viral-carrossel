@@ -443,6 +443,24 @@ export async function handleLogout(req, res) {
       } catch (e) {
         console.error('[auth/logout] revoke', e?.message || e);
         revocationError = 'revocation_failed';
+        for (let attempt = 0; attempt < 2 && !sessionsRevoked; attempt += 1) {
+          try {
+            if (accountIdentityBackendEnabled()) {
+              await revokeAccountSessions(access.customerId);
+            } else {
+              await getStripe().customers.update(access.customerId, {
+                metadata: {
+                  vc_session_revoked_before: String(Date.now()),
+                  vc_identity_epoch: crypto.randomBytes(16).toString('hex'),
+                },
+              });
+            }
+            sessionsRevoked = true;
+            revocationError = null;
+          } catch (retryError) {
+            console.error('[auth/logout] revoke retry', retryError?.message || retryError);
+          }
+        }
       }
     }
   } catch (e) {

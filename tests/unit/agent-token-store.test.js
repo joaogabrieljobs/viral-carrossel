@@ -20,6 +20,7 @@ vi.mock('../../api/lib/account-identity-postgres.js', () => ({
 
 import {
   authenticateAgentRequest,
+  clearAgentSubscriptionCache,
   createAgentToken,
   listAgentTokens,
   revokeAgentToken,
@@ -39,6 +40,7 @@ const row = {
 };
 
 beforeEach(() => {
+  clearAgentSubscriptionCache();
   vi.clearAllMocks();
   deps.billingDisabled.mockReturnValue(false);
   deps.identityBackend.mockReturnValue(false);

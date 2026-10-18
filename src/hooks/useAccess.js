@@ -500,12 +500,19 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             const deletedProjectEdits = outboxReceipt?.needsReview?.filter(
               (review) => review.kind === 'put_deleted',
             ) || [];
-            const deleteReviews = (outboxReceipt?.needsReview?.length || 0) - deletedProjectEdits.length;
+            const billingProjectEdits = outboxReceipt?.needsReview?.filter(
+              (review) => review.kind === 'put_billing',
+            ) || [];
+            const deleteReviews = (outboxReceipt?.needsReview?.length || 0)
+              - deletedProjectEdits.length - billingProjectEdits.length;
             if (deleteReviews) {
               toast?.(`${deleteReviews} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
             }
             if (deletedProjectEdits.length) {
               toast?.(`${deletedProjectEdits.length} edição(ões) locais de projeto excluído em outro dispositivo foram preservadas neste navegador para revisão. Nada foi recriado na conta.`, 'warning', 9000);
+            }
+            if (billingProjectEdits.length) {
+              toast?.(`${billingProjectEdits.length} edição(ões) continuam neste navegador porque a assinatura não confirmou o envio.`, 'warning', 7500);
             }
           } catch (error) {
             if (!cancelled && (sessionStillOwnsData()

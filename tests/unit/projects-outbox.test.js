@@ -229,9 +229,16 @@ describe('outbox durável por projeto', () => {
     const receipt = await flushProjectOutbox(ALICE);
     expect(receipt.sent).toBe(1);
     expect(receipt.needsReview).toEqual([{
-      kind: 'put_deleted', projectId: 'bloqueado', projectName: '', reviewVersion: 0,
+      kind: 'put_billing', projectId: 'bloqueado', projectName: '',
     }]);
     expect(await getPendingProjectOp(ALICE, 'livre')).toBeNull();
+    expect(await getPendingProjectOp(ALICE, 'bloqueado')).toMatchObject({ kind: 'review_put_billing' });
+
+    fetch.mockResolvedValueOnce(session()).mockResolvedValueOnce(json({
+      ok: true, project: { id: 'bloqueado', version: 1 },
+    }));
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(await getPendingProjectOp(ALICE, 'bloqueado')).toBeNull();
   });
 
   it('não recria projeto tombstonado: preserva a edição local para revisão e libera o boot', async () => {

@@ -8,7 +8,7 @@ export default function LandingPlans({ onEnter, onLogin, isMobile }) {
       <style>{`.vc-landing-plans-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } @media (max-width: 1050px) { .vc-landing-plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } } @media (max-width: 600px) { .vc-landing-plans-grid { grid-template-columns: 1fr; } }`}</style>
       <p style={{ margin: '0 0 8px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Quatro planos. O studio completo.</p>
       <h2 id="landing-plans-title" style={{ margin: '0 0 16px', fontSize: isMobile ? 28 : 36, fontFamily: 'var(--font-display)', letterSpacing: '-0.024em', lineHeight: 1.15 }}>Escolha pelo seu ritmo de criação.</h2>
-      <p style={{ color: 'var(--text-secondary)', maxWidth: '64ch', margin: '0 0 28px', lineHeight: 1.5 }}>Texto com IA incluso em todos os planos. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.</p>
+      <p style={{ color: 'var(--text-secondary)', maxWidth: '64ch', margin: '0 0 28px', lineHeight: 1.5 }}>Texto com IA incluso em todos os planos, com limite de ritmo por minuto e sem uma cota mensal como a das imagens. Para gerar imagens sem configurar uma chave própria, escolha Criador, Pro ou Max.</p>
       <div className="vc-landing-plans-grid">
         {PLAN_ORDER.map(id => {
           const plan = PLAN_TIERS[id];

@@ -1717,8 +1717,11 @@ export default function App() {
     // reaplicar o mesmo doc com outro updatedAt durante o pull.
     clearTimeout(docAutosaveTimerRef.current);
     const agora = Date.now();
+    const liveDoc = editorSyncStateRef.current?.activeDocId === activeDocId
+      ? editorSyncStateRef.current.doc
+      : doc;
     const lib = (libraryPersistRef.current || []).map((e) => (
-      e.id === activeDocId && e.doc !== doc ? { ...e, doc, updatedAt: agora } : e
+      e.id === activeDocId && e.doc !== liveDoc ? { ...e, doc: liveDoc, updatedAt: agora } : e
     ));
     libraryPersistRef.current = lib;
     const saved = [
@@ -2025,6 +2028,9 @@ export default function App() {
         const stillPending = await outbox.getPendingProjectOp(owner, entry.id);
         if (stillPending?.kind === 'review_put_deleted') {
           throw new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua neste navegador e precisa de revisão antes de salvar.');
+        }
+        if (stillPending?.kind === 'review_put_billing') {
+          throw new Error('A assinatura não confirmou este envio. A edição continua neste editor.');
         }
         if (stillPending) {
           throw new Error('O projeto ficou na fila local. Sincronize quando a conexão voltar.');
@@ -4031,12 +4037,28 @@ export default function App() {
   }, [activeProductKind, brand, setCaption, setSlides, toast]);
 
   const handleTeamShareLinked = useCallback((meta) => {
+    const shareCode = meta?.code || '';
+    const shareRevision = meta?.revision ?? 0;
+    const shareUpdatedAt = meta?.updatedAt ?? Date.now();
     history.set((d) => ({
       ...d,
-      shareCode: meta?.code || d.shareCode || '',
-      shareRevision: meta?.revision ?? d.shareRevision ?? 0,
-      shareUpdatedAt: meta?.updatedAt ?? Date.now(),
+      shareCode: shareCode || d.shareCode || '',
+      shareRevision: shareRevision || d.shareRevision || 0,
+      shareUpdatedAt,
     }));
+    const current = editorSyncStateRef.current;
+    if (!current?.activeDocId || !current.doc) return;
+    const nextDoc = {
+      ...current.doc,
+      shareCode: shareCode || current.doc.shareCode || '',
+      shareRevision: shareRevision || current.doc.shareRevision || 0,
+      shareUpdatedAt,
+    };
+    editorSyncStateRef.current = { ...current, doc: nextDoc };
+    libraryPersistRef.current = (libraryPersistRef.current || []).map((entry) => (
+      entry.id === current.activeDocId ? { ...entry, doc: nextDoc, updatedAt: Date.now() } : entry
+    ));
+    setLibrary(libraryPersistRef.current);
   }, [history]);
 
   const queueProjectForAccount = useCallback(async (entry) => {
@@ -4067,18 +4089,29 @@ export default function App() {
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
     history.reset(shaped);
-    const current = (libraryPersistRef.current || []).find((entry) => entry.id === activeDocId);
+    const currentEditor = editorSyncStateRef.current;
+    editorSyncStateRef.current = {
+      ...(currentEditor || {}),
+      activeDocId,
+      doc: shaped,
+    };
+    libraryPersistRef.current = (libraryPersistRef.current || []).map((entry) => (
+      entry.id === activeDocId ? { ...entry, doc: shaped, updatedAt: Date.now() } : entry
+    ));
+    setLibrary(libraryPersistRef.current);
+    const current = libraryPersistRef.current.find((entry) => entry.id === activeDocId);
+    let queued = true;
     if (current) {
       try {
         await queueProjectForAccount({ ...current, doc: shaped, updatedAt: Date.now() });
-      } catch { /* o autosave confirma a fila se este enfileiramento falhar */ }
+      } catch {
+        queued = false;
+      }
     }
     setActiveIdx(0);
-    const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
-    if (withPhoto) {
-      toast(`${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'} aberta${withPhoto === 1 ? '' : 's'} da equipa.`, 'success', 4000);
-    }
-  }, [activeDocId, history, queueProjectForAccount, toast]);
+    const failed = (shaped.slides || []).filter((slide) => slide.bgImageFailed).length;
+    return { failed, queued };
+  }, [activeDocId, history, queueProjectForAccount]);
 
   /** Entrar / link ?share=: cria projeto na lib ou reabre o que já tem o mesmo código. */
   const handleTeamShareJoined = useCallback(async (payload) => {
@@ -4097,9 +4130,12 @@ export default function App() {
     let created = false;
     let queuedEntry = null;
     setLibrary((prev) => {
+      const liveDoc = editorSyncStateRef.current?.activeDocId === activeDocId
+        ? editorSyncStateRef.current.doc
+        : history.state;
       const flushed = prev.map((e) => (
         e.id === activeDocId
-          ? { ...e, doc: history.state, updatedAt: Date.now() }
+          ? { ...e, doc: liveDoc, updatedAt: Date.now() }
           : e
       ));
       const existing = code
@@ -4122,9 +4158,10 @@ export default function App() {
       created = true;
       return [entry, ...flushed];
     });
+    let queued = true;
     if (queuedEntry) {
       try { await queueProjectForAccount(queuedEntry); }
-      catch { /* o autosave confirma a fila se este enfileiramento falhar */ }
+      catch { queued = false; }
     }
     if (targetId) {
       if (targetId === activeDocId) {
@@ -4137,13 +4174,18 @@ export default function App() {
       setActiveIdx(0);
     }
     const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
-    toast(
-      created
-        ? `Projeto da equipa adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}.`
-        : `Projeto da equipa actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}.`,
-      'success',
-      5000,
-    );
+    const failed = (shaped.slides || []).filter((slide) => slide.bgImageFailed).length;
+    if (!queued) {
+      toast('Projeto aberto neste editor. A fila da conta não confirmou. Salve para enviar.', 'warning', 6000);
+    } else {
+      toast(
+        created
+          ? `Projeto da equipa adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`
+          : `Projeto da equipa actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`,
+        failed ? 'warning' : 'success',
+        5000,
+      );
+    }
     trackEvent('team_share_joined', { created: created ? '1' : '0' });
   }, [activeDocId, history, queueProjectForAccount, toast]);
 

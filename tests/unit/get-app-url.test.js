@@ -91,5 +91,8 @@ describe('getAppUrl (WEB-001/006)', () => {
       .toBe('https://moont.ai');
     expect(getBillingReturnUrl({ headers: { host: 'viralcarrossel.com.br.evil.example' } }))
       .toBe('https://moont.ai');
+    process.env.APP_URL = 'https://example.invalid';
+    expect(getBillingReturnUrl({ headers: { host: 'moont.ai' } })).toBe('https://moont.ai');
+    expect(getBillingReturnUrl({ headers: { host: 'www.moont.com.br' } })).toBe('https://www.moont.com.br');
   });
 });

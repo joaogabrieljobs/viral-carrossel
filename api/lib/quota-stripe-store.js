@@ -26,6 +26,29 @@ function chaveDoPeriodo(periodStartSec) {
   return `${PREFIXO}${periodStartSec || 'nop'}`;
 }
 
+function chaveDasOperacoes(periodStartSec) {
+  return `vc_imgops_${periodStartSec || 'nop'}`;
+}
+
+function idDeOperacao(operationId) {
+  const id = String(operationId || '');
+  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : '';
+}
+
+function lerOperacoes(metadados, periodStartSec) {
+  const map = new Map();
+  const raw = String(metadados[chaveDasOperacoes(periodStartSec)] || '');
+  for (const part of raw.split(',')) {
+    const [id, status] = part.split(':');
+    if (id && status) map.set(id, status);
+  }
+  return map;
+}
+
+function serializarOperacoes(map) {
+  return [...map.entries()].slice(-12).map(([id, status]) => `${id}:${status}`).join(',').slice(0, 480);
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -42,8 +65,8 @@ async function lerMetadados(customerId) {
 }
 
 /** Escreve o contador e apaga períodos antigos (valor '' remove a chave no Stripe). */
-async function escreverContador(customerId, metadados, chave, valor) {
-  const patch = { [chave]: String(valor) };
+async function escreverContador(customerId, metadados, chave, valor, extra = {}) {
+  const patch = { [chave]: String(valor), ...extra };
   const antigas = Object.keys(metadados)
     .filter((k) => k.startsWith(PREFIXO) && k !== chave && k !== LOCK_KEY)
     .sort()
@@ -95,25 +118,39 @@ export async function stripeQuotaGet({ customerId, periodStartSec }) {
 }
 
 /** Lê, valida contra o tecto e grava. Devolve o total usado depois desta imagem. */
-export async function stripeQuotaConsume({ customerId, periodStartSec, cap }) {
+export async function stripeQuotaConsume({ customerId, periodStartSec, cap, operationId }) {
   return comLockStripe(customerId, async (metadados) => {
     const chave = chaveDoPeriodo(periodStartSec);
     const atual = Number(metadados[chave]);
     const usadas = Number.isFinite(atual) && atual > 0 ? Math.floor(atual) : 0;
+    const operacao = idDeOperacao(operationId);
+    const ops = lerOperacoes(metadados, periodStartSec);
+    if (operacao && ops.has(operacao)) {
+      return { replayed: true, reason: `already_${ops.get(operacao)}`, used: usadas };
+    }
     if (usadas >= cap) return cap + 1; // sinaliza esgotado, sem gravar
     const proximo = usadas + 1;
-    await escreverContador(customerId, metadados, chave, proximo);
+    if (operacao) ops.set(operacao, 'R');
+    await escreverContador(customerId, metadados, chave, proximo, operacao
+      ? { [chaveDasOperacoes(periodStartSec)]: serializarOperacoes(ops) }
+      : {});
     return proximo;
   });
 }
 
-export async function stripeQuotaRefund({ customerId, periodStartSec }) {
+export async function stripeQuotaRefund({ customerId, periodStartSec, operationId }) {
   return comLockStripe(customerId, async (metadados) => {
     const chave = chaveDoPeriodo(periodStartSec);
     const atual = Number(metadados[chave]);
     const usadas = Number.isFinite(atual) && atual > 0 ? Math.floor(atual) : 0;
+    const operacao = idDeOperacao(operationId);
+    const ops = lerOperacoes(metadados, periodStartSec);
+    if (operacao && ops.get(operacao) === 'F') return usadas;
     const proximo = Math.max(0, usadas - 1);
-    await escreverContador(customerId, metadados, chave, proximo);
+    if (operacao && ops.has(operacao)) ops.set(operacao, 'F');
+    await escreverContador(customerId, metadados, chave, proximo, operacao && ops.has(operacao)
+      ? { [chaveDasOperacoes(periodStartSec)]: serializarOperacoes(ops) }
+      : {});
     return proximo;
   });
 }
