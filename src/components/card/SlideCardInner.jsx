@@ -367,18 +367,30 @@ function BrandLogoLayer({
   const [useFallback, setUseFallback] = React.useState(false);
   const [hidden, setHidden] = React.useState(false);
   const [hit, setHit] = React.useState(null);
-  React.useEffect(() => {
+  const imgRef = React.useRef(null);
+  const box = Math.max(1, Math.round(sizePx));
+  const measureLogo = React.useCallback((img) => {
+    if (!img?.naturalWidth || !img?.naturalHeight) return;
+    if (looksBlankLogo(img)) {
+      setHidden(true);
+      return;
+    }
+    setHit(logoContainHitRect(box, img.naturalWidth, img.naturalHeight, readLogoInk(img)));
+  }, [box]);
+  React.useLayoutEffect(() => {
     setUseFallback(false);
     setHidden(false);
-    setHit(null);
-  }, [src, fallbackSrc, sizePx]);
+  }, [src, fallbackSrc]);
+  React.useLayoutEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete) measureLogo(img);
+  }, [measureLogo]);
   const active = useFallback ? fallbackSrc : src;
   if (!active || typeof active !== 'string' || hidden) return null;
   const giveUp = () => {
     if (!useFallback && fallbackSrc && fallbackSrc !== src) setUseFallback(true);
     else setHidden(true);
   };
-  const box = Math.max(1, Math.round(sizePx));
   const incoming = elementProps?.style || {};
   const style = {
     position: 'absolute',
@@ -401,12 +413,9 @@ function BrandLogoLayer({
         alt=""
         draggable={false}
         decoding="async"
+        ref={imgRef}
         onError={giveUp}
-        onLoad={(event) => {
-          const img = event.currentTarget;
-          if (looksBlankLogo(img)) { giveUp(); return; }
-          setHit(logoContainHitRect(box, img.naturalWidth, img.naturalHeight, readLogoInk(img)));
-        }}
+        onLoad={(event) => measureLogo(event.currentTarget)}
         style={{
           width: '100%',
           height: '100%',
@@ -1166,6 +1175,8 @@ const ClassicCanvasInner = React.forwardRef(({
             margin={margin}
             topOffset={topOffset}
             zIndex={23}
+            movable={!forExport && !showCanvasChrome}
+            elementProps={movOu('logo', {})}
           />
         );
       })()}
@@ -1655,6 +1666,8 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             margin={margin}
             topOffset={topOffset}
             zIndex={23}
+            movable={!forExport && !showCanvasChrome && !!mov}
+            elementProps={mov ? mov('logo', {}) : null}
           />
         );
       })()}
@@ -1843,11 +1856,16 @@ const SlideCardInner = React.forwardRef(({
   const elementsUnlocked = slide.elementsUnlocked === true;
   /** Cultura/sanduíche nasce como composição automática. Depois de desbloquear,
    *  cada parte recebe o próprio arrasto sem mudar a geometria do layout. */
-  const movSeparate = React.useCallback((chave, estiloBase) => (
-    elementsUnlocked
-      ? mov(chave, estiloBase)
-      : (estiloBase ? { style: estiloBase } : null)
-  ), [elementsUnlocked, mov]);
+  const movSeparate = React.useCallback((chave, estiloBase) => {
+    if (elementsUnlocked) return mov(chave, estiloBase);
+    return {
+      ...(estiloBase ? { style: estiloBase } : {}),
+      onClick: (event) => {
+        event.stopPropagation();
+        onElementSelect?.(chave);
+      },
+    };
+  }, [elementsUnlocked, mov, onElementSelect]);
   const onPhotoZoneClick = React.useCallback(() => {
     photoReqRef.current?.(slideIdx);
   }, [slideIdx]);

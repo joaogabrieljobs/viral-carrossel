@@ -48,6 +48,7 @@ import {
 } from './src/utils/image-store.js';
 import { storeSlideReference, importSlideReference } from './src/utils/slide-reference.js';
 import { makeTextOverlay, addOverlayToSlide, updateOverlayOnSlide, normalizeOverlays, MAX_CARD_OVERLAYS } from './src/utils/card-overlays.js';
+import { cardElementEditorTarget } from './src/utils/card-editor-target.js';
 import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
 import { readDataOwner, dataOwnerAliases } from './src/utils/account-data-owner.js';
 import { USER_PROFILE_KEY } from './src/utils/user-profile.js';
@@ -2327,10 +2328,12 @@ export default function App() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedCardElement, setSelectedCardElement] = useState(null);
+  const [editorFocus, setEditorFocus] = useState(null);
   const [editingTextArea, setEditingTextArea] = useState(null);
   useEffect(() => {
     setActiveIdx(0);
     setSelectedCardElement(null);
+    setEditorFocus(null);
     setEditingTextArea(null);
   }, [activeDocId]);
   useEffect(() => {
@@ -6014,6 +6017,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
     return () => window.removeEventListener('keydown', onKey);
   }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
 
+  const openCardElement = useCallback((slideId, key, { navigate = false } = {}) => {
+    if (!slideId || !key) return;
+    const index = slides.findIndex((item) => item.id === slideId);
+    if (index >= 0) setActiveIdx(index);
+    setSelectedCardElement({ slideId, key });
+    const target = cardElementEditorTarget(key);
+    if (!target) return;
+    const rank = { criador: 1, diretor: 2, studio: 3 };
+    if (navigate) {
+      if ((rank[appMode] || 1) < (rank[target.mode] || 1)) setAppMode(target.mode);
+      setTab(target.tab);
+      setDrawerOpen(true);
+    } else if (target.tab !== tab) {
+      return;
+    }
+    setEditorFocus({ slideId, tab: target.tab, section: target.section, at: Date.now() });
+  }, [slides, appMode, tab, setAppMode]);
+
   const sidebarProps = {
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
     // hookLibrary em si só é lido pelo GenerateModal — não entra aqui.
@@ -6054,7 +6075,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
       if (!PROJECTS_V2) toast('Projeto apagado.', 'success', 3000);
     },
     selectedCardElement,
-    onSelectCardElement: (key) => setSelectedCardElement({ slideId: slide.id, key }),
+    editorFocus,
+    onSelectCardElement: (key) => openCardElement(slide.id, key),
     onCreateText: () => createTextAreaAt(activeIdx),
     onGenerateProject: generateProjectByKind,
     onPickVideo: () => videoFileInputRef.current?.click(),
@@ -7028,7 +7050,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     onCreateText={(position) => createTextAreaAt(activeIdx, position)}
                     autoEditOverlayId={editingTextArea?.slideId === slide.id ? editingTextArea.overlayId : null}
                     onOverlayEditEnd={finishTextAreaEdit}
-                    onElementSelect={(key) => setSelectedCardElement({ slideId: slide.id, key })}
+                    onElementSelect={(key) => openCardElement(slide.id, key, { navigate: true })}
                     selectedElement={selectedCardElement?.slideId === slide.id ? selectedCardElement.key : null}
                   />
                   {showPreviewAlignGrid ? (
@@ -7343,7 +7365,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         onCreateText={(position) => createTextAreaAt(i, position)}
                         autoEditOverlayId={editingTextArea?.slideId === s.id ? editingTextArea.overlayId : null}
                         onOverlayEditEnd={finishTextAreaEdit}
-                        onElementSelect={(key) => { setActiveIdx(i); setSelectedCardElement({ slideId: s.id, key }); }}
+                        onElementSelect={(key) => openCardElement(s.id, key, { navigate: true })}
                         selectedElement={selectedCardElement?.slideId === s.id ? selectedCardElement.key : null}
                       />
                       {showPreviewAlignGrid ? (

@@ -345,16 +345,22 @@ function SidebarContent({
   const editorScrollRef = useRef(null);
   useLayoutEffect(() => {
     if (!editorFocus?.section || editorFocus.slideId !== slide?.id || tab !== editorFocus.tab) return;
-    const root = editorScrollRef.current;
-    const section = root?.querySelector(`[data-vc-editor-section="${editorFocus.section}"]`);
-    if (!root || !section) return;
-    const focusNode = section.querySelector('[data-vc-overlay-editor]') || section;
-    const rootRect = root.getBoundingClientRect();
-    const rect = focusNode.getBoundingClientRect();
-    root.scrollTop += rect.top - rootRect.top - 8;
-    if (editorFocus.section === 'texto-caixa') {
-      section.querySelector('#vc-card-text-box')?.focus({ preventScroll: true });
-    }
+    const scrollToSection = () => {
+      const root = editorScrollRef.current;
+      const section = root?.querySelector(`[data-vc-editor-section="${editorFocus.section}"]`);
+      if (!root || !section) return false;
+      const focusNode = section.querySelector('[data-vc-overlay-editor]') || section;
+      const rootRect = root.getBoundingClientRect();
+      const rect = focusNode.getBoundingClientRect();
+      root.scrollTop += rect.top - rootRect.top - 8;
+      if (editorFocus.section === 'texto-caixa') {
+        section.querySelector('#vc-card-text-box')?.focus({ preventScroll: true });
+      }
+      return true;
+    };
+    if (scrollToSection()) return undefined;
+    const frame = requestAnimationFrame(scrollToSection);
+    return () => cancelAnimationFrame(frame);
   }, [editorFocus, tab, slide?.id]);
 
   // A escolha da Home também descreve o projeto aberto. Ao trocar de projeto
@@ -3632,6 +3638,22 @@ function SidebarContent({
               </div>
             </S>
 
+            <S
+              title="Equipe"
+              hint="Envie o link de convite; a outra conta abre e o projeto entra na biblioteca."
+            >
+              <TeamSharePanel
+                doc={historyDoc}
+                projectName={activeEntry?.name || 'Projeto'}
+                shareCode={historyDoc?.shareCode || ''}
+                shareRevision={historyDoc?.shareRevision || 0}
+                onShareLinked={onTeamShareLinked}
+                onDocPulled={onTeamDocPulled}
+                onShareJoined={onTeamShareJoined}
+                toast={toast}
+              />
+            </S>
+
             {appMode === 'criador' ? null : (
               <details style={{
                 borderRadius: 12,
@@ -3755,22 +3777,6 @@ function SidebarContent({
                   </button>
                 </>
               )}
-            </S>
-
-            <S
-              title="Equipe"
-              hint="Envie o link de convite; a outra conta abre e o projeto entra na biblioteca."
-            >
-              <TeamSharePanel
-                doc={historyDoc}
-                projectName={activeEntry?.name || 'Projeto'}
-                shareCode={historyDoc?.shareCode || ''}
-                shareRevision={historyDoc?.shareRevision || 0}
-                onShareLinked={onTeamShareLinked}
-                onDocPulled={onTeamDocPulled}
-                onShareJoined={onTeamShareJoined}
-                toast={toast}
-              />
             </S>
 
             <div style={{ margin: '4px 0 12px' }}>
