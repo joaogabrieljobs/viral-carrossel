@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import {
-  acknowledgeProjectOp, flushProjectOutbox, getPendingProjectOp,
+  acknowledgeProjectOp, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listPendingProjectOps, queueProjectDelete, queueProjectPut,
 } from '../../src/utils/projects-outbox.js';
 
@@ -199,8 +199,8 @@ describe('outbox durável por projeto', () => {
   });
 
   it('cria cópia estável do PUT divergente sem substituir o original', async () => {
-    const op = await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local' } }, { baseVersion: 2 });
-    const copyId = `conflict-${op.opId.replace(/[^A-Za-z0-9]/g, '')}`;
+    await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local' } }, { baseVersion: 2 });
+    const copyId = conflictCopyId('janine');
     fetch.mockResolvedValueOnce(session())
       .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
       .mockResolvedValueOnce(json({ ok: true, project: {
@@ -216,6 +216,40 @@ describe('outbox durável por projeto', () => {
       id: copyId, conflictSourceId: 'janine', doc: { title: 'Local' },
     } });
     expect(await listPendingProjectOps(ALICE)).toHaveLength(0);
+  });
+
+  it('atualiza a mesma cópia quando o projeto conflita de novo', async () => {
+    await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local 1' } }, { baseVersion: 2 });
+    const copyId = conflictCopyId('janine');
+    const remote = { id: 'janine', entry: { id: 'janine', doc: { title: 'Outra aba' } }, version: 3 };
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+      .mockResolvedValueOnce(json({ ok: true, project: remote }))
+      .mockResolvedValueOnce(json({ ok: true, project: { id: copyId, version: 1 } }));
+    await flushProjectOutbox(ALICE);
+
+    await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local 2' } }, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+      .mockResolvedValueOnce(json({ ok: true, project: remote }))
+      .mockResolvedValueOnce(json({ error: 'Já existe', code: 'project_conflict', cloudVersion: 1 }, 409))
+      .mockResolvedValueOnce(json({ ok: true, project: {
+        id: copyId, entry: { id: copyId, name: 'Clínica (cópia de conflito)', doc: { title: 'Local 1' } }, version: 1,
+      } }))
+      .mockResolvedValueOnce(json({ ok: true, project: { id: copyId, version: 2 } }));
+    const receipt = await flushProjectOutbox(ALICE);
+    expect(receipt.recoveries).toEqual([{
+      sourceProjectId: 'janine', copyProjectId: copyId,
+      copyName: 'Clínica (cópia de conflito)',
+    }]);
+    const update = JSON.parse(fetch.mock.calls.at(-1)[1].body);
+    expect(update.baseVersion).toBe(1);
+    expect(update.entry.id).toBe(copyId);
+    expect(update.entry.doc.title).toBe('Local 2');
+    expect([...fetch.mock.calls].filter((call) => {
+      const body = call[1]?.body ? JSON.parse(call[1].body) : null;
+      return body?.entry?.id?.startsWith('conflict-');
+    }).map((call) => JSON.parse(call[1].body).entry.id)).toEqual([copyId, copyId, copyId]);
   });
 
   it('assinatura vencida vai para revisão e não trava o restante da fila', async () => {
@@ -301,7 +335,7 @@ describe('outbox durável por projeto', () => {
 
   it('reconhece a mesma cópia se a confirmação de rede se perder', async () => {
     const op = await queueProjectPut(ALICE, { id: 'janine', name: 'Clínica', doc: { title: 'Local' } }, { baseVersion: 2 });
-    const copyId = `conflict-${op.opId.replace(/[^A-Za-z0-9]/g, '')}`;
+    const copyId = conflictCopyId('janine');
     fetch.mockResolvedValueOnce(session())
       .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
       .mockResolvedValueOnce(json({ ok: true, project: {

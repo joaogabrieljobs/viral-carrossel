@@ -149,7 +149,7 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
   };
 
   return (
-    <section className="vc-type-inspector" aria-label="Tipografia do card">
+    <section className="vc-type-inspector" aria-label="Tipografia do card" data-vc-editor-section="texto-caixa">
       <div style={{ display: 'grid', gap: 4 }}>
         <strong className="vc-type-inspector__heading">Tipografia do card</strong>
         <p className="vc-type-inspector__help">

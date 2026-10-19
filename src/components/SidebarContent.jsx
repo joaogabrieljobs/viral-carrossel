@@ -27,7 +27,7 @@ import { ElementsPanel } from './panels/ElementsPanel.jsx';
 import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
 import { applyTextFontToAllCards } from '../utils/card-text-fonts.js';
 import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
-import { addOverlayToSlide, removeOverlayFromSlide, parseOverlayMoveKey } from '../utils/card-overlays.js';
+import { addOverlayToSlide, removeOverlayFromSlide, overlayMoveKey, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
@@ -316,6 +316,7 @@ function SidebarContent({
   onTeamDocPulled = null,
   onTeamShareJoined = null,
   historyDoc = null,
+  editorFocus = null,
 }) {
   const imageTargetRef = useRef(null);
   imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
@@ -341,6 +342,20 @@ function SidebarContent({
   const itemsLabel = isPresentationProject ? 'slides' : 'cards';
   const editorTabs = visibleEditorTabs(appMode);
   const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
+  const editorScrollRef = useRef(null);
+  useLayoutEffect(() => {
+    if (!editorFocus?.section || editorFocus.slideId !== slide?.id || tab !== editorFocus.tab) return;
+    const root = editorScrollRef.current;
+    const section = root?.querySelector(`[data-vc-editor-section="${editorFocus.section}"]`);
+    if (!root || !section) return;
+    const focusNode = section.querySelector('[data-vc-overlay-editor]') || section;
+    const rootRect = root.getBoundingClientRect();
+    const rect = focusNode.getBoundingClientRect();
+    root.scrollTop += rect.top - rootRect.top - 8;
+    if (editorFocus.section === 'texto-caixa') {
+      section.querySelector('#vc-card-text-box')?.focus({ preventScroll: true });
+    }
+  }, [editorFocus, tab, slide?.id]);
 
   // A escolha da Home também descreve o projeto aberto. Ao trocar de projeto
   // ou converter o documento, atualiza o seletor e os CTAs; uma escolha manual
@@ -757,7 +772,7 @@ function SidebarContent({
       </div>
 
       {/* Scrollable body */}
-      <div style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
+      <div ref={editorScrollRef} style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
 
         {tab === 'texto' && (
           <CardTextFontPanel
@@ -1515,7 +1530,7 @@ function SidebarContent({
               />
             )}
 
-            {(tab==='imagem'||tab==='slide') && (<S title={slide.canvas?.enabled ? 'Imagem na área da foto' : 'Imagem de fundo'}>
+            {(tab==='imagem'||tab==='slide') && (<S sectionId="imagem-ajustes" title={slide.canvas?.enabled ? 'Imagem na área da foto' : 'Imagem de fundo'}>
               {slide.bgImage && (
                 <div style={{ position:'relative', marginBottom:2, borderRadius:8, overflow:'hidden' }}>
                   <img
@@ -2283,7 +2298,7 @@ function SidebarContent({
                 </div>
               ) : null}
             </S>
-            <S title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do seleccionado.">
+            <S sectionId="visual-elementos" title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do seleccionado.">
               <ElementsPanel
                 brand={brand}
                 slide={slide}
@@ -2299,7 +2314,9 @@ function SidebarContent({
                     overlays: next.overlays,
                     elementsUnlocked: true,
                   });
+                  onSelectCardElement(overlayMoveKey(overlay.id));
                 }}
+                onSelect={(overlayId) => onSelectCardElement(overlayMoveKey(overlayId))}
                 onRemove={(overlayId) => {
                   const next = removeOverlayFromSlide(slide, overlayId);
                   const elementOffsets = { ...(slide.elementOffsets || {}) };
@@ -2318,7 +2335,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Marcas" hint="Identidade + contexto. Projetos novos nesta marca herdam o brief/estilo guardado na Home.">
+              <S title="Marcas" hint="Identidade + contexto. Projetos novos nesta marca herdam o brief guardado em Home → Brief da marca.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{
@@ -2520,7 +2537,7 @@ function SidebarContent({
               </div>
             </S>)}
 
-            {tab==='brand' && (<S title="Perfil Instagram" hint={`A foto do perfil aparece no círculo colorido ao lado do @ nos ${itemsLabel} (aba Marca).`}>
+            {tab==='brand' && (<S sectionId="marca-perfil" title="Perfil Instagram" hint={`A foto do perfil aparece no círculo colorido ao lado do @ nos ${itemsLabel} (aba Marca).`}>
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input
@@ -2768,6 +2785,7 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                sectionId="marca-barra"
                 title="Barra editorial (topo)"
                 hint={`Faixa fina no topo do ${itemLabel}. Vem preenchida pelos padrões visuais — aqui você troca por texto seu. Deixe vazio para esconder.`}
               >
@@ -2807,6 +2825,7 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                sectionId="marca-selo"
                 title="Selo do rodapé (pill)"
                 hint={`Cápsula centrada na base do ${itemLabel} — CTA, hashtag ou handle. Vazio esconde.`}
               >
@@ -2860,6 +2879,7 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                sectionId="marca-rodape"
                 title="Barra do rodapé (3 colunas)"
                 hint="Rodapé estilo ficha técnica. Use «rótulo|valor» para duas linhas — ex.: «Tema|Growth». Vazio esconde a coluna."
               >
@@ -2884,7 +2904,7 @@ function SidebarContent({
             )}
 
             {tab==='brand' && (
-              <S title="Ornamentos" hint="Detalhes de assinatura que os padrões visuais ligam ou desligam.">
+              <S sectionId="marca-ornamentos" title="Ornamentos" hint="Detalhes de assinatura que os padrões visuais ligam ou desligam.">
                 {[
                   ['showStarOrnament', 'Estrela de 8 pontas acima do título', false],
                   ['showPageBadge', 'Contador N/M no canto superior', false],
@@ -2907,6 +2927,7 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                sectionId="marca-logo"
                 title="Logo"
                 hint={`Padrão da marca em todos os ${itemsLabel} · ajustes e ocultar só no ${itemLabel} ${activeIdx + 1}.`}
               >
@@ -3359,13 +3380,13 @@ function SidebarContent({
           <>
             <S
               title="Projetos"
-              hint="Escolha a marca, defina o contexto dela e crie projetos que já herdam esse brief."
+              hint="Abra um projeto desta marca, ou crie outro."
             >
               <BrandWorkspacePanel
+                part="switcher"
                 brandRoster={brandRoster}
                 activeBrandId={activeBrandId}
                 onSelectBrand={onSelectBrand || (() => {})}
-                onSaveBrandContext={onSaveBrandContext}
                 onOpenBrands={setBrandsOpen ? () => setBrandsOpen(true) : null}
                 projectCount={projectsForBrand(library, activeBrandId).length}
                 toast={toast}
@@ -3431,7 +3452,7 @@ function SidebarContent({
                     lineHeight: 1.45,
                     textAlign: 'center',
                   }}>
-                    Nenhum projeto nesta marca ainda. Crie Comunica ou Apresenta — o contexto acima já entra no projeto.
+                    Nenhum projeto nesta marca ainda. Crie Comunica ou Apresenta.
                   </div>
                 ) : null}
                 {[...projectsForBrand(library, activeBrandId)]
@@ -3453,7 +3474,6 @@ function SidebarContent({
                         role="listitem"
                         aria-current={isActive ? 'true' : undefined}
                         aria-label={`Abrir ${product.eyebrow.toLowerCase()} ${label}`}
-                        title={label}
                         onClick={() => {
                           if (isActive) return;
                           if (onOpenProject) onOpenProject(entry.id);
@@ -3612,8 +3632,46 @@ function SidebarContent({
               </div>
             </S>
 
+            {appMode === 'criador' ? null : (
+              <details style={{
+                borderRadius: 12,
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-card)',
+                padding: '10px 12px',
+              }}>
+                <summary style={{
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.011em',
+                }}>
+                  Brief da marca
+                  <span style={{
+                    display: 'block',
+                    marginTop: 2,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'var(--text-muted)',
+                  }}>
+                    Estilo e texto que só entram em projetos novos
+                  </span>
+                </summary>
+                <div style={{ marginTop: 10 }}>
+                  <BrandWorkspacePanel
+                    part="editors"
+                    brandRoster={brandRoster}
+                    activeBrandId={activeBrandId}
+                    onSaveBrandContext={onSaveBrandContext}
+                    projectCount={projectsForBrand(library, activeBrandId).length}
+                    toast={toast}
+                  />
+                </div>
+              </details>
+            )}
+
             <S
-              title={appMode === 'criador' ? 'Criar rápido' : 'Contexto'}
+              title={appMode === 'criador' ? 'Criar rápido' : 'Deste projeto'}
               hint={appMode === 'criador'
                 ? (creativePreset === 'apresentacao'
                   ? 'Faça uma ideia avançar · contexto → argumento → decisão → PDF'

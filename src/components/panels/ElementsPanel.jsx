@@ -19,6 +19,7 @@ export function ElementsPanel({
   onInsert = () => {},
   onRemove = () => {},
   onUpdate = () => {},
+  onSelect = () => {},
   toast,
 }) {
   const overlays = normalizeOverlays(slide?.overlays);
@@ -128,12 +129,31 @@ export function ElementsPanel({
                 background: ov.id === selectedOverlayId ? 'var(--accent-surface)' : 'var(--bg-pearl)',
               }}
             >
-              <span style={{
-                flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {ov.type === 'cta' ? (ov.text || 'CTA') : ov.type === 'rule' ? 'Traço' : (ov.text || 'Texto').split('\n')[0]}
-              </span>
+              <button
+                type="button"
+                onClick={() => onSelect(ov.id)}
+                style={{
+                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+                  background: 'transparent', border: 0, padding: 0, cursor: 'pointer',
+                  textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                }}
+              >
+                {ov.type === 'rule' ? (
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 22,
+                      height: Math.max(2, Math.min(10, Number(ov.thickness) || 2)),
+                      background: ov.color,
+                      borderRadius: 99,
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {ov.type === 'cta' ? (ov.text || 'CTA') : ov.type === 'rule' ? 'Traço' : (ov.text || 'Texto').split('\n')[0]}
+                </span>
+              </button>
               <span style={{
                 fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
               }}>
@@ -161,21 +181,64 @@ export function ElementsPanel({
 
 function OverlayEditor({ overlay, onChange, onRemove, brand }) {
   if (overlay.type === 'text') {
-    return <TextOverlayEditor overlay={overlay} brand={brand} onChange={onChange} onRemove={onRemove} />;
+    return (
+      <div data-vc-overlay-editor="">
+        <TextOverlayEditor overlay={overlay} brand={brand} onChange={onChange} onRemove={onRemove} />
+      </div>
+    );
   }
   if (overlay.type === 'rule') {
     return (
-      <div style={editorBox}>
+      <div data-vc-overlay-editor="" style={editorBox}>
         <div style={editorTitle}>Editar traço</div>
+        <Slider
+          label="Espessura"
+          value={Math.max(1, Math.min(48, Math.round(Number(overlay.thickness) || 2)))}
+          min={1}
+          max={48}
+          onChange={(thickness) => onChange({ thickness })}
+        />
+        <Slider
+          label="Comprimento"
+          value={Math.max(8, Math.min(90, Math.round(Number(overlay.w) || 28)))}
+          min={8}
+          max={90}
+          onChange={(w) => onChange({ w })}
+        />
         <label style={fieldLabel}>
           Cor
           <input
             type="color"
+            aria-label="Cor do traço"
             value={toColorInput(overlay.color)}
             onChange={(e) => onChange({ color: e.target.value })}
             style={colorInput}
           />
         </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {ruleSwatches(brand).map((hex) => {
+            const active = toColorInput(overlay.color).toLowerCase() === hex.toLowerCase();
+            return (
+              <button
+                key={hex}
+                type="button"
+                aria-label={`Cor ${hex}`}
+                title={hex}
+                onClick={() => onChange({ color: hex })}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: hex,
+                  border: active ? '2px solid var(--accent)' : '1px solid var(--hairline)',
+                  boxShadow: active ? 'inset 0 0 0 2px #fff' : 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              />
+            );
+          })}
+        </div>
         <button type="button" className="vc-btn vc-btn-ghost" onClick={onRemove} style={{ minHeight: 36, fontSize: 12, color: '#f87171' }}>
           <Trash2 size={12} /> Remover
         </button>
@@ -184,7 +247,7 @@ function OverlayEditor({ overlay, onChange, onRemove, brand }) {
   }
   if (overlay.type !== 'cta') return null;
   return (
-    <div style={editorBox}>
+    <div data-vc-overlay-editor="" style={editorBox}>
       <div style={editorTitle}>Editar CTA</div>
       <FontFamilySelect label="Fonte da chamada" value={overlay.fontFamily || ''} brand={brand} onChange={fontFamily => onChange({ fontFamily })} />
       <Slider
@@ -275,7 +338,25 @@ function toColorInput(value) {
   if (/^#[0-9a-fA-F]{3}$/.test(v)) {
     return `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`;
   }
+  const rgb = v.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
+  if (rgb) {
+    const hex = (n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, '0');
+    return `#${hex(rgb[1])}${hex(rgb[2])}${hex(rgb[3])}`;
+  }
   return '#6B5344';
+}
+
+function ruleSwatches(brand) {
+  const list = [];
+  const push = (hex) => {
+    if (typeof hex !== 'string' || !hex.trim()) return;
+    const color = toColorInput(hex);
+    if (!list.some((item) => item.toLowerCase() === color.toLowerCase())) list.push(color);
+  };
+  push(brand?.accent);
+  push(brand?.titleColor);
+  ['#1A1410', '#FFFFFF', '#F5F0E8', '#C4A574', '#6B5344'].forEach(push);
+  return list.slice(0, 7);
 }
 
 function ElementPreview({ kind }) {
@@ -312,11 +393,19 @@ function ElementPreview({ kind }) {
   if (kind === 'gold') return pill({ background: '#4A3A32', color: '#F7F1E6', border: '1px solid #C4A574' });
   if (kind === 'white') return pill({ background: 'rgba(255,255,255,0.94)', color: '#1A1410', border: '1px solid #fff' }, 'COMEÇAR ›');
   if (kind === 'outline_light') return pill({ background: 'transparent', color: '#F5F0E8', border: '1px solid rgba(245,240,232,0.9)' });
-  if (kind === 'rule' || kind === 'rule_light' || kind === 'rule_accent') {
-    const color = kind === 'rule_light' ? 'rgba(245,240,232,0.9)' : kind === 'rule_accent' ? '#C4A574' : '#3A322C';
+  if (kind === 'rule' || kind === 'rule_light' || kind === 'rule_accent' || kind === 'rule_medium' || kind === 'rule_long' || kind === 'rule_bold') {
+    const lines = {
+      rule: { color: '#3A322C', width: '38%', height: 2 },
+      rule_light: { color: 'rgba(245,240,232,0.9)', width: '32%', height: 2, dark: true },
+      rule_accent: { color: '#C4A574', width: '28%', height: 3 },
+      rule_medium: { color: '#3A322C', width: '55%', height: 6 },
+      rule_long: { color: '#3A322C', width: '88%', height: 4 },
+      rule_bold: { color: '#1A1410', width: '70%', height: 10 },
+    };
+    const line = lines[kind];
     return (
-      <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 12, background: kind === 'rule_light' ? '#2a2420' : base.background }}>
-        <span style={{ width: '38%', height: kind === 'rule_accent' ? 3 : 2, background: color, borderRadius: 2 }} />
+      <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 12, background: line.dark ? '#2a2420' : base.background }}>
+        <span style={{ width: line.width, height: line.height, background: line.color, borderRadius: 99 }} />
       </div>
     );
   }

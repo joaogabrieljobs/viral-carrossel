@@ -6,9 +6,9 @@ import React from 'react';
  * - title: o que fazer aqui
  * - hint: uma frase de apoio (opcional)
  */
-export function SectionLabel({ title, children, className = '', hint, kicker }) {
+export function SectionLabel({ title, children, className = '', hint, kicker, sectionId }) {
   return (
-    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className={className} data-vc-editor-section={sectionId || undefined} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {kicker ? (
         <div style={{
           fontSize: 10,

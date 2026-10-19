@@ -20,12 +20,27 @@ describe('card-overlays', () => {
     expect(ids).toContain('cta_glass');
     expect(ids).toContain('cta_gold_edge');
     expect(ids).toContain('rule_thin');
+    expect(ids).toContain('rule_medium');
+    expect(ids).toContain('rule_long');
+    expect(ids).toContain('rule_bold');
     expect(ids).not.toContain('text_soft');
     expect(ELEMENT_CATALOG.every((e) => e.group !== 'Texto')).toBe(true);
     for (const item of ELEMENT_CATALOG) {
       const ov = item.factory();
       expect(normalizeOverlay(ov)).toBeTruthy();
     }
+  });
+
+  it('aceita traços maiores e mantém os finos já salvos', () => {
+    const bold = ELEMENT_CATALOG.find((e) => e.id === 'rule_bold').factory();
+    const long = ELEMENT_CATALOG.find((e) => e.id === 'rule_long').factory();
+    expect(normalizeOverlay(bold).thickness).toBe(22);
+    expect(normalizeOverlay(long).w).toBe(84);
+    expect(normalizeOverlay({ type: 'rule', thickness: 1.5, w: 28 }).thickness).toBe(1.5);
+    expect(normalizeOverlay({ type: 'rule', thickness: 80, w: 120 })).toMatchObject({
+      thickness: 48,
+      w: 90,
+    });
   });
 
   it('normalizeOverlay rejeita tipos inválidos e limita lista', () => {

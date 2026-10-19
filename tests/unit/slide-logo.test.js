@@ -21,6 +21,7 @@ import {
   projectLogoFromStored,
   LOGO_INLINE_MAX_BYTES,
   resolveLogoAssetSource,
+  logoContainHitRect,
 } from '../../src/utils/slide-logo.js';
 import { exportProjectReferences, migrateProjectReferences } from '../../src/utils/style-kit-storage.js';
 import { normalizeStyleKit } from '../../src/utils/style-kit.js';
@@ -187,5 +188,15 @@ describe('logo por card', () => {
     });
     expect(cleared.elementOffsets.logo).toBeUndefined();
     expect(cleared.elementOffsets.title).toEqual({ x: 1, y: 0 });
+  });
+  it('a caixa da logo segue o desenho e não o quadrado vazio', () => {
+    const wide = logoContainHitRect(400, 800, 120);
+    expect(wide.width).toBeGreaterThan(wide.height * 3);
+    expect(wide.height).toBeLessThan(120);
+    expect(wide.top).toBeGreaterThan(100);
+    const ink = logoContainHitRect(400, 400, 400, { x: 0.1, y: 0.05, w: 0.8, h: 0.2 });
+    expect(ink.height).toBeLessThan(120);
+    expect(ink.top).toBeLessThan(80);
+    expect(ink.width).toBeLessThan(400);
   });
 });

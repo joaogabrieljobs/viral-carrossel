@@ -15,6 +15,7 @@ export function BrandWorkspacePanel({
   onOpenBrands = null,
   projectCount = 0,
   toast,
+  part = 'all',
 }) {
   const active = brandRoster.find((b) => b.id === activeBrandId) || brandRoster[0] || null;
   const [draftBrief, setDraftBrief] = useState('');
@@ -44,18 +45,97 @@ export function BrandWorkspacePanel({
     toast?.('Contexto da marca guardado. Projetos novos herdam isto.', 'success', 3500);
   };
 
-  return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-      <div style={{
-        fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
-      }}>
-        Marcas
-      </div>
+  const editors = (
+    <div style={{
+      padding: 12,
+      borderRadius: 12,
+      border: '1px solid var(--hairline)',
+      background: 'var(--bg-pearl)',
+      display: 'grid',
+      gap: 8,
+    }}>
       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Cada marca tem um contexto. Ao criar um projeto nela, o brief e o estilo já vêm preenchidos —
-        organize a produção de conteúdo por marca.
+        Vale para projetos novos desta marca. O projeto aberto continua com o contexto dele.
       </p>
+      <label style={{ display: 'grid', gap: 4 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)',
+        }}>
+          Brief da marca
+        </span>
+        <textarea
+          className="vc-input"
+          rows={3}
+          value={draftBrief}
+          placeholder="Produto, público, voz, restrições… (herdado por projetos novos)"
+          onChange={(e) => { setDraftBrief(e.target.value); setDirty(true); }}
+          style={{ resize: 'vertical', minHeight: 64, fontSize: 12, lineHeight: 1.45 }}
+        />
+      </label>
+      <label style={{ display: 'grid', gap: 4 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)',
+        }}>
+          Estilo visual
+        </span>
+        <textarea
+          className="vc-input"
+          rows={2}
+          value={draftStyle}
+          placeholder="Composição, tipografia, luz, atmosfera…"
+          onChange={(e) => { setDraftStyle(e.target.value); setDirty(true); }}
+          style={{ resize: 'vertical', minHeight: 48, fontSize: 12, lineHeight: 1.45 }}
+        />
+      </label>
+      {onSaveBrandContext ? (
+        <button
+          type="button"
+          className="vc-btn"
+          disabled={!dirty}
+          onClick={save}
+          style={{
+            minHeight: 36,
+            borderRadius: 9999,
+            border: 'none',
+            background: dirty ? 'var(--accent)' : 'var(--bg-pearl)',
+            color: dirty ? '#fff' : 'var(--text-muted)',
+            fontWeight: 600,
+            fontSize: 12,
+            opacity: dirty ? 1 : 0.7,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <Check size={13} />
+          Guardar contexto da marca
+        </button>
+      ) : null}
+    </div>
+  );
+
+  if (part === 'editors') {
+    return active ? editors : null;
+  }
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: part === 'switcher' ? 0 : 12 }}>
+      {part === 'all' ? (
+        <>
+          <div style={{
+            fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
+          }}>
+            Marcas
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            Cada marca tem um contexto. Ao criar um projeto nela, o brief e o estilo já vêm preenchidos.
+          </p>
+        </>
+      ) : null}
 
       <div
         role="listbox"
@@ -130,86 +210,13 @@ export function BrandWorkspacePanel({
         ) : null}
       </div>
 
-      {active ? (
-        <div style={{
-          padding: 12,
-          borderRadius: 12,
-          border: '1px solid var(--hairline)',
-          background: 'var(--bg-pearl)',
-          display: 'grid',
-          gap: 8,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {active.name || 'Marca'}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              {projectCount} projeto{projectCount === 1 ? '' : 's'}
-              {hasCtx ? ' · contexto ON' : ' · sem contexto'}
-            </div>
-          </div>
-
-          <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)',
-            }}>
-              Brief da marca
-            </span>
-            <textarea
-              className="vc-input"
-              rows={3}
-              value={draftBrief}
-              placeholder="Produto, público, voz, restrições… (herdado por projetos novos)"
-              onChange={(e) => { setDraftBrief(e.target.value); setDirty(true); }}
-              style={{ resize: 'vertical', minHeight: 64, fontSize: 12, lineHeight: 1.45 }}
-            />
-          </label>
-
-          <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)',
-            }}>
-              Estilo visual
-            </span>
-            <textarea
-              className="vc-input"
-              rows={2}
-              value={draftStyle}
-              placeholder="Composição, tipografia, luz, atmosfera…"
-              onChange={(e) => { setDraftStyle(e.target.value); setDirty(true); }}
-              style={{ resize: 'vertical', minHeight: 48, fontSize: 12, lineHeight: 1.45 }}
-            />
-          </label>
-
-          {onSaveBrandContext ? (
-            <button
-              type="button"
-              className="vc-btn"
-              disabled={!dirty}
-              onClick={save}
-              style={{
-                minHeight: 36,
-                borderRadius: 9999,
-                border: 'none',
-                background: dirty ? 'var(--accent)' : 'var(--bg-pearl)',
-                color: dirty ? '#fff' : 'var(--text-muted)',
-                fontWeight: 600,
-                fontSize: 12,
-                opacity: dirty ? 1 : 0.7,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-            >
-              <Check size={13} />
-              Guardar contexto da marca
-            </button>
-          ) : null}
+      {active && part === 'switcher' ? (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          {projectCount} projeto{projectCount === 1 ? '' : 's'}
+          {hasCtx ? ' · contexto da marca ligado' : ' · sem brief de marca'}
         </div>
       ) : null}
+      {active && part === 'all' ? editors : null}
     </section>
   );
 }

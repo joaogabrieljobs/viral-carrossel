@@ -12,6 +12,36 @@ export const LOGO_SIZE_IMPORT = 300;
 export const LOGO_INLINE_MAX_BYTES = 256 * 1024;
 
 /**
+ * Retângulo clicável da logo dentro do quadrado do slider.
+ * A caixa segue o desenho (e o recorte opaco, se houver), não o PNG inteiro.
+ */
+export function logoContainHitRect(box, naturalW, naturalH, ink) {
+  const side = Math.max(1, Number(box) || 1);
+  const imgW = Math.max(1, Number(naturalW) || 1);
+  const imgH = Math.max(1, Number(naturalH) || 1);
+  const bounds = ink && ink.w > 0 && ink.h > 0 ? ink : { x: 0, y: 0, w: 1, h: 1 };
+  const fit = Math.min(side / imgW, side / imgH);
+  const renderedW = imgW * fit;
+  const renderedH = imgH * fit;
+  const offsetX = (side - renderedW) / 2;
+  const offsetY = (side - renderedH) / 2;
+  const raw = {
+    left: offsetX + bounds.x * renderedW,
+    top: offsetY + bounds.y * renderedH,
+    width: Math.max(1, bounds.w * renderedW),
+    height: Math.max(1, bounds.h * renderedH),
+  };
+  const pad = Math.min(12, Math.max(4, Math.min(raw.width, raw.height) * 0.08));
+  const left = Math.max(0, raw.left - pad);
+  const top = Math.max(0, raw.top - pad);
+  const right = Math.min(side, raw.left + raw.width + pad);
+  const bottom = Math.min(side, raw.top + raw.height + pad);
+  return {
+    left, top, width: Math.max(1, right - left), height: Math.max(1, bottom - top),
+  };
+}
+
+/**
  * Resolve a URL da logo a inserir em todos os cards. A logo específica do
  * projeto substitui a do perfil de marca; ambas vivem no IndexedDB.
  */

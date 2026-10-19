@@ -203,6 +203,54 @@ export const ELEMENT_CATALOG = Object.freeze([
       thickness: 2,
     }),
   },
+  {
+    id: 'rule_medium',
+    group: 'Linhas',
+    label: 'Traço médio',
+    hint: 'Mais grosso',
+    preview: 'rule_medium',
+    factory: () => ({
+      id: uid(),
+      type: 'rule',
+      x: 12,
+      y: 34,
+      w: 46,
+      color: '#3A322C',
+      thickness: 8,
+    }),
+  },
+  {
+    id: 'rule_long',
+    group: 'Linhas',
+    label: 'Traço longo',
+    hint: 'Quase a largura',
+    preview: 'rule_long',
+    factory: () => ({
+      id: uid(),
+      type: 'rule',
+      x: 8,
+      y: 18,
+      w: 84,
+      color: '#3A322C',
+      thickness: 6,
+    }),
+  },
+  {
+    id: 'rule_bold',
+    group: 'Linhas',
+    label: 'Barra',
+    hint: 'Faixa larga',
+    preview: 'rule_bold',
+    factory: () => ({
+      id: uid(),
+      type: 'rule',
+      x: 10,
+      y: 72,
+      w: 70,
+      color: '#1A1410',
+      thickness: 22,
+    }),
+  },
 ]);
 
 function makeCtaOverlay({
@@ -265,7 +313,7 @@ export function normalizeOverlay(raw) {
       ...base,
       w: clamp(raw.w, 4, 90, 28),
       color: String(raw.color || '#3A322C'),
-      thickness: clamp(raw.thickness, 0.5, 8, 1.5),
+      thickness: clamp(raw.thickness, 0.5, 48, 1.5),
     };
   }
   return {

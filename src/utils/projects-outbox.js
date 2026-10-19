@@ -242,7 +242,7 @@ function settleRecoveredPut(ownerId, sentOp) {
           setResult(true);
         } else {
           // Outra edição chegou enquanto a cópia era enviada. Ela permanece
-          // na fila e, se ainda conflitar, ganhará sua própria cópia.
+          // na fila e, se ainda conflitar, atualiza a mesma cópia.
           setResult(false);
         }
       } catch (error) { fail(error); }
@@ -343,31 +343,59 @@ function sameSavedEntry(local, remote) {
   return canonicalJson(localContent) === canonicalJson(remoteContent);
 }
 
+const CONFLICT_COPY_SUFFIX = ' (cópia de conflito)';
+
+/** Uma cópia por projeto. Novas gravações atualizam essa cópia em vez de abrir outra. */
+export function conflictCopyId(projectId) {
+  const clean = String(projectId || '').replace(/[^A-Za-z0-9._:-]/g, '');
+  if (clean.startsWith('conflict-')) return clean.slice(0, 120);
+  return `conflict-${clean}`.slice(0, 120);
+}
+
 function conflictCopyEntry(op) {
-  // O ID deriva do opId durável: se a resposta se perder, o próximo boot
-  // encontra a mesma cópia em vez de criar uma nova a cada tentativa.
-  const id = `conflict-${String(op.opId).replace(/[^A-Za-z0-9]/g, '').slice(0, 72)}`;
-  const name = String(op.entry?.name || 'Projeto').trim().slice(0, 120);
+  const id = conflictCopyId(op.projectId);
+  const rawName = String(op.entry?.name || 'Projeto').trim();
+  const name = rawName.endsWith(CONFLICT_COPY_SUFFIX)
+    ? rawName.slice(0, 160)
+    : `${rawName.slice(0, 120)}${CONFLICT_COPY_SUFFIX}`;
   return {
     ...op.entry,
     id,
-    name: `${name} (cópia de conflito)`,
+    name,
     conflictSourceId: op.projectId,
     createdAt: op.createdAt,
   };
+}
+
+async function saveConflictCopy(entry, baseVersion, op, { signal, expectedOwnerId }) {
+  return putProject(entry, { baseVersion, signal, expectedOwnerId, opId: op.opId });
 }
 
 async function recoverPutAsCopy(op, { signal, expectedOwnerId }) {
   const entry = conflictCopyEntry(op);
   let copy;
   try {
-    copy = await putProject(entry, { baseVersion: 0, signal, expectedOwnerId, opId: op.opId });
+    copy = await saveConflictCopy(entry, 0, op, { signal, expectedOwnerId });
   } catch (error) {
     if (!isProjectConflict(error)) throw error;
-    copy = await getProject(entry.id, { signal, expectedOwnerId });
-    if (!copy || copy.version !== 1 || !sameSavedEntry(entry, copy.entry)) throw error;
+    const existing = await getProject(entry.id, { signal, expectedOwnerId });
+    if (!existing || !Number.isSafeInteger(existing.version)) throw error;
+    if (sameSavedEntry(entry, existing.entry)) {
+      copy = existing;
+    } else {
+      try {
+        copy = await saveConflictCopy(entry, existing.version, op, { signal, expectedOwnerId });
+      } catch (updateError) {
+        if (!isProjectConflict(updateError)) throw updateError;
+        const latest = await getProject(entry.id, { signal, expectedOwnerId });
+        if (!latest || !Number.isSafeInteger(latest.version)) throw updateError;
+        copy = sameSavedEntry(entry, latest.entry)
+          ? latest
+          : await saveConflictCopy(entry, latest.version, op, { signal, expectedOwnerId });
+      }
+    }
   }
-  if (copy?.version !== 1) {
+  if (!Number.isSafeInteger(copy?.version) || copy.version < 1) {
     throw outboxError('A nuvem não confirmou a cópia do projeto em conflito.', 'project_conflict_copy_unconfirmed');
   }
   return {

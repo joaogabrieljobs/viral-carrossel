@@ -1,4 +1,4 @@
-import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, visibleLogoPosition } from '../../utils/slide-logo.js';
+import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, logoContainHitRect, visibleLogoPosition } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Layout, Minus, Plus, Video, User } from 'lucide-react';
@@ -277,6 +277,44 @@ function vcTextGlassSurfaceStyle(slide, f) {
 }
 
 /** O centro usa margem em vez de `transform`, preservando o translate do arraste livre. */
+function readLogoInk(img) {
+  const naturalW = img?.naturalWidth || 0;
+  const naturalH = img?.naturalHeight || 0;
+  if (!naturalW || !naturalH) return null;
+  try {
+    const sample = 180;
+    const scale = Math.min(1, sample / Math.max(naturalW, naturalH));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(naturalW * scale));
+    canvas.height = Math.max(1, Math.round(naturalH * scale));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minX = canvas.width;
+    let minY = canvas.height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        if (data[(y * canvas.width + x) * 4 + 3] < 16) continue;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < minX) return null;
+    return {
+      x: minX / canvas.width,
+      y: minY / canvas.height,
+      w: (maxX - minX + 1) / canvas.width,
+      h: (maxY - minY + 1) / canvas.height,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function looksBlankLogo(img) {
   if (!img || !img.naturalWidth) return false;
   try {
@@ -328,10 +366,12 @@ function BrandLogoLayer({
 }) {
   const [useFallback, setUseFallback] = React.useState(false);
   const [hidden, setHidden] = React.useState(false);
+  const [hit, setHit] = React.useState(null);
   React.useEffect(() => {
     setUseFallback(false);
     setHidden(false);
-  }, [src, fallbackSrc]);
+    setHit(null);
+  }, [src, fallbackSrc, sizePx]);
   const active = useFallback ? fallbackSrc : src;
   if (!active || typeof active !== 'string' || hidden) return null;
   const giveUp = () => {
@@ -339,28 +379,21 @@ function BrandLogoLayer({
     else setHidden(true);
   };
   const box = Math.max(1, Math.round(sizePx));
+  const incoming = elementProps?.style || {};
   const style = {
     position: 'absolute',
     width: box,
     height: box,
     opacity,
     zIndex,
-    pointerEvents: movable ? 'auto' : 'none',
+    pointerEvents: 'none',
+    transform: incoming.transform,
   };
   vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin);
-  if (elementProps?.style) {
-    Object.assign(style, elementProps.style);
-    style.width = box;
-    style.height = box;
-    style.position = 'absolute';
-    style.opacity = opacity;
-    style.zIndex = zIndex;
-    vcApplyLogoPosition(style, pos, margin, box, topOffset ?? margin);
-    if (elementProps.style.transform) style.transform = elementProps.style.transform;
-  }
   const { style: _ignored, ...handlers } = elementProps || {};
+  const hitBox = hit || { left: 0, top: 0, width: box, height: box };
   return (
-    <div {...handlers} style={style} aria-hidden={movable ? undefined : true}>
+    <div style={style} aria-hidden={movable ? undefined : true}>
       <img
         src={active}
         data-vc-brand-logo=""
@@ -369,7 +402,11 @@ function BrandLogoLayer({
         draggable={false}
         decoding="async"
         onError={giveUp}
-        onLoad={(event) => { if (looksBlankLogo(event.currentTarget)) giveUp(); }}
+        onLoad={(event) => {
+          const img = event.currentTarget;
+          if (looksBlankLogo(img)) { giveUp(); return; }
+          setHit(logoContainHitRect(box, img.naturalWidth, img.naturalHeight, readLogoInk(img)));
+        }}
         style={{
           width: '100%',
           height: '100%',
@@ -381,6 +418,24 @@ function BrandLogoLayer({
           userSelect: 'none',
         }}
       />
+      {movable ? (
+        <div
+          {...handlers}
+          data-vc-logo-hit=""
+          style={{
+            position: 'absolute',
+            left: hitBox.left,
+            top: hitBox.top,
+            width: hitBox.width,
+            height: hitBox.height,
+            pointerEvents: hit ? 'auto' : 'none',
+            cursor: incoming.cursor,
+            touchAction: incoming.touchAction,
+            outline: hit ? incoming.outline : undefined,
+            outlineOffset: hit ? incoming.outlineOffset : undefined,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1778,9 +1833,13 @@ const SlideCardInner = React.forwardRef(({
 
   const movArrasto = React.useCallback((chave, estiloBase) => {
     const drag = bindDrag(chave);
-    if (!drag) return { style: estiloBase };
-    return { ...drag, 'data-vc-movable': chave, style: { ...estiloBase, ...drag.style } };
-  }, [bindDrag]);
+    const onClick = (event) => {
+      event.stopPropagation();
+      onElementSelect?.(chave);
+    };
+    if (!drag) return { onClick, 'data-vc-movable': chave, style: estiloBase };
+    return { ...drag, onClick, 'data-vc-movable': chave, style: { ...estiloBase, ...drag.style } };
+  }, [bindDrag, onElementSelect]);
   const elementsUnlocked = slide.elementsUnlocked === true;
   /** Cultura/sanduíche nasce como composição automática. Depois de desbloquear,
    *  cada parte recebe o próprio arrasto sem mudar a geometria do layout. */
@@ -2170,6 +2229,7 @@ const SlideCardInner = React.forwardRef(({
             );
           }
           if (ov.type === 'rule') {
+            const hit = Math.round(Math.max(36, Math.min(f.h * 0.05, 64)));
             return (
               <div
                 key={ov.id}
@@ -2179,12 +2239,38 @@ const SlideCardInner = React.forwardRef(({
                   top: `${ov.y}%`,
                   width: `${ov.w}%`,
                   height: ov.thickness,
-                  background: ov.color,
-                  borderRadius: 2,
-                  zIndex: 27,
+                  zIndex: 32,
                   pointerEvents: movableElements ? 'auto' : 'none',
                 })}
-              />
+                title="Traço — arraste para mover"
+                aria-label="Traço. Arraste para mover."
+              >
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: '50%',
+                    height: hit,
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'auto',
+                  }}
+                />
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: ov.thickness,
+                    background: ov.color,
+                    borderRadius: 2,
+                    pointerEvents: 'none',
+                  }}
+                />
+              </div>
             );
           }
           return (
