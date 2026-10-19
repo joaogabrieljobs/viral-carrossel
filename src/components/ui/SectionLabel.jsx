@@ -1,12 +1,33 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 
 /**
  * Label de secção — hierarquia UX:
  * - kicker: passo / domínio (ex. "1 · Abrir")
  * - title: o que fazer aqui
  * - hint: uma frase de apoio (opcional)
+ * - fold: a secção nasce fechada; o título vira o resumo
  */
-export function SectionLabel({ title, children, className = '', hint, kicker, sectionId }) {
+export function SectionLabel({ title, children, className = '', hint, kicker, sectionId, fold = false }) {
+  if (fold) {
+    return (
+      <details
+        className={`vc-fold ${className}`.trim()}
+        data-vc-editor-section={sectionId || undefined}
+      >
+        <summary>
+          <span className="vc-fold-copy">
+            {kicker ? <span className="vc-fold-kicker">{kicker}</span> : null}
+            <span className="section-label">{title}</span>
+            {hint ? <span className="vc-fold-hint">{hint}</span> : null}
+          </span>
+          <ChevronDown size={16} className="vc-fold-chevron" aria-hidden />
+        </summary>
+        <div className="vc-fold-body">{children}</div>
+      </details>
+    );
+  }
+
   return (
     <div className={className} data-vc-editor-section={sectionId || undefined} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {kicker ? (

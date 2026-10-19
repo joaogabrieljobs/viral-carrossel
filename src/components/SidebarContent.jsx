@@ -349,6 +349,11 @@ function SidebarContent({
       const root = editorScrollRef.current;
       const section = root?.querySelector(`[data-vc-editor-section="${editorFocus.section}"]`);
       if (!root || !section) return false;
+      let node = section;
+      while (node && node !== root) {
+        if (node.tagName === 'DETAILS') node.open = true;
+        node = node.parentElement;
+      }
       const focusNode = section.querySelector('[data-vc-overlay-editor]') || section;
       const rootRect = root.getBoundingClientRect();
       const rect = focusNode.getBoundingClientRect();
@@ -2318,7 +2323,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Marcas" hint="Identidade desta marca. O brief abaixo vale para projetos novos. O projeto aberto tem o contexto dele, logo em seguida.">
+              <S title="Marcas" hint="Troca a marca activa. O brief fechado abaixo vale só para projetos novos.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{
@@ -2351,7 +2356,7 @@ function SidebarContent({
                   </div>
                   <ChevronRight size={13} color="var(--text-muted)"/>
                 </button>
-                {onSaveBrandContext && activeBrandId ? (
+                {appMode === 'criador' && onSaveBrandContext && activeBrandId ? (
                   <button
                     type="button"
                     className="vc-btn vc-btn-ghost"
@@ -2368,45 +2373,34 @@ function SidebarContent({
             )}
 
             {tab==='brand' && appMode !== 'criador' ? (
-              <details style={{
-                borderRadius: 12,
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-card)',
-                padding: '10px 12px',
-              }}>
-                <summary style={{
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  letterSpacing: '-0.011em',
-                }}>
-                  Brief da marca
-                  <span style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: 'var(--text-muted)',
-                  }}>
-                    Estilo e texto que só entram em projetos novos
-                  </span>
-                </summary>
-                <div style={{ marginTop: 10 }}>
-                  <BrandWorkspacePanel
-                    part="editors"
-                    brandRoster={brandRoster}
-                    activeBrandId={activeBrandId}
-                    onSaveBrandContext={onSaveBrandContext}
-                    projectCount={projectsForBrand(library, activeBrandId).length}
-                    toast={toast}
-                  />
-                </div>
-              </details>
+              <S fold title="Brief da marca" hint="Estilo e texto que só entram em projetos novos">
+                <BrandWorkspacePanel
+                  part="editors"
+                  brandRoster={brandRoster}
+                  activeBrandId={activeBrandId}
+                  onSaveBrandContext={onSaveBrandContext}
+                  projectCount={projectsForBrand(library, activeBrandId).length}
+                  toast={toast}
+                />
+                {onSaveBrandContext && activeBrandId ? (
+                  <button
+                    type="button"
+                    className="vc-btn vc-btn-ghost"
+                    onClick={() => {
+                      onSaveBrandContext(activeBrandId, styleKit);
+                      toast?.('Contexto deste projeto guardado na marca. Novos projetos herdam.', 'success', 4000);
+                    }}
+                    style={{ width: '100%', minHeight: 36, fontSize: 12 }}
+                  >
+                    Usar contexto deste projeto na marca
+                  </button>
+                ) : null}
+              </S>
             ) : null}
 
             {tab==='brand' && (
               <S
+                fold
                 title="Deste projeto"
                 hint={`${activeEntry?.name || 'Projeto'} · brief, estilo, referências e logo só deste projeto.`}
               >
@@ -2581,7 +2575,7 @@ function SidebarContent({
               </div>
             </S>)}
 
-            {tab==='brand' && (<S sectionId="marca-perfil" title="Perfil Instagram" hint={`A foto do perfil aparece no círculo colorido ao lado do @ nos ${itemsLabel} (aba Marca).`}>
+            {tab==='brand' && (<S fold sectionId="marca-perfil" title="Perfil Instagram" hint={brand.handle ? `@${String(brand.handle).replace(/^@/, '')}` : `Foto e @ nos ${itemsLabel}`}>
               <div>
                 <label className="vc-label-sm">@ Username</label>
                 <input
@@ -2829,9 +2823,10 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                fold
                 sectionId="marca-barra"
                 title="Barra editorial (topo)"
-                hint={`Faixa fina no topo do ${itemLabel}. Vem preenchida pelos padrões visuais — aqui você troca por texto seu. Deixe vazio para esconder.`}
+                hint="Esquerda, centro e ano. Vazio esconde."
               >
                 <div>
                   <label className="vc-label-sm">Esquerda</label>
@@ -2869,9 +2864,10 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                fold
                 sectionId="marca-selo"
-                title="Selo do rodapé (pill)"
-                hint={`Cápsula centrada na base do ${itemLabel} — CTA, hashtag ou handle. Vazio esconde.`}
+                title="Selo do rodapé"
+                hint={String(brand.footerPillText || '').trim() || 'CTA, hashtag ou @. Vazio esconde.'}
               >
                 <div>
                   <label className="vc-label-sm">Texto</label>
@@ -2923,9 +2919,10 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                fold
                 sectionId="marca-rodape"
-                title="Barra do rodapé (3 colunas)"
-                hint="Rodapé estilo ficha técnica. Use «rótulo|valor» para duas linhas — ex.: «Tema|Growth». Vazio esconde a coluna."
+                title="Barra do rodapé"
+                hint="Três colunas. Use rótulo|valor. Vazio esconde."
               >
                 {[
                   ['footerBarLeft', 'Esquerda', 'Tema|Growth'],
@@ -2948,7 +2945,7 @@ function SidebarContent({
             )}
 
             {tab==='brand' && (
-              <S sectionId="marca-ornamentos" title="Ornamentos" hint="Detalhes de assinatura que os padrões visuais ligam ou desligam.">
+              <S fold sectionId="marca-ornamentos" title="Ornamentos" hint="Estrela, contador e subtítulo.">
                 {[
                   ['showStarOrnament', 'Estrela de 8 pontas acima do título', false],
                   ['showPageBadge', 'Contador N/M no canto superior', false],
@@ -2971,9 +2968,10 @@ function SidebarContent({
 
             {tab==='brand' && (
               <S
+                fold
                 sectionId="marca-logo"
-                title="Logo"
-                hint={`Padrão da marca em todos os ${itemsLabel} · ajustes e ocultar só no ${itemLabel} ${activeIdx + 1}.`}
+                title="Logo nos cards"
+                hint={`Padrão da marca e ajuste do ${itemLabel} ${activeIdx + 1}. A logo do projeto fica em Deste projeto.`}
               >
                 <SlideLogoPanel
                   key={`${activeEntry?.id}-${slide.id}`}
@@ -2991,7 +2989,10 @@ function SidebarContent({
               </S>
             )}
 
-            {tab==='brand' && (<S title="Identidade verbal" hint="Esses campos viram contexto da IA em toda geração — quanto mais precisos, mais consistente a narrativa fica.">
+            {tab==='brand' && (<S fold title="Identidade verbal" hint={(() => {
+              const filled = [brand.bio, brand.positioning, brand.defaultTone, brand.defaultAudience, brand.signature, brand.links].filter((value) => String(value || '').trim()).length;
+              return filled ? `${filled} de 6 preenchidos · a IA usa isto na geração` : 'Bio, tom, público e assinatura. A IA usa isto na geração.';
+            })()}>
               <div>
                 <label className="vc-label-sm">Bio / o que faço</label>
                 <textarea

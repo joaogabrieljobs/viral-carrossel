@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { FileText, Image as ImageIcon, Trash2, Upload, X } from 'lucide-react';
+import { ChevronDown, FileText, Image as ImageIcon, Trash2, Upload, X } from 'lucide-react';
 import {
   MAX_REF_IMAGES,
   CONTEXT_MD_MAX,
@@ -13,6 +13,7 @@ import { storeProjectReference } from '../../utils/style-kit-storage.js';
 import { storeSlideLogo, projectLogoFromStored } from '../../utils/slide-logo.js';
 import { ContextStatusBar } from './ContextStatusBar.jsx';
 import { BrandTonePanel } from './BrandTonePanel.jsx';
+import { brandToneIsReady, normalizeBrandTone } from '../../utils/brand-tone.js';
 
 function ReferenceThumbnail({ reference }) {
   const [src, setSrc] = useState(reference.dataUrl || '');
@@ -28,6 +29,27 @@ function ReferenceThumbnail({ reference }) {
   return src
     ? <img src={src} alt={reference.name || 'Referência'} title={reference.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
     : <span>Reenvie a imagem</span>;
+}
+
+function Fold({ title, note, children }) {
+  return (
+    <details className="vc-fold">
+      <summary>
+        <span className="vc-fold-copy">
+          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.011em', color: 'var(--text-primary)' }}>{title}</span>
+          {note ? <span className="vc-fold-hint">{note}</span> : null}
+        </span>
+        <ChevronDown size={16} className="vc-fold-chevron" aria-hidden />
+      </summary>
+      <div className="vc-fold-body">{children}</div>
+    </details>
+  );
+}
+
+function clipNote(value, empty) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return empty;
+  return text.length > 72 ? `${text.slice(0, 72)}…` : text;
 }
 
 function Field({ label, hint, children }) {
@@ -175,7 +197,7 @@ function ProjectStyleKitPanel({
         />
       </Field>
 
-      <Field label="Logo" hint="PNG transparente. Preferência: aplicar nos novos cards do projeto.">
+      <Fold title="Logo deste projeto" note={kit.logo?.name || 'Sem logo. A seção Logo nos cards aplica nos slides.'}>
         {kit.logo ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -201,9 +223,9 @@ function ProjectStyleKitPanel({
         >
           {kit.logo ? 'Trocar logo' : 'Importar logo PNG'}
         </button>
-      </Field>
+      </Fold>
 
-      <Field label="Brief" hint="CLAUDE.md / .txt — produto, público, regras.">
+      <Fold title="Brief" note={clipNote(kit.contextMd, 'Produto, público e regras. Vazio.')}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
@@ -250,22 +272,24 @@ function ProjectStyleKitPanel({
             {kit.contextMd.length.toLocaleString('pt-BR')} caracteres
           </div>
         ) : null}
-      </Field>
+      </Fold>
 
       {setBrand ? (
-        <BrandTonePanel
-          brand={brand}
-          setBrand={setBrand}
-          onAnalyze={onAnalyzeBrandTone}
-          analyzing={analyzingBrandTone}
-          hasTextAI={hasOpenAI}
-          onNeedKeys={onNeedKeys}
-          toast={toast}
-          projectId={projectId}
-        />
+        <Fold title="Tom de voz" note={brandToneIsReady(brand) ? clipNote(normalizeBrandTone(brand?.brandTone).summary, 'Tom analisado') : 'Ainda não analisado'}>
+          <BrandTonePanel
+            brand={brand}
+            setBrand={setBrand}
+            onAnalyze={onAnalyzeBrandTone}
+            analyzing={analyzingBrandTone}
+            hasTextAI={hasOpenAI}
+            onNeedKeys={onNeedKeys}
+            toast={toast}
+            projectId={projectId}
+          />
+        </Fold>
       ) : null}
 
-      <Field label="Estilo visual" hint="Composição, tipografia, paleta, luz — direção dos cards.">
+      <Fold title="Estilo visual" note={clipNote(kit.stylePrompt, 'Composição, luz e paleta. Vazio.')}>
         <textarea
           aria-label="Estilo visual do projeto"
           value={kit.stylePrompt || ''}
@@ -275,9 +299,9 @@ function ProjectStyleKitPanel({
           className="vc-input vc-textarea"
           style={{ minHeight: 100, resize: 'vertical', lineHeight: 1.5, fontSize: 13 }}
         />
-      </Field>
+      </Fold>
 
-      <Field label="Referências" hint={`Moodboard (até ${MAX_REF_IMAGES}). Usadas se o slide não tiver referência própria.`}>
+      <Fold title="Referências" note={refs.length ? `${refs.length} de ${MAX_REF_IMAGES}` : `Nenhuma · até ${MAX_REF_IMAGES}`}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {refs.map((r) => (
             <div
@@ -324,7 +348,7 @@ function ProjectStyleKitPanel({
             </button>
           ) : null}
         </div>
-      </Field>
+      </Fold>
 
       {hasContent ? (
         <button

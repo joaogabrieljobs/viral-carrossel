@@ -1241,4 +1241,61 @@ export const GLOBAL_STYLE = `
   .vc-adjust-details > summary::-webkit-details-marker {
     display: none;
   }
+
+  .vc-fold {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--bg-card);
+  }
+  .vc-fold > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .vc-fold > summary::-webkit-details-marker {
+    display: none;
+  }
+  .vc-fold-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .vc-fold-hint {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: -0.011em;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-weight: 500;
+    text-transform: none;
+  }
+  .vc-fold-chevron {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 0.16s ease;
+  }
+  .vc-fold[open] > summary .vc-fold-chevron {
+    transform: rotate(180deg);
+  }
+  .vc-fold:not([open]) > .vc-fold-body {
+    display: none;
+  }
+  .vc-fold[open] > .vc-fold-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 14px 14px;
+  }
+  .vc-fold .vc-fold {
+    background: var(--bg-pearl);
+  }
 `;
