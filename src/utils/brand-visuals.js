@@ -2,6 +2,7 @@
 import { Plus } from 'lucide-react';
 import { hydrateBrandTextColors } from './brand-helpers.js';
 import { DARK_CREAM } from './slide-design-system.js';
+import { wcagContrast } from './wcag.js';
 
 /** Converte `#RGB`/`#RRGGBB`; retorna `{r,g,b}` ou null */
 function vcHexToRgb(hex) {
@@ -30,6 +31,42 @@ function vcRelLuminance01(rgb) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+function mixHex(fromHex, toHex, t) {
+  const from = vcHexToRgb(fromHex);
+  const to = vcHexToRgb(toHex);
+  if (!from || !to) return fromHex;
+  const ch = (k) => Math.round(from[k] + (to[k] - from[k]) * t);
+  return `#${['r', 'g', 'b'].map((k) => ch(k).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Mantém a cor pedida quando ela ainda se lê. Se não, usa o fallback. */
+function inkIfReadable(candidate, bgHex, fallback, minRatio = 3) {
+  const bg = vcNormalizeHex(bgHex);
+  const fg = vcNormalizeHex(candidate);
+  if (!bg || !fg) return fallback || candidate;
+  if (wcagContrast(fg, bg) >= minRatio) return candidate;
+  return fallback;
+}
+
+/**
+ * Segunda cor do brief (rose, acento) no fundo real do card.
+ * Clareia ou escurece o mesmo tom até passar contraste. Não troca por outro matiz.
+ */
+function accentInkOnSurface(accentHex, bgHex) {
+  const accent = vcNormalizeHex(accentHex) || '#000000';
+  const bg = vcNormalizeHex(bgHex) || '#ffffff';
+  if (wcagContrast(accent, bg) >= 3) return accent;
+  const rgb = vcHexToRgb(bg);
+  const toward = rgb && vcRelLuminance01(rgb) <= 0.45 ? '#ffffff' : '#000000';
+  let best = accent;
+  for (let i = 1; i <= 10; i += 1) {
+    const next = mixHex(accent, toward, i / 10);
+    best = next;
+    if (wcagContrast(next, bg) >= 3) return next;
+  }
+  return best;
+}
+
 /**
  * Cores de texto / destaque a partir da luminância REAL do fundo do card Cultura/Tendência.
  * O modo «par/ímpar» (surface light/dark) não garante fundo claro em «light» quando `brand.bg` é cinza‑carvão —
@@ -44,11 +81,9 @@ function cultureReadableInks(bgSolidHex, carouselTitleInk, carouselBodyInk, bran
 
   const darkBG = L <= 0.45;
   const lightBG = L >= 0.58;
+  const accentInk = accentInkOnSurface(accentHex, fb || (darkBG ? '#111111' : '#ffffff'));
 
   if (darkBG) {
-    const aRgb = vcHexToRgb(vcNormalizeHex(accentHex) || '#000000');
-    const aL = aRgb ? vcRelLuminance01(aRgb) : 0;
-    const accentInk = !aRgb || aL < 0.42 ? '#dceeb1' : accentHex;
     return {
       titleInk: DARK_CREAM.title,
       subtitleInk: DARK_CREAM.subtitle,
@@ -64,17 +99,17 @@ function cultureReadableInks(bgSolidHex, carouselTitleInk, carouselBodyInk, bran
       subtitleInk: carouselBodyInk,
       bodyInk: carouselBodyInk,
       inkMuted: 'rgba(29,29,31,0.48)',
-      accentInk: accentHex,
+      accentInk,
       solidBgIsLight: true,
     };
   }
-  /* Fundos de luminância intermédia (ex.: acento saturado) — texto sempre claro + destaque pastel Figma */
+  /* Fundos de luminância intermédia (ex.: acento saturado) — texto sempre claro. */
   return {
     titleInk: '#ffffff',
     subtitleInk: 'rgba(255,255,255,0.92)',
     bodyInk: 'rgba(255,255,255,0.82)',
     inkMuted: 'rgba(255,255,255,0.62)',
-    accentInk: '#dceeb1',
+    accentInk,
     solidBgIsLight: false,
   };
 }
@@ -239,6 +274,8 @@ export {
   vcHexToRgb,
   vcNormalizeHex,
   vcRelLuminance01,
+  inkIfReadable,
+  accentInkOnSurface,
   cultureReadableInks,
   brandMatchesPalette,
   BODY_FONTS,

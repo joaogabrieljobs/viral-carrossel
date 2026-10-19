@@ -22,6 +22,8 @@ import {
   LOGO_INLINE_MAX_BYTES,
   resolveLogoAssetSource,
   logoContainHitRect,
+  classifyLogoPixels,
+  logoToneForSurface,
 } from '../../src/utils/slide-logo.js';
 import { exportProjectReferences, migrateProjectReferences } from '../../src/utils/style-kit-storage.js';
 import { normalizeStyleKit } from '../../src/utils/style-kit.js';
@@ -198,5 +200,40 @@ describe('logo por card', () => {
     expect(ink.height).toBeLessThan(120);
     expect(ink.top).toBeLessThan(80);
     expect(ink.width).toBeLessThan(400);
+  });
+});
+
+describe('logo no grafite', () => {
+  function pixels(width, height, paint) {
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 4;
+        const [r, g, b, a] = paint(x, y);
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+        data[i + 3] = a;
+      }
+    }
+    return data;
+  }
+
+  it('tira a placa branca e deixa o desenho', () => {
+    const plate = pixels(8, 8, (x, y) => (
+      x >= 3 && x <= 4 && y >= 3 && y <= 4 ? [20, 20, 20, 255] : [255, 255, 255, 255]
+    ));
+    expect(classifyLogoPixels(plate)).toMatchObject({ hide: false, punchWhite: true });
+    const blank = pixels(8, 8, () => [255, 255, 255, 255]);
+    expect(classifyLogoPixels(blank).hide).toBe(true);
+  });
+
+  it('clareia logo escura no grafite e preserva logo colorida', () => {
+    expect(logoToneForSurface(0.08, 0, '#1c1c1c')).toBe('light');
+    expect(logoToneForSurface(0.45, 0.4, '#1c1c1c')).toBe('original');
+    const mark = pixels(8, 8, (x, y) => (
+      x === 2 && y === 2 ? [10, 10, 10, 255] : [0, 0, 0, 0]
+    ));
+    expect(classifyLogoPixels(mark)).toMatchObject({ hide: false, punchWhite: false });
   });
 });

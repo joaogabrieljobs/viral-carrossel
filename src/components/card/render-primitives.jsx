@@ -95,7 +95,7 @@ function CultureInlineRich({
             fontWeight: 800,
           }}>{p.v}</span>
         ) : p.type === 'italic' ? (
-          <span key={i} data-vc-italic style={{ fontStyle: 'italic' }}>{p.v}</span>
+          <span key={i} data-vc-italic style={{ fontStyle: 'italic', color: accentColor || 'inherit' }}>{p.v}</span>
         ) : (
           <span key={i}>{p.v}</span>
         ),

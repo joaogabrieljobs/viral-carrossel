@@ -1,4 +1,5 @@
 import { imagePut, newImageId, imagemComoDataUrl, dataUrlParaBlob, blobParaDataUrl } from './image-store.js';
+import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01 } from './brand-visuals.js';
 
 /** Tamanho em px na escala 1080 (caixa da logo no card). */
 export const LOGO_SIZE_MIN = 48;
@@ -277,6 +278,54 @@ export function projectLogoFromStored(stored, name = 'Logo do projeto') {
   return stored.logoImageId
     ? { imageId: stored.logoImageId, name }
     : { dataUrl: stored.logoImage, name };
+}
+
+/**
+ * Lê uma amostra RGBA e decide se a logo é uma placa branca, um desenho
+ * transparente ou um quadrado vazio. `data` é Uint8ClampedArray ou array.
+ */
+export function classifyLogoPixels(data) {
+  const px = data || [];
+  const total = Math.floor(px.length / 4);
+  if (!total) return { hide: false, punchWhite: false, inkLuminance: 1, chroma: 0 };
+  let opaque = 0;
+  let nearWhite = 0;
+  let ink = 0;
+  let lum = 0;
+  let chroma = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 16) continue;
+    opaque += 1;
+    const r = px[i];
+    const g = px[i + 1];
+    const b = px[i + 2];
+    if (r >= 245 && g >= 245 && b >= 245) {
+      nearWhite += 1;
+      continue;
+    }
+    ink += 1;
+    lum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    chroma += (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+  }
+  const plate = opaque / total > 0.72 && nearWhite / Math.max(1, opaque) > 0.85;
+  return {
+    hide: plate && ink === 0,
+    punchWhite: plate && ink > 0,
+    inkLuminance: ink ? lum / ink : 1,
+    chroma: ink ? chroma / ink : 0,
+  };
+}
+
+/** Logo escura em fundo escuro fica clara, e o inverso. Cor com matiz fica como está. */
+export function logoToneForSurface(inkLuminance, chroma, surfaceHex, explicitTone) {
+  if (explicitTone === 'dark' || explicitTone === 'light') return explicitTone;
+  if ((chroma || 0) > 0.12) return 'original';
+  const rgb = vcHexToRgb(vcNormalizeHex(surfaceHex) || '');
+  if (!rgb) return 'original';
+  const L = vcRelLuminance01(rgb);
+  if (L <= 0.45 && inkLuminance < 0.55) return 'light';
+  if (L >= 0.7 && inkLuminance > 0.75) return 'dark';
+  return 'original';
 }
 
 /** Logo no centro de um card com texto cobre a frase. Sem arrasto, fica no canto. */

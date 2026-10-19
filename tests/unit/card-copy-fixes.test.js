@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { cultureAccentRenderablePieces } from '../../src/utils/text-spans.js';
+import { cultureReadableInks, inkIfReadable } from '../../src/utils/brand-visuals.js';
+import { DARK_CREAM } from '../../src/utils/slide-design-system.js';
 import { collectSourceHosts, restoreSourceHosts } from '../../src/utils/generation-prompts.js';
 import { explicitBrandColorsFromKit } from '../../src/utils/style-kit-design.js';
 import { ensureDocShape, repairDefaultBrandHandle } from '../../src/utils/doc-schema.js';
@@ -17,6 +19,33 @@ describe('itálico do card', () => {
     const pieces = cultureAccentRenderablePieces('A CADEIRA **vazia** DO MARCOS');
     expect(pieces.find((p) => p.v === 'vazia')?.type).toBe('accent');
     expect(pieces.some((p) => p.type === 'italic')).toBe(false);
+  });
+
+  it('trata _esvaziou_ como itálico e não mostra o underscore', () => {
+    const pieces = cultureAccentRenderablePieces('A AGENDA QUE _esvaziou_');
+    expect(pieces.map((p) => p.v).join('')).toBe('A AGENDA QUE esvaziou');
+    expect(pieces.find((p) => p.v === 'esvaziou')?.type).toBe('italic');
+    expect(pieces.some((p) => p.v.includes('_'))).toBe(false);
+  });
+
+  it('não parte snake_case nem domínio', () => {
+    const pieces = cultureAccentRenderablePieces('get_webexpresso.com ficou no ar');
+    expect(pieces.map((p) => p.v).join('')).toBe('get_webexpresso.com ficou no ar');
+    expect(pieces.some((p) => p.type === 'italic')).toBe(false);
+  });
+});
+
+describe('contraste do título no grafite', () => {
+  it('troca preto do minimal clean por tinta clara e mantém o rose', () => {
+    const inks = cultureReadableInks('#1c1c1c', '#0a0a0a', '#3a3a3a', '#c45c6a');
+    expect(inkIfReadable('#0a0a0a', '#1c1c1c', inks.titleInk, 3)).toBe(DARK_CREAM.title);
+    expect(inkIfReadable('#3a3a3a', '#1c1c1c', inks.subtitleInk, 3)).toBe(inks.subtitleInk);
+    expect(inks.titleInk).toBe(DARK_CREAM.title);
+    expect(inks.accentInk.toLowerCase()).toBe('#c45c6a');
+  });
+
+  it('mantém o preto quando o fundo é claro', () => {
+    expect(inkIfReadable('#0a0a0a', '#fafaf6', '#ffffff', 3)).toBe('#0a0a0a');
   });
 });
 

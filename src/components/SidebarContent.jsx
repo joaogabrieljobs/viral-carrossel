@@ -900,10 +900,6 @@ function SidebarContent({
             panel={narrativaPanel}
             setPanel={setNarrativaPanel}
             styleKit={styleKit}
-            setStyleKit={setStyleKit}
-            toast={toast}
-            projectName={activeEntry?.name}
-            projectId={activeDocId || activeEntry?.id}
             quickPrompt={quickPrompt}
             setQuickPrompt={setQuickPrompt}
             onQuickGenerate={async (text, options) => {
@@ -916,8 +912,6 @@ function SidebarContent({
             onNarrativeModeChange={onQuickNarrativeModeChange}
             brand={brand}
             setBrand={setBrand}
-            onAnalyzeBrandTone={analyzeBrandTone}
-            analyzingBrandTone={analyzingBrandTone}
             hasOpenAI={hasTextAI}
             onOpenBrandContext={() => setTab('brand')}
             activeIdx={activeIdx}
@@ -2323,7 +2317,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Marcas" hint="Troca a marca activa. O brief fechado abaixo vale só para projetos novos.">
+              <S title="Marcas" hint="Troca a marca ativa. O brief fechado abaixo vale só para projetos novos.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{

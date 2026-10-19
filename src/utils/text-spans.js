@@ -35,28 +35,33 @@ function normalizeDestaqueSpansForLen(spans, len) {
   );
 }
 
-/** Regiões “acento” apenas no interior de `\*\*…\*\*` (asteriscos não pintados). */
+/** Regiões “acento” apenas no interior de `\*\*…\*\*` ou `__…__` (marcadores não pintados). */
 function markdownBoldAccentIntervalsUtf16(full) {
   const s = String(full ?? '');
   const iv = [];
-  const re = /\*\*([^*]+)\*\*/g;
+  const re = /\*\*([^*]+)\*\*|__([^_\n]+)__/g;
   let m;
   while ((m = re.exec(s)) !== null) iv.push([m.index + 2, m.index + m[0].length - 2]);
   return mergeUtf16AccentIntervals(iv);
 }
 
-/** Itálico de um asterisco só. Não pega o miolo de `**negrito**`. */
+/** Itálico de um asterisco ou underscore. Não pega o miolo de `**negrito**` nem `__negrito__`. */
 function markdownItalicIntervalsUtf16(full) {
   const s = String(full ?? '');
   const bold = markdownBoldAccentIntervalsUtf16(s);
   const iv = [];
-  const re = /(^|[^*])\*([^*\n]+)\*(?!\*)/g;
-  let m;
-  while ((m = re.exec(s)) !== null) {
-    const start = m.index + m[1].length + 1;
-    const end = start + m[2].length;
-    const insideBold = bold.some(([lo, hi]) => start >= lo && end <= hi);
-    if (!insideBold) iv.push([start, end]);
+  const patterns = [
+    /(^|[^*])\*([^*\n]+)\*(?!\*)/g,
+    /(^|[^A-Za-z0-9_])_([^_\n]+)_(?!_)/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(s)) !== null) {
+      const start = m.index + m[1].length + 1;
+      const end = start + m[2].length;
+      const insideBold = bold.some(([lo, hi]) => start >= lo && end <= hi);
+      if (!insideBold) iv.push([start, end]);
+    }
   }
   return mergeUtf16AccentIntervals(iv);
 }
@@ -68,16 +73,16 @@ function unifyAccentIntervalsUtf16(full, explicitSpans) {
   return mergeUtf16AccentIntervals([...md, ...ex]);
 }
 
-/** Remove pares `**` e `*` colados às zonas (marcadores Markdown — não aparecem no cartão). */
+/** Remove pares `**`, `__`, `*` e `_` colados às zonas (marcadores — não aparecem no cartão). */
 function stripAdjacentMarkdownBoldFences(fragment) {
   let s = String(fragment ?? '');
   let prev = null;
   while (prev !== s) {
     prev = s;
-    if (s.startsWith('**')) s = s.slice(2);
-    else if (s.startsWith('*')) s = s.slice(1);
-    if (s.endsWith('**')) s = s.slice(0, -2);
-    else if (s.endsWith('*')) s = s.slice(0, -1);
+    if (s.startsWith('**') || s.startsWith('__')) s = s.slice(2);
+    else if (s.startsWith('*') || s.startsWith('_')) s = s.slice(1);
+    if (s.endsWith('**') || s.endsWith('__')) s = s.slice(0, -2);
+    else if (s.endsWith('*') || s.endsWith('_')) s = s.slice(0, -1);
   }
   return s;
 }

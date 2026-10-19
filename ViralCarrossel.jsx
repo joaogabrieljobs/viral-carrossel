@@ -80,9 +80,10 @@ import {
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
+import { isPitchPath, cleanPitchSlide, PITCH_PROVENANCE_RULE } from './src/utils/pitch-content.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
-import PromptDialog from './src/components/PromptDialog.jsx';
+import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
@@ -2583,6 +2584,7 @@ export default function App() {
   const [captionEditorIdx, setCaptionEditorIdx] = useState(null);
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
+  const [replaceCardsPrompt, setReplaceCardsPrompt] = useState(null);
   const [imageCropOpen, setImageCropOpen] = useState(false);
   const [photoPositionOpen, setPhotoPositionOpen] = useState(false);
   const { aiSettings, setAISettings, openaiKey, anthropicKey } = useAiSettings();
@@ -4757,7 +4759,9 @@ export default function App() {
       return { cancelled: true };
     }
     if (!remix && projectHasCarouselContent(slides)) {
-      const ok = window.confirm('Este projeto já tem cards. Gerar substitui os cards atuais. Desfazer recupera esta versão. Quer continuar?');
+      const ok = await new Promise((resolve) => {
+        setReplaceCardsPrompt({ resolve });
+      });
       if (!ok) return { cancelled: true };
     }
     const generationProjectId = activeProjectRef.current;
@@ -4840,13 +4844,13 @@ export default function App() {
     const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode)}
 Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
     const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()));
-    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count);
+    const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
     const apresentacaoPackBlock = isPresentationGeneration
       ? buildApresentacaoPackBlock(count, presentationPathId)
       : '';
     const apresentacaoDesignBlock = isPresentationGeneration
-      ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef)
+      ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId)
       : '';
     const presentationRoute = isPresentationGeneration
       ? getPresentationPath(presentationPathId)
@@ -4871,7 +4875,7 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const persoHybridActive = isPersoHybridDensity(cp, td);
     const projectDesignInstructions = remix ? '' : buildProjectDesignInstructions(styleKit);
     const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
-    const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null);
+    const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null, presentationPathId);
 
     const idiomaRegra = `
 REGRA DE IDIOMA (obrigatória):
@@ -4959,6 +4963,7 @@ ${jsonShapeLine}`;
         count: Number(count),
         presetId: cp,
         densityId: td,
+        presentationPath: presentationPathId,
         presentationTextLimits,
       },
       aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
@@ -4978,13 +4983,19 @@ ${jsonShapeLine}`;
     const presetBrand = generationPresetId
       ? applyVisualPreset(brand, generationPresetId, visualPresets)
       : brand;
-    const generationBrand = {
+    let generationBrand = {
       ...presetBrand,
       ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked)
         ? projectDesignBrandPatch(result.projectDesign)
         : {}),
       ...explicitBrandColorsFromKit(styleKit),
     };
+    if (!generationBrand.logo && generationBrand.logoImageId) {
+      try {
+        const hydratedLogo = await resolveLogoDataUrl(generationBrand, {});
+        if (hydratedLogo) generationBrand = { ...generationBrand, logo: hydratedLogo };
+      } catch { /* logo opcional — geração segue sem bloquear */ }
+    }
     let projectLogoAsset = null;
     if (styleKit?.logoOnGenerate !== false && styleKit?.logo) {
       try {
@@ -4994,6 +5005,12 @@ ${jsonShapeLine}`;
           logoImage: logoUrl,
         };
       } catch { /* logo opcional — geração segue sem bloquear */ }
+    }
+    if (!projectLogoAsset && styleKit?.logoOnGenerate !== false && generationBrand.logo) {
+      projectLogoAsset = {
+        logoImageId: generationBrand.logoImageId || null,
+        logoImage: generationBrand.logo,
+      };
     }
     const resolvedImgMode = normalizeSlideImgMode(chosenMode || 'dalle');
     const nSlides = result.slides.length;
@@ -5340,8 +5357,8 @@ ${jsonShapeLine}`;
     } else if (!remix && result.slides.some(s => (s.imageQuery || '').trim())) {
       toast(
         isPresentationGeneration
-          ? 'Imagens não foram geradas agora — os slides já têm áreas prontas para importar ou gerar uma imagem.'
-          : 'Imagens não foram geradas agora — já existem zonas de foto nos cards (toque na área para importar ou use «Gerar imagem»).',
+          ? 'Imagens não foram geradas agora. Os slides já têm áreas prontas para importar ou gerar uma imagem.'
+          : 'Imagens não foram geradas agora. Já existem zonas de foto nos cards (toque na área para importar ou use «Gerar imagem»).',
         'info',
         5500,
       );
@@ -5420,16 +5437,16 @@ ${brandBlock}${projectContextBlock}${styleKitTextHint}${materialBlock}${material
 Slide ${activeIdx+1} (atual):
 Título: "${slide.title}"
 Subtítulo: "${slide.subtitle}"
-${refineNeedsBodyAfter ? `${isPresentationRefine ? 'Fonte, unidade, período, ressalva ou instrução' : 'Corpo abaixo da imagem / bloco inferior'} — bodyAfterImage atual:\n${JSON.stringify(slide.bodyAfterImage ?? '')}\n` : ''}
+${refineNeedsBodyAfter ? `${isPresentationRefine ? 'Conteúdo complementar' : 'Corpo abaixo da imagem / bloco inferior'} — bodyAfterImage atual:\n${JSON.stringify(slide.bodyAfterImage ?? '')}\n` : ''}
 Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
 ${isPresentationRefine ? buildApresentacaoRefineHint(presentationPath) : ''}
 ${presentationRefineLimitsBlock}
-${isPresentationRefine ? '- Preserve bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Nunca invente fonte, número, unidade ou período.\n' : ''}
+${isPresentationRefine ? isPitchPath(presentationPath) ? '- Desenvolva subtitle e bodyAfterImage com argumentos sustentados quando a instrução pedir aprofundamento. Preserve números, unidades, períodos e ressalvas reais.\n' : '- Preserve bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Nunca invente fonte, número, unidade ou período.\n' : ''}
 ${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
-${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset, slideIndex: activeIdx, slideCount: nSl })}
+${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset, slideIndex: activeIdx, slideCount: nSl, presentationPath })}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
 
@@ -5445,6 +5462,7 @@ Retorne exatamente: ${singleJson}`,
         patch.bodyAfterImage = stripLeadingSlideCardLabel(String(r.bodyAfterImage).trim());
       }
       if (isPresentationRefine) {
+        if (isPitchPath(presentationPath)) Object.assign(patch, cleanPitchSlide(patch));
         const candidateSlides = slides.map((item, index) => (
           index === activeIdx ? { ...item, ...patch } : item
         ));
@@ -5488,6 +5506,7 @@ ${buildCaptionOutlineInstructions(mode, creativePreset)}
 
 REGRAS:
 ${capRules}
+${isPresentationSummary && isPitchPath(presentationPath) ? PITCH_PROVENANCE_RULE : ''}
 ${isPresentationSummary
   ? '- Sintetize a tese, os principais pontos e a decisão ou próximo passo. Não use hashtags, gatilhos sociais ou pedidos para compartilhar.'
   : '- Hashtags no final, na quantidade indicada nas REGRAS acima.'}
@@ -5706,7 +5725,7 @@ ${isPresentationSummary
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
       const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
-      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length);
+      const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath);
       const refinePrompt = refiningPresentation
         ? `Atue como editor de apresentações profissionais. Reescreva TODOS os slides do deck 16:9 abaixo aplicando a instrução do usuário, preservando uma progressão própria de apresentação e o caminho ${getPresentationPath(presentationPath).label}.
 
@@ -5722,7 +5741,7 @@ ${presentationRefineLimitsBlock}
 - Mantenha exatamente ${slides.length} slides na mesma ordem e uma ideia central por slide.
 - Nos slides de conteúdo, escreva o título como conclusão sustentada pelo subtítulo ou pela evidência disponível.
 - Não invente números, fontes, resultados ou fatos ausentes do material.
-- Preserve cada bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Use esse campo somente para fonte, unidade, período, ressalva ou instrução.
+${isPitchPath(presentationPath) ? '- Desenvolva subtitle e bodyAfterImage quando houver argumento, exemplo ou evidência sustentados; preserve os fatos e as ressalvas, sem repetir slogans.' : '- Preserve cada bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Use esse campo somente para fonte, unidade, período, ressalva ou instrução.'}
 - Não use ganchos, cliffhangers, “arraste”, hashtags nem CTA de Instagram.
 - Respeite a identidade verbal, o modo de entrega e o material acima.
 
@@ -5765,7 +5784,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         const isHybridSandwich =
           isPersoHybridDensity(creativePreset, slideTextDensity) && i >= 2;
         const allowBodyAfter = refiningPresentation || isCultureSandwich || isHybridSandwich;
-        return {
+        const refined = {
           ...s,
           title: stripLeadingSlideCardLabel(String(r.slides[i]?.title ?? s.title ?? '').trim()),
           subtitle: stripLeadingSlideCardLabel(String(r.slides[i]?.subtitle ?? s.subtitle ?? '').trim()),
@@ -5773,6 +5792,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             ? { bodyAfterImage: stripLeadingSlideCardLabel(String(r.slides[i].bodyAfterImage).trim()) }
             : {}),
         };
+        return refiningPresentation && isPitchPath(presentationPath) ? cleanPitchSlide(refined) : refined;
       });
       const refinedSlides = applyRefinedSlides(slides);
       if (refiningPresentation) {
@@ -7763,6 +7783,20 @@ Retorne APENAS JSON: ${refineAllWantsBody
           toast('Gancho atualizado', 'success');
         }}
       />}
+      <ConfirmDialog
+        open={!!replaceCardsPrompt}
+        title="Substituir os cards?"
+        body="Este projeto já tem cards. Gerar substitui os cards atuais. Desfazer recupera esta versão."
+        confirmLabel="Substituir"
+        onCancel={() => {
+          replaceCardsPrompt?.resolve(false);
+          setReplaceCardsPrompt(null);
+        }}
+        onConfirm={() => {
+          replaceCardsPrompt?.resolve(true);
+          setReplaceCardsPrompt(null);
+        }}
+      />
       <PromptDialog
         open={imgPrompt.open}
         title={imgPrompt.title || 'Editar'}

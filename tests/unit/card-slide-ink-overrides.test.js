@@ -47,6 +47,32 @@ describe('cores individuais do card', () => {
     expect(html).toMatch(/<p[^>]*style="[^"]*color:#665447/);
   });
 
+  it('no grafite, o título automático fica claro e o _trecho_ sai em rose sem o underscore', () => {
+    const graphite = {
+      ...DEFAULT_BRAND,
+      bg: '#1c1c1c',
+      titleColor: '#0a0a0a',
+      subtitleColor: '#3a3a3a',
+      textColor: '#5a5a5a',
+      accent: '#c45c6a',
+    };
+    const slide = {
+      ...mkSlide(1, graphite),
+      title: 'A AGENDA QUE _esvaziou_',
+      subtitle: 'Lúcia terminou a sexta.',
+      canvas: { enabled: true, applied: true, variant: 'classic', zones: DEFAULT_CANVAS_ZONES_CLASSIC },
+      overlay: 0,
+      bgImage: null,
+    };
+    const html = renderToStaticMarkup(React.createElement(SlideCardInner, {
+      slide, brand: graphite, fmt: 'carrossel', num: 1, total: 4,
+    }));
+    expect(html).toMatch(/data-vc-italic[^>]*>esvaziou</);
+    expect(html).toMatch(/data-vc-italic[^>]*color:#c45c6a/i);
+    expect(html).toMatch(/color:#F2EDE4/i);
+    expect(html).not.toMatch(/>_esvaziou_</);
+  });
+
   it('usa uma coluna editorial estreita na prévia e na exportação sem alterar o texto', () => {
     for (const forExport of [false, true]) {
       const html = render({ textBlockWidth: 56, align: 'left' }, forExport);

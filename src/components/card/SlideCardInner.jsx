@@ -1,4 +1,4 @@
-import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, logoContainHitRect, visibleLogoPosition } from '../../utils/slide-logo.js';
+import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, logoContainHitRect, visibleLogoPosition, classifyLogoPixels, logoToneForSurface } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Layout, Minus, Plus, Video, User } from 'lucide-react';
@@ -14,7 +14,7 @@ import { AUTOFIT_MIN_SCALE, DARK_CREAM, getComposition } from '../../utils/slide
 import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentationAdjustIsNeutral } from './FullscreenViewer.jsx';
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
-import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks } from '../../utils/brand-visuals.js';
+import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
@@ -42,7 +42,7 @@ function textoComDestaque(text, spans, accentColor, accentWeight) {
       return <span key={i} data-vc-destaque style={{ color: accentColor || 'inherit', fontWeight: accentWeight }}>{p.v}</span>;
     }
     if (p.type === 'italic') {
-      return <span key={i} data-vc-italic style={{ fontStyle: 'italic' }}>{p.v}</span>;
+      return <span key={i} data-vc-italic style={{ fontStyle: 'italic', color: accentColor || 'inherit' }}>{p.v}</span>;
     }
     return <React.Fragment key={i}>{p.v}</React.Fragment>;
   });
@@ -315,25 +315,43 @@ function readLogoInk(img) {
   }
 }
 
-function looksBlankLogo(img) {
-  if (!img || !img.naturalWidth) return false;
+function readLogoSample(img) {
+  const naturalW = img?.naturalWidth || 0;
+  const naturalH = img?.naturalHeight || 0;
+  if (!naturalW || !naturalH) return null;
   try {
+    const sample = 180;
+    const scale = Math.min(1, sample / Math.max(naturalW, naturalH));
     const canvas = document.createElement('canvas');
-    canvas.width = 12;
-    canvas.height = 12;
+    canvas.width = Math.max(1, Math.round(naturalW * scale));
+    canvas.height = Math.max(1, Math.round(naturalH * scale));
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, 12, 12);
-    const data = ctx.getImageData(0, 0, 12, 12).data;
-    let opaque = 0;
-    let ink = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] < 16) continue;
-      opaque += 1;
-      if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) ink += 1;
-    }
-    return opaque > 100 && ink < 3;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+/** Tira o retângulo branco e deixa o desenho. Sem caixa por trás. */
+function logoWithoutWhitePlate(img) {
+  try {
+    const max = 1200;
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = image.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] >= 245 && d[i + 1] >= 245 && d[i + 2] >= 245) d[i + 3] = 0;
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return '';
   }
 }
 
@@ -357,6 +375,7 @@ function BrandLogoLayer({
   sizePx,
   opacity = 1,
   tone = 'original',
+  surface = '',
   pos = 'tr',
   margin,
   topOffset,
@@ -365,32 +384,52 @@ function BrandLogoLayer({
   movable = false,
 }) {
   const [useFallback, setUseFallback] = React.useState(false);
+  const [punched, setPunched] = React.useState('');
   const [hidden, setHidden] = React.useState(false);
+  const [autoTone, setAutoTone] = React.useState('original');
   const [hit, setHit] = React.useState(null);
   const imgRef = React.useRef(null);
   const box = Math.max(1, Math.round(sizePx));
   const measureLogo = React.useCallback((img) => {
     if (!img?.naturalWidth || !img?.naturalHeight) return;
-    if (looksBlankLogo(img)) {
+    const sample = readLogoSample(img);
+    const decision = sample ? classifyLogoPixels(sample) : { hide: false, punchWhite: false, inkLuminance: 0.2, chroma: 0 };
+    if (decision.hide) {
       setHidden(true);
       return;
     }
+    setAutoTone(logoToneForSurface(decision.inkLuminance, decision.chroma, surface, tone));
+    if (decision.punchWhite && img.getAttribute('data-vc-logo-punched') !== '1') {
+      const url = logoWithoutWhitePlate(img);
+      if (url) {
+        setPunched(url);
+        return;
+      }
+    }
     setHit(logoContainHitRect(box, img.naturalWidth, img.naturalHeight, readLogoInk(img)));
-  }, [box]);
+  }, [box, surface, tone]);
   React.useLayoutEffect(() => {
     setUseFallback(false);
+    setPunched('');
     setHidden(false);
+    setAutoTone('original');
   }, [src, fallbackSrc]);
   React.useLayoutEffect(() => {
     const img = imgRef.current;
     if (img?.complete) measureLogo(img);
   }, [measureLogo]);
-  const active = useFallback ? fallbackSrc : src;
+  const base = useFallback ? fallbackSrc : src;
+  const active = punched || base;
   if (!active || typeof active !== 'string' || hidden) return null;
   const giveUp = () => {
+    if (punched) {
+      setPunched('');
+      return;
+    }
     if (!useFallback && fallbackSrc && fallbackSrc !== src) setUseFallback(true);
     else setHidden(true);
   };
+  const drawnTone = tone === 'dark' || tone === 'light' ? tone : autoTone;
   const incoming = elementProps?.style || {};
   const style = {
     position: 'absolute',
@@ -409,7 +448,8 @@ function BrandLogoLayer({
       <img
         src={active}
         data-vc-brand-logo=""
-        data-vc-logo-tone={tone === 'dark' ? 'dark' : undefined}
+        data-vc-logo-punched={punched ? '1' : undefined}
+        data-vc-logo-tone={drawnTone === 'original' ? undefined : drawnTone}
         alt=""
         draggable={false}
         decoding="async"
@@ -422,7 +462,11 @@ function BrandLogoLayer({
           objectFit: 'contain',
           objectPosition: 'center',
           display: 'block',
-          filter: tone === 'dark' ? 'brightness(0)' : undefined,
+          filter: drawnTone === 'dark'
+            ? 'brightness(0)'
+            : drawnTone === 'light'
+              ? 'brightness(0) invert(1)'
+              : undefined,
           pointerEvents: 'none',
           userSelect: 'none',
         }}
@@ -940,7 +984,7 @@ const ClassicCanvasInner = React.forwardRef(({
             fontWeight={resolvedTitleWeight}
             letterSpacing={`${(-3 + resolvedTitleTracking) / 100}em`}
           />
-        ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</InlineEditableText>
+        ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, cultureAccentCol)}</InlineEditableText>
         </div>
         )}
       </OverflowScaler>
@@ -1038,7 +1082,7 @@ const ClassicCanvasInner = React.forwardRef(({
               textShadow: shadow,
               textTransform: resolvedSubtitleTransform,
               fontStyle: resolvedSubtitleItalic ? 'italic' : 'normal',
-            } }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</InlineEditableText>
+            } }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, cultureAccentCol, 700)}</InlineEditableText>
           )
         )}
         {supportingText && (
@@ -1072,7 +1116,7 @@ const ClassicCanvasInner = React.forwardRef(({
             {textoComDestaque(
               supportingText,
               slide.destaqueSpans?.bodyAfterImage,
-              brand.accent,
+              cultureAccentCol,
               700,
             )}
           </InlineEditableText>
@@ -1169,6 +1213,7 @@ const ClassicCanvasInner = React.forwardRef(({
             src={brand.logo}
             fallbackSrc={logoFallback}
             tone={slide.logoTone}
+            surface={bg}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}
@@ -1315,7 +1360,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         fontWeight={slide.titleWeight ?? 800}
         letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
       />
-    ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</h1>
+    ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, cultureAccentCol)}</h1>
   );
 
   // `brand.subtitleVisible === false` é assinatura de preset (ex.: Sports
@@ -1355,7 +1400,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
         textShadow: shadow,
         textTransform: subtitleTextTransform(brand),
         fontStyle: brand.subtitleItalic ? 'italic' : 'normal',
-      }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700)}</p>
+      }}>{textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, cultureAccentCol, 700)}</p>
     )
   ) : null;
 
@@ -1386,7 +1431,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
       {textoComDestaque(
         supportingText,
         slide.destaqueSpans?.bodyAfterImage,
-        brand.accent,
+        cultureAccentCol,
         700,
       )}
     </InlineEditableText>
@@ -1660,6 +1705,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             src={brand.logo}
             fallbackSrc={logoFallback}
             tone={slide.logoTone}
+            surface={bg}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}
@@ -1974,15 +2020,18 @@ const SlideCardInner = React.forwardRef(({
   // Badge "N/M" canto sup direito — ativado por brand.showPageBadge
   // (era hardcoded false; agora opt-in via preset visual Sports Editorial etc).
   const showCultureIdx = !!brand.showPageBadge;
-  const cultureAccentCol = brand.accent || '#000000';
+  const brandAccent = brand.accent || '#000000';
 
   const slideCardBg = resolveSlideBrandBg(brand, slideIdx, slide) || '#fafafc';
+  const photoInk = needsLightPhotoText(slide);
+  const inkSurface = photoInk ? '#111111' : slideCardBg;
+  const readableInks = cultureReadableInks(inkSurface, carouselTitleInk, carouselBodyInk, brandAccent);
+  let cultureAccentCol = photoInk ? accentInkOnSurface(brandAccent, '#111111') : readableInks.accentInk;
   let displayTitleInk = carouselTitleInk;
   let displayBodyInk = carouselBodyInk;
   if (culturePack || sandwichSkin) {
-    const cr = cultureReadableInks(slideCardBg, carouselTitleInk, carouselBodyInk, cultureAccentCol);
-    displayTitleInk = cr.titleInk;
-    displayBodyInk = cr.bodyInk;
+    displayTitleInk = readableInks.titleInk;
+    displayBodyInk = readableInks.bodyInk;
     if (
       cultureCoverOnly &&
       (slide.bgImage || slideHasPendingPhotoIntent(slide)) &&
@@ -1997,15 +2046,22 @@ const SlideCardInner = React.forwardRef(({
     }
   }
 
-  if (needsLightPhotoText(slide)) {
+  if (photoInk) {
     displayTitleInk = '#ffffff';
     displayBodyInk = '#f5f5f7';
   }
 
-  // Uma escolha explícita neste card vence a paleta e os ajustes automáticos de
-  // legibilidade. A cor de apoio continua independente da cor do subtítulo.
-  displayTitleInk = slide.titleColor || displayTitleInk;
-  const displaySubtitleInk = slide.subtitleColor || displayBodyInk;
+  // Tinta automática acompanha o fundo. Cor marcada neste card continua a escolha da pessoa.
+  const titleFallback = photoInk ? '#ffffff' : readableInks.titleInk;
+  const bodyFallback = photoInk ? '#f5f5f7' : readableInks.bodyInk;
+  displayTitleInk = slide.titleColor || inkIfReadable(displayTitleInk, inkSurface, titleFallback, 3);
+  const displaySubtitleInk = slide.subtitleColor || inkIfReadable(
+    displayBodyInk,
+    inkSurface,
+    photoInk ? '#f5f5f7' : readableInks.subtitleInk,
+    3,
+  );
+  displayBodyInk = inkIfReadable(displayBodyInk, inkSurface, bodyFallback, 3);
 
   /**
    * Assinatura da marca (barra editorial no topo, contador N/M, barra do rodapé
@@ -2465,7 +2521,7 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={slide.titleColor || cr.titleInk}
+                baseColor={slide.titleColor || inkIfReadable(cr.titleInk, bgSolid, cr.titleInk, 3)}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * topScale}
@@ -2478,7 +2534,7 @@ const SlideCardInner = React.forwardRef(({
           <CultureRichParagraphs
             text={slide.subtitle}
             destaqueSpans={slide.destaqueSpans?.subtitle}
-            ink={slide.subtitleColor || cr.subtitleInk}
+            ink={slide.subtitleColor || inkIfReadable(cr.subtitleInk, bgSolid, cr.subtitleInk, 3)}
             accentColor={cr.accentInk}
             fontFamily={subtitleFF}
             fontSize={f.w * 0.031 * (slide.subSize / 100) * topScale}
@@ -2645,6 +2701,7 @@ const SlideCardInner = React.forwardRef(({
               src={brand.logo}
               fallbackSrc={logoFallback}
               tone={slide.logoTone}
+              surface={bgSolid}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
               pos={pos}
@@ -2788,7 +2845,7 @@ const SlideCardInner = React.forwardRef(({
               <CultureInlineRich
                 text={slide.title || ''}
                 destaqueSpans={slide.destaqueSpans?.title}
-                baseColor={slide.titleColor || cr.titleInk}
+                baseColor={slide.titleColor || inkIfReadable(cr.titleInk, bgSolid, cr.titleInk, 3)}
                 accentColor={cr.accentInk}
                 fontFamily={titleFF}
                 fontSize={f.w * 0.036 * (presentationTitleSizePercent(slide) / 100) * scale}
@@ -2808,7 +2865,7 @@ const SlideCardInner = React.forwardRef(({
             <CultureRichParagraphs
               text={slide.subtitle}
               destaqueSpans={slide.destaqueSpans?.subtitle}
-              ink={slide.subtitleColor || cr.subtitleInk}
+              ink={slide.subtitleColor || inkIfReadable(cr.subtitleInk, bgSolid, cr.subtitleInk, 3)}
               accentColor={cr.accentInk}
               fontFamily={subtitleFF}
               fontSize={f.w * 0.031 * ((slide.subSize ?? 100) / 100) * scale}
@@ -2992,6 +3049,7 @@ const SlideCardInner = React.forwardRef(({
               src={brand.logo}
               fallbackSrc={logoFallback}
               tone={slide.logoTone}
+              surface={bgSolid}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
               pos={pos}
@@ -3493,7 +3551,7 @@ const SlideCardInner = React.forwardRef(({
                   fontWeight={slide.titleWeight ?? 800}
                   letterSpacing={`${(-3 + (slide.titleTracking ?? 0)) / 100}em`}
                 />
-              ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, brand.accent)}</InlineEditableText>
+              ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, cultureAccentCol)}</InlineEditableText>
               {/* Subtítulo — preset controla via brand.subtitleVisible/Weight/Case
                   (presets editoriais como Sports/NMLSS escondem subtítulo pra
                   não competir com eyebrow+título). */}
@@ -3545,7 +3603,7 @@ const SlideCardInner = React.forwardRef(({
                   const parts = slide.procedureLabelEmphasis !== true || slide.destaqueSpans?.subtitle?.length
                     ? null
                     : splitLeadingUppercaseLabel(slide.subtitle);
-                  if (!parts) return textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, brand.accent, 700);
+                  if (!parts) return textoComDestaque(slide.subtitle, slide.destaqueSpans?.subtitle, cultureAccentCol, 700);
                   const hasTitle = !!String(slide.title || '').trim();
                   return (
                     <>
@@ -3601,7 +3659,7 @@ const SlideCardInner = React.forwardRef(({
                   {textoComDestaque(
                     bodyAfterCulture,
                     slide.destaqueSpans?.bodyAfterImage,
-                    brand.accent,
+                    cultureAccentCol,
                     700,
                   )}
                 </InlineEditableText>
@@ -3660,6 +3718,7 @@ const SlideCardInner = React.forwardRef(({
             src={brand.logo}
             fallbackSrc={logoFallback}
             tone={slide.logoTone}
+            surface={slideCardBg}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
             pos={pos}
