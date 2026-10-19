@@ -1,6 +1,7 @@
 import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-control.js';
 import { isPersoHybridDensity, isTendenciaCulturaPreset } from './generation-prompts.js';
 import { normalizeInstagramCaption } from './editorial-strategy.js';
+import { isPitchPath, buildPitchReviewRules, cleanPitchSlide, cleanPitchText } from './pitch-content.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
@@ -162,19 +163,20 @@ function bodyAllowed(index, count, presetId, densityId) {
     : isPersoHybridDensity(presetId, densityId) && index >= 2;
 }
 
-export function validateCarouselDraft(draft, { count, presetId, densityId }) {
+export function validateCarouselDraft(draft, { count, presetId, densityId, presentationPath }) {
   if (!isObject(draft) || !Array.isArray(draft.slides) || draft.slides.length !== count || typeof draft.caption !== 'string') {
     throw new Error('A IA não retornou a quantidade de slides ou a legenda esperada. Tente gerar novamente.');
   }
   const wantsBody = presetId === 'apresentacao'
     || isTendenciaCulturaPreset(presetId)
     || isPersoHybridDensity(presetId, densityId);
+  const pitch = presetId === 'apresentacao' && isPitchPath(presentationPath);
   const slides = draft.slides.map((s, index) => {
     if (!isObject(s) || !['title', 'subtitle', 'imageQuery'].every(k => typeof s[k] === 'string') ||
         (wantsBody && typeof s.bodyAfterImage !== 'string')) {
       throw new Error('A IA retornou um campo de texto inválido. Tente gerar novamente.');
     }
-    const slide = { ...s };
+    const slide = pitch ? cleanPitchSlide(s) : { ...s };
     if (wantsBody && !bodyAllowed(index, count, presetId, densityId)) slide.bodyAfterImage = '';
     if (![slide.title, slide.subtitle, wantsBody ? slide.bodyAfterImage : ''].some(v => typeof v === 'string' && v.trim())) {
       throw new Error('A IA retornou um slide sem texto. Tente gerar novamente.');
@@ -186,7 +188,7 @@ export function validateCarouselDraft(draft, { count, presetId, densityId }) {
     ...draft,
     slides,
     caption: isPresentation
-      ? String(draft.caption || '').trim().slice(0, 2400)
+      ? (pitch ? cleanPitchText(draft.caption) : String(draft.caption || '').trim()).slice(0, 2400)
       : normalizeInstagramCaption(draft.caption),
   };
 }
@@ -194,13 +196,14 @@ export function validateCarouselDraft(draft, { count, presetId, densityId }) {
 export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
     const limitsBlock = buildPresentationLimitsBlock(config, draft?.slides?.length || config.count || 0);
+    const pitch = isPitchPath(config.presentationPath);
     return `REVISÃO DE APRESENTAÇÃO — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o deck novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 Verifique: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
-Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. bodyAfterImage continua reservado a fonte, unidade, período, ressalva ou instrução; você pode condensá-lo para cumprir os limites sem mudar seu sentido, números ou fonte.
+Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${pitch ? buildPitchReviewRules() : 'bodyAfterImage continua reservado a fonte, unidade, período, ressalva ou instrução; você pode condensá-lo para cumprir os limites sem mudar seu sentido, números ou fonte.'}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: title, subtitle ou bodyAfterImage. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem notas extras ou campos adicionais.`;
   }

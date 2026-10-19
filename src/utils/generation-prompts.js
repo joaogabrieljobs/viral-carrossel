@@ -13,6 +13,7 @@ import { INSTAGRAM_HASHTAG_LIMIT, INSTAGRAM_CAPTION_LIMIT } from './editorial-st
 import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 import { normalizeBrandTone } from './brand-tone.js';
 import { genModeUiLabel } from './ui-depth-labels.js';
+import { isPitchPath, buildPitchFieldRules } from './pitch-content.js';
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
 // de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
@@ -885,8 +886,9 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 }
 
 /** Regras de tamanho/layout por slide — modos narrativos não podem usar o bloco “denso analítico” dos editoriais. */
-function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9) {
+function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   if (creativePresetId === 'apresentacao') {
+    if (isPitchPath(presentationPath)) return buildPitchFieldRules();
     const { lo, hi } = scaledCharBand(90, 240, textDensityId);
     return `
 REGRAS DE LEITURA E COMPOSIÇÃO — DECK 16:9:
@@ -1102,9 +1104,10 @@ function buildNarrativeModeReminder(modeId) {
 }
 
 /** Regras de comprimento/tom para refinar UM slide, alinhadas ao modo + densidade de texto. */
-function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { presetId = 'livre', slideIndex, slideCount } = {}) {
+function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { presetId = 'livre', slideIndex, slideCount, presentationPath = 'auto' } = {}) {
   const positioned = Number.isInteger(slideIndex) && slideCount > 0;
   if (presetId === 'apresentacao') {
+    if (isPitchPath(presentationPath)) return buildPitchFieldRules();
     const { lo, hi } = scaledCharBand(90, 240, textDensityId);
     return `- Preserve a função desta posição no deck e uma ideia central por slide.
 - Em slide de conteúdo, use título como afirmação-conclusão e subtítulo como apoio entre ${lo} e ${hi} caracteres quando houver material suficiente.
@@ -1368,7 +1371,7 @@ function buildHookVariationRules(narrativeModeId, creativePresetId) {
 ${buildHookModeVariationRules(isTendenciaCulturaPreset(creativePresetId) ? 'editorial' : narrativeModeId, creativePresetId)}`;
 }
 
-function buildGenerationJsonContract(presetId, densityId, count, projectDesignSchema = null) {
+function buildGenerationJsonContract(presetId, densityId, count, projectDesignSchema = null, presentationPath = 'auto') {
   const slide = { title: '', subtitle: '', imageQuery: '' };
   const isPresentation = presetId === 'apresentacao';
   if (isPresentation || isTendenciaCulturaPreset(presetId) || isPersoHybridDensity(presetId, densityId)) {
@@ -1377,7 +1380,9 @@ function buildGenerationJsonContract(presetId, densityId, count, projectDesignSc
   return `Retorne um único objeto JSON com exatamente ${count} itens em slides, na ordem do arco, e caption como string.
 Use apenas os campos do modelo; todos os campos de texto são strings, nunca null, arrays ou objetos. As strings vazias do modelo indicam tipos, não conteúdo pronto.
 ${isPresentation
-    ? 'Em bodyAfterImage, use apenas fonte, unidade, período, ressalva ou instrução indispensável; deixe vazio nos demais slides.'
+    ? isPitchPath(presentationPath)
+      ? 'subtitle desenvolve o argumento; bodyAfterImage acrescenta evidência, exemplo, detalhe ou ressalva útil. Não inclua referências aos arquivos, ao manual ou ao processo de extração em nenhum campo.'
+      : 'Em bodyAfterImage, use apenas fonte, unidade, período, ressalva ou instrução indispensável; deixe vazio nos demais slides.'
     : 'bodyAfterImage' in slide
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}

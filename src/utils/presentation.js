@@ -6,6 +6,8 @@
  * decisões para a UI e os prompts não precisarem inferi-las por texto solto.
  */
 
+import { buildPitchStrategyBlock, buildPitchFieldRules, PITCH_PROVENANCE_RULE } from './pitch-content.js';
+
 export const APRESENTACAO_PRESET_ID = 'apresentacao';
 export const PRESENTATION_PRODUCT_KIND = 'apresentacao';
 export const DEFAULT_PRESENTATION_PATH_ID = 'auto';
@@ -26,6 +28,7 @@ const path = (definition) => Object.freeze({
     visualRole: 'evidence',
     density: definition.density || 'low',
     evidenceRequired: false,
+    ...(definition.id === 'pitch' ? { contentMode: 'pitch' } : {}),
     ...stage,
   }))),
 });
@@ -69,8 +72,8 @@ export const PRESENTATION_PATHS = Object.freeze([
       { label: 'POR QUE AGORA', instruction: 'Explique a mudança de tecnologia, comportamento ou mercado que abre a oportunidade.', evidenceRequired: true },
       { label: 'SOLUÇÃO E MECANISMO', instruction: 'Explique o produto e como ele resolve a causa central do problema.', visualRole: 'diagram' },
       { label: 'PRODUTO OU DEMONSTRAÇÃO', instruction: 'Mostre o fluxo, screenshot ou experiência principal; evite fotografia decorativa.', visualRole: 'demo' },
-      { label: 'MERCADO E CLIENTE IDEAL', instruction: 'Delimite público e oportunidade apenas com dados fornecidos e fonte.', visualRole: 'data', evidenceRequired: true },
-      { label: 'TRAÇÃO E PROVA', instruction: 'Apresente a métrica principal com período, unidade, comparação e fonte.', visualRole: 'data', evidenceRequired: true },
+      { label: 'MERCADO E CLIENTE IDEAL', instruction: 'Delimite o segmento acessível, comprador e oportunidade com dados sustentados; sem dados, explicite o recorte e a hipótese de validação.', visualRole: 'data', evidenceRequired: true },
+      { label: 'TRAÇÃO E PROVA', instruction: 'Apresente validações reais com período, unidade e comparação quando conhecidos; diferencie resultados de planos e testes futuros.', visualRole: 'data', evidenceRequired: true },
       { label: 'MODELO DE NEGÓCIO', instruction: 'Mostre pagador, lógica de receita e preço somente quando informados.', visualRole: 'diagram' },
       { label: 'ALTERNATIVAS E VANTAGEM', instruction: 'Compare concorrentes e solução atual; declare a vantagem sem caricaturar as opções.', visualRole: 'comparison', evidenceRequired: true },
       { label: 'AQUISIÇÃO', instruction: 'Explique como o público chega ao produto e qual hipótese ainda precisa ser validada.' },
@@ -328,6 +331,9 @@ ${stageLines}
 export function buildApresentacaoPackBlock(slideCount, pathId = DEFAULT_PRESENTATION_PATH_ID) {
   const route = getPresentationPath(pathId);
   const n = clampPresentationSlideCount(slideCount, route.defaultSlideCount);
+  if (route.id === 'pitch') {
+    return `PACOTE ATIVO — APRESENTAÇÃO / PITCH 16:9 (prioridade sobre fórmulas de carrossel e síntese para palestra):\n${buildPresentationPathBlock(route.id, n)}\n${buildPitchStrategyBlock()}`;
+  }
   return `
 PACOTE ATIVO — APRESENTAÇÃO / DECK 16:9 (prioridade sobre fórmulas de carrossel Instagram):
 Você está a criar SLIDES DE APRESENTAÇÃO (paisagem), não cards de feed vertical.
@@ -362,5 +368,6 @@ export function buildApresentacaoIntroLine() {
 
 export function buildApresentacaoRefineHint(pathId = DEFAULT_PRESENTATION_PATH_ID) {
   const route = getPresentationPath(pathId);
+  if (route.id === 'pitch') return `${buildPitchFieldRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
   return `- Pacote Apresentação 16:9 (${route.label}): capa pode ter title curto; conteúdo usa title como afirmação-conclusão em até duas linhas e subtitle apenas como apoio breve. Prefira evidência visual; bodyAfterImage só para fonte/ressalva/instrução. Preserve o caminho do deck e não use sanduíche de foto, bullets simulados ou CTAs de Instagram.`;
 }

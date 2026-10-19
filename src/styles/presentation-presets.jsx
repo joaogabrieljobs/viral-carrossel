@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { isPitchPath, buildPitchFieldRules, pitchCompositionOverrides } from '../utils/pitch-content.js';
 import { applyVisualPreset, getSlideOverridesForPreset } from './visual-presets.jsx';
 import {
   GENERATED_PRESENTATION_COMPOSITIONS,
@@ -665,9 +666,10 @@ function resolvePresentationDesignSystemPromptPreset(presetOrId) {
   );
 }
 
-export function buildPresentationDesignSystemPromptBlock(presetOrId) {
+export function buildPresentationDesignSystemPromptBlock(presetOrId, presentationPath = 'auto') {
   const selected = resolvePresentationDesignSystemPromptPreset(presetOrId);
   if (!selected) return '';
+  if (isPitchPath(presentationPath)) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${selected.label}:\nDireção: ${selected.desc}\nComposições adaptadas para leitura autônoma: título, argumento e bloco complementar legíveis. A área visual é opcional; não preencha espaços com imagens ou provas fictícias.\n${buildPitchFieldRules()}`;
   const limits = selected.textLimits || {};
   const title = limits.title || {};
   const subtitle = limits.subtitle || {};
@@ -802,7 +804,7 @@ export function getPresentationCompositionOverrides(
     ? { ...presetDefinition.autofit }
     : null;
 
-  return {
+  const composition = {
     ...getPresentationSlideOverrides(normalizedPresetId),
     layout: profile.layout,
     align: profile.align,
@@ -839,6 +841,9 @@ export function getPresentationCompositionOverrides(
       visualRole,
     },
   };
+  return stage?.contentMode === 'pitch'
+    ? pitchCompositionOverrides(composition, slide, kind)
+    : composition;
 }
 
 function textLines({ color, x, y, widths, height = 5, gap = 4, align = 'left' }) {
