@@ -1,4 +1,5 @@
 import { FORMATS } from './formats.js';
+import { LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -162,12 +163,16 @@ export function applyBrandEdit(doc, brandNext) {
   return { ...doc, brand: canonical, formatViews: views };
 }
 
-/** Logo do 16:9 cabe na altura. Nos outros formatos segue o tamanho salvo. */
+/** Logo do 16:9 segue a altura do slide. O máximo do slider chega a mais da metade da altura. */
 export function logoRenderPx(fmt, frameW, logoSize) {
   const chosen = Number(logoSize) || 260;
-  const px = chosen * ((frameW || 1080) / 1080);
+  const width = frameW || 1080;
+  const px = chosen * (width / 1080);
   if (fmt !== 'apresentacao') return px;
-  return Math.min(px, FORMATS.apresentacao.h * 0.085 * (chosen / 260));
+  const height = width * (FORMATS.apresentacao.h / FORMATS.apresentacao.w);
+  const span = LOGO_SIZE_MAX - LOGO_SIZE_MIN;
+  const t = Math.max(0, Math.min(1, (chosen - LOGO_SIZE_MIN) / span));
+  return height * (0.12 + t * 0.5);
 }
 
 /**

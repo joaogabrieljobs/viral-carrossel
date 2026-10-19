@@ -286,7 +286,7 @@ describe('geração com uma revisão editorial', () => {
     expect(ai.mock.calls[0][0]).toContain('subtitle: até 48 caracteres e até 2 linhas');
   });
 
-  it('não devolve silenciosamente um rascunho inválido quando a revisão também excede limites', async () => {
+  it('encurta o rascunho quando a revisão também passa do limite', async () => {
     const presentationConfig = {
       count: 1,
       presetId: 'apresentacao',
@@ -307,13 +307,17 @@ describe('geração com uma revisão editorial', () => {
     const ai = vi.fn()
       .mockResolvedValueOnce(first)
       .mockResolvedValueOnce({ edits: [{ slideIndex: 0, reason: 'Tentativa insuficiente', title: 'Ainda muito longo' }] });
-    await expect(generateReviewedCarousel({ prompt: '', config: presentationConfig }, ai)).rejects.toMatchObject({
-      code: 'presentation_text_limit_exceeded',
-      violations: [expect.objectContaining({ slideIndex: 0, field: 'title', rule: 'maxChars' })],
-    });
+    const output = await generateReviewedCarousel({ prompt: '', config: presentationConfig }, ai);
+    expect(output.reviewStatus).toBe('fitted');
+    expect(output.result.slides[0].title.length).toBeLessThanOrEqual(10);
+    expect(output.result.slides[0].title).not.toBe('Capa longa demais');
+    expect(() => assertPresentationTextLimits(
+      output.result.slides,
+      presentationConfig.presentationTextLimits,
+    )).not.toThrow();
   });
 
-  it('bloqueia o rascunho inválido também quando o serviço de revisão fica indisponível', async () => {
+  it('encurta o rascunho também quando o serviço de revisão fica indisponível', async () => {
     const presentationConfig = {
       count: 1,
       presetId: 'apresentacao',
@@ -326,9 +330,9 @@ describe('geração com uma revisão editorial', () => {
       })
       .mockRejectedValueOnce(new Error('offline'));
 
-    await expect(generateReviewedCarousel({ prompt: '', config: presentationConfig }, ai)).rejects.toMatchObject({
-      code: 'presentation_text_limit_exceeded',
-    });
+    const output = await generateReviewedCarousel({ prompt: '', config: presentationConfig }, ai);
+    expect(output.reviewStatus).toBe('fitted');
+    expect(output.result.slides[0].title.length).toBeLessThanOrEqual(8);
     expect(ai).toHaveBeenCalledTimes(2);
   });
 

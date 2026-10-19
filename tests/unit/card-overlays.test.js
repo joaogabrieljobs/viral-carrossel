@@ -116,8 +116,10 @@ describe('card-overlays', () => {
     expect(withCta.elementsUnlocked).toBe(true);
     expect(overlayMoveKey(withCta.overlays[0].id)).toMatch(/^ov_/);
 
-    const patched = updateOverlayOnSlide(withCta, withCta.overlays[0].id, { text: 'NOVO CTA' });
+    const patched = updateOverlayOnSlide(withCta, withCta.overlays[0].id, { text: 'NOVO CTA', size: 180 });
     expect(patched.overlays[0].text).toBe('NOVO CTA');
+    expect(patched.overlays[0].size).toBe(180);
+    expect(normalizeOverlay({ id: 'cta-velho', type: 'cta', text: 'Agende' }).size).toBe(100);
 
     const cleared = removeOverlayFromSlide(patched, patched.overlays[0].id);
     expect(cleared.overlays).toHaveLength(0);

@@ -63,10 +63,14 @@ describe('proporção sem reescrever o card', () => {
     expect(presentationReadingSurface('carrossel', '#f7f7f5', '#f7f4ef', false)).toBeNull();
   });
 
-  it('a logo do 16:9 cabe na altura e a do feed fica no tamanho salvo', () => {
-    expect(logoRenderPx('apresentacao', 1920, 260)).toBeLessThan(100);
+  it('a logo do 16:9 cresce com o slider e a do feed fica no tamanho salvo', () => {
+    const base = logoRenderPx('apresentacao', 1920, 260);
+    const max = logoRenderPx('apresentacao', 1920, 900);
+    expect(base).toBeGreaterThan(240);
+    expect(base).toBeLessThan(320);
+    expect(max).toBeGreaterThan(base * 2);
+    expect(max).toBeLessThan(1920 * (1080 / 1920) * 0.7);
     expect(logoRenderPx('carrossel', 1080, 260)).toBe(260);
-    expect(logoRenderPx('apresentacao', 1920, 520)).toBeGreaterThan(logoRenderPx('apresentacao', 1920, 260));
   });
 
   it('tamanho salvo na proporção vence o encaixe automático', () => {

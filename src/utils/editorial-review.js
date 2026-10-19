@@ -80,13 +80,54 @@ export function auditPresentationTextLimits(slides, limits) {
   return violations;
 }
 
+const FIELD_LABEL = { title: 'título', subtitle: 'subtítulo', bodyAfterImage: 'texto' };
+
+function violationSentence(violation) {
+  const name = FIELD_LABEL[violation.field] || 'texto';
+  const unit = violation.rule === 'maxLines' ? 'linhas' : 'caracteres';
+  return `O ${name} do slide ${violation.slideIndex + 1} passou do limite editorial (${violation.max} ${unit})`;
+}
+
+/** Corta no limite, de preferência no fim de uma palavra, sem inventar texto. */
+export function fitTextToEditorialLimit(text, limit = {}) {
+  let next = String(text ?? '').trim();
+  if (limit.maxLines) {
+    const lines = next.split(/\r\n|\r|\n/);
+    if (lines.length > limit.maxLines) next = lines.slice(0, limit.maxLines).join('\n').trim();
+  }
+  if (limit.maxChars && next.length > limit.maxChars) {
+    const slice = next.slice(0, limit.maxChars);
+    const cut = slice.lastIndexOf(' ');
+    next = (cut > limit.maxChars * 0.6 ? slice.slice(0, cut) : slice).trim();
+  }
+  return next;
+}
+
+/** Encaixa cada campo no limite do slide. O que já cabe permanece igual. */
+export function fitPresentationSlidesToLimits(slides, limits) {
+  const safeSlides = Array.isArray(slides) ? slides : [];
+  const normalized = normalizePresentationTextLimits(limits, safeSlides.length);
+  const fits = [];
+  const next = safeSlides.map((slide, slideIndex) => {
+    const copy = { ...slide };
+    for (const field of PRESENTATION_TEXT_FIELDS) {
+      const limit = normalized[slideIndex][field];
+      const before = String(copy[field] ?? '');
+      const after = fitTextToEditorialLimit(before, limit);
+      if (after !== before.trim()) {
+        copy[field] = after;
+        fits.push({ slideIndex, field, max: limit.maxChars || limit.maxLines });
+      }
+    }
+    return copy;
+  });
+  return { slides: next, fits };
+}
+
 export function assertPresentationTextLimits(slides, limits, context = 'Texto') {
   const violations = auditPresentationTextLimits(slides, limits);
   if (!violations.length) return slides;
-  const first = violations[0];
-  const error = new Error(
-    `${context} excede limite editorial no slide ${first.slideIndex + 1}: ${first.field} ${first.rule}`,
-  );
+  const error = new Error(`${context}: ${violationSentence(violations[0])}.`);
   error.code = 'presentation_text_limit_exceeded';
   error.violations = violations;
   throw error;
@@ -234,7 +275,9 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     // rascunho acima dos limites. Se ela falhar ou continuar inválida, não
     // publique silenciosamente o texto que sabemos que não cabe.
     if (draftLimitViolations.length) {
-      assertPresentationTextLimits(draft.slides, config?.presentationTextLimits, 'Texto gerado');
+      const fitted = fitPresentationSlidesToLimits(draft.slides, config?.presentationTextLimits);
+      const result = validateCarouselDraft({ ...draft, slides: fitted.slides }, config);
+      return { result, reviewStatus: 'fitted', fits: fitted.fits };
     }
     return { result: draft, reviewStatus: 'unavailable' };
   }

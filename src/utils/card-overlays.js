@@ -257,6 +257,7 @@ export function normalizeOverlay(raw) {
       uppercase: raw.uppercase !== false,
       blur: !!raw.blur,
       arrow: raw.arrow !== false,
+      size: clamp(raw.size, 50, 240, 100),
     };
   }
   if (type === 'rule') {

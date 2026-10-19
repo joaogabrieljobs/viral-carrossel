@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { Slider } from '../ui/primitives.jsx';
 import { TextOverlayEditor } from './TextAreaPanel.jsx';
 import { FontFamilySelect } from '../ui/font-pickers.jsx';
 import {
@@ -186,6 +187,13 @@ function OverlayEditor({ overlay, onChange, onRemove, brand }) {
     <div style={editorBox}>
       <div style={editorTitle}>Editar CTA</div>
       <FontFamilySelect label="Fonte da chamada" value={overlay.fontFamily || ''} brand={brand} onChange={fontFamily => onChange({ fontFamily })} />
+      <Slider
+        label="Tamanho"
+        value={Number(overlay.size) || 100}
+        min={50}
+        max={240}
+        onChange={(size) => onChange({ size })}
+      />
       <label style={fieldLabel}>
         Texto
         <input

@@ -2092,9 +2092,10 @@ const SlideCardInner = React.forwardRef(({
         {normalizeOverlays(slide.overlays).map((ov) => {
           const chave = overlayMoveKey(ov.id);
           if (ov.type === 'cta') {
-            const padY = Math.round(f.h * 0.012);
-            const padX = Math.round(f.w * 0.028);
-            const fontPx = Math.max(14, Math.round(f.w * 0.024));
+            const ctaScale = Math.min(2.4, Math.max(0.5, (Number(ov.size) || 100) / 100));
+            const padY = Math.round(f.h * 0.012 * ctaScale);
+            const padX = Math.round(f.w * 0.028 * ctaScale);
+            const fontPx = Math.max(14, Math.round(f.w * 0.024 * ctaScale));
             const isOutline = ov.variant === 'outline';
             const isGlass = ov.variant === 'glass' || ov.blur;
             return (
@@ -2115,7 +2116,7 @@ const SlideCardInner = React.forwardRef(({
                   position: 'relative',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: Math.round(f.w * 0.014),
+                  gap: Math.round(f.w * 0.014 * ctaScale),
                   padding: `${padY}px ${padX}px`,
                   borderRadius: 9999,
                   background: isGlass ? 'transparent' : ov.bg,
@@ -2143,7 +2144,7 @@ const SlideCardInner = React.forwardRef(({
                     zIndex: 1,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: Math.round(f.w * 0.014),
+                    gap: Math.round(f.w * 0.014 * ctaScale),
                     fontFamily: normalizeTextFont(ov.fontFamily) || bodyFF,
                     fontSize: fontPx,
                     fontWeight: isOutline ? 600 : 700,
