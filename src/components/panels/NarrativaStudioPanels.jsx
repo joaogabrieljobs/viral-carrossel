@@ -1,8 +1,7 @@
 import { GEN_MODES, resolveGenMode, normalizeNarrativeModeId } from '../../utils/generation-prompts.js';
 import React, { useState } from 'react';
 import { GenerationScopePicker } from '../GenerationScopePicker.jsx';
-import { BookOpen, ChevronDown, FileText, Loader2, Sparkles, Type } from 'lucide-react';
-import { ProjectStyleKitPanel } from './ProjectStyleKitPanel.jsx';
+import { ChevronDown, FileText, Loader2, Sparkles, Type } from 'lucide-react';
 import { styleKitHasContent } from '../../utils/style-kit.js';
 import { brandToneIsReady } from '../../utils/brand-tone.js';
 import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
@@ -116,15 +115,13 @@ const BTN_CAPS = {
 
 /**
  * Topo da aba Narrativa: controlos maximizáveis.
- * 1) Contexto da marca · 2) Prompt · 3) ADD CONTEÚDO · 4) EDITAR CARD
+ * 1) Prompt · 2) Adicionar conteúdo · 3) Editar card
+ * O brief, o estilo e a logo deste projeto ficam na aba Marca.
  */
 function NarrativaStudioPanels({
   panel,
   setPanel,
   styleKit,
-  setStyleKit,
-  toast,
-  projectName = '',
   quickPrompt,
   setQuickPrompt,
   onQuickGenerate,
@@ -137,33 +134,20 @@ function NarrativaStudioPanels({
   cardChildren = null,
   materialChildren = null,
   materialSummary = '',
-  material = null,
   brand = null,
   setBrand = null,
-  onAnalyzeBrandTone = null,
-  analyzingBrandTone = false,
   hasOpenAI = false,
-  onNeedKeys = null,
-  projectId = null,
+  onOpenBrandContext = null,
 }) {
   const [scope, setScope] = useState('text');
   const effectiveScope = hasImages ? scope : 'text';
   const kit = styleKit || {};
   const hasKit = styleKitHasContent(kit);
   const promptTrim = (quickPrompt || '').trim();
-  const nome = (projectName || '').trim() || 'este projeto';
   const toneReady = brandToneIsReady(brand);
   const useVoice = toneReady && brand?.useBrandVoice !== false;
   const modeId = normalizeNarrativeModeId(narrativeMode);
   const modeDef = resolveGenMode(modeId);
-  const contextBadge = hasKit
-    ? [
-        `«${nome}»`,
-        kit.contextMd?.trim() ? 'brief' : null,
-        kit.stylePrompt?.trim() ? 'estilo' : null,
-        (kit.refImages || []).length ? `${kit.refImages.length} ref.` : null,
-      ].filter(Boolean).join(' · ')
-    : `Só de «${nome}» — outros projetos não partilham`;
   const promptBadge = promptTrim
     ? (promptTrim.length > 48 ? `${promptTrim.slice(0, 48)}…` : promptTrim)
     : 'Ex.: criar card sobre a ferramenta X';
@@ -174,34 +158,6 @@ function NarrativaStudioPanels({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div>
-        <AccordionHeader
-          title="Usar contexto da marca"
-          hint={`Brief, estilo e referências de «${nome}»`}
-          badge={contextBadge}
-          icon={BookOpen}
-          open={panel === 'context'}
-          onToggle={() => toggle('context')}
-          connectBody
-        />
-        <AccordionPanel open={panel === 'context'}>
-          <ProjectStyleKitPanel
-            styleKit={styleKit}
-            setStyleKit={setStyleKit}
-            toast={toast}
-            projectName={projectName}
-            brand={brand}
-            setBrand={setBrand}
-            onAnalyzeBrandTone={onAnalyzeBrandTone}
-            analyzingBrandTone={analyzingBrandTone}
-            hasOpenAI={hasOpenAI}
-            onNeedKeys={onNeedKeys}
-            material={material}
-            projectId={projectId}
-          />
-        </AccordionPanel>
-      </div>
-
       <div>
         <AccordionHeader
           title="Prompt para gerar"
@@ -283,7 +239,7 @@ function NarrativaStudioPanels({
               </label>
             ) : (
               <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '10px 0 0', lineHeight: 1.45 }}>
-                Sem tom analisado. Em Contexto ou Home, use «Analisar meu tom» para manter a voz da marca.
+                Sem tom analisado. Em Marca, use «Analisar meu tom» para manter a voz da marca.
               </p>
             )}
           </fieldset>
@@ -315,10 +271,10 @@ function NarrativaStudioPanels({
               <><Sparkles size={14} /> Gerar com contexto e referências</>
             )}
           </button>
-          {!hasKit ? (
+          {!hasKit && onOpenBrandContext ? (
             <button
               type="button"
-              onClick={() => setPanel('context')}
+              onClick={onOpenBrandContext}
               style={{
                 alignSelf: 'center', border: 'none', background: 'transparent',
                 cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11,
@@ -326,7 +282,7 @@ function NarrativaStudioPanels({
                 textUnderlineOffset: 3, textTransform: 'uppercase', letterSpacing: '0.04em',
               }}
             >
-              Preencher contexto da marca primeiro
+              Preencher o contexto em Marca
             </button>
           ) : null}
         </AccordionPanel>

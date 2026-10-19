@@ -56,7 +56,7 @@ function Field({ label, hint, children }) {
 
 /**
  * Campos de contexto do projeto (brief / estilo / refs / logo).
- * Sem hierarquia própria: o pai (Home ou acordeão Narrativa) define o título.
+ * Sem hierarquia própria: a aba Marca define o título.
  * Troca de projeto vive só na Home — sem botões duplicados aqui.
  */
 function ProjectStyleKitPanel({

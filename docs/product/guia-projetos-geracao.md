@@ -4,7 +4,7 @@ Atualizado em 29/09/2026. Aplicável ao [Moont](https://moont.ai).
 
 ## Preparar um projeto
 
-Na aba **Narrativa**, abra **Usar contexto da marca**. Esse painel pertence ao projeto aberto na biblioteca.
+Na aba **Marca**, abra **Deste projeto**. Esse painel pertence ao projeto aberto na biblioteca. O brief da marca, logo acima, vale só para projetos novos.
 
 | Campo | Para que serve |
 | --- | --- |

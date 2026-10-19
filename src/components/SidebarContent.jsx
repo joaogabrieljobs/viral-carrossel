@@ -149,15 +149,15 @@ function unionDestaqueRangeIntoSpans(spansIn, selA, selB, len) {
 }
 
 // Fonte única das tabs do editor (sidebar desktop + bottom bar mobile).
-// Criador: Home + Narrativa + Visual + Imagem + Marca · Diretor: + Texto · Studio: + Layout
+// Criador: Home + Marca + Narrativa + Visual + Imagem · Diretor: + Texto · Studio: + Layout
 const EDITOR_TABS = [
   { id:'home',      icon:Home,     label:'Home',      mode:'criador' },
+  { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
   { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
   { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
   { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
   { id:'texto',     icon:Type,     label:'Texto',     mode:'diretor' },
   { id:'layout',    icon:Layout,   label:'Layout',    mode:'studio' },
-  { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
 ];
 const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
 const visibleEditorTabs = (appMode) =>
@@ -914,8 +914,7 @@ function SidebarContent({
             onAnalyzeBrandTone={analyzeBrandTone}
             analyzingBrandTone={analyzingBrandTone}
             hasOpenAI={hasTextAI}
-            onNeedKeys={() => setKeysOpen?.(true)}
-            material={material}
+            onOpenBrandContext={() => setTab('brand')}
             activeIdx={activeIdx}
             slidesCount={slides.length}
             materialSummary={(() => {
@@ -1495,28 +1494,6 @@ function SidebarContent({
                     />
                   </div>
                 </div>
-              </S>
-            )}
-
-            {tab==='narrativa' && narrativaPanel==='card' && (
-              <S
-                title={`Logo — ${itemLabel} ${activeIdx + 1}`}
-                hint={`Use a logo já salva no projeto, ou importe um PNG apenas para este ${itemLabel}.`}
-              >
-                <SlideLogoPanel
-                  key={`card-logo-${activeEntry?.id}-${slide.id}`}
-                  slide={slide}
-                  updateSlide={updateSlide}
-                  toast={toast}
-                  styleKit={styleKit}
-                  setStyleKit={setStyleKit}
-                  brand={brand}
-                  setBrand={setBrand}
-                  setSlides={setSlides}
-                  cardIndex={activeIdx}
-                  selectedSlideIds={selectedSlideIds}
-                  cardOnly
-                />
               </S>
             )}
 
@@ -2341,7 +2318,7 @@ function SidebarContent({
           <>
             {/* Switcher de perfis de marca — útil pra freelance/agência alternar entre clientes */}
             {tab==='brand' && setBrandsOpen && (
-              <S title="Marcas" hint="Identidade + contexto. Projetos novos nesta marca herdam o brief guardado em Home → Brief da marca.">
+              <S title="Marcas" hint="Identidade desta marca. O brief abaixo vale para projetos novos. O projeto aberto tem o contexto dele, logo em seguida.">
                 <button
                   onClick={() => setBrandsOpen(true)}
                   style={{
@@ -2387,6 +2364,67 @@ function SidebarContent({
                     Usar contexto deste projeto na marca
                   </button>
                 ) : null}
+              </S>
+            )}
+
+            {tab==='brand' && appMode !== 'criador' ? (
+              <details style={{
+                borderRadius: 12,
+                border: '1px solid var(--hairline)',
+                background: 'var(--bg-card)',
+                padding: '10px 12px',
+              }}>
+                <summary style={{
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.011em',
+                }}>
+                  Brief da marca
+                  <span style={{
+                    display: 'block',
+                    marginTop: 2,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'var(--text-muted)',
+                  }}>
+                    Estilo e texto que só entram em projetos novos
+                  </span>
+                </summary>
+                <div style={{ marginTop: 10 }}>
+                  <BrandWorkspacePanel
+                    part="editors"
+                    brandRoster={brandRoster}
+                    activeBrandId={activeBrandId}
+                    onSaveBrandContext={onSaveBrandContext}
+                    projectCount={projectsForBrand(library, activeBrandId).length}
+                    toast={toast}
+                  />
+                </div>
+              </details>
+            ) : null}
+
+            {tab==='brand' && (
+              <S
+                title="Deste projeto"
+                hint={`${activeEntry?.name || 'Projeto'} · brief, estilo, referências e logo só deste projeto.`}
+              >
+                <ProjectStyleKitPanel
+                  key={activeEntry?.id}
+                  styleKit={styleKit}
+                  setStyleKit={setStyleKit}
+                  toast={toast}
+                  projectName={activeEntry?.name}
+                  projectId={activeDocId || activeEntry?.id}
+                  brand={brand}
+                  setBrand={setBrand}
+                  onAnalyzeBrandTone={analyzeBrandTone}
+                  analyzingBrandTone={analyzingBrandTone}
+                  hasOpenAI={hasTextAI}
+                  onNeedKeys={() => setKeysOpen?.(true)}
+                  material={material}
+                />
               </S>
             )}
 
@@ -3654,53 +3692,13 @@ function SidebarContent({
               />
             </S>
 
-            {appMode === 'criador' ? null : (
-              <details style={{
-                borderRadius: 12,
-                border: '1px solid var(--hairline)',
-                background: 'var(--bg-card)',
-                padding: '10px 12px',
-              }}>
-                <summary style={{
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  letterSpacing: '-0.011em',
-                }}>
-                  Brief da marca
-                  <span style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: 'var(--text-muted)',
-                  }}>
-                    Estilo e texto que só entram em projetos novos
-                  </span>
-                </summary>
-                <div style={{ marginTop: 10 }}>
-                  <BrandWorkspacePanel
-                    part="editors"
-                    brandRoster={brandRoster}
-                    activeBrandId={activeBrandId}
-                    onSaveBrandContext={onSaveBrandContext}
-                    projectCount={projectsForBrand(library, activeBrandId).length}
-                    toast={toast}
-                  />
-                </div>
-              </details>
-            )}
-
+            {appMode === 'criador' ? (
             <S
-              title={appMode === 'criador' ? 'Criar rápido' : 'Deste projeto'}
-              hint={appMode === 'criador'
-                ? (creativePreset === 'apresentacao'
-                  ? 'Faça uma ideia avançar · contexto → argumento → decisão → PDF'
-                  : 'Faça uma ideia circular · gancho → argumento → ação → publicar')
-                : `${activeEntry?.name || 'Projeto'} · ${slides.length} ${creativePreset === 'apresentacao' || fmt === 'apresentacao' ? 'slides' : 'cards'} · brief e referências só deste projeto`}
+              title="Criar rápido"
+              hint={creativePreset === 'apresentacao'
+                ? 'Faça uma ideia avançar · contexto → argumento → decisão → PDF'
+                : 'Faça uma ideia circular · gancho → argumento → ação → publicar'}
             >
-              {appMode === 'criador' ? (
                 <CriarRapidoHome
                   brand={brand}
                   setBrand={setBrand}
@@ -3755,30 +3753,22 @@ function SidebarContent({
                   onSetPublicationDate={setDocPublicationDate}
                   onCreateFolder={createFolder}
                 />
-              ) : (
-                <>
-                  <ProjectStyleKitPanel
-                    key={activeEntry?.id}
-                    styleKit={styleKit}
-                    setStyleKit={setStyleKit}
-                    toast={toast}
-                    projectName={activeEntry?.name}
-                    projectId={activeDocId || activeEntry?.id}
-                    brand={brand}
-                    setBrand={setBrand}
-                    onAnalyzeBrandTone={analyzeBrandTone}
-                    analyzingBrandTone={analyzingBrandTone}
-                    hasOpenAI={hasTextAI}
-                    onNeedKeys={() => setKeysOpen?.(true)}
-                    material={material}
-                  />
-                  <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenResults} style={{ width: '100%', minHeight: 40, marginTop: 4 }}>
-                    Resultados das publicações
-                  </button>
-                </>
-              )}
             </S>
+            ) : (
+              <S
+                title="Resultados"
+                hint="Números das publicações deste projeto."
+              >
+                <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenResults} style={{ width: '100%', minHeight: 40 }}>
+                  Resultados das publicações
+                </button>
+              </S>
+            )}
+          </>
+        )}
 
+        {tab==='narrativa' && (
+          <>
             <div style={{ margin: '4px 0 12px' }}>
               <button
                 type="button"
