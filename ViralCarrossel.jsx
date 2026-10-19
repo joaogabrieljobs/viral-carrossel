@@ -80,7 +80,7 @@ import {
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
-import { isPitchPath, cleanPitchSlide, PITCH_PROVENANCE_RULE } from './src/utils/pitch-content.js';
+import { isPitchPath, cleanPitchSlide, cleanPitchText, PITCH_PROVENANCE_RULE } from './src/utils/pitch-content.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
 import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
@@ -4837,7 +4837,7 @@ export default function App() {
     });
     const projectContextBlock = buildProjectContextBlock(styleKit);
     const styleKitTextHint = buildStyleKitTextHint(styleKit);
-    const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
+    const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationGeneration ? presentationPathId : null }), job.signal);
     checkActive();
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
@@ -5403,7 +5403,7 @@ ${jsonShapeLine}`;
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationRefine ? presentationPath : null }), job.signal);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const nSl = slides.length;
       const presentationRefineTextLimits = isPresentationRefine
@@ -5490,7 +5490,7 @@ Retorne exatamente: ${singleJson}`,
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const isPresentationSummary = isApresentacaoPreset(creativePreset);
       const capRules = buildCaptionVoiceRules(creativePreset, mode);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null }), job.signal);
       const r = await callAI(
         `${isPresentationSummary
           ? 'Atue como editor de apresentações. Crie um resumo executivo e notas breves para acompanhar este deck em português brasileiro.'
@@ -5516,7 +5516,7 @@ ${isPresentationSummary
       );
       throwIfGenerationCancelled(job.signal);
       const finalCaption = isPresentationSummary
-        ? String(r?.summary ?? r?.caption ?? r ?? '').trim()
+        ? (isPitchPath(presentationPath) ? cleanPitchText(r?.summary ?? r?.caption ?? r) : String(r?.summary ?? r?.caption ?? r ?? '').trim())
         : normalizeInstagramCaption(r);
 
       if (activeProjectRef.current === projectId) {
@@ -5723,7 +5723,7 @@ ${isPresentationSummary
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: refiningPresentation ? presentationPath : null }), job.signal);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath);
       const refinePrompt = refiningPresentation

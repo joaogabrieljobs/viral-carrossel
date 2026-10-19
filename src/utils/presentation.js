@@ -368,6 +368,6 @@ export function buildApresentacaoIntroLine() {
 
 export function buildApresentacaoRefineHint(pathId = DEFAULT_PRESENTATION_PATH_ID) {
   const route = getPresentationPath(pathId);
-  if (route.id === 'pitch') return `${buildPitchFieldRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
+  if (route.id === 'pitch') return `Pacote Apresentação 16:9 (Pitch):\n${buildPitchFieldRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
   return `- Pacote Apresentação 16:9 (${route.label}): capa pode ter title curto; conteúdo usa title como afirmação-conclusão em até duas linhas e subtitle apenas como apoio breve. Prefira evidência visual; bodyAfterImage só para fonte/ressalva/instrução. Preserve o caminho do deck e não use sanduíche de foto, bullets simulados ou CTAs de Instagram.`;
 }

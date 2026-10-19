@@ -467,11 +467,14 @@ async function fetchMaterialUrlSnippets(material) {
 }
 
 /** Monta os blocos de material para o prompt da IA e, se houver URL(s), obtém texto no servidor antes. `toastCb` opcional — (msg, kind, ttl?). */
-async function resolveMaterialPromptParts(material, toastCb) {
+async function resolveMaterialPromptParts(material, toastCb, options = {}) {
+  if (isPitchPath(options.presentationPath) && normalizedMaterialPieces(material).c.length > 40_000) {
+    toastCb?.('O conteúdo base excede 40 mil caracteres. Este Pitch usará o início do texto; reduza o material para incluir todos os pontos essenciais.', 'warning', 8000);
+  }
   const urls = extractHttpUrlsFromMaterial(material);
   if (!urls.length) {
     return {
-      materialBlock: buildMaterialBlock(material, []),
+      materialBlock: buildMaterialBlock(material, [], options),
       materialPriorityBlock: buildMaterialPriorityBlock(material, []),
     };
   }
@@ -490,7 +493,7 @@ async function resolveMaterialPromptParts(material, toastCb) {
     }
   }
   return {
-    materialBlock: buildMaterialBlock(material, urlSnippets),
+    materialBlock: buildMaterialBlock(material, urlSnippets, options),
     materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets),
   };
 }
@@ -502,9 +505,13 @@ function materialHasUserInput(material) {
   return !!(c || s || x);
 }
 
-const buildMaterialBlock = (material, urlSnippets = []) => {
+const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
   const parts = [];
   const { c, s, x } = normalizedMaterialPieces(material);
+  const pitch = isPitchPath(options.presentationPath);
+  const contentLimit = pitch ? 40_000 : 8000;
+  // Reserva espaço para instruções e para o rascunho na segunda chamada.
+  const fetchedLimit = pitch ? 60_000 - Math.min(c.length, contentLimit) : 62_000;
   const refId = material?.refProfileId;
   const ref = refId && REFERENCE_PROFILE_BY_ID[refId];
 
@@ -520,14 +527,14 @@ const buildMaterialBlock = (material, urlSnippets = []) => {
       blobs.push(`=== ORIGEM ${p.url} ===\n${body.slice(0, 13000)}`);
     }
     if (blobs.length) {
-      fetchedBody = blobs.join('\n\n').slice(0, 62000);
+      fetchedBody = blobs.join('\n\n').slice(0, fetchedLimit);
       parts.push(
         `TEXTO OBTIDO DAS FONTES (extraído automaticamente pelo app a partir das URL(s); use como BASE FACTUAL principal — sintetize com palavras próprias nos slides em português, sem cópia longa nem plagio):\n"""\n${fetchedBody}\n"""`,
       );
     }
   }
 
-  if (c) parts.push(`MATÉRIA-PRIMA (base factual — extraia teses, não copie literalmente nem invente fatos):\n"""\n${c.slice(0, 8000)}\n"""`);
+  if (c) parts.push(`MATÉRIA-PRIMA (base factual — extraia teses, não copie literalmente nem invente fatos):\n"""\n${c.slice(0, contentLimit)}\n"""`);
   if (s) {
     const fetchedFull = Array.isArray(urlSnippets)
       ? urlSnippets.filter((u) => u.text && String(u.text).trim().length >= 120)
@@ -537,7 +544,7 @@ const buildMaterialBlock = (material, urlSnippets = []) => {
         ? 'FONTES & REFERÊNCIAS (URL listada — o texto legível já foi transcrito para o bloco «TEXTO OBTIDO DAS FONTES» acima):'
         : /https?:\/\//i.test(s) || /\bwww\.[^\s]+\b/i.test(s)
           ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) sem extração bem-sucedida — o endereço não comprova fatos; use apenas o texto disponível, sem fingir leitura):'
-          : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
+          : pitch ? 'FONTES & REFERÊNCIAS (conferência factual interna; não mencione a origem na apresentação final):' : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
     parts.push(`${srcLabel}\n${s.slice(0, 2000)}`);
   }
   if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (orientam recorte e estilo; preserve idioma, veracidade e schema solicitado):\n${x.slice(0, 1500)}`);
