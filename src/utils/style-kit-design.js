@@ -7,10 +7,37 @@ export const PROJECT_DESIGN_SCHEMA = {
   bg: '', titleColor: '', subtitleColor: '', textColor: '', accent: '',
 };
 
+const COLOR_LABELS = [
+  { re: /fundo|background|\bbg\b|grafite|graphite/i, key: 'bg' },
+  { re: /acento|accent|rose|rosa|destaque/i, key: 'accent' },
+  { re: /subt[ií]tulo/i, key: 'subtitleColor' },
+  { re: /t[ií]tulo/i, key: 'titleColor' },
+  { re: /texto|corpo/i, key: 'textColor' },
+];
+
+/** Cores escritas no brief. O gerador não pode trocá-las por creme ou cinza. */
+export function explicitBrandColorsFromKit(kit) {
+  const text = `${kit?.contextMd || ''}\n${kit?.stylePrompt || ''}`;
+  const patch = {};
+  const re = /([^\n#]{0,64})#([0-9a-fA-F]{6})\b/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const label = match[1] || '';
+    const hex = `#${match[2]}`;
+    const hit = COLOR_LABELS.find((item) => item.re.test(label));
+    if (hit && !patch[hit.key]) patch[hit.key] = hex;
+  }
+  return patch;
+}
+
 export function buildProjectDesignInstructions(kit) {
   if (!kit?.contextMd?.trim() && !kit?.stylePrompt?.trim()) return '';
+  const locked = explicitBrandColorsFromKit(kit);
+  const lockedLine = Object.keys(locked).length
+    ? ` Cores já definidas no brief e que devem ser copiadas exatamente: ${Object.entries(locked).map(([key, hex]) => `${key} ${hex}`).join(', ')}.`
+    : '';
   return `IDENTIDADE EDITÁVEL DO PROJETO:
-Preencha projectDesign a partir das regras explícitas do brief e estilo. Campo não especificado: string vazia (titleWeight: 0). Não deduza a identidade a partir do assunto, nem transforme cores de acento em filtros de imagem.
+Preencha projectDesign a partir das regras explícitas do brief e estilo. Campo não especificado: string vazia (titleWeight: 0). Não deduza a identidade a partir do assunto, nem transforme cores de acento em filtros de imagem. Se o brief nomeia grafite, rose ou qualquer #RRGGBB, use esse valor. Não troque a paleta do brief por creme, cinza ou preto genérico.${lockedLine}
 layout: fullbleed se o brief exigir imagem em toda a peça; classic se pedir foto em área separada; vazio se não especificado.
 titleFont: nome exato entre ${TITLE_FONTS.map(f => f.name).join(', ')}.
 bodyFont: nome exato entre ${BODY_FONTS.map(f => f.name).join(', ')}.

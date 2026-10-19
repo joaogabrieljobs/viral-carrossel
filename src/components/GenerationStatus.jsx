@@ -52,7 +52,7 @@ export function GenerationStatus({ progress, onCancel }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} aria-hidden />
           <span role="status" style={{ flex: 1, fontSize: 13 }}>
-            {progress?.label || (isImport ? 'A importar fotos…' : 'Operação de IA em andamento…')}
+            {progress?.label || (isImport ? 'Importando fotos…' : 'Operação de IA em andamento…')}
           </span>
           <button
             type="button"

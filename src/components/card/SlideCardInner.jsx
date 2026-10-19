@@ -1,4 +1,4 @@
-import { brandWithSlideLogo, LOGO_SIZE_DEFAULT } from '../../utils/slide-logo.js';
+import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, visibleLogoPosition } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Layout, Minus, Plus, Video, User } from 'lucide-react';
@@ -36,10 +36,16 @@ function textoComDestaque(text, spans, accentColor, accentWeight) {
   const t = String(text ?? '');
   if (!t) return t;
   const pieces = cultureAccentRenderablePieces(t, spans);
-  if (!pieces.some((p) => p.type === 'accent')) return t;
-  return pieces.map((p, i) => (p.type === 'accent'
-    ? <span key={i} data-vc-destaque style={{ color: accentColor || 'inherit', fontWeight: accentWeight }}>{p.v}</span>
-    : <React.Fragment key={i}>{p.v}</React.Fragment>));
+  if (!pieces.some((p) => p.type === 'accent' || p.type === 'italic')) return t;
+  return pieces.map((p, i) => {
+    if (p.type === 'accent') {
+      return <span key={i} data-vc-destaque style={{ color: accentColor || 'inherit', fontWeight: accentWeight }}>{p.v}</span>;
+    }
+    if (p.type === 'italic') {
+      return <span key={i} data-vc-italic style={{ fontStyle: 'italic' }}>{p.v}</span>;
+    }
+    return <React.Fragment key={i}>{p.v}</React.Fragment>;
+  });
 }
 
 /**
@@ -271,6 +277,28 @@ function vcTextGlassSurfaceStyle(slide, f) {
 }
 
 /** O centro usa margem em vez de `transform`, preservando o translate do arraste livre. */
+function looksBlankLogo(img) {
+  if (!img || !img.naturalWidth) return false;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 12;
+    canvas.height = 12;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 12, 12);
+    const data = ctx.getImageData(0, 0, 12, 12).data;
+    let opaque = 0;
+    let ink = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 16) continue;
+      opaque += 1;
+      if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) ink += 1;
+    }
+    return opaque > 100 && ink < 3;
+  } catch {
+    return false;
+  }
+}
+
 function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin) {
   if (pos === 'tl') Object.assign(style, { top: margin, left: margin });
   else if (pos === 'tr') Object.assign(style, { top: topOffset, right: margin });
@@ -287,6 +315,7 @@ function vcApplyLogoPosition(style, pos, margin, sizePx, topOffset = margin) {
  */
 function BrandLogoLayer({
   src,
+  fallbackSrc = '',
   sizePx,
   opacity = 1,
   tone = 'original',
@@ -297,7 +326,18 @@ function BrandLogoLayer({
   elementProps = null,
   movable = false,
 }) {
-  if (!src || typeof src !== 'string') return null;
+  const [useFallback, setUseFallback] = React.useState(false);
+  const [hidden, setHidden] = React.useState(false);
+  React.useEffect(() => {
+    setUseFallback(false);
+    setHidden(false);
+  }, [src, fallbackSrc]);
+  const active = useFallback ? fallbackSrc : src;
+  if (!active || typeof active !== 'string' || hidden) return null;
+  const giveUp = () => {
+    if (!useFallback && fallbackSrc && fallbackSrc !== src) setUseFallback(true);
+    else setHidden(true);
+  };
   const box = Math.max(1, Math.round(sizePx));
   const style = {
     position: 'absolute',
@@ -322,12 +362,14 @@ function BrandLogoLayer({
   return (
     <div {...handlers} style={style} aria-hidden={movable ? undefined : true}>
       <img
-        src={src}
+        src={active}
         data-vc-brand-logo=""
         data-vc-logo-tone={tone === 'dark' ? 'dark' : undefined}
         alt=""
         draggable={false}
         decoding="async"
+        onError={giveUp}
+        onLoad={(event) => { if (looksBlankLogo(event.currentTarget)) giveUp(); }}
         style={{
           width: '100%',
           height: '100%',
@@ -608,8 +650,10 @@ const ClassicCanvasInner = React.forwardRef(({
   /** Arrasto livre; vem do SlideCardInner. Ausente quando o chrome de zonas
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
+  fallbackLogo = '',
 }, ref) => {
   void imgModeNorm;
+  const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
   const movOu = React.useCallback(
     (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
     [mov],
@@ -716,7 +760,7 @@ const ClassicCanvasInner = React.forwardRef(({
               animation:'spin 0.9s linear infinite',
             }}/>
             <span role="status" style={{ color:'rgba(255,255,255,0.55)', fontSize:f.w*0.026, fontWeight:600, letterSpacing:'-0.011em' }}>
-              {generateImageBusy ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
+              {generateImageBusy ? 'Gerando com GPT Image 2…' : 'Carregando a foto…'}
             </span>
           </div>
         )}
@@ -1052,13 +1096,14 @@ const ClassicCanvasInner = React.forwardRef(({
 
       {brand.logo && (() => {
         const handleAtTop = brand.showHandle;
-        const pos = brand.logoPosition || 'tr';
+        const pos = visibleLogoPosition(brand, slide);
         const margin = f.w * 0.045;
         const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
             src={brand.logo}
+            fallbackSrc={logoFallback}
             tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
@@ -1131,8 +1176,10 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
   onInlineTextChange = null,
   /** `(chave, estiloBase) => props` do arrasto livre; vem do SlideCardInner. */
   mov = null,
+  fallbackLogo = '',
 }, ref) => {
   void imgModeNorm;
+  const logoFallback = fallbackLogo && fallbackLogo !== brand?.logo ? fallbackLogo : '';
   const movOu = React.useCallback(
     (chave, estilo) => (mov ? mov(chave, estilo) : { style: estilo }),
     [mov],
@@ -1433,7 +1480,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
             fontWeight: 600,
             letterSpacing: '-0.011em',
           }}>
-            {generateImageBusy ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
+            {generateImageBusy ? 'Gerando com GPT Image 2…' : 'Carregando a foto…'}
           </span>
           {generateImageBusy && (
             <span style={{
@@ -1538,13 +1585,14 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
 
       {brand.logo && (() => {
         const handleAtTop = brand.showHandle;
-        const pos = brand.logoPosition || 'tr';
+        const pos = visibleLogoPosition(brand, slide);
         const margin = f.w * 0.045;
         const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
             src={brand.logo}
+            fallbackSrc={logoFallback}
             tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}
@@ -1593,6 +1641,7 @@ const SlideCardInner = React.forwardRef(({
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
   // handle mesmo que o usuário configure depois de aplicar o padrão visual.
+  const profileLogo = typeof brand?.logo === 'string' ? brand.logo : '';
   slide = React.useMemo(() => resolveSlideTextFonts(slide, brand), [slide, brand]);
   const brandRaw = React.useMemo(() => brandWithSlideLogo(brand, slide), [brand, slide.logoImageId, slide.logoImage, slide.logoHidden, slide.logoPosition, slide.logoSize, slide.logoOpacity]);
   brand = React.useMemo(() => {
@@ -1603,6 +1652,7 @@ const SlideCardInner = React.forwardRef(({
     for (const k of campos) out[k] = resolvePresetText(brandRaw[k], brandRaw);
     return out;
   }, [brandRaw]);
+  const logoFallback = profileLogo && profileLogo !== brand?.logo ? profileLogo : '';
 
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const presentationMode = fmt === 'apresentacao'
@@ -2481,13 +2531,14 @@ const SlideCardInner = React.forwardRef(({
 
         {brandFooterChrome}
         {brand.logo && (() => {
-          const pos = brand.logoPosition || 'tr';
+          const pos = visibleLogoPosition(brand, slide);
           const margin = f.w * 0.045;
           const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
               src={brand.logo}
+              fallbackSrc={logoFallback}
               tone={slide.logoTone}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
@@ -2570,7 +2621,7 @@ const SlideCardInner = React.forwardRef(({
         {sandwich && (showPhotoSpinner || showAiGeneratingOverlay) && (
           <div
             aria-busy="true"
-            aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'A carregar foto'}
+            aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'Carregando a foto'}
             style={{
             position:'absolute', inset:0, zIndex:6, display:'flex', alignItems:'center', justifyContent:'center',
             background: cr.solidBgIsLight ? 'rgba(250,250,252,0.72)' : 'rgba(10,10,12,0.72)',
@@ -2672,7 +2723,7 @@ const SlideCardInner = React.forwardRef(({
                 borderStyle: 'solid',
               })}
               aria-busy="true"
-              aria-label="A carregar foto"
+              aria-label="Carregando a foto"
             >
               {!forExport ? (
                 <div style={{
@@ -2827,13 +2878,14 @@ const SlideCardInner = React.forwardRef(({
         </OverflowScaler>
         {brandFooterChrome}
         {brand.logo && (() => {
-          const pos = brand.logoPosition || 'tr';
+          const pos = visibleLogoPosition(brand, slide);
           const margin = f.w * 0.045;
           const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
           const topOffset = hasBar && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.072 : margin;
           return (
             <BrandLogoLayer
               src={brand.logo}
+              fallbackSrc={logoFallback}
               tone={slide.logoTone}
               sizePx={sizePx}
               opacity={(brand.logoOpacity ?? 90) / 100}
@@ -2895,6 +2947,7 @@ const SlideCardInner = React.forwardRef(({
         fmt={fmt}
         slide={slide}
         brand={brand}
+        fallbackLogo={profileLogo}
         bg={bg}
         titleFF={titleFF}
         bodyFF={bodyFF}
@@ -2943,6 +2996,7 @@ const SlideCardInner = React.forwardRef(({
         forExport={forExport}
         slide={slide}
         brand={brand}
+        fallbackLogo={profileLogo}
         bg={bg}
         L={L}
         isBebas={isBebas}
@@ -3018,7 +3072,7 @@ const SlideCardInner = React.forwardRef(({
       {(showPhotoSpinner || showAiGeneratingOverlay) && !slide.videoId && !forExport && (
         <div
           aria-busy="true"
-          aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'A carregar foto'}
+          aria-label={showAiGeneratingOverlay ? 'Gerando imagem' : 'Carregando a foto'}
           style={{
             position: 'absolute',
             left: '8%',
@@ -3110,7 +3164,7 @@ const SlideCardInner = React.forwardRef(({
             fontWeight:600,
             letterSpacing:'-0.011em',
           }}>
-            {showAiGeneratingOverlay ? 'Gerando com GPT Image 2…' : 'A carregar foto…'}
+            {showAiGeneratingOverlay ? 'Gerando com GPT Image 2…' : 'Carregando a foto…'}
           </span>
           {showAiGeneratingOverlay && (
           <span style={{
@@ -3492,13 +3546,14 @@ const SlideCardInner = React.forwardRef(({
       {brand.logo && (() => {
         // Se o handle está no topo, evita conflito com a logo (desloca pra mais longe)
         const handleAtTop = brand.showHandle;
-        const pos = brand.logoPosition || 'tr';
+        const pos = visibleLogoPosition(brand, slide);
         const margin = f.w * 0.045;
         const sizePx = logoRenderPx(fmt, f.w, brand.logoSize ?? LOGO_SIZE_DEFAULT);
         const topOffset = handleAtTop && pos.startsWith('t') && pos.endsWith('r') ? margin + f.h * 0.05 : margin;
         return (
           <BrandLogoLayer
             src={brand.logo}
+            fallbackSrc={logoFallback}
             tone={slide.logoTone}
             sizePx={sizePx}
             opacity={(brand.logoOpacity ?? 90) / 100}

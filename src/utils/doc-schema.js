@@ -137,6 +137,37 @@ const mkSlide = (n = 1, brand = null) => {
 };
 };
 
+const LEAKED_DEFAULT_HANDLES = new Set(['clinicajaninearaujo']);
+
+function brandHandleKey(value) {
+  return String(value || '').replace(/^@+/, '').trim().toLowerCase();
+}
+
+/** A marca Padrão não fica com o @ de outro perfil nem com o da clínica de teste. */
+function repairDefaultBrandHandle(brands) {
+  if (!Array.isArray(brands)) return brands;
+  const foreign = new Set(
+    brands
+      .filter((item) => item && item.id !== 'default')
+      .map((item) => brandHandleKey(item.handle))
+      .filter(Boolean),
+  );
+  return brands.map((item) => {
+    if (!item || (item.id !== 'default' && item.name !== 'Padrão')) return item;
+    const handle = brandHandleKey(item.handle);
+    if (!handle || (!LEAKED_DEFAULT_HANDLES.has(handle) && !foreign.has(handle))) return item;
+    return { ...item, handle: '', showHandle: false };
+  });
+}
+
+function defaultBrandHandleIsLeaked(brand, brands = []) {
+  if (!brand || (brand.id !== 'default' && brand.name !== 'Padrão')) return false;
+  const handle = brandHandleKey(brand.handle);
+  if (!handle) return false;
+  if (LEAKED_DEFAULT_HANDLES.has(handle)) return true;
+  return brands.some((item) => item && item !== brand && item.id !== brand.id && brandHandleKey(item.handle) === handle);
+}
+
 const DEFAULT_BRAND = {
   id: 'default',
   name: 'Padrão',
@@ -311,6 +342,9 @@ function ensureDocShape(d) {
     imgParams: { ...DEFAULT_DOC.imgParams, ...(migrated.imgParams && typeof migrated.imgParams === 'object' ? migrated.imgParams : {}) },
     styleKit: normalizeStyleKit(migrated.styleKit),
   };
+  if (defaultBrandHandleIsLeaked(out.brand)) {
+    out.brand = { ...out.brand, handle: '', showHandle: false };
+  }
   out.material.sources = scrubStaleMaterialSources(
     typeof out.material.sources === 'string' ? out.material.sources : ''
   );
@@ -378,6 +412,8 @@ export {
   typographyPatchFromBrand,
   mkSlide,
   DEFAULT_BRAND,
+  repairDefaultBrandHandle,
+  defaultBrandHandleIsLeaked,
   DEFAULT_DOC,
   STALE_MATERIAL_SOURCE_MARKERS,
   tokenLooksLikeStaleMaterialSource,

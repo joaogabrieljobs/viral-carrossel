@@ -90,14 +90,12 @@ function CultureInlineRich({
     <span style={wrapStyle}>
       {parts.map((p, i) =>
         p.type === 'accent' ? (
-          // Accent: SEMPRE visualmente distinto do base, mesmo quando a cor está washout.
-          // - fontWeight 800 garante destaque acima de base 400/500/600 padrão
-          // - se a cor accent estiver muito próxima do base (washout em fundos com baixo contraste),
-          //   o weight extra ainda permite o usuário ver o destaque
           <span key={i} data-vc-destaque style={{
             color: accentColor,
             fontWeight: 800,
           }}>{p.v}</span>
+        ) : p.type === 'italic' ? (
+          <span key={i} data-vc-italic style={{ fontStyle: 'italic' }}>{p.v}</span>
         ) : (
           <span key={i}>{p.v}</span>
         ),

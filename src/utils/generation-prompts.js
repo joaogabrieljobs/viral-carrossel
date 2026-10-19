@@ -337,6 +337,51 @@ function normalizedMaterialPieces(material) {
 }
 
 /** Recolhe até 5 URLs únicas em «Conteúdo base», «Fontes» e «Contexto». */
+function collectSourceHosts(...blobs) {
+  const hosts = new Set();
+  const urlRe = /https?:\/\/[^\s<>"'{}|\\^[\])]+/gi;
+  const bareRe = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
+  for (const blob of blobs) {
+    const text = String(blob || '');
+    let match;
+    while ((match = urlRe.exec(text)) !== null) {
+      try {
+        hosts.add(new URL(match[0].replace(/[,.;:!?)]+$/g, '')).hostname.replace(/^www\./, '').toLowerCase());
+      } catch { /* token inválido */ }
+    }
+    while ((match = bareRe.exec(text)) !== null) {
+      const host = match[0].toLowerCase();
+      if (!/\.(png|jpe?g|webp|gif|svg)$/i.test(host)) hosts.add(host);
+    }
+  }
+  return [...hosts].filter((host) => host.includes('.') && host.length > 4);
+}
+
+/** Recoloca o domínio do material quando a geração corta o começo ou separa o .com. */
+function restoreSourceHosts(text, hosts) {
+  let next = String(text ?? '');
+  if (!next || !hosts?.length) return next;
+  const sorted = [...hosts].sort((a, b) => b.length - a.length);
+  for (const host of sorted) {
+    const parts = host.split('.');
+    const flexible = parts.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*\\.\\s*');
+    next = next.replace(new RegExp(flexible, 'gi'), host);
+    if (next.toLowerCase().includes(host)) continue;
+    const name = parts[0];
+    const tld = parts.slice(1).join('.');
+    for (let i = 1; i <= name.length - 6; i += 1) {
+      const frag = name.slice(i).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const tldPattern = tld.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const broken = new RegExp(`\\b${frag}\\s*\\.\\s*(?:${tldPattern})?`, 'gi');
+      if (!broken.test(next)) continue;
+      broken.lastIndex = 0;
+      next = next.replace(broken, host);
+      break;
+    }
+  }
+  return next;
+}
+
 function extractHttpUrlsFromMaterial(material) {
   const { c, s, x } = normalizedMaterialPieces(material);
   const blob = [c, s, x].filter(Boolean).join('\n');
@@ -429,7 +474,7 @@ async function resolveMaterialPromptParts(material, toastCb) {
       materialPriorityBlock: buildMaterialPriorityBlock(material, []),
     };
   }
-  toastCb?.('A ler texto das URLs em Fontes…', 'info', 2600);
+  toastCb?.('Lendo o texto dos links…', 'info', 2600);
   const urlSnippets = await fetchMaterialUrlSnippets(material);
   const ok = urlSnippets.filter((u) => String(u.text || '').trim().length >= 80).length;
   if (toastCb) {
@@ -1336,7 +1381,7 @@ ${isPresentation
     : 'bodyAfterImage' in slide
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}
-Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaques **assim** são permitidos dentro das strings quando o layout pedir.
+Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **duas** asteriscos. Não use asterisco simples: o card mostraria o símbolo. Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
 ${JSON.stringify({ slides: [slide], caption: '', ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}) })}`;
 }
 
@@ -1386,6 +1431,8 @@ export {
   isUrlOnlyNormalizedText,
   normalizedMaterialPieces,
   extractHttpUrlsFromMaterial,
+  collectSourceHosts,
+  restoreSourceHosts,
   FETCH_SOURCE_API,
   materialHasUserInput,
   buildMaterialBlock,

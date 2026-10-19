@@ -45,6 +45,22 @@ function markdownBoldAccentIntervalsUtf16(full) {
   return mergeUtf16AccentIntervals(iv);
 }
 
+/** Itálico de um asterisco só. Não pega o miolo de `**negrito**`. */
+function markdownItalicIntervalsUtf16(full) {
+  const s = String(full ?? '');
+  const bold = markdownBoldAccentIntervalsUtf16(s);
+  const iv = [];
+  const re = /(^|[^*])\*([^*\n]+)\*(?!\*)/g;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    const start = m.index + m[1].length + 1;
+    const end = start + m[2].length;
+    const insideBold = bold.some(([lo, hi]) => start >= lo && end <= hi);
+    if (!insideBold) iv.push([start, end]);
+  }
+  return mergeUtf16AccentIntervals(iv);
+}
+
 function unifyAccentIntervalsUtf16(full, explicitSpans) {
   const len = full.length;
   const md = markdownBoldAccentIntervalsUtf16(full);
@@ -52,43 +68,45 @@ function unifyAccentIntervalsUtf16(full, explicitSpans) {
   return mergeUtf16AccentIntervals([...md, ...ex]);
 }
 
-/** Remove pares `**` colados às zonas accent (marcadores Markdown — não aparecem no cartão). */
+/** Remove pares `**` e `*` colados às zonas (marcadores Markdown — não aparecem no cartão). */
 function stripAdjacentMarkdownBoldFences(fragment) {
   let s = String(fragment ?? '');
   let prev = null;
   while (prev !== s) {
     prev = s;
     if (s.startsWith('**')) s = s.slice(2);
+    else if (s.startsWith('*')) s = s.slice(1);
     if (s.endsWith('**')) s = s.slice(0, -2);
+    else if (s.endsWith('*')) s = s.slice(0, -1);
   }
   return s;
 }
 
-/** Trechos `{ type:'base'|'accent', v }` na ordem do texto. */
+function pushCleanPiece(pieces, type, raw) {
+  const cleaned = type === 'base' ? stripAdjacentMarkdownBoldFences(raw) : raw;
+  if (cleaned.length) pieces.push({ type, v: cleaned });
+}
+
+/** Trechos `{ type:'base'|'accent'|'italic', v }` na ordem do texto. */
 function cultureAccentRenderablePieces(fullText, explicitSpans) {
   const full = String(fullText ?? '');
   const len = full.length;
   if (!len) return [];
-  const iv = unifyAccentIntervalsUtf16(full, explicitSpans);
+  const marks = [
+    ...unifyAccentIntervalsUtf16(full, explicitSpans).map(([lo, hi]) => ({ type: 'accent', lo, hi })),
+    ...markdownItalicIntervalsUtf16(full).map(([lo, hi]) => ({ type: 'italic', lo, hi })),
+  ].sort((a, b) => a.lo - b.lo || a.hi - b.hi);
   const pieces = [];
   let ptr = 0;
-  for (const [a, b] of iv) {
-    const lo = Math.max(0, a);
-    const hi = Math.min(len, b);
-    if (hi <= lo) continue;
-    if (ptr < lo) {
-      const rawBase = full.slice(ptr, lo);
-      const cleaned = stripAdjacentMarkdownBoldFences(rawBase);
-      if (cleaned.length) pieces.push({ type: 'base', v: cleaned });
-    }
-    pieces.push({ type: 'accent', v: full.slice(lo, hi) });
+  for (const mark of marks) {
+    const lo = Math.max(0, mark.lo);
+    const hi = Math.min(len, mark.hi);
+    if (hi <= lo || lo < ptr) continue;
+    if (ptr < lo) pushCleanPiece(pieces, 'base', full.slice(ptr, lo));
+    pushCleanPiece(pieces, mark.type, full.slice(lo, hi));
     ptr = hi;
   }
-  if (ptr < len) {
-    const rawTail = full.slice(ptr);
-    const cleaned = stripAdjacentMarkdownBoldFences(rawTail);
-    if (cleaned.length) pieces.push({ type: 'base', v: cleaned });
-  }
+  if (ptr < len) pushCleanPiece(pieces, 'base', full.slice(ptr));
   return pieces.length ? pieces : [{ type: 'base', v: stripAdjacentMarkdownBoldFences(full) || full }];
 }
 
@@ -141,6 +159,7 @@ export {
   mergeUtf16AccentIntervals,
   normalizeDestaqueSpansForLen,
   markdownBoldAccentIntervalsUtf16,
+  markdownItalicIntervalsUtf16,
   unifyAccentIntervalsUtf16,
   stripAdjacentMarkdownBoldFences,
   cultureAccentRenderablePieces,

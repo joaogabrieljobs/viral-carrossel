@@ -391,7 +391,7 @@ function SidebarContent({
     try {
       let text = joinSlideCaptions(slides) || String(caption || '').trim();
       if (!text && generateCaption) {
-        toast?.(isPresentationProject ? 'A gerar resumo…' : 'A gerar legenda…', 'info');
+        toast?.(isPresentationProject ? 'Gerando o resumo…' : 'Gerando a legenda…', 'info');
         text = String(await generateCaption() || '').trim();
       }
       await copyTextToClipboard(text);

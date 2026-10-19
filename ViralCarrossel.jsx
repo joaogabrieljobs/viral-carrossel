@@ -117,6 +117,8 @@ import {
   isUrlOnlyNormalizedText,
   normalizedMaterialPieces,
   extractHttpUrlsFromMaterial,
+  collectSourceHosts,
+  restoreSourceHosts,
   FETCH_SOURCE_API,
   materialHasUserInput,
   buildMaterialBlock,
@@ -188,7 +190,7 @@ import {
   resolveQuickGenerationRequest,
   buildGenerationTaskBlock,
 } from './src/utils/style-kit.js';
-import { buildProjectDesignInstructions, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
+import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
@@ -385,12 +387,15 @@ import {
   typographyPatchFromBrand,
   mkSlide,
   DEFAULT_BRAND,
+  defaultBrandHandleIsLeaked,
+  repairDefaultBrandHandle,
   DEFAULT_DOC,
   STALE_MATERIAL_SOURCE_MARKERS,
   tokenLooksLikeStaleMaterialSource,
   scrubStaleMaterialSources,
   ensureDocShape,
 } from './src/utils/doc-schema.js';
+import { projectHasCarouselContent } from './src/utils/context-status.js';
 import {
   mergeUtf16AccentIntervals,
   normalizeDestaqueSpansForLen,
@@ -1037,7 +1042,7 @@ export default function App() {
   });
   const [brandRoster, setBrandRoster] = useState(() => {
     const stored = lsGet(SK.brands, null);
-    if (Array.isArray(stored) && stored.length) return stored.map(hydrateBrandTextColors);
+    if (Array.isArray(stored) && stored.length) return repairDefaultBrandHandle(stored.map(hydrateBrandTextColors));
     return [hydrateBrandTextColors({ ...DEFAULT_BRAND })];
   });
   const [activeBrandId, setActiveBrandId] = useState(() => lsGet(SK.activeBrandId, 'default'));
@@ -2654,10 +2659,15 @@ export default function App() {
           : current[key] !== value
       ));
       if (!changed) return currentRoster;
+      const identity = { ...creatorIdentitySnapshot };
+      if (current.id === 'default' && defaultBrandHandleIsLeaked({ ...current, handle: identity.handle }, currentRoster)) {
+        identity.handle = '';
+        identity.showHandle = false;
+      }
       const nextRoster = [...currentRoster];
       nextRoster[index] = hydrateBrandTextColors({
         ...current,
-        ...creatorIdentitySnapshot,
+        ...identity,
         id: current.id,
       });
       return nextRoster;
@@ -3795,11 +3805,11 @@ export default function App() {
     setSlideImgGenBusy({});
     const job = { cancelled: false };
     importAbortRef.current = job;
-    setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A importar foto… 0/1' });
+    setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Importando a foto… 0/1' });
     void (async () => {
       try {
         if (job.cancelled) return;
-        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A ler foto… 0/1' });
+        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Lendo a foto… 0/1' });
         const url = await vcImageFileToStorageDataUrl(file);
         if (job.cancelled) return;
         if (typeof url !== 'string' || url.length < 32) {
@@ -3810,7 +3820,7 @@ export default function App() {
           toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
           return;
         }
-        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'A guardar foto… 0/1' });
+        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Salvando a foto… 0/1' });
         let patch;
         try {
           patch = await guardarImagemDoSlide(url);
@@ -4241,7 +4251,7 @@ export default function App() {
       phase: 'import',
       current: 0,
       total,
-      label: `A importar fotos… 0/${total}`,
+      label: `Importando fotos… 0/${total}`,
     });
 
     const readOne = async (file) => {
@@ -4264,7 +4274,7 @@ export default function App() {
             phase: 'import',
             current: i,
             total,
-            label: `A importar fotos… ${i}/${total}`,
+            label: `Importando fotos… ${i}/${total}`,
           });
           const dataUrl = await readOne(file);
           if (job.cancelled) break;
@@ -4274,7 +4284,7 @@ export default function App() {
               phase: 'import',
               current: i + 1,
               total,
-              label: `A importar fotos… ${i + 1}/${total}`,
+              label: `Importando fotos… ${i + 1}/${total}`,
             });
             continue;
           }
@@ -4296,7 +4306,7 @@ export default function App() {
             phase: 'import',
             current: i + 1,
             total,
-            label: `A importar fotos… ${i + 1}/${total}`,
+            label: `Importando fotos… ${i + 1}/${total}`,
           });
         }
 
@@ -4743,6 +4753,10 @@ export default function App() {
       toast('Há outra operação de IA em andamento. Conclua ou cancele antes de iniciar uma nova geração.', 'info', 4800);
       return { cancelled: true };
     }
+    if (!remix && projectHasCarouselContent(slides)) {
+      const ok = window.confirm('Este projeto já tem cards. Gerar substitui os cards atuais. Desfazer recupera esta versão. Quer continuar?');
+      if (!ok) return { cancelled: true };
+    }
     const generationProjectId = activeProjectRef.current;
     const job = startAIJob();
     generationRef.current = job;
@@ -4965,6 +4979,7 @@ ${jsonShapeLine}`;
       ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked)
         ? projectDesignBrandPatch(result.projectDesign)
         : {}),
+      ...explicitBrandColorsFromKit(styleKit),
     };
     let projectLogoAsset = null;
     if (styleKit?.logoOnGenerate !== false && styleKit?.logo) {
@@ -4986,8 +5001,15 @@ ${jsonShapeLine}`;
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
       let q = textOnlyPlan ? '' : ((s.imageQuery ?? s.image_query) || '').trim();
-      const title = stripLeadingSlideCardLabel(String(s.title ?? '').trim());
-      const subtitle = stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim());
+      const sourceHosts = collectSourceHosts(
+        material?.content,
+        material?.sources,
+        material?.context,
+        styleKit?.contextMd,
+        styleKit?.stylePrompt,
+      );
+      const title = restoreSourceHosts(stripLeadingSlideCardLabel(String(s.title ?? '').trim()), sourceHosts);
+      const subtitle = restoreSourceHosts(stripLeadingSlideCardLabel(String(s.subtitle ?? '').trim()), sourceHosts);
       const stageIndex = presentationStages.length <= 1 || nSlides <= 1
         ? 0
         : Math.round((i * (presentationStages.length - 1)) / (nSlides - 1));
@@ -5068,7 +5090,7 @@ ${jsonShapeLine}`;
           align: presetAlign,
           photoRegion: compositionOverrides.photoRegion || 'full',
           useCultureLayout: false,
-          bodyAfterImage: stripLeadingSlideCardLabel(rawBodyAfterImage.trim()),
+          bodyAfterImage: restoreSourceHosts(stripLeadingSlideCardLabel(rawBodyAfterImage.trim()), sourceHosts),
           presentationStageId: stage.id || null,
           presentationStageLabel: stage.label || '',
           showSwipeCue: false,
@@ -5083,7 +5105,7 @@ ${jsonShapeLine}`;
           : typeof s.body_after_image === 'string'
             ? s.body_after_image
             : '';
-        let bodyAfterImage = stripLeadingSlideCardLabel(rawBody.trim());
+        let bodyAfterImage = restoreSourceHosts(stripLeadingSlideCardLabel(rawBody.trim()), sourceHosts);
         const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
 
         let overlay = 0;
@@ -5105,7 +5127,7 @@ ${jsonShapeLine}`;
           : typeof s.body_after_image === 'string'
             ? s.body_after_image
             : '';
-        let bodyAfterImage = stripLeadingSlideCardLabel(rawBody.trim());
+        let bodyAfterImage = restoreSourceHosts(stripLeadingSlideCardLabel(rawBody.trim()), sourceHosts);
         const ct = coerceCultureTone(s.cultureTone ?? s.culture_tone);
         let overlay = 0;
         const fullBleedPair = i <= 1;

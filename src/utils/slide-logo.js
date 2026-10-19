@@ -249,6 +249,15 @@ export function projectLogoFromStored(stored, name = 'Logo do projeto') {
     : { dataUrl: stored.logoImage, name };
 }
 
+/** Logo no centro de um card com texto cobre a frase. Sem arrasto, fica no canto. */
+export function visibleLogoPosition(brand = {}, slide = {}) {
+  const pos = slide.logoPosition || brand.logoPosition || 'tr';
+  if (slide.elementOffsets?.logo) return pos;
+  if (pos !== 'c') return pos;
+  const text = `${slide.title || ''} ${slide.subtitle || ''} ${slide.bodyAfterImage || ''}`.trim();
+  return text.length > 24 ? 'tr' : pos;
+}
+
 /** Controles efetivos (card override → marca → default). */
 export function resolveLogoControls(brand = {}, slide = {}) {
   return {

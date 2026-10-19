@@ -363,7 +363,7 @@ function GenerateModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={() => { if (!busy) onClose?.(); }}>
+    <div className="modal-overlay">
       <div
         ref={dialogRef}
         className="modal-panel vc-modal-scroll"

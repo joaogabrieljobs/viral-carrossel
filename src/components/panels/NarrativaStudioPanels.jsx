@@ -310,7 +310,7 @@ function NarrativaStudioPanels({
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {genBusy ? (
-              <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> A GERAR…</>
+              <><Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> Gerando…</>
             ) : (
               <><Sparkles size={14} /> Gerar com contexto e referências</>
             )}
@@ -334,7 +334,7 @@ function NarrativaStudioPanels({
 
       <div>
         <AccordionHeader
-          title="Add Conteúdo"
+          title="Adicionar conteúdo"
           hint="Matéria-prima, fontes e instruções para a IA"
           badge={materialSummary || 'Conteúdo base · fontes · contexto'}
           icon={FileText}
