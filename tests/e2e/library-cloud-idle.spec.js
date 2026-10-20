@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
-test('falha lenta do IndexedDB não repete sync na nuvem sem edição', async ({ page }) => {
+test('falha lenta do IndexedDB não repete atualizar da conta sem edição', async ({ page }) => {
   test.setTimeout(45_000);
   const requests = [];
   const runtimeErrors = [];

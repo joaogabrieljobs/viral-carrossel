@@ -7,7 +7,7 @@
 // tinta, e dão sobreposição mesmo quando o texto respira. O invariante testável é
 // o leading e o tracking mínimos por face, que foi o que se calibrou no olho.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const TITULO = 'A IA NÃO ESTÁ CONVERSANDO. ESTÁ CONSPIRANDO CONTRA NÓS';
 

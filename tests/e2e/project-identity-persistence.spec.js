@@ -49,13 +49,13 @@ test('pedido rápido pertence ao projeto e volta após trocar de projeto', async
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
   await page.getByRole('dialog', { name: /biblioteca de projetos/i })
     .getByRole('button', { name: 'Abrir Projeto B', exact: true }).click();
-  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await expect(prompt).toHaveValue('Pedido inicial B');
 
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
   await page.getByRole('dialog', { name: /biblioteca de projetos/i })
     .getByRole('button', { name: 'Abrir Projeto A', exact: true }).click();
-  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await expect(prompt).toHaveValue('Pedido editado e salvo em A');
 });
 
@@ -98,7 +98,8 @@ test('logo base64 antiga sai do localStorage e ganha ID durável no perfil e pro
 
 test('importação v2 não mistura marcas diferentes que usavam o mesmo id default', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
-  await enter(page);
+  // Import starts from the empty library; there is no automatic draft to open.
+  await page.goto('/?app=1');
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   const legacyBackup = {

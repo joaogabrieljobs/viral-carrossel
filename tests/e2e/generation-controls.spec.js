@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { limit: 50, remaining: 50, used: 0 } };
@@ -161,7 +161,7 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
   await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
   await prompt(page);
   await expect(page.getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
-  await page.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
+  await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await page.screenshot({ path: '/tmp/viral-generation-prompt.png' });
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides.filter(s => s.bgImageId).length).toBe(3);
@@ -187,7 +187,7 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
   await page.getByLabel('Estilo visual do projeto').fill('Colagem de papel laranja, recortes com textura.');
   await openPanel(page, /EDITAR CARD/i);
   await tones.getByRole('button', { name: 'Comercial', exact: true }).click();
-  await page.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
+  await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await page.getByRole('button', { name: 'Refazer texto e imagens', exact: true }).click();
   await expect.poll(() => imageRequests.length).toBe(6);
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
@@ -277,7 +277,7 @@ test('cancelar imagens para a fila e mantém imagens já concluídas', async ({ 
     },
   });
   await prompt(page);
-  await page.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
+  await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await generate(page);
   await expect.poll(() => imageCalls).toBe(2);
   await page.getByRole('tab', { name: /^Marca$/i }).first().click();
@@ -308,7 +308,7 @@ test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ p
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
 
-  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await page.getByRole('button', { name: 'Gerar imagens', exact: true }).click();
   await expect(page.getByText('Quais cards terão imagem?')).toBeVisible();
   await page.getByRole('button', { name: 'Gerar 3 imagens', exact: true }).click();
@@ -335,7 +335,7 @@ test('ações globais dos cards geram, excluem imagem e limpam texto selecionado
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
 
-  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await page.getByRole('button', { name: 'Selecionar card 1', exact: true }).click();
   await page.getByRole('button', { name: 'Gerar imagens (1)', exact: true }).click();
   await expect.poll(async () => !!(await doc(page))?.slides[0]?.bgImageId).toBe(true);

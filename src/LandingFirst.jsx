@@ -4,32 +4,14 @@ import { dismissOnboardingLanding } from './utils/landing-gate.js';
 import { fetchAccessSession } from './lib/billing.js';
 import BootScreen from './components/BootScreen.jsx';
 
-const OnboardingLanding = lazy(() => import('./components/OnboardingLandingProduct.jsx'));
+const OnboardingLandingProduct = lazy(() => import('./components/OnboardingLandingProduct.jsx'));
 const LoginModal = lazy(() => import('./components/LoginModal.jsx'));
 const StudioApp = lazy(() => import('../ViralCarrossel.jsx'));
 
-function useIsMobile() {
-  const [mobile, setMobile] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  ));
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const onChange = () => setMobile(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return mobile;
-}
-
-/**
- * Primeira visita: carrega só a landing (+ LoginModal).
- * Ao entrar no studio, faz dynamic import do monólito ViralCarrossel —
- * evita puxar GSAP + editor no first paint.
- */
 export default function LandingFirst() {
   const [phase, setPhase] = useState('landing');
   const [loginOpen, setLoginOpen] = useState(false);
-  const isMobile = useIsMobile();
+  const [loginMode, setLoginMode] = useState('login');
 
   const enterStudio = useCallback(() => {
     dismissOnboardingLanding();
@@ -85,13 +67,14 @@ export default function LandingFirst() {
     >
       <style>{GLOBAL_STYLE}</style>
       <Suspense fallback={<BootScreen />}>
-        <OnboardingLanding
+        <OnboardingLandingProduct
           onEnter={enterStudio}
-          onLogin={() => setLoginOpen(true)}
-          isMobile={isMobile}
+          onLogin={() => { setLoginMode('login'); setLoginOpen(true); }}
+          onRegister={() => { setLoginMode('register'); setLoginOpen(true); }}
         />
         <LoginModal
           open={loginOpen}
+          initialMode={loginMode}
           onClose={() => setLoginOpen(false)}
           onLoggedIn={() => {
             setLoginOpen(false);

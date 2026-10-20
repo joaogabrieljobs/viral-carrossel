@@ -183,22 +183,7 @@ function AccountHomeShell({
     </div>
   );
 
-  const createSelectedProject = async () => {
-    const isPresentation = creationType === 'apresentacao';
-    let name = '';
-    if (typeof askPrompt === 'function') {
-      const answered = await askPrompt({
-        title: isPresentation ? 'Nome da apresentação' : 'Nome da comunicação',
-        label: 'Como se chama este projeto?',
-        placeholder: isPresentation ? 'Ex.: Pitch clínica' : 'Ex.: Clínica Janine',
-        cta: 'Criar',
-        defaultValue: '',
-      });
-      if (answered === null || answered === undefined) return;
-      name = String(answered).trim();
-    }
-    newDoc?.(creationType, name);
-  };
+  const createSelectedProject = () => newDoc?.(creationType);
 
   const generateBtn = (fullWidth = false) => (
     <button
@@ -538,7 +523,7 @@ function AccountHomeShell({
           </header>
 
           <section
-            aria-label="Projeto atual"
+            aria-label={activeProject ? "Projeto atual" : "Seu primeiro projeto"}
             style={{
               border: '1.5px solid var(--accent)',
               background: 'var(--accent-surface)',
@@ -549,12 +534,12 @@ function AccountHomeShell({
             }}
           >
             <div>
-              <div className="vc-eyebrow" style={{ marginBottom: 6 }}>Em edição</div>
+              <div className="vc-eyebrow" style={{ marginBottom: 6 }}>{activeProject ? 'Em edição' : 'Comece por aqui'}</div>
               <h3 style={{
                 margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
                 color: 'var(--text-primary)',
               }}>
-                {projectName}
+                {activeProject ? projectName : 'O que vamos criar?'}
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
                 <strong style={{ color: 'var(--text-secondary)' }}>{activeProjectCopy.name}</strong>{' · '}
@@ -573,7 +558,7 @@ function AccountHomeShell({
               <button
                 type="button"
                 className="vc-pressable"
-                onClick={onContinueEditor}
+                onClick={activeProject ? onContinueEditor : createSelectedProject}
                 style={{
                   minHeight: 44, padding: '0 18px', borderRadius: 9999, border: 'none',
                   background: 'var(--accent)', color: '#fff', cursor: 'pointer',
@@ -581,7 +566,7 @@ function AccountHomeShell({
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}
               >
-                Continuar no editor <ChevronRight size={15} />
+                {activeProject ? 'Continuar no editor' : 'Criar primeiro projeto'} <ChevronRight size={15} />
               </button>
               <button
                 type="button"
@@ -689,7 +674,7 @@ function AccountHomeShell({
                       opacity: cloudSyncBusy ? 0.7 : 1,
                     }}
                   >
-                    {cloudSyncBusy ? 'A sincronizar…' : 'Sync na nuvem'}
+                    {cloudSyncBusy ? 'A sincronizar…' : 'Atualizar da conta'}
                   </button>
                 ) : null}
                 <button

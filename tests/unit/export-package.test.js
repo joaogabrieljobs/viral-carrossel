@@ -43,6 +43,11 @@ describe('export-package (Fatia 2)', () => {
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
   });
 
+  it('não confirma pacote ou copia legenda quando o download falha', async () => {
+    await expect(exportCarouselPackage({ exportAll:vi.fn().mockResolvedValue(false), caption:'Texto' })).rejects.toThrow(/baixar/);
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
   it('falha se exportAll não for função', async () => {
     await expect(exportCarouselPackage({})).rejects.toThrow(/indisponível/i);
   });

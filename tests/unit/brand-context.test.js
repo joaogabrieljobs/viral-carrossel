@@ -53,6 +53,14 @@ describe('brand-context', () => {
 });
 
 describe('buildSeededLibraryDoc herda contexto da marca', () => {
+  it('um novo cliente não recebe o briefing do cliente anterior', () => {
+    const oldBrand = { ...DEFAULT_BRAND, id:'anterior', styleKit:{ contextMd:'Segredo do cliente anterior', stylePrompt:'Estilo anterior', refImages:[] } };
+    const newBrand = { ...DEFAULT_BRAND, id:'novo', name:'Novo cliente' };
+    const doc = buildSeededLibraryDoc({ brand:newBrand }, oldBrand);
+    expect(doc.styleKit.contextMd).toBe('');
+    expect(doc.styleKit.stylePrompt).toBe('');
+    expect(doc.brand.styleKit?.contextMd || '').toBe('');
+  });
   it('sem styleKit no seed → usa brand.styleKit', () => {
     const brand = {
       ...DEFAULT_BRAND,

@@ -1,6 +1,6 @@
 // Itens da revisão de UX do editor (docs/ux-audit-editor-2026-09-16.md) e marca Moont AI.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 async function entrarNoEditor(page) {
   await mockApi(page, { session: SESSAO_ATIVA });
@@ -12,7 +12,7 @@ async function entrarNoEditor(page) {
 test.describe('Editor — revisão de UX', () => {
   test('UX-004: o editor abre na aba Home, não em Marca', async ({ page }) => {
     await entrarNoEditor(page);
-    await expect(page.getByRole('tab', { name: /^home$/i }).first()).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: /^Início$/i }).first()).toHaveAttribute('aria-selected', 'true');
   });
 
   test('UX-005: direção da imagem começa fechada e abre por card', async ({ page }) => {

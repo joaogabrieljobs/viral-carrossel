@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const routes = [
   ['Auto', 'estrategista editorial', 'uma única lógica dominante'],
@@ -48,7 +48,7 @@ for (const [label, role, criterion] of routes) {
     await page.getByRole('button', { name: /Modo atual: Criar rápido/i }).click();
     await page.getByRole('menuitem', { name: /Controle profissional/i }).click();
     await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
-    await page.getByPlaceholder('Ex.: Pitch clínica').fill(`Teste ${label}`);
+    await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill(`Teste ${label}`);
     await page.getByRole('button', { name: 'Criar', exact: true }).click();
 
     const modal = page.locator('.modal-panel');

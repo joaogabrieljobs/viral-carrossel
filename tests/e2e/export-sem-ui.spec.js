@@ -2,7 +2,7 @@
 // "Toque para inserir foto" saía dentro do PNG exportado, e o controlo nativo do
 // input de ficheiro aparecia por cima do título no card.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 test.describe('Export limpo de interface', () => {
   test('árvore de export não tem placeholder de foto nem input de ficheiro', async ({ page }) => {

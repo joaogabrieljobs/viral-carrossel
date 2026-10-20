@@ -177,7 +177,7 @@ async function expectStoredProjects(page) {
 }
 
 async function expectHomeProjects(page, { stored = true } = {}) {
-  await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(5);
   for (const name of PROJECT_NAMES) {
     await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toBeVisible();
@@ -186,7 +186,7 @@ async function expectHomeProjects(page, { stored = true } = {}) {
 }
 
 async function goHome(page) {
-  if (await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).isVisible()) return;
+  if (await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).isVisible()) return;
   // Em 1280px o header esconde Projetos; Perfil permanece e abre a mesma Home.
   await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
   await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
@@ -234,7 +234,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(1);
 
     cloud.online = true;
-    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
     try {
       await expectHomeProjects(page);
     } catch (error) {
@@ -350,7 +350,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       };
     });
     cloud.online = true;
-    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
     await expect(page.getByText(/Lista atualizada: 5 projeto\(s\).*navegador continua sem espaço para a cópia local/)).toBeVisible();
     await expect(page.getByText(/Sincronização incompleta:/)).toHaveCount(0);
     await expectHomeProjects(page, { stored: false });
@@ -358,7 +358,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       .toEqual(['Clínica Janine']);
     expect(cloud.manifest.docs).toHaveLength(5);
     expect(cloud.pullCount).toBeGreaterThan(0);
-    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
   });
 
   test('Salvar envia o título recém-editado mesmo com library sempre sem espaço e mostra a união na UI', async ({ page }) => {
@@ -559,7 +559,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await expectHomeProjects(page);
     expect(cloud.loginCount).toBe(1);
     expect(cloud.pullCount).toBeGreaterThan(0);
-    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: /continuar no editor/i })).toBeEnabled();
     await page.reload();
     await expectHomeProjects(page);
@@ -599,8 +599,8 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.goto('/?app=1');
     await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();
     // O cofre antigo tem os cinco projetos: a exclusão precisa vencer esse backup.
-    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
     if (quota) await page.evaluate(() => {
       const original = Storage.prototype.setItem;
       Storage.prototype.setItem = function(key, value) {
@@ -613,12 +613,12 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       await page.getByRole('button', { name: 'Confirmar eliminação', exact: true }).click();
       await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
     }
-    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
+    await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
     await expect.poll(() => cloud.manifest.docs.map(entry => entry.id)).toEqual([janine.id]);
-    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
     // Outro save sem novas exclusões não pode apagar o registro delas.
-    await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Sync na nuvem', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
     expect(cloud.manifest.deletedIds).toHaveLength(4);
     await page.reload();
     await goHome(page);

@@ -327,7 +327,8 @@ export function useExport({
       const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
       toast(`ZIP com ${slides.length} ${itemLabel}s pronto${videoNote}`, 'success');
       trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
-    } catch(e) { setError('Erro ao exportar: '+e.message); }
+      return true;
+    } catch(e) { setError('Erro ao exportar: '+e.message); return false; }
     finally { setExporting(false); }
   };
 
@@ -397,7 +398,8 @@ export function useExport({
       }
       await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`);
       toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
-    } catch(e) { setError('Erro ao gerar PDF: '+e.message); }
+      return true;
+    } catch(e) { setError('Erro ao gerar PDF: '+e.message); return false; }
     finally { setExporting(false); }
   };
 

@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles, SlidersHorizontal, Settings, Check, ChevronRight } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
-import { APP_MODE_UI, DEPTH_LAYERS_HINT } from '../utils/ui-depth-labels.js';
+import { APP_MODE_UI } from '../utils/ui-depth-labels.js';
 
 export default function ModesIntroModal({ open, onSelect, onClose, currentMode = 'criador' }) {
   const dialogRef = useRef(null);
+  const [showModes, setShowModes] = useState(false);
   const returnFocusRef = useRef(null);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
       label: APP_MODE_UI.diretor.label,
       tagline: APP_MODE_UI.diretor.tagline,
       desc: APP_MODE_UI.diretor.desc,
-      features: ['Tudo do caminho rápido', '+ Tipografia (Texto)', '+ Refinamento e remix', '+ Modos narrativos'],
+      features: ['Tudo do caminho rápido', '+ Refinamento de texto', '+ Refinamento e remix', '+ Modos narrativos'],
     },
     {
       id: 'studio',
@@ -121,14 +122,17 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
             letterSpacing: '-0.011em', lineHeight: 1.5, margin: 0,
             maxWidth: 480, marginInline: 'auto',
           }}>
-            Escolha a profundidade de criação. Pode mudar a qualquer momento no chip do topo.{' '}
-            {DEPTH_LAYERS_HINT}
+            Escolha o cliente, conte o que quer comunicar e revise a primeira versão. Texto, fotos e exportação ficam à mão.
           </p>
         </div>
 
+        <ol style={{ margin:'0 0 20px', paddingLeft:24, fontSize:15, lineHeight:2, color:'var(--text-secondary)' }}>
+          <li>Crie um projeto para seu cliente.</li><li>Descreva o objetivo e o conteúdo.</li><li>Revise e exporte para aprovação ou publicação.</li>
+        </ol>
+        <button type="button" className="vc-btn vc-btn-ghost" aria-expanded={showModes} onClick={() => setShowModes(v => !v)} style={{ marginBottom:12 }}>Ver controles avançados</button>
         {/* 3 mode cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 8 }}>
-          {MODES.map((m) => {
+          {showModes && MODES.map((m) => {
             const I = m.icon;
             const isCurrent = m.id === currentMode;
             return (
@@ -244,7 +248,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
           justifyContent: 'space-between',
           gap: 12,
           flexShrink: 0,
-          padding: '12px 24px calc(14px + env(safe-area-inset-bottom, 0px))',
+          flexWrap:'wrap', padding: '12px 24px calc(14px + env(safe-area-inset-bottom, 0px))',
           borderTop: '1px solid var(--hairline)',
           background: 'var(--bg-sidebar)',
         }}>
@@ -281,7 +285,7 @@ export default function ModesIntroModal({ open, onSelect, onClose, currentMode =
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}
             >
-              Começar no Criar rápido <ChevronRight size={14} aria-hidden />
+              Começar a criar <ChevronRight size={14} aria-hidden />
             </button>
           </div>
         </div>

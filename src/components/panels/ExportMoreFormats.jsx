@@ -1,15 +1,13 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Download, FileText, Image as ImageIcon, ChevronDown, Copy, Archive } from 'lucide-react';
-import { FORMATS } from '../../utils/formats.js';
 
 // ─── EXPORT MORE FORMATS — único dropdown "Baixar" com todas as saídas ────────
-// Antes era um botão secundário ("Mais formatos") abaixo do CTA fixo "Baixar
-// card N". Agora absorve a opção do card individual como PRIMEIRA do menu e
-// vira o único ponto de download da app — economiza 50px no footer mobile.
+// O conjunto completo vem primeiro; o card selecionado é uma opção explícita.
 function ExportMoreFormats({
   slides, exporting, exportProgress,
   isPresentation = false,
+  align = 'left',
   activeIdx, onExportSlide,
   onExportAll, onExportPDF, onExportPhotosOnly,
   hideSlideOption = false,
@@ -44,7 +42,7 @@ function ExportMoreFormats({
   const temConteudo = slides.some(s => (s.title || '').trim() || (s.body || '').trim() || s.bgImage);
   const aiCount = slides.filter(s => s.bgImageSource === 'ai').length;
   const menuItemStyle = {
-    display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+    display:'flex', alignItems:'center', gap:10, minHeight:44, padding:'10px 12px',
     border:'none', background:'transparent', cursor:'pointer', borderRadius:6,
     fontSize:12, fontFamily:'var(--font-ui)', color:'var(--text-primary)',
     transition:'background 0.12s', textAlign:'left', width:'100%',
@@ -59,7 +57,7 @@ function ExportMoreFormats({
         aria-expanded={open}
         aria-label="Opções de download"
         style={{
-          minHeight:36, padding:'0 16px', borderRadius:9999,
+          minHeight:44, padding:'0 12px', borderRadius:9999,
           ...(temConteudo
             ? { border:'none', background:'var(--text-primary)', color:'#fff' }
             : { border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-secondary)' }),
@@ -81,7 +79,7 @@ function ExportMoreFormats({
         <div
           role="menu"
           style={{
-            position:'absolute', bottom:'100%', left:0, marginBottom:6, minWidth:260,
+            position:'absolute', bottom:'100%', ...(align === 'right' ? {right:0} : {left:0}), marginBottom:6, width:280, maxWidth:'calc(100vw - 24px)', maxHeight:'min(70dvh, 520px)', overflowY:'auto',
             background:'var(--bg-base)', border:'1px solid var(--hairline)',
             borderRadius:10, boxShadow:'0 8px 28px rgba(0,0,0,0.12)',
             padding:6, display:'flex', flexDirection:'column', gap:2, zIndex:50,
@@ -92,6 +90,22 @@ function ExportMoreFormats({
           }}>
             {isPresentation ? 'Baixe a apresentação em PDF ou os slides em PNG.' : 'Baixa os arquivos. A publicação é no Instagram.'}
           </p>
+
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => { setOpen(false); onExportAll(); }}
+            disabled={exporting}
+            style={menuItemStyle}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Download size={13} style={{ color:'var(--text-muted)' }}/>
+            <span style={{ flex:1 }}>{`Todos os ${slides.length} ${isPresentation ? 'slides' : 'cards'} (ZIP)`}</span>
+            <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
+              {slides.length} {isPresentation ? 'slides' : 'cards'}
+            </span>
+          </button>
           {!hideSlideOption && onExportSlide && (
             <button
               role="menuitem"
@@ -103,25 +117,10 @@ function ExportMoreFormats({
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <Download size={13} style={{ color:'var(--accent)' }}/>
-              <span style={{ flex:1, fontWeight:600 }}>{itemLabel} {activeIdx + 1}</span>
+              <span style={{ flex:1, fontWeight:600 }}>Somente {itemLabel.toLowerCase()} {activeIdx + 1}</span>
               <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>PNG</span>
             </button>
           )}
-          <button
-            role="menuitem"
-            type="button"
-            onClick={() => { setOpen(false); onExportAll(); }}
-            disabled={exporting}
-            style={menuItemStyle}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-pearl)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <Download size={13} style={{ color:'var(--text-muted)' }}/>
-            <span style={{ flex:1 }}>{isPresentation ? 'Slides em PNG (ZIP)' : 'Baixar PNGs (ZIP)'}</span>
-            <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
-              {slides.length} {isPresentation ? 'slides' : 'cards'}
-            </span>
-          </button>
           {onCopyCaption ? (
             <button
               role="menuitem"

@@ -63,7 +63,8 @@ export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BR
   hydratedBrand.brandTone = normalizeBrandTone(hydratedBrand.brandTone);
   hydratedBrand.useBrandVoice = hydratedBrand.useBrandVoice !== false;
   // Preserva styleKit da marca no perfil embutido no doc (para reaplicar / sync).
-  if (!hydratedBrand.styleKit && fallbackBrand?.styleKit) {
+  const sameBrand = !seeded.brand || seeded.brand.id === fallbackBrand?.id;
+  if (!hydratedBrand.styleKit && sameBrand && fallbackBrand?.styleKit) {
     hydratedBrand.styleKit = cloneBrandStyleKit(fallbackBrand);
   } else if (hydratedBrand.styleKit) {
     hydratedBrand.styleKit = normalizeStyleKit(hydratedBrand.styleKit);
@@ -71,7 +72,7 @@ export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BR
   const seedHasKit = seeded.styleKit && styleKitHasContent(seeded.styleKit);
   const inheritedKit = seedHasKit
     ? normalizeStyleKit(seeded.styleKit)
-    : cloneBrandStyleKit(fallbackBrand?.styleKit ? fallbackBrand : hydratedBrand);
+    : cloneBrandStyleKit(hydratedBrand);
   return {
     ...DEFAULT_DOC,
     ...seeded,
@@ -315,10 +316,10 @@ export function useLibrary({
     setLibrary(prev => {
       const next = prev.filter(e => e.id !== docId);
       if (next.length === 0) {
-        // Sempre mantém pelo menos 1 doc na biblioteca
-        const seed = mkLibEntry(DEFAULT_DOC, 'Carrossel');
-        setActiveDocId(seed.id);
-        return [seed];
+        setActiveDocId(null);
+        history.reset(ensureDocShape(DEFAULT_DOC));
+        setShellView('home');
+        return [];
       }
       if (docId === activeDocId) setActiveDocId(next[0].id);
       return next;

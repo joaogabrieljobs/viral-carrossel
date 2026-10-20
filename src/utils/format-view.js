@@ -4,7 +4,7 @@ import { hasPresentationDesign, presentationForSocialFormat } from './presentati
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
-  'layout', 'align', 'photoRegion', 'bgFit', 'photoFraming',
+  'visualBrand', 'visualPresetId', 'visualCreativePreset', 'layout', 'align', 'photoRegion', 'bgFit', 'photoFraming',
   'bgX', 'bgY', 'bgZoom', 'bgMirror', 'bgOpacity', 'overlay',
   'textShadow', 'textBg', 'textBgOpacity', 'textInset', 'textBlockWidth',
   'titleSize', 'subSize', 'bodyAfterSize',

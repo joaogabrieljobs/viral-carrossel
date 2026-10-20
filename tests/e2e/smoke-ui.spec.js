@@ -3,7 +3,7 @@
 // (18.5k → 4k linhas) moveu ~60 componentes e 5 hooks: um render quebrado num
 // painel pouco usado não apareceria em nenhuma jornada de negócio.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 /** ruído conhecido e inofensivo — qualquer coisa fora disto reprova */
 const IGNORAR = [
@@ -65,8 +65,8 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
         await page.waitForTimeout(120);
       }
     }
-    // o gating por modo tem de ser crescente (Criador ⊂ Diretor ⊂ Studio)
-    expect(contagem.diretor).toBeGreaterThan(contagem.criador);
+    // Texto fica disponível desde Criar rápido; Studio acrescenta Layout.
+    expect(contagem.diretor).toBeGreaterThanOrEqual(contagem.criador);
     expect(contagem.studio).toBeGreaterThan(contagem.diretor);
 
     expect(erros, `erros no editor:\n${erros.join('\n')}`).toEqual([]);

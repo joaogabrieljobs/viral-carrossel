@@ -2,7 +2,7 @@
 // fonte da marca e do comprimento do texto do utilizador, logo não pode ser fixo
 // no padrão visual.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 /** Tamanho de letra do item, medido no card do export (escala 1). */
 async function tamanhoNoCard(page, texto) {

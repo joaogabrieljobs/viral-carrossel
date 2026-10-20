@@ -11,6 +11,26 @@ export const SESSAO_ATIVA = {
   currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
 };
 
+/** Editor regression fixtures start with an explicitly saved draft.
+ * First-use and account restoration tests continue to use mockApi, with no seed.
+ */
+export async function mockEditorApi(page, opts = {}) {
+  await mockApi(page, opts);
+  if (!opts.session?.active) return;
+  await page.addInitScript(() => {
+    if (localStorage.getItem('vc_library') !== null) return;
+    localStorage.setItem('vc_library', JSON.stringify([{
+      id:'editor-fixture', name:'Carrossel', updatedAt:Date.now(),
+      doc:{ fmt:'carrossel', slides:[{
+        id:'editor-fixture-slide', num:1, title:'Seu título aqui',
+        subtitle:'Subtítulo descritivo que reforça o gancho principal do carrossel.',
+        layout:'mc', align:'center',
+      }] },
+    }]));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('editor-fixture'));
+  });
+}
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {{ session?: object, checkout?: object, confirm?: object, extra?: Record<string, (route) => any> }} opts

@@ -1,3 +1,4 @@
+import { sanitizeCustomVisualPresetBrand } from '../../utils/custom-visual-presets.js';
 import { brandWithSlideLogo, LOGO_SIZE_DEFAULT, logoContainHitRect, visibleLogoPosition, classifyLogoPixels, logoToneForSurface } from '../../utils/slide-logo.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
@@ -1764,6 +1765,8 @@ const SlideCardInner = React.forwardRef(({
   // Textos de preset trazem tokens ({handle}, {marca}, {ano}) em vez de nomes
   // de marca de terceiros. Resolve UMA vez aqui — assim o card acompanha o
   // handle mesmo que o usuário configure depois de aplicar o padrão visual.
+  brand = React.useMemo(() => slide.visualBrand ? { ...brand, ...sanitizeCustomVisualPresetBrand(slide.visualBrand) } : brand, [brand, slide.visualBrand]);
+  creativePreset = slide.visualCreativePreset || creativePreset;
   const profileLogo = typeof brand?.logo === 'string' ? brand.logo : '';
   slide = React.useMemo(() => resolveSlideTextFonts(slide, brand), [slide, brand]);
   const brandRaw = React.useMemo(() => brandWithSlideLogo(brand, slide), [brand, slide.logoImageId, slide.logoImage, slide.logoHidden, slide.logoPosition, slide.logoSize, slide.logoOpacity]);

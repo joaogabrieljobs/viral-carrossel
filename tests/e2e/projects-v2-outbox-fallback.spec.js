@@ -110,7 +110,7 @@ async function createProject(page) {
   await page.goto('/?app=1');
   await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByPlaceholder('Ex.: Clínica Janine').fill('Projeto sem IDB');
+  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto sem IDB');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
 }
 

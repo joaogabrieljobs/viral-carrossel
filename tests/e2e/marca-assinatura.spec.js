@@ -2,7 +2,7 @@
 // vivia só no ramo legado full-bleed: nos cards com composição ou layout sanduíche
 // o utilizador preenchia os campos em Marca e nada aparecia no card.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 async function abrirEditorComTemplate(page) {
   await mockApi(page, { session: SESSAO_ATIVA });

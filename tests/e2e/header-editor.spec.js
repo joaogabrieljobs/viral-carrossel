@@ -4,7 +4,7 @@
 // Este teste mede intersecção real em X **e** Y (só em X dá falso positivo
 // quando os botões estão em linhas diferentes) e falha se algum par colidir.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 async function paresSobrepostos(page) {
   return page.evaluate(() => {

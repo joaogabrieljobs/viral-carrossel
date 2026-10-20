@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const currentDoc = page => page.evaluate(() => {
   const lib = JSON.parse(localStorage.getItem('vc_library') || '[]');

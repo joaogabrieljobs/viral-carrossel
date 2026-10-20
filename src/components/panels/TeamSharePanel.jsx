@@ -85,7 +85,7 @@ export function TeamSharePanel({
       </div>
       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
         Envie o <strong>link</strong> à equipe. Quem abrir entra com a conta Moont e o projeto
-        aparece na biblioteca. Depois: <strong>Publicar</strong> / <strong>Puxar alterações</strong>.
+        aparece na biblioteca. Depois: <strong>Enviar alterações</strong> / <strong>Receber alterações</strong>.
       </p>
 
       {linked ? (
@@ -137,7 +137,7 @@ export function TeamSharePanel({
               }}
             >
               {busy ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <RefreshCw size={14} />}
-              Publicar alterações
+              Enviar alterações à equipe
             </button>
             <button
               type="button"
@@ -167,7 +167,7 @@ export function TeamSharePanel({
               })}
               style={{ minHeight: 40, fontSize: 12 }}
             >
-              Puxar alterações
+              Receber alterações da equipe
             </button>
             <button
               type="button"
@@ -215,7 +215,7 @@ export function TeamSharePanel({
             }}
           >
             {busy ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Users size={14} />}
-            Criar link para a equipe
+            Convidar para editar
           </button>
         </div>
       )}

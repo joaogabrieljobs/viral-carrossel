@@ -155,7 +155,7 @@ export function OrganizeForPublish({
           ) : null}
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-            <span style={{ color: 'var(--text-muted)' }}>Data editorial (local)</span>
+            <span style={{ color: 'var(--text-muted)' }}>Data planejada</span>
             <input
               type="date"
               className="vc-input"
@@ -170,7 +170,7 @@ export function OrganizeForPublish({
           </label>
 
           <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-            A data é só planeamento neste browser. Não agenda nem publica no Instagram.
+            A data faz parte do planejamento do projeto. A publicação no Instagram é feita por você.
             {publicationDate ? ' Com data, o estado passa a Agendado.' : ''}
           </p>
         </div>

@@ -1,3 +1,4 @@
+import { ApprovalPanel } from './panels/ApprovalPanel.jsx';
 import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
 import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT } from '../utils/slide-logo.js';
 import { isGenerationCancelled, startAIJob, runAIJob, throwIfGenerationCancelled } from '../utils/generation-control.js';
@@ -32,7 +33,6 @@ import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
 import { trackEvent, lsGet } from '../utils/telemetry.js';
 import { appModeLabel } from '../utils/ui-depth-labels.js';
-import { copyTextToClipboard, exportCarouselPackage } from '../utils/export-package.js';
 import { SK, lsSet } from '../utils/storage.js';
 import { OrganizeForPublish } from './panels/OrganizeForPublish.jsx';
 import { ObjectiveTemplateChips } from './panels/ObjectiveTemplateChips.jsx';
@@ -51,7 +51,6 @@ import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
 import { generateDALLE } from '../utils/ai-client.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
-import { joinSlideCaptions } from '../utils/import-text.js';
 import { composeImgExtraPrompt } from '../utils/style-kit.js';
 import { resolveImageReferences } from '../utils/style-kit-storage.js';
 import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
@@ -149,14 +148,14 @@ function unionDestaqueRangeIntoSpans(spansIn, selA, selB, len) {
 }
 
 // Fonte única das tabs do editor (sidebar desktop + bottom bar mobile).
-// Criador: Home + Marca + Narrativa + Visual + Imagem · Diretor: + Texto · Studio: + Layout
+// Texto está disponível em todos os modos; Studio acrescenta Layout.
 const EDITOR_TABS = [
-  { id:'home',      icon:Home,     label:'Home',      mode:'criador' },
+  { id:'home',      icon:Home,     label:'Início',      mode:'criador' },
   { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
   { id:'narrativa', icon:Wand2,    label:'Narrativa', mode:'criador' },
   { id:'visual',    icon:Palette,  label:'Visual',    mode:'criador' },
   { id:'imagem',    icon:ImageIcon,label:'Imagem',    mode:'criador' },
-  { id:'texto',     icon:Type,     label:'Texto',     mode:'diretor' },
+  { id:'texto',     icon:Type,     label:'Texto',     mode:'criador' },
   { id:'layout',    icon:Layout,   label:'Layout',    mode:'studio' },
 ];
 const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
@@ -233,6 +232,7 @@ function SidebarContent({
   slide, slides, activeIdx, brand, setBrand, updateSlide,
   setSlides = null,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
+  handleCopyCaption, handleExportPackage,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
   exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
   openaiKey, hasOpenAI=false, hasTextAI=false, setKeysOpen,
@@ -243,6 +243,8 @@ function SidebarContent({
   onQuickGenerate = null,
   quickPrompt = '', setQuickPrompt = () => {},
   quickNarrativeMode = 'none',
+  generationScope = 'text',
+  onGenerationScopeChange = () => {},
   onQuickNarrativeModeChange = () => {},
   genBusy = false,
   imgParams = { fidelity:50, creativity:50, irreverence:50, objectivity:50 },
@@ -317,6 +319,8 @@ function SidebarContent({
   onTeamShareJoined = null,
   historyDoc = null,
   editorFocus = null,
+  saveIndicator = null,
+  onReviewChange = null,
 }) {
   const imageTargetRef = useRef(null);
   imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
@@ -325,6 +329,7 @@ function SidebarContent({
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
+  const [visualScope, setVisualScope] = React.useState('all');
   const [customPresetName, setCustomPresetName] = React.useState('');
   const [importTextOpen, setImportTextOpen] = React.useState(false);
   const [importTextBusy, setImportTextBusy] = React.useState(false);
@@ -398,9 +403,7 @@ function SidebarContent({
     toast?.(`Elementos separados neste ${itemLabel}. Agora cada parte pode ser movida individualmente.`, 'success', 5200);
   }, [itemLabel, setCanvasEditMode, slide, toast, updateSlide]);
   // O rascunho do prompt vive no editor; este painel pode desmontar no mobile.
-  React.useLayoutEffect(() => {
-    setNarrativaPanel('prompt');
-  }, [activeEntry?.id]);
+
   React.useEffect(() => {
     setSelectedSlideIds([]);
     setObjectiveTemplateId(null);
@@ -413,65 +416,6 @@ function SidebarContent({
     ));
   }, []);
 
-  const handleCopyCaption = React.useCallback(async () => {
-    try {
-      let text = joinSlideCaptions(slides) || String(caption || '').trim();
-      if (!text && generateCaption) {
-        toast?.(isPresentationProject ? 'Gerando o resumo…' : 'Gerando a legenda…', 'info');
-        text = String(await generateCaption() || '').trim();
-      }
-      await copyTextToClipboard(text);
-      trackEvent('caption_copy');
-      toast?.(isPresentationProject ? 'Resumo da apresentação copiado.' : 'Legenda copiada. Cole no Instagram.', 'success');
-    } catch (e) {
-      toast?.(e.message || `Não foi possível copiar ${isPresentationProject ? 'o resumo' : 'a legenda'}.`, 'error');
-    }
-  }, [caption, generateCaption, isPresentationProject, slides, toast]);
-
-  const handleExportPackage = React.useCallback(async () => {
-    try {
-      trackEvent('export_package');
-      let text = joinSlideCaptions(slides) || String(caption || '').trim();
-      if (!text && generateCaption) {
-        toast?.(isPresentationProject ? 'A preparar resumo da apresentação…' : 'A preparar legenda do pacote…', 'info');
-        text = String(await generateCaption() || '').trim();
-      }
-      const result = await exportCarouselPackage({ exportAll, caption: text });
-      if (isPresentationProject) {
-        toast?.(
-          result.captionCopied ? 'Slides baixados e resumo copiado.' : 'Slides baixados.',
-          'success',
-          5500,
-        );
-        return;
-      }
-      if (result.captionCopied) {
-        toast?.('PNGs baixados e legenda copiada. Publique no Instagram e, se quiser, marque como Publicado na Fila.', 'success', 7500);
-      } else {
-        toast?.('PNGs baixados. Gere a legenda se quiser copiá-la também.', 'success', 6500);
-      }
-      const projectId = activeDocId || activeEntry?.id;
-      if (projectId && setDocStatus && activeEntry?.status !== 'published') {
-        // Checklist pós-pacote: não marca sozinho — pergunta.
-        const mark = window.confirm(
-          'Pacote pronto.\n\n1) PNGs baixados\n2) Legenda' + (result.captionCopied ? ' copiada' : ' a gerar') + '\n3) Publicar no Instagram (fora da Moont)\n\nJá publicou? Marcar este projeto como Publicado?',
-        );
-        if (mark) {
-          setDocStatus(projectId, 'published');
-          trackEvent('mark_published', { from: 'export_package' });
-          toast?.('Projeto marcado como Publicado.', 'success', 3500);
-        }
-      }
-      if (!lsGet(SK.backupNudgeDone, false)) {
-        lsSet(SK.backupNudgeDone, true);
-        toast?.('Dica: em Exportar → Backup JSON guarda o projeto neste browser.', 'info', 7000);
-      }
-    } catch (e) {
-      toast?.(e.message || 'Falha no pacote de exportação.', 'error');
-    }
-  }, [caption, generateCaption, exportAll, isPresentationProject, slides, toast, activeDocId, activeEntry?.id, activeEntry?.status, setDocStatus]);
-
-  // remove unused ensureCaptionText if I left it - check
   /** Barra de tamanho de um item da assinatura (barra editorial, selo, rodapé…). */
   const BarraTamanho = ({ campo, rotulo, padrao = 100 }) => {
     const valor = Number(brand[campo] ?? padrao);
@@ -610,6 +554,18 @@ function SidebarContent({
 
   const titleTaRef = React.useRef(null);
   const subtitleTaRef = React.useRef(null);
+  React.useEffect(() => {
+    if (tab !== 'narrativa' || narrativaPanel !== 'card') return;
+    const frame = requestAnimationFrame(() => {
+      const field = titleTaRef.current;
+      const root = editorScrollRef.current;
+      if (!field || !root) return;
+      root.scrollTop += field.getBoundingClientRect().top - root.getBoundingClientRect().top - 40;
+      field.focus({ preventScroll:true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab, narrativaPanel, slide?.id]);
+
   const sandwichBodyTaRef = React.useRef(null);
   const lastTextFieldRef = React.useRef('title');
   const pendTitleSel = React.useRef(null);
@@ -802,7 +758,7 @@ function SidebarContent({
         )}
 
         {tab === 'texto' && (
-          <S title="Cor do texto" hint={`Título = primeira e última folha · Subtítulo = linha curta nos ${itemsLabel} do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor. A cor dentro de Tipografia vale só neste card.`}>
+          <S title="Cor do texto" hint={slide.visualBrand ? `Este ${itemLabel} tem um padrão próprio. Os ajustes de cor e tipografia valem para ele.` : `Título = primeira e última folha · Subtítulo = linha curta nos ${itemsLabel} do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor. A cor dentro de Tipografia vale só neste card.`}>
             {(() => {
               const bh = hydrateBrandTextColors(brand);
               const activeBgImage = slides[activeIdx]?.bgImage;
@@ -862,7 +818,7 @@ function SidebarContent({
           />
         )}
 
-        {tab === 'narrativa' && appMode === 'criador' && projectHasCarouselContent(slides) && (
+        {tab === 'narrativa' && narrativaPanel !== 'card' && appMode === 'criador' && projectHasCarouselContent(slides) && (
           <S title="Depois de gerar" hint={`Revise, baixe ou abra mais controlos — sem recriar ${isPresentationProject ? 'a apresentação' : 'o carrossel'}.`}>
             <PostGenerateActions
               onAdjustText={() => setNarrativaPanel('card')}
@@ -908,6 +864,8 @@ function SidebarContent({
             }}
             genBusy={genBusy}
             hasImages={hasOpenAI}
+            generationScope={generationScope}
+            onGenerationScopeChange={onGenerationScopeChange}
             narrativeMode={quickNarrativeMode}
             onNarrativeModeChange={onQuickNarrativeModeChange}
             brand={brand}
@@ -2237,9 +2195,12 @@ function SidebarContent({
         {tab==='visual' && (
           <>
             <S title="Padrão visual" hint={`Paleta, fontes e tipografia de uma vez. Não altera o texto dos ${itemsLabel}.`}>
+              <div role="group" aria-label="Aplicar padrão visual em" style={{ display:'flex', gap:6, marginBottom:12 }}>
+                {[['card', `Este ${itemLabel}`], ['all', `Todos os ${itemsLabel}`]].map(([scope, label]) => <button key={scope} type="button" className="vc-btn vc-btn-ghost" aria-pressed={visualScope === scope} onClick={() => setVisualScope(scope)} style={{ flex:1, minHeight:44, borderColor:visualScope === scope ? 'var(--accent)' : undefined }}>{label}</button>)}
+              </div>
               <VisualStylePicker
-                value={visualPreset}
-                onChange={applyVisualPresetCb}
+                value={visualScope === 'card' ? (slide.visualPresetId || visualPreset) : visualPreset}
+                onChange={id => applyVisualPresetCb(id, visualScope, activeIdx)}
                 presets={productVisualPresets}
                 title=""
                 suggestedId={isPresentationProject ? null : suggestVisualPresetForCreative(creativePreset)}
@@ -3671,9 +3632,13 @@ function SidebarContent({
               </div>
             </S>
 
+            {onReviewChange && activeDocId && projectHasCarouselContent(slides) && <S fold title="Aprovação do cliente" hint="Prepare a entrega e acompanhe o retorno.">
+              <ApprovalPanel review={historyDoc?.clientReview} onChange={onReviewChange} onExportPDF={exportPDF} exporting={exporting} onStatus={status => setDocStatus?.(activeDocId || activeEntry?.id, status)} toast={toast} />
+            </S>}
+
             <S
-              title="Equipe"
-              hint="Envie o link de convite; a outra conta abre e o projeto entra na biblioteca."
+              fold title="Convidar para editar"
+              hint="Acesso de edição para sua equipe. Para o cliente revisar, use Aprovação."
             >
               <TeamSharePanel
                 doc={historyDoc}
@@ -4045,29 +4010,26 @@ function SidebarContent({
             ) : null}
 
             <S
-              title={isPresentationProject ? 'Resumo e notas deste slide' : `Legenda do card ${String((activeIdx ?? 0) + 1).padStart(2, '0')}`}
+              title={isPresentationProject ? 'Resumo e notas deste slide' : 'Legenda da publicação'}
               hint={isPresentationProject
                 ? 'Notas deste slide — não entram no visual exportado.'
-                : 'Uma legenda por card. Use o ícone ao lado de tela cheia para maximizar. Copiar junta todas as legendas dos cards.'}
+                : 'Este é o texto que será copiado junto com os arquivos. Vale para a publicação inteira.'}
             >
               {(
                 <>
                   <textarea
-                    value={slide?.caption ?? ''}
-                    onChange={(e) => updateSlide({ caption: e.target.value })}
+                    value={isPresentationProject ? (slide?.caption ?? '') : caption}
+                    onChange={(e) => isPresentationProject ? updateSlide({ caption: e.target.value }) : setCaption(e.target.value)}
                     rows={7}
                     className="vc-input vc-textarea"
-                    placeholder="Legenda deste card…"
+                    aria-label={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
+                    placeholder={isPresentationProject ? "Notas deste slide…" : "Escreva a legenda da publicação…"}
                     style={{ fontSize:11, lineHeight:1.6, fontFamily:'var(--font-mono)', color:'var(--text-secondary)' }}
                   />
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                     <button
                       type="button"
-                      onClick={() => {
-                        const joined = joinSlideCaptions(slides) || String(slide?.caption || caption || '').trim();
-                        if (joined) navigator.clipboard?.writeText(joined);
-                        toast?.(joined ? 'Legendas copiadas.' : 'Nada para copiar.', joined ? 'success' : 'info', 2500);
-                      }}
+                      onClick={handleCopyCaption}
                       className="vc-btn vc-btn-ghost"
                       style={{ height:34 }}
                     >
@@ -4087,7 +4049,7 @@ function SidebarContent({
       {/* Download footer — uma única row: dropdown "Baixar" (com card N + ZIP
           + PDF + fotos limpas dentro) + Projetos + ✓ Salvo. Liberta ~80px
           que antes eram do CTA fixo "Baixar card N". */}
-      <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', alignItems:'center', gap:8, justifyContent:'space-between', flexShrink:0 }}>
+      <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', flexWrap:'wrap', alignItems:'center', gap:8, justifyContent:'space-between', flexShrink:0 }}>
         <ExportMoreFormats
           slides={slides}
           isPresentation={isPresentationProject}
@@ -4102,8 +4064,9 @@ function SidebarContent({
           onExportPDF={exportPDF}
           onExportPhotosOnly={exportPhotosOnly}
           hideSlideOption={false}
-          caption={joinSlideCaptions(slides) || caption}
+          caption={caption}
           genCaption={genCaption}
+          onGenerateCaption={generateCaption}
           onCopyCaption={handleCopyCaption}
           onExportPackage={handleExportPackage}
           onExportBackup={exportDoc ? () => {
@@ -4140,18 +4103,7 @@ function SidebarContent({
             ? <>Projetos · <strong style={{ color:'inherit', fontWeight:700 }}>{libraryCount}</strong></>
             : 'Projetos'}
         </button>
-        <span
-          title="Salvando automaticamente neste navegador. Faça backup JSON para não perder o trabalho."
-          aria-label="Salvo neste navegador"
-          style={{
-            display:'inline-flex', alignItems:'center', gap:4,
-            fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-ui)',
-            letterSpacing:'-0.005em', whiteSpace:'nowrap',
-          }}
-        >
-          <Check size={10} strokeWidth={3} style={{ color:'var(--accent)' }} aria-hidden/>
-          Salvo
-        </span>
+        <div style={{ flexBasis:'100%' }}>{saveIndicator}</div>
       </div>
 
       <ImportTextModal

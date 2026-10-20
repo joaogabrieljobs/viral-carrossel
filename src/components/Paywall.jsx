@@ -13,6 +13,7 @@ export default function Paywall({
   isMobile,
   onBack,
   onLogin,
+  onRegister,
   initialEmail = '',
   loginHint = '',
 }) {
@@ -213,6 +214,7 @@ export default function Paywall({
             fontWeight: 600,
             fontSize: 13,
           }}>Entrar com senha</button>}
+          {onRegister && <button type="button" className="vc-btn vc-btn-ghost" onClick={onRegister}>Criar conta</button>}
           <p style={{
             margin: 0,
             fontSize: 11,

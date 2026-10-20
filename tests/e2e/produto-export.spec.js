@@ -2,7 +2,7 @@
 // NOTA: exportSlide carrega html2canvas do CDN cdnjs em runtime — único fetch
 // externo permitido neste E2E (documentado; remoção = backlog #7 do audit).
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 test.describe('Produto (RF-02)', () => {
   // Render 2160x2700 via html2canvas (CDN) fica lento com workers paralelos

@@ -3,7 +3,7 @@
 // fixa com overflow escondido, sem o utilizador ter ligado composição nenhuma.
 // Com a composição desligada o texto tem de usar o card inteiro.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const SUBTITULO_LONGO = 'O conteúdo só se espalha se a recompensa emocional superar o custo de compartilhar. Não é sobre ser apenas engraçado, mas criar intimidade e identificação através de emoções fortes que validam a conexão social.';
 

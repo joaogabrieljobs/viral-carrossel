@@ -126,6 +126,8 @@ function NarrativaStudioPanels({
   setQuickPrompt,
   onQuickGenerate,
   genBusy = false,
+  generationScope = 'text',
+  onGenerationScopeChange = () => {},
   hasImages = false,
   narrativeMode = 'none',
   onNarrativeModeChange = () => {},
@@ -139,7 +141,8 @@ function NarrativaStudioPanels({
   hasOpenAI = false,
   onOpenBrandContext = null,
 }) {
-  const [scope, setScope] = useState('text');
+  const scope = generationScope;
+  const setScope = onGenerationScopeChange;
   const effectiveScope = hasImages ? scope : 'text';
   const kit = styleKit || {};
   const hasKit = styleKitHasContent(kit);

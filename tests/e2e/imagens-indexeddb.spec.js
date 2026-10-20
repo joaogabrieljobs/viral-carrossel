@@ -2,7 +2,7 @@
 // localStorage (~5 MB). Ao encher, o código apagava as imagens para conseguir
 // gravar — perda real. Agora os bytes ficam no IndexedDB e o documento guarda o id.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 

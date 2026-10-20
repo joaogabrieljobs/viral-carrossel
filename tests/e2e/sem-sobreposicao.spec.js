@@ -5,7 +5,7 @@
 // Este teste mede sobreposição real entre caixas: nenhum par de elementos
 // visíveis do card pode se cruzar por mais de 2px.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 /** Pares de elementos que se cruzam, em px do card (1080×1350). */
 async function colisoes(page) {

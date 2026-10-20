@@ -58,7 +58,7 @@ function dismissOnboardingLanding() {
 const mkLibEntry = (doc, name = 'Sem título', metadata = {}) => {
   const now = Date.now();
   const publicationDate = metadata.publicationDate || '';
-  let status = ['draft', 'ready', 'scheduled', 'published'].includes(metadata.status)
+  let status = ['draft', 'in_review', 'changes_requested', 'approved', 'ready', 'scheduled', 'published'].includes(metadata.status)
     ? metadata.status
     : 'draft';
   // Data editorial local → Agendado (exceto se já marcado Publicado).

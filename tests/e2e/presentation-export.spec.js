@@ -30,8 +30,8 @@ for (const fmt of ['apresentacao', 'carrossel']) {
     const presentation = fmt === 'apresentacao';
     await options.click();
     const menu = page.getByRole('menu');
-    await expect(menu).toContainText(presentation ? 'Slide 1' : 'Card 1');
-    await expect(menu).toContainText(presentation ? 'Copiar resumo' : 'Copiar legenda');
+    await expect(menu).toContainText(presentation ? 'Somente slide 1' : 'Somente card 1');
+    await expect(menu).toContainText(presentation ? 'Gerar e copiar resumo' : 'Gerar e copiar legenda');
     if (presentation) await expect(menu).not.toContainText(/Instagram|Carrossel|legenda|cards/);
     const [pdf] = await Promise.all([
       page.waitForEvent('download'),
@@ -51,7 +51,7 @@ for (const fmt of ['apresentacao', 'carrossel']) {
     await options.click();
     const [zip] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: presentation ? /Slides em PNG/ : /Baixar PNGs/ }).click(),
+      page.getByRole('menuitem', { name: presentation ? /Todos os .* slides/ : /Todos os .* cards/ }).click(),
     ]);
     expect(zip.suggestedFilename()).toBe(`${stem}.zip`);
     await expect(options).toBeEnabled();

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 async function useProfessionalControls(page) {
   await page.getByRole('button', { name: /Modo atual: Criar rápido/i }).click();
@@ -84,7 +84,7 @@ test('apresentação abre um fluxo próprio com caminhos e padrões 16:9', async
   // Ao trocar de Carrossel para Apresentação, o produto cria um projeto
   // próprio antes de abrir o assistente de geração.
   await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
-  await page.getByPlaceholder('Ex.: Pitch clínica').fill('Plano de expansão 2027');
+  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Plano de expansão 2027');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
 
   const modal = page.locator('.modal-panel');

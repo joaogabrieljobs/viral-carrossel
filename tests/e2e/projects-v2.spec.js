@@ -137,7 +137,7 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
 }
 
 async function home(page) {
-  if (await page.getByRole('button', { name: 'Sync na nuvem', exact: true }).isVisible()) return;
+  if (await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).isVisible()) return;
   await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
   await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
 }
@@ -148,7 +148,7 @@ test('Salvar cria só o projeto ativo; novo browser restaura e exclusão não re
   await page.goto('/?app=1');
   await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByPlaceholder('Ex.: Clínica Janine').fill('Projeto novo');
+  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto novo');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
   await expect.poll(() => cloud.puts.filter((item) => item.id !== 'p-a').length).toBe(1);
@@ -255,11 +255,11 @@ test('conflito 409 preserva ambas as versões como projetos separados', async ({
   await page.goto('/?app=1');
   await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByPlaceholder('Ex.: Clínica Janine').fill('Projeto em edição');
+  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto em edição');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
   cloud.forceConflictOnce = true;
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
-  await expect(page.getByText(/cópia de conflito na conta/)).toBeVisible();
+  await expect(page.getByText(/Sua edição ficou na cópia/)).toBeVisible();
   expect(cloud.puts).toHaveLength(1);
   const conflicted = [...cloud.rows.values()].find((row) => row.entry.name === 'Versão de outro dispositivo');
   expect(conflicted?.version).toBe(1);

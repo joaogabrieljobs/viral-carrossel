@@ -1,7 +1,7 @@
 // Faltava ver o consumo de imagens do plano, rever as imagens geradas e voltar a
 // baixá-las; e faltava um gesto explícito de salvar (o autosave era invisível).
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const SESSAO_COM_QUOTA = {
   ...SESSAO_ATIVA,

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const session = { ...SESSAO_ATIVA, tier: 'essential', imageQuota: { used: 0, limit: 0, remaining: 0, tier: 'essential' } };
 const completion = payload => ({ choices: [{ message: { content: JSON.stringify(payload) } }] });

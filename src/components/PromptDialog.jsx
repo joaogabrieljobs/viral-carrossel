@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { X } from 'lucide-react';
 
 export function ConfirmDialog({ open, title, body, confirmLabel = 'Continuar', cancelLabel = 'Cancelar', onConfirm, onCancel }) {
@@ -39,25 +39,35 @@ export function ConfirmDialog({ open, title, body, confirmLabel = 'Continuar', c
   );
 }
 
-export default function PromptDialog({ open, title, defaultValue = '', placeholder = '', label = '', cta = 'OK', onConfirm, onClose }) {
+export default function PromptDialog({ open, title, defaultValue = '', placeholder = '', label = '', cta = 'OK', onConfirm, onClose, brands = null, initialBrandId = '' }) {
   const [val, setVal] = useState(defaultValue);
+  const [brandId, setBrandId] = useState(initialBrandId);
+  const [brandName, setBrandName] = useState('');
   const inputRef = useRef(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open) {
       setVal(defaultValue);
-      setTimeout(() => inputRef.current?.focus(), 30);
+      setBrandId(initialBrandId);
+      setBrandName('');
+      inputRef.current?.focus();
     }
-  }, [open, defaultValue]);
+  }, [open, defaultValue, initialBrandId]);
   if (!open) return null;
   const submit = () => {
     const v = val.trim();
-    if (!v) return;
-    onConfirm(v);
+    if (!v || (brandId === '__new__' && !brandName.trim())) return;
+    onConfirm(brands ? { name: v, brandId, brandName: brandName.trim() } : v);
     onClose();
   };
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={e=>e.stopPropagation()} style={{ maxWidth:420 }}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-label={title} onClick={e=>e.stopPropagation()} style={{ maxWidth:420 }} onKeyDown={event => {
+        if (event.key === 'Escape') onClose();
+        if (event.key !== 'Tab') return;
+        const fields = [...event.currentTarget.querySelectorAll('button:not([disabled]), input, select')];
+        const target = event.shiftKey ? fields.at(-1) : fields[0];
+        if (document.activeElement === (event.shiftKey ? fields[0] : fields.at(-1))) { event.preventDefault(); target?.focus(); }
+      }}>
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
@@ -68,12 +78,22 @@ export default function PromptDialog({ open, title, defaultValue = '', placehold
           </button>
         </div>
         <div style={{ padding:20, display:'flex', flexDirection:'column', gap:14 }}>
+          {brands && <label className="vc-label">Cliente / marca
+            <select className="vc-input" value={brandId} onChange={e => setBrandId(e.target.value)}>
+              {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name === 'Padrão' ? 'Sem cliente definido' : brand.name}</option>)}
+              <option value="__new__">+ Novo cliente / marca</option>
+            </select>
+          </label>}
+          {brands && brandId === '__new__' && <label className="vc-label">Nome do cliente
+            <input className="vc-input" value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Ex.: Café Aurora" />
+          </label>}
           {label && (
             <label className="vc-label" style={{ marginBottom:0 }}>
               {label}
             </label>
           )}
           <input
+            aria-label={label || title}
             ref={inputRef}
             value={val}
             onChange={e=>setVal(e.target.value)}
@@ -86,7 +106,7 @@ export default function PromptDialog({ open, title, defaultValue = '', placehold
           />
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
             <button onClick={onClose} className="vc-btn vc-btn-ghost" style={{ height:38, padding:'0 14px' }}>Cancelar</button>
-            <button onClick={submit} disabled={!val.trim()} className="vc-btn vc-btn-primary" style={{ height:38, padding:'0 16px', opacity: val.trim() ? 1 : 0.4 }}>
+            <button onClick={submit} disabled={!val.trim() || (brandId === '__new__' && !brandName.trim())} className="vc-btn vc-btn-primary" style={{ height:44, padding:'0 16px', opacity: val.trim() ? 1 : 0.4 }}>
               {cta}
             </button>
           </div>

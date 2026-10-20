@@ -14,6 +14,7 @@ export default function LoginModal({
   open,
   onClose,
   initialEmail = '',
+  initialMode = 'login',
   hint = '',
   onLoggedIn,
 }) {
@@ -32,8 +33,8 @@ export default function LoginModal({
     setPassword('');
     setNotice('');
     setCheckoutReady(false);
-    setMode('login');
-  }, [open, hint, initialEmail]);
+    setMode(initialMode === 'register' ? 'register' : 'login');
+  }, [open, hint, initialEmail, initialMode]);
 
   if (!open) return null;
 

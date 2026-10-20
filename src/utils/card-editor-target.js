@@ -16,7 +16,7 @@ export function cardElementEditorTarget(key) {
   if (!chave) return null;
   if (chave.startsWith('ov_')) return { tab: 'visual', section: 'visual-elementos', mode: 'criador' };
   if (chave === 'photo') return { tab: 'imagem', section: 'imagem-ajustes', mode: 'criador' };
-  if (TEXT_KEYS.has(chave)) return { tab: 'texto', section: 'texto-caixa', mode: 'diretor' };
+  if (TEXT_KEYS.has(chave)) return { tab: 'texto', section: 'texto-caixa', mode: 'criador' };
   const section = BRAND_SECTIONS[chave];
   if (section) return { tab: 'brand', section, mode: 'criador' };
   return null;

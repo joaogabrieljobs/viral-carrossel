@@ -22,7 +22,7 @@ describe('seletor de produto na Home e na Biblioteca', () => {
     expect(code).toContain("entry?.doc?.productKind === 'apresentacao'");
     expect(code).toContain('setCreationType(projectKindOf(activeProject))');
     expect(code).toContain("onGenerate?.(creationType)");
-    expect(code).toContain("newDoc?.(creationType, name)");
+    expect(code).toContain("newDoc?.(creationType)");
     expect(code).toContain("{product.singular} · {slides.length}");
     expect(code).toContain("width: isPresentation ? 88 : 56");
     expect(code).not.toContain("newDoc(\n                  {");

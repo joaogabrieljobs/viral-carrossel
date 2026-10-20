@@ -4,7 +4,7 @@
 //
 // Este teste mede a geometria real: nenhum <h1> pode sair da zona que o contém.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 /** Quanto o título extravasa a caixa que o recorta, em px do card (1080×1350). */
 async function transbordoDosTitulos(page) {

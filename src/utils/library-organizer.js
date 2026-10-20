@@ -49,7 +49,7 @@ export function normalizeLibraryEntry(entry, folders = []) {
   const folderIds = new Set(normalizeLibraryFolders(folders).map((folder) => folder.id));
   const folderId = folderIds.has(String(entry?.folderId || '')) ? String(entry.folderId) : '';
   const publicationDate = normalizePublicationDate(entry?.publicationDate);
-  const status = ['draft', 'ready', 'scheduled', 'published'].includes(entry?.status)
+  const status = ['draft', 'in_review', 'changes_requested', 'approved', 'ready', 'scheduled', 'published'].includes(entry?.status)
     ? entry.status
     : 'draft';
   const next = { ...entry, folderId, publicationDate, status };

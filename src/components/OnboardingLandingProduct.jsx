@@ -241,7 +241,7 @@ function Plans({ onEnter }) {
   );
 }
 
-export default function OnboardingLandingProduct({ onEnter, onLogin }) {
+export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister }) {
   return (
     <main className="moont-product-landing">
       <a className="moont-lp-skip" href="#conteudo-principal">Ir para o conteúdo</a>
@@ -259,7 +259,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
           </nav>
           <div className="moont-lp-header__actions">
             <button type="button" className="moont-lp-login" onClick={onLogin}>Entrar</button>
-            <ActionButton onClick={onEnter} className="moont-lp-header__cta">Começar a criar</ActionButton>
+            {onRegister && <button type="button" className="moont-lp-login" onClick={onRegister}>Criar conta</button>}
+            <ActionButton onClick={onEnter} className="moont-lp-header__cta">Ver planos</ActionButton>
           </div>
         </div>
       </header>
@@ -273,7 +274,8 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
               Reúna briefing, links e referências na Moont. A plataforma organiza a narrativa, propõe uma direção visual e prepara a primeira versão do carrossel ou da apresentação para você revisar.
             </p>
             <div className="moont-lp-hero__actions">
-              <ActionButton onClick={onEnter}>Criar meu primeiro projeto <ArrowRight aria-hidden="true" /></ActionButton>
+              <ActionButton onClick={onEnter}>Escolher plano e começar <ArrowRight aria-hidden="true" /></ActionButton>
+              <a href="#demonstracao" className="moont-lp-login">Experimentar a demonstração</a>
               <button
                 type="button"
                 className="moont-lp-button moont-lp-button--secondary"
@@ -367,7 +369,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
         </div>
       </section>
 
-      <WorkflowDemo onEnter={onEnter} />
+      <div id="demonstracao"><WorkflowDemo onEnter={onEnter} /></div>
 
       <section id="modos" className="moont-lp-section moont-lp-formats" aria-labelledby="moont-formats-title">
         <div className="moont-lp-container">
@@ -534,7 +536,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin }) {
           <span className="moont-lp-closing__mark" aria-hidden="true" />
           <h2 id="moont-closing-title">A próxima pauta já pode começar com tudo o que você reuniu hoje.</h2>
           <p>Traga o briefing e as referências. A Moont organiza esse material em uma primeira versão pronta para revisar.</p>
-          <ActionButton onClick={onEnter}>Criar meu primeiro projeto <ArrowRight aria-hidden="true" /></ActionButton>
+          <ActionButton onClick={onEnter}>Escolher plano e começar <ArrowRight aria-hidden="true" /></ActionButton>
         </div>
       </section>
 

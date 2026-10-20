@@ -35,7 +35,8 @@ export async function copyTextToClipboard(text) {
  */
 export async function exportCarouselPackage({ exportAll, caption = '' } = {}) {
   if (typeof exportAll !== 'function') throw new Error('Exportação indisponível.');
-  await exportAll();
+  const downloaded = await exportAll();
+  if (downloaded === false) throw new Error('Não foi possível baixar os arquivos. Tente exportar novamente.');
   const text = String(caption || '').trim();
   if (!text) {
     return { captionCopied: false, checklist: PUBLISH_CHECKLIST };

@@ -2,7 +2,7 @@
 // os layouts culture desenhavam os trechos: nos restantes o card continuava com
 // o texto simples. O teste marca um trecho do subtítulo e procura-o pintado no card.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 test('destaque marcado no subtítulo aparece no card', async ({ page }) => {
   test.setTimeout(60_000);

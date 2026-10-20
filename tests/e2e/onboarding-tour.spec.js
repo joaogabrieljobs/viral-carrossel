@@ -6,14 +6,18 @@ import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const TOTAL_PASSOS = 3;
 
-async function openTourFromHelp(page) {
-  await page.getByRole('button', { name: /Continuar no editor/i }).click();
-  const intro = page.getByRole('dialog', { name: 'Bem-vindo à Moont' });
+async function firstEditor(page) {
+  const intro = page.getByRole('dialog', { name:'Bem-vindo à Moont' });
   await expect(intro).toBeVisible();
-  await intro.getByRole('button', { name: 'Fechar', exact: true }).click();
-  // Desktop: ícone ?; mobile: barra.
-  const help = page.getByRole('button', { name: /Ajuda|ajuda e atalhos|\?/i }).first();
-  await help.click();
+  await intro.getByRole('button', { name:'Começar a criar', exact:true }).click();
+  await page.getByRole('button', { name:'Criar primeiro projeto', exact:true }).click();
+  const naming = page.getByRole('dialog', { name:'Nome da comunicação' });
+  await naming.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Primeiro projeto');
+  await naming.getByRole('button', { name:'Criar', exact:true }).click();
+}
+async function openTourFromHelp(page) {
+  await firstEditor(page);
+  await page.getByRole('button', { name: /Ajuda|ajuda e atalhos|\?/i }).first().click();
   await page.getByRole('button', { name: /Ver tour guiado/i }).click();
 }
 
@@ -22,7 +26,6 @@ test.describe('Tour de onboarding', () => {
     await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
 
-    await page.getByRole('button', { name: /Continuar no editor/i }).click();
     await expect(page.getByRole('dialog', { name: 'Bem-vindo à Moont' })).toBeVisible({ timeout: 10_000 });
     // 850ms do tour + folga: enquanto o modal está aberto (e canvas vazio), nenhum card de tour.
     await page.waitForTimeout(1600);
@@ -48,21 +51,12 @@ test.describe('Tour de onboarding', () => {
     await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
 
-  test('primeiro projeto criado nesta visita ainda recebe o tour ao preencher', async ({ page }) => {
-    await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
+  test('o primeiro projeto não recebe tour automático durante a criação', async ({ page }) => {
+    await mockApi(page, { session:SESSAO_ATIVA, onboarding:true });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /Continuar no editor/i }).click();
-
-    const intro = page.getByRole('dialog', { name: 'Bem-vindo à Moont' });
-    await expect(intro).toBeVisible();
-    await intro.getByRole('button', { name: 'Fechar', exact: true }).click();
-    await page.getByRole('button', { name: 'Criar nova comunicação' }).click();
-    await page.getByPlaceholder('Ex.: Clínica Janine').fill('Meu primeiro projeto');
-    await page.getByRole('button', { name: 'Criar', exact: true }).click();
-
-    await page.getByRole('button', { name: /abrir templates/i }).click();
-    await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click();
-    await expect(page.locator('[data-vc-tour-card]')).toBeVisible({ timeout: 10_000 });
+    await firstEditor(page);
+    await page.waitForTimeout(1100);
+    await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
 
   test('percorre os 3 passos sem erro de console e sem realce fora de alvo', async ({ page }) => {

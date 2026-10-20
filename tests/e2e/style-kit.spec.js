@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
 const brief = '# MUSA Studio de Geração\nImagem, vídeo e áudio.\n\n' + 'Contexto de produto. '.repeat(1250) + '\n## Identidade visual final\nTítulo Anton Regular em caixa alta. Corpo Inter. Acento #FF5C00. Imagem fullbleed, 3D expressivo. Não divulgar preço ou data.';
 const completion = value => ({ choices: [{ message: { content: JSON.stringify(value) } }] });
@@ -107,9 +107,9 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   await page.getByLabel('Brief do projeto').fill(brief + '\nÚltima edição antes da troca.');
   await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
   // Troca de projeto vive na Home no fluxo com divulgação progressiva.
-  await page.getByRole('tab', { name: /^Home$/i }).first().click();
+  await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await page.getByRole('button', { name: /Criar nova comunicação/i }).first().click();
-  await page.getByPlaceholder('Ex.: Clínica Janine').fill('Projeto B MUSA');
+  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto B MUSA');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
   await narrativa(page);
   await contextPanel(page);

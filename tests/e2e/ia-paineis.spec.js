@@ -5,7 +5,7 @@
 // A chave OpenAI é semeada no storage e `api.openai.com` é interceptado, então
 // nenhuma chamada real acontece (RNF-02).
 import { test, expect } from '@playwright/test';
-import { SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 /** OpenAI: formato chat.completions */
 const respostaOpenAI = (payload) => ({ choices: [{ message: { content: JSON.stringify(payload) } }] });
@@ -13,6 +13,7 @@ const respostaOpenAI = (payload) => ({ choices: [{ message: { content: JSON.stri
 const respostaAnthropic = (payload) => ({ content: [{ type: 'text', text: JSON.stringify(payload) }] });
 
 async function prepara(page, payload) {
+  await mockEditorApi(page, { session:SESSAO_ATIVA });
   await page.addInitScript(() => {
     try {
       localStorage.setItem('vc_onboarding_done', '1');

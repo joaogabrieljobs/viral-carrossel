@@ -1,0 +1,20 @@
+.vc-canvas-navigator{display:flex;align-items:center;justify-content:center;gap:4px;flex-shrink:0;padding:4px 8px;border-bottom:1px solid var(--border);background:var(--bg-sidebar);color:var(--text-primary)}
+.vc-canvas-navigator button,.vc-canvas-navigator select{min-height:40px;border:1px solid transparent;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.vc-canvas-navigator button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:40px;padding:0 8px}
+.vc-canvas-navigator button:hover{background:var(--bg-card)}
+.vc-canvas-navigator button:disabled{opacity:.35;cursor:default}
+.vc-canvas-navigator select{max-width:140px;font-size:12px}
+.vc-canvas-navigator option{background:var(--bg-sidebar)}
+.vc-canvas-navigator output{min-width:42px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}
+.vc-canvas-navigator-divider{height:20px;border-left:1px solid var(--border);margin:0 6px}
+.vc-canvas-navigator .vc-canvas-zoom-range{flex:0 0 140px;width:140px;accent-color:var(--accent)}
+.vc-canvas-fit-label{font-size:12px}
+.vc-cards-viewport{scrollbar-width:auto;scrollbar-color:var(--text-muted) var(--bg-base)}
+.vc-cards-viewport::-webkit-scrollbar{width:12px;height:12px}
+.vc-cards-viewport::-webkit-scrollbar-thumb{background:var(--text-muted);border:3px solid var(--bg-base);border-radius:10px}
+.vc-mobile-scroll-rail{position:absolute;right:0;top:8px;bottom:92px;width:44px;pointer-events:none;z-index:12}
+.vc-mobile-scroll-track{position:absolute;right:5px;width:8px;height:100%;border-radius:8px;background:color-mix(in srgb,var(--text-muted) 14%,transparent)}
+.vc-mobile-scroll-thumb{position:absolute;right:0;width:44px;min-height:44px;pointer-events:auto;touch-action:none;cursor:grab;display:flex;justify-content:flex-end;padding-right:4px;box-sizing:border-box}
+.vc-mobile-scroll-thumb span{width:10px;background:var(--text-muted);border-radius:8px;box-shadow:0 0 0 1px var(--bg-base)}
+.vc-mobile-scroll-thumb:active span{background:var(--accent)}
+@media(max-width:767px){.vc-canvas-navigator{gap:0;padding:2px 4px}.vc-canvas-navigator button{min-width:40px;min-height:44px;padding:0 4px}.vc-canvas-navigator select{max-width:104px}.vc-canvas-zoom-range,.vc-canvas-fit-label{display:none}.vc-canvas-navigator-divider{margin:0 2px}.vc-canvas-navigator output{min-width:38px}}

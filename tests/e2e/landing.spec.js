@@ -15,7 +15,7 @@ test.describe('Landing (RF-01)', () => {
     await page.goto('/?landing=1');
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText('A pauta chegou.');
-    await expect(page.getByRole('button', { name: /criar meu primeiro projeto/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Escolher plano e começar/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /ver a moont em ação/i }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: /no feed, cada card precisa dar vontade/i })).toBeVisible();
     await expect(page.locator('#resultados')).toContainText('A mesma ideia pode virar carrossel hoje e apresentação amanhã.');

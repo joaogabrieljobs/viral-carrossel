@@ -1,3 +1,10 @@
+import { useCaptionDelivery } from './src/hooks/useCaptionDelivery.js';
+import { copyTextToClipboard } from './src/utils/export-package.js';
+import { GenerationScopePicker } from './src/components/GenerationScopePicker.jsx';
+import { joinSlideCaptions } from './src/utils/import-text.js';
+import { applyVisualPresetToCard, editCardVisualBrand } from './src/utils/visual-scope.js';
+import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
+import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
 import { buildRemixBlock, mergeRemixedSlides } from './src/utils/carousel-remix.js';
@@ -76,6 +83,7 @@ import {
 } from './src/styles/presentation-presets.jsx';
 import {
   createCustomVisualPreset,
+  sanitizeCustomVisualPresetBrand,
   readCustomVisualPresets,
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
@@ -596,7 +604,7 @@ function accountMetaFingerprint(snapshot) {
   });
 }
 
-const OnboardingLanding = lazy(() => import('./src/components/OnboardingLandingProduct.jsx'));
+const OnboardingLandingProduct = lazy(() => import('./src/components/OnboardingLandingProduct.jsx'));
 const Paywall = lazy(() => import('./src/components/Paywall.jsx'));
 const LoginModal = lazy(() => import('./src/components/LoginModal.jsx'));
 const ModesIntroModal = lazy(() => import('./src/components/ModesIntroModal.jsx'));
@@ -1020,7 +1028,7 @@ export default function App() {
   const [library, setLibrary] = useState(() => {
     const folders = normalizeLibraryFolders(lsGet(SK.libraryFolders, []));
     const lib = lsGet(SK.library, null);
-    if (Array.isArray(lib) && lib.length) {
+    if (Array.isArray(lib)) {
       return lib.map((e) => normalizeLibraryEntry({ ...e, doc: ensureDocShape(e.doc || {}) }, folders));
     }
     const legacy = lsGet(SK.legacyDoc, null);
@@ -1028,7 +1036,7 @@ export default function App() {
       // Migra o doc antigo pra primeira entrada da biblioteca
       return [mkLibEntry(ensureDocShape({ ...DEFAULT_DOC, ...legacy }), 'Carrossel')];
     }
-    return [mkLibEntry(DEFAULT_DOC, 'Carrossel')];
+    return [];
   });
   const [activeDocId, setActiveDocId] = useState(() => {
     const stored = lsGet(SK.activeDocId, null);
@@ -1141,6 +1149,8 @@ export default function App() {
   // Auto-save da biblioteca + tracking do último save pro indicador no header
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [cloudUnsaved, setCloudUnsaved] = useState(false);
+  const [cloudReceipts, setCloudReceipts] = useState({});
+  const [autoSaveBusy, setAutoSaveBusy] = useState(false);
   const [remoteProjectNotice, setRemoteProjectNotice] = useState(null);
   const firstSaveRef = useRef(true);
   useEffect(() => {
@@ -1200,7 +1210,7 @@ export default function App() {
   const slidesLiveRef = useRef(slides);
   slidesLiveRef.current = slides;
   const fmt = doc.fmt && FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
-  const caption = typeof doc.caption === 'string' ? doc.caption : '';
+  const caption = doc.captionScope === 'publication' ? String(doc.caption || '') : (String(doc.caption || '') || joinSlideCaptions(slides));
   const material  = doc.material  || { content:'', sources:'', context:'' };
   const imgParams = doc.imgParams || { fidelity:50, creativity:50, irreverence:50, objectivity:50 };
   const styleKit = useMemo(() => normalizeStyleKit(doc.styleKit), [doc.styleKit]);
@@ -1252,7 +1262,7 @@ export default function App() {
     };
   }), [history]);
 
-  const setCaption   = useCallback(next => history.set(d => ({ ...d, caption:   typeof next==='function' ? next(d.caption)  : next })), [history]);
+  const setCaption   = useCallback(next => history.set(d => ({ ...d, captionScope:'publication', caption: typeof next==='function' ? next(d.caption) : next })), [history]);
   const setMaterial  = useCallback(next => history.set(d => ({
     ...d,
     material: typeof next==='function'
@@ -1332,7 +1342,7 @@ export default function App() {
     ...d,
     visualPreset: typeof next === 'function' ? next(d.visualPreset ?? null) : next,
   })), [history]);
-  const applyVisualStylePreset = useCallback((presetId) => {
+  const applyVisualStylePreset = useCallback((presetId, scope = 'all', index = 0) => {
     if (!presetId) return;
     const preset = resolvePresentationVisualPresetDefinition(presetId, visualPresets);
     if (!preset) return;
@@ -1340,6 +1350,8 @@ export default function App() {
     const isPresentationVisual = preset?.productKind === 'apresentacao';
     const fromPreset = preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId);
     history.set((d) => {
+      if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
+      d = transformFormatVisuals(d, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
       if (isPresentationVisual) {
         return applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
           initialize: d.productKind !== 'apresentacao' || !isApresentacaoPreset(d.creativePreset),
@@ -1358,6 +1370,7 @@ export default function App() {
           };
       return fromPreset ? { ...next, creativePreset: fromPreset } : next;
     });
+    toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}. Use Desfazer para voltar.` : 'Padrão aplicado a todos. Use Desfazer para voltar.', 'success', 4000);
     trackEvent('visual_preset_applied', { preset: resolvedPresetId, creativePreset: fromPreset || null });
   }, [history, visualPresets]);
   const setSlideTextDensity = useCallback(next => history.set(d => ({
@@ -1511,6 +1524,7 @@ export default function App() {
       const readyEntry = mergeHydratedProjectMedia(cloudEntry, current);
       v2VersionsRef.current.set(docId, remote.version);
       v2BaselinesRef.current.set(docId, projectCacheFingerprint(readyEntry));
+      setCloudReceipts(current => ({ ...current, [docId]:{ owner, at:Date.now(), fingerprint:projectCacheFingerprint(readyEntry) } }));
       if (docId === activeDocId) {
         // `openDocLocal` inclui um flush do doc em edição. Para o projeto que já
         // estava ativo, esse flush reporia a versão anterior sobre o GET novo.
@@ -1545,23 +1559,30 @@ export default function App() {
     // Sem 2º argumento (Home / Biblioteca / Gerar): pede nome.
     // Com nome explícito (já perguntado na conta): não pergunta de novo.
     let name = projectName !== undefined ? String(projectName || '').trim() : '';
+    let chosenBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || brand;
     if (projectName === undefined) {
       const ask = askPromptRef.current;
       if (typeof ask === 'function') {
         const answered = await ask({
           title: isPresentation ? 'Nome da apresentação' : 'Nome da comunicação',
+          brands: brandRoster, initialBrandId: activeBrandId,
           label: 'Como se chama este projeto?',
-          placeholder: isPresentation ? 'Ex.: Pitch clínica' : 'Ex.: Clínica Janine',
+          placeholder: isPresentation ? 'Ex.: Proposta comercial — outubro' : 'Ex.: Campanha de lançamento — outubro',
           cta: 'Criar',
           defaultValue: '',
         });
         if (answered === null || answered === undefined) return false;
-        name = String(answered).trim();
+        name = String(answered.name || answered).trim();
+        if (answered.brandId === '__new__') {
+          chosenBrand = hydrateBrandTextColors({ ...DEFAULT_BRAND, id:uid(), name:answered.brandName });
+          setBrandRoster(items => [...items, chosenBrand]);
+        } else if (answered.brandId) {
+          chosenBrand = brandRoster.find(b => b.id === answered.brandId) || chosenBrand;
+        }
+        setActiveBrandId(chosenBrand.id);
       }
     }
-    const rosterBrand = brandRoster.find((b) => b.id === activeBrandId)
-      || brandRoster[0]
-      || brand;
+    const rosterBrand = chosenBrand;
     const identity = hydrateBrandTextColors({ ...rosterBrand });
     const presentationSeed = isPresentation
       ? applyPresentationVisualPresetToDoc({
@@ -1669,6 +1690,15 @@ export default function App() {
 
   const editorSyncStateRef = useRef({ doc, activeDocId, activeBrandId });
   editorSyncStateRef.current = { doc, activeDocId, activeBrandId };
+
+  const acknowledgeCloudSave = useCallback((snapshot) => {
+    const entry = snapshot?.library?.find(item => item.id === snapshot.activeDocId);
+    if (!entry) return;
+    const owner = readDataOwner();
+    const at = Date.now();
+    setCloudReceipts(current => ({ ...current, ...Object.fromEntries(snapshot.library.map(item => [item.id, { owner, at, fingerprint:projectCacheFingerprint(item) }])) }));
+    setCloudUnsaved(false);
+  }, []);
 
   const cloudAutoPushSnapshot = useCallback(() => {
     const owner = readDataOwner();
@@ -1795,6 +1825,7 @@ export default function App() {
       setLastSavedAt(Date.now());
     });
     unlockAccountDataWrites();
+    if (!result?.assetsMissing && !result?.assetsFailed) acknowledgeCloudSave({ ...snapshot, library:restored, activeDocId:nextActiveId });
     return restored.length;
   }, [history.reset]);
 
@@ -2237,7 +2268,7 @@ export default function App() {
             : `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`,
           'warning', 6000);
         }
-        setCloudUnsaved(false);
+        if (!recoveredCopies.size && !reviewCount && source !== 'sync') acknowledgeCloudSave({ ...pending.snapshot, library:entries });
         return { cloudSaved: true, outboxSaved: !verifyWithoutOutbox && outbox.pending === 0 };
       } catch (error) {
         setCloudUnsaved(true);
@@ -2285,6 +2316,8 @@ export default function App() {
       await snapshotAccountVaultForOwners(owners, { snapshot: result.snapshot });
       trackEvent('library_cloud_push', { project_count: String(count), source });
       const photosPending = Number(result.assetsFailed || 0) + Number(result.assetsMissing || 0);
+      if (!photosPending) acknowledgeCloudSave(result.snapshot);
+      else setCloudUnsaved(true);
       const cachePending = result.localPersisted === false;
       toast(
         cachePending
@@ -2296,6 +2329,7 @@ export default function App() {
         photosPending || cachePending ? 6500 : 3500,
       );
     } catch (e) {
+      setCloudUnsaved(true);
       toast(
         `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${e?.message || 'tente novamente.'}`,
         'warning',
@@ -2309,6 +2343,13 @@ export default function App() {
     finishCloudSync]);
 
   const salvarProjeto = useCallback(() => syncProjectLibrary('salvar'), [syncProjectLibrary]);
+
+  useEffect(() => {
+    if (!accountLibraryReady || activeDocId || library.length || isDefault(slides)) return;
+    const entry = mkLibEntry(doc, doc.productKind === 'apresentacao' ? 'Nova apresentação' : 'Nova comunicação');
+    setLibrary([entry]);
+    setActiveDocId(entry.id);
+  }, [accountLibraryReady, activeDocId, library.length, doc]);
 
   // Autosave: salva o doc atual na entrada da biblioteca (debounced)
   useEffect(() => {
@@ -2554,10 +2595,17 @@ export default function App() {
             snapshot: pending.snapshot, signal: controller.signal,
           }) };
           cloudAutoPushRef.current = task;
-          try { await task.promise; }
-          finally { if (cloudAutoPushRef.current === task) cloudAutoPushRef.current = null; }
+          setAutoSaveBusy(true);
+          try {
+            const result = await task.promise;
+            if (!controller.signal.aborted && result?.ok && !result.assetsFailed && !result.assetsMissing) acknowledgeCloudSave(pending.snapshot);
+            else if (!controller.signal.aborted) setCloudUnsaved(true);
+          } finally {
+            setAutoSaveBusy(false);
+            if (cloudAutoPushRef.current === task) cloudAutoPushRef.current = null;
+          }
         })
-        .catch(() => {});
+        .catch(() => { if (!controller.signal.aborted) setCloudUnsaved(true); });
     }, 4_000);
     return () => {
       controller.abort();
@@ -2579,6 +2627,7 @@ export default function App() {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   /** Índice do card cuja legenda está aberta no painel (null = fechado). */
   const [captionEditorIdx, setCaptionEditorIdx] = useState(null);
+  const [loginMode, setLoginMode] = useState('login');
   const [brandsOpen, setBrandsOpen] = useState(false);
   const [imgPrompt, setImgPrompt] = useState({ open:false, mode:null, defaultValue:'' });
   const [replaceCardsPrompt, setReplaceCardsPrompt] = useState(null);
@@ -3183,33 +3232,8 @@ export default function App() {
     setNiche(String(activeEntry?.doc?.editorialContext?.niche || ''));
   }, [activeEntry?.id]);
 
-  // Tour guiado — uma única vez, no primeiro projeto ainda vazio, antes do pedido.
+  // A visita guiada é aberta pela Ajuda; nunca interrompe criação ou digitação.
   const tourScheduledRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || landingOpen || !accountLibraryReady || modesIntroOpen) return undefined;
-    try {
-      if (localStorage.getItem(SK.onboarding)) return undefined;
-      // Reentrada com projetos salvos ou restaurados → não interromper.
-      if (hadProjectsAtRestore) {
-        localStorage.setItem(SK.onboarding, '1');
-        localStorage.setItem(SK.modesIntro, '1');
-        return undefined;
-      }
-      if (localStorage.getItem(SK.modesIntro) !== '1') return undefined;
-      if (tourScheduledRef.current || tourOpen) return undefined;
-      tourScheduledRef.current = true;
-      let opened = false;
-      const t = window.setTimeout(() => {
-        opened = true;
-        setTourOpen(true);
-      }, 850);
-      return () => {
-        window.clearTimeout(t);
-        if (!opened) tourScheduledRef.current = false;
-      };
-    } catch { /* ignore */ }
-    return undefined;
-  }, [landingOpen, accountLibraryReady, hadProjectsAtRestore, modesIntroOpen, slides, tourOpen]);
   useEffect(() => {
     if (!PROJECTS_V2 || !accountLibraryReady || !activeDocId) return undefined;
     let cancelled = false;
@@ -3446,11 +3470,12 @@ export default function App() {
   /* <1000px: some o atalho "Projetos" do header (o rodapé já tem um igual). */
   const headerVeryTight = !isMobile && vw < 1000;
   const f = FORMATS[fmt] || FORMATS.carrossel;
-  const previewScale = useMemo(() => {
+  const { zoom: canvasZoom, changeZoom } = useCanvasZoom(boardScrollRef, `${activeDocId}:${fmt}:${shellView}:${isMobile}:${accountLibraryReady}`);
+  const previewBaseScale = useMemo(() => {
     if (isMobile) {
       /* Margens laterais maiores para o texto não “escorrer” junto ao bezel / overscroll */
       const side = Math.max(16, vw * 0.04);
-      const base = Math.min((vw - side * 2) / f.w, 0.92);
+      const base = Math.min((vw - side - 44) / f.w, 0.92);
       return thumbQaMode ? base * 0.72 : base;
     }
     // No desktop, a apresentação é uma superfície de edição 16:9. Limitá-la à
@@ -3458,11 +3483,12 @@ export default function App() {
     // praticamente ilegíveis. O alvo cresce com a área útil e mantém um limite
     // confortável para a fila horizontal.
     const targetWidth = fmt === 'apresentacao'
-      ? Math.min(920, Math.max(720, (vw - 272) * 0.66))
+      ? Math.min(920, Math.max(320, (vw - 272 - 96) * 0.9))
       : 360;
     const base = Math.min(targetWidth / f.w, fmt === 'apresentacao' ? 0.5 : 0.44);
     return thumbQaMode ? Math.min(base * 0.7, 0.28) : base;
   }, [isMobile, vw, f, fmt, thumbQaMode]);
+  const previewScale = previewBaseScale * canvasZoom;
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const formatSlides = useMemo(
@@ -5510,8 +5536,7 @@ ${isPresentationSummary
 
       if (activeProjectRef.current === projectId) {
         setCaption(finalCaption);
-        // Legenda regenerada também preenche o card activo (modelo por card).
-        updateSlideAt(activeIdx, { caption: finalCaption });
+        if (isPresentationSummary) updateSlideAt(activeIdx, { caption: finalCaption });
       }
       return finalCaption;
     } catch(e) {
@@ -5536,6 +5561,10 @@ ${isPresentationSummary
     projectName: activeEntry?.name,
     productKind: doc.productKind === 'apresentacao' ? 'apresentacao' : activeProductKind,
     setExporting, setExportProgress, setError, toast,
+  });
+
+  const { handleCopyCaption, handleExportPackage } = useCaptionDelivery({
+    caption, generateCaption, exportAll, toast, isPresentation:activeProductKind === 'apresentacao',
   });
 
   const handleImageUpload = (e) => {
@@ -5570,9 +5599,9 @@ ${isPresentationSummary
 
   /** Geração rápida a partir do prompt da aba Narrativa (usa styleKit + material). */
   const handleQuickGenerateFromNarrativa = async (promptText, {
-    withImages = false,
-    narrativeMode = 'none',
-    cardCount = 'auto',
+    withImages = doc.quickGenerationScope === 'text_images',
+    narrativeMode = doc.quickNarrativeMode || 'none',
+    cardCount = quickCardCount,
     productKind = null,
     presentationPath: quickPresentationPath = null,
   } = {}) => {
@@ -6046,15 +6075,27 @@ Retorne APENAS JSON: ${refineAllWantsBody
     setEditorFocus({ slideId, tab: target.tab, section: target.section, at: Date.now() });
   }, [slides, appMode, tab, setAppMode]);
 
+  const currentDocumentFingerprint = useMemo(() => projectCacheFingerprint(activeEntry ? { ...activeEntry, doc } : null), [activeEntry, doc]);
+  const cloudReceipt = cloudReceipts[activeDocId];
+  const confirmedCloudAt = cloudReceipt && cloudReceipt.owner === readDataOwner()
+    && cloudReceipt.fingerprint === currentDocumentFingerprint ? cloudReceipt.at : null;
+  const saveIndicator = <ProjectSaveStatus localSavedAt={lastSavedAt} cloudSavedAt={confirmedCloudAt} busy={cloudSyncBusy || autoSaveBusy} error={cloudUnsaved} onRetry={salvarProjeto} />;
+
+  const editingCardVisual = !!panelSlide.visualBrand && ['texto', 'visual'].includes(tab);
+  const sidebarBrand = editingCardVisual ? { ...displayBrand, ...sanitizeCustomVisualPresetBrand(panelSlide.visualBrand) } : displayBrand;
+  const setSidebarBrand = editingCardVisual ? next => history.set(d => editCardVisualBrand(d, activeIdx, next)) : setBrand;
+
   const sidebarProps = {
+    saveIndicator,
+    onReviewChange: review => history.set(d => ({ ...d, clientReview: review })),
     // setHookLibrary/niche: botão "salvar hook na biblioteca" (SidebarContent).
     // hookLibrary em si só é lido pelo GenerateModal — não entra aqui.
     setHookLibrary, niche,
     onOpenResults: () => setResultsOpen(true),
-    slide: panelSlide, slides, activeIdx, brand: displayBrand, setBrand, updateSlide,
+    slide: panelSlide, slides, activeIdx, brand: sidebarBrand, setBrand:setSidebarBrand, updateSlide,
     setSlides,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
-    generateCaption, genCaption, caption, setCaption,
+    generateCaption, genCaption, caption, setCaption, handleCopyCaption, handleExportPackage,
     setSetupOpen: setSetupOpenForSidebar,
     setResearchOpen, fileInputRef,
     exportSlide, exportAll, exportPDF, exporting, exportProgress, tab, setTab,
@@ -6065,6 +6106,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     onQuickGenerate: handleQuickGenerateFromNarrativa,
     quickPrompt, setQuickPrompt,
     quickNarrativeMode: doc.quickNarrativeMode || 'none',
+    generationScope: doc.quickGenerationScope || 'text',
+    onGenerationScopeChange: value => history.set(d => ({ ...d, quickGenerationScope:value })),
     onQuickNarrativeModeChange: value => history.set(d => ({ ...d, quickNarrativeMode: value })),
     genBusy: !!genProgress,
     imgParams, setImgParams,
@@ -6271,18 +6314,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
       >
         <style>{GLOBAL_STYLE}</style>
         <Suspense fallback={<BootScreen />}>
-          <OnboardingLanding
+          <OnboardingLandingProduct
             onEnter={completeLanding}
-            onEnterProfessional={() => {
-              setAppMode('diretor');
-              trackEvent('landing_enter_profissional');
-              completeLanding();
-            }}
-            onLogin={() => { setLoginHint(''); setLoginOpen(true); }}
-            isMobile={isMobile}
+            onLogin={() => { setLoginMode('login'); setLoginHint(''); setLoginOpen(true); }}
+            onRegister={() => { setLoginMode('register'); setLoginHint(''); setLoginOpen(true); }}
           />
           <LoginModal
             open={loginOpen}
+            initialMode={loginMode}
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
@@ -6328,10 +6367,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
             initialEmail={paywallEmail}
             loginHint={loginHint}
             onBack={reopenLanding}
-            onLogin={() => setLoginOpen(true)}
+            onLogin={() => { setLoginMode('login'); setLoginOpen(true); }}
+            onRegister={() => { setLoginMode('register'); setLoginOpen(true); }}
           />
           <LoginModal
             open={loginOpen}
+            initialMode={loginMode}
             onClose={() => setLoginOpen(false)}
             initialEmail={paywallEmail}
             hint={loginHint}
@@ -6344,7 +6385,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
   return (
     <div style={{
-      width:'100%', height:'100vh', background:'var(--bg-base)', color:'var(--text-primary)',
+      width:'100%', height:'100dvh', background:'var(--bg-base)', color:'var(--text-primary)',
       display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'var(--font-ui)',
       ...(activeProductKind === 'apresentacao' ? {
         '--accent-primary': '#d7ff5a',
@@ -6511,6 +6552,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 </button>
               </div>
             </div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, minWidth:0 }}>
+              <div style={{ minWidth:0, fontSize:12 }}>
+                <strong style={{ display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{activeEntry?.name || 'Novo projeto'}</strong>
+                <span style={{ color:'var(--text-muted)' }}>{brand.name === 'Padrão' ? 'Sem cliente definido' : (brand.name || brand.handle || 'Sem cliente definido')}</span>
+              </div>
+              {saveIndicator}
+            </div>
             {/* Linha 2 — ferramentas secundárias (modo / biblioteca / IA) */}
             <div style={{
               display: 'flex',
@@ -6559,12 +6607,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   {activeEntry.name || 'Sem título'}
                 </button>
                 {!headerTight && (
-                  <SavedIndicator
-                    savedAt={lastSavedAt}
-                    unsaved={cloudUnsaved}
-                    notice={remoteProjectNotice}
-                    onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }}
-                  />
+                  <>{remoteProjectNotice ? <SavedIndicator savedAt={lastSavedAt} notice={remoteProjectNotice} onUpdate={() => { setRemoteProjectNotice(null); syncProjectLibrary('sync'); }} /> : saveIndicator}</>
                 )}
                 <button
                   type="button"
@@ -6778,7 +6821,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
           </div>
 
           {/* ── MAIN CANVAS AREA ── */}
-          <div ref={boardScrollRef} style={{ flex:1, overflow:'auto' }}>
+          {!empty && <CanvasNavigator zoom={canvasZoom} onZoom={changeZoom} onFit={() => {
+            const root = boardScrollRef.current;
+            if (!root) return;
+            changeZoom(Math.min(1, (root.clientWidth - (isMobile ? 56 : 96)) / (f.w * previewBaseScale), (root.clientHeight - (isMobile ? 108 : 110)) / (f.h * previewBaseScale)));
+            setBoardJump(n => n + 1);
+          }} index={activeIdx} count={slides.length} isPresentation={isPresentationProject} onNavigate={index => { setActiveIdx(index); setBoardJump(n => n + 1); }} />}
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
+          <div id="vc-cards-viewport" className="vc-cards-viewport" ref={boardScrollRef} style={{ flex:1, minWidth:0, overflow:'auto', overscrollBehavior:'contain', touchAction:'pan-x pan-y' }}>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{
@@ -6862,6 +6912,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     Apresentação organiza contexto, argumento e evidência em slides.
                   </p>
                   )}
+                  {appMode === 'criador' && <div style={{ marginBottom:16, textAlign:'left', display:'grid', gap:12 }}>
+                    <GenerationScopePicker value={hasOpenAI ? (doc.quickGenerationScope || 'text') : 'text'} onChange={value => history.set(d => ({ ...d, quickGenerationScope:value }))} hasImages={hasOpenAI} disabled={!!genProgress} />
+                    <label style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:12 }}>Quantidade de páginas
+                      <select className="vc-input" aria-label="Quantidade de páginas" value={quickCardCount} onChange={event => setQuickCardCount(event.target.value)} style={{ width:130 }}>
+                        <option value="auto">Pelo pedido</option>
+                        {Array.from({length:24}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                      </select>
+                    </label>
+                  </div>}
                   <div style={{ display:'flex', flexDirection:'column', gap:10, width: '100%' }}>
                     <button
                       type="button"
@@ -6873,7 +6932,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                             document.querySelector('[data-vc-center-prompt]')?.focus?.();
                             return;
                           }
-                          handleQuickGenerateFromNarrativa(topic, { productKind: 'carrossel' });
+                          handleQuickGenerateFromNarrativa(topic, { productKind: 'carrossel', cardCount:quickCardCount, narrativeMode:doc.quickNarrativeMode || 'none' });
                           return;
                         }
                         generateProjectByKind('carrossel');
@@ -6916,7 +6975,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                             document.querySelector('[data-vc-center-prompt]')?.focus?.();
                             return;
                           }
-                          handleQuickGenerateFromNarrativa(topic, { productKind: 'apresentacao' });
+                          handleQuickGenerateFromNarrativa(topic, { productKind: 'apresentacao', cardCount:quickCardCount });
                           return;
                         }
                         generateProjectByKind('apresentacao');
@@ -7014,15 +7073,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
               <div
                 style={{
                   display:'flex', flexDirection:'column', alignItems:'center',
-                  padding:'16px 12px calc(108px + env(safe-area-inset-bottom, 0))',
+                  padding:'16px 44px calc(108px + env(safe-area-inset-bottom, 0)) 12px',
+                  minWidth: Math.max(vw, f.w * previewScale + 56), boxSizing: 'border-box',
                   minHeight:'100%', position:'relative',
                 }}
                 onTouchStart={e => {
-                  if (canvasEditMode) return;
+                  if (canvasEditMode || canvasZoom > 1 || e.touches.length > 1) return;
                   e.currentTarget.dataset.tx = String(e.touches[0].clientX);
                 }}
                 onTouchEnd={e => {
-                  if (canvasEditMode) return;
+                  if (canvasEditMode || canvasZoom > 1 || boardScrollRef.current?.dataset.pinching || e.touches.length) return;
                   const start = parseFloat(e.currentTarget.dataset.tx || '0');
                   const dx = e.changedTouches[0].clientX - start;
                   if (Math.abs(dx) > 50) {
@@ -7031,7 +7091,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   }
                 }}
               >
-                <div
+                <div data-canvas-card data-canvas-active="true"
                   style={{
                     animation:'fadeUp 0.2s var(--ease-smooth)',
                     position:'relative',
@@ -7181,19 +7241,19 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     <button
                       type="button"
                       onClick={() => setCaptionEditorIdx(activeIdx)}
-                      title="Ver e editar legenda deste card"
+                      title={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
                       aria-label={`Legenda do card ${activeIdx + 1}`}
                       style={{
                         minWidth:36, minHeight:36, borderRadius:9999, cursor:'pointer',
-                        background: String(slide?.caption || '').trim() ? 'var(--accent-surface)' : 'transparent',
+                        background: String(isPresentationProject ? slide?.caption || '' : caption).trim() ? 'var(--accent-surface)' : 'transparent',
                         border:'none',
-                        color: String(slide?.caption || '').trim() ? 'var(--accent)' : 'var(--text-secondary)',
+                        color: String(isPresentationProject ? slide?.caption || '' : caption).trim() ? 'var(--accent)' : 'var(--text-secondary)',
                         display:'inline-flex', alignItems:'center', justifyContent:'center',
                         transition:'background 0.12s, color 0.12s',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background='var(--bg-pearl)'; e.currentTarget.style.color='var(--text-primary)'; }}
                       onMouseLeave={e => {
-                        const has = String(slide?.caption || '').trim();
+                        const has = String(isPresentationProject ? slide?.caption || '' : caption).trim();
                         e.currentTarget.style.background = has ? 'var(--accent-surface)' : 'transparent';
                         e.currentTarget.style.color = has ? 'var(--accent)' : 'var(--text-secondary)';
                       }}
@@ -7325,6 +7385,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   <div
                     key={s.id}
                     ref={(el) => { boardCardRefs.current[i] = el; }}
+                    data-canvas-card
+                    data-canvas-active={i === activeIdx ? 'true' : undefined}
                     style={{ flexShrink:0, animation:`fadeUp 0.2s ${i*0.04}s both var(--ease-smooth)` }}
                     onDragOver={(e) => {
                       if (!canvasEditMode) return;
@@ -7414,19 +7476,19 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         ><Maximize2 size={11}/></button>
                         <button
                           onClick={(e)=>{ e.stopPropagation(); setActiveIdx(i); setCaptionEditorIdx(i); }}
-                          title="Ver e editar legenda deste card"
+                          title={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
                           aria-label={`Legenda do card ${i+1}`}
                           style={{
-                            background: String(s.caption || '').trim() ? 'var(--accent-surface)' : 'none',
+                            background: String(isPresentationProject ? s.caption || '' : caption).trim() ? 'var(--accent-surface)' : 'none',
                             border:'none',
-                            color: String(s.caption || '').trim() ? 'var(--accent)' : 'var(--text-muted)',
+                            color: String(isPresentationProject ? s.caption || '' : caption).trim() ? 'var(--accent)' : 'var(--text-muted)',
                             cursor:'pointer', padding:6, borderRadius:6, transition:'color 0.12s, background 0.12s',
                             display:'inline-flex', alignItems:'center', justifyContent:'center',
                             minWidth:32, minHeight:32,
                           }}
                           onMouseEnter={e=>e.currentTarget.style.color='var(--text-primary)'}
                           onMouseLeave={e=>{
-                            const has = String(s.caption || '').trim();
+                            const has = String(isPresentationProject ? s.caption || '' : caption).trim();
                             e.currentTarget.style.color = has ? 'var(--accent)' : 'var(--text-muted)';
                           }}
                         ><AlignLeft size={11}/></button>
@@ -7518,6 +7580,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
             )}
           </div>
 
+          {isMobile && !empty && !drawerOpen && <MobileScrollRail scrollRef={boardScrollRef} watchKey={`${activeDocId}:${activeIdx}:${canvasZoom}:${fmt}`} />}
+          </div>
+
           {/* Mobile bottom bar — tabs sempre visíveis (também no empty) + Exportar
               compacto. Chrome claro alinhado ao DS Figma (sem glow saturado). */}
           {isMobile && !drawerOpen && (
@@ -7540,7 +7605,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 WebkitOverflowScrolling:'touch',
                 scrollbarWidth:'none',
               }}>
-              {visibleEditorTabs(appMode).map(({ id, label, icon:Icon }) => {
+              {[...visibleEditorTabs(appMode).filter(item => ['narrativa', 'texto', 'imagem'].includes(item.id)).sort((a, b) => ['narrativa', 'texto', 'imagem'].indexOf(a.id) - ['narrativa', 'texto', 'imagem'].indexOf(b.id)), { id:'home', label:'Mais', icon:Layers }].map(({ id, label, icon:Icon }) => {
                 const active = tab === id;
                 return (
                   <button
@@ -7549,10 +7614,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     className="vc-pressable"
                     onClick={() => { setTab(id); setDrawerOpen(true); }}
                     style={{
-                      flex:'1 0 auto',
-                      minWidth:56,
+                      flex:'1 1 0',
+                      minWidth:44,
                       minHeight:56,
-                      padding:'6px 8px',
+                      padding:'6px 1px',
                       borderRadius:12,
                       border: active
                         ? '1px solid var(--accent)'
@@ -7561,7 +7626,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         ? 'var(--accent-surface)'
                         : 'transparent',
                       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-                      fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
+                      fontSize:11, fontWeight:600, fontFamily:'var(--font-ui)', cursor:'pointer',
                       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
                       letterSpacing:'-0.011em',
                       transition:'background 0.15s var(--ease-smooth), border-color 0.15s, color 0.15s',
@@ -7576,28 +7641,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               })}
               </div>
               {!empty && (
-              <button
-                type="button"
-                className="vc-pressable"
-                onClick={() => exportSlide(activeIdx)}
-                disabled={exporting}
-                style={{
-                  alignSelf:'center',
-                  width:56, height:56, borderRadius:9999,
-                  border:'none', cursor: exporting ? 'wait' : 'pointer',
-                  background:'var(--accent)', color:'var(--accent-on-dark, #fff)',
-                  display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1,
-                  letterSpacing:'-0.011em',
-                  opacity:exporting?0.5:1,
-                  flexShrink:0,
-                  transition:'transform 0.12s var(--ease-smooth), opacity 0.15s',
-                }}
-                aria-label="Exportar card atual"
-                title="Exportar"
-              >
-                <Download size={18} strokeWidth={2.4}/>
-                <span style={{ fontSize:8, fontWeight:700, letterSpacing:'0.04em' }}>PNG</span>
-              </button>
+              <ExportMoreFormats slides={slides} isPresentation={isPresentationProject} exporting={exporting} exportProgress={exportProgress} activeIdx={activeIdx} onExportSlide={exportSlide} onExportAll={exportAll} onExportPDF={exportPDF} onExportPhotosOnly={exportPhotosOnly} align="right" caption={caption} genCaption={genCaption} onGenerateCaption={generateCaption} onCopyCaption={handleCopyCaption} onExportPackage={handleExportPackage} onExportBackup={() => exportDoc(activeDocId)} />
               )}
             </nav>
           )}
@@ -7792,6 +7836,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
         open={imgPrompt.open}
         title={imgPrompt.title || 'Editar'}
         label={imgPrompt.label}
+        brands={imgPrompt.brands}
+        initialBrandId={imgPrompt.initialBrandId}
         defaultValue={imgPrompt.defaultValue || ''}
         placeholder={imgPrompt.placeholder || ''}
         cta={imgPrompt.cta || 'Aplicar'}
@@ -7856,21 +7902,22 @@ Retorne APENAS JSON: ${refineAllWantsBody
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}
         creativePreset={creativePreset}
-        caption={slides[activeIdx]?.caption || ''}
+        caption={isPresentationProject ? (slides[activeIdx]?.caption || '') : caption}
         setCaption={(value) => {
           const next = typeof value === 'function'
-            ? value(slides[activeIdx]?.caption || '')
+            ? value(isPresentationProject ? (slides[activeIdx]?.caption || '') : caption)
             : value;
-          updateSlideAt(activeIdx, { caption: String(next ?? '') });
+          if (isPresentationProject) updateSlideAt(activeIdx, { caption: String(next ?? '') });
+          else setCaption(String(next ?? ''));
         }}
-        captionLabel="Legenda deste card"
+        captionLabel={isPresentationProject ? "Notas deste slide" : "Legenda da publicação"}
       />
       {captionEditorIdx != null && slides[captionEditorIdx] ? (
         <div
           className="modal-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label={`Legenda do card ${captionEditorIdx + 1}`}
+          aria-label={isPresentationProject ? `Notas do slide ${captionEditorIdx + 1}` : "Legenda da publicação"}
           onClick={() => setCaptionEditorIdx(null)}
           style={{ zIndex: 1200 }}
         >
@@ -7885,7 +7932,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>
-                  Legenda · card {String(captionEditorIdx + 1).padStart(2, '0')}
+                  {isPresentationProject ? `Notas · slide ${captionEditorIdx + 1}` : 'Legenda da publicação'}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                   Não aparece no visual do card — só para publicar / copiar.
@@ -7905,9 +7952,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 className="vc-input vc-textarea"
                 autoFocus
                 rows={7}
-                value={slides[captionEditorIdx].caption || ''}
-                onChange={(e) => updateSlideAt(captionEditorIdx, { caption: e.target.value })}
-                placeholder="Escreva a legenda deste card e as hashtags…"
+                value={isPresentationProject ? (slides[captionEditorIdx].caption || '') : caption}
+                onChange={(e) => isPresentationProject ? updateSlideAt(captionEditorIdx, { caption: e.target.value }) : setCaption(e.target.value)}
+                placeholder={isPresentationProject ? "Notas deste slide…" : "Escreva a legenda da publicação…"}
                 style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 140 }}
               />
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -7915,10 +7962,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   type="button"
                   className="vc-btn vc-btn-ghost"
                   style={{ minHeight: 36, fontSize: 12 }}
-                  onClick={() => {
-                    const text = String(slides[captionEditorIdx]?.caption || '').trim();
-                    if (text) navigator.clipboard?.writeText(text);
-                    toast?.(text ? 'Legenda copiada.' : 'Legenda vazia.', text ? 'success' : 'info', 2500);
+                  onClick={async () => {
+                    const text = String(isPresentationProject ? slides[captionEditorIdx]?.caption || '' : caption).trim();
+                    if (!text) { toast('Texto vazio.', 'info', 2500); return; }
+                    try {
+                      await copyTextToClipboard(text);
+                      toast(isPresentationProject ? 'Notas copiadas.' : 'Legenda da publicação copiada.', 'success', 2500);
+                    } catch {
+                      toast('Não foi possível copiar. Selecione o texto e copie novamente.', 'error', 4000);
+                    }
                   }}
                 >
                   <Copy size={13} /> Copiar
