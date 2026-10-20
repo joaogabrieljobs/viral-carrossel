@@ -16,6 +16,7 @@ import { downloadBlob, vcPrepareHtml2CanvasClone, downloadCanvasPng } from '../u
 import { trackEvent } from '../utils/telemetry.js';
 import { blobFromSlideRef } from '../utils/ai-client.js';
 import { waitForExportFonts } from '../utils/export-fonts.js';
+import { waitForPhotoFraming } from '../utils/photo-framing.js';
 
 // O editor carrega seus exportadores junto com a própria versão. Buscar um
 // chunk só no clique falhava em abas abertas durante um novo deploy.
@@ -149,6 +150,7 @@ export async function waitForExportReadiness({
   await waitForFonts((Array.isArray(roots) ? roots : []).filter(Boolean));
 
   await waitForFrames();
+  await waitForPhotoFraming(roots);
 
   // Confirma os assets realmente montados depois do paint do renderer.
   await waitForAssets((Array.isArray(roots) ? roots : []).filter(Boolean), {

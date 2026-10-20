@@ -74,6 +74,7 @@ function FullscreenViewer({
   setCaption = null,
   captionLabel = 'Legenda deste card',
   formatViews = null,
+  displaySlides = null,
 }) {
   useScrollLock(open);
   const touchRef = useRef({ x:0, y:0 });
@@ -246,7 +247,7 @@ function FullscreenViewer({
       {/* Slide */}
       <div style={{ pointerEvents:'none' }}>
         <SlideCard
-          slide={slideForFormatDisplay(activeSlideFs, fmt, formatViews, creativePreset)} fmt={fmt} brand={brand}
+          slide={displaySlides?.[activeIdx] || slideForFormatDisplay(activeSlideFs, fmt, formatViews, creativePreset)} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
           creativePreset={creativePreset}
           showCanvasChrome={false}

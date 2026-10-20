@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, RotateCcw, Move, FlipHorizontal2 } from 'lucide-react';
+import { X, RotateCcw, Move, FlipHorizontal2, Scan } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
 import { FORMATS } from '../utils/formats.js';
 
@@ -12,8 +12,10 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
   useScrollLock(open);
   const dragRef = React.useRef(null);
   const previewRef = React.useRef(null);
+  const naturalRef = React.useRef({ width: 0, height: 0 });
   const f = FORMATS[fmt] || FORMATS.carrossel;
-  const aspect = f.w / f.h;
+  const photo = (slide?.canvas?.enabled || slide?.canvas?.applied) && slide.canvas?.zones?.photo;
+  const aspect = (f.w * (photo?.w || 100)) / (f.h * (photo?.h || 100));
   if (!open || !slide?.bgImage) return null;
   const bgX = slide.bgX ?? 50;
   const bgY = slide.bgY ?? 50;
@@ -38,11 +40,13 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
     if (!st || st.pointerId !== e.pointerId) return;
     const dxPx = e.clientX - st.startClientX;
     const dyPx = e.clientY - st.startClientY;
-    // Mover a foto pra direita visualmente = bgX diminui (objectPosition mostra o lado esquerdo da foto)
-    // Inversão dx/dy x sinal pra UX intuitiva (arrasta foto = foto vai junto):
-    const factor = 100 / Math.max(1, bgZoom / 100);
-    let nextX = st.startBgX - (dxPx / st.rect.width) * 100 * factor;
-    let nextY = st.startBgY - (dyPx / st.rect.height) * 100 * factor;
+    const natural = naturalRef.current;
+    const cover = Math.max(st.rect.width / natural.width, st.rect.height / natural.height) * bgZoom / 100;
+    const overflowX = natural.width * cover - st.rect.width;
+    const overflowY = natural.height * cover - st.rect.height;
+    // A distância arrastada é relativa à sobra da foto, como background-position.
+    let nextX = st.startBgX - (overflowX > 1 ? dxPx / overflowX * 100 : 0);
+    let nextY = st.startBgY - (overflowY > 1 ? dyPx / overflowY * 100 : 0);
     nextX = Math.max(0, Math.min(100, nextX));
     nextY = Math.max(0, Math.min(100, nextY));
     onChange({ bgX: Math.round(nextX), bgY: Math.round(nextY) });
@@ -53,7 +57,7 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
   const previewW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 48 : 520);
   const previewH = Math.round(previewW / aspect);
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Posicionar foto">
       <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: previewW + 48 }}>
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -62,7 +66,7 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
         }}>
           <div>
             <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Posicionar foto</div>
-            <div className="vc-eyebrow">Arraste a foto para mover · use o zoom abaixo</div>
+            <div className="vc-eyebrow">{slide.autoPhotoPending ? 'Ajustando enquadramento…' : 'Arraste a foto para mover · use o zoom abaixo'}</div>
           </div>
           <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
             <X size={16}/>
@@ -89,6 +93,9 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
               src={slide.bgImage}
               alt=""
               draggable={false}
+              onLoad={event => { naturalRef.current = {
+                width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight,
+              }; }}
               style={{
                 position:'absolute', inset:0, width:'100%', height:'100%',
                 objectFit:'cover',
@@ -136,6 +143,18 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
             />
           </div>
 
+          <button
+            type="button"
+            className="vc-btn vc-btn-secondary"
+            disabled={slide.autoPhotoPending}
+            aria-pressed={slide.photoFraming === 'auto'}
+            onClick={() => onChange({ photoFraming: 'auto', bgFit: 'cover', bgZoom: 100, bgX: 50, bgY: 50 })}
+          >
+            <Scan size={16} aria-hidden/> Priorizar assunto
+          </button>
+          <div className="vc-text-helper">
+            O enquadramento automático procura preservar a parte principal da foto. Arraste para escolher outro enquadramento.
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
             <button
               type="button"

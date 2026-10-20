@@ -51,6 +51,7 @@ export function presentationForSocialFormat(source, fmt) {
     align: 'left',
     photoRegion: 'full',
     bgFit: 'cover',
+    photoFraming: 'auto',
     bgZoom: 100,
     bgOpacity: 100,
     overlay: hasPhoto ? Math.max(64, Number(source.overlay) || 0) : 0,

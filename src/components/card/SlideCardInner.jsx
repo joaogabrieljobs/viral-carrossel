@@ -3767,6 +3767,7 @@ const SlideCardInner = React.forwardRef(({
     <div
       ref={cardSurfaceRef}
       data-vc-card-surface={slide.id}
+      data-vc-framing-pending={slide.autoPhotoPending ? 'true' : undefined}
       onPointerDownCapture={onCreateText && !forExport ? (event) => {
         if (!event.ctrlKey || event.button !== 0) return;
         event.preventDefault();

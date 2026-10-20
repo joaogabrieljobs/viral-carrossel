@@ -90,6 +90,7 @@ import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/libr
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
+import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
 import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
@@ -3464,14 +3465,12 @@ export default function App() {
   }, [isMobile, vw, f, fmt, thumbQaMode]);
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
-  const displaySlides = useMemo(
+  const formatSlides = useMemo(
     () => slides.map((item) => slideForFormatDisplay(item, fmt, doc.formatViews, creativePreset)),
     [slides, fmt, doc.formatViews, creativePreset],
   );
-  const panelSlide = useMemo(
-    () => slideForFormatDisplay(slide, fmt, doc.formatViews, creativePreset),
-    [slide, fmt, doc.formatViews, creativePreset],
-  );
+  const displaySlides = usePhotoFraming(formatSlides, fmt);
+  const panelSlide = displaySlides[activeIdx] || displaySlides[0] || slide;
   const displayBrand = useMemo(
     () => brandForFormatDisplay(brand, fmt, doc.formatViews, creativePreset),
     [brand, fmt, doc.formatViews, creativePreset],
@@ -3773,8 +3772,13 @@ export default function App() {
   }, [history]);
 
   const patchElementOffsetAt = useCallback((idx, chave, offset) => {
-    history.set((d) => applyFormatEdit(d, idx, { elementOffsets: { [chave]: offset } }));
-  }, [history]);
+    history.set((d) => {
+      const viewed = displaySlides[idx];
+      const anchor = chave === 'photo' && viewed?.photoFraming === 'auto' && viewed.id === d.slides?.[idx]?.id
+        ? { bgX: viewed.bgX, bgY: viewed.bgY } : {};
+      return applyFormatEdit(d, idx, { ...anchor, elementOffsets: { [chave]: offset } });
+    });
+  }, [history, displaySlides]);
 
   const patchCanvasZonesAt = useCallback((idx, zonePatch) => {
     history.set((d) => {
@@ -7808,10 +7812,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
       />
       <PhotoPositionModal
         open={photoPositionOpen}
-        slide={panelSlide}
+        slide={{ ...panelSlide,
+          bgX: Math.max(0, Math.min(100, (panelSlide.bgX ?? 50) - (panelSlide.elementOffsets?.photo?.x || 0))),
+          bgY: Math.max(0, Math.min(100, (panelSlide.bgY ?? 50) - (panelSlide.elementOffsets?.photo?.y || 0))),
+        }}
         fmt={fmt}
         onClose={() => setPhotoPositionOpen(false)}
-        onChange={(patch) => updateSlide(patch)}
+        onChange={(patch) => updateSlide({
+          bgX: Math.max(0, Math.min(100, (panelSlide.bgX ?? 50) - (panelSlide.elementOffsets?.photo?.x || 0))),
+          bgY: Math.max(0, Math.min(100, (panelSlide.bgY ?? 50) - (panelSlide.elementOffsets?.photo?.y || 0))),
+          ...patch,
+          elementOffsets: { photo: { x: 0, y: 0 } },
+        })}
       />
       <OnboardingTour
         open={tourOpen}
@@ -7839,6 +7851,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <FullscreenViewer
         open={fullscreenOpen} onClose={()=>setFullscreenOpen(false)}
         slides={slides} fmt={fmt} brand={displayBrand}
+        displaySlides={displaySlides}
         formatViews={doc.formatViews}
         activeIdx={activeIdx} setActiveIdx={setActiveIdx}
         onSavePresentationAdjust={persistFullscreenPresentationAdjustDraft}

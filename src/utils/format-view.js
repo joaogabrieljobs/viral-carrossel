@@ -4,7 +4,7 @@ import { hasPresentationDesign, presentationForSocialFormat } from './presentati
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
-  'layout', 'align', 'photoRegion', 'bgFit',
+  'layout', 'align', 'photoRegion', 'bgFit', 'photoFraming',
   'bgX', 'bgY', 'bgZoom', 'bgMirror', 'bgOpacity', 'overlay',
   'textShadow', 'textBg', 'textBgOpacity', 'textInset', 'textBlockWidth',
   'titleSize', 'subSize', 'bodyAfterSize',
@@ -140,6 +140,11 @@ export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
     ? presentationForSocialFormat(slideForFormatDisplay(slide, 'apresentacao', formatViews), fmt)
     : slide;
   const next = { ...base, ...entry };
+  // Ajustes já gravados antes da opção automática também são escolhas manuais.
+  if (adaptPresentation && !entry.photoFraming
+    && (['bgX', 'bgY', 'bgZoom', 'bgFit'].some(key => Object.hasOwn(entry, key)) || entry.elementOffsets?.photo)) {
+    next.photoFraming = 'manual';
+  }
   if (!adaptPresentation) {
     const factor = formatFitFactor(fmt);
     if (entry.titleSize == null) next.titleSize = clampSize((slide.titleSize ?? 100) * factor);
@@ -199,6 +204,9 @@ export function applyFormatEdit(doc, index, patch) {
   if (!slide) return doc;
   const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
   const rest = { ...patch };
+  if (!rest.photoFraming && (
+    ['bgX', 'bgY', 'bgZoom', 'bgFit'].some(key => rest[key] !== undefined) || rest.elementOffsets?.photo
+  )) rest.photoFraming = 'manual';
   const view = {};
   if (fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset)) {
     for (const key of VIEW_KEYS) {

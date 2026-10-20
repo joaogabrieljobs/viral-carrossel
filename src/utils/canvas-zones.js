@@ -24,8 +24,8 @@ function slideAutoAdjustPatch(slide, { creativePreset, fmt = 'carrossel' }) {
 
   if (slide.bgImage) {
     if (slide.bgFit !== 'cover') patch.bgFit = 'cover';
-    if ((slide.bgX ?? 50) !== 50) patch.bgX = 50;
-    if ((slide.bgY ?? 50) !== 50) patch.bgY = 50;
+    if (!slide.photoFraming && (slide.bgX ?? 50) !== 50) patch.bgX = 50;
+    if (!slide.photoFraming && (slide.bgY ?? 50) !== 50) patch.bgY = 50;
     if ((slide.bgZoom ?? 100) !== 100) patch.bgZoom = 100;
   }
 
