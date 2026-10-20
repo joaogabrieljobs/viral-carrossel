@@ -171,7 +171,7 @@ describe('modo Apresentação', () => {
     expect(app).toContain("if (activeProductKind === 'apresentacao') {\n      setTemplatesOpen(false);");
     expect(app).toContain('const newSlide = applyPresentationVisualPresetToSlide(\n        seed');
     expect(app).toContain('setSlides([\n        ...slides,\n        { ...newSlide');
-    expect(app).toContain('setActiveIdx(0);\n    setSelectedCardElement(null);\n    setEditingTextArea(null);\n  }, [activeDocId])');
+    expect(app).toContain('setActiveIdx(0);\n    setSelectedCardElement(null);\n    setEditorFocus(null);\n    setEditingTextArea(null);\n  }, [activeDocId])');
     expect(app).toContain('setLibraryOpen, toast, setError, visualPresets,');
     expect(libraryHook).toContain('presentationPresetId,\n          visualPresets,\n          { initialize: true }');
     expect(libraryHook).toContain('carouselPresetId,\n              visualPresets,\n              { fmt: baseSeed.fmt }');

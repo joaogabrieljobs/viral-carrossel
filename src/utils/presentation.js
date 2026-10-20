@@ -6,7 +6,7 @@
  * decisões para a UI e os prompts não precisarem inferi-las por texto solto.
  */
 
-import { buildPitchStrategyBlock, buildPitchFieldRules, PITCH_PROVENANCE_RULE } from './pitch-content.js';
+import { buildPitchStrategyBlock, buildPitchFieldRules, buildPitchEvidenceRules, PITCH_PROVENANCE_RULE } from './pitch-content.js';
 
 export const APRESENTACAO_PRESET_ID = 'apresentacao';
 export const PRESENTATION_PRODUCT_KIND = 'apresentacao';
@@ -77,10 +77,10 @@ export const PRESENTATION_PATHS = Object.freeze([
       { label: 'MODELO DE NEGÓCIO', instruction: 'Mostre pagador, lógica de receita e preço somente quando informados.', visualRole: 'diagram' },
       { label: 'ALTERNATIVAS E VANTAGEM', instruction: 'Compare concorrentes e solução atual; declare a vantagem sem caricaturar as opções.', visualRole: 'comparison', evidenceRequired: true },
       { label: 'AQUISIÇÃO', instruction: 'Explique como o público chega ao produto e qual hipótese ainda precisa ser validada.' },
-      { label: 'EQUIPE', instruction: 'Mostre por que este time tem capacidade específica para executar a proposta.', visualRole: 'people' },
+      { label: 'EQUIPE', instruction: 'Relacione experiência real e responsabilidades à execução; sem dados de equipe, não invente competências nem uma página genérica.', visualRole: 'people', optionalWhenMissing: true },
       { label: 'MARCOS E RECURSOS', instruction: 'Relacione plano, uso dos recursos e marco financiado; não invente projeções.' },
       { label: 'PEDIDO', instruction: 'Declare valor, recurso, decisão ou próximo encontro e o que ele viabiliza.', visualRole: 'decision' },
-      { label: 'VISÃO DE FUTURO', instruction: 'Feche com a nova realidade possível se o plano for executado.', density: 'minimal', visualRole: 'vision' },
+      { label: 'DECISÃO E PRÓXIMO PASSO', instruction: 'Feche com o avanço solicitado e o que ele viabiliza; inclua contato somente se informado. Não termine só com fotografia, logo ou promessa abstrata.', visualRole: 'decision' },
     ],
   }),
   path({
@@ -368,6 +368,6 @@ export function buildApresentacaoIntroLine() {
 
 export function buildApresentacaoRefineHint(pathId = DEFAULT_PRESENTATION_PATH_ID) {
   const route = getPresentationPath(pathId);
-  if (route.id === 'pitch') return `Pacote Apresentação 16:9 (Pitch):\n${buildPitchFieldRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
+  if (route.id === 'pitch') return `Pacote Apresentação 16:9 (Pitch):\n${buildPitchFieldRules()}\n${buildPitchEvidenceRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
   return `- Pacote Apresentação 16:9 (${route.label}): capa pode ter title curto; conteúdo usa title como afirmação-conclusão em até duas linhas e subtitle apenas como apoio breve. Prefira evidência visual; bodyAfterImage só para fonte/ressalva/instrução. Preserve o caminho do deck e não use sanduíche de foto, bullets simulados ou CTAs de Instagram.`;
 }

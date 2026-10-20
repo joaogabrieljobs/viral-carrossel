@@ -256,20 +256,25 @@ export function applyEditorialReview(draft, review, config) {
  */
 export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview }, callAI) {
   const isPresentation = config?.presetId === 'apresentacao';
+  const textOptions = {
+    ...aiOptions,
+    ...(isPresentation && isPitchPath(config.presentationPath) ? { contentMode: 'pitch' } : {}),
+    json: true,
+  };
   // Entregue os limites ao primeiro rascunho, quando ainda há liberdade para
   // estruturar cada slide. A revisão continua sendo a segunda barreira, mas
   // não deve ser a primeira vez que a IA descobre quanto texto realmente cabe.
   const generationPrompt = isPresentation
     ? `${prompt}${buildPresentationLimitsBlock(config, config?.count || 0)}`
     : prompt;
-  const draft = validateCarouselDraft(await callAI(generationPrompt, { ...aiOptions, json: true }), config);
+  const draft = validateCarouselDraft(await callAI(generationPrompt, textOptions), config);
   const draftLimitViolations = isPresentation
     ? auditPresentationTextLimits(draft.slides, config?.presentationTextLimits)
     : [];
   throwIfGenerationCancelled(aiOptions?.signal);
   onReview?.();
   try {
-    const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), { ...aiOptions, json: true });
+    const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
     const result = applyEditorialReview(draft, review, config);
     return { result, reviewStatus: JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised' };
   } catch (error) {

@@ -11,6 +11,7 @@ import { extractJSON } from './parsers.js';
 import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
+import { PITCH_SYSTEM_PT } from './pitch-content.js';
 
 // Acima do orçamento do proxy (240 s em api/ai/compatible.js): se o cliente
 // abortasse primeiro, o utilizador perdia uma geração que o servidor ainda ia
@@ -121,11 +122,11 @@ const parseStructuredText = (text, json, jsonParser) => (
   json ? (typeof jsonParser === 'function' ? jsonParser(text) : extractJSON(text)) : text.trim()
 );
 
-const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal } = {}) => {
+const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal, systemPrompt = AI_SYSTEM_PT } = {}) => {
   const body = {
     model: getTextModel('anthropic'),
     max_tokens: maxTokens,
-    system: AI_SYSTEM_PT,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userMsg }],
   };
   if (tools) body.tools = tools;
@@ -175,7 +176,7 @@ const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxToke
 };
 
 // Backend OpenAI — Chat Completions com a família GPT-5.6.
-const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, key, signal }) => {
+const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, key, signal, systemPrompt = AI_SYSTEM_PT }) => {
   key = String(key || getProviderKey('openai')).trim();
   // Em local dev, o proxy usa a chave do .env.local quando o frontend não envia uma.
   // Fora do dev (Claude artifact), a chave é obrigatória.
@@ -184,7 +185,7 @@ const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTok
     model: getTextModel('openai'),
     max_completion_tokens: maxTokens,
     messages: [
-      { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.` },
+      { role: 'system', content: `${systemPrompt} Responda APENAS o que foi pedido, sem texto extra, sem markdown explicativo.` },
       { role: 'user',   content: userMsg },
     ],
   };
@@ -255,7 +256,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, jsonParser = null, maxTokens = 4096, signal } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -268,7 +269,7 @@ const callCompatibleChat = async (
   const basePayload = {
     max_tokens: maxTokens,
     messages: [
-      { role: 'system', content: `${AI_SYSTEM_PT} Responda APENAS o que foi pedido, sem texto extra.` },
+      { role: 'system', content: `${systemPrompt} Responda APENAS o que foi pedido, sem texto extra.` },
       { role: 'user', content: userMsg },
     ],
     temperature: 0.8,
@@ -346,18 +347,19 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+  const systemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT : AI_SYSTEM_PT;
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
   if (provider === 'kimi' && !getProviderKey('kimi')) provider = 'zai';
 
-  if (provider === 'anthropic') return callAnthropic(userMsg, { json, jsonParser, maxTokens, signal });
+  if (provider === 'anthropic') return callAnthropic(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt });
   if (provider === 'openai') {
-    return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, key: getProviderKey('openai') || openaiKey });
+    return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);

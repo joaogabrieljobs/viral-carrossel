@@ -14,7 +14,7 @@ function between(code, start, end) {
 describe('isolamento das logos de marca, projeto e card', () => {
   it('não promove a logo do projeto para a identidade global durante a geração', () => {
     const app = source('ViralCarrossel.jsx');
-    const generation = between(app, 'const generationBrand =', 'const resolvedImgMode');
+    const generation = between(app, 'let generationBrand =', 'const resolvedImgMode');
     expect(generation).toContain('projectLogoAsset');
     expect(generation).not.toContain('brandLogoInsertPatch');
     expect(app).toContain('applyGenerationLogoPolicy(newSlides');

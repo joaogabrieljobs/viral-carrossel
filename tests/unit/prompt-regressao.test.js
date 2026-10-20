@@ -117,7 +117,7 @@ describe('montagem final dos prompts de texto', () => {
   });
 
   it('a geração usa a definição efetiva e só cria imagem quando a composição exige', () => {
-    expect(src).toContain('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef)');
+    expect(src).toContain('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId)');
     expect(src).toContain('resolvePresentationVisualPresetDefinition(\n      requestedVisualPreset');
     expect(src).toContain('? requestedVisualPresetDef.id');
     expect(src).toContain('compositionOverrides.presentationRequiresImage === true');
@@ -152,7 +152,10 @@ describe('montagem final dos prompts de texto', () => {
     expect(caption).toContain('buildCarouselTextContext(slides)');
     expect(caption).toContain('buildCaptionOutlineInstructions(mode, creativePreset)');
     expect(caption).not.toContain('8-12 linhas');
-    expect(src).toContain('buildGenerationSlideLayoutRules(effectiveMode, cp, td, count)');
-    expect(src).toContain('buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length)');
+    expect(src).toContain('buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId)');
+    expect(src).toContain('buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath)');
+    expect(src).toContain('buildGenerationLanguageLayer(cp, tone, effectiveMode, presentationPathId)');
+    expect(single).toContain("contentMode: isPresentationRefine && isPitchPath(presentationPath) ? 'pitch'");
+    expect(bulk).toContain("contentMode: refiningPresentation && isPitchPath(presentationPath) ? 'pitch'");
   });
 });

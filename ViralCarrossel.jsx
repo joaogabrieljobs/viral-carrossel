@@ -4832,9 +4832,9 @@ export default function App() {
     checkActive();
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
-    const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode)}
+    const langLayer = `${buildGenerationLanguageLayer(cp, tone, effectiveMode, presentationPathId)}
 Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
-    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()));
+    const imageLayer = buildGenerationImageLayer(cp, topic, n, audience, !!(styleKit.contextMd.trim() || styleKit.stylePrompt.trim()), presentationPathId);
     const slideLayoutRules = buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId);
     const tendenciaPackBlock = isTendenciaCulturaPreset(cp) ? buildTendenciaCulturaPackBlock(count, td) : '';
     const apresentacaoPackBlock = isPresentationGeneration
@@ -5442,7 +5442,7 @@ ${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset
 - Respeite a identidade verbal e o material acima.
 
 Retorne exatamente: ${singleJson}`,
-        { json:true, openaiKey, signal: job.signal }
+        { json:true, openaiKey, signal: job.signal, contentMode: isPresentationRefine && isPitchPath(presentationPath) ? 'pitch' : undefined }
       );
       throwIfGenerationCancelled(job.signal);
       const patch = {
@@ -5765,7 +5765,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           : '{"slides":[{"title":"...","subtitle":"..."}]}'}`;
       const r = await callAI(
         refinePrompt,
-        { json:true, openaiKey, signal: job.signal }
+        { json:true, openaiKey, signal: job.signal, contentMode: refiningPresentation && isPitchPath(presentationPath) ? 'pitch' : undefined }
       );
       throwIfGenerationCancelled(job.signal);
       if (!r?.slides?.length) throw new Error('IA não retornou slides');

@@ -808,8 +808,14 @@ function buildGenerationIntroLine(presetId) {
   return 'Crie conteúdo para Instagram alinhado ao contexto abaixo. Responda APENAS com JSON válido, sem markdown, sem texto extra.';
 }
 
-function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial') {
+function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial', presentationPath = 'auto') {
   if (presetId === 'apresentacao') {
+    if (isPitchPath(presentationPath)) return `REGRAS DE TEXTO — PITCH PARA LEITURA AUTÔNOMA:
+- Use o tom da marca (${tone || 'profissional, claro e direto'}) com precisão e respeito ao público. Clareza factual tem prioridade sobre provocação ou frase de efeito.
+- O título comunica uma conclusão sustentada ou uma hipótese explicitamente qualificada. O subtitle explica o mecanismo; bodyAfterImage acrescenta evidência, condição ou detalhe operacional.
+- Cada página deve responder a uma pergunta de negócio e acrescentar informação. Preserve os limites do contrato do Pitch, sem reduzir o desenvolvimento a uma legenda.
+- Quando houver etapas ou comparação, use poucas linhas reais com rótulos claros. Não simule tabelas com caracteres, nem listas com “·”.
+- Evite slogans repetidos, falsas dicotomias e promessas absolutas. Termine com decisão ou próximo passo sustentado.`;
     return `REGRAS DE TEXTO — APRESENTAÇÃO 16:9:
 - Escreva para leitura em tela e fala do apresentador: uma ideia central por slide, hierarquia clara e frases concretas.
 - Use o tom da marca (${tone || 'profissional, claro e direto'}) sem jargão de rede social, chamada para salvar, compartilhar ou comentar.
@@ -1055,8 +1061,14 @@ ${hookVisualHint}
 `;
 }
 
-function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false) {
+function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto') {
   if (presetId === 'apresentacao') {
+    if (isPitchPath(presentationPath)) return `imageQuery — APOIO VISUAL DO PITCH:
+• Use "" quando o argumento depende de fluxo, comparação, modelo comercial, métricas, marcos ou responsabilidades. Essas informações devem existir nos campos de texto editáveis.
+• Uma fotografia é opcional e deve esclarecer um uso ou contexto específico de “${topic}”. Não preencha todo o deck com retratos, cenas de rotina ou acessórios; não faça um complemento parecer o produto principal.
+• Demonstrações reais usam apenas materiais fornecidos. Não peça à IA para inventar screenshot, gráfico, cliente, equipe, depoimento ou evidência.
+• Se uma imagem for útil, descreva em INGLÊS, 8–15 palavras, com composição horizontal 16:9 e espaço para texto. Não desenhe texto, números, logo ou marca-d'água.
+• ${projectDirection ? 'Preserve a estética do brief nas imagens necessárias; ela não obriga fotografia em cada slide.' : 'Mantenha coerência visual nas imagens necessárias.'}`;
     const directionLine = projectDirection
       ? '• A estética, técnica e atmosfera descritas no brief do projeto têm prioridade.'
       : '• Mantenha uma linguagem visual coerente do primeiro ao último slide.';
