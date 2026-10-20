@@ -246,7 +246,7 @@ function FullscreenViewer({
       {/* Slide */}
       <div style={{ pointerEvents:'none' }}>
         <SlideCard
-          slide={slideForFormatDisplay(activeSlideFs, fmt, formatViews)} fmt={fmt} brand={brand}
+          slide={slideForFormatDisplay(activeSlideFs, fmt, formatViews, creativePreset)} fmt={fmt} brand={brand}
           num={activeIdx+1} total={slides.length} scale={realScale}
           creativePreset={creativePreset}
           showCanvasChrome={false}

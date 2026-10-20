@@ -1,5 +1,6 @@
 import { FORMATS } from './formats.js';
 import { LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
+import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -80,7 +81,7 @@ function clampSize(value) {
 }
 
 function viewEntry(formatViews, fmt, slideId) {
-  if (!fmt || fmt === 'carrossel' || !slideId) return null;
+  if (!fmt || !slideId) return null;
   const entry = formatViews?.[fmt]?.slides?.[slideId];
   return entry && typeof entry === 'object' ? entry : null;
 }
@@ -118,44 +119,56 @@ function mergeOverlayContent(canonical, saved) {
   return merged;
 }
 
-/** Marca desenhada nesta proporção. No feed é a marca salva. */
-export function brandForFormatDisplay(brand, fmt, formatViews) {
-  if (!brand || !fmt || fmt === 'carrossel' || !FORMATS[fmt]) return brand;
+/** Marca desenhada nesta proporção; apresentações herdam a identidade do 16:9. */
+export function brandForFormatDisplay(brand, fmt, formatViews, creativePreset) {
+  if (!brand || !fmt || !FORMATS[fmt]) return brand;
+  const source = creativePreset === 'apresentacao' && fmt !== 'apresentacao'
+    ? { ...brand, ...formatViews?.apresentacao?.brand }
+    : brand;
   const extra = formatViews?.[fmt]?.brand;
-  if (!extra || typeof extra !== 'object') return brand;
-  return { ...brand, ...extra };
+  if (!extra || typeof extra !== 'object') return source;
+  return { ...source, ...extra };
 }
 
-/** Slide só para desenhar. O objeto do documento continua o do feed. */
-export function slideForFormatDisplay(slide, fmt, formatViews) {
-  if (!slide || !fmt || fmt === 'carrossel' || !FORMATS[fmt]) return slide;
+/** Slide só para desenhar. A composição original do documento não muda. */
+export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
+  if (!slide || !fmt || !FORMATS[fmt]) return slide;
+  const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(slide, creativePreset);
+  if (fmt === 'carrossel' && !adaptPresentation) return slide;
   const entry = viewEntry(formatViews, fmt, slide.id) || {};
-  const next = { ...slide, ...entry };
-  const factor = formatFitFactor(fmt);
-  if (entry.titleSize == null) next.titleSize = clampSize((slide.titleSize ?? 100) * factor);
-  if (entry.subSize == null) next.subSize = clampSize((slide.subSize ?? 100) * factor);
-  if (entry.bodyAfterSize == null && slide.bodyAfterSize != null) {
-    next.bodyAfterSize = clampSize(slide.bodyAfterSize * factor);
+  const base = adaptPresentation
+    ? presentationForSocialFormat(slideForFormatDisplay(slide, 'apresentacao', formatViews), fmt)
+    : slide;
+  const next = { ...base, ...entry };
+  if (!adaptPresentation) {
+    const factor = formatFitFactor(fmt);
+    if (entry.titleSize == null) next.titleSize = clampSize((slide.titleSize ?? 100) * factor);
+    if (entry.subSize == null) next.subSize = clampSize((slide.subSize ?? 100) * factor);
+    if (entry.bodyAfterSize == null && slide.bodyAfterSize != null) {
+      next.bodyAfterSize = clampSize(slide.bodyAfterSize * factor);
+    }
   }
   if (entry.elementOffsets && typeof entry.elementOffsets === 'object') {
-    next.elementOffsets = { ...(slide.elementOffsets || {}), ...entry.elementOffsets };
+    next.elementOffsets = { ...(base.elementOffsets || {}), ...entry.elementOffsets };
   }
   if (entry.overlays) next.overlays = mergeOverlayContent(slide.overlays, entry.overlays);
   return next;
 }
 
-/** Ajuste de marca fora do feed fica só nessa proporção. */
+/** Ajuste da marca numa vista derivada fica só nessa proporção. */
 export function applyBrandEdit(doc, brandNext) {
   if (!doc || !brandNext) return doc;
   const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
-  if (fmt === 'carrossel') return { ...doc, brand: brandNext };
+  if (fmt === 'carrossel' && !doc.slides?.some(slide => hasPresentationDesign(slide, doc.creativePreset))) {
+    return { ...doc, brand: brandNext };
+  }
   const base = doc.brand || {};
   const views = { ...(doc.formatViews || {}) };
   const bucket = { ...(views[fmt] || {}) };
   const viewBrand = { ...(bucket.brand || {}) };
   const canonical = { ...brandNext };
   for (const key of BRAND_KEYS) {
-    if (brandNext[key] !== base[key]) viewBrand[key] = brandNext[key];
+    if (Object.hasOwn(viewBrand, key) || brandNext[key] !== base[key]) viewBrand[key] = brandNext[key];
     canonical[key] = base[key];
   }
   bucket.brand = viewBrand;
@@ -176,8 +189,8 @@ export function logoRenderPx(fmt, frameW, logoSize) {
 }
 
 /**
- * Edição de largura ou posição numa proporção que não é o feed
- * vai para o mapa dessa proporção. O slide canônico não muda.
+ * Edição visual numa vista derivada vai para o mapa dessa proporção.
+ * Em apresentações, o feed também é derivado; o original não muda.
  */
 export function applyFormatEdit(doc, index, patch) {
   if (!doc || !patch || typeof patch !== 'object') return doc;
@@ -187,7 +200,7 @@ export function applyFormatEdit(doc, index, patch) {
   const fmt = FORMATS[doc.fmt] ? doc.fmt : 'carrossel';
   const rest = { ...patch };
   const view = {};
-  if (fmt !== 'carrossel') {
+  if (fmt !== 'carrossel' || hasPresentationDesign(slide, doc.creativePreset)) {
     for (const key of VIEW_KEYS) {
       if (rest[key] !== undefined) {
         view[key] = rest[key];
@@ -230,4 +243,21 @@ export function applyFormatEdit(doc, index, patch) {
     };
   }
   return next;
+}
+
+/** Ferramentas de composição operam sobre o que está na tela, inclusive em lote. */
+export function transformFormatVisuals(doc, transform) {
+  const displayed = (doc.slides || []).map(slide => slideForFormatDisplay(
+    slide, doc.fmt, doc.formatViews, doc.creativePreset,
+  ));
+  const transformed = transform(displayed);
+  return displayed.reduce((next, slide, index) => {
+    const edited = transformed[index];
+    if (!edited) return next;
+    const patch = {};
+    for (const key of VIEW_KEYS) {
+      if (edited[key] !== undefined && edited[key] !== slide[key]) patch[key] = edited[key];
+    }
+    return Object.keys(patch).length ? applyFormatEdit(next, index, patch) : next;
+  }, doc);
 }

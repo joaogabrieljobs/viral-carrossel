@@ -902,6 +902,7 @@ const ClassicCanvasInner = React.forwardRef(({
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <div
         {...movOu('photo', photoZoneBoxStyle)}
+        data-vc-photo-zone="1"
         data-vc-presentation-glass={evidenceGlassActive ? 'evidence' : undefined}
         onClick={photoZoneInteractive && !photoZoneNativeHit ? (e) => { e.stopPropagation(); onPhotoZoneClick(); } : undefined}
         role={photoZoneInteractive && !photoZoneNativeHit ? 'button' : undefined}
@@ -1778,6 +1779,7 @@ const SlideCardInner = React.forwardRef(({
 
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const presentationMode = fmt === 'apresentacao'
+    || slide.formatAdaptedFrom === 'apresentacao'
     || !!slide.presentationPresetId
     || !!slide.presentationCompositionId;
   const slideIdx = slideIndexProp != null ? slideIndexProp : num - 1;

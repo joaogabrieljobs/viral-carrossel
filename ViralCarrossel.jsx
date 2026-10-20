@@ -90,7 +90,7 @@ import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/libr
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 
 import { FORMATS } from './src/utils/formats.js';
-import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay } from './src/utils/format-view.js';
+import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
 import {
@@ -1225,7 +1225,10 @@ export default function App() {
   const setBrand = useCallback(
     (next) =>
       history.set((d) => {
-        const cur = hydrateBrandTextColors(d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND });
+        const cur = hydrateBrandTextColors(brandForFormatDisplay(
+          d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND },
+          d.fmt, d.formatViews, d.creativePreset,
+        ));
         const brandNextRaw =
           typeof next === 'function' ? next(cur) : { ...cur, ...next };
         const brandNext = hydrateBrandTextColors(brandNextRaw);
@@ -3462,16 +3465,16 @@ export default function App() {
 
   const slide = slides[activeIdx] ?? slides[0] ?? mkSlide(1, brand);
   const displaySlides = useMemo(
-    () => slides.map((item) => slideForFormatDisplay(item, fmt, doc.formatViews)),
-    [slides, fmt, doc.formatViews],
+    () => slides.map((item) => slideForFormatDisplay(item, fmt, doc.formatViews, creativePreset)),
+    [slides, fmt, doc.formatViews, creativePreset],
   );
   const panelSlide = useMemo(
-    () => slideForFormatDisplay(slide, fmt, doc.formatViews),
-    [slide, fmt, doc.formatViews],
+    () => slideForFormatDisplay(slide, fmt, doc.formatViews, creativePreset),
+    [slide, fmt, doc.formatViews, creativePreset],
   );
   const displayBrand = useMemo(
-    () => brandForFormatDisplay(brand, fmt, doc.formatViews),
-    [brand, fmt, doc.formatViews],
+    () => brandForFormatDisplay(brand, fmt, doc.formatViews, creativePreset),
+    [brand, fmt, doc.formatViews, creativePreset],
   );
   const empty = isDefault(slides);
 
@@ -3777,9 +3780,7 @@ export default function App() {
     history.set((d) => {
       const sl = d.slides?.[idx];
       if (!sl) return d;
-      const fmtKey = d.fmt && d.fmt !== 'carrossel' ? d.fmt : 'carrossel';
-      const saved = fmtKey !== 'carrossel' ? d.formatViews?.[fmtKey]?.slides?.[sl.id]?.canvas : null;
-      const canvas = saved || sl.canvas;
+      const canvas = slideForFormatDisplay(sl, d.fmt, d.formatViews, d.creativePreset).canvas;
       if (!canvas?.enabled || !canvas.zones) return d;
       const nextZones = { ...canvas.zones };
       for (const [k, rect] of Object.entries(zonePatch || {})) {
@@ -4358,28 +4359,30 @@ export default function App() {
 
   const enableCanvasLayout = useCallback(() => {
     // Reutiliza zonas guardadas — antes repunha os defaults e perdia a foto ajustada (bug 2026-09-15).
-    setSlides((prev) => enableCanvasLayoutSlides(prev, creativePreset));
+    history.set(d => transformFormatVisuals(d, viewed => enableCanvasLayoutSlides(viewed, d.creativePreset)));
     setCanvasEditMode(true);
     toast('Composição ativada em todos os cards. Use o toggle para mover e redimensionar zonas.', 'success');
-  }, [creativePreset, setSlides, toast]);
+  }, [history, toast]);
 
   const disableCanvasLayout = useCallback(() => {
     // Só sai do modo de edição: o card continua a renderizar a composição (zonas guardadas).
-    setSlides((prev) => disableCanvasLayoutSlides(prev));
+    history.set(d => transformFormatVisuals(d, disableCanvasLayoutSlides));
     setCanvasEditMode(false);
     toast('Edição da composição desativada — o layout ajustado fica no card.', 'info');
-  }, [setSlides, toast]);
+  }, [history, toast]);
 
   const autoAdjustAllSlides = useCallback(() => {
-    setSlides((prev) => autoAdjustSlides(prev, { creativePreset, fmt }));
+    history.set(d => transformFormatVisuals(d, viewed => autoAdjustSlides(viewed, {
+      creativePreset: d.creativePreset, fmt: d.fmt,
+    })));
     toast('Todos os cards foram ajustados às áreas seguras.', 'success');
-  }, [creativePreset, fmt, setSlides, toast]);
+  }, [history, toast]);
 
   const removeCanvasLayout = useCallback(() => {
-    setSlides((prev) => removeCanvasLayoutSlides(prev));
+    history.set(d => transformFormatVisuals(d, removeCanvasLayoutSlides));
     setCanvasEditMode(false);
     toast('Composição removida — cards voltaram ao layout padrão.', 'info');
-  }, [setSlides, toast]);
+  }, [history, toast]);
 
   const swapCanvasZoneContent = useCallback((toIdx, raw) => {
     let parsed;
@@ -4430,7 +4433,7 @@ export default function App() {
   /** Replica tamanhos, espaçamento e legibilidade do card ativo para todos os slides. */
   const applyTypographyToAllCards = useCallback(() => {
     history.set((d) => {
-      const src = slideForFormatDisplay(d.slides?.[activeIdx], d.fmt, d.formatViews);
+      const src = slideForFormatDisplay(d.slides?.[activeIdx], d.fmt, d.formatViews, d.creativePreset);
       if (!src) return d;
       const patch = {
         titleSize: src.titleSize ?? 100,
@@ -6095,8 +6098,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     applyBrandTypographyToAllSlides,
     canvasEditMode, setCanvasEditMode,
     showPreviewAlignGrid, setShowPreviewAlignGrid,
-    anyCanvasEnabled: slides.some((s) => s.canvas?.enabled),
-    anyCanvasSaved: slides.some((s) => !!s.canvas?.zones),
+    anyCanvasEnabled: displaySlides.some((s) => s.canvas?.enabled),
+    anyCanvasSaved: displaySlides.some((s) => !!s.canvas?.zones),
     removeCanvasLayout,
     patchCanvasZonesAt,
     openPhotoZoneImport,
