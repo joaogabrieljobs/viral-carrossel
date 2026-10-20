@@ -9,6 +9,7 @@ import { FORMATS } from '../../utils/formats.js';
 // vira o único ponto de download da app — economiza 50px no footer mobile.
 function ExportMoreFormats({
   slides, exporting, exportProgress,
+  isPresentation = false,
   activeIdx, onExportSlide,
   onExportAll, onExportPDF, onExportPhotosOnly,
   hideSlideOption = false,
@@ -19,6 +20,8 @@ function ExportMoreFormats({
   genCaption = false,
   onGenerateCaption = null,
 }) {
+  const itemLabel = isPresentation ? 'Slide' : 'Card';
+  const summaryLabel = isPresentation ? 'resumo' : 'legenda';
   const [open, setOpen] = React.useState(false);
   const refMenu = React.useRef(null);
   React.useEffect(() => {
@@ -87,7 +90,7 @@ function ExportMoreFormats({
           <p style={{
             margin: '4px 10px 8px', fontSize: 12, lineHeight: 1.4, color: 'var(--text-muted)',
           }}>
-            Baixa os arquivos. A publicação é no Instagram.
+            {isPresentation ? 'Baixe a apresentação em PDF ou os slides em PNG.' : 'Baixa os arquivos. A publicação é no Instagram.'}
           </p>
           {!hideSlideOption && onExportSlide && (
             <button
@@ -100,7 +103,7 @@ function ExportMoreFormats({
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <Download size={13} style={{ color:'var(--accent)' }}/>
-              <span style={{ flex:1, fontWeight:600 }}>Card {activeIdx + 1}</span>
+              <span style={{ flex:1, fontWeight:600 }}>{itemLabel} {activeIdx + 1}</span>
               <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>PNG</span>
             </button>
           )}
@@ -114,9 +117,9 @@ function ExportMoreFormats({
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <Download size={13} style={{ color:'var(--text-muted)' }}/>
-            <span style={{ flex:1 }}>Baixar PNGs (ZIP)</span>
+            <span style={{ flex:1 }}>{isPresentation ? 'Slides em PNG (ZIP)' : 'Baixar PNGs (ZIP)'}</span>
             <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
-              {slides.length} cards
+              {slides.length} {isPresentation ? 'slides' : 'cards'}
             </span>
           </button>
           {onCopyCaption ? (
@@ -131,7 +134,7 @@ function ExportMoreFormats({
             >
               <Copy size={13} style={{ color:'var(--text-muted)' }}/>
               <span style={{ flex:1 }}>
-                {String(caption || '').trim() ? 'Copiar legenda' : (onGenerateCaption ? 'Gerar e copiar legenda' : 'Copiar legenda')}
+                {!String(caption || '').trim() && onGenerateCaption ? `Gerar e copiar ${summaryLabel}` : `Copiar ${summaryLabel}`}
               </span>
             </button>
           ) : null}
@@ -146,7 +149,7 @@ function ExportMoreFormats({
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <Archive size={13} style={{ color:'var(--accent)' }}/>
-              <span style={{ flex:1, fontWeight: 600 }}>PNGs + copiar legenda</span>
+              <span style={{ flex:1, fontWeight: 600 }}>PNGs + copiar {summaryLabel}</span>
             </button>
           ) : null}
           {onExportBackup ? (
@@ -159,7 +162,7 @@ function ExportMoreFormats({
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <FileText size={13} style={{ color:'var(--text-muted)' }}/>
-              <span style={{ flex:1 }}>Fazer backup do projeto</span>
+              <span style={{ flex:1 }}>{isPresentation ? 'Backup da apresentação' : 'Fazer backup do projeto'}</span>
               <span style={{ color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>JSON</span>
             </button>
           ) : null}
@@ -173,7 +176,7 @@ function ExportMoreFormats({
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <FileText size={13} style={{ color:'var(--text-muted)' }}/>
-            <span style={{ flex:1 }}>Carrossel em PDF</span>
+            <span style={{ flex:1 }}>{isPresentation ? 'Apresentação em PDF' : 'Carrossel em PDF'}</span>
           </button>
           {photoCount > 0 && (
             <button

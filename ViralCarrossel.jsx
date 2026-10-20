@@ -733,15 +733,6 @@ const REFERENCE_PROFILE_BY_ID = Object.fromEntries(REFERENCE_PROFILES.map(p => [
 // extractJSON foi extraído para src/utils/parsers.js
 
 
-// Bundle local (chunk lazy do Vite) — antes vinha do cdnjs em runtime:
-// export quebrava offline e dependia de CDN de terceiro (audit-produto #7).
-const loadHtml2Canvas = async () => (await import('html2canvas')).default;
-
-
-
-// Carrega jsPDF on-demand — bundle local (chunk lazy do Vite), sem CDN.
-const loadJsPdf = async () => (await import('jspdf')).jsPDF;
-
 /**
  * Safari iOS ignora `.click()` em `<input type="file" hidden>`. Mantém elemento ativo mas fora da vista.
  * @see https://bugs.webkit.org/show_bug.cgi?id=22261 (padrões semelhantes)
@@ -5544,6 +5535,8 @@ ${isPresentationSummary
     exportPDF,
   } = useExport({
     slides, fmt, slideRefs,
+    projectName: activeEntry?.name,
+    productKind: doc.productKind === 'apresentacao' ? 'apresentacao' : activeProductKind,
     setExporting, setExportProgress, setError, toast,
   });
 

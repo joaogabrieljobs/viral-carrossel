@@ -4090,6 +4090,7 @@ function SidebarContent({
       <div style={{ borderTop:'1px solid var(--border)', padding:'10px 12px', display:'flex', alignItems:'center', gap:8, justifyContent:'space-between', flexShrink:0 }}>
         <ExportMoreFormats
           slides={slides}
+          isPresentation={isPresentationProject}
           exporting={exporting}
           exportProgress={exportProgress}
           activeIdx={activeIdx}
@@ -4112,7 +4113,7 @@ function SidebarContent({
           } : null}
         />
         <span
-          title="A Moont prepara os arquivos. A publicação é no Instagram."
+          title={isPresentationProject ? 'Baixe a apresentação para apresentar ou compartilhar.' : 'A Moont prepara os arquivos. A publicação é no Instagram.'}
           style={{
             display: 'none',
           }}

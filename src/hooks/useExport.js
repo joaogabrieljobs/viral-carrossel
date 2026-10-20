@@ -6,6 +6,9 @@
  * então o resultado sai sempre nas dimensões reais do formato × 3 (retina).
  */
 import { useCallback } from 'react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 import { FORMATS } from '../utils/formats.js';
 import { videoGet } from '../utils/video-store.js';
 import { canvasToPngBlob } from '../utils/image-storage.js';
@@ -14,8 +17,14 @@ import { trackEvent } from '../utils/telemetry.js';
 import { blobFromSlideRef } from '../utils/ai-client.js';
 import { waitForExportFonts } from '../utils/export-fonts.js';
 
-const loadHtml2Canvas = async () => (await import('html2canvas')).default;
-const loadJsPdf = async () => (await import('jspdf')).jsPDF;
+// O editor carrega seus exportadores junto com a própria versão. Buscar um
+// chunk só no clique falhava em abas abertas durante um novo deploy.
+export function exportFileStem(projectName, isPresentation = false) {
+  const name = String(projectName || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100);
+  const kind = isPresentation ? 'apresentacao' : 'carrossel';
+  return name ? `${kind}-${name}` : kind;
+}
 
 /** Extrai todas as URLs de `background-image`, inclusive em camadas múltiplas. */
 export function extractCssBackgroundUrls(backgroundImage) {
@@ -180,12 +189,17 @@ export function exportRenderScope(slides, refs, slideIndexes = null) {
 export function useExport({
   slides,
   fmt,
+  projectName = '',
+  productKind = '',
   slideRefs,
   setExporting,
   setExportProgress,
   setError,
   toast,
 }) {
+  const isPresentation = productKind === 'apresentacao' || fmt === 'apresentacao';
+  const itemLabel = isPresentation ? 'slide' : 'card';
+  const fileStem = exportFileStem(projectName, isPresentation);
   const waitForRender = async (slideIndexes = null) => {
     const scope = exportRenderScope(slides, slideRefs.current, slideIndexes);
     await waitForExportReadiness(scope);
@@ -199,13 +213,12 @@ export function useExport({
   };
 
   const renderSlideToCanvas = async (slideObj) => {
-    const h2c = await loadHtml2Canvas();
     const el = slideRefs.current[slideObj.id];
     if (!el) throw new Error('Elemento de export não encontrado');
     const f = FORMATS[fmt] || FORMATS.carrossel;
     const w = Math.max(1, Math.round(el.offsetWidth || el.scrollWidth || f.w));
     const h = Math.max(1, Math.round(el.offsetHeight || el.scrollHeight || f.h));
-    return h2c(el, {
+    return html2canvas(el, {
       scale: 3,                 // 3× — logos finas e CTAs saem nítidos no PNG
       useCORS: true,
       allowTaint: true,
@@ -233,16 +246,15 @@ export function useExport({
         const entry = await videoGet(slide.videoId);
         if (entry?.blob) {
           const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
-          await downloadBlob(entry.blob, `slide-${String(idx+1).padStart(2,'0')}-video.${ext}`);
-          toast(`Vídeo do card ${idx+1} baixado. Adicione o texto no editor de vídeo (CapCut, InShot, etc).`, 'success', 6000);
+          await downloadBlob(entry.blob, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}-video.${ext}`);
+          toast(`Vídeo do ${itemLabel} ${idx+1} baixado. Adicione o texto no editor de vídeo (CapCut, InShot, etc).`, 'success', 6000);
           return;
         }
       }
-      await loadHtml2Canvas();
       await waitForRender([idx]);
       const canvas = await renderSlideToCanvas(slide);
-      await downloadCanvasPng(canvas, `slide-${String(idx+1).padStart(2,'0')}.png`);
-      toast(`Card ${idx+1} baixado`, 'success');
+      await downloadCanvasPng(canvas, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}.png`);
+      toast(`${isPresentation ? 'Slide' : 'Card'} ${idx+1} baixado`, 'success');
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
   };
@@ -251,9 +263,7 @@ export function useExport({
     setExporting(true);
     setExportProgress({current:0,total:slides.length});
     try {
-      await loadHtml2Canvas();
       await waitForRender();
-      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       const videoSlides = [];
       for (let i=0; i<slides.length; i++) {
@@ -282,12 +292,12 @@ export function useExport({
       // README explicando como usar quando há vídeos
       if (videoSlides.length > 0) {
         const readme = [
-          '# Carrossel — Material de Exportação',
+          `# ${isPresentation ? 'Apresentação' : 'Carrossel'} — Material de Exportação`,
           '',
-          `Este ZIP contém ${slides.length} card(s).`,
-          `${videoSlides.length} card(s) têm VÍDEO em vez de foto estática.`,
+          `Este ZIP contém ${slides.length} ${itemLabel}(s).`,
+          `${videoSlides.length} ${itemLabel}(s) têm VÍDEO em vez de foto estática.`,
           '',
-          '## Cards com vídeo',
+          `## ${isPresentation ? 'Slides' : 'Cards'} com vídeo`,
           '',
           ...videoSlides.map(v => [
             `### Slide ${String(v.idx).padStart(2, '0')}`,
@@ -303,18 +313,17 @@ export function useExport({
           '',
           '1. Abre o vídeo no CapCut, InShot, Premiere ou similar',
           '2. Adiciona uma camada de texto por cima usando o título/subtítulo acima',
-          '3. Exporta como MP4 com proporção 4:5 (1080×1350) pra feed do Instagram',
-          '4. Pra carrossel misto (foto + vídeo), suba todos juntos no Instagram',
+          isPresentation ? '3. Exporte o vídeo na mesma proporção dos slides.' : '3. Exporta como MP4 com proporção 4:5 (1080×1350) pra feed do Instagram',
+          isPresentation ? '4. Insira os vídeos no aplicativo usado para apresentar.' : '4. Pra carrossel misto (foto + vídeo), suba todos juntos no Instagram',
           '',
-          '(Cards SEM vídeo já vêm prontos como PNG — basta postar.)',
+          isPresentation ? '(Slides sem vídeo já estão prontos como PNG.)' : '(Cards SEM vídeo já vêm prontos como PNG — basta postar.)',
         ].join('\n');
         zip.file('LEIA-ME.md', readme);
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-      const stamp = new Date().toISOString().slice(0, 10);
-      await downloadBlob(zipBlob, `carrossel-${stamp}.zip`);
+      await downloadBlob(zipBlob, `${fileStem}.zip`);
       const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
-      toast(`ZIP com ${slides.length} cards pronto${videoNote}`, 'success');
+      toast(`ZIP com ${slides.length} ${itemLabel}s pronto${videoNote}`, 'success');
       trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
     } catch(e) { setError('Erro ao exportar: '+e.message); }
     finally { setExporting(false); }
@@ -327,13 +336,12 @@ export function useExport({
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => !!s.bgImage);
     if (withPhotos.length === 0) {
-      toast('Nenhum card tem foto pra baixar.', 'info');
+      toast(`Nenhum ${itemLabel} tem foto para baixar.`, 'info');
       return;
     }
     setExporting(true);
     setExportProgress({ current: 0, total: withPhotos.length });
     try {
-      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       let aiCount = 0;
       for (let k = 0; k < withPhotos.length; k++) {
@@ -353,8 +361,7 @@ export function useExport({
         }
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-      const stamp = new Date().toISOString().slice(0, 10);
-      await downloadBlob(zipBlob, `carrossel-fotos-${stamp}.zip`);
+      await downloadBlob(zipBlob, `${fileStem}-fotos.zip`);
       toast(
         aiCount > 0
           ? `${withPhotos.length} fotos baixadas (${aiCount} geradas por IA — guarde pra reuso!)`
@@ -374,10 +381,10 @@ export function useExport({
     setExporting(true);
     setExportProgress({current:0,total:slides.length});
     try {
-      const [, JsPDF] = await Promise.all([loadHtml2Canvas(), loadJsPdf()]);
       await waitForRender();
       const f = FORMATS[fmt] || FORMATS.carrossel;
-      const pdf = new JsPDF({ unit:'px', format:[f.w, f.h], orientation: f.h > f.w ? 'portrait' : 'landscape', compress:true });
+      const pdf = new jsPDF({ unit:'px', format:[f.w, f.h], orientation: f.h > f.w ? 'portrait' : 'landscape', compress:true });
+      pdf.setProperties({ title: projectName || (isPresentation ? 'Apresentação' : 'Carrossel') });
       for (let i=0; i<slides.length; i++) {
         setExportProgress({current:i+1,total:slides.length});
         const canvas = await renderSlideToCanvas(slides[i]);
@@ -386,9 +393,8 @@ export function useExport({
         if (i > 0) pdf.addPage([f.w, f.h], f.h > f.w ? 'portrait' : 'landscape');
         pdf.addImage(dataUrl, 'PNG', 0, 0, f.w, f.h);
       }
-      const pdfStem = fmt === 'apresentacao' ? 'apresentacao' : 'carrossel';
-      pdf.save(`${pdfStem}-${Date.now()}.pdf`);
-      toast(`PDF com ${slides.length} slides gerado`, 'success');
+      await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`);
+      toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
     } catch(e) { setError('Erro ao gerar PDF: '+e.message); }
     finally { setExporting(false); }
   };
