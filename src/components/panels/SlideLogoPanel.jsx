@@ -96,22 +96,21 @@ export function SlideLogoPanel({
       let { logoImageId, logoImage } = asset;
       // PNG embutido já é portátil. Object URLs antigas ainda precisam de uma
       // gravação confirmada (ou do fallback portátil) antes de serem replicadas.
-      if ((ids || asset.source !== 'brand') && !logoImageId && !String(logoImage).startsWith('data:image/png;base64,')) {
+      if (!logoImageId && !String(logoImage).startsWith('data:image/png;base64,')) {
         const stored = await storeSlideLogo(await origemParaBlob(logoImage));
         logoImageId = stored.logoImageId;
         logoImage = stored.logoImage;
       }
       if (!alive.current) return;
       setSlides((list) => {
-        const withAsset = (ids || asset.source !== 'brand')
-          ? applyLogoAssetToSlides(list, {
-              ids,
-              logoImageId,
-              logoImage,
-              hideUnselected: false,
-            })
-          // A fonte já é a marca global; basta controlar a visibilidade.
-          : stampLogoVisibleOnSlides(list, ids);
+        // Mesmo quando a origem é a marca, substituir as cópias antigas dos
+        // destinos. Apenas desocultar deixava overrides vazios bloqueando-a.
+        const withAsset = applyLogoAssetToSlides(list, {
+          ids,
+          logoImageId,
+          logoImage,
+          hideUnselected: false,
+        });
         return applyLogoLayoutToSlides(withAsset, {
           sourceSlide: slide,
           brand,

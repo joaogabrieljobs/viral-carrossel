@@ -395,7 +395,15 @@ function BrandLogoLayer({
     const sample = readLogoSample(img);
     const decision = sample ? classifyLogoPixels(sample) : { hide: false, punchWhite: false, inkLuminance: 0.2, chroma: 0 };
     if (decision.hide) {
-      setHidden(true);
+      // Algumas cópias legadas são PNGs/JPEGs válidos, mas só contêm uma
+      // placa branca. Elas não disparam onError: recuperar a marca também
+      // neste caso, antes de desistir da camada (inclusive na exportação).
+      if (fallbackSrc && img.getAttribute('src') !== fallbackSrc) {
+        setPunched('');
+        setUseFallback(true);
+      } else {
+        setHidden(true);
+      }
       return;
     }
     setAutoTone(logoToneForSurface(decision.inkLuminance, decision.chroma, surface, tone));
@@ -407,7 +415,7 @@ function BrandLogoLayer({
       }
     }
     setHit(logoContainHitRect(box, img.naturalWidth, img.naturalHeight, readLogoInk(img)));
-  }, [box, surface, tone]);
+  }, [box, surface, tone, fallbackSrc]);
   React.useLayoutEffect(() => {
     setUseFallback(false);
     setPunched('');
