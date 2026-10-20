@@ -80,7 +80,7 @@ import {
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
 import { useScrollLock } from './src/hooks/useScrollLock.js';
-import { isPitchPath, cleanPitchSlide, cleanPitchText, PITCH_PROVENANCE_RULE } from './src/utils/pitch-content.js';
+import { isPitchPath, cleanPitchSlide, cleanPitchText } from './src/utils/pitch-content.js';
 import { vcCustomTitleFace, hydrateBrandTextColors, effectiveTitleFontFamily } from './src/utils/brand-helpers.js';
 import { SectionLabel as S } from './src/components/ui/SectionLabel.jsx';
 import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
@@ -165,6 +165,8 @@ import {
   isApresentacaoPreset,
   buildApresentacaoPackBlock,
   buildApresentacaoRefineHint,
+  presentationAIOptions,
+  buildPresentationSummaryRules,
   presentationDocPatch,
   APRESENTACAO_PRESET_ID,
   normalizePresentationPath,
@@ -5050,19 +5052,8 @@ ${jsonShapeLine}`;
         q = `editorial photo illustrating: ${seed} — cinematic, documentary mood, natural lighting`;
         console.warn(`[handleGenerate] IA omitiu imageQuery do slide ${i+1} (full-bleed) — usando fallback baseado em título.`);
       }
-      // Só composições que declaram uma imagem obrigatória recebem fallback.
-      // Capas/divisores tipográficos continuam intencionalmente sem imagem.
-      if (
-        !textOnlyPlan
-        && !q
-        && isPresentationGeneration
-        && compositionOverrides.presentationRequiresImage === true
-        && (title || subtitle)
-      ) {
-        const seed = `${title}. ${subtitle}`.trim().slice(0, 220);
-        q = `widescreen presentation visual illustrating: ${seed}. Editorial evidence or clean diagrammatic concept, strong 16:9 composition, no embedded text, no logo`;
-        console.warn(`[handleGenerate] IA omitiu imageQuery obrigatória do slide ${i+1} da apresentação — usando fallback semântico.`);
-      }
+      // Em apresentações, imageQuery vazia é uma decisão editorial explícita.
+      // O padrão visual não deve convertê-la em fotografia ou prova gerada.
       const base = {
         ...mkSlide(i + 1, generationBrand),
         title,
@@ -5435,14 +5426,14 @@ REGRAS:
 ${voiceRefine}
 ${isPresentationRefine ? buildApresentacaoRefineHint(presentationPath) : ''}
 ${presentationRefineLimitsBlock}
-${isPresentationRefine ? isPitchPath(presentationPath) ? '- Desenvolva subtitle e bodyAfterImage com argumentos sustentados quando a instrução pedir aprofundamento. Preserve números, unidades, períodos e ressalvas reais.\n' : '- Preserve bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Nunca invente fonte, número, unidade ou período.\n' : ''}
+${isPresentationRefine ? '- Desenvolva subtitle e bodyAfterImage quando necessário à instrução e à função do slide, dentro dos limites. Preserve fatos, números, unidades, períodos e ressalvas reais.\n' : ''}
 ${isPersoHybridRefineSlide ? '- Layout Personalizado (1/1 ou 1/2): slides desta posição usam formato sanduíche — mantenha payoff em bodyAfterImage abaixo da foto.\n' : ''}
 ${buildRefineSingleSlideRules(mode, slideTextDensity, { presetId: creativePreset, slideIndex: activeIdx, slideCount: nSl, presentationPath })}
 - Mantenha coerência com os outros slides e com o modo narrativo acima.
 - Respeite a identidade verbal e o material acima.
 
 Retorne exatamente: ${singleJson}`,
-        { json:true, openaiKey, signal: job.signal, contentMode: isPresentationRefine && isPitchPath(presentationPath) ? 'pitch' : undefined }
+        { json:true, openaiKey, signal: job.signal, ...presentationAIOptions(creativePreset, presentationPath) }
       );
       throwIfGenerationCancelled(job.signal);
       const patch = {
@@ -5497,13 +5488,13 @@ ${buildCaptionOutlineInstructions(mode, creativePreset)}
 
 REGRAS:
 ${capRules}
-${isPresentationSummary && isPitchPath(presentationPath) ? PITCH_PROVENANCE_RULE : ''}
+${isPresentationSummary ? buildPresentationSummaryRules(presentationPath) : ''}
 ${isPresentationSummary
   ? '- Sintetize a tese, os principais pontos e a decisão ou próximo passo. Não use hashtags, gatilhos sociais ou pedidos para compartilhar.'
   : '- Hashtags no final, na quantidade indicada nas REGRAS acima.'}
 - Respeite a identidade verbal e use o material para conferir os fatos.
 - Entregue apenas ${isPresentationSummary ? 'o resumo e as notas' : 'a legenda e as hashtags'}, nada mais.`,
-        { openaiKey, signal: job.signal }
+        { openaiKey, signal: job.signal, ...presentationAIOptions(creativePreset, presentationPath) }
       );
       throwIfGenerationCancelled(job.signal);
       const finalCaption = isPresentationSummary
@@ -5734,7 +5725,7 @@ ${presentationRefineLimitsBlock}
 - Mantenha exatamente ${slides.length} slides na mesma ordem e uma ideia central por slide.
 - Nos slides de conteúdo, escreva o título como conclusão sustentada pelo subtítulo ou pela evidência disponível.
 - Não invente números, fontes, resultados ou fatos ausentes do material.
-${isPitchPath(presentationPath) ? '- Desenvolva subtitle e bodyAfterImage quando houver argumento, exemplo ou evidência sustentados; preserve os fatos e as ressalvas, sem repetir slogans.' : '- Preserve cada bodyAfterImage literalmente, a menos que a instrução peça sua correção e o novo texto esteja sustentado pelo pedido ou material. Use esse campo somente para fonte, unidade, período, ressalva ou instrução.'}
+- Desenvolva subtitle e bodyAfterImage conforme a função de cada slide, com argumento, exemplo ou evidência disponíveis; preserve os fatos e as ressalvas, sem repetir slogans.
 - Não use ganchos, cliffhangers, “arraste”, hashtags nem CTA de Instagram.
 - Respeite a identidade verbal, o modo de entrega e o material acima.
 
@@ -5765,7 +5756,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           : '{"slides":[{"title":"...","subtitle":"..."}]}'}`;
       const r = await callAI(
         refinePrompt,
-        { json:true, openaiKey, signal: job.signal, contentMode: refiningPresentation && isPitchPath(presentationPath) ? 'pitch' : undefined }
+        { json:true, openaiKey, signal: job.signal, ...presentationAIOptions(creativePreset, presentationPath), maxTokens: refiningPresentation ? Math.min(8192, 3072 + slides.length * 512) : 4096 }
       );
       throwIfGenerationCancelled(job.signal);
       if (!r?.slides?.length) throw new Error('IA não retornou slides');

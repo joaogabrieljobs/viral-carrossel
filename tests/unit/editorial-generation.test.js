@@ -126,7 +126,8 @@ describe('geração com uma revisão editorial', () => {
     expect(validated.slides[1].bodyAfterImage).toContain('Fonte: relatório 2026');
     const reviewPrompt = buildEditorialReviewPrompt('briefing', validated, presentationConfig);
     expect(reviewPrompt).toContain('REVISÃO DE APRESENTAÇÃO');
-    expect(reviewPrompt).toContain('bodyAfterImage continua reservado');
+    expect(reviewPrompt).toContain('subtitle e bodyAfterImage são editáveis');
+    expect(reviewPrompt).toContain('Não mencione o arquivo enviado');
     expect(reviewPrompt).not.toContain('CTA coerente com o objetivo');
   });
 

@@ -139,7 +139,7 @@ describe('modo Apresentação', () => {
     expect(keynote).toMatch(/apresentado ao vivo/i);
     expect(pack).toMatch(/AFIRMAÇÃO → EVIDÊNCIA/i);
     expect(pack).toMatch(/título conclusivo/i);
-    expect(pack).toMatch(/não simule listas/i);
+    expect(pack).toMatch(/Nunca simule listas/i);
     expect(pack).toMatch(/unidade, período, comparação e fonte/i);
   });
 

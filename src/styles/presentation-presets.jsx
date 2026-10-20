@@ -706,10 +706,10 @@ PADRÃO VISUAL DA APRESENTAÇÃO — ${String(selected.label || '').toUpperCase(
 - Limites obrigatórios da composição escolhida (use o tipo correspondente a cada slide):
 ${compositionLimitLines}
 - Teto editorial: cerca de ${wordsPerSlide} palavras por slide. Se o conteúdo exceder, sintetize ou distribua entre os slides; nunca comprima tudo em uma caixa.
-- Tratamento visual: ${imageTreatment}. Quando a composição exigir evidência, a imageQuery deve pedir imagem coerente com esta direção, sem texto incorporado. Slides tipográficos podem manter imageQuery vazia.
+- Tratamento visual: ${imageTreatment}. Imagem é opcional; se útil, peça contexto ilustrativo coerente, sem texto incorporado. Evidência factual deve existir nos textos ou nos materiais reais fornecidos; imageQuery pode ser vazia.
 - O renderer materializa título, subtítulo, corpo de apoio e uma área de evidência visual.
 ${evidenceAdaptation}
-- Não simule tabelas, gráficos ou diagramas com caracteres dentro de title/subtitle; descreva a evidência em imageQuery.
+- Não simule tabelas, gráficos ou diagramas com caracteres. Explique relações e comparações no texto editável. Nunca peça que imageQuery fabrique gráfico, screenshot ou prova; a área visual não substitui a informação disponível.
 `;
 }
 

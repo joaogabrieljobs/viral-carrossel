@@ -14,6 +14,9 @@ import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 import { normalizeBrandTone } from './brand-tone.js';
 import { genModeUiLabel } from './ui-depth-labels.js';
 import { isPitchPath, buildPitchFieldRules } from './pitch-content.js';
+import {
+  buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules,
+} from './presentation.js';
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
 // de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
@@ -468,8 +471,8 @@ async function fetchMaterialUrlSnippets(material) {
 
 /** Monta os blocos de material para o prompt da IA e, se houver URL(s), obtém texto no servidor antes. `toastCb` opcional — (msg, kind, ttl?). */
 async function resolveMaterialPromptParts(material, toastCb, options = {}) {
-  if (isPitchPath(options.presentationPath) && normalizedMaterialPieces(material).c.length > 40_000) {
-    toastCb?.('O conteúdo base excede 40 mil caracteres. Este Pitch usará o início do texto; reduza o material para incluir todos os pontos essenciais.', 'warning', 8000);
+  if (options.presentationPath != null && normalizedMaterialPieces(material).c.length > 40_000) {
+    toastCb?.(`O conteúdo base excede 40 mil caracteres. ${isPitchPath(options.presentationPath) ? 'Este Pitch' : 'Esta apresentação'} usará o início do texto; reduza o material para incluir todos os pontos essenciais.`, 'warning', 8000);
   }
   const urls = extractHttpUrlsFromMaterial(material);
   if (!urls.length) {
@@ -508,10 +511,10 @@ function materialHasUserInput(material) {
 const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
   const parts = [];
   const { c, s, x } = normalizedMaterialPieces(material);
-  const pitch = isPitchPath(options.presentationPath);
-  const contentLimit = pitch ? 40_000 : 8000;
+  const presentation = options.presentationPath != null;
+  const contentLimit = presentation ? 40_000 : 8000;
   // Reserva espaço para instruções e para o rascunho na segunda chamada.
-  const fetchedLimit = pitch ? 60_000 - Math.min(c.length, contentLimit) : 62_000;
+  const fetchedLimit = presentation ? 60_000 - Math.min(c.length, contentLimit) : 62_000;
   const refId = material?.refProfileId;
   const ref = refId && REFERENCE_PROFILE_BY_ID[refId];
 
@@ -544,7 +547,7 @@ const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
         ? 'FONTES & REFERÊNCIAS (URL listada — o texto legível já foi transcrito para o bloco «TEXTO OBTIDO DAS FONTES» acima):'
         : /https?:\/\//i.test(s) || /\bwww\.[^\s]+\b/i.test(s)
           ? 'FONTES & REFERÊNCIAS (há URL(s) colada(s) sem extração bem-sucedida — o endereço não comprova fatos; use apenas o texto disponível, sem fingir leitura):'
-          : pitch ? 'FONTES & REFERÊNCIAS (conferência factual interna; não mencione a origem na apresentação final):' : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
+          : presentation ? 'FONTES & REFERÊNCIAS (conferência factual interna; não mencione a origem na apresentação final):' : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
     parts.push(`${srcLabel}\n${s.slice(0, 2000)}`);
   }
   if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (orientam recorte e estilo; preserve idioma, veracidade e schema solicitado):\n${x.slice(0, 1500)}`);
@@ -816,12 +819,7 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 - Cada página deve responder a uma pergunta de negócio e acrescentar informação. Preserve os limites do contrato do Pitch, sem reduzir o desenvolvimento a uma legenda.
 - Quando houver etapas ou comparação, use poucas linhas reais com rótulos claros. Não simule tabelas com caracteres, nem listas com “·”.
 - Evite slogans repetidos, falsas dicotomias e promessas absolutas. Termine com decisão ou próximo passo sustentado.`;
-    return `REGRAS DE TEXTO — APRESENTAÇÃO 16:9:
-- Escreva para leitura em tela e fala do apresentador: uma ideia central por slide, hierarquia clara e frases concretas.
-- Use o tom da marca (${tone || 'profissional, claro e direto'}) sem jargão de rede social, chamada para salvar, compartilhar ou comentar.
-- Em slides de conteúdo, o título deve afirmar a conclusão; o subtítulo sustenta a afirmação com uma explicação coerente de 1–3 frases.
-- Quando o conteúdo exigir enumeração, use poucas linhas reais com quebra de linha. Nunca simule bullets separando itens com “·”.
-- Evite repetir a mesma estrutura verbal em todos os slides e não transforme o deck em uma sequência de slogans.`;
+    return buildPresentationLanguageRules(presentationPath, tone);
   }
   if (narrativeMode === 'none') return `LINGUAGEM: siga a voz do brief e o tom solicitado: ${tone || 'natural e concreto'}. Não force um registro editorial ou uma fórmula narrativa.`;
   const storyLike = narrativeMode === 'storytelling' || narrativeMode === 'pain';
@@ -902,17 +900,7 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   if (creativePresetId === 'apresentacao') {
     if (isPitchPath(presentationPath)) return buildPitchFieldRules();
-    const { lo, hi } = scaledCharBand(90, 240, textDensityId);
-    return `
-REGRAS DE LEITURA E COMPOSIÇÃO — DECK 16:9:
-- Capa: título de 3–9 palavras e subtítulo de até ${scaledCeiling(120, textDensityId)} caracteres.
-- Miolo: título conclusivo de 3–12 palavras; subtítulo normalmente entre ${lo} e ${hi} caracteres, com uma explicação coerente ou até quatro linhas reais quando uma enumeração for indispensável.
-- Nunca simule listas unindo itens com “·”. Prefira prosa curta, uma tabela/diagrama visual ou linhas separadas por quebra de linha.
-- Síntese/fecho: conclusão ou próximo passo claro, sem CTA de Instagram.
-- Varie a função visual dos ${slideCount} slides: capa, mapa/agenda, afirmação, explicação, dado/prova, comparação, síntese e fecho conforme o caminho escolhido.
-- Não escreva “slide N”, “arraste”, “salve”, “compartilhe”, hashtags ou instruções de feed.
-- bodyAfterImage fica vazio por padrão; use-o somente para fonte, unidade, período, ressalva ou instrução indispensável. Cada slide deve funcionar projetado em uma tela ampla.
-- Não invente garantia, prazo, preço, item incluso ou promessa comercial que não esteja no material. Se for hipótese, escreva isso.`;
+    return buildPresentationFieldRules(presentationPath);
   }
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
     return buildPersoHybridLayoutBlock(slideCount, textDensityId);
@@ -1069,16 +1057,7 @@ function buildGenerationImageLayer(presetId, topic, n, audience, projectDirectio
 • Demonstrações reais usam apenas materiais fornecidos. Não peça à IA para inventar screenshot, gráfico, cliente, equipe, depoimento ou evidência.
 • Se uma imagem for útil, descreva em INGLÊS, 8–15 palavras, com composição horizontal 16:9 e espaço para texto. Não desenhe texto, números, logo ou marca-d'água.
 • ${projectDirection ? 'Preserve a estética do brief nas imagens necessárias; ela não obriga fotografia em cada slide.' : 'Mantenha coerência visual nas imagens necessárias.'}`;
-    const directionLine = projectDirection
-      ? '• A estética, técnica e atmosfera descritas no brief do projeto têm prioridade.'
-      : '• Mantenha uma linguagem visual coerente do primeiro ao último slide.';
-    return `imageQuery — DIREÇÃO DE ARTE PARA APRESENTAÇÃO 16:9:
-• INGLÊS, 8–15 palavras: assunto + contexto + composição horizontal + luz/linguagem visual.
-• Relacione a imagem ao ponto específico do slide sobre “${topic}”${n ? ` (nicho: ${n})` : ''}${audience ? ` (público: ${audience})` : ''}; não use a mesma cena em todo o deck.
-• Prefira enquadramento horizontal com espaço negativo para texto e um foco visual claro.
-• Não desenhe texto, números, gráficos rotulados, logo ou marca-d’água dentro da imagem.
-• Use imagem somente quando ela acrescentar evidência, contexto ou atmosfera; imageQuery pode ser "" em slides tipográficos, agenda, quadro comparativo ou síntese.
-${directionLine}`;
+    return buildPresentationImageRules(presentationPath, topic, projectDirection);
   }
   if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
 • INGLÊS, 8–15 palavras: sujeito + ação + ambiente + linguagem visual/luz extraída do brief.
@@ -1127,11 +1106,7 @@ function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { p
   const positioned = Number.isInteger(slideIndex) && slideCount > 0;
   if (presetId === 'apresentacao') {
     if (isPitchPath(presentationPath)) return buildPitchFieldRules();
-    const { lo, hi } = scaledCharBand(90, 240, textDensityId);
-    return `- Preserve a função desta posição no deck e uma ideia central por slide.
-- Em slide de conteúdo, use título como afirmação-conclusão e subtítulo como apoio entre ${lo} e ${hi} caracteres quando houver material suficiente.
-- Não simule listas com “·”. bodyAfterImage serve apenas para fonte, unidade, período, ressalva ou instrução indispensável.
-- Não introduza linguagem de carrossel, gesto de arrastar, hashtags ou CTA social.`;
+    return buildPresentationFieldRules(presentationPath);
   }
   const culture = isTendenciaCulturaPreset(presetId);
   const hybrid = isPersoHybridDensity(presetId, textDensityId);
@@ -1288,7 +1263,7 @@ function buildHookModeVariationRules(narrativeModeId, creativePresetId) {
 
 function buildRefineModeVoiceRules(presetId, narrativeMode = 'editorial') {
   if (presetId === 'apresentacao') {
-    return `- Preserve o caminho e a função deste slide na apresentação. Em slides de conteúdo, mantenha o título como afirmação-conclusão e o subtítulo como apoio breve.
+    return `- Preserve o caminho e a função deste slide na apresentação. Em slides de conteúdo, mantenha uma afirmação-conclusão sustentada ou pergunta didática pertinente e desenvolva a explicação conforme o caminho e os limites.
 - Não introduza gancho viral, cliffhanger, pedido de deslizar, CTA social ou itens simulados com “·”. Evidências e ressalvas devem continuar ligadas à afirmação que sustentam.`;
   }
   if (narrativeMode === 'none') return '- Preserve a voz do brief e a entrega original, sem acrescentar um modo narrativo.';
@@ -1401,7 +1376,7 @@ Use apenas os campos do modelo; todos os campos de texto são strings, nunca nul
 ${isPresentation
     ? isPitchPath(presentationPath)
       ? 'subtitle desenvolve o argumento; bodyAfterImage acrescenta evidência, exemplo, detalhe ou ressalva útil. Não inclua referências aos arquivos, ao manual ou ao processo de extração em nenhum campo.'
-      : 'Em bodyAfterImage, use apenas fonte, unidade, período, ressalva ou instrução indispensável; deixe vazio nos demais slides.'
+      : 'subtitle desenvolve a ideia; bodyAfterImage pode acrescentar critério, detalhe, exemplo, instrução ou contexto da evidência (fonte, unidade, período), respeitando os limites da composição. Não mencione arquivos enviados nem o processo de extração.'
     : 'bodyAfterImage' in slide
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}

@@ -6,7 +6,14 @@
  * decisões para a UI e os prompts não precisarem inferi-las por texto solto.
  */
 
-import { buildPitchStrategyBlock, buildPitchFieldRules, buildPitchEvidenceRules, PITCH_PROVENANCE_RULE } from './pitch-content.js';
+import { buildPitchStrategyBlock, buildPitchFieldRules, buildPitchEvidenceRules, buildPitchReviewRules, PITCH_SYSTEM_PT, PITCH_PROVENANCE_RULE } from './pitch-content.js';
+import {
+  presentationSystemForRoute, presentationFieldsForRoute, presentationStrategyForRoute,
+  presentationReviewForRoute, presentationRefineForRoute, presentationLanguageForRoute, presentationImagesForRoute,
+  PRESENTATION_EVIDENCE_RULES, PRESENTATION_PROVENANCE_RULE,
+} from './presentation-content.js';
+
+export { PRESENTATION_PROVENANCE_RULE } from './presentation-content.js';
 
 export const APRESENTACAO_PRESET_ID = 'apresentacao';
 export const PRESENTATION_PRODUCT_KIND = 'apresentacao';
@@ -334,32 +341,9 @@ export function buildApresentacaoPackBlock(slideCount, pathId = DEFAULT_PRESENTA
   if (route.id === 'pitch') {
     return `PACOTE ATIVO — APRESENTAÇÃO / PITCH 16:9 (prioridade sobre fórmulas de carrossel e síntese para palestra):\n${buildPresentationPathBlock(route.id, n)}\n${buildPitchStrategyBlock()}`;
   }
-  return `
-PACOTE ATIVO — APRESENTAÇÃO / DECK 16:9 (prioridade sobre fórmulas de carrossel Instagram):
-Você está a criar SLIDES DE APRESENTAÇÃO (paisagem), não cards de feed vertical.
-Pense em deck profissional: uma ideia por slide, hierarquia clara e espaço para leitura à distância.
-
-Validação do pedido:
-- Qual é a decisão, aprendizagem ou ação que o público deve levar?
-- Quem estará na sala (cliente, investidor, liderança, time ou alunos)?
-- Quais afirmações têm evidência nas fontes e quais ainda são hipóteses?
-
+  return `PACOTE ATIVO — APRESENTAÇÃO / DECK 16:9 (prioridade sobre fórmulas de carrossel Instagram):
 ${buildPresentationPathBlock(route.id, n)}
-REGRAS DE CAMPO (JSON do app):
-- "title": capa/divisor pode ser curto; em slides de conteúdo escreva uma afirmação-conclusão clara, em até duas linhas, que já comunique a mensagem principal.
-- "subtitle": apoio breve à afirmação — implicação, explicação curta ou poucos rótulos. Não transcreva a fala, não crie parágrafos longos e não simule listas com " · ".
-- "bodyAfterImage": quase sempre ""; use para fonte, unidade, período, ressalva ou instrução de atividade indispensável.
-- "imageQuery": inglês, 8–15 palavras, opcional. Prefira evidência, diagrama, demonstração, comparação ou contexto diretamente ligado à afirmação; evite fotografia genérica decorativa.
-- Em slides analíticos, use a estrutura AFIRMAÇÃO → EVIDÊNCIA: título conclusivo e visual que permita verificar ou entender a afirmação.
-- Em pitch, relatório e proposta, números precisam de unidade, período, comparação e fonte. Em keynote, privilegie imagem única, frase única, dado único ou pausa visual.
-- Deck ao vivo: mantenha baixa densidade e deixe explicações secundárias para a fala. Leave-behind: inclua contexto suficiente para o slide fazer sentido sozinho, sem virar documento corrido.
-- Toda tela deve ter título único, ordem de leitura evidente, contraste forte e texto legível à distância; não dependa apenas de cor para comunicar significado.
-- Não escreva "Slide 1" no título. Não use jargão de Instagram (salvar, comentar, feed ou arrastar).
-- Não use mini-ganchos, cliffhangers, "continue", CTA de compartilhar ou qualquer frase que dependa do gesto de deslizar.
-- Não invente métricas, resultados, clientes, preços, citações ou fontes. Quando faltar informação, formule sem fingir precisão.
-
-TOM: profissional, claro e concreto. Prefira substantivos e verbos de decisão a adjetivos vazios.
-`;
+${presentationStrategyForRoute(route)}`;
 }
 
 export function buildApresentacaoIntroLine() {
@@ -369,5 +353,44 @@ export function buildApresentacaoIntroLine() {
 export function buildApresentacaoRefineHint(pathId = DEFAULT_PRESENTATION_PATH_ID) {
   const route = getPresentationPath(pathId);
   if (route.id === 'pitch') return `Pacote Apresentação 16:9 (Pitch):\n${buildPitchFieldRules()}\n${buildPitchEvidenceRules()}\n${PITCH_PROVENANCE_RULE}\nPreserve o caminho do deck, o estágio do negócio e os fatos sustentados. Desenvolva o argumento disponível sem transformá-lo em um slogan.`;
-  return `- Pacote Apresentação 16:9 (${route.label}): capa pode ter title curto; conteúdo usa title como afirmação-conclusão em até duas linhas e subtitle apenas como apoio breve. Prefira evidência visual; bodyAfterImage só para fonte/ressalva/instrução. Preserve o caminho do deck e não use sanduíche de foto, bullets simulados ou CTAs de Instagram.`;
+  return `Pacote Apresentação 16:9 (${route.label}):
+${presentationRefineForRoute(route)}
+Preserve a função desta posição. Ao refinar um slide, os demais são contexto; ao refinar o deck, preserve quantidade e ordem.`;
+}
+
+/** Opções locais à chamada: o caminho nunca muda o provedor global. */
+export function presentationAIOptions(presetId, pathId) {
+  if (!isApresentacaoPreset(presetId)) return {};
+  const route = getPresentationPath(pathId);
+  return { contentMode: route.id === 'pitch' ? 'pitch' : 'presentation', presentationPath: route.id };
+}
+
+export function buildPresentationSystemPrompt(pathId) {
+  const route = getPresentationPath(pathId);
+  return route.id === 'pitch' ? PITCH_SYSTEM_PT : presentationSystemForRoute(route);
+}
+
+export function buildPresentationFieldRules(pathId) {
+  const route = getPresentationPath(pathId);
+  return route.id === 'pitch' ? buildPitchFieldRules() : presentationFieldsForRoute(route);
+}
+
+export function buildPresentationReviewRules(pathId) {
+  const route = getPresentationPath(pathId);
+  return route.id === 'pitch' ? buildPitchReviewRules() : presentationReviewForRoute(route);
+}
+
+export function buildPresentationLanguageRules(pathId, tone) {
+  return presentationLanguageForRoute(getPresentationPath(pathId), tone);
+}
+
+export function buildPresentationImageRules(pathId, topic, projectDirection) {
+  return presentationImagesForRoute(getPresentationPath(pathId), topic, projectDirection);
+}
+
+export function buildPresentationSummaryRules(pathId) {
+  const route = getPresentationPath(pathId);
+  return `RESUMO — ${route.label.toUpperCase()}: sintetize a progressão, evidências e aprendizagem, decisão ou próximo passo do deck. Preserve hipóteses e pendências; não acrescente fatos.
+${route.id === 'pitch' ? buildPitchEvidenceRules() : PRESENTATION_EVIDENCE_RULES}
+${route.id === 'pitch' ? PITCH_PROVENANCE_RULE : PRESENTATION_PROVENANCE_RULE}`;
 }

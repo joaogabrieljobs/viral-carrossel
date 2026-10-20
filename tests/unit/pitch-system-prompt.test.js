@@ -85,10 +85,12 @@ describe('geração e segunda leitura do Pitch', () => {
   it.each([
     { presetId: 'apresentacao', presentationPath: 'keynote_manifesto' },
     { presetId: 'livre', presentationPath: 'pitch' },
-  ])('não aplica o papel do Pitch fora de uma apresentação Pitch (%j)', async mode => {
+  ])('mantém o papel apropriado fora de uma apresentação Pitch (%j)', async mode => {
     const ai = vi.fn().mockResolvedValueOnce(draft).mockResolvedValueOnce({ edits: [] });
     await generateReviewedCarousel({ prompt: '', config: { ...mode, count: 3 } }, ai);
-    for (const [, options] of ai.mock.calls) expect(options.contentMode).toBeUndefined();
+    for (const [, options] of ai.mock.calls) {
+      expect(options.contentMode).toBe(mode.presetId === 'apresentacao' ? 'presentation' : undefined);
+    }
   });
 
   it('geração, revisão e refinamento compartilham critérios factuais e preservam a autonomia do deck', () => {
@@ -114,7 +116,7 @@ describe('geração e segunda leitura do Pitch', () => {
     const language = buildGenerationLanguageLayer('apresentacao', 'provocador', 'viral', 'pitch');
     expect(language).toContain('Clareza factual tem prioridade');
     expect(language).not.toContain('fala do apresentador');
-    expect(buildGenerationImageLayer('apresentacao', 'Tema')).toContain('contexto ou atmosfera');
-    expect(buildGenerationLanguageLayer('apresentacao', 'direto')).toContain('fala do apresentador');
+    expect(buildGenerationImageLayer('apresentacao', 'Tema')).toContain('APOIO VISUAL DE AUTO');
+    expect(buildGenerationLanguageLayer('apresentacao', 'direto')).toContain('Escolha a densidade pelo uso');
   });
 });

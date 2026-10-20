@@ -116,11 +116,12 @@ describe('montagem final dos prompts de texto', () => {
     expect(final).toContain('área de evidência visual');
   });
 
-  it('a geração usa a definição efetiva e só cria imagem quando a composição exige', () => {
+  it('a geração usa a definição efetiva e preserva a escolha editorial de não usar imagem', () => {
     expect(src).toContain('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId)');
     expect(src).toContain('resolvePresentationVisualPresetDefinition(\n      requestedVisualPreset');
     expect(src).toContain('? requestedVisualPresetDef.id');
-    expect(src).toContain('compositionOverrides.presentationRequiresImage === true');
+    expect(src).not.toContain('widescreen presentation visual illustrating:');
+    expect(src).toContain('imageQuery vazia é uma decisão editorial explícita');
     expect(src).toContain('presentationTextLimits = isPresentationGeneration');
     expect(src).toContain('presentationTextLimits,\n      },');
     expect(src).toContain('presentationDesignSystemId: isPresentationGeneration');
@@ -131,8 +132,9 @@ describe('montagem final dos prompts de texto', () => {
       src.indexOf('if (isTendenciaCulturaPreset(cp))', src.indexOf('result.slides.map((s, i) => {')),
     );
     expect(generatedSlides.indexOf('const compositionOverrides'))
-      .toBeLessThan(generatedSlides.indexOf('compositionOverrides.presentationRequiresImage'));
-    expect(generatedSlides).toContain('Capas/divisores tipográficos continuam intencionalmente sem imagem');
+      .toBeLessThan(generatedSlides.indexOf('const base'));
+    expect(generatedSlides).toContain('imageQuery: q');
+    expect(generatedSlides).not.toContain('compositionOverrides.presentationRequiresImage');
   });
 
   it('handlers conectam contexto completo, densidade por posição e legenda compartilhada', () => {
@@ -155,7 +157,9 @@ describe('montagem final dos prompts de texto', () => {
     expect(src).toContain('buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId)');
     expect(src).toContain('buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath)');
     expect(src).toContain('buildGenerationLanguageLayer(cp, tone, effectiveMode, presentationPathId)');
-    expect(single).toContain("contentMode: isPresentationRefine && isPitchPath(presentationPath) ? 'pitch'");
-    expect(bulk).toContain("contentMode: refiningPresentation && isPitchPath(presentationPath) ? 'pitch'");
+    expect(single).toContain('...presentationAIOptions(creativePreset, presentationPath)');
+    expect(bulk).toContain('...presentationAIOptions(creativePreset, presentationPath)');
+    expect(caption).toContain('...presentationAIOptions(creativePreset, presentationPath)');
+    expect(caption).toContain('buildPresentationSummaryRules(presentationPath)');
   });
 });
