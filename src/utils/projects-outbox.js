@@ -4,6 +4,7 @@
  */
 import { dataOwnerAliases, readDataOwner } from './account-data-owner.js';
 import { isAccountDataWriteOwnerCurrent } from './storage.js';
+import { CLOUD_IMAGE_MAX_CHARS, imageContentType } from './cloud-image-assets.js';
 import {
   ProjectApiError, deleteProject, getProject, isProjectConflict,
   isProjectDeletedConflict, putProject,
@@ -15,6 +16,7 @@ const DB_VERSION = 1;
 const TIMEOUT_MS = 8_000;
 const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
+const flushFlights = new Map();
 
 function outboxError(message, code) {
   return new ProjectApiError(message, { code });
@@ -122,7 +124,7 @@ async function transaction(mode, action) {
   });
 }
 
-function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectName = '') {
+function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectName = '', entryFingerprint = null, assets = []) {
   assertActiveOwner(ownerId);
   assertId(projectId);
   assertVersion(baseVersion);
@@ -133,6 +135,22 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
       try {
         assertActiveOwner(ownerId);
         const previous = read.result;
+        const entryJson = kind === 'put' ? JSON.stringify(entry) : '';
+        const pendingAssets = kind === 'put' ? [...new Map([
+          ...(Array.isArray(previous?.assets) ? previous.assets : []), ...assets,
+        ])].filter(([id]) => entryJson.includes(JSON.stringify(id))) : [];
+        // Preparar fotos e transmitir usam a mesma operação. Reenfileirar o
+        // mesmo snapshot não cria uma nova escrita nem invalida seu recibo.
+        if (kind === 'put' && previous?.kind === 'put'
+          && sameSavedEntry(previous.entry, entry)) {
+          const beforeAssets = previous.assets || [];
+          const assetsChanged = beforeAssets.length !== pendingAssets.length
+            || pendingAssets.some(([id, bytes], index) => beforeAssets[index]?.[0] !== id || beforeAssets[index]?.[1] !== bytes);
+          const unchanged = assetsChanged ? { ...previous, assets: pendingAssets } : previous;
+          if (unchanged !== previous) store.put(unchanged);
+          setResult(unchanged);
+          return;
+        }
         const now = Date.now();
         // Uma edição de projeto já excluído só pode voltar à nuvem como um
         // projeto novo após uma escolha explícita da pessoa. Salvar de novo
@@ -157,6 +175,12 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
           ...(effectiveKind === 'review_put_deleted'
             ? { reviewVersion: previous.reviewVersion } : {}),
           opId: operationId(),
+          ...(entryFingerprint ? { entryFingerprint } : {}),
+          ...(pendingAssets.length ? { assets: pendingAssets } : {}),
+          // Só estes hashes permitem reconhecer um envio próprio cuja
+          // resposta se perdeu. Não são uma autorização para sobrescrever
+          // uma edição remota divergente.
+          ...(kind === 'put' ? { predecessors: pendingPredecessors(previous) } : {}),
           createdAt: previous?.createdAt ?? now,
           updatedAt: now,
         };
@@ -170,7 +194,7 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
 }
 
 /** Persiste o JSON enviado ao servidor; rejeita documentos que ele não aceita. */
-export async function queueProjectPut(ownerId, entry, { baseVersion = 0 } = {}) {
+export async function queueProjectPut(ownerId, entry, { baseVersion = 0, assets } = {}) {
   assertId(entry?.id);
   let snapshot;
   try { snapshot = JSON.stringify(entry); }
@@ -178,7 +202,14 @@ export async function queueProjectPut(ownerId, entry, { baseVersion = 0 } = {}) 
   if (!snapshot || new TextEncoder().encode(snapshot).byteLength > MAX_ENTRY_BYTES) {
     throw outboxError('Este projeto excede o tamanho permitido.', 'project_too_large');
   }
-  return persistOperation(ownerId, entry.id, 'put', JSON.parse(snapshot), baseVersion);
+  const prepared = JSON.parse(snapshot);
+  const assetRows = assets == null ? [] : assets instanceof Map ? [...assets] : null;
+  if (!assetRows || assetRows.some(([id, dataUrl]) => typeof id !== 'string'
+    || typeof dataUrl !== 'string' || !imageContentType(dataUrl) || dataUrl.length > CLOUD_IMAGE_MAX_CHARS)) {
+    throw outboxError('Não foi possível proteger as imagens deste projeto na fila local.', 'project_bad_assets');
+  }
+  const fingerprint = await savedEntryFingerprint(prepared);
+  return persistOperation(ownerId, entry.id, 'put', prepared, baseVersion, '', fingerprint, assetRows);
 }
 
 export function queueProjectDelete(ownerId, projectId, { baseVersion = 0, projectName = '' } = {}) {
@@ -343,6 +374,28 @@ function sameSavedEntry(local, remote) {
   return canonicalJson(localContent) === canonicalJson(remoteContent);
 }
 
+async function savedEntryFingerprint(entry) {
+  try {
+    const { updatedAt: _timestamp, ...content } = entry || {};
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(content)));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  } catch { return null; } // Sem prova criptográfica, conserva o conflito.
+}
+
+function pendingPredecessors(previous) {
+  if (!previous || (previous.kind !== 'put' && previous.kind !== 'review_put_billing')) return [];
+  const rows = Array.isArray(previous.predecessors) ? previous.predecessors : [];
+  const next = previous.entryFingerprint ? [...rows, {
+    fingerprint: previous.entryFingerprint, baseVersion: previous.baseVersion,
+  }] : rows;
+  const unique = next.filter((item, index) => typeof item?.fingerprint === 'string'
+    && Number.isSafeInteger(item.baseVersion)
+    && next.findIndex((row) => row.fingerprint === item.fingerprint
+      && row.baseVersion === item.baseVersion) === index);
+  // Mantém o primeiro envio possivelmente em trânsito e os mais recentes.
+  return unique.length > 20 ? [...unique.slice(0, 10), ...unique.slice(-10)] : unique;
+}
+
 const CONFLICT_COPY_SUFFIX = ' (cópia de conflito)';
 
 /** Uma cópia por projeto. Novas gravações atualizam essa cópia em vez de abrir outra. */
@@ -434,6 +487,16 @@ export async function verifyProjectOutboxOwner(ownerId, { signal } = {}) {
 async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
   assertActiveOwner(ownerId);
   const isPut = op.kind === 'put' || op.kind === 'review_put_billing';
+  if (isPut && op.assets?.length) {
+    const { uploadAssetsBestEffort } = await import('./library-sync.js');
+    const uploaded = await uploadAssetsBestEffort(new Map(op.assets), {
+      owner: ownerId, signal, assertCurrent: () => assertActiveOwner(ownerId),
+    });
+    if (uploaded.failed) {
+      throw outboxError('As imagens continuam na fila local. Tente sincronizar novamente.', 'project_asset_upload_failed');
+    }
+    assertActiveOwner(ownerId);
+  }
   try {
     return isPut
       ? await putProject(op.entry, { baseVersion: op.baseVersion, signal, expectedOwnerId, opId: op.opId })
@@ -451,7 +514,7 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
     const remote = await getProject(op.projectId, { signal, expectedOwnerId });
     // A resposta do primeiro envio pode ter se perdido. Comparar a versão
     // atual permite reconhecer o mesmo PUT/DELETE sem reenviar e duplicar.
-    if (isPut && remote && remote.version === op.baseVersion + 1
+    if (isPut && remote && remote.version > op.baseVersion
       && sameSavedEntry(op.entry, remote.entry)) {
       return remote;
     }
@@ -463,6 +526,18 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
     // um tombstone: GET 404 nunca permite recuperar o PUT como cópia.
     if (isPut && !remote) {
       return { id: op.projectId, needsReviewPut: true, cloudVersion: error.cloudVersion };
+    }
+    if (isPut && remote?.version === op.baseVersion + 1 && op.predecessors?.length) {
+      const fingerprint = await savedEntryFingerprint(remote.entry);
+      const isOwnPredecessor = fingerprint && op.predecessors.some((prior) =>
+        prior.baseVersion === op.baseVersion && prior.fingerprint === fingerprint);
+      if (isOwnPredecessor) {
+        // A confirmou na conta; B chegou à fila antes do recibo de A. Só
+        // rebaseia B sobre A comprovado, nunca sobre texto de outra aba.
+        return sendOperation(ownerId, { ...op, baseVersion: remote.version, predecessors: [] }, {
+          signal, expectedOwnerId,
+        });
+      }
     }
     if (isPut) {
       const recoveredCopy = await recoverPutAsCopy(op, { signal, expectedOwnerId });
@@ -480,7 +555,7 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
  * A fila fica intacta se rede, sessão ou versão falharem. Uma edição recebida
  * durante o envio é mantida e herda a versão confirmada da operação anterior.
  */
-export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 } = {}) {
+async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, onConfirmed } = {}) {
   assertActiveOwner(ownerId);
   if (!Number.isSafeInteger(maxOperations) || maxOperations < 1) {
     throw outboxError('Limite de sincronização inválido.', 'project_bad_limit');
@@ -524,6 +599,7 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
         throw outboxError('A nuvem não confirmou a versão do projeto.', 'project_bad_response');
       }
       await acknowledgeProjectOp(ownerId, op, result.version);
+      onConfirmed?.({ projectId: op.projectId, version: result.version, entry: op.entry });
       sent += 1;
     }
   }
@@ -541,4 +617,26 @@ export async function flushProjectOutbox(ownerId, { signal, maxOperations = 100 
     ...(recoveries.length ? { recoveries } : {}),
     ...(needsReview.length ? { needsReview } : {}),
   };
+}
+
+/** Boot, autosave e Salvar não podem transmitir a mesma fila em paralelo. */
+export function flushProjectOutbox(ownerId, options = {}) {
+  const previous = flushFlights.get(ownerId) || Promise.resolve();
+  const task = previous.catch(() => {}).then(async () => {
+    assertActiveOwner(ownerId);
+    if (options.signal?.aborted) throw outboxError('Sincronização cancelada.', 'project_sync_aborted');
+    const run = () => flushProjectOutboxSerial(ownerId, options);
+    // Web Locks também coordena abas. O encadeamento acima atende browsers
+    // sem essa API e conserva cancelamento independente de cada chamador.
+    if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+      return navigator.locks.request(`moont-project-outbox:${ownerId}`, {
+        mode: 'exclusive', ...(options.signal ? { signal: options.signal } : {}),
+      }, run);
+    }
+    return run();
+  });
+  flushFlights.set(ownerId, task);
+  return task.finally(() => {
+    if (flushFlights.get(ownerId) === task) flushFlights.delete(ownerId);
+  });
 }

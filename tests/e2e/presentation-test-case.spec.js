@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const completion = (payload) => ({ choices: [{ message: { content: JSON.stringify(payload) } }] });
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+const pitchArgument = 'O clique isolado não explica o impacto no negócio. A equipe conecta exposição, comportamento esperado e janela de leitura antes de iniciar o experimento. Assim, uma diferença observada pode orientar uma decisão concreta, com responsabilidade clara sobre o próximo passo e sobre os limites da análise.';
+const pitchSupport = 'A hipótese deve definir o mecanismo esperado e o critério de decisão. Um resultado inconclusivo exige rever a pergunta antes de ampliar o investimento.';
 
 const deck = {
   slides: [
@@ -49,7 +51,7 @@ const deck = {
 const fittedReview = {
   edits: [
     { slideIndex: 0, reason: 'Encaixar a capa', title: 'A/B testing para decidir', subtitle: 'Da hipótese à decisão confiável.' },
-    { slideIndex: 1, reason: 'Encaixar o argumento', title: 'Mapeie o funil antes da métrica', subtitle: 'Conecte jornada, sinal e impacto.' },
+    { slideIndex: 1, reason: 'Desenvolver o argumento com o mecanismo e a decisão', title: 'Mapeie o funil antes da métrica', subtitle: pitchArgument, bodyAfterImage: `${pitchSupport}\nFonte: Matéria-prima fornecida` },
     { slideIndex: 2, reason: 'Encaixar o dado', title: 'Testes inconclusivos começam na hipótese', subtitle: 'Defina mecanismo, público e limiar.' },
     { slideIndex: 3, reason: 'Encaixar a evidência', title: 'Leia efeito, incerteza e custo juntos', subtitle: 'A evidência sustenta a decisão.' },
     { slideIndex: 4, reason: 'Encaixar a aplicação', title: 'IA acelera sem eliminar julgamento', subtitle: 'Automatize e preserve o julgamento.' },
@@ -99,6 +101,7 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1680, height: 900 });
   const imageRequests = [];
+  const textPrompts = [];
   await mockApi(page, {
     session: {
       ...SESSAO_ATIVA,
@@ -109,8 +112,33 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
       '/api/ai/compatible': (route) => {
         const prompt = route.request().postDataJSON()?.payload?.messages
           ?.find((message) => message.role === 'user')?.content || '';
+        textPrompts.push(prompt);
+        const payload = prompt.startsWith('PLANEJAMENTO')
+          ? {
+            schemaVersion: 1, promptVersion: 'presentation-plan-v1',
+            objective: 'Organizar testes A/B que apoiem decisões responsáveis.',
+            audience: 'Equipes de produto e liderança.',
+            thesis: 'Uma hipótese clara conecta medição, incerteza e decisão.',
+            evidence: [], gaps: [],
+            slides: deck.slides.map((slide, index) => ({
+              index: index + 1,
+              visualRole: index === 0 ? 'cover' : index === deck.slides.length - 1 ? 'closing' : ['demo', 'content', 'data', 'divider'][index - 1],
+              purpose: ['introduction', 'journey', 'evidence', 'metrics', 'process', 'decision'][index],
+              question: [
+                'Como tornar o teste útil à decisão?',
+                'Qual parte do funil merece ser medida?',
+                'O que torna uma hipótese verificável?',
+                'Como interpretar incerteza e risco?',
+                'Onde a IA ajuda sem substituir julgamento?',
+                'Qual é o próximo experimento a decidir?',
+              ][index],
+              keyMessage: slide.title,
+              evidenceIds: [], imageBrief: slide.imageQuery,
+            })),
+          }
+          : /^REVISÃO (?:EDITORIAL|DE APRESENTAÇÃO)/.test(prompt) ? fittedReview : deck;
         return route.fulfill({
-          json: completion(/^REVISÃO (?:EDITORIAL|DE APRESENTAÇÃO)/.test(prompt) ? fittedReview : deck),
+          json: completion(payload),
         });
       },
       '/api/ai/sjinn-image': (route) => {
@@ -132,7 +160,7 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
 
   await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
-  await page.getByPlaceholder('Ex.: Pitch clínica').fill('Nova apresentação');
+  await page.getByRole('textbox', { name: 'Como se chama este projeto?' }).fill('Nova apresentação');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
 
   const modal = page.locator('.modal-panel');
@@ -149,12 +177,21 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
 
   await expect(modal).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText('Nova apresentação', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Apresentação', exact: true }).first())
+  await expect(page.getByRole('button', { name: /^Apresentação(?: 16:9)?$/ }).first())
     .toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => imageRequests.length, { timeout: 30_000 }).toBe(6);
-  expect(imageRequests.every((request) => request.aspectRatio === '16:9')).toBe(true);
+  expect(imageRequests.every((request) => ['16:9', '3:2', '1:1', '2:3', '9:16'].includes(request.aspectRatio))).toBe(true);
+  expect(imageRequests.some((request) => request.aspectRatio !== '16:9')).toBe(true);
   await expectGeneratedThumbnailsVisible(page, 6);
   await expect.poll(() => persistedSlideImageCount(page), { timeout: 15_000 }).toBe(6);
+  expect(textPrompts).toHaveLength(3);
+  expect(textPrompts[0]).toContain('PLANEJAMENTO ESTRUTURADO');
+  expect(textPrompts[1]).toContain('PITCH COMPLETO PARA LEITURA AUTÔNOMA');
+  expect(textPrompts[1]).not.toContain('bodyAfterImage fica vazio por padrão');
+  expect(textPrompts[2]).toContain('REVISÃO DE PROFUNDIDADE DO PITCH');
+  await expect(page.locator('main').getByText(pitchArgument, { exact: true })).toBeVisible();
+  await expect(page.locator('main').getByText(pitchSupport, { exact: true })).toBeVisible();
+  await expect(page.locator('main').getByText(/Fonte: Matéria-prima/)).toHaveCount(0);
 
   const geometry = await page.evaluate(() => {
     const cards = new Set();
@@ -163,7 +200,9 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
       while (node && node !== document.body) {
         if (node.style.width === '1920px' && node.style.height === '1080px') {
           const rect = node.getBoundingClientRect();
-          if (rect.width > 100 && rect.top > 0 && rect.top < window.innerHeight) cards.add(node);
+          // O editor empilha apresentações; valide também os slides abaixo
+          // da dobra, não somente os dois que cabem no viewport inicial.
+          if (rect.width > 100 && rect.height > 0) cards.add(node);
           break;
         }
         node = node.parentElement;
@@ -239,4 +278,6 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   }
   await expectGeneratedThumbnailsVisible(page, 6);
   await expect.poll(() => persistedSlideImageCount(page), { timeout: 15_000 }).toBe(6);
+  await expect(page.locator('main').getByText(pitchArgument, { exact: true })).toBeVisible();
+  await expect(page.locator('main').getByText(pitchSupport, { exact: true })).toBeVisible();
 });

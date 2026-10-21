@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
 
 const routes = [
   ['Auto', 'estrategista editorial', 'uma única lógica dominante'],
@@ -23,7 +24,19 @@ for (const [label, role, criterion] of routes) {
           const messages = route.request().postDataJSON().payload.messages;
           textRequests.push(messages);
           const user = messages.find(message => message.role === 'user').content;
-          const data = user.startsWith('REVISÃO DE APRESENTAÇÃO')
+          const data = user.startsWith('PLANEJAMENTO ESTRUTURADO')
+            ? {
+              schemaVersion: 1, promptVersion: PRESENTATION_PLAN_PROMPT_VERSION,
+              objective: 'Decidir com critérios verificáveis.', audience: 'Público interessado no tema.', thesis: 'Validar antes de agir.',
+              evidence: [], gaps: [],
+              slides: Array.from({ length: 6 }, (_, index) => ({
+                index: index + 1, visualRole: index === 0 ? 'cover' : index === 5 ? 'closing' : ['content', 'data', 'demo', 'divider'][index - 1],
+                purpose: index === 0 ? 'introduction' : index === 5 ? 'decision' : 'learning',
+                question: `Qual critério considerar na etapa ${index + 1}?`, keyMessage: `Aplicar o critério ${index + 1} antes da decisão.`,
+                evidenceIds: [], imageBrief: '',
+              })),
+            }
+            : user.startsWith('REVISÃO DE APRESENTAÇÃO')
             ? { edits: [{ slideIndex: 1, reason: 'Esclarecer a decisão', subtitle: 'Validar antes de agir.' }] }
             : {
               slides: Array.from({ length: 6 }, (_, index) => ({
@@ -63,14 +76,16 @@ for (const [label, role, criterion] of routes) {
     await modal.getByRole('button', { name: 'Gerar apresentação com imagens', exact: true }).click();
     await expect(modal).toHaveCount(0, { timeout: 30_000 });
     await expect(page.locator('main').getByText('Validar antes de agir.', { exact: true })).toBeVisible();
-    expect(textRequests).toHaveLength(2);
+    expect(textRequests).toHaveLength(3);
     for (const request of textRequests) {
       expect(request.find(message => message.role === 'system').content).toContain(role);
     }
-    const userPrompt = textRequests[0].find(message => message.role === 'user').content;
+    expect(textRequests[0].find(message => message.role === 'user').content).toContain('PLANEJAMENTO ESTRUTURADO');
+    const userPrompt = textRequests[1].find(message => message.role === 'user').content;
     expect(userPrompt).toContain(criterion);
     expect(userPrompt).toContain('Não mencione o arquivo enviado');
-    expect(textRequests[1].find(message => message.role === 'user').content).toContain('REVISÃO DE PROFUNDIDADE');
+    expect(userPrompt).toContain('PLANO EDITORIAL VALIDADO');
+    expect(textRequests[2].find(message => message.role === 'user').content).toContain('REVISÃO DE PROFUNDIDADE');
     expect(imageRequests).toHaveLength(0);
   });
 }

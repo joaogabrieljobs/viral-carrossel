@@ -8,6 +8,11 @@
 
 import React from 'react';
 import { isPitchPath, buildPitchFieldRules, pitchCompositionOverrides } from '../utils/pitch-content.js';
+import {
+  contentAwarePresentationOverrides,
+  resolvePresentationCompositionKind,
+  resolvePresentationVisualRole,
+} from '../utils/presentation-composition.js';
 import { applyVisualPreset, getSlideOverridesForPreset } from './visual-presets.jsx';
 import {
   GENERATED_PRESENTATION_COMPOSITIONS,
@@ -666,9 +671,18 @@ function resolvePresentationDesignSystemPromptPreset(presetOrId) {
   );
 }
 
-export function buildPresentationDesignSystemPromptBlock(presetOrId, presentationPath = 'auto') {
+export function buildPresentationDesignSystemPromptBlock(presetOrId, presentationPath = 'auto', { planned = false } = {}) {
   const selected = resolvePresentationDesignSystemPromptPreset(presetOrId);
   if (!selected) return '';
+  if (planned) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${String(selected.label || '').toUpperCase()}:
+- Direção de marca: ${selected.desc}. Preserve sua paleta, suas fontes e a identidade fornecida.
+- O roteiro validado escolhe a função de cada página: cover (abertura), content (argumento), divider (transição), data (comparação ou evidência), demo (fluxo ou demonstração), closing (decisão). A função determina a composição; não repita uma moldura em todas as posições.
+- Composições próprias para leitura: título conclusivo, desenvolvimento e complemento útil, com faixa livre para a marca. Fotos ocupam uma superfície separada, preservando proporção e assunto.
+- Os limites obrigatórios por slide fornecidos junto ao roteiro são a referência da redação. Nos slides de leitura autônoma, subtitle desenvolve o raciocínio (normalmente 320–360 caracteres no conteúdo); nos caminhos ao vivo, mantenha ritmo com até 180 caracteres e amplie exemplos e explicações nas notas. Não preencha um mínimo com repetição.
+- Capa e fecho têm orçamento próprio. Títulos têm até 90 caracteres e duas a três linhas, respeitando o limite de cada posição. Se faltar espaço, sintetize preservando números, condições e hipóteses; não corte frases ou qualificadores.
+- Comparações, métricas e etapas podem usar presentationBlocks nativos editáveis quando houver dados suficientes. Nesse caso, subtitle contextualiza em até 180 caracteres; bodyAfterImage fica vazio e speakerNotes recebe o complemento. Não repita a tabela em parágrafos.
+- Imagem é opcional: imageQuery pode ser "". Nunca peça foto de um gráfico, screenshot, depoimento ou prova inventados. Informação factual permanece editável no texto ou bloco nativo, com suas condições.
+${isPitchPath(presentationPath) ? buildPitchFieldRules() : ''}`;
   if (isPitchPath(presentationPath)) return `PADRÃO VISUAL DA APRESENTAÇÃO — ${selected.label}:\nDireção: ${selected.desc}\nComposições adaptadas para leitura autônoma: título, argumento e bloco complementar legíveis. A área visual é opcional; não preencha espaços com imagens ou provas fictícias.\n${buildPitchFieldRules()}`;
   const limits = selected.textLimits || {};
   const title = limits.title || {};
@@ -713,16 +727,6 @@ ${evidenceAdaptation}
 `;
 }
 
-const PRESENTATION_DATA_ROLES = new Set([
-  'data', 'metric', 'result', 'matrix', 'comparison', 'priorities',
-]);
-const PRESENTATION_DEMO_ROLES = new Set([
-  'demo', 'example', 'evidence', 'story', 'people', 'application',
-]);
-const PRESENTATION_DIVIDER_ROLES = new Set([
-  'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives',
-]);
-
 function normalizeCompositionInput(input, stageArg, indexArg, countArg) {
   const objectInput = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const isOptions = ['slide', 'stage', 'index', 'count']
@@ -734,18 +738,6 @@ function normalizeCompositionInput(input, stageArg, indexArg, countArg) {
   const index = Math.max(0, Math.trunc(Number(rawIndex) || 0));
   const count = Math.max(1, Math.trunc(Number(rawCount) || 1));
   return { slide, stage, index, count };
-}
-
-function presentationCompositionKind({ slide, stage, index, count }) {
-  if (index === 0) return 'cover';
-  if (index >= count - 1) return 'closing';
-  const role = String(
-    stage?.visualRole || slide?.presentationVisualRole || slide?.visualRole || '',
-  ).trim().toLowerCase();
-  if (PRESENTATION_DATA_ROLES.has(role)) return 'data';
-  if (PRESENTATION_DEMO_ROLES.has(role)) return 'demo';
-  if (PRESENTATION_DIVIDER_ROLES.has(role)) return 'divider';
-  return 'content';
 }
 
 function clonePresentationZones(zones) {
@@ -783,7 +775,7 @@ export function getPresentationCompositionOverrides(
     indexArg,
     countArg,
   );
-  const kind = presentationCompositionKind({ slide, stage, index, count });
+  const kind = resolvePresentationCompositionKind({ slide, stage, index, count });
   const defaults = presetDefinition.presentationDefaults || {};
   const field = kind === 'closing' ? 'closingComposition' : `${kind}Composition`;
   const configuredComposition = defaults[field]
@@ -793,12 +785,7 @@ export function getPresentationCompositionOverrides(
   const profile = PRESENTATION_COMPOSITIONS[compositionId]
     || PRESENTATION_COMPOSITIONS[PRESENTATION_COMPOSITION_ALIASES[defaults.contentComposition]]
     || PRESENTATION_COMPOSITIONS['executive-content'];
-  const visualRole = String(
-    stage?.visualRole
-    || slide?.presentationVisualRole
-    || slide?.visualRole
-    || 'content',
-  ).trim().toLowerCase() || 'content';
+  const visualRole = resolvePresentationVisualRole(slide, stage);
   const presentationAutofit = presetDefinition.autofit
     && typeof presetDefinition.autofit === 'object'
     ? { ...presetDefinition.autofit }
@@ -841,8 +828,9 @@ export function getPresentationCompositionOverrides(
       visualRole,
     },
   };
-  return stage?.contentMode === 'pitch'
-    ? pitchCompositionOverrides(composition, slide, kind)
+  if (stage?.contentMode === 'pitch') return pitchCompositionOverrides(composition, slide, kind);
+  return slide.presentationPlan || (Array.isArray(slide.presentationBlocks) && slide.presentationBlocks.length)
+    ? contentAwarePresentationOverrides(composition, slide, kind, { deliveryMode: stage.deliveryMode })
     : composition;
 }
 

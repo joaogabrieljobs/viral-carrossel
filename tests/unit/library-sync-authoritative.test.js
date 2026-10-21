@@ -106,6 +106,17 @@ describe('leitura autoritativa da biblioteca v2', () => {
     expect(requests.some(({ url }) => url.includes('other-photo'))).toBe(false);
   });
 
+  it('mantém o projeto selecionado em vez de abrir a cópia mais recente ou preferência remota antiga', async () => {
+    const source = manifest();
+    source.docs.unshift({ id: 'conflict-janine', conflictSourceId: 'janine', name: 'Clínica (cópia de conflito)', doc: { slides: [] } });
+    source.activeDocId = 'conflict-janine';
+    fetch.mockImplementation(async () => response({ ok: true, manifest: source }));
+    const result = await pullAccountLibraryAuthoritative({ ...owner, selectedProjectId: 'janine', hydrateImages: 'none' });
+    expect(result.snapshot.activeDocId).toBe('janine');
+    expect(result.snapshot.library).toHaveLength(3);
+    expect(result.snapshot.library[0].id).toBe('conflict-janine');
+  });
+
   it('permite hidratar o detalhe de outro projeto sob demanda', async () => {
     const result = await hydrateProjectEntryFromCloud(manifest().docs[1]);
     expect(result.entry.doc.slides[0].title).toBe('Outro');

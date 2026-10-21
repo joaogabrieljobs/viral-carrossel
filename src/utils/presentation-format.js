@@ -1,4 +1,5 @@
 import { FORMATS } from './formats.js';
+import { normalizePresentationBlocks } from './presentation-quality.js';
 
 export function hasPresentationDesign(slide, creativePreset) {
   return creativePreset === 'apresentacao'
@@ -45,7 +46,7 @@ export function presentationForSocialFormat(source, fmt) {
   for (const key of ['title', 'subtitle']) {
     if (!textFonts[key] && typography?.[key]?.fontFamily) textFonts[key] = typography[key].fontFamily;
   }
-  return {
+  const adapted = {
     ...source,
     layout: 'tl',
     align: 'left',
@@ -96,5 +97,26 @@ export function presentationForSocialFormat(source, fmt) {
         subtitle: { x: 5, y: (titleY + titleH + gap) / h * 100, w: 90, h: supportH / h * 100 },
       },
     },
+  };
+  if (!normalizePresentationBlocks(source.presentationBlocks).length) return adapted;
+  // Native evidence needs its own space in a portrait/square adaptation. It
+  // must not disappear because the social photo layout replaces its zones.
+  const nativeTitleH = Math.min(h * 0.18, titleHeight);
+  const nativeSupportH = Math.min(h * 0.16, supportingHeight);
+  const nativeTitleY = h * 0.16;
+  const nativeSupportY = nativeTitleY + nativeTitleH + gap;
+  const evidenceY = nativeSupportY + nativeSupportH + gap;
+  return {
+    ...adapted,
+    presentationSuppressPhoto: true,
+    presentationRequiresImage: false,
+    overlay: 0, textShadow: false,
+    titleColor: source.titleColor, subtitleColor: source.subtitleColor, textColor: source.textColor,
+    canvas: { ...adapted.canvas, zones: {
+      ...adapted.canvas.zones,
+      title: { x: 6, y: nativeTitleY / h * 100, w: 88, h: nativeTitleH / h * 100 },
+      subtitle: { x: 6, y: nativeSupportY / h * 100, w: 88, h: nativeSupportH / h * 100 },
+      evidence: { x: 6, y: evidenceY / h * 100, w: 88, h: Math.max(25, (bottom - evidenceY) / h * 100) },
+    } },
   };
 }

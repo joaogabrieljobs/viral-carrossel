@@ -20,6 +20,7 @@ import {
   sanitizeCustomVisualPresetBrand,
   sanitizeCustomVisualPresetSlideDefaults,
 } from './custom-visual-presets.js';
+import { resolvePresentationVisualRole } from './presentation-composition.js';
 
 export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
 
@@ -44,11 +45,14 @@ export function presentationStageAt(pathId, index, count) {
 
 function applyResolvedPresentationPresetToSlide(slide, preset, normalizedPath, index, count) {
   const resolvedPresetId = preset?.id || DEFAULT_PRESENTATION_VISUAL_PRESET_ID;
-  const stage = presentationStageAt(normalizedPath, index, count);
+  const stage = {
+    ...presentationStageAt(normalizedPath, index, count),
+    deliveryMode: getPresentationPath(normalizedPath).deliveryMode,
+  };
   const stageMeta = {
     presentationStageId: stage.id || null,
     presentationStageLabel: stage.label || '',
-    presentationVisualRole: stage.visualRole || slide.presentationVisualRole || 'content',
+    presentationVisualRole: resolvePresentationVisualRole(slide, stage),
     presentationPresetId: resolvedPresetId,
     showSwipeCue: false,
   };

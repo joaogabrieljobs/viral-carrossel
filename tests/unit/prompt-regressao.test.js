@@ -117,13 +117,14 @@ describe('montagem final dos prompts de texto', () => {
   });
 
   it('a geração usa a definição efetiva e preserva a escolha editorial de não usar imagem', () => {
-    expect(src).toContain('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId)');
+    expect(src.includes('buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId')).toBe(true);
     expect(src).toContain('resolvePresentationVisualPresetDefinition(\n      requestedVisualPreset');
     expect(src).toContain('? requestedVisualPresetDef.id');
     expect(src).not.toContain('widescreen presentation visual illustrating:');
     expect(src).toContain('imageQuery vazia é uma decisão editorial explícita');
     expect(src).toContain('presentationTextLimits = isPresentationGeneration');
-    expect(src).toContain('presentationTextLimits,\n      },');
+    expect(src.includes('presentationTextLimits,')).toBe(true);
+    expect(src.includes('presentationPlanning: isPresentationGeneration && !remix')).toBe(true);
     expect(src).toContain('presentationDesignSystemId: isPresentationGeneration');
     expect(src).toContain('effectiveVisualPresetDef?.sourceVersion || null');
 

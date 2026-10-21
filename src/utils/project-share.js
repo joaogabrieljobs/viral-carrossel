@@ -656,8 +656,10 @@ export function readShareCodeFromSearch(search) {
 export function stashPendingShareCode(code) {
   const normalized = normalizeShareCode(code);
   if (!normalized || typeof sessionStorage === 'undefined') return '';
-  try { sessionStorage.setItem(PENDING_SHARE_KEY, normalized); } catch { /* */ }
-  return normalized;
+  try {
+    sessionStorage.setItem(PENDING_SHARE_KEY, normalized);
+    return normalizeShareCode(sessionStorage.getItem(PENDING_SHARE_KEY)) === normalized ? normalized : '';
+  } catch { return ''; }
 }
 
 export function peekPendingShareCode() {
@@ -669,26 +671,29 @@ export function peekPendingShareCode() {
   }
 }
 
-export function consumePendingShareCode() {
-  const code = peekPendingShareCode();
-  if (!code || typeof sessionStorage === 'undefined') return code;
+export function consumePendingShareCode(expectedCode) {
+  const code = peekPendingShareCode() || readShareCodeFromSearch(globalThis.location?.search);
+  if (!code || (expectedCode && normalizeShareCode(expectedCode) !== code)) return '';
   try { sessionStorage.removeItem(PENDING_SHARE_KEY); } catch { /* */ }
+  clearShareCodeFromLocation(code);
   return code;
 }
 
-/** Grava ?share= no stash e remove da URL (OAuth / reload limpos). */
+function clearShareCodeFromLocation(code) {
+  if (readShareCodeFromSearch(globalThis.location?.search) !== code) return;
+  try {
+    const url = new URL(globalThis.location.href);
+    url.searchParams.delete('share');
+    globalThis.history?.replaceState?.({}, '', url.pathname + url.search + url.hash);
+  } catch { /* Keep the original URL when the browser cannot replace it. */ }
+}
+
+/** Remove ?share= only after durable stash; blocked storage keeps the retry link. */
 export function captureShareInviteFromLocation() {
   if (typeof globalThis === 'undefined' || !globalThis.location) return '';
   const fromUrl = readShareCodeFromSearch(globalThis.location.search);
-  if (fromUrl) stashPendingShareCode(fromUrl);
+  const stored = fromUrl ? stashPendingShareCode(fromUrl) : '';
   const pending = peekPendingShareCode();
-  if (fromUrl) {
-    try {
-      const url = new URL(globalThis.location.href);
-      url.searchParams.delete('share');
-      const next = url.pathname + url.search + url.hash;
-      globalThis.history?.replaceState?.({}, '', next);
-    } catch { /* */ }
-  }
-  return pending;
+  if (stored === fromUrl && fromUrl) clearShareCodeFromLocation(fromUrl);
+  return fromUrl || pending;
 }

@@ -1,6 +1,7 @@
 import { FORMATS } from './formats.js';
 import { LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
+import { restorePresentationPhotoComposition } from './presentation-composition.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -133,12 +134,13 @@ export function brandForFormatDisplay(brand, fmt, formatViews, creativePreset) {
 /** Slide só para desenhar. A composição original do documento não muda. */
 export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
   if (!slide || !fmt || !FORMATS[fmt]) return slide;
+  const source = restorePresentationPhotoComposition(slide);
   const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(slide, creativePreset);
   if (fmt === 'carrossel' && !adaptPresentation) return slide;
   const entry = viewEntry(formatViews, fmt, slide.id) || {};
   const base = adaptPresentation
-    ? presentationForSocialFormat(slideForFormatDisplay(slide, 'apresentacao', formatViews), fmt)
-    : slide;
+    ? presentationForSocialFormat(slideForFormatDisplay(source, 'apresentacao', formatViews), fmt)
+    : source;
   const next = { ...base, ...entry };
   // Ajustes já gravados antes da opção automática também são escolhas manuais.
   if (adaptPresentation && !entry.photoFraming

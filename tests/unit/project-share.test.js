@@ -8,6 +8,7 @@ import {
   stashPendingShareCode,
   peekPendingShareCode,
   consumePendingShareCode,
+  captureShareInviteFromLocation,
   readShareCodeFromSearch,
   PENDING_SHARE_KEY,
 } from '../../src/utils/project-share.js';
@@ -271,5 +272,40 @@ describe('team share invite link', () => {
     expect(sessionStorage.getItem(PENDING_SHARE_KEY)).toBe('HELLO12');
     expect(consumePendingShareCode()).toBe('HELLO12');
     expect(peekPendingShareCode()).toBe('');
+  });
+
+  it('guarda o convite antes de limpar a URL e o mantém entre capturas de login', () => {
+    vi.stubGlobal('location', new URL('https://moont.ai/?share=AB12CD34&app=1#editor'));
+    const replaceState = vi.fn((_state, _title, url) => {
+      vi.stubGlobal('location', new URL(url, 'https://moont.ai'));
+    });
+    vi.stubGlobal('history', { replaceState });
+    expect(captureShareInviteFromLocation()).toBe('AB12CD34');
+    expect(replaceState).toHaveBeenCalledWith({}, '', '/?app=1#editor');
+    expect(captureShareInviteFromLocation()).toBe('AB12CD34');
+    expect(consumePendingShareCode('AB12CD34')).toBe('AB12CD34');
+    expect(captureShareInviteFromLocation()).toBe('');
+  });
+
+  it('preserva o link quando sessionStorage está bloqueado e limpa só após aceitar', () => {
+    vi.stubGlobal('sessionStorage', {
+      getItem: () => { throw new Error('blocked'); },
+      setItem: () => { throw new Error('blocked'); },
+      removeItem: () => { throw new Error('blocked'); },
+    });
+    vi.stubGlobal('location', new URL('https://moont.ai/?share=AB12CD34&app=1'));
+    const replaceState = vi.fn();
+    vi.stubGlobal('history', { replaceState });
+    expect(captureShareInviteFromLocation()).toBe('AB12CD34');
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(consumePendingShareCode('AB12CD34')).toBe('AB12CD34');
+    expect(replaceState).toHaveBeenCalledWith({}, '', '/?app=1');
+  });
+
+  it('uma resposta atrasada não consome um convite mais novo', () => {
+    stashPendingShareCode('AB12CD34');
+    stashPendingShareCode('ZZ99YY88');
+    expect(consumePendingShareCode('AB12CD34')).toBe('');
+    expect(peekPendingShareCode()).toBe('ZZ99YY88');
   });
 });

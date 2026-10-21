@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
+import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import {
   acknowledgeProjectOp, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listPendingProjectOps, queueProjectDelete, queueProjectPut,
@@ -145,6 +146,135 @@ describe('outbox durável por projeto', () => {
     });
     expect(await acknowledgeProjectOp(ALICE, next, 2)).toBe(true);
     expect(await listPendingProjectOps(ALICE)).toEqual([]);
+  });
+
+  it('reenfileirar o mesmo snapshot conserva a operação em trânsito, inclusive com updatedAt novo', async () => {
+    const first = await queueProjectPut(ALICE, {
+      id: 'janine', updatedAt: 1, doc: { title: 'Texto', format: 'portrait' },
+    }, { baseVersion: 2 });
+    const repeated = await queueProjectPut(ALICE, {
+      id: 'janine', updatedAt: 2, doc: { format: 'portrait', title: 'Texto' },
+    }, { baseVersion: 2 });
+    expect(repeated.opId).toBe(first.opId);
+    expect(await acknowledgeProjectOp(ALICE, first, 3)).toBe(true);
+    expect(await listPendingProjectOps(ALICE)).toEqual([]);
+  });
+
+  it('serializa boot e autosave concorrentes para não enviar a mesma operação duas vezes', async () => {
+    await queueProjectPut(ALICE, { id: 'janine', doc: { title: 'Texto' } }, { baseVersion: 2 });
+    let finishPut;
+    let putCount = 0;
+    fetch.mockImplementation(async (url) => {
+      if (url === '/api/auth/session') return session();
+      putCount += 1;
+      return new Promise((resolve) => { finishPut = resolve; });
+    });
+    const first = flushProjectOutbox(ALICE);
+    await vi.waitFor(() => expect(finishPut).toBeTypeOf('function'));
+    const second = flushProjectOutbox(ALICE);
+    await Promise.resolve();
+    expect(putCount).toBe(1);
+    finishPut(json({ ok: true, project: { id: 'janine', version: 3 } }));
+    expect(await first).toEqual({ sent: 1, pending: 0 });
+    expect(await second).toEqual({ sent: 0, pending: 0 });
+    expect(putCount).toBe(1);
+  });
+
+  it('reconhece antecessor próprio com resposta perdida antes de enviar o formato mais recente', async () => {
+    const firstEntry = { id: 'janine', name: 'Halloween', doc: { format: 'presentation', title: 'Texto inteiro' } };
+    await queueProjectPut(ALICE, firstEntry, { baseVersion: 2 });
+    // A foi gravada na conta, mas a resposta não chegou ao navegador.
+    fetch.mockResolvedValueOnce(session()).mockRejectedValueOnce(new TypeError('Resposta perdida'));
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ code: 'project_network_error' });
+    const latestEntry = { ...firstEntry, doc: { ...firstEntry.doc, format: 'portrait' } };
+    await queueProjectPut(ALICE, latestEntry, { baseVersion: 2 });
+    const onConfirmed = vi.fn();
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+      .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 3, entry: { ...firstEntry, updatedAt: 700 } } }))
+      .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 4, entry: latestEntry } }));
+    expect(await flushProjectOutbox(ALICE, { onConfirmed })).toEqual({ sent: 1, pending: 0 });
+    const lastPut = JSON.parse(fetch.mock.calls.at(-1)[1].body);
+    expect(lastPut).toMatchObject({ baseVersion: 3, entry: latestEntry });
+    expect(onConfirmed).toHaveBeenCalledWith({ projectId: 'janine', version: 4, entry: latestEntry });
+    expect(fetch.mock.calls.some(([, request]) => request?.body?.includes('conflict-janine'))).toBe(false);
+  });
+
+  it('não usa antecessor local para sobrescrever uma edição remota divergente', async () => {
+    const firstEntry = { id: 'janine', name: 'Halloween', doc: { title: 'Antes' } };
+    await queueProjectPut(ALICE, firstEntry, { baseVersion: 2 });
+    await queueProjectPut(ALICE, { ...firstEntry, doc: { title: 'Depois' } }, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Conflito', code: 'project_conflict', cloudVersion: 3 }, 409))
+      .mockResolvedValueOnce(json({ ok: true, project: {
+        id: 'janine', version: 3, entry: { ...firstEntry, doc: { title: 'Outro dispositivo' } },
+      } }))
+      .mockResolvedValueOnce(json({ ok: true, project: { id: 'conflict-janine', version: 1 } }));
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ recoveries: [{ sourceProjectId: 'janine' }] });
+    const puts = fetch.mock.calls.filter(([, request]) => request?.method === 'PUT')
+      .map(([, request]) => JSON.parse(request.body));
+    expect(puts.map((body) => [body.entry.id, body.baseVersion])).toEqual([['janine', 2], ['conflict-janine', 0]]);
+  });
+
+  it('mantém bytes novos na fila durável e envia a imagem antes do PUT depois de reabrir a fila', async () => {
+    const photo = 'data:image/png;base64,bmV3LXBob3RvLWFmdGVyLXNhdmU=';
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'janine', doc: { slides: [{ id: 's1', title: 'Novo texto', bgImageAssetId: assetId }] } };
+    const op = await queueProjectPut(ALICE, entry, { baseVersion: 2, assets: new Map([[assetId, photo]]) });
+    expect(idb.records.get(op.key).assets).toEqual([[assetId, photo]]);
+    // Nenhum cache JS é necessário: a leitura abre outra conexão IDB.
+    const restored = await getPendingProjectOp(ALICE, 'janine');
+    expect(restored.assets).toEqual([[assetId, photo]]);
+    const events = [];
+    fetch.mockImplementation(async (url, request) => {
+      if (url === '/api/auth/session') return session();
+      if (url === '/api/library-sync') {
+        const body = JSON.parse(request.body);
+        expect(body).toMatchObject({ action: 'putAsset', assetId, dataUrl: photo });
+        events.push('asset');
+        return json({ ok: true, assetId });
+      }
+      events.push('project');
+      expect(events[0]).toBe('asset');
+      expect(JSON.parse(request.body).entry.doc.slides[0].bgImageAssetId).toBe(assetId);
+      return json({ ok: true, project: { id: 'janine', entry, version: 3 } });
+    });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 1, pending: 0 });
+    expect(events).toEqual(['asset', 'project']);
+    expect(await getPendingProjectOp(ALICE, 'janine')).toBeNull();
+  });
+
+  it('falha no upload mantém manifesto e bytes pendentes sem publicar referências órfãs', async () => {
+    const photo = 'data:image/png;base64,cGhvdG8tdXBsb2FkLWZhaWxlZA==';
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'janine', doc: { slides: [{ id: 's1', bgImageAssetId: assetId }] } };
+    const op = await queueProjectPut(ALICE, entry, { assets: new Map([[assetId, photo]]) });
+    fetch.mockImplementation(async (url) => url === '/api/auth/session'
+      ? session() : json({ error: 'Upload indisponível.' }, 503));
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ code: 'project_asset_upload_failed' });
+    expect(fetch.mock.calls.some(([url]) => url === '/api/projects')).toBe(false);
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ opId: op.opId, entry, assets: [[assetId, photo]] });
+  });
+
+  it('adiciona bytes ao mesmo snapshot sem trocar o ID da operação', async () => {
+    const photo = 'data:image/png;base64,c2FtZS1vcC1hc3NldA==';
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'janine', doc: { slides: [{ id: 's1', bgImageAssetId: assetId }] } };
+    const first = await queueProjectPut(ALICE, entry);
+    const second = await queueProjectPut(ALICE, entry, { assets: new Map([[assetId, photo]]) });
+    expect(second.opId).toBe(first.opId);
+    expect((await getPendingProjectOp(ALICE, 'janine')).assets).toEqual([[assetId, photo]]);
+  });
+
+  it('edita texto sem perder bytes já pendentes e deixa de enviar uma foto removida', async () => {
+    const photo = 'data:image/png;base64,cGVuZGluZy1waG90by1ieXRlcw==';
+    const assetId = await originalImageAssetId(photo);
+    const entry = { id: 'janine', doc: { slides: [{ id: 's1', title: 'Antes', bgImageAssetId: assetId }] } };
+    await queueProjectPut(ALICE, entry, { assets: new Map([[assetId, photo]]) });
+    await queueProjectPut(ALICE, { ...entry, doc: { slides: [{ ...entry.doc.slides[0], title: 'Depois' }] } });
+    expect((await getPendingProjectOp(ALICE, 'janine')).assets).toEqual([[assetId, photo]]);
+    await queueProjectPut(ALICE, { ...entry, doc: { slides: [{ id: 's1', title: 'Sem foto' }] } });
+    expect((await getPendingProjectOp(ALICE, 'janine')).assets).toBeUndefined();
   });
 
   it('não transmite dados de outra conta, mesmo quando o cookie mudou antes do flush', async () => {

@@ -4,6 +4,22 @@ export function decideCloudAutoPush({ key, lastKey, dirty, inFlight }) {
   return { lastKey: key, schedule: !inFlight, defer: inFlight };
 }
 
+/** Abrir uma biblioteca não troca silenciosamente o projeto que a pessoa escolheu. */
+export function selectRestoredProjectId({ library = [], preferredId, metadataActiveId, manifestActiveId } = {}) {
+  const live = Array.isArray(library) ? library.filter((entry) => entry?.id) : [];
+  for (const id of [preferredId, metadataActiveId, manifestActiveId]) {
+    if (id && live.some((entry) => entry.id === id)) return id;
+  }
+  return live.find((entry) => !entry.conflictSourceId)?.id || live[0]?.id || '';
+}
+
+/** Um snapshot confirmado pode ter uma edição sucessora ainda por enviar. */
+export function cloudSaveContinuation({ source, current, sameOwner }) {
+  if (!sameOwner) return 'owner_changed';
+  if (current) return 'confirmed';
+  return source === 'sync' || source === 'logout' ? 'changed_before_restore' : 'send_latest';
+}
+
 const OUTBOX_UNAVAILABLE_CODES = new Set([
   'project_outbox_unavailable', 'project_outbox_timeout', 'project_outbox_failed',
 ]);

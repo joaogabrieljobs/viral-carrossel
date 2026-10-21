@@ -14,6 +14,7 @@ import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 import { normalizeBrandTone } from './brand-tone.js';
 import { genModeUiLabel } from './ui-depth-labels.js';
 import { isPitchPath, buildPitchFieldRules } from './pitch-content.js';
+import { buildPresentationMaterial } from './presentation-material.js';
 import {
   buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules,
 } from './presentation.js';
@@ -224,16 +225,32 @@ function isPersoHybridDensity(presetId, densityId) {
   return presetId === 'livre' && (densityId === '1_1' || densityId === '1_2');
 }
 
-function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
+function persoHybridCharBands(textDensityId = '1_1', narrativeModeId = 'editorial') {
+  if (narrativeModeId !== 'viral') return tendenciaStyleSandwichCharBands(textDensityId);
+  // Retention copy is not the dense Cultura essay. Split the selected mode's
+  // single-copy budget between the two existing visual regions instead of
+  // imposing two long paragraphs independently of the chosen mode.
+  const band = scaledCharBand(...midSubtitleBandFor(narrativeModeId), textDensityId);
+  return {
+    subLo: Math.max(24, Math.round(band.lo * 0.58)),
+    subHi: Math.max(32, Math.round(band.hi * 0.58)),
+    bodyLo: Math.max(20, Math.round(band.lo * 0.42)),
+    bodyHi: Math.max(24, Math.round(band.hi * 0.42)),
+  };
+}
+
+function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1', narrativeModeId = 'editorial') {
   const n = Math.min(12, Math.max(2, slideCount | 0));
-  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
+  const { subLo, subHi, bodyLo, bodyHi } = persoHybridCharBands(textDensityId || '1_1', narrativeModeId);
+  const attention = narrativeModeId === 'viral';
   return `
 LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
 
 - Slide 1 e Slide 2: subtítulo até ${scaledCeiling(80, textDensityId)} caracteres; formato de tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
 
 - A segunda tela já desenvolve o argumento; não repita a abertura. O último slide conclui o arco, mesmo usando dois blocos.
-- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche (como Pacote Tendência/Cultura): bloco inicial em "subtitle" (+ "title" se fizer sentido) ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Com ou sem foto, preencha **subtitle** com **${subLo}–${subHi}** caracteres (prosa de várias frases, não headline solta) e **bodyAfterImage** com **${bodyLo}–${bodyHi}** caracteres. As faixas incluem espaços e são alvos: não acrescente redundância ou fatos para atingir o piso. Preserve o ritmo do modo com frases curtas dentro de cada bloco. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
+- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche: bloco inicial em "subtitle" ${attention ? 'e "title" OBRIGATÓRIO, curto e específico' : '(+ "title" se fizer sentido)'} ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Com ou sem foto, ${attention ? 'subtitle tem alvo de' : 'preencha **subtitle** com'} **${subLo}–${subHi}** caracteres ${attention ? '(uma frase curta com informação)' : '(prosa de várias frases, não headline solta)'} e **bodyAfterImage** ${attention ? 'pode acrescentar um payoff de' : 'com'} **${bodyLo}–${bodyHi}** caracteres.${attention ? ' Pode deixar o payoff vazio se a ideia já estiver completa; não repita a legenda para preencher a zona.' : ''} As faixas incluem espaços e são alvos: não acrescente redundância ou fatos para atingir o piso. Preserve o ritmo do modo com frases curtas dentro de cada bloco. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
+${attention ? '- Modo Prender atenção: TODOS os cards, inclusive 3 em diante e o fecho, exigem title não vazio. Nunca use "Seu título aqui" nem coloque o texto inteiro no subtitle. O título entrega o gancho; subtitle o desenvolve e bodyAfterImage só complementa. Este é um layout, não uma troca do modo narrativo para Cultura.' : ''}
 - Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
 - Slide só texto SEM foto neste formato: imageQuery ""; use "subtitle" + "bodyAfterImage" em dupla coluna tipográfica (sem sanduíche de foto).
 `;
@@ -471,11 +488,13 @@ async function fetchMaterialUrlSnippets(material) {
 
 /** Monta os blocos de material para o prompt da IA e, se houver URL(s), obtém texto no servidor antes. `toastCb` opcional — (msg, kind, ttl?). */
 async function resolveMaterialPromptParts(material, toastCb, options = {}) {
-  if (options.presentationPath != null && normalizedMaterialPieces(material).c.length > 40_000) {
-    toastCb?.(`O conteúdo base excede 40 mil caracteres. ${isPitchPath(options.presentationPath) ? 'Este Pitch' : 'Esta apresentação'} usará o início do texto; reduza o material para incluir todos os pontos essenciais.`, 'warning', 8000);
-  }
   const urls = extractHttpUrlsFromMaterial(material);
   if (!urls.length) {
+    if (options.presentationPath != null) {
+      const result = presentationMaterialParts(material, [], options);
+      if (result.partial) toastCb?.('O material é extenso. Selecionamos trechos relevantes de todo o conteúdo para planejar a apresentação.', 'info', 6000);
+      return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, []) };
+    }
     return {
       materialBlock: buildMaterialBlock(material, [], options),
       materialPriorityBlock: buildMaterialPriorityBlock(material, []),
@@ -495,10 +514,24 @@ async function resolveMaterialPromptParts(material, toastCb, options = {}) {
       toastCb('Algumas URLs não devolveram texto; a IA usará as que funcionaram.', 'warning', 4500);
     }
   }
+  if (options.presentationPath != null) {
+    const result = presentationMaterialParts(material, urlSnippets, options);
+    if (result.partial) toastCb?.('O material é extenso. Selecionamos trechos relevantes de todo o conteúdo para planejar a apresentação.', 'info', 6000);
+    return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets) };
+  }
   return {
     materialBlock: buildMaterialBlock(material, urlSnippets, options),
     materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets),
   };
+}
+
+function presentationMaterialParts(material, urlSnippets, options) {
+  const { c, s, x } = normalizedMaterialPieces(material);
+  const ref = material?.refProfileId && REFERENCE_PROFILE_BY_ID[material.refProfileId];
+  return buildPresentationMaterial({
+    content: c, references: s, instructions: x, referenceVoice: ref?.promptBlock || '',
+    urlSnippets, additionalSources: options.additionalSources || [], topic: options.topic || '',
+  });
 }
 
 function materialHasUserInput(material) {
@@ -509,12 +542,13 @@ function materialHasUserInput(material) {
 }
 
 const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
+  if (options.presentationPath != null) return presentationMaterialParts(material, urlSnippets, options).materialBlock;
   const parts = [];
   const { c, s, x } = normalizedMaterialPieces(material);
-  const presentation = options.presentationPath != null;
-  const contentLimit = presentation ? 40_000 : 8000;
+  const presentation = false;
+  const contentLimit = 8000;
   // Reserva espaço para instruções e para o rascunho na segunda chamada.
-  const fetchedLimit = presentation ? 60_000 - Math.min(c.length, contentLimit) : 62_000;
+  const fetchedLimit = 62_000;
   const refId = material?.refProfileId;
   const ref = refId && REFERENCE_PROFILE_BY_ID[refId];
 
@@ -903,7 +937,7 @@ function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, text
     return buildPresentationFieldRules(presentationPath);
   }
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
-    return buildPersoHybridLayoutBlock(slideCount, textDensityId);
+    return buildPersoHybridLayoutBlock(slideCount, textDensityId, narrativeModeId);
   }
   const base = midSubtitleBandFor(narrativeModeId);
   const { lo: midLo, hi: midHi } = scaledCharBand(...base, textDensityId);
@@ -1113,7 +1147,7 @@ function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', { p
   const sandwich = positioned && ((culture && slideIndex > 0 && slideIndex < slideCount - 1) || (hybrid && slideIndex >= 2));
   let denHint = buildSlideTextDensityRefineHint(textDensityId);
   if (sandwich) {
-    const b = tendenciaStyleSandwichCharBands(textDensityId);
+    const b = hybrid ? persoHybridCharBands(textDensityId, narrativeModeId) : tendenciaStyleSandwichCharBands(textDensityId);
     denHint = `- Alvos deste slide: subtitle ${b.subLo}–${b.subHi} caracteres; bodyAfterImage ${b.bodyLo}–${b.bodyHi}. Desenvolva a mesma ideia em dois blocos sem repetição, sem forçar o piso.\n`;
     if (culture) denHint += '- No miolo Cultura, title = ""; primeira frase de subtitle é o gancho.\n';
   } else if (positioned) {
@@ -1380,7 +1414,7 @@ ${isPresentation
     : 'bodyAfterImage' in slide
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}
-Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **duas** asteriscos. Não use asterisco simples: o card mostraria o símbolo. Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
+Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **asteriscos duplos**; para itálico use _underscores_. Esses marcadores são formatados pelo card, não são texto literal. Não use outros recursos de Markdown. Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
 ${JSON.stringify({ slides: [slide], caption: '', ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}) })}`;
 }
 

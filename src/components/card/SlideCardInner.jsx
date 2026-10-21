@@ -5,6 +5,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { Layout, Minus, Plus, Video, User } from 'lucide-react';
 import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
+import PresentationBlocks from '../PresentationBlocks.jsx';
+import { normalizePresentationBlocks } from '../../utils/presentation-quality.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { resolveSlideBrandBg } from '../../utils/brand-helpers.js';
@@ -453,7 +455,8 @@ function BrandLogoLayer({
   const { style: _ignored, ...handlers } = elementProps || {};
   const hitBox = hit || { left: 0, top: 0, width: box, height: box };
   return (
-    <div style={style} aria-hidden={movable ? undefined : true}>
+    <div style={style} aria-hidden={movable ? undefined : true}
+      data-vc-logo-visible-rect={`${hitBox.left},${hitBox.top},${hitBox.width},${hitBox.height}`}>
       <img
         src={active}
         data-vc-brand-logo=""
@@ -819,6 +822,7 @@ const ClassicCanvasInner = React.forwardRef(({
   const pendingPhotoZone = slideHasPendingPhotoIntent(slide) && !slide.bgImage && !slide.bgImageId;
   const photoFailed = slide.bgImageFailed === true || (!!slide.bgImage && imgReady && imgErr);
   const supportingText = showSupportingText ? String(slide.bodyAfterImage || '').trim() : '';
+  const nativeEvidence = showSupportingText && normalizePresentationBlocks(slide.presentationBlocks).length > 0;
   const photoZoneInteractive = !!(onPhotoZoneClick && (showCanvasChrome || pendingPhotoZone || photoFailed));
   const photoZoneNativeHit = !!(photoZoneInteractive && onPhotoZoneFileChange);
   const evidenceGlassActive = presentationEvidenceGlassActive(slide);
@@ -901,7 +905,7 @@ const ClassicCanvasInner = React.forwardRef(({
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
-      <div
+      {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
         data-vc-photo-zone="1"
         data-vc-presentation-glass={evidenceGlassActive ? 'evidence' : undefined}
@@ -920,10 +924,10 @@ const ClassicCanvasInner = React.forwardRef(({
             aria-label="Importar imagem na zona da foto"
           />
         ) : null}
-      </div>
+      </div>}
 
       <OverflowScaler
-        containerProps={movOu('title')}
+        containerProps={{ ...movOu('title'), 'data-vc-quality-zone': showSupportingText ? 'title' : undefined }}
         containerStyle={{
           ...pctBox(tr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -1000,7 +1004,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </OverflowScaler>
 
       <OverflowScaler
-        containerProps={movOu('subtitle')}
+        containerProps={{ ...movOu('subtitle'), 'data-vc-quality-zone': showSupportingText ? 'subtitle' : undefined }}
         containerStyle={{
           ...pctBox(sr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -1134,6 +1138,17 @@ const ClassicCanvasInner = React.forwardRef(({
         </div>
         )}
       </OverflowScaler>
+
+      {nativeEvidence && zcv.evidence && <PresentationBlocks
+        blocks={slide.presentationBlocks}
+        rect={zcv.evidence}
+        frame={f}
+        ink={bodyInk}
+        background={bg}
+        fontFamily={bodyAfterFF}
+        forExport={forExport}
+        onChange={(blocks) => onInlineTextChange?.('presentationBlocks', blocks)}
+      />}
 
       {culture && (() => {
         const hasHdr = !!(brand.cultureHeaderLeft || '').trim() || !!(brand.cultureHeaderYear || '').trim();
@@ -3628,7 +3643,7 @@ const SlideCardInner = React.forwardRef(({
                         lineHeight: hasTitle ? 1.15 : 1.05,
                         letterSpacing: hasTitle ? '0.06em' : '-0.025em',
                         textTransform: 'none',
-                      }}>{parts.label}</span>
+                      }}>{textoComDestaque(parts.label, null, cultureAccentCol, 700)}</span>
                       {parts.support && (
                         <span data-vc-subtitle-support style={{
                           display: 'block',
@@ -3640,7 +3655,7 @@ const SlideCardInner = React.forwardRef(({
                           letterSpacing: '0.005em',
                           textTransform: 'none',
                           opacity: 0.86,
-                        }}>{parts.support}</span>
+                        }}>{textoComDestaque(parts.support, null, cultureAccentCol, 700)}</span>
                       )}
                     </>
                   );
@@ -3770,6 +3785,7 @@ const SlideCardInner = React.forwardRef(({
     <div
       ref={cardSurfaceRef}
       data-vc-card-surface={slide.id}
+      data-vc-presentation={presentationMode ? 'true' : undefined}
       data-vc-framing-pending={slide.autoPhotoPending ? 'true' : undefined}
       onPointerDownCapture={onCreateText && !forExport ? (event) => {
         if (!event.ctrlKey || event.button !== 0) return;

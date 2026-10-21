@@ -51,4 +51,16 @@ describe('procedure label hierarchy in full-bleed cards', () => {
     expect(html).not.toContain('data-vc-subtitle-label');
     expect(html).toContain('EMAGRECIMENTO Acompanhamento médico individualizado.');
   });
+
+  it.each([false, true])('renders emphasis inside the automatic supporting sentence, export=%s', forExport => {
+    const html = render('SUA MARCA Uma *porta de entrada de verdade*, com _continuidade_ e **clareza**.', { forExport });
+    expect(html).toContain('data-vc-subtitle-label');
+    expect(html).toContain('data-vc-subtitle-support');
+    expect(html).toContain('data-vc-italic="true"');
+    expect(html).toContain('data-vc-destaque="true"');
+    expect(html).toContain('>porta de entrada de verdade</span>');
+    expect(html).not.toContain('*porta de entrada de verdade*');
+    expect(html).not.toContain('_continuidade_');
+    expect(html).not.toContain('**clareza**');
+  });
 });

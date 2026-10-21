@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  selectRestoredProjectId,
 } from '../../src/utils/project-sync-control.js';
 
 describe('gatilho de salvamento automático', () => {
@@ -19,6 +20,33 @@ describe('gatilho de salvamento automático', () => {
     expect(decideCloudAutoPush({
       key: 'edit-2', lastKey: 'edit-1', dirty: true, inFlight: true,
     })).toMatchObject({ schedule: false, defer: true });
+  });
+});
+
+describe('edições durante um envio confirmado', () => {
+  it('continua autosave e Salvar sem transformar edição sucessora em conflito', () => {
+    for (const source of ['auto', 'salvar', 'profile']) {
+      expect(cloudSaveContinuation({ source, current: false, sameOwner: true })).toBe('send_latest');
+    }
+    for (const source of ['sync', 'logout']) {
+      expect(cloudSaveContinuation({ source, current: false, sameOwner: true })).toBe('changed_before_restore');
+    }
+    expect(cloudSaveContinuation({ source: 'auto', current: true, sameOwner: false })).toBe('owner_changed');
+    expect(cloudSaveContinuation({ source: 'auto', current: true, sameOwner: true })).toBe('confirmed');
+  });
+});
+
+describe('projeto selecionado ao restaurar a conta', () => {
+  const library = [{ id: 'copy', conflictSourceId: 'original' }, { id: 'original' }, { id: 'other' }];
+  it('mantém o projeto escolhido mesmo se uma cópia é a primeira ou o metadata é antigo', () => {
+    expect(selectRestoredProjectId({ library, preferredId: 'original', metadataActiveId: 'other', manifestActiveId: 'copy' }))
+      .toBe('original');
+    expect(selectRestoredProjectId({ library })).toBe('original');
+  });
+  it('respeita a cópia escolhida explicitamente e faz fallback se o anterior foi excluído', () => {
+    expect(selectRestoredProjectId({ library, preferredId: 'copy' })).toBe('copy');
+    expect(selectRestoredProjectId({ library, preferredId: 'deleted', metadataActiveId: 'other' })).toBe('other');
+    expect(selectRestoredProjectId({ library: [] })).toBe('');
   });
 });
 

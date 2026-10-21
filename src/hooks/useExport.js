@@ -17,6 +17,7 @@ import { trackEvent } from '../utils/telemetry.js';
 import { blobFromSlideRef } from '../utils/ai-client.js';
 import { waitForExportFonts } from '../utils/export-fonts.js';
 import { waitForPhotoFraming } from '../utils/photo-framing.js';
+import { auditPresentationLayout, auditRenderedPresentationLayout } from '../utils/presentation-quality.js';
 
 // O editor carrega seus exportadores junto com a própria versão. Buscar um
 // chunk só no clique falhava em abas abertas durante um novo deploy.
@@ -188,6 +189,24 @@ export function exportRenderScope(slides, refs, slideIndexes = null) {
   };
 }
 
+/** Legacy decks keep their existing export behavior. The new planning pipeline
+ * opts into measured quality gates; native evidence blocks always opt in. */
+export function assertPresentationExportQuality(scope) {
+  const managed = (scope.slides || []).map((slide, index) => ({ slide, index }))
+    .filter(({ slide }) => slide.presentationQualityVersion === 1 || slide.presentationBlocks?.length);
+  if (!managed.length) return;
+  const issues = managed.flatMap(({ slide, index }) => auditPresentationLayout(slide, { index }).issues);
+  const roots = managed.map(({ slide }) => (scope.roots || []).find((root) =>
+    root?.getAttribute?.('data-vc-card-surface') === slide.id
+    || root?.closest?.('[data-vc-card-surface]')?.getAttribute?.('data-vc-card-surface') === slide.id));
+  issues.push(...auditRenderedPresentationLayout(roots).issues.map((issue) => ({
+    ...issue,
+    slideIndex: managed[issue.slideIndex]?.index ?? issue.slideIndex,
+  })));
+  const error = issues.find((issue) => issue.severity === 'error');
+  if (error) throw new Error(`Revise o slide ${error.slideIndex + 1} antes de baixar: ${error.message}`);
+}
+
 export function useExport({
   slides,
   fmt,
@@ -212,6 +231,7 @@ export function useExport({
         `O texto excede a área segura em ${overflow.length} slide${overflow.length === 1 ? '' : 's'}. Use “Autoajustar todos” ou reduza o texto antes de baixar.`,
       );
     }
+    if (isPresentation) assertPresentationExportQuality(scope);
   };
 
   const renderSlideToCanvas = async (slideObj) => {

@@ -46,6 +46,7 @@ function EditorFormatSelector({ fmt, setFmt, layout }) {
           <button
             key={k}
             type="button"
+            aria-pressed={isActive}
             onClick={() => setFmt(k)}
             title={`${v.label} · ${v.w}×${v.h}`}
             style={

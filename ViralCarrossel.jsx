@@ -16,6 +16,9 @@ import {
   generateReviewedCarousel,
   presentationTextLimitsFromSlides,
 } from './src/utils/editorial-review.js';
+import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
+import { repairRenderedPresentation } from './src/utils/presentation-render-review.js';
+import { presentationPhotoAspectRatio } from './src/utils/presentation-composition.js';
 import { buildPerformanceGuidance, savePublicationResult, removePublicationResult } from './src/utils/publication-results.js';
 import { PublicationResultsModal } from './src/components/panels/PublicationResultsModal.jsx';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
@@ -207,7 +210,7 @@ import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesi
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
-import { useExport } from './src/hooks/useExport.js';
+import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
 import { useLibrary } from './src/hooks/useLibrary.js';
 import { useToasts } from './src/hooks/useToasts.js';
@@ -486,7 +489,7 @@ import {
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
-  decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
 } from './src/utils/project-sync-control.js';
 import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
@@ -1251,6 +1254,14 @@ export default function App() {
       }),
     [history],
   );
+  // Importar em “Logo da marca” atualiza a identidade compartilhada também no
+  // Studio. Ajustes de outros campos e logos específicas continuam no projeto.
+  const saveBrandLogo = useCallback((patch) => {
+    setBrand((current) => ({ ...current, ...patch }));
+    setBrandRoster((current) => current.map((profile) => (
+      profile.id === brand.id ? { ...profile, ...patch } : profile
+    )));
+  }, [setBrand, brand.id]);
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
@@ -1990,6 +2001,12 @@ export default function App() {
     }
     const baseVersion = v2VersionsRef.current.get(entry.id) ?? 0;
     const fingerprint = projectCacheFingerprint(entry);
+    // O snapshot é imutável. Editar ou trocar de formato enquanto ele sobe
+    // não o torna inseguro: a versão seguinte será enviada em seguida. Só
+    // troca de conta ou remoção do projeto cancela esta escrita.
+    const canPersistEntry = () => readDataOwner() === owner
+      && v2ObservedOwnerRef.current === owner
+      && (libraryPersistRef.current || []).some((item) => item?.id === entry.id);
     const [{ prepareProjectCloudPayload }, { uploadAssetsBestEffort }, outbox] = await Promise.all([
       import('./src/utils/projects-cloud-sync.js'),
       import('./src/utils/library-sync.js'),
@@ -2011,16 +2028,16 @@ export default function App() {
     }
     const queuedBaseVersion = existing?.baseVersion ?? baseVersion;
     const prepared = await prepareProjectCloudPayload(entry, {
-      snapshot: pending.snapshot, ownerId: owner, isCurrent: pending.isCurrent,
+      snapshot: pending.snapshot, ownerId: owner, isCurrent: canPersistEntry,
     });
-    if (!pending.isCurrent() || readDataOwner() !== owner) {
+    if (!canPersistEntry()) {
       throw new Error('O projeto mudou durante o envio. As alterações continuam no editor; salve novamente.');
     }
     // A fila fica durável antes das fotos. Recarregar ou fechar a aba no meio
     // do envio não devolve a revisão antiga da nuvem.
     if (outboxAvailable) {
       try {
-        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
+        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion, assets: prepared.assets });
       } catch (error) {
         if (!isProjectOutboxUnavailable(error)) throw error;
         outboxAvailable = false;
@@ -2030,23 +2047,31 @@ export default function App() {
     const uploaded = await uploadAssetsBestEffort(prepared.assets, {
       owner,
       assertCurrent: () => {
-        if (!pending.isCurrent() || readDataOwner() !== owner) {
+        if (!canPersistEntry()) {
           throw new Error('O projeto mudou durante o envio. Salve novamente.');
         }
       },
     });
     if (uploaded.failed) {
-      if (outboxAvailable && pending.isCurrent() && readDataOwner() === owner) {
-        try { await outbox.flushProjectOutbox(owner); } catch { /* a fila local segue no próximo boot */ }
-      }
       throw new Error(`${uploaded.failed} imagem(ns) não foram enviadas. O texto ficou na fila desta conta; tente salvar novamente.`);
     }
+    if (!canPersistEntry()) {
+      throw new Error('O projeto foi removido ou a conta mudou durante o envio. Nenhuma edição foi substituída.');
+    }
     let flushed = { recoveries: [] };
+    let confirmedVersion = null;
+    const onConfirmed = ({ projectId, version, entry: confirmedEntry }) => {
+      if (readDataOwner() !== owner || v2ObservedOwnerRef.current !== owner) return;
+      v2VersionsRef.current.set(projectId, Math.max(v2VersionsRef.current.get(projectId) || 0, version));
+      if (projectId === entry.id && projectCacheFingerprint(confirmedEntry) === projectCacheFingerprint(prepared.entry)) {
+        confirmedVersion = version;
+      }
+    };
     if (outboxAvailable) {
       try {
-        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion });
+        await outbox.queueProjectPut(owner, prepared.entry, { baseVersion, assets: prepared.assets });
         // Com IndexedDB funcional, a fila protege a edição se a rede cair.
-        flushed = await outbox.flushProjectOutbox(owner);
+        flushed = await outbox.flushProjectOutbox(owner, { onConfirmed });
         const stillPending = await outbox.getPendingProjectOp(owner, entry.id);
         if (stillPending?.kind === 'review_put_deleted') {
           throw new Error('Este projeto foi excluído em outro dispositivo. Sua edição continua neste navegador e precisa de revisão antes de salvar.');
@@ -2066,8 +2091,15 @@ export default function App() {
     if (!outboxAvailable) {
       // IndexedDB pode bloquear indefinidamente em Safari/Chrome. Nesse caso
       // a confirmação passa a ser a resposta versionada da própria conta.
-      if (!pending.isCurrent() || readDataOwner() !== owner) {
+      if (!canPersistEntry()) {
         throw new Error('O projeto mudou durante o envio. Salve novamente.');
+      }
+      // A confirmação pode ter chegado antes de uma falha posterior do IDB.
+      // Não repetir um PUT já confirmado com a versão antiga.
+      if (Number.isSafeInteger(confirmedVersion)) {
+        v2BaselinesRef.current.set(entry.id, fingerprint);
+        v2RecoveredProjectsRef.current.delete(entry.id);
+        return { saved: true, version: confirmedVersion };
       }
       const expectedOwnerId = accessSessionRef.current?.customerId;
       if (!expectedOwnerId) throw new Error('Não foi possível confirmar a conta para salvar.');
@@ -2092,10 +2124,13 @@ export default function App() {
       v2RecoveredProjectsRef.current.set(entry.id, recovery.copyName);
       return { recoveredCopy: recovery.copyName };
     }
-    v2VersionsRef.current.set(entry.id, queuedBaseVersion + 1);
+    if (!Number.isSafeInteger(confirmedVersion)) {
+      throw new Error('A conta ainda não confirmou a versão deste projeto. Suas alterações continuam no editor.');
+    }
+    v2VersionsRef.current.set(entry.id, confirmedVersion);
     v2BaselinesRef.current.set(entry.id, fingerprint);
     v2RecoveredProjectsRef.current.delete(entry.id);
-    return { saved: true, version: queuedBaseVersion + 1 };
+    return { saved: true, version: confirmedVersion };
   }, []);
 
   const persistAccountMetadataV2 = useCallback(async (pending, { owner, expectedOwnerId } = {}) => {
@@ -2109,7 +2144,7 @@ export default function App() {
       baseRevision: v2MetaRevisionRef.current,
       expectedOwnerId,
       localOwnerId: owner,
-      isCurrent: pending.isCurrent,
+      isCurrent: () => readDataOwner() === owner && v2ObservedOwnerRef.current === owner,
       resolveRevisionConflict: true,
     });
     v2MetaRevisionRef.current = saved.revision;
@@ -2122,7 +2157,7 @@ export default function App() {
     setCloudSyncBusy(false);
     if (cloudAutoPushAfterFlightRef.current) {
       cloudAutoPushAfterFlightRef.current = false;
-      queueMicrotask(() => cloudAutoPushScheduleRef.current?.());
+      queueMicrotask(() => cloudAutoPushScheduleRef.current?.({ immediate: true }));
     }
   }, []);
 
@@ -2202,8 +2237,49 @@ export default function App() {
         if (source !== 'salvar' && outbox.needsReview?.some((item) => item.kind === 'put_deleted')) {
           throw new Error('Uma edição local pertence a um projeto excluído em outro dispositivo. Revise essa edição antes de sincronizar ou sair da conta.');
         }
-        if (!pending.isCurrent() || readDataOwner() !== owner) {
+        const continuation = cloudSaveContinuation({
+          source, current: pending.isCurrent(), sameOwner: readDataOwner() === owner,
+        });
+        if (continuation === 'owner_changed' || continuation === 'changed_before_restore') {
           throw new Error('A biblioteca mudou durante a sincronização. Suas alterações foram preservadas; salve novamente.');
+        }
+        const newerChanges = continuation === 'send_latest';
+        if (newerChanges) {
+          cloudAutoPushAfterFlightRef.current = true;
+          // B precisa sobreviver a um reload depois do recibo de A, sem
+          // aguardar outro debounce. Bytes novos viajam na fila e só serão
+          // publicados depois de seu upload confirmado.
+          const latest = flushPersistRef.current({ returnSnapshot: true });
+          flushSync(() => setLibrary(latest.snapshot.library));
+          const [{ prepareProjectCloudPayload }, latestOutbox] = await Promise.all([
+            import('./src/utils/projects-cloud-sync.js'),
+            import('./src/utils/projects-outbox.js'),
+          ]);
+          for (const entry of latest.snapshot.library) {
+            if (v2BaselinesRef.current.get(entry.id) === projectCacheFingerprint(entry)) continue;
+            if (!v2OutboxUnavailableRef.current) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                const prepared = await prepareProjectCloudPayload(entry, {
+                  snapshot: latest.snapshot, ownerId: owner,
+                  isCurrent: () => readDataOwner() === owner
+                    && (libraryPersistRef.current || []).some((item) => item?.id === entry.id),
+                });
+                // eslint-disable-next-line no-await-in-loop
+                await latestOutbox.queueProjectPut(owner, prepared.entry, {
+                  baseVersion: v2VersionsRef.current.get(entry.id) ?? 0, assets: prepared.assets,
+                });
+                continue;
+              } catch (error) {
+                if (!isProjectOutboxUnavailable(error)) throw error;
+                v2OutboxUnavailableRef.current = true;
+              }
+            }
+            // Sem fila, conclui no máximo este snapshot adicional pela API.
+            // Novas edições posteriores continuam para a próxima passagem.
+            // eslint-disable-next-line no-await-in-loop
+            await persistProjectV2(entry, latest, { owner });
+          }
         }
         if (recoveredCopies.size) {
           setRemoteProjectNotice({ kind: 'copy', copyName: [...recoveredCopies][0] });
@@ -2260,7 +2336,8 @@ export default function App() {
             ? `Este projeto mudou em outro lugar. Sua edição ficou na cópia “${[...recoveredCopies][0]}”. Toque em Atualizar para ver as duas versões.`
             : reviewCount
               ? `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`
-              : source === 'profile' ? 'Perfil salvo na sua conta.' : 'Projeto salvo na sua conta.',
+              : newerChanges ? 'Versão salva na conta. Enviando suas alterações mais recentes…'
+                : source === 'profile' ? 'Perfil salvo na sua conta.' : 'Projeto salvo na sua conta.',
           recoveredCopies.size || reviewCount ? 'warning' : 'success', 5200);
         } else if (recoveredCopies.size || reviewCount) {
           toast(recoveredCopies.size
@@ -2268,8 +2345,11 @@ export default function App() {
             : `${reviewCount} alteração(ões) pendentes exigem revisão na conta.`,
           'warning', 6000);
         }
-        if (!recoveredCopies.size && !reviewCount && source !== 'sync') acknowledgeCloudSave({ ...pending.snapshot, library:entries });
-        return { cloudSaved: true, outboxSaved: !verifyWithoutOutbox && outbox.pending === 0 };
+        if (!recoveredCopies.size && !reviewCount && source !== 'sync' && !newerChanges) {
+          acknowledgeCloudSave({ ...pending.snapshot, library:entries });
+        }
+        return { cloudSaved: true, outboxSaved: !newerChanges && !verifyWithoutOutbox && outbox.pending === 0,
+          ...(newerChanges ? { pendingChanges: true } : {}) };
       } catch (error) {
         setCloudUnsaved(true);
         if (source !== 'logout') {
@@ -2539,7 +2619,7 @@ export default function App() {
   }, [access?.active, syncProjectLibrary, toast]);
   // Auto-push na nuvem ~4s após uma edição real, inclusive durante outro envio.
   const cloudAutoPushSkipFirstRef = useRef(true);
-  const scheduleCloudAutoPush = useCallback(() => {
+  const scheduleCloudAutoPush = useCallback(({ immediate = false } = {}) => {
     if (!accessSessionRef.current?.active || !accountLibraryReadyRef.current
       || areAccountDataWritesLocked() || (PROJECTS_V2 && !cloudAutoPushSnapshot().dirty)) return;
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
@@ -2552,7 +2632,7 @@ export default function App() {
       }
       if (PROJECTS_V2 && !cloudAutoPushSnapshot().dirty) return;
       void syncProjectLibrary('auto');
-    }, 4_000);
+    }, immediate ? 0 : 4_000);
   }, [cloudAutoPushSnapshot, syncProjectLibrary]);
   cloudAutoPushScheduleRef.current = scheduleCloudAutoPush;
   useEffect(() => {
@@ -3758,6 +3838,10 @@ export default function App() {
 
   const patchInlineTextAt = useCallback((idx, field, text) => {
     if (!field) return;
+    if (field === 'presentationBlocks') {
+      updateSlideAt(idx, { presentationBlocks: normalizePresentationBlocks(text) });
+      return;
+    }
     if (field.startsWith('ov_')) {
       setSlides(current => current.map((slide, i) => i === idx
         ? updateOverlayOnSlide(slide, field.slice(3), { text }) : slide));
@@ -4116,6 +4200,7 @@ export default function App() {
     if (readDataOwner() !== owner) return;
     await outbox.queueProjectPut(owner, prepared.entry, {
       baseVersion: v2VersionsRef.current.get(entry.id) ?? 0,
+      assets: prepared.assets,
     });
   }, []);
 
@@ -4155,10 +4240,13 @@ export default function App() {
   }, [activeDocId, history, queueProjectForAccount]);
 
   /** Entrar / link ?share=: cria projeto na lib ou reabre o que já tem o mesmo código. */
-  const handleTeamShareJoined = useCallback(async (payload) => {
-    if (!payload?.doc || typeof payload.doc !== 'object') return;
+  const handleTeamShareJoined = useCallback(async (payload, { isCurrent = () => true } = {}) => {
+    if (!payload?.doc || typeof payload.doc !== 'object' || !Array.isArray(payload.doc.slides) || !payload.doc.slides.length) {
+      throw new Error('O link da equipe não retornou um projeto válido. Peça um novo link à equipe.');
+    }
     const { hydrateSharedDocImages, normalizeShareCode } = await import('./src/utils/project-share.js');
     const hydrated = await hydrateSharedDocImages(payload.doc, { code: payload.code });
+    if (!isCurrent()) return false;
     const code = normalizeShareCode(payload.code || hydrated.shareCode || '');
     const shaped = ensureDocShape({
       ...hydrated,
@@ -4167,53 +4255,37 @@ export default function App() {
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
     const name = String(payload.name || '').trim() || 'Projeto da equipe';
-    let targetId = null;
-    let created = false;
-    let queuedEntry = null;
-    setLibrary((prev) => {
-      const liveDoc = editorSyncStateRef.current?.activeDocId === activeDocId
-        ? editorSyncStateRef.current.doc
-        : history.state;
-      const flushed = prev.map((e) => (
-        e.id === activeDocId
-          ? { ...e, doc: liveDoc, updatedAt: Date.now() }
-          : e
-      ));
-      const existing = code
-        ? flushed.find((e) => normalizeShareCode(e.doc?.shareCode) === code)
-        : null;
-      if (existing) {
-        targetId = existing.id;
-        const updated = {
-          ...existing,
-          doc: shaped,
-          name: existing.name || name,
-          updatedAt: Date.now(),
-        };
-        queuedEntry = updated;
-        return flushed.map((e) => (e.id === existing.id ? updated : e));
-      }
-      const entry = mkLibEntry(shaped, name);
-      targetId = entry.id;
-      queuedEntry = entry;
-      created = true;
-      return [entry, ...flushed];
-    });
+    // React may defer a state updater. Build from the live snapshot before
+    // scheduling it, so opening/queueing never depends on updater side effects.
+    const current = editorSyncStateRef.current;
+    const flushed = (libraryPersistRef.current || []).map((entry) => (
+      entry.id === current?.activeDocId && current.doc
+        ? { ...entry, doc: current.doc, updatedAt: Date.now() }
+        : entry
+    ));
+    const existing = code
+      ? flushed.find((entry) => normalizeShareCode(entry.doc?.shareCode) === code)
+      : null;
+    const created = !existing;
+    const queuedEntry = existing
+      ? { ...existing, doc: shaped, name: existing.name || name, updatedAt: Date.now() }
+      : mkLibEntry(shaped, name);
+    const targetId = queuedEntry.id;
+    const nextLibrary = existing
+      ? flushed.map((entry) => entry.id === targetId ? queuedEntry : entry)
+      : [queuedEntry, ...flushed];
+    libraryPersistRef.current = nextLibrary;
+    editorSyncStateRef.current = { ...current, activeDocId: targetId, doc: shaped };
+    setLibrary(nextLibrary);
+    history.reset(shaped);
+    setActiveDocId(targetId);
+    setShellView('project');
+    setLibraryOpen(false);
+    setActiveIdx(0);
     let queued = true;
-    if (queuedEntry) {
-      try { await queueProjectForAccount(queuedEntry); }
-      catch { queued = false; }
-    }
-    if (targetId) {
-      if (targetId === activeDocId) {
-        history.reset(shaped);
-      } else {
-        setActiveDocId(targetId);
-      }
-      setShellView('project');
-      setLibraryOpen(false);
-      setActiveIdx(0);
-    }
+    try { await queueProjectForAccount(queuedEntry); }
+    catch { queued = false; }
+    if (!isCurrent()) return false;
     const withPhoto = (shaped.slides || []).filter((s) => s.bgImage || s.bgImageId).length;
     const failed = (shaped.slides || []).filter((slide) => slide.bgImageFailed).length;
     if (!queued) {
@@ -4228,38 +4300,62 @@ export default function App() {
       );
     }
     trackEvent('team_share_joined', { created: created ? '1' : '0' });
-  }, [activeDocId, history, queueProjectForAccount, toast]);
+    return true;
+  }, [history.reset, queueProjectForAccount, toast]);
 
   // Link ?share=CÓDIGO (stash sobrevive ao login Google): entra e abre o projeto.
-  const shareInviteInFlight = useRef('');
+  const shareInviteInFlight = useRef(null);
+  const shareInviteHandlersRef = useRef(null);
+  shareInviteHandlersRef.current = { handleTeamShareJoined, enterStudio, toast };
   useEffect(() => {
-    if (!accessActive) return undefined;
+    // Wait for account restoration so a late pull cannot replace the invite.
+    if (!accessActive || !accountLibraryReady) return undefined;
     let cancelled = false;
+    let flight = null;
+    const owner = readDataOwner();
+    const isCurrent = () => !cancelled
+      && accessSessionRef.current?.active
+      && accessSessionRef.current?.customerId === access.customerId
+      && accessSessionRef.current?.email === access.email
+      && readDataOwner() === owner;
     (async () => {
       const {
-        peekPendingShareCode,
+        captureShareInviteFromLocation,
         consumePendingShareCode,
         joinProjectShare,
-        normalizeShareCode,
+        readShareCodeFromSearch,
       } = await import('./src/utils/project-share.js');
-      const code = normalizeShareCode(peekPendingShareCode());
-      if (!code || shareInviteInFlight.current === code) return;
-      shareInviteInFlight.current = code;
-      try {
-        const res = await joinProjectShare(code);
-        if (cancelled) return;
-        consumePendingShareCode();
-        await handleTeamShareJoined(res);
-        enterStudio();
-      } catch (e) {
-        shareInviteInFlight.current = '';
-        if (!cancelled) {
-          toast(e?.message || 'Não foi possível abrir o link da equipe.', 'error', 6000);
-        }
+      if (!isCurrent()) return;
+      if (new URLSearchParams(window.location.search).has('share') && !readShareCodeFromSearch(window.location.search)) {
+        shareInviteHandlersRef.current.toast('O link da equipe está incompleto. Peça à equipe o link completo do projeto.', 'error', 8000);
+        return;
       }
-    })();
-    return () => { cancelled = true; };
-  }, [accessActive, handleTeamShareJoined, enterStudio, toast]);
+      const code = captureShareInviteFromLocation();
+      if (!code || shareInviteInFlight.current) return;
+      flight = { code };
+      shareInviteInFlight.current = flight;
+      try {
+        shareInviteHandlersRef.current.enterStudio();
+        shareInviteHandlersRef.current.toast('Abrindo projeto da equipe…', 'info', 8000);
+        const res = await joinProjectShare(code);
+        if (!isCurrent()) return;
+        const opened = await shareInviteHandlersRef.current.handleTeamShareJoined(res, { isCurrent });
+        if (opened && isCurrent()) consumePendingShareCode(code);
+      } catch (e) {
+        if (isCurrent()) {
+          shareInviteHandlersRef.current.toast(e?.message || 'Não foi possível abrir o link da equipe.', 'error', 8000);
+        }
+      } finally {
+        if (shareInviteInFlight.current === flight) shareInviteInFlight.current = null;
+      }
+    })().catch(() => {
+      if (isCurrent()) shareInviteHandlersRef.current.toast('Não foi possível abrir o link da equipe. Recarregue para tentar novamente.', 'error', 8000);
+    });
+    return () => {
+      cancelled = true;
+      if (shareInviteInFlight.current === flight) shareInviteInFlight.current = null;
+    };
+  }, [accessActive, access.customerId, access.email, accountLibraryReady]);
 
   const handleBatchPhotos = useCallback((e) => {
     const files = Array.from(e.target.files || []);
@@ -4861,9 +4957,17 @@ export default function App() {
     const brandVoiceBlock = buildBrandVoiceBlock(brand, {
       enabled: brand.useBrandVoice !== false && brandToneIsReady(brand),
     });
-    const projectContextBlock = buildProjectContextBlock(styleKit);
+    // Presentation briefs participate in the same bounded, whole-document
+    // selection as uploaded material; do not append the entire brief again.
+    const projectContextBlock = isPresentationGeneration ? '' : buildProjectContextBlock(styleKit);
     const styleKitTextHint = buildStyleKitTextHint(styleKit);
-    const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationGeneration ? presentationPathId : null }), job.signal);
+    const { materialBlock, materialPriorityBlock, presentationSources = [] } = await runAIJob(() => resolveMaterialPromptParts(material, toast, {
+      presentationPath: isPresentationGeneration ? presentationPathId : null,
+      topic,
+      additionalSources: isPresentationGeneration && styleKit.contextMd.trim()
+        ? [{ id: 'project-brief', title: 'Brief do projeto', kind: 'brief', text: styleKit.contextMd }]
+        : [],
+    }), job.signal);
     checkActive();
     const imgParamsBlock = buildImgParamsBlockPT(effectiveAxes);
     const introLine = buildGenerationIntroLine(cp);
@@ -4876,7 +4980,7 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
       ? buildApresentacaoPackBlock(count, presentationPathId)
       : '';
     const apresentacaoDesignBlock = isPresentationGeneration
-      ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId)
+      ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId, { planned: !remix })
       : '';
     const presentationRoute = isPresentationGeneration
       ? getPresentationPath(presentationPathId)
@@ -4980,26 +5084,65 @@ ${buildCaptionVoiceRules(cp, effectiveMode)}
 JSON exato a retornar (sem mais nada):
 ${jsonShapeLine}`;
 
-    setGenProgress({ phase: 'text', current: 1, total: 3, label: 'Etapa 1 de 3 · Escrevendo o texto' });
+    setGenProgress({ phase: 'text', current: 1, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 1 de 5 · Organizando o roteiro e as evidências' : 'Etapa 1 de 3 · Escrevendo o texto' });
     // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
     const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
-    const { result, reviewStatus } = await generateReviewedCarousel({
+    const planningBrief = [
+      buildGenerationTaskBlock(topic, announcement),
+      n ? `Área ou contexto: ${n}` : '',
+      audience ? `Público: ${audience}` : '',
+      `Tom: ${tone}`,
+      material?.context ? `Recorte e instruções atuais do usuário: ${String(material.context).slice(0, 3000)}` : '',
+      brandBlock,
+      styleKitTextHint,
+    ].filter(Boolean).join('\n');
+    const { result, reviewStatus, plan: generationPlan } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
         presetId: cp,
         densityId: td,
+        narrativeMode: effectiveMode,
         presentationPath: presentationPathId,
         presentationTextLimits,
+        presentationPlanning: isPresentationGeneration && !remix,
+        nativeBlocks: !effectiveVisualPresetDef?.isCustom,
+        planningContext: {
+          brief: planningBrief,
+          sources: [{ id: 'request', title: 'Pedido atual e marca', kind: 'brief', text: planningBrief }, ...presentationSources],
+        },
+        presentationLimitsForPlan: (plan, draftedSlides = []) => {
+          if (effectiveVisualPresetDef?.isCustom) return null;
+          return plan.slides.map((entry, index) => {
+            const stage = { ...presentationStageAt(presentationPathId, index, Number(count)), deliveryMode: presentationRoute?.deliveryMode, visualRole: entry.visualRole };
+            const limits = getPresentationCompositionOverrides(effectiveVisualPreset, {
+              slide: { ...(draftedSlides[index] || {}), presentationPlan: entry, imageQuery: entry.imageBrief || '' },
+              stage, index, count: Number(count),
+            }).presentationTextLimits || {};
+            return { title: limits.title, subtitle: limits.subtitle, bodyAfterImage: limits.body };
+          });
+        },
       },
       aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
-      onReview: () => { checkActive(); setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Revisando clareza e coerência' }); },
+      onStage: stage => {
+        checkActive();
+        const stages = {
+          planning: [1, 'Organizando o roteiro e as evidências'],
+          writing: [2, 'Desenvolvendo os argumentos de cada slide'],
+          reviewing: [3, 'Conferindo clareza, profundidade e fidelidade'],
+          repairing: [3, 'Ajustando os textos que precisam de revisão'],
+        };
+        const [current, label] = stages[stage] || stages.writing;
+        setGenProgress({ phase: 'text', current, total: 5, label: `Etapa ${current} de 5 · ${label}` });
+      },
+      onReview: () => { checkActive(); if (!isPresentationGeneration || remix) setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Revisando clareza e coerência' }); },
     }, callAI);
     checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
+    if (reviewStatus === 'needs_attention') toast('Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.', 'warning', 8000);
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
-    setGenProgress({ phase: 'text', current: 3, total: 3, label: 'Etapa 3 de 3 · Montando os cards' });
+    setGenProgress({ phase: 'text', current: isPresentationGeneration ? 4 : 3, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 4 de 5 · Compondo a apresentação' : 'Etapa 3 de 3 · Montando os cards' });
 
     // O modal aplica o preset e dispara a geração no mesmo gesto. Não dependemos
     // do próximo render do React: a marca efetiva já nasce com a paleta/fontes
@@ -5016,11 +5159,11 @@ ${jsonShapeLine}`;
         : {}),
       ...explicitBrandColorsFromKit(styleKit),
     };
-    if (!generationBrand.logo && generationBrand.logoImageId) {
+    if (generationBrand.logoImageId) {
       try {
         const hydratedLogo = await resolveLogoDataUrl(generationBrand, {});
-        if (hydratedLogo) generationBrand = { ...generationBrand, logo: hydratedLogo };
-      } catch { /* logo opcional — geração segue sem bloquear */ }
+        generationBrand = { ...generationBrand, logo: hydratedLogo || null };
+      } catch { generationBrand = { ...generationBrand, logo: null }; }
     }
     let projectLogoAsset = null;
     if (styleKit?.logoOnGenerate !== false && styleKit?.logo) {
@@ -5061,7 +5204,7 @@ ${jsonShapeLine}`;
         ? 0
         : Math.round((i * (presentationStages.length - 1)) / (nSlides - 1));
       const stage = isPresentationGeneration
-        ? (presentationStages[stageIndex] || {})
+        ? { ...(presentationStages[stageIndex] || {}), deliveryMode: presentationRoute?.deliveryMode, ...(s.presentationPlan ? { visualRole: s.presentationPlan.visualRole, purpose: s.presentationPlan.purpose } : {}) }
         : {};
       // Resolve uma única vez a composição efetiva antes de decidir se o
       // slide precisa de imagem. Presets personalizados mantêm a composição
@@ -5127,6 +5270,10 @@ ${jsonShapeLine}`;
           photoRegion: compositionOverrides.photoRegion || 'full',
           useCultureLayout: false,
           bodyAfterImage: restoreSourceHosts(stripLeadingSlideCardLabel(rawBodyAfterImage.trim()), sourceHosts),
+          presentationPlan: s.presentationPlan || null,
+          ...(s.presentationPlan ? { presentationQualityVersion: 1, photoFraming: 'auto' } : {}),
+          presentationBlocks: normalizePresentationBlocks(s.presentationBlocks),
+          caption: s.speakerNotes || '',
           presentationStageId: stage.id || null,
           presentationStageLabel: stage.label || '',
           showSwipeCue: false,
@@ -5202,6 +5349,14 @@ ${jsonShapeLine}`;
         hasBrandLogo: !!(generationBrand?.logo || generationBrand?.logoImageId),
       });
     }
+    const visualQuality = isPresentationGeneration && !remix
+      ? repairPresentationLayouts(newSlides, { fmt: 'apresentacao' })
+      : null;
+    if (visualQuality) {
+      setGenProgress({ phase: 'text', current: 5, total: 5, label: 'Etapa 5 de 5 · Conferindo as áreas de texto, imagem e logo' });
+      newSlides = visualQuality.slides;
+      if (!visualQuality.ok) toast('A apresentação foi montada. Revise a composição antes de exportar.', 'warning', 6500);
+    }
     checkActive();
     if (!remix) {
       lastGenerateArgsRef.current = {
@@ -5228,6 +5383,16 @@ ${jsonShapeLine}`;
         ? (effectiveVisualPresetDef?.sourceVersion || null)
         : undefined,
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      ...(generationPlan ? {
+        presentationPlan: generationPlan,
+        presentationQuality: {
+          version: 1,
+          reviewStatus,
+          repairs: visualQuality?.repairs || [],
+          issues: visualQuality?.issues || [],
+          checkedAt: new Date().toISOString(),
+        },
+      } : !isPresentationGeneration ? { presentationPlan: null, presentationQuality: null } : {}),
       editorialContext: {
         topic,
         niche: n || '',
@@ -5298,8 +5463,10 @@ ${jsonShapeLine}`;
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId),
-              imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
-              aspectRatio: isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
+              imgExtraPrompt: composeImgExtraPrompt(styleKit, [newSlides[i]?.imgExtraPrompt,
+                generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
+              ].filter(Boolean).join('\n')),
+              aspectRatio: generationPlan ? presentationPhotoAspectRatio(newSlides[i]) : isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
             });
             checkActive();
             const patchImg = await guardarImagemDoSlide(url);
@@ -5379,6 +5546,70 @@ ${jsonShapeLine}`;
       );
     }
       checkActive();
+      if (isPresentationGeneration && generationPlan) {
+        setGenProgress({ phase: 'text', current: 5, total: 5, label: 'Conferindo a apresentação renderizada…' });
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        checkActive();
+        const roots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
+        if (roots.length === newSlides.length) {
+          try {
+          await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots }), job.signal);
+          checkActive();
+          let rendered = auditRenderedPresentationLayout(roots);
+          let renderRepairStatus = 'not_needed';
+          if (rendered.issues.some(issue => issue.code === 'render-overflow')) {
+            setGenProgress({ phase: 'text', current: 5, total: 5, label: 'Ajustando os slides que ainda não cabem…' });
+            const repair = await repairRenderedPresentation({
+              slides: newSlides, plan: generationPlan, issues: rendered.issues,
+              presentationPath: presentationPathId, aiOptions: { openaiKey, signal: job.signal },
+            }, callAI);
+            checkActive();
+            renderRepairStatus = repair.status;
+            if (repair.patches.length) {
+              // Images may have finished hydrating while the repair was in
+              // flight. Patch only text/data, and never replace a user's edit.
+              history.set(d => ({ ...d, slides: d.slides.map(current => {
+                const candidate = repair.patches.find(item => item.slideId === current.id);
+                if (!candidate) return current;
+                const unchanged = Object.entries(candidate.before).every(([key, value]) => JSON.stringify(
+                  key === 'presentationBlocks' ? normalizePresentationBlocks(current[key]) : String(current[key] || ''),
+                ) === JSON.stringify(value));
+                return unchanged ? { ...current, ...candidate.patch } : current;
+              }) }));
+              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              checkActive();
+              const repairedRoots = newSlides.map(slide => slideRefs.current[slide.id]).filter(Boolean);
+              await runAIJob(() => waitForExportReadiness({ slides: newSlides, roots: repairedRoots }), job.signal);
+              checkActive();
+              rendered = auditRenderedPresentationLayout(repairedRoots);
+            }
+          }
+          history.set(d => ({ ...d, presentationQuality: {
+            ...d.presentationQuality,
+            renderedIssues: rendered.issues,
+            renderRepairStatus,
+            renderCheckStatus: rendered.ok ? 'passed' : 'needs_attention',
+            renderCheckedAt: new Date().toISOString(),
+          } }));
+          if (!rendered.ok) {
+            const indexes = [...new Set(rendered.issues.filter(issue => issue.severity === 'error').map(issue => issue.slideIndex + 1))];
+            toast(`Revise a composição dos slides ${indexes.join(', ')} antes de exportar. O texto completo foi preservado.`, 'warning', 8500);
+          }
+          } catch (renderError) {
+            if (isGenerationCancelled(renderError) || job.signal.aborted) throw renderError;
+            checkActive();
+            // Draft creation has already succeeded. A missing font/asset must
+            // not invite another paid generation or discard the editable deck.
+            history.set(d => ({ ...d, presentationQuality: {
+              ...d.presentationQuality,
+              renderCheckStatus: 'unavailable',
+              renderRepairStatus: 'unavailable',
+              renderedIssues: [{ code: 'render-assets-unavailable', severity: 'warning', message: 'A conferência visual não foi concluída porque uma fonte ou imagem não carregou.' }],
+            } }));
+            toast('Apresentação criada e preservada. A conferência visual ficou pendente porque uma fonte ou imagem não carregou. Confira antes de exportar.', 'warning', 9000);
+          }
+        }
+      }
       trackEvent('carousel_generate_success', {
         product: isPresentationGeneration ? 'apresentacao' : 'carrossel',
         slide_count: String(newSlides.length),
@@ -6093,6 +6324,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     setHookLibrary, niche,
     onOpenResults: () => setResultsOpen(true),
     slide: panelSlide, slides, activeIdx, brand: sidebarBrand, setBrand:setSidebarBrand, updateSlide,
+    onSaveBrandLogo: editingCardVisual ? null : saveBrandLogo,
     setSlides,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, handleCopyCaption, handleExportPackage,

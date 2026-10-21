@@ -24,7 +24,7 @@ import { ACCOUNT_VAULT_KEY, snapshotAccountVaultForOwners } from '../utils/accou
 import { PENDING_SHARE_KEY, captureShareInviteFromLocation } from '../utils/project-share.js';
 import { USER_PROFILE_KEY } from '../utils/user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from '../utils/custom-visual-presets.js';
-import { isProjectOutboxUnavailable } from '../utils/project-sync-control.js';
+import { isProjectOutboxUnavailable, selectRestoredProjectId } from '../utils/project-sync-control.js';
 
 const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
@@ -414,11 +414,16 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             const { receipt: outboxReceipt, unavailable: outboxUnavailable } =
               await awaitBoot(flushProjectOutboxForBoot(owner, flushProjectOutbox));
             if (!sessionStillOwnsData()) return;
+            let preferredProjectId = restoredSnapshot?.activeDocId;
+            if (!preferredProjectId) {
+              try { preferredProjectId = JSON.parse(localStorage.getItem(SK.activeDocId) || 'null'); }
+              catch { /* preferência ausente não deve impedir restauração */ }
+            }
             const projects = await awaitBoot(listProjects({ expectedOwnerId, signal: bootAbort.signal }));
             const restored = await awaitBoot(pullAccountLibraryAuthoritative({
               expectedOwnerId,
               localOwnerId: owner,
-              selectedProjectId: restoredSnapshot?.activeDocId,
+              selectedProjectId: preferredProjectId,
               hydrateImages: 'none',
               localSnapshot: restoredSnapshot,
               signal: bootAbort.signal,
@@ -441,7 +446,12 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               libraryFolders: metadata.metadata.folders || restored.snapshot.libraryFolders,
               brandRoster: metadata.metadata.brands || restored.snapshot.brandRoster,
               activeBrandId: metadata.metadata.activeBrandId || restored.snapshot.activeBrandId,
-              activeDocId: metadata.metadata.activeDocId || restored.snapshot.activeDocId,
+              activeDocId: selectRestoredProjectId({
+                library: restored.snapshot.library,
+                preferredId: preferredProjectId,
+                metadataActiveId: metadata.metadata.activeDocId,
+                manifestActiveId: restored.snapshot.activeDocId,
+              }),
             };
             let localLibrary = restoredSnapshot?.library;
             if (!Array.isArray(localLibrary)) {

@@ -140,11 +140,11 @@ it('fallback para a IA do plano preserva o especialista e aceita resumo em texto
   expect(bodyAt(fetchMock).response_format).toBeUndefined();
 });
 
-it('respeita o limite do material e avisa sobre truncamento em todas as apresentações', async () => {
+it('respeita o orçamento do material e avisa sobre seleção distribuída nas apresentações', async () => {
   const toast = vi.fn();
-  const { materialBlock } = await resolveMaterialPromptParts({ content: 'a'.repeat(40_001) }, toast, { presentationPath: 'aula' });
-  expect(toast).toHaveBeenCalledWith(expect.stringContaining('Esta apresentação usará o início'), 'warning', 8000);
-  expect(materialBlock).not.toContain('a'.repeat(40_001));
+  const { materialBlock } = await resolveMaterialPromptParts({ content: 'a'.repeat(80_001) }, toast, { presentationPath: 'aula' });
+  expect(toast).toHaveBeenCalledWith(expect.stringContaining('todo o conteúdo'), 'info', 6000);
+  expect(materialBlock.length).toBeLessThanOrEqual(58_000);
 });
 
 it('preserva aula e keynote ao vivo, e a leitura autônoma dos documentos de decisão', () => {

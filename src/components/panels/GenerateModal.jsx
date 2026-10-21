@@ -23,6 +23,7 @@ import {
   resolvePresentationVisualPresetDefinition,
 } from '../../styles/presentation-presets.jsx';
 import { moontNarrative } from '../../config/moont-brand.js';
+import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -1111,7 +1112,7 @@ function GenerateModal({
                           const ModeIc = GEN_MODE_BY_ID[mode]?.Icon;
                           return ModeIc ? <ModeIc size={13} strokeWidth={2} style={{ color:'var(--text-secondary)', flexShrink:0 }} /> : null;
                         })()}
-                        {GEN_MODE_BY_ID[mode]?.label}
+                        {genModeUiLabel(mode, GEN_MODE_BY_ID[mode]?.label)}
                       </span>
                     </>
                   )}

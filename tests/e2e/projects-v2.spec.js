@@ -56,6 +56,12 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
               version: row.version, deleted: false })) } });
         }
         const id = request.method() === 'DELETE' ? body.id : body.entry.id;
+        if (request.method() === 'PUT' && cloud.putGate) {
+          const gate = cloud.putGate;
+          cloud.putGate = null;
+          cloud.putStarted = true;
+          await gate;
+        }
         const previous = cloud.rows.get(id);
         if (body.baseVersion !== (previous?.version || 0)) {
           return route.fulfill({ status: 409, json: { error: 'Projeto mudou.', code: 'project_conflict', cloudVersion: previous?.version || 0 } });
@@ -82,8 +88,15 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
         }
         const saved = { ...body.entry, updatedAt: Date.now() };
         cloud.rows.set(id, { entry: saved, version: body.baseVersion + 1 });
-        cloud.puts.push({ id, baseVersion: body.baseVersion });
+        cloud.puts.push({ id, baseVersion: body.baseVersion, fmt: body.entry.doc?.fmt });
         cloud.revision += 1;
+        if (cloud.holdPutNumber === cloud.puts.length && cloud.afterPutGate) {
+          await cloud.afterPutGate;
+          // Este cenário recarrega a página depois do commit remoto e antes
+          // da resposta. A rejeição da resposta antiga é esperada no mock.
+          return route.fulfill({ json: { ok: true, project: { id, entry: saved,
+            version: body.baseVersion + 1, deleted: false } } }).catch(() => {});
+        }
         return route.fulfill({ json: { ok: true, project: { id, entry: saved, version: body.baseVersion + 1, deleted: false } } });
       },
       '/api/account-library-meta': (route) => {
@@ -284,6 +297,69 @@ test('DELETE em conflito mantém o projeto e a revisão pendente não bloqueia o
   await home(page);
   await expect(page.getByText('Versão revista', { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/exclusão\(ões\) precisam de revisão/)).toBeVisible();
+});
+
+test('trocar formatos durante autosave protege sucessor durável e recupera reload sem cópia', async ({ page }) => {
+  const cloud = accountSeed();
+  await mockV2(page, cloud);
+  await page.goto('/?app=1');
+  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
+  const formats = page.getByRole('group', { name: 'Formato do card (exportação)' }).first();
+  let releasePut;
+  let releaseLostResponse;
+  cloud.putGate = new Promise((resolve) => { releasePut = resolve; });
+  cloud.holdPutNumber = 2;
+  cloud.afterPutGate = new Promise((resolve) => { releaseLostResponse = resolve; });
+  await formats.getByRole('button', { name: 'Apresentação 16:9', exact: true }).click();
+  await expect.poll(() => cloud.putStarted, { timeout: 15_000 }).toBe(true);
+  await formats.getByRole('button', { name: 'Stories', exact: true }).click();
+  await formats.getByRole('button', { name: 'Feed 4:5', exact: true }).click();
+  releasePut();
+  await expect.poll(() => cloud.puts.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => cloud.rows.get('p-a')?.entry.doc.fmt).toBe('carrossel');
+  expect(cloud.puts.slice(-2).map((item) => item.baseVersion)).toEqual([1, 2]);
+  expect([...cloud.rows.keys()]).toEqual(['p-a']);
+  expect(cloud.rows.get('p-a').entry.doc.slides[0].title).toBe('Texto de Projeto A');
+  const readPending = () => page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('viral-carrossel-project-outbox');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('operations', 'readonly');
+      const read = tx.objectStore('operations').getAll();
+      read.onsuccess = () => { const rows = read.result; tx.oncomplete = () => { db.close(); resolve(rows); }; };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }));
+  await expect.poll(async () => (await readPending()).map((op) => op.entry?.doc?.fmt)).toEqual(['carrossel']);
+  await expect(page.getByText(/A biblioteca mudou durante a sincronização/)).toHaveCount(0);
+  await expect(page.getByText('Sincronização pendente', { exact: true })).toHaveCount(0);
+  await page.reload();
+  releaseLostResponse();
+  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_active_doc_id') || 'null'))).toBe('p-a');
+  await expect.poll(async () => (await readPending()).length).toBe(0);
+  expect([...cloud.rows.keys()]).toEqual(['p-a']);
+  expect(cloud.rows.get('p-a').version).toBe(3);
+  expect(cloud.puts).toHaveLength(2);
+});
+
+test('reload mantém projeto escolhido quando a lista começa por uma cópia e a preferência remota é antiga', async ({ page }) => {
+  const cloud = accountSeed();
+  await mockV2(page, cloud);
+  await page.goto('/?app=1');
+  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
+  const copy = { ...entry('conflict-p-a', 'Projeto A (cópia de conflito)'), conflictSourceId: 'p-a' };
+  cloud.rows = new Map([['conflict-p-a', { entry: copy, version: 1 }], ...cloud.rows]);
+  cloud.metadata.activeDocId = 'conflict-p-a';
+  await page.reload();
+  await home(page);
+  await expect(page.getByText('Projeto A (cópia de conflito)', { exact: true }).first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_active_doc_id') || 'null'))).toBe('p-a');
+  expect(cloud.rows.get('p-a').entry.name).toBe('Projeto A');
+  expect(cloud.rows.get('conflict-p-a').entry.name).toBe('Projeto A (cópia de conflito)');
 });
 
 test('abre projetos e textos antes de um cache de imagens travado responder', async ({ page }) => {

@@ -1,3 +1,5 @@
+import { contentAwarePresentationOverrides } from './presentation-composition.js';
+
 /** Contrato compartilhado entre redação, revisão e composição do Pitch. */
 export const isPitchPath = (pathId) => ['pitch', 'pitch_deck', 'investor_pitch'].includes(pathId);
 
@@ -117,38 +119,9 @@ export function cleanPitchSlide(slide) {
 
 /** Espaço de leitura compatível com os mesmos limites enviados ao modelo. */
 export function pitchCompositionOverrides(base, slide, kind) {
-  const cover = kind === 'cover';
-  const withVisual = !!(slide.bgImage || slide.bgImageId || String(slide.imageQuery || '').trim());
-  const previousTypography = base.presentationTypographyByComposition || {};
-  const typography = previousTypography[kind] || {};
-  return {
+  return contentAwarePresentationOverrides({
     ...base,
-    align: 'left',
-    overlay: 0,
     presentationContentMode: 'pitch',
-    presentationRequiresImage: false,
     presentationTextLimits: pitchTextLimits(kind),
-    titleSize: cover ? 55 : 46,
-    subSize: 72,
-    subLeading: 135,
-    subTracking: 0,
-    bodyAfterSize: 104,
-    bodyLeading: 135,
-    presentationTypographyByComposition: {
-      ...previousTypography,
-      [kind]: {
-        ...typography,
-        title: { ...typography.title, sizePercent: cover ? 55 : 46, leadingPercent: 110, case: 'normal' },
-        subtitle: { ...typography.subtitle, sizePercent: 72, leadingPercent: 135, tracking: 0, case: 'normal' },
-      },
-    },
-    canvas: {
-      ...base.canvas,
-      zones: {
-        title: { x: 6, y: cover ? 23 : 12, w: 88, h: 22 },
-        subtitle: { x: 6, y: cover ? 50 : 38, w: withVisual ? 55 : 82, h: cover ? 42 : 56 },
-        photo: { x: 65, y: cover ? 50 : 39, w: 29, h: cover ? 40 : 49 },
-      },
-    },
-  };
+  }, slide, kind, { pitch: true });
 }

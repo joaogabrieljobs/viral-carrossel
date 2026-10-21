@@ -15,6 +15,7 @@ import {
   LOGO_SIZE_DEFAULT,
   LOGO_SIZE_IMPORT,
   logoImportControls,
+  brandLogoReplacementPatch,
   clearLogoOffsetOnSlide,
   clearLogoOffsetOnSlides,
 } from '../../utils/slide-logo.js';
@@ -43,6 +44,7 @@ export function SlideLogoPanel({
   setStyleKit,
   brand,
   setBrand,
+  onSaveBrandLogo = null,
   setSlides,
   cardIndex = 0,
   selectedSlideIds = null,
@@ -157,12 +159,9 @@ export function SlideLogoPanel({
     try {
       const stored = await storeSlideLogo(file);
       if (!alive.current) { URL.revokeObjectURL(stored.logoImage); return; }
-      setBrand((current) => ({
-        ...current,
-        logo: stored.logoImage,
-        logoImageId: stored.logoImageId,
-        ...logoImportControls(current),
-      }));
+      const patch = brandLogoReplacementPatch(stored, brand);
+      if (onSaveBrandLogo) onSaveBrandLogo(patch);
+      else setBrand((current) => ({ ...current, ...patch }));
       setSlides?.((list) => clearLogoOffsetOnSlides(stampLogoVisibleOnSlides(list)));
       updateSlide({ ...clearSlideLogoLayout(), logoHidden: false });
       toast?.(
@@ -280,7 +279,9 @@ export function SlideLogoPanel({
               <button
                 type="button"
                 onClick={() => {
-                  setBrand((current) => ({ ...current, logo: null, logoImageId: null }));
+                  const patch = { logo: null, logoImageId: null, logoAssetId: null, logoForeign: false };
+                  if (onSaveBrandLogo) onSaveBrandLogo(patch);
+                  else setBrand((current) => ({ ...current, ...patch }));
                 }}
                 aria-label="Remover logo da marca"
                 title="Remove de todos os cards (exceto overrides)"

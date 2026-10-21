@@ -24,10 +24,24 @@ async function openPanel(page, label) {
   if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
 }
 async function prompt(page) {
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /PROMPT PARA GERAR/i);
   await page.getByLabel('Prompt para gerar', { exact: true }).fill('CRIE 3 CARDS ANUNCIANDO O MUSA');
 }
 const generate = page => page.getByRole('button', { name: /Gerar com contexto e referências/i }).click();
+async function openFold(page, title) {
+  const summary = page.locator('summary').filter({ has: page.getByText(title, { exact: true }) }).first();
+  if (!await summary.evaluate(node => node.parentElement.open)) await summary.click();
+}
+async function projectContext(page, sections = []) {
+  await page.getByRole('tab', { name: /^Marca$/i }).first().click();
+  await openFold(page, 'Deste projeto');
+  for (const section of sections) await openFold(page, section);
+}
+async function cardLogo(page) {
+  await page.getByRole('tab', { name: /^Marca$/i }).first().click();
+  await openFold(page, 'Logo nos cards');
+}
 
 test('analisar meu tom usa somente IA de texto e não inicia carrossel', async ({ page }) => {
   const textOnlySession = {
@@ -149,7 +163,7 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
       return route.fulfill({ json: { b64_json: PNG, mime: 'image/png' } });
     },
   });
-  await openPanel(page, /USAR CONTEXTO DA MARCA/i);
+  await projectContext(page, ['Brief', 'Estilo visual', 'Referências']);
   await page.getByLabel('Nome do contexto', { exact: true }).fill('MUSA');
   await page.getByLabel('Brief do projeto').fill('# MUSA\nStudio de imagem, vídeo e áudio. Não invente preços.');
   await page.getByLabel('Estilo visual do projeto').fill('3D expressivo, laranja, tipografia Anton.');
@@ -160,18 +174,19 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
   await expect(page.getByRole('button', { name: 'Remover mood-b.png', exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
   await prompt(page);
-  await expect(page.getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
+  await expect(page.getByRole('complementary').getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
   await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await page.screenshot({ path: '/tmp/viral-generation-prompt.png' });
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides.filter(s => s.bgImageId).length).toBe(3);
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
   const before = await doc(page);
+  await openPanel(page, /EDITAR CARD/i);
   const tones = page.getByRole('group', { name: 'Tom do remix' });
   await expect(tones.getByRole('button')).toHaveCount(8);
   await tones.getByRole('button', { name: 'Leve', exact: true }).click();
   expect(prompts).toHaveLength(2);
-  await expect(page.getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
+  await expect(page.getByRole('complementary').getByRole('radio', { name: 'Só texto', exact: true })).toBeChecked();
   await page.getByRole('button', { name: 'Refazer só texto', exact: true }).click();
   await expect.poll(async () => (await doc(page))?.slides[0].title).toBe('Versão 2 1');
   const after = await doc(page);
@@ -183,8 +198,9 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
   }
   expect(prompts[2]).toContain('REMIX DO CARROSSEL ATUAL');
   expect(prompts[2]).toContain('Não invente preços');
-  await openPanel(page, /USAR CONTEXTO DA MARCA/i);
+  await projectContext(page, ['Estilo visual']);
   await page.getByLabel('Estilo visual do projeto').fill('Colagem de papel laranja, recortes com textura.');
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /EDITAR CARD/i);
   await tones.getByRole('button', { name: 'Comercial', exact: true }).click();
   await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
@@ -221,6 +237,10 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
   await prompt(page);
   await modes.selectOption('storytelling');
   await generate(page);
+  const replace = page.getByRole('dialog', { name: 'Substituir os cards?', exact: true });
+  await expect(replace).toBeVisible();
+  expect(prompts).toHaveLength(2);
+  await replace.getByRole('button', { name: 'Substituir', exact: true }).click();
   await expect.poll(() => prompts.length).toBe(4);
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
   expect(prompts[2]).toContain('MÉTODO STORYTELLING');
@@ -335,8 +355,9 @@ test('ações globais dos cards geram, excluem imagem e limpam texto selecionado
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
 
-  await page.getByRole('tab', { name: /^Início$/i }).first().click();
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await page.getByRole('button', { name: 'Selecionar card 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Desmarcar card 1', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Gerar imagens (1)', exact: true }).click();
   await expect.poll(async () => !!(await doc(page))?.slides[0]?.bgImageId).toBe(true);
 
@@ -357,6 +378,8 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   } });
   await prompt(page);
   await generate(page);
+  await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
+  await cardLogo(page);
   await expect(page.getByRole('button', { name: 'Importar logo PNG neste card', exact: true })).toBeVisible();
   // Fixture com metade dos pixels transparentes; o upload não pode converter em JPEG.
   const pngData = await page.evaluate(() => {
@@ -364,11 +387,11 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
     const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ff5500'; ctx.fillRect(0, 0, 10, 20);
     return canvas.toDataURL('image/png');
   });
-  await openPanel(page, /USAR CONTEXTO DA MARCA/i);
-  await page.getByLabel('Arquivo PNG da logo do projeto').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(pngData.split(',')[1], 'base64') });
+  await projectContext(page, ['Logo deste projeto']);
+  await page.getByLabel('Arquivo PNG ou JPEG da logo do projeto').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(pngData.split(',')[1], 'base64') });
   await expect.poll(async () => (await doc(page))?.styleKit.logo?.imageId).toBeTruthy();
   expect((await doc(page)).slides.some(s => s.logoImageId)).toBe(false);
-  await openPanel(page, /EDITAR CARD/i);
+  await cardLogo(page);
   await page.getByRole('button', { name: 'Aplicar logo do projeto neste card', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
   await expect.poll(async () => (await doc(page))?.slides[0].logoImageId).toBeTruthy();
@@ -388,8 +411,7 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   });
   expect(alpha).toBe(0);
   await page.reload();
-  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
-  await openPanel(page, /EDITAR CARD/i);
+  await cardLogo(page);
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
   await expect(page.getByLabel('Posição da logo neste card')).toHaveValue('bl');
   await page.getByRole('button', { name: /^Card 2 de / }).click();
@@ -410,8 +432,54 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   expect(backup.docs[0].doc.slides[0].logoImageId).toBeUndefined();
   await page.locator('input[accept=".json,application/json"]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
   await expect.poll(async () => (await doc(page))?.slides[0].logoImageId).not.toBe(saved.slides[0].logoImageId);
-  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
-  await openPanel(page, /EDITAR CARD/i);
+  await cardLogo(page);
   await page.getByRole('button', { name: /^Card 1 de / }).click();
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
+});
+
+test('Prender atenção recupera títulos ausentes dos cards 3–5 sem perder texto nem markup', async ({ page }) => {
+  const prompts = [];
+  const subtitles = [
+    'Seu cliente procura no Google.', 'Seu endereço precisa ser encontrado.',
+    'Fora do algoritmo. Seu site continua acessível pelo link.',
+    'Uma *porta de entrada de verdade*. Horários e contatos em um só lugar.',
+    'Da descoberta à conversa. Visite get_webexpresso.com para saber mais.',
+  ];
+  const generated = {
+    slides: subtitles.map((subtitle, index) => ({
+      title: index < 2 ? `Halloween WebExpresso ${index + 1}` : index === 3 ? 'Seu título aqui' : '',
+      subtitle, bodyAfterImage: index < 2 ? '' : 'O plano está em estudo.', imageQuery: '',
+    })),
+    caption: 'A campanha de Halloween da WebExpresso.',
+  };
+  await openEditor(page, { '/api/ai/compatible': route => {
+    const text = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+    prompts.push(text);
+    return route.fulfill({ json: completion(text.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated) });
+  } });
+  await openPanel(page, /PROMPT PARA GERAR/i);
+  await page.getByLabel('Prompt para gerar', { exact: true }).fill('Crie 5 cards sobre a campanha Halloween WebExpresso.');
+  await page.getByLabel('Modo narrativo', { exact: true }).selectOption('viral');
+  await generate(page);
+  await expect.poll(async () => (await doc(page))?.slides.length).toBe(5);
+  await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
+  const saved = await doc(page);
+  expect(saved.mode).toBe('viral');
+  expect(saved.slides.slice(2).map(slide => slide.title)).toEqual([
+    'Fora do algoritmo.', 'Uma *porta de entrada de verdade*.', 'Da descoberta à conversa.',
+  ]);
+  for (let index = 2; index < 5; index++) {
+    expect([saved.slides[index].title, saved.slides[index].subtitle].join(' ')).toBe(subtitles[index]);
+    expect(saved.slides[index].bodyAfterImage).toBe('O plano está em estudo.');
+  }
+  expect(prompts).toHaveLength(2);
+  expect(prompts[0]).toContain('"title" OBRIGATÓRIO');
+  expect(prompts[1]).toContain('TODOS os cards exigem title curto');
+  const fourth = page.locator(`main [data-vc-card-surface="${saved.slides[3].id}"]`);
+  await expect(fourth.locator('[data-vc-italic]')).toHaveText('porta de entrada de verdade');
+  await expect(fourth).not.toContainText('*');
+  await page.reload();
+  await expect.poll(async () => (await doc(page))?.slides.slice(2).map(slide => slide.title)).toEqual(saved.slides.slice(2).map(slide => slide.title));
+  await expect(fourth.locator('[data-vc-italic]')).toHaveText('porta de entrada de verdade');
+  expect(prompts).toHaveLength(2);
 });

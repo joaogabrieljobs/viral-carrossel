@@ -14,6 +14,7 @@ import {
   applyLogoLayoutToSlides,
   applyGenerationLogoPolicy,
   brandLogoInsertPatch,
+  brandLogoReplacementPatch,
   logoImportControls,
   LOGO_SIZE_IMPORT,
   LOGO_SIZE_MAX,
@@ -155,6 +156,27 @@ describe('logo por card', () => {
       { logo: { imageId: 'projeto' } },
     )).resolves.toBe('data:image/png;base64,PROJETO');
     expect(imagemComoDataUrl).toHaveBeenLastCalledWith('projeto');
+  });
+  it('resolve o arquivo atual antes de uma cópia inline antiga da marca ou do kit', async () => {
+    imagemComoDataUrl.mockResolvedValue('data:image/png;base64,NOVA');
+    await expect(resolveLogoDataUrl({ logoImageId: 'nova', logo: 'data:image/jpeg;base64,ANTIGA' }))
+      .resolves.toBe('data:image/png;base64,NOVA');
+    expect(imagemComoDataUrl).toHaveBeenLastCalledWith('nova');
+    await expect(resolveLogoDataUrl({}, { logo: { imageId: 'kit-novo', dataUrl: 'data:image/jpeg;base64,ANTIGA' } }))
+      .resolves.toBe('data:image/png;base64,NOVA');
+    expect(imagemComoDataUrl).toHaveBeenLastCalledWith('kit-novo');
+    imagemComoDataUrl.mockResolvedValue(null);
+    await expect(resolveLogoDataUrl({ logoImageId: 'missing-new', logo: 'data:image/jpeg;base64,ANTIGA' }))
+      .resolves.toBeNull();
+  });
+  it('substituir a logo limpa a referência antiga da nuvem sem copiar campos da marca', () => {
+    const old = { id: 'b', logo: 'data:image/jpeg;base64,ANTIGA', logoAssetId: 'old-cloud', logoPosition: 'bl', name: 'Marca' };
+    const patch = brandLogoReplacementPatch({ logoImageId: 'new-local', logoImage: 'blob:new' }, old);
+    expect(patch).toEqual({ logo: 'blob:new', logoImageId: 'new-local', logoAssetId: null, logoForeign: false,
+      logoSize: LOGO_SIZE_IMPORT, logoPosition: 'bl', logoOpacity: 90 });
+    expect(old.logoAssetId).toBe('old-cloud');
+    expect(semImagensDeRuntime([{ doc: { brand: { ...old, ...patch }, slides: [] } }])[0].doc.brand)
+      .toMatchObject({ logoImageId: 'new-local', logoAssetId: null });
   });
   it('não grava bytes em localStorage e protege o ID contra limpeza de órfãos', () => {
     const lib = [{ doc: { slides: [{ logoImageId: 'logo1', logoImage: 'blob:runtime' }, { title: 'outro' }] } }];

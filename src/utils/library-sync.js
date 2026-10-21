@@ -16,6 +16,7 @@ import { CLOUD_IMAGE_PART_CHARS, CLOUD_IMAGE_MAX_CHARS, originalImageAssetId, is
 import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './cloud-upload-receipts.js';
 import { readDeletedProjectIds, rememberDeletedProjectIds, mergeDeletedProjectIds } from './project-deletions.js';
 import { readDataOwner } from './account-data-owner.js';
+import { selectRestoredProjectId } from './project-sync-control.js';
 export { rememberDeletedProjectIds } from './project-deletions.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
@@ -1043,8 +1044,9 @@ export async function pullAccountLibraryAuthoritative({
   const remoteDeletedIds = mergeDeletedProjectIds(manifest.deletedIds);
   const remotelyDeleted = new Set(remoteDeletedIds);
   const liveDocs = manifest.docs.filter((entry) => entry?.id && !remotelyDeleted.has(String(entry.id)));
-  const activeDocId = liveDocs.some((entry) => entry.id === manifest.activeDocId)
-    ? manifest.activeDocId : liveDocs[0]?.id || '';
+  const activeDocId = selectRestoredProjectId({
+    library: liveDocs, preferredId: selectedProjectId, manifestActiveId: manifest.activeDocId,
+  });
   const selectedId = liveDocs.some((entry) => entry.id === selectedProjectId)
     ? selectedProjectId : activeDocId;
   const localDocs = Array.isArray(localSnapshot?.library) ? localSnapshot.library : [];

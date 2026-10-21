@@ -354,12 +354,23 @@ function ensureDocShape(d) {
     out.slides = out.slides.map((sl) => {
       if (!sl || typeof sl !== 'object') return mkSlide(1, out.brand);
       const bp = sl.bgPattern;
+      // O 16:9 usa outra curva de tamanho: a logo ocupa uma caixa relativa à
+      // altura. Nas composições planejadas, 80 já é legível e mantém a faixa
+      // superior livre; a migração de carrossel não deve aumentá-la ao reabrir.
+      const plannedPresentation = (migrated.productKind === 'apresentacao'
+        || migrated.fmt === 'apresentacao' || migrated.creativePreset === 'apresentacao')
+        && (sl.presentationCompositionVersion === 2 || !!sl.presentationPlan);
+      const logoSize = Number(sl.logoSize);
       const normalized = {
         ...sl,
         bgPattern: BG_PATTERN_IDS.has(bp) ? bp : 'none',
         caption: typeof sl.caption === 'string' ? sl.caption : '',
         overlays: normalizeOverlays(sl.overlays),
-        ...(sl.logoSize != null ? { logoSize: coerceReadableLogoSize(sl.logoSize) } : {}),
+        ...(sl.logoSize != null ? {
+          logoSize: plannedPresentation && Number.isFinite(logoSize) && logoSize >= 80
+            ? Math.min(LOGO_SIZE_MAX, logoSize)
+            : coerceReadableLogoSize(sl.logoSize),
+        } : {}),
       };
       // Projetos anteriores à edição individual não tinham este campo. Migra
       // os offsets antes de ativar os alvos separados para a composição não

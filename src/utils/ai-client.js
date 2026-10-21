@@ -123,6 +123,11 @@ const parseStructuredText = (text, json, jsonParser) => (
   json ? (typeof jsonParser === 'function' ? jsonParser(text) : extractJSON(text)) : text.trim()
 );
 
+function assertCompleteText(reason) {
+  if (reason !== 'length' && reason !== 'max_tokens') return;
+  throw Object.assign(new Error('A resposta da IA ficou incompleta. Reduza a quantidade de slides ou o material e tente novamente. Seu projeto foi preservado.'), { code: 'ai_output_truncated' });
+}
+
 const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal, systemPrompt = AI_SYSTEM_PT } = {}) => {
   const body = {
     model: getTextModel('anthropic'),
@@ -168,6 +173,7 @@ const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxToke
     e.status = res.status;
     throw e;
   }
+  assertCompleteText(data.stop_reason);
   const text = (data.content||[])
     .filter(b => b?.type === 'text')
     .map(b => b.text)
@@ -220,6 +226,7 @@ const callOpenAIChat = async (userMsg, { json = false, jsonParser = null, maxTok
   if (!res.ok || data.error) {
     throw new Error(data?.error?.message || `OpenAI HTTP ${res.status}`);
   }
+  assertCompleteText(data.choices?.[0]?.finish_reason);
   const text = data.choices?.[0]?.message?.content || '';
   if (!text.trim()) throw new Error('OpenAI retornou conteúdo vazio.');
   return parseStructuredText(text, json, jsonParser);
@@ -257,7 +264,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8 } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -273,7 +280,7 @@ const callCompatibleChat = async (
       { role: 'system', content: `${systemPrompt} Responda APENAS o que foi pedido, sem texto extra.` },
       { role: 'user', content: userMsg },
     ],
-    temperature: 0.8,
+    temperature: Number.isFinite(temperature) ? Math.max(0, Math.min(1, temperature)) : 0.8,
   };
   if (json) basePayload.response_format = { type: 'json_object' };
 
@@ -334,6 +341,7 @@ const callCompatibleChat = async (
       throw lastError;
     }
 
+    assertCompleteText(data.choices?.[0]?.finish_reason);
     const text = data.choices?.[0]?.message?.content || '';
     if (!text.trim()) {
       lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'} retornou conteúdo vazio.`);
@@ -348,7 +356,7 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, temperature, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   const systemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT
     : contentMode === 'presentation' ? buildPresentationSystemPrompt(presentationPath) : AI_SYSTEM_PT;
   let provider = _aiRuntimeSettings.textProvider;
@@ -361,7 +369,7 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
     return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);

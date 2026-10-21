@@ -47,11 +47,22 @@ export function logoContainHitRect(box, naturalW, naturalH, ink) {
  * projeto substitui a do perfil de marca; ambas vivem no IndexedDB.
  */
 export async function resolveLogoDataUrl(brand = {}, styleKit = {}) {
-  if (styleKit?.logo?.dataUrl) return styleKit.logo.dataUrl;
   if (styleKit?.logo?.imageId) return imagemComoDataUrl(styleKit.logo.imageId);
-  if (brand?.logo && typeof brand.logo === 'string') return brand.logo;
+  if (styleKit?.logo?.dataUrl) return styleKit.logo.dataUrl;
   if (brand?.logoImageId) return imagemComoDataUrl(brand.logoImageId);
+  if (brand?.logo && typeof brand.logo === 'string') return brand.logo;
   return null;
+}
+
+/** Substituição explícita da logo da marca: o arquivo anterior deixa de ser fallback. */
+export function brandLogoReplacementPatch(stored = {}, brand = {}) {
+  return {
+    logo: stored.logoImage || null,
+    logoImageId: stored.logoImageId || null,
+    logoAssetId: null,
+    logoForeign: false,
+    ...logoImportControls(brand),
+  };
 }
 
 /** ID e imagem são inseparáveis: nunca completar um PNG de card/projeto com

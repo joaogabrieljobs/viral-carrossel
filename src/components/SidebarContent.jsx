@@ -230,6 +230,7 @@ function SidebarContent({
   setHookLibrary,
   niche,
   slide, slides, activeIdx, brand, setBrand, updateSlide,
+  onSaveBrandLogo = null,
   setSlides = null,
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   handleCopyCaption, handleExportPackage,
@@ -2938,6 +2939,7 @@ function SidebarContent({
                   brand={brand}
                   setBrand={setBrand}
                   setSlides={setSlides}
+                  onSaveBrandLogo={onSaveBrandLogo}
                   cardIndex={activeIdx}
                   selectedSlideIds={selectedSlideIds}
                 />
