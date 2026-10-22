@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyVisualPresetToCard, editCardVisualBrand } from '../../src/utils/visual-scope.js';
+import { applyVisualPresetToCard, editCardVisualBrand, preserveVisualPresetContent } from '../../src/utils/visual-scope.js';
 import { VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS } from '../../src/styles/presentation-presets.jsx';
 import { DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
@@ -53,5 +53,18 @@ describe('padrão visual por card', () => {
     expect(result.fmt).toBe('apresentacao');
     expect(result.slides[0]).toEqual(original.slides[0]);
     expect(result.slides[1].title).toBe(original.slides[1].title);
+  });
+  it('aplicar em todos preserva preços, chamadas, fotos e CTAs sem inserir textos de exemplo', () => {
+    const original = makeDoc();
+    original.slides[0].strikethroughText = 'De R$ 299';
+    original.slides[0].afterTitleText = 'Por R$ 199';
+    const styled = { ...original, visualPreset: 'bold_promo_rosa', slides: original.slides.map(slide => ({
+      ...slide, titleSize: 115, eyebrowText: 'CHAMADA DE EXEMPLO', strikethroughText: 'DE R$00', afterTitleText: 'POR R$00', overlays: [],
+    })) };
+    const result = preserveVisualPresetContent(styled, original);
+    expect(result.visualPreset).toBe('bold_promo_rosa');
+    expect(result.slides[0]).toEqual({ ...original.slides[0], titleSize: 115 });
+    expect(result.slides[1]).toEqual({ ...original.slides[1], titleSize: 115 });
+    expect(styled.slides[0].strikethroughText).toBe('DE R$00');
   });
 });

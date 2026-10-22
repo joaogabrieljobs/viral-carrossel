@@ -17,6 +17,21 @@ import {
 const source = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 describe('interface lateral por tipo de produto', () => {
+  it('Criar rápido mostra só Início e Ajustes na mesma linha', () => {
+    const tabs = visibleEditorTabs('criador');
+    expect(tabs.map(({ id, label }) => ({ id, label }))).toEqual([
+      { id: 'home', label: 'Início' },
+      { id: 'ajustes', label: 'Ajustes' },
+    ]);
+    expect(tabs.map((_, index) => editorTabGridSpan(tabs.length, index)))
+      .toEqual(['span 6', 'span 6']);
+  });
+
+  it('Controle profissional mantém seus seis domínios independentes', () => {
+    expect(visibleEditorTabs('diretor').map(({ id }) => id))
+      .toEqual(['home', 'brand', 'narrativa', 'visual', 'imagem', 'texto']);
+  });
+
   it('distribui as sete abas do Studio em 4 + 3 sem coluna vazia', () => {
     const tabs = visibleEditorTabs('studio');
     expect(tabs).toHaveLength(7);

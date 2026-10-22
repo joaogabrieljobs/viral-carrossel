@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 // As imagens viviam como data URL dentro do documento, e o documento no
 // localStorage (~5 MB). Ao encher, o código apagava as imagens para conseguir
 // gravar — perda real. Agora os bytes ficam no IndexedDB e o documento guarda o id.
@@ -90,6 +90,7 @@ test.describe('Imagens no IndexedDB', () => {
     await abrirEditor(page);
 
     // Tabs do editor usam role="tab", não button.
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /^Imagem$/i }).click({ force: true });
     const batch = page.locator('input.vc-batch-photo-input').first();
     await expect(batch).toBeAttached({ timeout: 10_000 });

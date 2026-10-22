@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -80,6 +80,7 @@ test('cópia branca vazia recupera a marca no card e no PNG, preservando logos p
 
   // Herda a marca no card de origem e replica: o destino precisa perder a
   // logo antiga, mesmo quando a origem não tem override próprio.
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: 'Marca', exact: true }).click();
   await page.getByText('Logo nos cards', { exact: true }).click();
   await page.getByRole('button', { name: 'Voltar à logo da marca neste card', exact: true }).click();

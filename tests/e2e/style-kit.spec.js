@@ -1,4 +1,4 @@
-import { enterEditorFromHome, createTextProject } from './helpers/project-entry.js';
+import { enterEditorFromHome, createTextProject, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
@@ -53,9 +53,11 @@ test('plano: prompt rápido gera três imagens com as referências e o estilo do
 });
 
 async function narrativa(page) {
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
 }
 async function contextPanel(page) {
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name:'Marca', exact:true }).first().click();
   const section = page.locator('details').filter({ has:page.locator('summary').filter({ hasText:/^Deste projeto/ }) });
   if (await section.getAttribute('open') === null) await section.locator(':scope > summary').click();

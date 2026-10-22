@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -44,6 +44,7 @@ for (const failure of ['blocked', 'timeout']) {
     }, { owner: `email:${SESSAO_ATIVA.email}`, failure, source: SOURCE });
     await page.goto('/?app=1');
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /^Marca$/ }).first().click();
     const logoSection = page.locator('details').filter({ has:page.locator('summary').filter({ hasText:'Logo nos cards' }) });
     if (await logoSection.getAttribute('open') === null) await logoSection.locator('summary').click();
@@ -58,6 +59,7 @@ for (const failure of ['blocked', 'timeout']) {
 
     await page.reload();
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /^Marca$/ }).first().click();
     if (await logoSection.getAttribute('open') === null) await logoSection.locator('summary').click();
     await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toHaveAttribute('src', SOURCE);

@@ -21,6 +21,7 @@ import { PerSlideImageRefBlock } from './panels/PerSlideImageRefBlock.jsx';
 import { ProjectStyleKitPanel } from './panels/ProjectStyleKitPanel.jsx';
 import { NarrativaStudioPanels, BTN_CAPS } from './panels/NarrativaStudioPanels.jsx';
 import { CriarRapidoHome, PostGenerateActions } from './panels/CriarRapidoHome.jsx';
+import { QuickAdjustmentsPanel } from './panels/QuickAdjustmentsPanel.jsx';
 import { ImportTextModal } from './panels/ImportTextModal.jsx';
 import { TeamSharePanel } from './panels/TeamSharePanel.jsx';
 import { BrandWorkspacePanel } from './panels/BrandWorkspacePanel.jsx';
@@ -148,7 +149,7 @@ function unionDestaqueRangeIntoSpans(spansIn, selA, selB, len) {
 }
 
 // Fonte única das tabs do editor (sidebar desktop + bottom bar mobile).
-// Texto está disponível em todos os modos; Studio acrescenta Layout.
+// Criar rápido reúne a edição em Ajustes; os demais modos mantêm suas áreas.
 const EDITOR_TABS = [
   { id:'home',      icon:Home,     label:'Início',      mode:'criador' },
   { id:'brand',     icon:Instagram,label:'Marca',     mode:'criador' },
@@ -160,13 +161,16 @@ const EDITOR_TABS = [
 ];
 const APP_MODE_RANK = { criador: 1, diretor: 2, studio: 3 };
 const visibleEditorTabs = (appMode) =>
-  EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= (APP_MODE_RANK[appMode] || 1));
+  !APP_MODE_RANK[appMode] || appMode === 'criador'
+    ? [EDITOR_TABS[0], { id:'ajustes', icon:SlidersHorizontal, label:'Ajustes', mode:'criador' }]
+    : EDITOR_TABS.filter((t) => APP_MODE_RANK[t.mode] <= APP_MODE_RANK[appMode]);
 
 // O Studio tem sete áreas. Uma grelha fixa de três colunas deixava a última
 // aba sozinha numa terceira linha. Dividimos cada linha nas mesmas 12 colunas:
 // 7 abas viram 4 + 3, 6 viram 3 + 3 e 5 viram 3 + 2, sem células vazias.
 function editorTabGridSpan(total, index) {
   const safeTotal = Math.max(1, Number(total) || 1);
+  if (safeTotal <= 2) return `span ${12 / safeTotal}`;
   const firstRowCount = Math.ceil(safeTotal / 2);
   const rowCount = index < firstRowCount
     ? firstRowCount
@@ -235,7 +239,7 @@ function SidebarContent({
   addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
   handleCopyCaption, handleExportPackage,
   generateCaption, genCaption, caption, setCaption, setSetupOpen, setResearchOpen, fileInputRef,
-  exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab, setTab,
+  exportSlide, exportAll, exportPDF, exportPhotosOnly = () => {}, exporting, exportProgress, tab: requestedTab, setTab,
   openaiKey, hasOpenAI=false, hasTextAI=false, setKeysOpen,
   imageGenerationAvailability = null,
   setTemplatesOpen, setHookVarsOpen, refineAll, askPrompt, toast,
@@ -323,6 +327,7 @@ function SidebarContent({
   saveIndicator = null,
   onReviewChange = null,
 }) {
+  const tab = appMode === 'criador' && requestedTab !== 'home' ? 'ajustes' : requestedTab;
   const imageTargetRef = useRef(null);
   imageTargetRef.current = { projectId: activeEntry?.id, slideId: slide?.id };
   const [dalleLoading, setDalleLoading] = React.useState(false);
@@ -349,6 +354,9 @@ function SidebarContent({
   const editorTabs = visibleEditorTabs(appMode);
   const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
   const editorScrollRef = useRef(null);
+  useLayoutEffect(() => {
+    if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;
+  }, [tab]);
   useLayoutEffect(() => {
     if (!editorFocus?.section || editorFocus.slideId !== slide?.id || tab !== editorFocus.tab) return;
     const scrollToSection = () => {
@@ -741,6 +749,25 @@ function SidebarContent({
 
       {/* Scrollable body */}
       <div ref={editorScrollRef} style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:16, paddingBottom:28 }}>
+
+        {tab === 'ajustes' && appMode === 'criador' && (
+          <QuickAdjustmentsPanel
+            slide={slide} brand={brand} activeIdx={activeIdx} cardCount={slides.length}
+            isPresentation={isPresentationProject} projectId={activeDocId || activeEntry?.id}
+            visualPreset={visualPreset} presets={productVisualPresets}
+            applyVisualPreset={applyVisualPresetCb} updateSlide={updateSlide}
+            onImportPhotoAt={onImportPhotoAt} onOpenPhotoPosition={onOpenPhotoPosition}
+            onSaveBrandLogo={onSaveBrandLogo}
+            onRemix={(hint) => refineAll?.(`Reescreva com tom ${hint}. Preserve os fatos, a ideia, a ordem, a quantidade de cards e o volume aproximado de texto. Não invente informação nem preencha campos vazios.`)}
+            busy={refining || genBusy} hasTextAI={hasTextAI}
+            onAutoAdjust={() => {
+              updateSlide(slideAutoAdjustPatch(slide, { creativePreset, fmt }));
+              toast?.(`${isPresentationProject ? 'Slide organizado' : 'Card organizado'}. Você pode desfazer pelo botão no topo.`, 'success');
+            }}
+            onMoreControl={() => { setAppMode?.('diretor'); setTab('visual'); }}
+            editorFocus={editorFocus} toast={toast}
+          />
+        )}
 
         {tab === 'texto' && (
           <CardTextFontPanel
@@ -3672,8 +3699,7 @@ function SidebarContent({
                   onQuickGenerate={async (text, options) => {
                     const result = await onQuickGenerate?.(text, options);
                     if (result && !result.cancelled) {
-                      setTab('narrativa');
-                      setNarrativaPanel('card');
+                      setTab('ajustes');
                     }
                     return result;
                   }}
@@ -3695,8 +3721,7 @@ function SidebarContent({
                     toast?.(`${appModeLabel('diretor')} ativo — mesmos ${itemsLabel} e identidade.`, 'success', 4000);
                   }}
                   onAdjustText={() => {
-                    setTab('narrativa');
-                    setNarrativaPanel('card');
+                    setTab('ajustes');
                   }}
                   onGenerateImages={generateMissingImages}
                   imagesBusy={imagesBatchBusy}

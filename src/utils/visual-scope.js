@@ -4,6 +4,25 @@ import { sanitizeCustomVisualPresetBrand } from './custom-visual-presets.js';
 import { suggestCreativePresetForVisual } from './slide-design-system.js';
 import { applyFormatEdit, applyBrandEdit, brandForFormatDisplay, slideForFormatDisplay } from './format-view.js';
 
+const CONTENT_KEYS = ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'bgImageAssetId', 'imageQuery', 'overlays'];
+
+/** Applying a look never inserts sample prices or replaces the author's copy. */
+export function preserveVisualPresetContent(styled, source) {
+  return {
+    ...styled,
+    slides: (styled.slides || []).map((slide, index) => {
+      const original = source.slides?.[index];
+      if (!original) return slide;
+      const next = { ...slide };
+      for (const key of CONTENT_KEYS) {
+        if (Object.hasOwn(original, key)) next[key] = original[key];
+        else delete next[key];
+      }
+      return next;
+    }),
+  };
+}
+
 export function editCardVisualBrand(doc, index, nextBrand) {
   const slide = slideForFormatDisplay(doc.slides[index], doc.fmt, doc.formatViews, doc.creativePreset);
   const base = brandForFormatDisplay(doc.brand, doc.fmt, doc.formatViews, doc.creativePreset);
@@ -32,7 +51,7 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
     brand = applyVisualPreset(doc.brand, preset.id, presets);
   }
   // Keep the author's content and photos, including auxiliary copy and CTAs.
-  for (const key of ['id', 'title', 'subtitle', 'bodyAfterImage', 'eyebrowText', 'strikethroughText', 'afterTitleText', 'caption', 'bgImage', 'bgImageId', 'imageQuery', 'overlays']) delete patch[key];
+  for (const key of CONTENT_KEYS) delete patch[key];
   return applyFormatEdit(doc, index, {
     ...patch,
     visualBrand: sanitizeCustomVisualPresetBrand(brand),

@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -91,6 +91,7 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     ctx.fillRect(210, 12, 12, 24);
     return canvas.toDataURL('image/png');
   });
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Marca$/ }).first().click();
   await page.locator('[data-vc-editor-section="marca-logo"] > summary').click();
   await page.getByLabel('Arquivo PNG da logo deste card', { exact: true }).setInputFiles({
@@ -127,6 +128,7 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     await restored.goto('/?app=1&login=password');
     await enterEditorFromHome(restored, 'Logo transparente');
     expect(await logoPixels(restored)).toEqual(before);
+    await selectEditorMode(restored, 'diretor');
     await restored.getByRole('tab', { name: /^Marca$/ }).first().click();
     await restored.locator('[data-vc-editor-section="marca-logo"] > summary').click();
     await restored.getByLabel('Posição da logo neste card', { exact: true }).selectOption('bl');

@@ -28,6 +28,19 @@ export async function enterEditorFromHome(page, projectName) {
   await expect(page.locator('[data-vc-tour="account-home"]')).toHaveCount(0);
 }
 
+/** Explicit opt-in for regression scenarios about professional tools.
+ * Quick-mode and onboarding tests never change mode through entry defaults. */
+export async function selectEditorMode(page, mode) {
+  const labels = { criador: 'Criar rápido', diretor: 'Controle profissional', studio: 'Studio' };
+  const label = labels[mode];
+  if (!label) throw new Error(`Modo de teste inválido: ${mode}`);
+  const current = page.getByRole('button', { name: /^Modo atual:/ });
+  if ((await current.getAttribute('aria-label'))?.startsWith(`Modo atual: ${label}.`)) return;
+  await current.click();
+  await page.getByRole('menuitem', { name: new RegExp(`^${label}`) }).click();
+  await expect(current).toHaveAttribute('aria-label', `Modo atual: ${label}. Clique para mudar.`);
+}
+
 /** Create a small synthetic project through the public wizard. AI is mocked
  * only for this action; existing test handlers resume when creation finishes. */
 export async function createTextProject(page, { name = 'Projeto novo', newBrand, beforeGenerate } = {}) {

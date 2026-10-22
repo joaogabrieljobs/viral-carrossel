@@ -28,7 +28,9 @@ Guia completo: [Projetos, contexto e geração](docs/product/guia-projetos-gerac
 - Editor responsivo, histórico de alterações, biblioteca de projetos e exportação.
 - Login por e-mail/senha ou Google, mostrar/ocultar senha e recuperação por link via Resend.
 
-Os modos de interface **Criador, Diretor e Studio** controlam a quantidade de ferramentas visíveis. São distintos dos **modos narrativos**, que orientam a estrutura do conteúdo.
+Os modos de interface **Criar rápido, Controle profissional e Studio** controlam a quantidade de ferramentas visíveis. São distintos dos **modos narrativos**, que orientam a estrutura do conteúdo.
+
+No **Criar rápido**, o editor tem duas abas, no computador e no celular: **Início** para projetos e geração; **Ajustes** para estilos prontos, texto, imagem, logo do projeto e tom. Os presets salvos pelo usuário aparecem junto aos estilos prontos. É possível aplicar um estilo ao card atual ou a todos, preservando os textos, preços, fotos e CTAs. A troca de logo em Ajustes vale para o projeto e não modifica a marca salva. **Mais controles** abre o Controle profissional com o mesmo projeto.
 
 ## Planos e IA
 

@@ -2,7 +2,7 @@ import { useCaptionDelivery } from './src/hooks/useCaptionDelivery.js';
 import { copyTextToClipboard } from './src/utils/export-package.js';
 import { GenerationScopePicker } from './src/components/GenerationScopePicker.jsx';
 import { joinSlideCaptions } from './src/utils/import-text.js';
-import { applyVisualPresetToCard, editCardVisualBrand } from './src/utils/visual-scope.js';
+import { applyVisualPresetToCard, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
 import { cloudSyncFailureMessage, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
@@ -495,6 +495,9 @@ import {
   resolveLogoDataUrl,
   applyGenerationLogoPolicy,
   storeSlideLogo,
+  applyLogoAssetToSlides,
+  clearLogoOffsetOnSlide,
+  projectLogoFromStored,
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
@@ -1271,6 +1274,31 @@ export default function App() {
       profile.id === brand.id ? { ...profile, ...patch } : profile
     )));
   }, [setBrand, brand.id]);
+  // Ajustes rápidos altera só o projeto. A marca salva continua disponível
+  // para outros projetos e a troca inteira pode ser desfeita em um passo.
+  const saveQuickProjectLogo = useCallback((patch) => {
+    history.set((d) => {
+      const asset = { logoImageId: patch.logoImageId, logoImage: patch.logo };
+      const logoLayout = (slide) => ({
+        ...clearLogoOffsetOnSlide(slide),
+        logoHidden: false,
+        logoPosition: patch.logoPosition,
+        logoSize: patch.logoSize,
+        logoOpacity: patch.logoOpacity,
+      });
+      const slides = applyLogoAssetToSlides(d.slides, asset).map((slide) => ({
+        ...logoLayout(slide), logoImageAssetId: null,
+      }));
+      const formatViews = Object.fromEntries(Object.entries(d.formatViews || {}).map(([fmtKey, view]) => [fmtKey, {
+        ...view,
+        slides: Object.fromEntries(Object.entries(view.slides || {}).map(([id, slide]) => [id, logoLayout(slide)])),
+      }]));
+      return {
+        ...d, slides, formatViews,
+        styleKit: { ...normalizeStyleKit(d.styleKit), logo: projectLogoFromStored(asset), logoOnGenerate: true },
+      };
+    });
+  }, [history]);
   const setFmt       = useCallback(next => history.set(d => {
     const raw = typeof next === 'function' ? next(d.fmt) : next;
     const nextFmt = FORMATS[raw] ? raw : 'carrossel';
@@ -1373,9 +1401,9 @@ export default function App() {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
       d = transformFormatVisuals(d, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
       if (isPresentationVisual) {
-        return applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
+        return preserveVisualPresetContent(applyPresentationVisualPresetToDoc(d, resolvedPresetId, visualPresets, {
           initialize: d.productKind !== 'apresentacao' || !isApresentacaoPreset(d.creativePreset),
-        });
+        }), d);
       }
       const next = d.productKind === 'apresentacao' || isApresentacaoPreset(d.creativePreset)
         ? applyCarouselVisualPresetToDoc(d, resolvedPresetId, visualPresets, { fmt: 'carrossel' })
@@ -1388,7 +1416,7 @@ export default function App() {
               ...getSlideOverridesForPreset(resolvedPresetId, visualPresets),
             })),
           };
-      return fromPreset ? { ...next, creativePreset: fromPreset } : next;
+      return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
     });
     toast(scope === 'card' ? `Padrão aplicado ao card ${index + 1}. Use Desfazer para voltar.` : 'Padrão aplicado a todos. Use Desfazer para voltar.', 'success', 4000);
     trackEvent('visual_preset_applied', { preset: resolvedPresetId, creativePreset: fromPreset || null });
@@ -2717,7 +2745,8 @@ export default function App() {
     setAppModeState(next);
     // Nunca deixe ativa uma aba que o modo recém-selecionado esconde.
     setTab((current) => (
-      visibleEditorTabs(next).some(({ id }) => id === current) ? current : 'home'
+      visibleEditorTabs(next).some(({ id }) => id === current) ? current
+        : next === 'criador' ? 'ajustes' : 'home'
     ));
     lsSet(SK.appMode, next);
     trackEvent('app_mode_change', { mode: next });
@@ -5364,11 +5393,7 @@ ${jsonShapeLine}`;
       }));
     }
     if (isMobile) {
-      // Antes ia para a tab 'slide' — que não existe em EDITOR_TABS e renderiza
-      // a união de layout+imagem+texto, entregando ferramentas de Studio a um
-      // usuário no modo Criador. 'narrativa' existe em todos os modos e é onde
-      // o texto recém-gerado é editado.
-      setTab('narrativa');
+      setTab(appMode === 'criador' ? 'ajustes' : 'narrativa');
       setDrawerOpen(true);
     }
     if (n) setNiche(n);
@@ -6395,8 +6420,13 @@ Retorne APENAS JSON: ${refineAllWantsBody
     const index = slides.findIndex((item) => item.id === slideId);
     if (index >= 0) setActiveIdx(index);
     setSelectedCardElement({ slideId, key });
-    const target = cardElementEditorTarget(key);
-    if (!target) return;
+    const elementTarget = cardElementEditorTarget(key);
+    if (!elementTarget) return;
+    const target = appMode === 'criador'
+      ? { ...elementTarget, tab: 'ajustes', section: key === 'photo' ? 'imagem-ajustes'
+        : ['title', 'subtitle', 'text', 'eyebrow', 'bodyAfterImage', 'offer'].includes(key) || key.startsWith('ov_') ? 'texto-caixa'
+          : key === 'logo' ? 'marca-logo' : 'ajustes-estilos' }
+      : elementTarget;
     const rank = { criador: 1, diretor: 2, studio: 3 };
     if (navigate) {
       if ((rank[appMode] || 1) < (rank[target.mode] || 1)) setAppMode(target.mode);
@@ -6405,7 +6435,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     } else if (target.tab !== tab) {
       return;
     }
-    setEditorFocus({ slideId, tab: target.tab, section: target.section, at: Date.now() });
+    setEditorFocus({ slideId, key, tab: target.tab, section: target.section, at: Date.now() });
   }, [slides, appMode, tab, setAppMode]);
 
   const currentDocumentFingerprint = useMemo(() => projectCacheFingerprint(activeEntry ? { ...activeEntry, doc } : null), [activeEntry, doc]);
@@ -6414,7 +6444,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     && cloudReceipt.fingerprint === currentDocumentFingerprint ? cloudReceipt.at : null;
   const saveIndicator = <ProjectSaveStatus localSavedAt={lastSavedAt} cloudSavedAt={confirmedCloudAt} busy={cloudSyncBusy || autoSaveBusy} error={cloudUnsaved} onRetry={salvarProjeto} />;
 
-  const editingCardVisual = !!panelSlide.visualBrand && ['texto', 'visual'].includes(tab);
+  const editingCardVisual = !!panelSlide.visualBrand && ['texto', 'visual', 'ajustes'].includes(tab);
   const sidebarBrand = editingCardVisual ? { ...displayBrand, ...sanitizeCustomVisualPresetBrand(panelSlide.visualBrand) } : displayBrand;
   const setSidebarBrand = editingCardVisual ? next => history.set(d => editCardVisualBrand(d, activeIdx, next)) : setBrand;
 
@@ -6426,7 +6456,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     setHookLibrary, niche,
     onOpenResults: () => setResultsOpen(true),
     slide: panelSlide, slides, activeIdx, brand: sidebarBrand, setBrand:setSidebarBrand, updateSlide,
-    onSaveBrandLogo: editingCardVisual ? null : saveBrandLogo,
+    onSaveBrandLogo: appMode === 'criador' ? saveQuickProjectLogo : editingCardVisual ? null : saveBrandLogo,
     setSlides,
     addSlide, deleteSlide, duplicateSlide, moveSlide, refineSlide, refining,
     generateCaption, genCaption, caption, setCaption, handleCopyCaption, handleExportPackage,
@@ -7942,7 +7972,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                 WebkitOverflowScrolling:'touch',
                 scrollbarWidth:'none',
               }}>
-              {[...visibleEditorTabs(appMode).filter(item => ['narrativa', 'texto', 'imagem'].includes(item.id)).sort((a, b) => ['narrativa', 'texto', 'imagem'].indexOf(a.id) - ['narrativa', 'texto', 'imagem'].indexOf(b.id)), { id:'home', label:'Mais', icon:Layers }].map(({ id, label, icon:Icon }) => {
+              {(appMode === 'criador' ? visibleEditorTabs(appMode) : [...visibleEditorTabs(appMode).filter(item => ['narrativa', 'texto', 'imagem'].includes(item.id)).sort((a, b) => ['narrativa', 'texto', 'imagem'].indexOf(a.id) - ['narrativa', 'texto', 'imagem'].indexOf(b.id)), { id:'home', label:'Mais', icon:Layers }]).map(({ id, label, icon:Icon }) => {
                 const active = tab === id;
                 return (
                   <button
@@ -8061,6 +8091,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           setShellView('project');
           // «Fontes & referências» vive na tab narrativa — 'material' não é uma
           // tab real e deixava a sidebar vazia.
+          if (appMode === 'criador') setAppMode('diretor');
           setTab('narrativa');
           if (isMobile) setDrawerOpen(true);
         }}

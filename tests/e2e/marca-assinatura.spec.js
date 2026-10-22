@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 // A assinatura da marca (barra editorial, contador N/M, barra do rodapé e selo)
 // vivia só no ramo legado full-bleed: nos cards com composição ou layout sanduíche
 // o utilizador preenchia os campos em Marca e nada aparecia no card.
@@ -31,6 +31,7 @@ test.describe('Assinatura da marca no card', () => {
     const totalCards = await page.getByRole('button', { name: /^Card \d+ de \d+$/ }).count();
     expect(totalCards).toBeGreaterThan(2);
 
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });
     for (const section of ['Barra editorial (topo)', 'Selo do rodapé', 'Barra do rodapé']) {
       await page.locator('summary').filter({ hasText:section }).click();

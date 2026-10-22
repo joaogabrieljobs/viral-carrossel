@@ -60,14 +60,14 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
       const n = await abas.count();
       expect(n, `modo ${modo} deveria expor abas`).toBeGreaterThan(0);
       contagem[modo] = n;
+      if (modo === 'criador') expect(await abas.allTextContents()).toEqual(['Início', 'Ajustes']);
       for (let i = 0; i < n; i++) {
         await abas.nth(i).click({ force: true });
         await page.waitForTimeout(120);
       }
     }
-    // Texto fica disponível desde Criar rápido; Studio acrescenta Layout.
-    expect(contagem.diretor).toBeGreaterThanOrEqual(contagem.criador);
-    expect(contagem.studio).toBeGreaterThan(contagem.diretor);
+    // Criar rápido reduz a navegação; os outros modos preservam os domínios.
+    expect(contagem).toEqual({ criador: 2, diretor: 6, studio: 7 });
 
     expect(erros, `erros no editor:\n${erros.join('\n')}`).toEqual([]);
   });

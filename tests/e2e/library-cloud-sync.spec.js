@@ -1,3 +1,4 @@
+import { selectEditorMode } from './helpers/project-entry.js';
 import { enterEditorFromHome, openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA, SESSAO_ANONIMA } from './helpers/api-mock.js';
@@ -311,6 +312,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -373,6 +375,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -425,6 +428,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -456,6 +460,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).map((entry) => entry.id)))
       .toEqual(['cloud-clinic-1']);
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     if (!(await title.isVisible())) await page.getByRole('button', { name: /editar card/i }).first().click();
     await expect(title).toHaveValue(editedTitle);
@@ -482,6 +487,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
     await enterEditorFromHome(page);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');

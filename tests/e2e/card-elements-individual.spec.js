@@ -75,6 +75,12 @@ test('card Cultura antigo abre com elementos independentes e arrasta só o alvo 
     };
   }), { timeout: 5000 }).toEqual({ titleMoved: true, bodyMoved: false, baseX: 4 });
 
+  await title.click();
+  await expect(page.getByRole('tab', { name: 'Ajustes', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByLabel('Título deste card', { exact: true })).toHaveValue('DIREÇÃO.');
+  expect(await page.getByRole('tab').allTextContents()).toEqual(['Início', 'Ajustes']);
+
+
 });
 
 test('gesto de toque num elemento móvel não dispara o swipe para o card seguinte', async ({ page }) => {

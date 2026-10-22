@@ -1,3 +1,4 @@
+import { selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -21,6 +22,7 @@ async function openEditor(page, extra) {
   await mockApi(page, { session, extra });
   await page.goto('/?app=1');
   await enterSavedProject(page);
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
 }
 async function openPanel(page, label) {
@@ -28,6 +30,7 @@ async function openPanel(page, label) {
   if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
 }
 async function prompt(page) {
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /PROMPT PARA GERAR/i);
   await page.getByLabel('Prompt para gerar', { exact: true }).fill('CRIE 3 CARDS ANUNCIANDO O MUSA');
@@ -38,11 +41,13 @@ async function openFold(page, title) {
   if (!await summary.evaluate(node => node.parentElement.open)) await summary.click();
 }
 async function projectContext(page, sections = []) {
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Marca$/i }).first().click();
   await openFold(page, 'Deste projeto');
   for (const section of sections) await openFold(page, section);
 }
 async function cardLogo(page) {
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name: /^Marca$/i }).first().click();
   await openFold(page, 'Logo nos cards');
 }
@@ -333,6 +338,7 @@ test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ p
   await generate(page);
   await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Original 1');
 
+  await selectEditorMode(page, 'criador');
   await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await page.getByRole('button', { name: 'Gerar imagens', exact: true }).click();
   await expect(page.getByText('Quais cards terão imagem?')).toBeVisible();

@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 // Cada item da assinatura tem a sua barra de tamanho: o valor certo depende da
 // fonte da marca e do comprimento do texto do utilizador, logo não pode ser fixo
 // no padrão visual.
@@ -31,6 +31,7 @@ test.describe('Tamanho dos itens da marca', () => {
     await enterEditorFromHome(page);
     await page.waitForTimeout(800);
 
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });
     await page.locator('summary').filter({ hasText:'Barra editorial (topo)' }).click();
     // Barra editorial: escreve na coluna da esquerda e mede
@@ -60,6 +61,7 @@ test.describe('Tamanho dos itens da marca', () => {
     await page.goto('/?app=1');
     await enterEditorFromHome(page);
     await page.waitForTimeout(800);
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });
     await page.locator('summary').filter({ hasText:'Barra editorial (topo)' }).click();
     await page.getByText('Esquerda', { exact: true }).first().locator('xpath=following::input[1]').fill('SELO TESTE', { force: true });

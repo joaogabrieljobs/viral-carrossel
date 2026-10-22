@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 // Cobre os dois painéis de IA que estavam com import faltando (audit: bugs
 // latentes achados pelo check-undefined). Sem estes testes, se o import sumir
 // de novo, ninguém vê — o build continua verde e só quebra no clique do usuário.
@@ -93,6 +93,7 @@ test.describe('Painéis de IA', () => {
     await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
 
     // o botão vive na aba Narrativa da sidebar
+    await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /narrativa/i }).first().click({ force: true });
     await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
     await page.getByRole('button', { name: /gerar variações de gancho/i }).click({ force: true });

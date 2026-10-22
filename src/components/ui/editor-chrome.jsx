@@ -301,7 +301,12 @@ function MobileDrawer({ open, onClose, children }) {
     returnFocusRef.current = document.activeElement;
     document.body.style.overflow = 'hidden';
     applyDrag(0);
-    const focusTimer = window.requestAnimationFrame(() => closeRef.current?.focus());
+    const focusTimer = window.requestAnimationFrame(() => {
+      // A contextual editor can focus its requested field when it mounts.
+      // Preserve that focus instead of moving it back to the drawer's close
+      // button; opening a panel without a target still gets a safe default.
+      if (!panelRef.current?.contains(document.activeElement)) closeRef.current?.focus();
+    });
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();

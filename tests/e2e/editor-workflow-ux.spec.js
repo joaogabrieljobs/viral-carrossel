@@ -1,4 +1,4 @@
-import { enterEditorFromHome, createTextProject, openProjectLibrary } from './helpers/project-entry.js';
+import { enterEditorFromHome, createTextProject, openProjectLibrary, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -50,10 +50,10 @@ test('zoom altera apenas preview, navega entre cards e ajusta novamente à tela'
   await page.screenshot({ path:testInfo.outputPath('desktop-workflow.png') });
 });
 
-test('mobile identifica projeto, tem Texto, exporta conjunto e rola por uma alça visível', async ({ page }, testInfo) => {
+test('mobile identifica projeto, tem Ajustes, exporta conjunto e rola por uma alça visível', async ({ page }, testInfo) => {
   await editor(page, true);
   await expect(page.getByText('Café Aurora — outubro', { exact:true })).toBeVisible();
-  const textTab = page.getByRole('button', { name:'Abrir aba Texto', exact:true });
+  const textTab = page.getByRole('button', { name:'Abrir aba Ajustes', exact:true });
   await expect(textTab).toBeInViewport();
   await page.getByRole('button', { name:'Aumentar zoom', exact:true }).click();
   const rail = page.getByRole('scrollbar', { name:'Rolar área dos cards' });
@@ -71,8 +71,8 @@ test('mobile identifica projeto, tem Texto, exporta conjunto e rola por uma alç
   expect(await page.getByRole('menuitem').first().innerText()).toContain('Todos os 6 cards');
   await expect(page.getByRole('menuitem', { name:'Copiar legenda', exact:true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name:'Abrir aba Narrativa' }).click();
-  await page.getByRole('button', { name:/Ajustar texto/ }).click();
+  await page.locator('main [data-vc-card-surface="ux-0"] [data-vc-movable="title"]').click();
+  await expect(page.getByRole('tab', { name:'Ajustes', exact:true })).toHaveAttribute('aria-selected', 'true');
   // Focus lands on the editable title, not on the actions above it.
   await expect.poll(() => page.evaluate(() => document.activeElement?.value)).toBe('Dica 1 para um café melhor');
   const visible = await page.evaluate(() => {
@@ -121,6 +121,7 @@ test('padrão visual explicita o alcance e mantém os demais cards intactos', as
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc);
   await expect.poll(async () => (await stored()).slides[1].elementsUnlocked).toBe(true);
   const original = await stored();
+  await selectEditorMode(page, 'diretor');
   await page.getByRole('tab', { name:'Visual', exact:true }).click();
   await page.getByRole('button', { name:'Este card', exact:true }).click();
   await page.getByRole('group', { name:'Padrões visuais', exact:true }).getByRole('button').first().click();

@@ -10,7 +10,7 @@ export const APP_MODE_UI = {
     label: 'Criar rápido',
     tagline: 'Pra começar agora',
     desc: 'Ideia → narrativa de comunicação ou apresentação → revisar → exportar',
-    shortDesc: 'Poucas decisões — gerar e exportar',
+    shortDesc: 'Presets e ajustes simples',
   },
   diretor: {
     label: 'Controle profissional',
