@@ -331,6 +331,54 @@ test('mobile deixa quantidade visível, valida limites e preserva escolha ao vol
   expect(await library(page)).toHaveLength(0);
 });
 
+test('mobile mantém o fluxo dentro da tela e exibe o texto digitado nos campos longos', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page, { withProject: false });
+  await page.getByRole('button', { name: 'Criar um projeto', exact: true }).click();
+  const wizard = flow(page);
+  await wizard.getByLabel(/^Nome do projeto/).fill('Projeto mobile');
+  await next(page);
+  await next(page);
+
+  const topic = wizard.getByLabel(/^Sobre o que vamos criar/);
+  const support = wizard.getByLabel(/^Texto de apoio/);
+  await topic.fill('Campanha criada no celular');
+  await support.fill('Este texto precisa continuar legível enquanto a pessoa escreve.');
+
+  await expect(topic).toHaveValue('Campanha criada no celular');
+  await expect(support).toHaveValue('Este texto precisa continuar legível enquanto a pessoa escreve.');
+  const layout = await page.evaluate(() => {
+    const supportField = document.querySelector('textarea[rows="7"]');
+    const footer = document.querySelector('.vc-create-footer');
+    const nextButton = [...footer.querySelectorAll('button')].find(button => button.textContent.includes('Continuar'));
+    const rect = node => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right, width: box.width, height: box.height };
+    };
+    const style = getComputedStyle(supportField);
+    return {
+      viewport: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      field: rect(supportField),
+      footer: rect(footer),
+      nextButton: rect(nextButton),
+      color: style.color,
+      textFill: style.webkitTextFillColor,
+      opacity: style.opacity,
+    };
+  });
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewport + 1);
+  for (const box of [layout.field, layout.footer, layout.nextButton]) {
+    expect(box.left).toBeGreaterThanOrEqual(-1);
+    expect(box.right).toBeLessThanOrEqual(layout.viewport + 1);
+  }
+  expect(layout.field.height).toBeGreaterThanOrEqual(200);
+  expect(layout.nextButton.height).toBeGreaterThanOrEqual(44);
+  expect(layout.opacity).toBe('1');
+  expect(layout.color).not.toBe('rgba(0, 0, 0, 0)');
+  expect(layout.textFill).not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test('apresentação passa pelo planejamento e só abre edição após conferir a composição', async ({ page }) => {
   test.setTimeout(60_000);
   const prompts = [];
