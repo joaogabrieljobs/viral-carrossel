@@ -5,6 +5,7 @@
 import { dataOwnerAliases, readDataOwner } from './account-data-owner.js';
 import { isAccountDataWriteOwnerCurrent } from './storage.js';
 import { CLOUD_IMAGE_MAX_CHARS, imageContentType } from './cloud-image-assets.js';
+import { uploadAssetsBestEffort } from './library-sync.js';
 import {
   ProjectApiError, deleteProject, getProject, isProjectConflict,
   isProjectDeletedConflict, putProject,
@@ -488,7 +489,6 @@ async function sendOperation(ownerId, op, { signal, expectedOwnerId }) {
   assertActiveOwner(ownerId);
   const isPut = op.kind === 'put' || op.kind === 'review_put_billing';
   if (isPut && op.assets?.length) {
-    const { uploadAssetsBestEffort } = await import('./library-sync.js');
     const uploaded = await uploadAssetsBestEffort(new Map(op.assets), {
       owner: ownerId, signal, assertCurrent: () => assertActiveOwner(ownerId),
     });

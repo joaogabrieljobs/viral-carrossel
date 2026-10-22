@@ -4,6 +4,7 @@ import { GenerationScopePicker } from './src/components/GenerationScopePicker.js
 import { joinSlideCaptions } from './src/utils/import-text.js';
 import { applyVisualPresetToCard, editCardVisualBrand } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
+import { cloudSyncFailureMessage, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
@@ -99,6 +100,13 @@ import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
 import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
+// Persistência precisa estar disponível desde a abertura do editor. Chunks lazy
+// podem desaparecer no próximo deploy enquanto esta aba continua com edições.
+import * as projectCloudSync from './src/utils/projects-cloud-sync.js';
+import * as librarySync from './src/utils/library-sync.js';
+import * as projectOutbox from './src/utils/projects-outbox.js';
+import * as projectClient from './src/utils/projects-client.js';
+import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 
 import { FORMATS } from './src/utils/formats.js';
 import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
@@ -1429,7 +1437,7 @@ export default function App() {
       return false;
     }
     try {
-      const { queueProjectDelete, flushProjectOutbox, getPendingProjectOp } = await import('./src/utils/projects-outbox.js');
+      const { queueProjectDelete, flushProjectOutbox, getPendingProjectOp } = projectOutbox;
       const projectName = libraryPersistRef.current.find((entry) => entry.id === docId)?.name || '';
       await queueProjectDelete(owner, docId, {
         baseVersion: v2VersionsRef.current.get(docId) ?? 0, projectName,
@@ -1494,7 +1502,7 @@ export default function App() {
     }
     setOpeningDocId(docId);
     try {
-      const { getProject } = await import('./src/utils/projects-client.js');
+      const { getProject } = projectClient;
       const openingAbort = new AbortController();
       const openingTimer = setTimeout(() => openingAbort.abort(), 15_000);
       let remote;
@@ -1911,7 +1919,7 @@ export default function App() {
       }, 4000);
     };
     flight.promise = (async () => {
-      const { hydrateProjectEntryFromCloud } = await import('./src/utils/library-sync.js');
+      const { hydrateProjectEntryFromCloud } = librarySync;
       const hydrated = await hydrateProjectEntryFromCloud(entry, {
         localEntry,
         onSlideHydrated: ({ projectId, slide }) => {
@@ -1996,11 +2004,9 @@ export default function App() {
     const canPersistEntry = () => readDataOwner() === owner
       && v2ObservedOwnerRef.current === owner
       && (libraryPersistRef.current || []).some((item) => item?.id === entry.id);
-    const [{ prepareProjectCloudPayload }, { uploadAssetsBestEffort }, outbox] = await Promise.all([
-      import('./src/utils/projects-cloud-sync.js'),
-      import('./src/utils/library-sync.js'),
-      import('./src/utils/projects-outbox.js'),
-    ]);
+    const { prepareProjectCloudPayload } = projectCloudSync;
+    const { uploadAssetsBestEffort } = librarySync;
+    const outbox = projectOutbox;
     let existing = null;
     let outboxAvailable = !v2OutboxUnavailableRef.current;
     if (outboxAvailable) {
@@ -2092,7 +2098,7 @@ export default function App() {
       }
       const expectedOwnerId = accessSessionRef.current?.customerId;
       if (!expectedOwnerId) throw new Error('Não foi possível confirmar a conta para salvar.');
-      const client = await import('./src/utils/projects-client.js');
+      const client = projectClient;
       const saved = await putProjectDirectly(prepared.entry, {
         baseVersion: queuedBaseVersion, expectedOwnerId,
         putProject: client.putProject, getProject: client.getProject,
@@ -2128,7 +2134,7 @@ export default function App() {
     }
     const fingerprint = accountMetaFingerprint(pending.snapshot);
     if (fingerprint === v2MetaBaselineRef.current) return { skipped: true };
-    const { saveAccountLibraryMetadata } = await import('./src/utils/account-library-meta.js');
+    const { saveAccountLibraryMetadata } = accountLibraryMeta;
     const saved = await saveAccountLibraryMetadata(pending.snapshot, {
       baseRevision: v2MetaRevisionRef.current,
       expectedOwnerId,
@@ -2192,7 +2198,7 @@ export default function App() {
         let verifyWithoutOutbox = v2OutboxUnavailableRef.current;
         if (!verifyWithoutOutbox) {
           try {
-            const { flushProjectOutbox } = await import('./src/utils/projects-outbox.js');
+            const { flushProjectOutbox } = projectOutbox;
             outbox = await flushProjectOutbox(owner);
             for (const recovery of outbox.recoveries || []) {
               if (recovery?.copyName) recoveredCopies.add(recovery.copyName);
@@ -2207,7 +2213,7 @@ export default function App() {
           // Sem acesso à fila, compare a lista da conta antes de anunciar
           // sucesso. Em Sync/Logout, um projeto remoto extra pode ser uma
           // exclusão pendente que não se deve ocultar.
-          const { listProjects } = await import('./src/utils/projects-client.js');
+          const { listProjects } = projectClient;
           const remote = await listProjects({ expectedOwnerId });
           const remoteById = new Map(remote.map((project) => [project.id, project]));
           const exactListRequired = source === 'sync' || source === 'logout';
@@ -2240,10 +2246,8 @@ export default function App() {
           // publicados depois de seu upload confirmado.
           const latest = flushPersistRef.current({ returnSnapshot: true });
           flushSync(() => setLibrary(latest.snapshot.library));
-          const [{ prepareProjectCloudPayload }, latestOutbox] = await Promise.all([
-            import('./src/utils/projects-cloud-sync.js'),
-            import('./src/utils/projects-outbox.js'),
-          ]);
+          const { prepareProjectCloudPayload } = projectCloudSync;
+          const latestOutbox = projectOutbox;
           for (const entry of latest.snapshot.library) {
             if (v2BaselinesRef.current.get(entry.id) === projectCacheFingerprint(entry)) continue;
             if (!v2OutboxUnavailableRef.current) {
@@ -2275,12 +2279,9 @@ export default function App() {
         }
         cloudSaved = true;
         if (source === 'sync') {
-          const [{ listProjects }, { pullAccountLibraryAuthoritative },
-            { restoreAccountLibraryMetadata }] = await Promise.all([
-            import('./src/utils/projects-client.js'),
-            import('./src/utils/library-sync.js'),
-            import('./src/utils/account-library-meta.js'),
-          ]);
+          const { listProjects } = projectClient;
+          const { pullAccountLibraryAuthoritative } = librarySync;
+          const { restoreAccountLibraryMetadata } = accountLibraryMeta;
           const projects = await listProjects({ expectedOwnerId });
           const restored = await pullAccountLibraryAuthoritative({
             expectedOwnerId, localOwnerId: owner,
@@ -2343,8 +2344,8 @@ export default function App() {
         setCloudUnsaved(true);
         if (source !== 'logout') {
           toast(
-            `${cloudSaved ? 'O projeto foi salvo, mas a lista não foi atualizada. ' : localSaved ? 'A edição continua neste editor, mas ainda não foi confirmada na conta. ' : ''}${error?.message || 'Não foi possível sincronizar.'}`,
-            'warning', 7000,
+            cloudSyncFailureMessage(error, { localSaved, cloudSaved }),
+            'warning', isModuleLoadError(error) ? 14000 : 7000,
           );
         }
         return { cloudSaved, outboxSaved: false };
@@ -2363,7 +2364,7 @@ export default function App() {
       const owners = [...new Set([owner, ...dataOwnerAliases(session?.email, session?.customerId)].filter(Boolean))];
       await snapshotAccountVaultForOwners(owners, { snapshot: pending.snapshot });
 
-      const { pushLibraryToCloud } = await import('./src/utils/library-sync.js');
+      const { pushLibraryToCloud } = librarySync;
       const result = await pushLibraryToCloud({
         force: true,
         allowShrink: false,
@@ -2400,9 +2401,9 @@ export default function App() {
     } catch (e) {
       setCloudUnsaved(true);
       toast(
-        `${localSaved ? 'Projeto salvo neste navegador. ' : ''}Sincronização incompleta: ${e?.message || 'tente novamente.'}`,
+        cloudSyncFailureMessage(e, { localSaved, legacy: true }),
         'warning',
-        7000,
+        isModuleLoadError(e) ? 14000 : 7000,
       );
     } finally {
       finishCloudSync();
@@ -2647,7 +2648,7 @@ export default function App() {
     if (cloudAutoPushTimerRef.current) clearTimeout(cloudAutoPushTimerRef.current);
     const controller = new AbortController();
     cloudAutoPushTimerRef.current = setTimeout(() => {
-      import('./src/utils/library-sync.js')
+      Promise.resolve(librarySync)
         .then(async ({ pushLibraryToCloudBestEffort }) => {
           if (controller.signal.aborted || areAccountDataWritesLocked() || cloudSyncInFlightRef.current) return;
           await stopCloudAutoPush();
@@ -3259,7 +3260,7 @@ export default function App() {
       const expectedOwnerId = accessSessionRef.current?.customerId;
       if (!Number.isSafeInteger(known) || !expectedOwnerId) return;
       try {
-        const { getProject } = await import('./src/utils/projects-client.js');
+        const { getProject } = projectClient;
         const remote = await getProject(activeDocId, { expectedOwnerId });
         if (cancelled || !remote) return;
         const remoteVersion = Number(remote.version);
@@ -4126,8 +4127,8 @@ export default function App() {
     if (!PROJECTS_V2 || !entry?.id) return;
     const owner = readDataOwner();
     if (!owner || v2ObservedOwnerRef.current !== owner || readDataOwner() !== owner) return;
-    const { prepareProjectCloudPayload } = await import('./src/utils/projects-cloud-sync.js');
-    const outbox = await import('./src/utils/projects-outbox.js');
+    const { prepareProjectCloudPayload } = projectCloudSync;
+    const outbox = projectOutbox;
     const prepared = await prepareProjectCloudPayload(entry, {
       snapshot: { library: libraryPersistRef.current || [] },
       ownerId: owner,
