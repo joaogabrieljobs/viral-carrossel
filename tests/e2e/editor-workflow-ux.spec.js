@@ -1,3 +1,4 @@
+import { enterEditorFromHome, createTextProject, openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -17,6 +18,7 @@ async function editor(page, mobile = false) {
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   await expect(page.locator('#vc-cards-viewport')).toBeVisible();
 }
 
@@ -89,6 +91,7 @@ test('legenda geral é editável, pode ser apagada e persiste após recarregar',
   await modal.getByRole('button', { name:'Feito' }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.caption)).toBe('Legenda revisada de toda a publicação.');
   await page.reload();
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name:/Legenda.*card 1/i }).first().click();
   await expect(modal.getByRole('textbox')).toHaveValue('Legenda revisada de toda a publicação.');
   await modal.getByRole('textbox').fill('');
@@ -98,24 +101,17 @@ test('legenda geral é editável, pode ser apagada e persiste após recarregar',
 test('primeira conta cria só o projeto solicitado e não recebe tour sobre formulário', async ({ page }) => {
   await mockApi(page, { session:SESSAO_ATIVA, onboarding:true });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name:'Começar a criar', exact:true }).click();
-  await page.getByRole('button', { name:/Nova comunicação|Criar comunicação/ }).first().click();
-  const dialog = page.getByRole('dialog', { name:'Nome da comunicação' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Cliente / marca').selectOption('__new__');
-  await dialog.getByLabel('Nome do cliente').fill('Café Aurora');
-  await expect(dialog.getByLabel('Nome do cliente')).toHaveValue('Café Aurora');
-  await dialog.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Dicas de preparo');
-  await page.waitForTimeout(1100); // exceeds the old automatic-tour timer
-  await expect(page.getByRole('dialog')).toHaveCount(1);
-  await dialog.getByRole('button', { name:'Criar', exact:true }).click();
+  await createTextProject(page, { name:'Dicas de preparo', newBrand:'Café Aurora' });
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]').map(e => e.name))).toEqual(['Dicas de preparo']);
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.brand.name)).toBe('Café Aurora');
-  page.once('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name:'Apagar projeto inteiro', exact:true }).click();
+  await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
+  await page.getByRole('button', { name:'Perfil', exact:true }).first().click();
+  const library = await openProjectLibrary(page);
+  await library.getByRole('button', { name:'Apagar Dicas de preparo', exact:true }).click();
+  await library.getByRole('button', { name:'Confirmar eliminação', exact:true }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')))).toEqual([]);
   await page.reload();
-  await expect(page.getByRole('button', { name:'Criar primeiro projeto', exact:true })).toBeVisible();
+  await expect(page.getByRole('button', { name:'Criar um projeto', exact:true })).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')))).toEqual([]);
 });
 
@@ -148,6 +144,7 @@ test('aprovação guarda retorno e estado separados do convite de edição', asy
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].status)).toBe('changes_requested');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.clientReview?.feedback)).toBe('Aumentar o destaque do produto no card 2.');
   await page.reload();
+  await enterEditorFromHome(page);
   await page.getByRole('tab', { name:'Início', exact:true }).click();
   await page.locator('summary').filter({ hasText:'Aprovação do cliente' }).click();
   await expect(review.getByLabel('Situação da aprovação')).toHaveValue('changes_requested');

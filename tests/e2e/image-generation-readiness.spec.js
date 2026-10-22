@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
@@ -54,7 +55,7 @@ async function openImageProject(page, { quota = QUOTA, slide = {}, storedReferen
   }, { slide, owner: `email:${SESSAO_ATIVA.email}`, storedReference });
   await page.goto('/?app=1');
   if (storedReference) await page.evaluate(() => window.__referenceSeed);
-  await page.getByRole('button', { name: 'Abrir Teste de imagem', exact: true }).click();
+  await enterEditorFromHome(page, 'Teste de imagem');
   return requests;
 }
 
@@ -97,6 +98,7 @@ test('miniatura e geração usam referência do IndexedDB sem embutir foto na bi
   expect(requests[0].imageList).toEqual([`data:image/png;base64,${PNG}`]);
   await expect(page.getByRole('button', { name: 'Regenerar imagem', exact: true }).first()).toBeEnabled();
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(preview).toHaveAttribute('src', `data:image/png;base64,${PNG}`);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0]);
   expect(stored.refImageId).toBe('ref_stored');
@@ -144,6 +146,7 @@ test('upload de referência grande preserva bytes originais no IndexedDB e fica 
   const preview = page.getByRole('button', { name: 'Adicionar imagem de referência', exact: true }).first().locator('img');
   await expect.poll(() => preview.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(preview).toBeVisible();
   await expect.poll(() => preview.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0]);

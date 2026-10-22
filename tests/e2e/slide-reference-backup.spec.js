@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -33,7 +34,7 @@ test('referência de card sai do cache, permanece portátil no backup e volta co
     localStorage.setItem('vc_shell_view', JSON.stringify('home'));
   }, { owner: `email:${SESSAO_ATIVA.email}`, source: SOURCE });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: 'Abrir Projeto com referência', exact: true }).click();
+  await enterEditorFromHome(page);
   await expect.poll(async () => (await readLibrary(page)).find((entry) => entry.id === 'ref-project')?.doc.slides[0].refImageId).toBeTruthy();
   const original = (await readLibrary(page)).find((entry) => entry.id === 'ref-project').doc.slides[0];
   expect(original.refImage).toBeFalsy();
@@ -58,6 +59,7 @@ test('referência de card sai do cache, permanece portátil no backup e volta co
   expect(imported.refImage).toBeFalsy();
   expect(imported.imgExtraPrompt).toBe('Preserve o enquadramento.');
   await page.reload();
+  await enterEditorFromHome(page);
   const afterReload = (await readLibrary(page)).find((entry) => entry.id !== 'ref-project').doc.slides[0];
   expect(afterReload.refImageId).toBe(imported.refImageId);
   expect(afterReload.refImage).toBeFalsy();

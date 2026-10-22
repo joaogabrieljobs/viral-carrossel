@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -34,6 +35,7 @@ test('preserva assunto lateral, compartilha recorte com export e respeita ajuste
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const card = page.locator('main [data-vc-card-surface="subject"]');
   const photo = card.locator('[data-vc-photo-zone] [style*="background-image"]');
   await expect(card).toBeVisible();
@@ -76,6 +78,7 @@ test('preserva assunto lateral, compartilha recorte com export e respeita ajuste
     JSON.parse(localStorage.getItem('vc_library') || '[]')[0]?.doc?.formatViews?.quadrado?.slides?.subject?.photoFraming
   ))).toBe('manual');
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(photo).toHaveCSS('background-position', '50% 50%');
   await page.getByRole('button', { name: 'Editar foto do card 1', exact: true }).click();
   await modal.getByRole('button', { name: 'Priorizar assunto' }).click();

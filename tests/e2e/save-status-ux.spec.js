@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -27,6 +28,7 @@ test('salvo na conta só aparece para a edição confirmada pelo servidor', asyn
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const save = page.getByRole('button', { name:'Salvar projeto agora', exact:true });
   await expect(save).toBeVisible();
   await save.click();

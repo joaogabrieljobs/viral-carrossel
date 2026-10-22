@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Faltava ver o consumo de imagens do plano, rever as imagens geradas e voltar a
 // baixá-las; e faltava um gesto explícito de salvar (o autosave era invisível).
 import { test, expect } from '@playwright/test';
@@ -38,9 +39,7 @@ test.describe('Salvar projeto', () => {
     test.setTimeout(60_000); // boot + reload com CPU dividida entre workers
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    const continuar = page.getByRole('button', { name: /continuar no editor/i });
-    await expect(continuar).toBeVisible({ timeout: 10_000 });
-    await continuar.click({ force: true });
+    await enterEditorFromHome(page);
 
     const salvar = page.getByRole('button', { name: /salvar projeto agora/i });
     await expect(salvar).toBeVisible({ timeout: 10_000 });
@@ -53,6 +52,7 @@ test.describe('Salvar projeto', () => {
     const antes = await page.evaluate(() => localStorage.getItem('vc_library')?.length || 0);
     expect(antes).toBeGreaterThan(0);
     await page.reload();
+    await enterEditorFromHome(page);
     await expect(page.getByRole('button', { name: /salvar projeto agora/i })).toBeVisible({ timeout: 10_000 });
   });
 });

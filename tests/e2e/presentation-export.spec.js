@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -24,6 +25,7 @@ for (const fmt of ['apresentacao', 'carrossel']) {
       } }]));
     }, { fmt });
     await page.goto('/?app=1');
+    await enterEditorFromHome(page);
     const options = page.getByRole('button', { name: 'Opções de download', exact: true });
     await expect(options).toBeVisible();
     await page.route('**/assets/*.js', route => route.abort('failed'));

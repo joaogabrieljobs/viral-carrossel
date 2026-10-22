@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -33,6 +34,7 @@ test('trocar a logo da marca no Studio substitui o JPEG do perfil e preserva os 
     localStorage.setItem('vc_data_owner', JSON.stringify(owner));
   }, { owner: `email:${SESSAO_ATIVA.email}` });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   await page.getByRole('tab', { name: /^Marca$/ }).first().click();
   await page.getByText('Logo nos cards', { exact: true }).click();
   const otherBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).find(entry => entry.id === 'logo-other'));
@@ -65,6 +67,7 @@ test('trocar a logo da marca no Studio substitui o JPEG do perfil e preserva os 
   const expected = { edge: [0, 0, 0, 0], center: [18, 191, 207, 255] };
   await expect.poll(pixels).toEqual(expected);
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(logo).toBeAttached();
   await expect.poll(pixels).toEqual(expected);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).find(entry => entry.id === 'logo-other'))).toEqual(otherBefore);

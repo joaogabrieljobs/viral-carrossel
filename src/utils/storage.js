@@ -48,32 +48,8 @@ const SK = {
   libraryDeletedIds: 'vc_library_deleted_ids',
 };
 
-/** Preferência Home vs Editor: persiste como JSON `"home"` | `"project"` */
+/** Todo acesso começa pelas escolhas de abrir ou criar; o projeto salvo é preservado. */
 function readInitialShellView() {
-  try {
-    const raw = localStorage.getItem(SK.shellView);
-    if (raw != null) {
-      const val = JSON.parse(raw);
-      if (val === 'home' || val === 'project') return val;
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    const rawLib = localStorage.getItem(SK.library);
-    if (!rawLib) return 'home';
-    const lib = JSON.parse(rawLib);
-    if (Array.isArray(lib) && lib.length) {
-      const hasNonTrivial = lib.some((e) => {
-        const sl = e?.doc?.slides;
-        if (!Array.isArray(sl) || sl.length !== 1) return true;
-        return sl[0]?.title !== 'Seu título aqui';
-      });
-      if (hasNonTrivial) return 'project';
-    }
-  } catch {
-    /* ignore */
-  }
   return 'home';
 }
 

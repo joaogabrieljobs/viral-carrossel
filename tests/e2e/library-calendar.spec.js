@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -33,7 +34,7 @@ async function expandOrganize(dialog) {
 test('organiza projeto em pasta e conserva a pauta no calendário após reload', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   let dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
@@ -55,6 +56,7 @@ test('organiza projeto em pasta e conserva a pauta no calendário após reload',
   await expect(dialog.getByText(/não publica nem apresenta automaticamente em plataformas externas/i)).toBeVisible();
 
   await page.reload();
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
   dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
   await expect(dialog.getByRole('button', { name: /^Campanha Outubro \(\d+\)$/ })).toBeVisible();
@@ -65,7 +67,7 @@ test('organiza projeto em pasta e conserva a pauta no calendário após reload',
 test('fila editorial mostra atrasados e permite marcar publicado', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
@@ -95,7 +97,7 @@ test('fila editorial mostra atrasados e permite marcar publicado', async ({ page
 test('limpa filtros da Biblioteca antes de abrir Calendário ou Fila', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
@@ -112,7 +114,7 @@ test('limpa filtros da Biblioteca antes de abrir Calendário ou Fila', async ({ 
 test('Escape fecha a Biblioteca e devolve o foco ao botão que a abriu', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
 
   const trigger = page.getByRole('button', { name: /abrir biblioteca/i }).first();
   await trigger.focus();
@@ -126,7 +128,7 @@ test('Escape fecha a Biblioteca e devolve o foco ao botão que a abriu', async (
 test('confirmações recebem foco, Escape devolve ao gatilho e abrir projeto foca o editor', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
@@ -154,7 +156,7 @@ test('cabeçalho e ações da Biblioteca cabem em celular sem rolagem horizontal
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
 
   const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });

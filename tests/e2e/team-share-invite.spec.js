@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA, SESSAO_ANONIMA } from './helpers/api-mock.js';
 
@@ -95,7 +96,7 @@ test('convite autenticado sobrevive a renders durante a rede e abre o projeto se
   expect(new URL(page.url()).searchParams.has('share')).toBe(false);
   expect(await page.evaluate(() => sessionStorage.getItem('vc_pending_share'))).toBe(CODE);
   // Opening another document changes history/state while the invite is pending.
-  await page.getByRole('button', { name: 'Abrir Projeto pessoal', exact: true }).click();
+  await enterEditorFromHome(page, 'Projeto pessoal');
   await expect(page.locator('main [data-vc-card-surface="personal-slide"]')).toBeVisible();
   release();
   const teamCard = page.locator('main [data-vc-card-surface="team-slide"]');

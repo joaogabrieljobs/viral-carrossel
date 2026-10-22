@@ -1,3 +1,4 @@
+import { enterEditorFromHome, createTextProject } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
@@ -23,7 +24,7 @@ test('plano: prompt rápido gera três imagens com as referências e o estilo do
     },
   } });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await narrativa(page);
   await contextPanel(page);
   await page.getByLabel('Brief do projeto').fill('# MUSA\nStudio de geração de imagem, vídeo e áudio.');
@@ -33,9 +34,11 @@ test('plano: prompt rápido gera três imagens com as referências e o estilo do
     { name: 'mood-b.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') },
   ]);
   await expect(page.getByRole('button', { name: 'Remover mood-b.png', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /PROMPT PARA GERAR/i }).first().click();
+  await narrativa(page);
+  const promptToggle = page.getByRole('button', { name:/PROMPT PARA GERAR/i }).first();
+  if (await promptToggle.getAttribute('aria-expanded') !== 'true') await promptToggle.click();
   await page.getByLabel('Prompt para gerar', { exact: true }).fill('CRIE 3 CARDS ANUNCIANDO LANÇAMENTO DO MUSA');
-  await page.getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
+  await page.getByRole('complementary').getByRole('radio', { name: 'Texto e imagens', exact: true }).check();
   await page.getByRole('button', { name: /Gerar com contexto e referências/i }).click();
   await expect.poll(() => imageRequests.length).toBe(3);
   for (const body of imageRequests) {
@@ -53,14 +56,19 @@ async function narrativa(page) {
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
 }
 async function contextPanel(page) {
-  const button = page.getByRole('button', { name: /USAR CONTEXTO DA MARCA/i }).first();
-  if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
+  await page.getByRole('tab', { name:'Marca', exact:true }).first().click();
+  const section = page.locator('details').filter({ has:page.locator('summary').filter({ hasText:/^Deste projeto/ }) });
+  if (await section.getAttribute('open') === null) await section.locator(':scope > summary').click();
+  for (const title of ['Brief', 'Estilo visual', 'Referências']) {
+    const summary = section.locator('summary').filter({ hasText:new RegExp(`^${title}`) });
+    if (await summary.locator('..').getAttribute('open') === null) await summary.click();
+  }
 }
 
 test('upload atual → três anúncios; referências em IndexedDB; projeto B isolado e A restaurado', async ({ page }) => {
   test.setTimeout(90_000);
   const prompts = [];
-  await mockApi(page, { session: { ...SESSAO_ATIVA, tier: 'essential', imageQuota: { limit: 0, remaining: 0 } }, extra: {
+  await mockApi(page, { session: { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { limit: 50, remaining: 50, used: 0 } }, extra: {
     '/api/ai/compatible': route => {
       const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
       prompts.push(prompt);
@@ -75,7 +83,7 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
     },
   } });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await narrativa(page);
   await contextPanel(page);
   await page.locator('input[accept=".md,.txt,.markdown,text/plain,text/markdown"]').first().setInputFiles({ name: 'MUSA.md', mimeType: 'text/markdown', buffer: Buffer.from(brief) });
@@ -89,8 +97,11 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   const saved = (await persisted(page))[0];
   expect(saved.doc.styleKit.refImages.every(r => r.imageId && !r.dataUrl)).toBe(true);
   const id = saved.id;
-  await page.getByRole('button', { name: /PROMPT PARA GERAR/i }).first().click();
+  await narrativa(page);
+  const promptToggle = page.getByRole('button', { name:/PROMPT PARA GERAR/i }).first();
+  if (await promptToggle.getAttribute('aria-expanded') !== 'true') await promptToggle.click();
   await page.getByLabel('Prompt para gerar', { exact: true }).fill('CRIE 3 CARDS ANUNCIANDO LANÇAMENTO DO MUSA');
+  await page.getByRole('complementary').getByRole('radio', { name:'Só texto', exact:true }).check();
   await page.getByRole('button', { name: /Gerar com contexto e referências/i }).click();
   await expect.poll(async () => (await persisted(page)).find(e => e.id === id)?.doc.slides.length).toBe(3);
   const generated = (await persisted(page)).find(e => e.id === id).doc;
@@ -106,11 +117,9 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   await page.getByLabel('Nome do contexto', { exact: true }).fill('MUSA');
   await page.getByLabel('Brief do projeto').fill(brief + '\nÚltima edição antes da troca.');
   await expect(page.getByRole('status', { name: 'Contexto ativo' })).toContainText('MUSA — Contexto ON');
-  // Troca de projeto vive na Home no fluxo com divulgação progressiva.
-  await page.getByRole('tab', { name: /^Início$/i }).first().click();
-  await page.getByRole('button', { name: /Criar nova comunicação/i }).first().click();
-  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto B MUSA');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  // Criação guiada preserva o contexto do projeto anterior e inicia outro isolado.
+  await page.getByRole('button', { name:'Perfil', exact:true }).first().click();
+  await createTextProject(page, { name:'Projeto B MUSA' });
   await narrativa(page);
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue('');
@@ -123,6 +132,7 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue(brief + '\nÚltima edição antes da troca.');
   await page.reload();
+  await enterEditorFromHome(page);
   await narrativa(page);
   await contextPanel(page);
   await expect(page.getByLabel('Brief do projeto')).toHaveValue(brief + '\nÚltima edição antes da troca.');

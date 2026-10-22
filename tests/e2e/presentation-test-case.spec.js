@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -155,13 +156,10 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   });
 
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await useProfessionalControls(page);
-  await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
-
-  await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Como se chama este projeto?' }).fill('Nova apresentação');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentação 16:9', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).first().click();
 
   const modal = page.locator('.modal-panel');
   await modal.getByLabel('Qual é o tema da apresentação?', { exact: true })
@@ -176,7 +174,7 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   await modal.getByRole('button', { name: 'Gerar apresentação com imagens', exact: true }).click();
 
   await expect(modal).toHaveCount(0, { timeout: 30_000 });
-  await expect(page.getByText('Nova apresentação', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Carrossel', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /^Apresentação(?: 16:9)?$/ }).first())
     .toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => imageRequests.length, { timeout: 30_000 }).toBe(6);
@@ -261,21 +259,14 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
 
   // Voltar à Home não pode redefinir uma apresentação como carrossel.
   await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
-  const presentationSelectors = page.getByRole('group', { name: 'Tipo de projeto para criar' })
-    .getByRole('button', { name: 'Apresentação', exact: true });
-  await expect(presentationSelectors).toHaveCount(2);
-  await expect.poll(() => presentationSelectors.evaluateAll(
-    (buttons) => buttons.every((button) => button.getAttribute('aria-pressed') === 'true'),
-  )).toBe(true);
+  await expect(page.getByRole('button', { name:'Abrir um projeto', exact:true })).toBeVisible();
 
-  await page.getByRole('button', { name: /Continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await expectGeneratedThumbnailsVisible(page, 6);
+  await expect(page.getByRole('button', { name:'Apresentação 16:9', exact:true }).first()).toHaveAttribute('aria-pressed', 'true');
 
   await page.reload();
-  const continueAfterReload = page.getByRole('button', { name: /Continuar no editor/i });
-  if (await continueAfterReload.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await continueAfterReload.click();
-  }
+  await enterEditorFromHome(page);
   await expectGeneratedThumbnailsVisible(page, 6);
   await expect.poll(() => persistedSlideImageCount(page), { timeout: 15_000 }).toBe(6);
   await expect(page.locator('main').getByText(pitchArgument, { exact: true })).toBeVisible();

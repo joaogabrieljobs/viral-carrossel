@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -41,6 +42,7 @@ test('PNG aguarda fonte atrasada e renderiza as letras em 3× com a família esc
     sheetRoute = route;
   });
   await page.goto('/?app=1', { waitUntil: 'domcontentloaded' });
+  await enterEditorFromHome(page);
   const downloadButton = page.getByRole('button', { name: /baixar card 1/i });
   await expect(downloadButton).toBeVisible();
   await expect.poll(() => !!sheetRoute).toBe(true);
@@ -84,6 +86,7 @@ test('fonte com erro não produz PNG com lettering substituído', async ({ page 
   await seedCard(page);
   await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ contentType: 'text/css', body: mockFontCss(route.request().url(), true) }));
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const downloads = [];
   page.on('download', (download) => downloads.push(download));
   await page.getByRole('button', { name: /baixar card 1/i }).click();

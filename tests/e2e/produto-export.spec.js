@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Task 09 — RF-02: jornada mínima do produto (editor + export PNG válido).
 // NOTA: exportSlide carrega html2canvas do CDN cdnjs em runtime — único fetch
 // externo permitido neste E2E (documentado; remoção = backlog #7 do audit).
@@ -21,9 +22,7 @@ test.describe('Produto (RF-02)', () => {
     await page.goto('/?app=1');
 
     // home shell → editor
-    const continuar = page.getByRole('button', { name: /continuar no editor/i });
-    await expect(continuar).toBeVisible({ timeout: 10_000 });
-    await continuar.click({ force: true });
+    await enterEditorFromHome(page);
 
     // editor abre no empty state — aplica um template pra ter conteúdo real
     // (force em tudo: o empty state tem animação contínua e o wait de

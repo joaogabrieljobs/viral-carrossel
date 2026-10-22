@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Texto passando por baixo do selo de rodapé já apareceu duas vezes. As duas
 // só se veem na pré-visualização — a exportação sai igual, porque o problema
 // é geométrico e não de escala.
@@ -55,12 +56,11 @@ test.describe('Nenhum elemento do card se sobrepõe a outro', () => {
     test.setTimeout(180_000);
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(600);
     await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
     await page.reload();
-    await page.getByRole('button', { name: /continuar no editor/i })
-      .click({ force: true, timeout: 2000 }).catch(() => {});
+    await enterEditorFromHome(page);
     await page.waitForTimeout(700);
 
     const escreve = async (txt) => {

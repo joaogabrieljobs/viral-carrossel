@@ -1,7 +1,9 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
-const session = { ...SESSAO_ATIVA, tier: 'essential', imageQuota: { used: 0, limit: 0, remaining: 0, tier: 'essential' } };
+// Plano com imagens: escolher Gerar só texto adia as fotos sem apagar a direção.
+const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { used: 0, limit: 50, remaining: 50, tier: 'creator' } };
 const completion = payload => ({ choices: [{ message: { content: JSON.stringify(payload) } }] });
 const generated = {
   slides: Array.from({ length: 6 }, (_, i) => ({
@@ -42,13 +44,15 @@ for (const fails of [false, true]) {
       },
     } });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await useProfessionalControls(page);
     await page.getByRole('button', { name: 'Gerar carrossel com IA', exact: true }).first().click();
     const modal = page.locator('.modal-panel');
     await modal.getByLabel('O que você quer com este conteúdo?').selectOption('saves');
     await modal.getByPlaceholder(/como freelancers/i).fill('Reuniões sem pauta');
-    for (let i = 0; i < 3; i++) await modal.getByRole('button', { name: /continuar/i }).click();
+    for (let i = 0; i < 2; i++) await modal.getByRole('button', { name: /continuar/i }).click();
+    await modal.getByRole('radio', { name:'Só texto', exact:true }).check();
+    await modal.getByRole('button', { name:/continuar/i }).click();
     await expect(modal).toContainText('Gerar salvamentos');
     await modal.getByRole('button', { name: 'Gerar só texto', exact: true }).click();
     await expect(modal).toHaveCount(0, { timeout: 25_000 });
@@ -63,6 +67,7 @@ for (const fails of [false, true]) {
     expect(prompts[0]).toContain('OBJETIVO DO CONTEÚDO: Gerar salvamentos');
     if (fails) await expect(page.getByText(/revisão automática não foi concluída/i)).toBeVisible();
     await page.reload();
+    await enterEditorFromHome(page);
     await page.getByRole('button', { name: 'Gerar carrossel com IA', exact: true }).first().click();
     await expect(page.getByLabel('O que você quer com este conteúdo?')).toHaveValue('saves');
   });
@@ -81,7 +86,8 @@ test('pesquisa com fonte datada leva evidência ao material da ideia', async ({ 
     }) }] } }),
   } });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /^pesquisa$/i }).first().click();
+  await enterEditorFromHome(page);
+  await page.getByRole('button', { name: 'Pesquisar nicho', exact:true }).first().click();
   await page.getByPlaceholder(/nicho ou tema/i).fill('Reuniões');
   await page.getByRole('button', { name: /^pesquisar$/i }).click();
   await expect(page.getByRole('link', { name: 'Fonte de teste' })).toHaveAttribute('href', 'https://example.com/relato');
@@ -103,7 +109,8 @@ test('pesquisa sem web identifica hipótese e não exibe fontes inventadas', asy
     },
   } });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /^pesquisa$/i }).first().click();
+  await enterEditorFromHome(page);
+  await page.getByRole('button', { name: 'Pesquisar nicho', exact:true }).first().click();
   await page.getByPlaceholder(/nicho ou tema/i).fill('Reuniões');
   await page.getByRole('button', { name: /^pesquisar$/i }).click();
   await expect(page.getByRole('button', { name: /Qual decisão ficou pendente/ })).toContainText('Hipótese para validar');

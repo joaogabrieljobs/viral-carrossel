@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Auditoria pós-refactor: percorre TODA a UI e falha em qualquer erro de
 // console / exceção não tratada. Existe porque a decomposição do monólito
 // (18.5k → 4k linhas) moveu ~60 componentes e 5 hooks: um render quebrado num
@@ -32,7 +33,7 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
     await page.route('https://api.openai.com/**', (r) => r.fulfill({ status: 401, json: {} }));
 
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
 
     // conteúdo real (um template) para os painéis terem o que renderizar
     await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
@@ -52,8 +53,7 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
       await page.reload();
       // após o reload normalmente já estamos no editor (shellView persiste);
       // timeout curto para não pagar 30s de espera quando o botão não existe
-      await page.getByRole('button', { name: /continuar no editor/i })
-        .click({ force: true, timeout: 2000 }).catch(() => {});
+      await enterEditorFromHome(page);
       await page.waitForTimeout(400);
 
       const abas = page.getByRole('tab');
@@ -79,7 +79,7 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
     await page.route('https://api.openai.com/**', (r) => r.fulfill({ status: 401, json: {} }));
 
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
 
     const abrir = [
       /templates prontos/i,

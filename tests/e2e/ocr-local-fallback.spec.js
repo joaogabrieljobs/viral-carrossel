@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -17,7 +18,7 @@ test('prints continuam sendo lidos no aparelho quando o OCR online cai', async (
     },
   });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /Usar publicações para extrair o DNA/i }).click();
   await page.getByLabel('Imagens de carrosséis publicados').setInputFiles(cardImage);
 

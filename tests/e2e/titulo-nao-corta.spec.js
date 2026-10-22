@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // O título já foi cortado no topo duas vezes por causas diferentes, e as duas
 // passaram despercebidas porque o corte só aparece na PRÉ-VISUALIZAÇÃO em
 // escala reduzida — na exportação (escala 1) o card sai correto.
@@ -48,14 +49,13 @@ test.describe('Título nunca sai da zona que o recorta', () => {
     test.setTimeout(120_000);
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(600);
 
     // Studio expõe a aba Layout (composição), onde o corte reapareceu.
     await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
     await page.reload();
-    await page.getByRole('button', { name: /continuar no editor/i })
-      .click({ force: true, timeout: 2000 }).catch(() => {});
+    await enterEditorFromHome(page);
     await page.waitForTimeout(600);
 
     const escreveTitulo = async (txt) => {

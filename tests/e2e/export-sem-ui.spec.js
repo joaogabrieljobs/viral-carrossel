@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // A árvore offscreen usada pelo html2canvas não pode conter texto de interface:
 // "Toque para inserir foto" saía dentro do PNG exportado, e o controlo nativo do
 // input de ficheiro aparecia por cima do título no card.
@@ -14,9 +15,7 @@ test.describe('Export limpo de interface', () => {
     );
     await page.goto('/?app=1');
 
-    const continuar = page.getByRole('button', { name: /continuar no editor/i });
-    await expect(continuar).toBeVisible({ timeout: 10_000 });
-    await continuar.click({ force: true });
+    await enterEditorFromHome(page);
 
     // Template dá cards com imageQuery e sem foto: é o estado que mostra o placeholder.
     await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
@@ -39,6 +38,7 @@ test.describe('Export limpo de interface', () => {
   test('camada de toque da foto não mostra o controlo nativo', async ({ page }) => {
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
+    await enterEditorFromHome(page);
     const opacidades = await page.evaluate(() => [...document.querySelectorAll('input[type="file"].vc-photo-hit')]
       .map((el) => {
         const cs = getComputedStyle(el);

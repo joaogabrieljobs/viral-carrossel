@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // O header do editor tinha 3 grupos em grid `1fr auto 1fr`: o grupo da direita
 // (histórico + formato + ferramentas + perfil) mede ~730px e transbordava para
 // a esquerda, sobrepondo o CTA "Gerar com IA" — 28px a 1440px, 87px a 1100px.
@@ -39,7 +40,7 @@ test.describe('Header do editor', () => {
       await page.setViewportSize({ width: largura, height: 900 });
       await mockApi(page, { session: SESSAO_ATIVA });
       await page.goto('/?app=1');
-      await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+      await enterEditorFromHome(page);
       await page.waitForTimeout(900);
 
       expect(await paresSobrepostos(page)).toEqual([]);
@@ -50,7 +51,7 @@ test.describe('Header do editor', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(900);
 
     for (const nome of [/^desfazer$/i, /^refazer$/i]) {

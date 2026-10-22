@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Itens da revisão de UX do editor (docs/ux-audit-editor-2026-09-16.md) e marca Moont AI.
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
@@ -5,7 +6,7 @@ import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 async function entrarNoEditor(page) {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.waitForTimeout(800);
 }
 

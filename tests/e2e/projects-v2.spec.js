@@ -1,3 +1,4 @@
+import { openProjectLibrary, createTextProject } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -150,37 +151,38 @@ async function mockV2(page, cloud, session = SESSAO_ATIVA) {
 }
 
 async function home(page) {
-  if (await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).isVisible()) return;
-  await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
+  if (!await page.locator('[data-vc-tour="account-home"]').isVisible()) {
+    await page.getByRole('button', { name:'Perfil', exact:true }).first().click();
+  }
+  await openProjectLibrary(page);
 }
 
 test('Salvar cria só o projeto ativo; novo browser restaura e exclusão não reaparece', async ({ page, browser }) => {
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto novo');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
+  await createTextProject(page, { name:'Projeto novo' });
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
   await expect.poll(() => cloud.puts.filter((item) => item.id !== 'p-a').length).toBe(1);
   expect(cloud.puts.every((item) => item.id !== 'p-a')).toBe(true);
   await page.reload();
   await home(page);
-  await expect(page.getByText('Projeto novo', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Projeto novo', exact:true }).first()).toBeVisible();
 
   const anotherContext = await browser.newContext();
   const anotherPage = await anotherContext.newPage();
   await mockV2(anotherPage, cloud);
   await anotherPage.goto('/?app=1');
-  await expect(anotherPage.getByText('Projeto novo', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(anotherPage);
+  await expect(anotherPage.getByRole('button', { name:'Abrir Projeto novo', exact:true }).first()).toBeVisible();
   await anotherPage.getByRole('button', { name: 'Apagar Projeto novo' }).click();
   await anotherPage.getByRole('button', { name: 'Confirmar eliminação' }).click();
   await expect.poll(() => cloud.deletes.length).toBe(1);
   await page.reload();
   await home(page);
-  await expect(page.getByText('Projeto novo', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name:'Abrir Projeto novo', exact:true })).toHaveCount(0);
   await anotherContext.close();
 });
 
@@ -188,7 +190,8 @@ test('outra conta não recebe os projetos da primeira', async ({ page, browser }
   const first = accountSeed();
   await mockV2(page, first);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
 
   const other = accountSeed();
   other.rows = new Map([['p-b', { entry: entry('p-b', 'Projeto da conta B'), version: 1 }]]);
@@ -197,8 +200,9 @@ test('outra conta não recebe os projetos da primeira', async ({ page, browser }
   const pageB = await contextB.newPage();
   await mockV2(pageB, other, { ...SESSAO_ATIVA, email: 'outra@teste.exemplo', customerId: 'cus_e2e_2' });
   await pageB.goto('/?app=1');
-  await expect(pageB.getByText('Projeto da conta B', { exact: true }).first()).toBeVisible();
-  await expect(pageB.getByText('Projeto A', { exact: true })).toHaveCount(0);
+  await openProjectLibrary(pageB);
+  await expect(pageB.getByRole('button', { name:'Abrir Projeto da conta B', exact:true }).first()).toBeVisible();
+  await expect(pageB.getByRole('button', { name:'Abrir Projeto A', exact:true })).toHaveCount(0);
   await contextB.close();
 });
 
@@ -206,7 +210,8 @@ test('abrir o projeto ativo usa a versão mais recente do servidor', async ({ pa
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   const updated = entry('p-a', 'Projeto A');
   updated.doc.slides[0].title = 'Texto vindo da nuvem';
   cloud.rows.set('p-a', { entry: updated, version: 2 });
@@ -232,7 +237,8 @@ test('entra no editor enquanto fotos demoram, mostra progresso e preserva texto 
   ]);
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   await expect(page.getByText('Fotos: 0 de 2').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
@@ -266,10 +272,9 @@ test('conflito 409 preserva ambas as versões como projetos separados', async ({
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto em edição');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
+  await createTextProject(page, { name:'Projeto em edição' });
   cloud.forceConflictOnce = true;
   await page.getByRole('button', { name: 'Salvar projeto agora' }).click();
   await expect(page.getByText(/Sua edição ficou na cópia/)).toBeVisible();
@@ -279,15 +284,16 @@ test('conflito 409 preserva ambas as versões como projetos separados', async ({
   await expect(page.getByText('Projeto em edição', { exact: true }).first()).toBeVisible();
   await page.reload();
   await home(page);
-  await expect(page.getByText('Versão de outro dispositivo', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Projeto em edição (cópia de conflito)', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Versão de outro dispositivo', exact:true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Projeto em edição (cópia de conflito)', exact:true }).first()).toBeVisible();
 });
 
 test('DELETE em conflito mantém o projeto e a revisão pendente não bloqueia o boot', async ({ page }) => {
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   cloud.forceDeleteConflictOnce = true;
   await page.getByRole('button', { name: 'Apagar Projeto A' }).click();
   await page.getByRole('button', { name: 'Confirmar eliminação' }).click();
@@ -295,7 +301,7 @@ test('DELETE em conflito mantém o projeto e a revisão pendente não bloqueia o
   expect(cloud.deletes).toHaveLength(0);
   await page.reload();
   await home(page);
-  await expect(page.getByText('Versão revista', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Versão revista', exact:true }).first()).toBeVisible();
   await expect(page.getByText(/exclusão\(ões\) precisam de revisão/)).toBeVisible();
 });
 
@@ -303,7 +309,8 @@ test('trocar formatos durante autosave protege sucessor durável e recupera relo
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
   const formats = page.getByRole('group', { name: 'Formato do card (exportação)' }).first();
   let releasePut;
@@ -337,7 +344,8 @@ test('trocar formatos durante autosave protege sucessor durável e recupera relo
   await expect(page.getByText('Sincronização pendente', { exact: true })).toHaveCount(0);
   await page.reload();
   releaseLostResponse();
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_active_doc_id') || 'null'))).toBe('p-a');
   await expect.poll(async () => (await readPending()).length).toBe(0);
   expect([...cloud.rows.keys()]).toEqual(['p-a']);
@@ -349,14 +357,15 @@ test('reload mantém projeto escolhido quando a lista começa por uma cópia e a
   const cloud = accountSeed();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
   const copy = { ...entry('conflict-p-a', 'Projeto A (cópia de conflito)'), conflictSourceId: 'p-a' };
   cloud.rows = new Map([['conflict-p-a', { entry: copy, version: 1 }], ...cloud.rows]);
   cloud.metadata.activeDocId = 'conflict-p-a';
   await page.reload();
   await home(page);
-  await expect(page.getByText('Projeto A (cópia de conflito)', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Projeto A (cópia de conflito)', exact:true }).first()).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_active_doc_id') || 'null'))).toBe('p-a');
   expect(cloud.rows.get('p-a').entry.name).toBe('Projeto A');
   expect(cloud.rows.get('conflict-p-a').entry.name).toBe('Projeto A (cópia de conflito)');
@@ -386,10 +395,12 @@ test('abre projetos e textos antes de um cache de imagens travado responder', as
   });
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible({ timeout: 6_000 });
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible({ timeout: 6_000 });
   await expect(page.getByText('23 cards').first()).toBeVisible({ timeout: 6_000 });
   await page.reload();
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible({ timeout: 6_000 });
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible({ timeout: 6_000 });
   await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
   await expect(page.locator('main h1[data-vc-inline-editable="true"]').first()).toContainText('Texto 1', { timeout: 3_000 });
   await expect(page.getByText('Fotos: 0 de 23').first()).toBeVisible();
@@ -400,7 +411,8 @@ test('abertura pendurada termina com aviso e deixa o projeto na lista', async ({
   await page.clock.install();
   await mockV2(page, cloud);
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   cloud.projectGate = new Promise(() => {});
   const detailRequest = page.waitForRequest((request) => request.url().includes('/api/projects?id=p-a'));
   await page.getByRole('button', { name: 'Abrir Projeto A' }).first().click();
@@ -408,7 +420,7 @@ test('abertura pendurada termina com aviso e deixa o projeto na lista', async ({
   await expect(page.getByText('Abrindo projeto…')).toBeVisible();
   await page.clock.fastForward(16_000);
   await expect(page.getByText(/A abertura demorou demais/)).toBeVisible();
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
   await expect(page.getByText('Abrindo projeto…')).toHaveCount(0);
 });
 

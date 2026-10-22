@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -37,8 +38,7 @@ test('card Cultura antigo abre com elementos independentes e arrasta só o alvo 
   await mockApi(page, { session: SESSAO_ATIVA });
   await seedLegacyCultureCard(page);
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i })
-    .click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
 
   const title = page.locator('[data-vc-movable="title"]:visible').first();
   await expect(title).toBeVisible();
@@ -82,8 +82,7 @@ test('gesto de toque num elemento móvel não dispara o swipe para o card seguin
   await seedLegacyCultureCard(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i })
-    .click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
 
   const title = page.locator('[data-vc-movable="title"]:visible').first();
   await expect(title).toContainText('DIREÇÃO');

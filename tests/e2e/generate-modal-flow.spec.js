@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -17,7 +18,7 @@ test('modal mobile prioriza o pedido e usa um único escopo até o CTA final', a
   });
 
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await useProfessionalControls(page);
   await page.getByRole('button', { name: 'Gerar carrossel com IA', exact: true }).first().click();
 
@@ -77,15 +78,10 @@ test('apresentação abre um fluxo próprio com caminhos e padrões 16:9', async
   });
 
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterEditorFromHome(page);
   await useProfessionalControls(page);
-  await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
-
-  // Ao trocar de Carrossel para Apresentação, o produto cria um projeto
-  // próprio antes de abrir o assistente de geração.
-  await expect(page.getByText('Nome da apresentação', { exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Plano de expansão 2027');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  await page.getByRole('button', { name: 'Apresentação 16:9', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).first().click();
 
   const modal = page.locator('.modal-panel');
   await expect(modal.getByText('Configurar apresentação', { exact: true })).toBeVisible();

@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { createPublicationResult } from '../../src/utils/publication-results.js';
@@ -29,6 +30,7 @@ test('registra, corrige, persiste e exclui uma medição sem alterar o texto', a
   await mockApi(page, { session });
   await seed(page);
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: 'Resultados das publicações', exact: true }).click();
   const modal = page.getByRole('dialog', { name: 'Resultados das publicações' });
   await expect(modal).toBeVisible();
@@ -45,6 +47,7 @@ test('registra, corrige, persiste e exclui uma medição sem alterar o texto', a
   expect(lib[0].publicationResults[0].metrics.comments).toBeNull();
   expect(lib[0].publicationResults[0].snapshot.slides[0].title).toBe('Capa publicada');
   await page.reload();
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: 'Resultados das publicações', exact: true }).click();
   await modal.getByRole('button', { name: 'Atualizar números' }).click();
   await expect(modal.getByLabel('Link da publicação')).toBeDisabled();
@@ -86,6 +89,7 @@ test('histórico comparável orienta geração e pode ser desativado', async ({ 
   } });
   await seed(page, publications);
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: 'Resultados das publicações', exact: true }).click();
   const results = page.getByRole('dialog', { name: 'Resultados das publicações' });
   await expect(results).toContainText('Estrutura para considerar no próximo teste: Identificação');
@@ -104,6 +108,8 @@ test('histórico comparável orienta geração e pode ser desativado', async ({ 
     await expect(modal).toContainText(enabled ? 'Seu histórico será considerado' : 'Histórico desativado');
     for (let i = 0; i < 3; i++) await modal.getByRole('button', { name: /continuar/i }).click();
     await modal.getByRole('button', { name: 'Gerar só texto', exact: true }).click();
+    await page.getByRole('dialog', { name:'Substituir os cards?', exact:true })
+      .getByRole('button', { name:'Substituir', exact:true }).click();
     await expect(modal).toHaveCount(0, { timeout: 25_000 });
     const draftPrompt = prompts[prompts.length - 2];
     expect(draftPrompt.includes('HISTÓRICO INFORMADO PELO USUÁRIO')).toBe(enabled);

@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Cada item da assinatura tem a sua barra de tamanho: o valor certo depende da
 // fonte da marca e do comprimento do texto do utilizador, logo não pode ser fixo
 // no padrão visual.
@@ -27,10 +28,11 @@ test.describe('Tamanho dos itens da marca', () => {
     test.setTimeout(90_000);
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(800);
 
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });
+    await page.locator('summary').filter({ hasText:'Barra editorial (topo)' }).click();
     // Barra editorial: escreve na coluna da esquerda e mede
     const inpEsquerda = page.getByText('Esquerda', { exact: true }).first().locator('xpath=following::input[1]');
     await inpEsquerda.fill('SELO TESTE', { force: true });
@@ -47,7 +49,7 @@ test.describe('Tamanho dos itens da marca', () => {
     const pequeno = await tamanhoNoCard(page, 'SELO TESTE');
     expect(pequeno).toBeLessThan(base * 0.75);
 
-    await page.getByRole('button', { name: /^padrão$/i }).first().click({ force: true });
+    await page.locator('details').filter({ has:page.locator('summary').filter({ hasText:'Barra editorial (topo)' }) }).getByRole('button', { name:/^padrão$/i }).click();
     await page.waitForTimeout(700);
     expect(await tamanhoNoCard(page, 'SELO TESTE')).toBeCloseTo(base, 0);
   });
@@ -56,15 +58,16 @@ test.describe('Tamanho dos itens da marca', () => {
     test.setTimeout(90_000);
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(800);
     await page.getByRole('tab', { name: /marca/i }).click({ force: true });
+    await page.locator('summary').filter({ hasText:'Barra editorial (topo)' }).click();
     await page.getByText('Esquerda', { exact: true }).first().locator('xpath=following::input[1]').fill('SELO TESTE', { force: true });
     await moverBarra(page, 'Tamanho da barra', 150);
     const antes = await tamanhoNoCard(page, 'SELO TESTE');
 
     await page.reload();
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 5000 }).catch(() => {});
+    await enterEditorFromHome(page);
     await page.waitForTimeout(1500);
     expect(await tamanhoNoCard(page, 'SELO TESTE')).toBeCloseTo(antes, 0);
   });

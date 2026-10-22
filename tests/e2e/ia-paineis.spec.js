@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Cobre os dois painéis de IA que estavam com import faltando (audit: bugs
 // latentes achados pelo check-undefined). Sem estes testes, se o import sumir
 // de novo, ninguém vê — o build continua verde e só quebra no clique do usuário.
@@ -61,7 +62,8 @@ test.describe('Painéis de IA', () => {
     });
 
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /^pesquisa$/i }).first().click({ force: true });
+    await enterEditorFromHome(page);
+  await page.getByRole('button', { name: 'Pesquisar nicho', exact:true }).first().click({ force: true });
 
     const campo = page.getByPlaceholder(/nicho ou tema/i);
     await expect(campo).toBeVisible({ timeout: 10_000 });
@@ -82,7 +84,7 @@ test.describe('Painéis de IA', () => {
     });
 
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
 
     // template dá conteúdo real ao card antes de pedir variações
     await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });

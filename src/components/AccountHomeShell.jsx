@@ -1,6 +1,5 @@
-// Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, Download, Trash2, Copy, Plus, Layout, TrendingUp, Gauge, X, ChevronRight, Settings, Layers, User, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Download, Trash2, Copy, Plus, Gauge, X, ChevronRight, ArrowLeft, FolderOpen, Layers, User, Image as ImageIcon } from 'lucide-react';
 import AccountProfile from './AccountProfile.jsx';
 import AccountUsage from './AccountUsage.jsx';
 import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
@@ -9,12 +8,8 @@ import CloudPhotoProgress from './CloudPhotoProgress.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
-import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
-
-const CREATION_TYPES = [
-  { ...MOONT_NARRATIVES.carrossel, label: MOONT_NARRATIVES.carrossel.family, flow: 'Faça uma ideia circular', icon: Layers },
-  { ...MOONT_NARRATIVES.apresentacao, label: MOONT_NARRATIVES.apresentacao.family, flow: 'Faça uma ideia avançar', icon: Layout },
-];
+import { moontNarrative } from '../config/moont-brand.js';
+import '../styles/project-entry.css';
 
 const projectKindOf = (entry) => (
   entry?.doc?.productKind === 'apresentacao'
@@ -32,9 +27,10 @@ const projectKindCopy = (entry) => {
     : { ...narrative, kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
 };
 
-// ─── ACCOUNT HOME — visão da conta + lista de projetos (antes do editor) ─────
+// The initial account entry offers two paths. Editor project-list links can
+// request initialProjectView="library"; creation always enters the guided flow.
 function AccountHomeShell({
-  library,
+  library = [],
   activeDocId,
   activeEntryName,
   brandCount,
@@ -43,6 +39,8 @@ function AccountHomeShell({
   hasImageAI,
   isMobile,
   onGenerate,
+  onStartCreation = null,
+  initialProjectView = 'welcome',
   onOpenLibrary,
   onOpenTemplates,
   onOpenResearch,
@@ -81,646 +79,191 @@ function AccountHomeShell({
     () => library.reduce((n, e) => n + (Array.isArray(e.doc?.slides) ? e.doc.slides.length : 0), 0),
     [library],
   );
-  const activeProject = library.find((entry) => entry.id === activeDocId) || library[0];
-  const activeProjectCopy = projectKindCopy(activeProject);
-
+  const [projectView, setProjectView] = useState(initialProjectView === 'library' ? 'library' : 'welcome');
   const [search, setSearch] = useState('');
-  const [creationType, setCreationType] = useState(() => projectKindOf(activeProject));
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const PAGE_SIZE = 48;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const headingRef = useRef(null);
+  const focusHeadingOnChange = useRef(false);
+
+  useEffect(() => {
+    setProjectView(initialProjectView === 'library' ? 'library' : 'welcome');
+  }, [initialProjectView]);
 
   useEffect(() => {
     if (accountTab === 'usage') onRefreshUsage?.().catch(() => {});
   }, [accountTab, onRefreshUsage]);
 
-  // A Home desmonta enquanto o editor está aberto. Ao voltar, o seletor deve
-  // refletir o projeto ativo — inclusive quando o documento foi convertido ou
-  // importado apenas com `productKind`.
   useEffect(() => {
-    setCreationType(projectKindOf(activeProject));
-  }, [activeProject?.id, activeProject?.doc?.productKind, activeProject?.doc?.fmt, activeProject?.doc?.creativePreset]);
+    if (accountTab === 'projects' && focusHeadingOnChange.current) {
+      headingRef.current?.focus();
+      focusHeadingOnChange.current = false;
+    }
+  }, [accountTab, projectView]);
 
-  const navBtn = (id, label, Icon) => {
-    const active = accountTab === id;
-    return (
-      <button
-        key={id}
-        type="button"
-        className="vc-pressable"
-        onClick={() => setAccountTab?.(id)}
-        aria-current={active ? 'page' : undefined}
-        style={{
-          minHeight: 44,
-          padding: '0 12px',
-          borderRadius: 9999,
-          border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-          background: active ? 'var(--accent-surface)' : 'var(--bg-card)',
-          color: 'var(--text-primary)',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontWeight: 600,
-          fontFamily: 'var(--font-ui)',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <Icon size={13} color={active ? 'var(--accent)' : 'var(--text-muted)'} />
-        {label}
-      </button>
-    );
+  const showProjectView = (nextView) => {
+    focusHeadingOnChange.current = true;
+    setProjectView(nextView);
+    setAccountTab?.('projects');
   };
-
-  const creationTypeSelector = (compact = false) => (
-    <div
-      role="group"
-      aria-label="Tipo de projeto para criar"
-      style={{
-        display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 3 : 8,
-        padding: compact ? 3 : 0, borderRadius: compact ? 9999 : 14,
-        border: compact ? '1px solid var(--border)' : 'none',
-        background: 'var(--bg-card)', width: compact ? 'auto' : '100%',
-      }}
-    >
-      {CREATION_TYPES.map(({ id, label, name, eyebrow, format, flow, icon: Icon }) => {
-        const active = creationType === id;
-        return (
-          <button
-            key={id}
-            type="button"
-            className="vc-pressable"
-            aria-pressed={active}
-            aria-label={id === 'apresentacao' ? 'Apresentação' : 'Carrossel'}
-            title={`${name}: ${eyebrow}. ${format}. ${flow}.`}
-            onClick={() => setCreationType(id)}
-            style={{
-              minHeight: compact ? 44 : 76,
-              padding: compact ? '0 10px' : '12px 14px',
-              borderRadius: compact ? 9999 : 12,
-              border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-              background: active ? 'var(--accent-surface)' : 'transparent',
-              color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer', fontSize: compact ? 12 : 12, fontWeight: 650,
-              fontFamily: 'var(--font-ui)', display: 'flex',
-              alignItems: compact ? 'center' : 'flex-start', justifyContent: compact ? 'center' : 'flex-start',
-              gap: compact ? 6 : 9, whiteSpace: compact ? 'nowrap' : 'normal', textAlign: 'left',
-            }}
-          >
-            <Icon size={compact ? 13 : 16} color={active ? 'var(--accent)' : 'currentColor'} style={{ flexShrink: 0, marginTop: compact ? 0 : 2 }} />
-            {compact ? label : (
-              <span style={{ display: 'grid', gap: 3, minWidth: 0 }}>
-                <span style={{ color: 'var(--text-primary)', fontSize: 13 }}>{name}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 10.5, lineHeight: 1.35, fontWeight: 500 }}>{eyebrow} · {format}</span>
-                <span style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 11, lineHeight: 1.35 }}>{flow}</span>
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const createSelectedProject = () => newDoc?.(creationType);
-
-  const generateBtn = (fullWidth = false) => (
-    <button
-      type="button"
-      className="vc-pressable"
-      data-vc-tour="generate"
-      onClick={() => onGenerate?.(creationType)}
-      aria-label={`Gerar ${creationType === 'apresentacao' ? 'apresentação' : 'carrossel'} com IA`}
-      style={{
-        width: fullWidth ? '100%' : 'auto',
-        minHeight: fullWidth ? 48 : 44,
-        padding: '0 22px',
-        borderRadius: 9999,
-        border: 'none',
-        cursor: 'pointer',
-        background: 'var(--accent)',
-        color: '#fff',
-        fontSize: fullWidth ? 15 : 13,
-        fontWeight: 600,
-        letterSpacing: '-0.016em',
-        fontFamily: 'var(--font-ui)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        boxShadow: '0 0 0 1px rgba(91,83,232,0.25)',
-      }}
-    >
-      <Sparkles size={fullWidth ? 15 : 14} />
-      {creationType === 'apresentacao' ? 'Gerar com Moont Apresenta' : 'Gerar com Moont Comunica'}
-    </button>
-  );
 
   const items = useMemo(() => (
     [...library]
-      .filter(e => !search.trim() || (e.name || '').toLowerCase().includes(search.toLowerCase()))
+      .filter(e => !search.trim() || (e.name || '').toLowerCase().includes(search.trim().toLowerCase()))
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   ), [library, search]);
 
-  // FE-014: reset da janela visível ao mudar busca/biblioteca.
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [search, library.length]);
-
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search, library.length]);
   const visibleItems = items.slice(0, visibleCount);
   const hasMore = items.length > visibleCount;
+  const isWelcome = accountTab === 'projects' && projectView === 'welcome';
 
-  const aiReady = hasTextAI && hasImageAI;
-  const projectName = activeEntryName || 'Sem título';
-
-  const headerBtn = {
-    minHeight: 44,
-    padding: '0 12px',
-    borderRadius: 9999,
-    border: '1px solid var(--border)',
-    background: 'var(--bg-card)',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    fontSize: 12,
-    fontWeight: 600,
-    fontFamily: 'var(--font-ui)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-  };
-
-  // Perfil e Imagens abrem por cima do trabalho: fechar volta ao editor quando há
-  // projeto aberto, senão à lista de projetos.
-  const fecharConta = () => {
+  const closeAccount = () => {
     if (activeDocId && onContinueEditor) onContinueEditor();
-    else setAccountTab?.('projects');
+    else showProjectView('welcome');
   };
-  const fecharBtn = (
-    <button
-      type="button"
-      onClick={fecharConta}
-      aria-label="Fechar"
-      title="Fechar"
-      className="vc-pressable"
-      style={{
-        width: 44, height: 44, borderRadius: 9999,
-        border: '1px solid var(--border)', background: 'var(--bg-card)',
-        color: 'var(--text-secondary)', cursor: 'pointer',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
+
+  const closeButton = (
+    <button type="button" onClick={closeAccount} className="project-entry-icon-button vc-pressable" aria-label="Fechar" title="Fechar">
       <X size={18} />
     </button>
   );
 
+  const accountNav = (
+    <nav className="project-entry-account-nav" aria-label="Conta">
+      {[
+        { id: 'projects', label: 'Início', Icon: Layers },
+        { id: 'images', label: 'Imagens', Icon: ImageIcon },
+        { id: 'usage', label: 'Uso', Icon: Gauge },
+        { id: 'profile', label: 'Perfil', Icon: User },
+      ].map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          className="project-entry-nav-button vc-pressable"
+          aria-current={accountTab === id ? 'page' : undefined}
+          onClick={() => id === 'projects' ? showProjectView('welcome') : setAccountTab?.(id)}
+        >
+          <Icon size={16} aria-hidden="true" />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+
   return (
-    <div
-      data-vc-tour="account-home"
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: 'var(--bg-base)',
-        minHeight: 0,
-        minWidth: 0,
-        width: '100%',
-      }}
-    >
-      <header style={{
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg-sidebar)',
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto minmax(0, 1fr)',
-        alignItems: 'center',
-        gap: isMobile ? 12 : 16,
-        padding: isMobile
-          ? `calc(10px + env(safe-area-inset-top, 0)) max(12px, env(safe-area-inset-left, 0px)) 12px max(12px, env(safe-area-inset-right, 0px))`
-          : `calc(10px + env(safe-area-inset-top, 0)) 16px 10px`,
-        flexShrink: 0,
-      }}>
-        {/* Esquerda — marca + Projetos */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          minWidth: 0,
-          justifyContent: 'flex-start',
-        }}>
-          <button
-            type="button"
-            onClick={() => setAccountTab?.('projects')}
-            aria-label="Projetos" title="Projetos"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              minWidth: 0,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: 0,
-              color: 'inherit',
-              textAlign: 'left',
-            }}
-          >
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-              <BrandLogo height={isMobile ? 24 : 28} style={{ maxWidth: isMobile ? 160 : 210 }} />
-              <div style={{
-                fontSize: 11, color: 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                maxWidth: isMobile ? 160 : 220,
-              }}>
-                {accessEmail || 'Studio · dados neste aparelho'}
-              </div>
-            </div>
-          </button>
-          {!isMobile && navBtn('projects', 'Projetos', Layers)}
-          {!isMobile && navBtn('images', 'Imagens', ImageIcon)}
-        </div>
-
-        {/* Centro — escolhe o produto antes de gerar */}
-        {!isMobile && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-            {creationTypeSelector(true)}
-            {generateBtn(false)}
-          </div>
+    <div className={`project-entry-shell${isMobile ? ' project-entry-shell--mobile' : ''}`} data-vc-tour="account-home">
+      <header className="project-entry-header">
+        <button type="button" onClick={() => showProjectView('welcome')} className="project-entry-brand" aria-label="Moont — início">
+          <BrandLogo height={isMobile ? 25 : 29} style={{ maxWidth: 180 }} />
+          <span>{accessEmail || 'Seu espaço de criação'}</span>
+        </button>
+        {!isMobile && accountNav}
+        {typeof onOpenHelp === 'function' && (
+          <button type="button" className="project-entry-secondary vc-pressable" onClick={onOpenHelp} aria-label="Ajuda">Ajuda</button>
         )}
-
-        {/* Direita — ferramentas + Perfil (extremo direito; Assinatura fica dentro do Perfil) */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 8,
-          minWidth: 0,
-          flexWrap: 'wrap',
-        }}>
-          {isMobile ? (
-            <button
-              type="button"
-              className="vc-pressable"
-              onClick={() => onOpenSettings()}
-              aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
-              style={{
-                ...headerBtn,
-                border: '1px solid var(--border)',
-                background: 'var(--bg-pearl)',
-                color: 'var(--text-secondary)',
-                position: 'relative',
-              }}
-            >
-              <Settings size={13} /> IA
-              {aiReady ? (
-                <span aria-hidden style={{
-                  position: 'absolute', top: 6, right: 6, width: 7, height: 7,
-                  borderRadius: 99, background: 'var(--success)',
-                }} />
-              ) : null}
-            </button>
-          ) : (
-            <>
-              <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Ferramentas">
-                <button type="button" className="vc-pressable" onClick={() => onOpenTemplates()} style={headerBtn}>
-                  <Layout size={13} /> Padrões visuais
-                </button>
-                <button type="button" className="vc-pressable" onClick={() => onOpenResearch()} style={headerBtn}>
-                  <TrendingUp size={13} /> Pesquisa
-                </button>
-                <button type="button" className="vc-pressable" onClick={() => onOpenHelp()} style={headerBtn} aria-label="Ajuda">?</button>
-                <button
-                  type="button"
-                  className="vc-pressable"
-                  onClick={() => onOpenSettings()}
-                  aria-label={aiReady ? 'IA pronta — abrir configurações' : 'Configurar IA'}
-                  style={{
-                    ...headerBtn,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-pearl)',
-                    color: 'var(--text-secondary)',
-                    position: 'relative',
-                  }}
-                >
-                  <Settings size={13} /> Configurar IA
-                  {aiReady ? (
-                    <span aria-hidden style={{
-                      width: 7, height: 7, borderRadius: 99, background: 'var(--success)', marginLeft: 2,
-                    }} />
-                  ) : null}
-                </button>
-              </nav>
-              <nav aria-label="Conta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {isMobile && navBtn('images', 'Imagens', ImageIcon)}
-                {navBtn('usage', 'Uso', Gauge)}
-                {navBtn('profile', 'Perfil', User)}
-              </nav>
-            </>
-          )}
-        </div>
       </header>
 
-      <div style={{
-        flex: 1, minHeight: 0, minWidth: 0, width: '100%',
-        overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch',
-      }}>
-        <div style={{
-          boxSizing: 'border-box', width: '100%', maxWidth: ['profile', 'usage'].includes(accountTab) ? 820 : 720,
-          marginLeft: 'auto', marginRight: 'auto',
-          padding: isMobile
-            ? '20px 16px calc(88px + env(safe-area-inset-bottom, 0px))'
-            : '40px 24px 72px',
-          display: 'grid', gap: isMobile ? 22 : 28,
-        }}>
-          {['images', 'usage'].includes(accountTab) && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? -14 : -20 }}>
-              {fecharBtn}
-            </div>
-          )}
+      <main className={`project-entry-scroll${isWelcome ? ' project-entry-scroll--welcome' : ''}`}>
+        <div className={`project-entry-content${isWelcome ? ' project-entry-content--welcome' : ''}${['profile', 'usage'].includes(accountTab) ? ' project-entry-content--account' : ''}`}>
+          {['images', 'usage'].includes(accountTab) && <div className="project-entry-close">{closeButton}</div>}
           {accountTab === 'usage' && (
             <AccountUsage
-              imageQuota={imageQuota}
-              planTier={planTier}
-              currentPeriodStart={currentPeriodStart}
-              currentPeriodEnd={currentPeriodEnd}
-              useOwnImageKey={useOwnImageKey}
-              isMobile={isMobile}
-              onRefresh={onRefreshUsage}
-              onOpenSettings={onOpenSettings}
-              onManageBilling={onManageBilling}
+              imageQuota={imageQuota} planTier={planTier} currentPeriodStart={currentPeriodStart}
+              currentPeriodEnd={currentPeriodEnd} useOwnImageKey={useOwnImageKey} isMobile={isMobile}
+              onRefresh={onRefreshUsage} onOpenSettings={onOpenSettings} onManageBilling={onManageBilling}
             />
           )}
           {accountTab === 'images' && (
             <ImagesLibraryPanel
-              library={library}
-              imageQuota={imageQuota}
-              planTier={planTier}
-              isMobile={isMobile}
-              useOwnImageKey={useOwnImageKey}
-              onOpenUsage={() => setAccountTab?.('usage')}
+              library={library} imageQuota={imageQuota} planTier={planTier} isMobile={isMobile}
+              useOwnImageKey={useOwnImageKey} onOpenUsage={() => setAccountTab?.('usage')}
             />
           )}
-
           {accountTab === 'profile' && (
             <>
-              <header style={{ position: 'relative', paddingRight: 48 }}>
-                <div style={{ position: 'absolute', top: 0, right: 0 }}>{fecharBtn}</div>
-                <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Conta</p>
-                <h2 style={{
-                  margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
-                  letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
-                  color: 'var(--text-primary)', lineHeight: 1.15,
-                }}>
-                  Perfil pessoal
-                </h2>
-                <p style={{
-                  margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
-                  color: 'var(--text-muted)', maxWidth: '52ch',
-                }}>
-                  Seu nome, bio, redes e assinatura.
-                </p>
+              <header className="project-entry-section-heading">
+                <div className="project-entry-close">{closeButton}</div>
+                <p className="vc-eyebrow">Conta</p>
+                <h1>Perfil pessoal</h1>
+                <p>Seu nome, bio, redes e assinatura.</p>
               </header>
               <AccountProfile
-                email={accessEmail}
-                libraryCount={library.length}
-                brandCount={brandCount}
-                totalCards={totalItems}
-                aiSettings={aiSettings}
-                hasTextAI={hasTextAI}
-                hasImageAI={hasImageAI}
-                isMobile={isMobile}
-                onOpenSettings={onOpenSettings}
-                onManageBilling={onManageBilling}
-                onLogout={onLogout}
-                onOpenBrands={onOpenBrands}
-                currentPeriodEnd={currentPeriodEnd}
-                planTier={planTier}
-                imageQuota={imageQuota}
-                onOpenUsage={() => setAccountTab?.('usage')}
-                onProfileSaved={onProfileSaved}
-                cloudProfile={cloudProfile}
+                email={accessEmail} libraryCount={library.length} brandCount={brandCount}
+                totalCards={totalItems} aiSettings={aiSettings} hasTextAI={hasTextAI} hasImageAI={hasImageAI}
+                isMobile={isMobile} onOpenSettings={onOpenSettings} onManageBilling={onManageBilling}
+                onLogout={onLogout} onOpenBrands={onOpenBrands} currentPeriodEnd={currentPeriodEnd}
+                planTier={planTier} imageQuota={imageQuota} onOpenUsage={() => setAccountTab?.('usage')}
+                onProfileSaved={onProfileSaved} cloudProfile={cloudProfile}
               />
             </>
           )}
 
-          {accountTab === 'projects' && (
-          <>
-          <header>
-            <p className="vc-eyebrow" style={{ margin: '0 0 8px' }}>Início</p>
-            <h2 style={{
-              margin: 0, fontSize: isMobile ? 24 : 28, fontWeight: 600,
-              letterSpacing: '-0.024em', fontFamily: 'var(--font-display)',
-              color: 'var(--text-primary)', lineHeight: 1.15,
-            }}>
-              Seus projetos
-            </h2>
-            <p style={{
-              margin: '8px 0 0', fontSize: 15, lineHeight: 1.45,
-              color: 'var(--text-muted)', maxWidth: '52ch',
-            }}>
-              Continue o projeto em edição ou escolha o que deseja criar.
-            </p>
-          </header>
-
-          <section
-            aria-label={activeProject ? "Projeto atual" : "Seu primeiro projeto"}
-            style={{
-              border: '1.5px solid var(--accent)',
-              background: 'var(--accent-surface)',
-              borderRadius: 16,
-              padding: isMobile ? 16 : 20,
-              display: 'grid',
-              gap: 14,
-            }}
-          >
-            <div>
-              <div className="vc-eyebrow" style={{ marginBottom: 6 }}>{activeProject ? 'Em edição' : 'Comece por aqui'}</div>
-              <h3 style={{
-                margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
-                color: 'var(--text-primary)',
-              }}>
-                {activeProject ? projectName : 'O que vamos criar?'}
-              </h3>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>{activeProjectCopy.name}</strong>{' · '}
-                {activeProjectCopy.format}{' · '}
-                {appMode === 'criador'
-                  ? (activeProjectCopy.kind === 'apresentacao'
-                    ? 'Faça uma ideia avançar: contexto → argumento → decisão'
-                    : 'Faça uma ideia circular: gancho → argumento → ação')
-                  : 'No editor: Contexto → Narrativa → Visual → Exportar'}
-              </p>
-            </div>
-            {photoLoad?.projectId === activeProject?.id && <CloudPhotoProgress progress={photoLoad} />}
-            <div style={{ display: 'grid', gap: 8 }}>
-              {creationTypeSelector(false)}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <button
-                type="button"
-                className="vc-pressable"
-                onClick={activeProject ? onContinueEditor : createSelectedProject}
-                style={{
-                  minHeight: 44, padding: '0 18px', borderRadius: 9999, border: 'none',
-                  background: 'var(--accent)', color: '#fff', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                {activeProject ? 'Continuar no editor' : 'Criar primeiro projeto'} <ChevronRight size={15} />
-              </button>
-              <button
-                type="button"
-                className="vc-pressable"
-                onClick={createSelectedProject}
-                style={{
-                  minHeight: 44, padding: '0 16px', borderRadius: 9999,
-                  border: '1px solid var(--border)', background: 'var(--bg-base)',
-                  color: 'var(--text-primary)', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <Plus size={14} />
-                {creationType === 'apresentacao' ? 'Criar apresentação' : 'Criar comunicação'}
-              </button>
-              </div>
-            </div>
-          </section>
-
-          {(appMode !== 'criador' || library.length >= 2) ? (
-          <section aria-label="Resumo">
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: 10,
-            }}>
-              {[
-                { label: 'Projetos', value: library.length },
-                { label: 'Marcas', value: brandCount },
-                { label: 'Cards e slides', value: totalItems },
-              ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  style={{
-                    background: 'var(--bg-pearl)',
-                    borderRadius: 12,
-                    border: '1px solid var(--hairline)',
-                    padding: '14px 16px',
-                  }}
-                >
-                  <div style={{
-                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 600,
-                    textTransform: 'uppercase', color: 'var(--text-muted)',
-                    fontFamily: 'var(--font-mono)', marginBottom: 6,
-                  }}>
-                    {label}
-                  </div>
-                  <div style={{
-                    fontSize: 26, fontWeight: 600, letterSpacing: '-0.028em',
-                    fontFamily: 'var(--font-display)', color: 'var(--text-primary)', lineHeight: 1,
-                  }}>
-                    {value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          ) : null}
-
-          <section aria-label="Lista de projetos" style={{ display: 'grid', gap: 14 }}>
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', alignItems: 'center',
-              justifyContent: 'space-between', gap: 10,
-            }}>
-              <div>
-                <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Biblioteca</div>
-                <h3 style={{
-                  margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.022em',
-                  fontFamily: 'var(--font-display)', color: 'var(--text-primary)',
-                }}>
-                  Todos os projetos
-                </h3>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <button
-                  type="button"
-                  className="vc-pressable"
-                  onClick={() => onOpenLibrary()}
-                  data-vc-tour="library"
-                  style={{
-                    minHeight: 44, padding: '0 14px', borderRadius: 9999,
-                    border: '1px solid var(--border)', background: 'var(--bg-base)',
-                    cursor: 'pointer', color: 'var(--text-secondary)',
-                    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                  }}
-                >
-                  Abrir biblioteca
+          {isWelcome && (
+            <>
+              <header className="project-entry-welcome-heading">
+                <p className="vc-eyebrow">Seu próximo projeto começa aqui</p>
+                <h1 ref={headingRef} tabIndex={-1}>O que vamos fazer hoje?</h1>
+                <p>Continue uma ideia ou comece uma nova. O Moont acompanha você em cada etapa.</p>
+              </header>
+              <div className="project-entry-choices" aria-label="Como você quer começar?">
+                <button type="button" className="project-entry-choice vc-pressable" aria-labelledby="entry-open-project-title" aria-describedby="entry-open-project-description" onClick={() => showProjectView('library')} data-vc-tour="library">
+                  <span className="project-entry-choice-icon"><FolderOpen size={25} aria-hidden="true" /></span>
+                  <span className="project-entry-choice-title" id="entry-open-project-title">Abrir um projeto</span>
+                  <span className="project-entry-choice-description" id="entry-open-project-description">Encontre seus projetos e continue de onde parou, com todas as ferramentas de edição.</span>
+                  <span className="project-entry-choice-action">Ver meus projetos <ChevronRight size={17} aria-hidden="true" /></span>
                 </button>
-                {typeof onSyncCloud === 'function' ? (
-                  <button
-                    type="button"
-                    className="vc-pressable"
-                    onClick={() => onSyncCloud()}
-                    disabled={cloudSyncBusy}
-                    aria-busy={cloudSyncBusy}
-                    data-vc-tour="cloud-sync"
-                    title="Guardar e restaurar os seus projetos nesta conta, em qualquer browser"
-                    style={{
-                      minHeight: 44, padding: '0 14px', borderRadius: 9999,
-                      border: '1px solid var(--border)', background: 'var(--bg-base)',
-                      cursor: cloudSyncBusy ? 'wait' : 'pointer',
-                      color: 'var(--text-secondary)',
-                      fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                      opacity: cloudSyncBusy ? 0.7 : 1,
-                    }}
-                  >
-                    {cloudSyncBusy ? 'A sincronizar…' : 'Atualizar da conta'}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="vc-pressable"
-                  onClick={createSelectedProject}
-                  style={{
-                    minHeight: 44, padding: '0 14px', borderRadius: 9999, border: 'none',
-                    cursor: 'pointer', background: 'var(--accent)', color: '#fff',
-                    fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                  }}
-                >
-                  <Plus size={13} />
-                  {creationType === 'apresentacao' ? 'Nova apresentação' : 'Nova comunicação'}
+                <button type="button" className="project-entry-choice project-entry-choice--create vc-pressable" aria-labelledby="entry-create-project-title" aria-describedby="entry-create-project-description" onClick={() => onStartCreation?.()} data-vc-tour="generate">
+                  <span className="project-entry-choice-icon"><Plus size={25} aria-hidden="true" /></span>
+                  <span className="project-entry-choice-title" id="entry-create-project-title">Criar um projeto</span>
+                  <span className="project-entry-choice-description" id="entry-create-project-description">Escolha o que quer criar. Vamos organizar o conteúdo, o estilo e os detalhes juntos, passo a passo.</span>
+                  <span className="project-entry-choice-action">Começar a criação <ChevronRight size={17} aria-hidden="true" /></span>
                 </button>
               </div>
-            </div>
-
-            <input
-              type="search"
-              placeholder="Buscar projeto…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="vc-input"
-              aria-label="Buscar projetos"
-              style={{ width: '100%' }}
-            />
-
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {items.length === 0 && (
-            <div style={{
-              padding: 36,
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              border: '1px dashed var(--hairline)',
-              borderRadius: 16,
-              fontSize: 14,
-              lineHeight: 1.45,
-            }}>
-              {search.trim()
-                ? 'Nenhum projeto com esse nome.'
-                : 'Ainda sem projetos. Crie um novo ou gere com IA.'}
-            </div>
+              <p className="project-entry-welcome-note">Carrosséis e apresentações, da primeira ideia à versão final.</p>
+            </>
           )}
+
+          {accountTab === 'projects' && projectView === 'library' && (
+            <>
+              <div className="project-entry-library-topline">
+                <button type="button" onClick={() => showProjectView('welcome')} className="project-entry-back vc-pressable"><ArrowLeft size={16} aria-hidden="true" /> Início</button>
+                <button type="button" onClick={() => onStartCreation?.()} className="project-entry-primary vc-pressable"><Plus size={16} aria-hidden="true" /> Criar um projeto</button>
+              </div>
+              <header className="project-entry-section-heading">
+                <p className="vc-eyebrow">Sua biblioteca</p>
+                <h1 ref={headingRef} tabIndex={-1}>Seus projetos</h1>
+                <p>Escolha um projeto para abrir no editor.</p>
+              </header>
+              <section aria-label="Lista de projetos" className="project-entry-library">
+                <div className="project-entry-library-controls">
+                  <label className="project-entry-search">
+                    <span className="project-entry-search-label">Buscar projetos</span>
+                    <input type="search" placeholder="Nome do projeto…" value={search} onChange={(e) => setSearch(e.target.value)} className="vc-input" />
+                  </label>
+                  {typeof onOpenLibrary === 'function' && (
+                    <button type="button" onClick={onOpenLibrary} className="project-entry-secondary vc-pressable">
+                      Importar ou organizar biblioteca
+                    </button>
+                  )}
+                  {typeof onSyncCloud === 'function' && (
+                    <button type="button" onClick={() => onSyncCloud()} disabled={cloudSyncBusy} aria-busy={cloudSyncBusy} className="project-entry-secondary vc-pressable" data-vc-tour="cloud-sync">
+                      {cloudSyncBusy ? 'Atualizando…' : 'Atualizar da conta'}
+                    </button>
+                  )}
+                </div>
+                <div className="project-entry-results-count" role="status">{cloudSyncBusy ? 'Buscando seus projetos…' : `${items.length} ${items.length === 1 ? 'projeto' : 'projetos'}`}</div>
+                <div className="project-entry-projects">
+                  {items.length === 0 && (
+                    <div className="project-entry-empty">
+                      <FolderOpen size={30} aria-hidden="true" />
+                      <h2>{search.trim() ? 'Nenhum projeto encontrado' : cloudSyncBusy ? 'Carregando sua biblioteca' : 'Sua próxima ideia pode ser a primeira'}</h2>
+                      <p>{search.trim() ? 'Tente outro nome para encontrar seu projeto.' : cloudSyncBusy ? 'Seus projetos vão aparecer aqui.' : 'Crie um projeto com a ajuda do Moont, uma escolha de cada vez.'}</p>
+                      {!search.trim() && !cloudSyncBusy && <button type="button" className="project-entry-primary vc-pressable" onClick={() => onStartCreation?.()}><Plus size={16} aria-hidden="true" /> Criar meu primeiro projeto</button>}
+                    </div>
+                  )}
           {visibleItems.map(entry => {
             const isActive = entry.id === activeDocId;
             const slides = entry.doc?.slides || [];
@@ -858,7 +401,7 @@ function AccountHomeShell({
                   )}
                 </div>
                 </div>
-                {photoLoad?.projectId === entry.id && !(isMobile && activeProject?.id === entry.id)
+                {photoLoad?.projectId === entry.id
                   && <CloudPhotoProgress progress={photoLoad} compact announce={false} />}
                 <div style={{
                   display: 'flex',
@@ -931,7 +474,7 @@ function AccountHomeShell({
                           }}
                           style={{
                             padding: '0 10px',
-                            height: 36,
+                            minHeight: 44,
                             borderRadius: 8,
                             border: '1px solid rgba(255,59,48,0.35)',
                             cursor: 'pointer',
@@ -972,112 +515,17 @@ function AccountHomeShell({
               </div>
             );
           })}
-          {hasMore && (
-            <button
-              type="button"
-              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-              style={{
-                height: 44,
-                borderRadius: 9999,
-                border: '1px solid var(--border)',
-                background: 'var(--bg-card)',
-                color: 'var(--text-primary)',
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: 'var(--font-ui)',
-                cursor: 'pointer',
-              }}
-            >
-              Mostrar mais ({items.length - visibleCount} restantes)
-            </button>
+
+                  {hasMore && <button type="button" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)} className="project-entry-secondary vc-pressable">Mostrar mais ({items.length - visibleCount} restantes)</button>}
+                </div>
+              </section>
+            </>
           )}
         </div>
-
-          <p style={{
-            margin: 0,
-            fontSize: 12,
-            lineHeight: 1.45,
-            color: 'var(--text-muted)',
-            textAlign: 'center',
-          }}>
-            Atalhos: Templates e Pesquisa no topo · chave de texto em Configurar IA
-          </p>
-          </section>
-          </>
-          )}
-        </div>
-      </div>
-
-      {isMobile && (
-        <nav
-          aria-label="Conta"
-          style={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 30,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-            gap: 4,
-            padding: '8px 12px calc(8px + env(safe-area-inset-bottom, 0px))',
-            background: 'var(--bg-sidebar)',
-            borderTop: '1px solid var(--hairline)',
-            boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
-          }}
-        >
-          {[
-            { id: 'projects', label: 'Início', Icon: Layers, onClick: () => setAccountTab?.('projects') },
-            { id: 'generate', label: 'Gerar', Icon: Sparkles, onClick: () => onGenerate?.(creationType) },
-            { id: 'usage', label: 'Uso', Icon: Gauge, onClick: () => setAccountTab?.('usage') },
-            { id: 'profile', label: 'Perfil', Icon: User, onClick: () => setAccountTab?.('profile') },
-          ].map(({ id, label, Icon, onClick }) => {
-            const active = id === 'generate' ? false : accountTab === id;
-            const primary = id === 'generate';
-            return (
-              <button
-                key={id}
-                type="button"
-                className="vc-pressable"
-                onClick={onClick}
-                aria-current={active ? 'page' : undefined}
-                style={{
-                  minHeight: 56,
-                  borderRadius: 12,
-                  border: primary
-                    ? 'none'
-                    : active
-                      ? '1px solid var(--accent)'
-                      : '1px solid transparent',
-                  background: primary
-                    ? 'var(--accent)'
-                    : active
-                      ? 'var(--accent-surface)'
-                      : 'transparent',
-                  color: primary ? '#fff' : active ? 'var(--text-primary)' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 2,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  fontFamily: 'var(--font-ui)',
-                  letterSpacing: '-0.011em',
-                }}
-              >
-                <Icon size={18} strokeWidth={active || primary ? 2.35 : 2} />
-                {label}
-              </button>
-            );
-          })}
-        </nav>
-      )}
+      </main>
+      {isMobile && <div className="project-entry-mobile-nav">{accountNav}</div>}
     </div>
   );
 }
 
-export {
-  AccountHomeShell,
-};
+export { AccountHomeShell };

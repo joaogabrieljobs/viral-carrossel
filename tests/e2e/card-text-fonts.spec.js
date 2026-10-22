@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -66,8 +67,7 @@ async function openProject(page, width) {
     }]));
   }, { projectId: PROJECT_ID, firstCard: FIRST_CARD, secondCard: SECOND_CARD });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i })
-    .click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
   await expect(surface(page, FIRST_CARD)).toBeVisible();
 }
 
@@ -187,6 +187,7 @@ for (const width of [1680, 390]) {
     if (!mobile) await page.screenshot({ path: testInfo.outputPath('fontes-por-texto.png') });
     await closeMobilePanel(page, mobile);
     await page.reload();
+    await enterEditorFromHome(page);
     await expectFont(page, 'IDEIA 1', 'Playfair Display');
     await expectFont(page, 'Detalhe 1', 'Montserrat');
     await expectFont(page, 'Texto livre A', 'Outfit');
@@ -258,6 +259,7 @@ test('Aplicar em todos replica apenas a fonte do título e persiste após recarr
   await expect.poll(async () => (await savedDoc(page))?.slides?.map(slide => slide.textFonts?.title))
     .toEqual([TITLE_FONT, TITLE_FONT]);
   await page.reload();
+  await enterEditorFromHome(page);
   await expectFont(page, 'IDEIA 2', 'Playfair Display', SECOND_CARD);
   await expectFont(page, 'Detalhe 2', 'Arial', SECOND_CARD);
 });

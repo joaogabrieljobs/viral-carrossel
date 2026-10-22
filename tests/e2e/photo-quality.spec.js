@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { createHash } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
@@ -33,7 +34,7 @@ async function openPhotoProject(page) {
     } }]));
   }, { projectId: PROJECT_ID, cardId: CARD_ID, owner: `email:${SESSAO_ATIVA.email}` });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
   await expect(page.locator(`main [data-vc-card-surface="${CARD_ID}"]`)).toBeVisible();
 }
 
@@ -142,6 +143,7 @@ test('importação conserva original grande e PNG 3× conserva detalhe de um pix
 
   // Reload usa o IndexedDB, e importar em lote percorre outro handler da UI.
   await page.reload();
+  await enterEditorFromHome(page);
   const { id: beforeBatch, ...restored } = await storedPhoto(page);
   expect(restored).toEqual(expected);
   await page.getByRole('tab', { name: /^Imagem$/i }).click();

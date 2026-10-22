@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // "Marcar destaque" gravava `destaqueSpans` e mostrava o toast de sucesso, mas só
 // os layouts culture desenhavam os trechos: nos restantes o card continuava com
 // o texto simples. O teste marca um trecho do subtítulo e procura-o pintado no card.
@@ -8,7 +9,7 @@ test('destaque marcado no subtítulo aparece no card', async ({ page }) => {
   test.setTimeout(60_000);
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.waitForTimeout(800);
   await page.getByRole('tab', { name: /narrativa/i }).first().click({ force: true });
   await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();

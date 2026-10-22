@@ -1,3 +1,4 @@
+import { enterEditorFromHome, openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA, SESSAO_ANONIMA } from './helpers/api-mock.js';
 
@@ -177,6 +178,7 @@ async function expectStoredProjects(page) {
 }
 
 async function expectHomeProjects(page, { stored = true } = {}) {
+  await openProjectLibrary(page);
   await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(5);
   for (const name of PROJECT_NAMES) {
@@ -186,10 +188,10 @@ async function expectHomeProjects(page, { stored = true } = {}) {
 }
 
 async function goHome(page) {
-  if (await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).isVisible()) return;
-  // Em 1280px o header esconde Projetos; Perfil permanece e abre a mesma Home.
-  await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
+  if (!await page.locator('[data-vc-tour="account-home"]').isVisible()) {
+    await page.getByRole('button', { name: 'Perfil', exact: true }).first().click();
+  }
+  await openProjectLibrary(page);
 }
 
 test.describe('Biblioteca da conta: nuvem → React → lista', () => {
@@ -231,9 +233,11 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await seedOneProject(page);
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
+    await openProjectLibrary(page);
     await expect(page.getByRole('button', { name: /^Abrir Clínica / })).toHaveCount(1);
 
     cloud.online = true;
+    await openProjectLibrary(page);
     await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
     try {
       await expectHomeProjects(page);
@@ -269,7 +273,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await seedOneProject(page);
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     cloud.online = true;
 
     await page.getByRole('button', { name: /salvar projeto agora/i }).click();
@@ -278,6 +282,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await expectStoredProjects(page);
     await page.reload();
+    await enterEditorFromHome(page);
     await expect(page.getByRole('button', { name: /salvar projeto agora/i })).toBeVisible();
     await goHome(page);
     await expectHomeProjects(page);
@@ -305,7 +310,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await seedOneProject(page);
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -350,6 +355,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       };
     });
     cloud.online = true;
+    await openProjectLibrary(page);
     await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
     await expect(page.getByText(/Lista atualizada: 5 projeto\(s\).*navegador continua sem espaço para a cópia local/)).toBeVisible();
     await expect(page.getByText(/Sincronização incompleta:/)).toHaveCount(0);
@@ -366,7 +372,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await seedOneProject(page);
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -418,7 +424,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     await seedOneProject(page);
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -449,8 +455,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_data_owner')))).toBe(`email:${SESSAO_ATIVA.email}`);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library')).map((entry) => entry.id)))
       .toEqual(['cloud-clinic-1']);
-    await page.getByRole('button', { name: 'Projetos', exact: true }).first().click();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     if (!(await title.isVisible())) await page.getByRole('button', { name: /editar card/i }).first().click();
     await expect(title).toHaveValue(editedTitle);
@@ -476,7 +481,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     });
     await page.goto('/?app=1');
     await expect(page.getByText(BOOT_OFFLINE_MESSAGE, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('tab', { name: 'Narrativa', exact: true }).click();
     await page.getByRole('button', { name: /editar card/i }).first().click();
     const title = page.getByText('Título', { exact: true }).first().locator('xpath=following::textarea[1]');
@@ -507,7 +512,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(await page.evaluate(() => localStorage.getItem('vc_library'))).toBeNull();
     cloud.session = { ...SESSAO_ATIVA };
     await page.goto('/?app=1&login=password');
-    await expect(page.getByRole('button', { name: /continuar no editor/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Abrir um projeto', exact: true })).toBeVisible();
     const restored = await page.evaluate(async (owner) => {
       const library = await new Promise((resolve, reject) => {
         const req = indexedDB.open('viral-carrossel-account-vault', 1);
@@ -535,12 +540,10 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     }, `email:${SESSAO_ATIVA.email}`);
     expect(restored).toEqual({ count: 23, title: editedTitle, photos: Array(23).fill(true) });
     await page.reload();
-    // Com cache disponível, o boot já pode reabrir o editor restaurado.
-    const continueEditing = page.getByRole('button', { name: /continuar no editor/i });
-    await expect(continueEditing.or(page.getByRole('button', { name: 'Salvar projeto agora', exact: true }))).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Abrir um projeto', exact: true })).toBeVisible();
     if (quotaPersists) expect(await page.evaluate(() => localStorage.getItem('vc_library'))).toBeNull();
     else expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].title)).toBe(editedTitle);
-    if (await continueEditing.isVisible()) await continueEditing.click();
+    await enterEditorFromHome(page);
     await expect(page.locator('main [data-vc-card-surface]')).toHaveCount(23);
     await expect(page.locator('main').getByText(editedTitle, { exact: true }).first()).toBeVisible();
     await expect.poll(() => page.locator('main [data-vc-card-surface]').first().evaluate(el =>
@@ -560,7 +563,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
     expect(cloud.loginCount).toBe(1);
     expect(cloud.pullCount).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: 'Atualizar da conta', exact: true })).toBeEnabled();
-    await expect(page.getByRole('button', { name: /continuar no editor/i })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Abrir Clínica / }).first()).toBeEnabled();
     await page.reload();
     await expectHomeProjects(page);
   });
@@ -597,6 +600,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       id: `janine-${index}`, num: index + 1, title: `Janine — card ${index + 1}`,
     }));
     await page.goto('/?app=1');
+    await openProjectLibrary(page);
     await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();
     // O cofre antigo tem os cinco projetos: a exclusão precisa vencer esse backup.
     await page.getByRole('button', { name: 'Atualizar da conta', exact: true }).click();
@@ -637,6 +641,7 @@ test.describe('Biblioteca da conta: nuvem → React → lista', () => {
       throw error;
     })).toEqual([{ id: janine.id, count: 23 }]);
     await goHome(page);
+    await openProjectLibrary(page);
     await expect(page.getByRole('button', { name: 'Abrir CLINICA JANINE ARAUJO', exact: true })).toBeVisible();
     for (const name of PROJECT_NAMES.slice(1)) await expect(page.getByRole('button', { name: `Abrir ${name}`, exact: true })).toHaveCount(0);
     expect(cloud.manifest.docs[0].doc.slides).toHaveLength(23);

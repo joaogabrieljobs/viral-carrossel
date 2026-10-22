@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // As imagens viviam como data URL dentro do documento, e o documento no
 // localStorage (~5 MB). Ao encher, o código apagava as imagens para conseguir
 // gravar — perda real. Agora os bytes ficam no IndexedDB e o documento guarda o id.
@@ -9,9 +10,7 @@ const PNG_1x1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8D
 async function abrirEditor(page) {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  const continuar = page.getByRole('button', { name: /continuar no editor/i });
-  await expect(continuar).toBeVisible({ timeout: 10_000 });
-  await continuar.click({ force: true });
+  await enterEditorFromHome(page);
   await page.waitForTimeout(600);
   // A camada de toque da zona da foto só existe quando há card com zona de foto.
   await page.route('https://api.openai.com/**', (r) => r.fulfill({ status: 401, json: { error: { message: 'e2e' } } }));
@@ -74,7 +73,7 @@ test.describe('Imagens no IndexedDB', () => {
     const idsAntes = await idsNoIndexedDB(page);
 
     await page.reload();
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 5000 }).catch(() => {});
+    await enterEditorFromHome(page);
     await page.waitForTimeout(1800);
 
     expect(await idsNoIndexedDB(page)).toEqual(idsAntes);

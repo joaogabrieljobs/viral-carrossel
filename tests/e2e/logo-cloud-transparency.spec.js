@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -43,7 +44,7 @@ async function connectCloud(page, state) {
 }
 
 async function logoPixels(page) {
-  const logo = page.locator('main [data-vc-movable="logo"] img').first();
+  const logo = page.locator('main img[data-vc-brand-logo]').first();
   await expect(logo).toBeVisible();
   return logo.evaluate(async (img) => {
     await img.decode();
@@ -78,7 +79,7 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     localStorage.setItem('vc_data_owner', JSON.stringify(owner));
   }, { owner: `email:${SESSAO_ATIVA.email}` });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: 'Abrir Logo transparente', exact: true }).click();
+  await enterEditorFromHome(page, 'Logo transparente');
   const source = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 240; canvas.height = 48;
@@ -91,6 +92,7 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     return canvas.toDataURL('image/png');
   });
   await page.getByRole('tab', { name: /^Marca$/ }).first().click();
+  await page.locator('[data-vc-editor-section="marca-logo"] > summary').click();
   await page.getByLabel('Arquivo PNG da logo deste card', { exact: true }).setInputFiles({
     name: 'marca-branca-transparente.png', mimeType: 'image/png', buffer: Buffer.from(source.split(',')[1], 'base64'),
   });
@@ -123,13 +125,15 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     const restored = await otherContext.newPage();
     await connectCloud(restored, state);
     await restored.goto('/?app=1&login=password');
-    await restored.getByRole('button', { name: 'Abrir Logo transparente', exact: true }).click();
+    await enterEditorFromHome(restored, 'Logo transparente');
     expect(await logoPixels(restored)).toEqual(before);
     await restored.getByRole('tab', { name: /^Marca$/ }).first().click();
+    await restored.locator('[data-vc-editor-section="marca-logo"] > summary').click();
     await restored.getByLabel('Posição da logo neste card', { exact: true }).selectOption('bl');
     await restored.getByRole('button', { name: /salvar projeto agora/i }).click();
     await expect.poll(() => state.manifest.docs[0].doc.slides[0].logoPosition).toBe('bl');
     await restored.reload();
+    await enterEditorFromHome(restored);
     expect(await logoPixels(restored)).toEqual(before);
     await restored.locator('main [data-vc-card-surface="s1"]').first().screenshot({ path: testInfo.outputPath('logo-after-restore-edit-reload.png') });
   } finally {

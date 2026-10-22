@@ -1,33 +1,27 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // Regressão do crash React #185 (loop de render no tour) e do realce vazio:
 // o tour abria empilhado no modal de boas-vindas e destacava elementos tapados.
 // Tour automático só após conteúdo real; estes testes abrem via Ajuda.
 import { test, expect } from '@playwright/test';
-import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
+import { mockApi, mockEditorApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
 const TOTAL_PASSOS = 3;
 
-async function firstEditor(page) {
-  const intro = page.getByRole('dialog', { name:'Bem-vindo à Moont' });
-  await expect(intro).toBeVisible();
-  await intro.getByRole('button', { name:'Começar a criar', exact:true }).click();
-  await page.getByRole('button', { name:'Criar primeiro projeto', exact:true }).click();
-  const naming = page.getByRole('dialog', { name:'Nome da comunicação' });
-  await naming.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Primeiro projeto');
-  await naming.getByRole('button', { name:'Criar', exact:true }).click();
-}
 async function openTourFromHelp(page) {
-  await firstEditor(page);
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /Ajuda|ajuda e atalhos|\?/i }).first().click();
   await page.getByRole('button', { name: /Ver tour guiado/i }).click();
 }
 
 test.describe('Tour de onboarding', () => {
-  test('não abre empilhado no modal de boas-vindas', async ({ page }) => {
+  test('a entrada oferece duas escolhas sem empilhar boas-vindas ou tour', async ({ page }) => {
     await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
 
-    await expect(page.getByRole('dialog', { name: 'Bem-vindo à Moont' })).toBeVisible({ timeout: 10_000 });
-    // 850ms do tour + folga: enquanto o modal está aberto (e canvas vazio), nenhum card de tour.
+    await expect(page.getByRole('button', { name:'Abrir um projeto', exact:true })).toBeVisible();
+    await expect(page.getByRole('button', { name:'Criar um projeto', exact:true })).toBeVisible();
+    await expect(page.getByRole('dialog', { name:'Bem-vindo à Moont' })).toHaveCount(0);
+    // Ultrapassa o antigo temporizador: a entrada não deve iniciar um tour sozinha.
     await page.waitForTimeout(1600);
     await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
@@ -42,11 +36,7 @@ test.describe('Tour de onboarding', () => {
       }]));
     });
     await page.goto('/?app=1');
-    const continueInEditor = page.getByRole('button', { name: /Continuar no editor/i });
-    if (await continueInEditor.isVisible().catch(() => false)) await continueInEditor.click();
-
-    await expect.poll(() => page.evaluate(() => localStorage.getItem('vc_modes_intro_done')))
-      .toBe('1');
+    await enterEditorFromHome(page, 'Projeto existente');
     await expect(page.getByRole('dialog', { name: 'Bem-vindo à Moont' })).toHaveCount(0);
     await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
@@ -54,7 +44,12 @@ test.describe('Tour de onboarding', () => {
   test('o primeiro projeto não recebe tour automático durante a criação', async ({ page }) => {
     await mockApi(page, { session:SESSAO_ATIVA, onboarding:true });
     await page.goto('/?app=1');
-    await firstEditor(page);
+    await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
+    const flow = page.getByRole('region', { name:'Criar novo projeto' });
+    await flow.getByLabel(/^Nome do projeto/).fill('Primeiro projeto');
+    await flow.getByRole('button', { name:'Continuar', exact:true }).click();
+    await expect(flow).toBeVisible();
+    await expect(page.getByRole('tab', { name:'Marca', exact:true })).toHaveCount(0);
     await page.waitForTimeout(1100);
     await expect(page.locator('[data-vc-tour-card]')).toHaveCount(0);
   });
@@ -64,7 +59,7 @@ test.describe('Tour de onboarding', () => {
     page.on('console', (m) => { if (m.type() === 'error') erros.push(m.text()); });
     page.on('pageerror', (e) => erros.push(String(e)));
 
-    await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
+    await mockEditorApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
 
     await openTourFromHelp(page);
@@ -97,7 +92,7 @@ test.describe('Tour de onboarding', () => {
 
 test.describe('Copy do tour', () => {
   test('nenhum passo fala de .env, chave de API ou ambiente local', async ({ page }) => {
-    await mockApi(page, { session: SESSAO_ATIVA, onboarding: true });
+    await mockEditorApi(page, { session: SESSAO_ATIVA, onboarding: true });
     await page.goto('/?app=1');
     await openTourFromHelp(page);
     const card = page.locator('[data-vc-tour-card]');

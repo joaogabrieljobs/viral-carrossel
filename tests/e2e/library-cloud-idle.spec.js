@@ -1,3 +1,4 @@
+import { openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -48,6 +49,7 @@ test('falha lenta do IndexedDB não repete atualizar da conta sem edição', asy
   }, { owner: `email:${SESSAO_ATIVA.email}` });
 
   await page.goto('/?app=1');
+  await openProjectLibrary(page);
   await expect(page.getByRole('button', { name: 'Abrir Projeto com foto', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__imageReadFailures), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
   const savedBefore = await page.evaluate(() => localStorage.getItem('vc_library'));

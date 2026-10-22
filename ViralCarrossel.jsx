@@ -282,6 +282,7 @@ import {
 import {
   AccountHomeShell,
 } from './src/components/AccountHomeShell.jsx';
+import CreateProjectFlow from './src/components/CreateProjectFlow.jsx';
 import {
   normalizeCardVisualStyle,
   CARD_VISUAL_STYLE_OPTIONS,
@@ -1564,47 +1565,35 @@ export default function App() {
     }
   }, [activeDocId, history.reset, openDocLocal, setShellView, toast]);
   const askPromptRef = useRef(null);
-  const createProjectByKind = useCallback(async (kind = 'carrossel', projectName) => {
-    const isPresentation = kind === 'apresentacao';
-    const fallback = isPresentation ? 'Nova apresentação' : 'Nova comunicação';
-    // Sem 2º argumento (Home / Biblioteca / Gerar): pede nome.
-    // Com nome explícito (já perguntado na conta): não pergunta de novo.
-    let name = projectName !== undefined ? String(projectName || '').trim() : '';
-    let chosenBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || brand;
-    if (projectName === undefined) {
-      const ask = askPromptRef.current;
-      if (typeof ask === 'function') {
-        const answered = await ask({
-          title: isPresentation ? 'Nome da apresentação' : 'Nome da comunicação',
-          brands: brandRoster, initialBrandId: activeBrandId,
-          label: 'Como se chama este projeto?',
-          placeholder: isPresentation ? 'Ex.: Proposta comercial — outubro' : 'Ex.: Campanha de lançamento — outubro',
-          cta: 'Criar',
-          defaultValue: '',
-        });
-        if (answered === null || answered === undefined) return false;
-        name = String(answered.name || answered).trim();
-        if (answered.brandId === '__new__') {
-          chosenBrand = hydrateBrandTextColors({ ...DEFAULT_BRAND, id:uid(), name:answered.brandName });
-          setBrandRoster(items => [...items, chosenBrand]);
-        } else if (answered.brandId) {
-          chosenBrand = brandRoster.find(b => b.id === answered.brandId) || chosenBrand;
-        }
-        setActiveBrandId(chosenBrand.id);
-      }
+  // Configuração isolada: nenhum projeto/identidade é alterado ao navegar
+  // pelas páginas. O destino só nasce na confirmação final de geração.
+  const [creationSession, setCreationSession] = useState(null);
+  const creationTargetRef = useRef(null);
+  const creationRequestRef = useRef(null);
+  const [creationRequestVersion, setCreationRequestVersion] = useState(0);
+  const creationGenerateRef = useRef(null);
+  const createProjectByKind = useCallback((kind, projectName) => {
+    if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
+      toast('Aguarde seus projetos terminarem de carregar para criar um novo.', 'info', 4500);
+      return false;
     }
-    const rosterBrand = chosenBrand;
-    const identity = hydrateBrandTextColors({ ...rosterBrand });
-    const presentationSeed = isPresentation
-      ? applyPresentationVisualPresetToDoc({
-          ...presentationDocPatch(),
-          brand: identity,
-          slides: [mkSlide(1, identity)],
-        }, DEFAULT_PRESENTATION_VISUAL_PRESET_ID, PRESENTATION_VISUAL_PRESETS, { initialize: true })
-      : { brand: identity };
-    newDoc(presentationSeed, name || fallback);
+    if (getAIGenerationCount() > 0) {
+      toast('Conclua ou cancele a geração em andamento antes de criar outro projeto.', 'info', 4500);
+      return false;
+    }
+    creationTargetRef.current = null;
+    setLibraryOpen(false);
+    setSetupOpen(false);
+    setDrawerOpen(false);
+    setModesIntroOpen(false);
+    setTourOpen(false);
+    setCreationSession({
+      id: uid(), owner: readDataOwner(),
+      productKind: kind === 'apresentacao' || kind === 'carrossel' ? kind : null,
+      name: typeof projectName === 'string' ? projectName : '',
+    });
     return true;
-  }, [brand, brandRoster, activeBrandId, newDoc]);
+  }, [toast]);
 
   /** Selecciona marca para produção (Home) sem sobrescrever o projeto aberto. */
   const selectBrandForProduction = useCallback((brandId) => {
@@ -2546,17 +2535,10 @@ export default function App() {
     setSetupProductKind(normalizedKind);
     setSetupOpen(true);
   }, [activeProductKind]);
-  const generateProjectByKind = useCallback(async (kind = activeProductKind) => {
-    const normalizedKind = kind === 'apresentacao' ? 'apresentacao' : 'carrossel';
-    // A Home é também a porta de criação. Se o pedido troca o tipo de produto,
-    // abre um destino próprio antes do wizard para não transformar/apagar o
-    // projeto que estava aberto.
-    if (normalizedKind !== activeProductKind) {
-      const created = await createProjectByKind(normalizedKind);
-      if (created === false) return;
-    }
-    openGenerationSetup(normalizedKind);
-  }, [activeProductKind, createProjectByKind, openGenerationSetup]);
+  const generateProjectByKind = useCallback((kind = activeProductKind) => (
+    createProjectByKind(kind)
+  ), [activeProductKind, createProjectByKind]);
+
   const setSetupOpenForSidebar = useCallback((open, kind = activeProductKind) => {
     if (open) openGenerationSetup(kind);
     else setSetupOpen(false);
@@ -2804,56 +2786,10 @@ export default function App() {
       return nextRoster;
     });
   }, [appMode, activeBrandId, activeEntry?.id, creatorIdentitySnapshot]);
-  // Modal de boas-vindas dos 3 modos — só na 1.ª visita da conta (nunca a cada geração).
+  // A explicação dos modos continua disponível pela ajuda do editor.
   const [modesIntroOpen, setModesIntroOpen] = useState(false);
-  const modesIntroScheduledRef = useRef(false);
-  const bootProjectsRef = useRef(null);
-  if (bootProjectsRef.current === null) {
-    const persistedLibrary = lsGet(SK.library, null);
-    const legacyDoc = lsGet(SK.legacyDoc, null);
-    const hadSavedProjects = (Array.isArray(persistedLibrary) && persistedLibrary.length > 0)
-      || !!legacyDoc?.slides?.length;
-    // `library` sempre contém um Carrossel de exemplo, mesmo no primeiro acesso.
-    // Guardar o ID permite distinguir esse placeholder de projetos restaurados
-    // da nuvem quando o carregamento da conta terminar.
-    bootProjectsRef.current = {
-      hadSavedProjects,
-      placeholderId: hadSavedProjects ? null : library[0]?.id,
-    };
-  }
-  const hadProjectsAtRestoreRef = useRef(null);
-  if (accountLibraryReady && hadProjectsAtRestoreRef.current === null) {
-    // A decisão de primeira visita pertence ao boot. Criar o primeiro projeto
-    // nesta sessão não pode cancelá-la nem suprimir o tour da primeira geração.
-    hadProjectsAtRestoreRef.current = bootProjectsRef.current.hadSavedProjects
-      || library.some((entry) => entry.id !== bootProjectsRef.current.placeholderId);
-  }
-  const hadProjectsAtRestore = hadProjectsAtRestoreRef.current === true;
-  useEffect(() => {
-    if (typeof window === 'undefined' || landingOpen || !accountLibraryReady) return undefined;
-    try {
-      if (localStorage.getItem(SK.modesIntro)) return undefined;
-      // Conta com projetos salvos ou restaurados — sem modal de primeira visita.
-      if (hadProjectsAtRestore) {
-        localStorage.setItem(SK.modesIntro, '1');
-        localStorage.setItem(SK.onboarding, '1');
-        return undefined;
-      }
-      if (!modesIntroScheduledRef.current) {
-        modesIntroScheduledRef.current = true;
-        let opened = false;
-        const t = window.setTimeout(() => {
-          opened = true;
-          setModesIntroOpen(true);
-        }, 600);
-        return () => {
-          window.clearTimeout(t);
-          if (!opened) modesIntroScheduledRef.current = false;
-        };
-      }
-    } catch { /* */ }
-    return undefined;
-  }, [landingOpen, accountLibraryReady, hadProjectsAtRestore]);
+  // A entrada já orienta a criação. A escolha de profundidade das ferramentas
+  // fica no editor; não interrompe a primeira visita com outro onboarding.
   // Identidade estável: como props inline, entravam nas deps do layout effect do
   // tour e realimentavam o ciclo render → effect → setState → render (React #185).
   const tourEnterEditor = useCallback(() => setShellView('project'), [setShellView]);
@@ -4872,6 +4808,8 @@ export default function App() {
     visualPreset: visualPresetArg,
     presentationPath: presentationPathArg,
     fetchImagesNow = true,
+    preserveBrandIdentity = false,
+    brandVisualOverrides = null,
     announcement = false,
     remix = false,
   }) => {
@@ -5149,15 +5087,18 @@ ${jsonShapeLine}`;
     // escolhidas, evitando que o primeiro lote use o preset anterior.
     const textOnlyPlan = imageGenerationAvailability.reason === 'plan_without_images' && !isPresentationGeneration;
     const generationPresetId = effectiveVisualPreset || (textOnlyPlan ? 'minimal_clean' : null);
-    const presetBrand = generationPresetId
+    const presetBrand = generationPresetId && !preserveBrandIdentity
       ? applyVisualPreset(brand, generationPresetId, visualPresets)
       : brand;
     let generationBrand = {
       ...presetBrand,
-      ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked)
+      ...((projectDesignInstructions && !effectiveVisualPreset && !brand.visualIdentityLocked && !preserveBrandIdentity)
         ? projectDesignBrandPatch(result.projectDesign)
         : {}),
       ...explicitBrandColorsFromKit(styleKit),
+      // Escolhas feitas nos controles do assistente prevalecem sobre cores
+      // descritas em um briefing antigo, sem alterar o preset de origem.
+      ...sanitizeCustomVisualPresetBrand(brandVisualOverrides),
     };
     if (generationBrand.logoImageId) {
       try {
@@ -5410,7 +5351,7 @@ ${jsonShapeLine}`;
       setBrand((b) => (b?.subtitleVisible === false ? { ...b, subtitleVisible: true } : b));
     }
     const quickTplSynced = isQuickTemplatePreset(cp) ? TEMPLATES.find((x) => x.id === quickTemplateIdFromPreset(cp)) : null;
-    if (quickTplSynced && !remix) {
+    if (quickTplSynced && !remix && !preserveBrandIdentity && !effectiveVisualPreset) {
       const pal = PALETTES[quickTplSynced.palette] || PALETTES[0];
       setBrand((b) => ({
         ...b,
@@ -5638,6 +5579,162 @@ ${jsonShapeLine}`;
       if (generationRef.current === job) { generationRef.current = null; setGenProgress(null); }
     }
   };
+
+  creationGenerateRef.current = handleGenerate;
+
+  const leaveCreation = useCallback(() => {
+    if (creationRequestRef.current) {
+      cancelGeneration();
+      creationRequestRef.current.resolve({ cancelled: true });
+      creationRequestRef.current = null;
+    }
+    setCreationSession(null);
+    creationTargetRef.current = null;
+    setShellView('home');
+    setAccountTab('projects');
+  }, [cancelGeneration, setShellView, setAccountTab]);
+
+  const openCreationDraft = useCallback(() => {
+    if (!creationTargetRef.current || getAIGenerationCount() > 0) return;
+    setCreationSession(null);
+    creationTargetRef.current = null;
+    setAppMode('studio');
+    setTab('texto');
+    setShellView('project');
+  }, [setAppMode, setShellView]);
+
+  // Um submit cria um único destino. Falha/cancelamento conservam esse rascunho
+  // para repetir a tentativa; nunca reutilizamos o projeto anterior.
+  const createAndGenerateProject = async (draft) => {
+    if (!creationSession || creationRequestRef.current || getAIGenerationCount() > 0) return { cancelled: true };
+    if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()
+      || readDataOwner() !== creationSession.owner) {
+      throw new Error('A conta ainda está carregando. Aguarde antes de gerar.');
+    }
+    const isPresentation = draft.productKind === 'apresentacao';
+    const count = Number(draft.generation?.count);
+    if (!Number.isInteger(count) || count < (isPresentation ? 5 : 1) || count > 24) {
+      throw new Error(`Escolha de ${isPresentation ? 5 : 1} a 24 ${isPresentation ? 'slides' : 'cards'}.`);
+    }
+    const target = creationTargetRef.current;
+    if (target && activeProjectRef.current !== target.id) {
+      throw new Error('O projeto aberto mudou. Volte ao início para criar com segurança.');
+    }
+    const existingBrand = brandRoster.find(item => item.id === draft.brandId);
+    const brandId = existingBrand?.id
+      || (target?.sourceBrandId === draft.brandId ? target.brandId : null)
+      || uid();
+    const identity = hydrateBrandTextColors({ ...DEFAULT_BRAND, ...(draft.brand || {}), id: brandId });
+    const seed = {
+      ...(isPresentation ? presentationDocPatch() : {}),
+      productKind: isPresentation ? 'apresentacao' : 'carrossel',
+      fmt: isPresentation ? 'apresentacao' : ['carrossel', 'quadrado', 'stories'].includes(draft.formatId) ? draft.formatId : 'carrossel',
+      brand: identity,
+      styleKit: normalizeStyleKit(draft.styleKit),
+      material: { content: '', sources: '', context: '', ...(draft.material || {}) },
+      creativePreset: draft.generation.creativePreset,
+      presentationPath: normalizePresentationPath(draft.generation.presentationPath),
+      mode: draft.generation.mode,
+      contentObjective: normalizeContentObjective(draft.generation.contentObjective),
+      slideTextDensity: draft.generation.slideTextDensity,
+      cardVisualStyle: normalizeCardVisualStyle(draft.generation.cardVisualStyle),
+      visualPreset: draft.generation.visualPreset || null,
+      imgParams: draft.generation.imgParams,
+      quickCardCount: count,
+      quickPromptDraft: draft.generation.topic,
+      quickNarrativeMode: draft.generation.mode,
+      quickGenerationScope: draft.generation.fetchImagesNow ? 'text_images' : 'text',
+    };
+    let targetId;
+    let readySlideId;
+    // Flush the destination and its identity before the deferred generation.
+    // Studio also keeps project-only identity overrides out of the brand roster.
+    flushSync(() => {
+      setAppMode('studio');
+      setQuickPrompt(draft.generation.topic);
+      if (draft.brandId === '__new__') {
+        const ownsReservedBrand = target?.sourceBrandId === '__new__' && target.brandId === brandId;
+        const profile = { ...identity, styleKit: seed.styleKit };
+        setBrandRoster(items => {
+          if (!items.some(item => item.id === brandId)) return [...items, profile];
+          // Only a profile created by this attempt may be refreshed on retry.
+          // Selecting a pre-existing brand always keeps its saved preset intact.
+          return ownsReservedBrand ? items.map(item => item.id === brandId ? profile : item) : items;
+        });
+      }
+      setActiveBrandId(brandId);
+      if (!target) {
+        const entry = newDoc(seed, String(draft.name || '').trim() || (isPresentation ? 'Nova apresentação' : 'Novo carrossel'), { shellView: 'home' });
+        targetId = entry.id;
+        readySlideId = entry.doc.slides[0].id;
+      } else {
+        targetId = target.id;
+        readySlideId = slides[0]?.id;
+        renameDoc(target.id, String(draft.name || '').trim() || activeEntry.name);
+        history.set(current => ({ ...current, ...seed }));
+      }
+      creationTargetRef.current = { id: targetId, brandId, sourceBrandId: draft.brandId };
+    });
+    return new Promise((resolve, reject) => {
+      creationRequestRef.current = {
+        projectId: targetId, readySlideId, owner: creationSession.owner,
+        sessionId: creationSession.id, generation: draft.generation,
+        resolve, reject, started: false,
+      };
+      setCreationRequestVersion(value => value + 1);
+    });
+  };
+
+  useEffect(() => {
+    const request = creationRequestRef.current;
+    if (!request || request.started || !creationSession) return undefined;
+    if (activeDocId !== request.projectId || readDataOwner() !== request.owner) {
+      creationRequestRef.current = null;
+      request.resolve({ cancelled: true });
+      return undefined;
+    }
+    if (slides[0]?.id !== request.readySlideId) return undefined;
+    // A macrotask follows the active-project lifecycle (including cancellation
+    // of the previous project's jobs) and uses the newest document closure.
+    const timer = window.setTimeout(async () => {
+      if (creationRequestRef.current !== request) return;
+      if (readDataOwner() !== request.owner || activeProjectRef.current !== request.projectId) {
+        creationRequestRef.current = null;
+        request.resolve({ cancelled: true });
+        return;
+      }
+      request.started = true;
+      try {
+        const result = await creationGenerateRef.current(request.generation);
+        if (creationRequestRef.current !== request) return;
+        if (!result?.cancelled && readDataOwner() === request.owner
+          && activeProjectRef.current === request.projectId) {
+          // Commit the generated history before reading its live persistence
+          // snapshot. A fast response can still share React's async batch.
+          flushSync(() => {
+            setCreationSession(current => current?.id === request.sessionId ? null : current);
+            setTab('texto');
+            setShellView('project');
+          });
+          const persisted = flushPersistRef.current?.();
+          // flush cancels the pending doc autosave. Keep React's library in
+          // step with that snapshot so its next save cannot restore the seed.
+          if (Array.isArray(persisted)) setLibrary(persisted);
+          creationTargetRef.current = null;
+        }
+        request.resolve(result || { cancelled: true });
+      } catch (error) {
+        request.reject(error);
+      } finally {
+        if (creationRequestRef.current === request) creationRequestRef.current = null;
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [creationRequestVersion, creationSession, activeDocId, slides[0]?.id, setShellView]);
+
+  useEffect(() => {
+    if (creationSession && readDataOwner() !== creationSession.owner) leaveCreation();
+  }, [access.email, access.active, creationSession, leaveCreation]);
 
   const refineSlide = async (instruction) => {
     const projectId = activeProjectRef.current;
@@ -6215,6 +6312,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
       const anyModalOpen = resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
+      if (creationSession) {
+        if (mod && k.toLowerCase() === 's') e.preventDefault();
+        return;
+      }
 
       // Cmd/Ctrl+S: grava já. Vale mesmo com modal aberto — nunca é destrutivo.
       if (mod && (k === 's' || k === 'S')) {
@@ -6286,7 +6387,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView]); // eslint-disable-line
+  }, [activeIdx, slides, selectedCardElement, deleteCardTarget, history, setupOpen, researchOpen, seriesOpen, resultsOpen, keysOpen, templatesOpen, hookVarsOpen, helpOpen, imgPrompt.open, fullscreenOpen, tourOpen, libraryOpen, brandsOpen, imageCropOpen, photoPositionOpen, modesIntroOpen, landingOpen, paywallOpen, loginOpen, shellView, creationSession]); // eslint-disable-line
 
   const openCardElement = useCallback((slideId, key, { navigate = false } = {}) => {
     if (!slideId || !key) return;
@@ -6635,7 +6736,26 @@ Retorne APENAS JSON: ${refineAllWantsBody
       } : {}),
     }}>
 
-      {shellView === 'home' ? (
+      {creationSession ? (
+        <CreateProjectFlow
+          key={creationSession.id}
+          initialProductKind={creationSession.productKind}
+          initialName={creationSession.name}
+          brandRoster={brandRoster}
+          activeBrandId={activeBrandId}
+          defaultBrand={DEFAULT_BRAND}
+          visualPresets={visualPresets}
+          hasOpenAI={hasOpenAI}
+          hasAnthropic={hasAnyAI}
+          onOpenKeys={() => setKeysOpen(true)}
+          onCreate={createAndGenerateProject}
+          onCancel={leaveCreation}
+          onCancelGeneration={cancelGeneration}
+          onOpenDraft={openCreationDraft}
+          hasDraft={!!creationTargetRef.current && projectHasCarouselContent(slides)}
+          progress={genProgress}
+        />
+      ) : shellView === 'home' ? (
         <AccountHomeShell
           library={library}
           activeDocId={activeDocId}
@@ -6647,6 +6767,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           isMobile={isMobile}
           useOwnImageKey={useOwnImageKey}
           appMode={appMode}
+          onStartCreation={() => createProjectByKind()}
           onGenerate={generateProjectByKind}
           onOpenLibrary={() => setLibraryOpen(true)}
           onOpenTemplates={() => setTemplatesOpen(true)}
@@ -6926,23 +7047,6 @@ Retorne APENAS JSON: ${refineAllWantsBody
             <SidebarContent {...sidebarProps}/>
           </MobileDrawer>
         )}
-
-        {/* ── EXPORT REFS (offscreen, scale=1) ──
-            Mantemos UMA árvore oculta com cada slide em escala real (1080×1350).
-            html2canvas captura SEMPRE estes elementos — nunca os preview escalados,
-            que distorcem o resultado por causa do `transform: scale()` aplicado. */}
-        <div data-vc-export-tree style={{ position:'fixed', left:'-99999px', top:0, pointerEvents:'none', opacity:0, zIndex:-1 }} aria-hidden>
-          {displaySlides.map((s,i)=>(
-            <SlideCard
-              key={`exp-${s.id}`}
-              ref={el=>slideRefs.current[s.id]=el}
-              slide={s} fmt={fmt} brand={displayBrand} num={i+1} total={slides.length} scale={1}
-              creativePreset={creativePreset}
-              showCanvasChrome={false}
-              forExport
-            />
-          ))}
-        </div>
 
         {/* ── CANVAS ── */}
         <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-base)' }}>
@@ -7882,6 +7986,24 @@ Retorne APENAS JSON: ${refineAllWantsBody
       </>
       )}
 
+        {/* ── EXPORT REFS (offscreen, scale=1) ──
+            Mantemos UMA árvore oculta com cada slide em escala real (1080×1350).
+            html2canvas captura SEMPRE estes elementos — nunca os preview escalados,
+            que distorcem o resultado por causa do `transform: scale()` aplicado. */}
+        <div data-vc-export-tree style={{ position:'fixed', left:'-99999px', top:0, pointerEvents:'none', opacity:0, zIndex:-1 }} aria-hidden>
+          {displaySlides.map((s,i)=>(
+            <SlideCard
+              key={`exp-${s.id}`}
+              ref={el=>slideRefs.current[s.id]=el}
+              slide={s} fmt={fmt} brand={displayBrand} num={i+1} total={slides.length} scale={1}
+              creativePreset={creativePreset}
+              showCanvasChrome={false}
+              forExport
+            />
+          ))}
+        </div>
+
+
       {/* File inputs: evitar hidden (Safari iOS bloqueia .click() via JS). */}
       <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
       <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
@@ -7896,18 +8018,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <Suspense fallback={null}>
       {/* Onboarding dos 3 modos — primeira visita ou reabrível via ? */}
       <ModesIntroModal
-        open={modesIntroOpen}
+        open={modesIntroOpen && !creationSession && shellView === 'project'}
         currentMode={appMode}
         onSelect={(m) => { setAppMode(m); closeModesIntro(); toast(`${appModeLabel(m)} ativo. Pode mudar a qualquer momento.`, 'success', 4000); }}
         onClose={closeModesIntro}
       />
 
-      <GenerationStatus
+      {!creationSession && <GenerationStatus
         progress={analyzingBrandTone
           ? { phase: 'tone', label: 'Analisando publicações e tom da marca…' }
           : genProgress}
         onCancel={cancelGeneration}
-      />
+      />}
 
       {/* Modals */}
       <KeysModal
@@ -8104,7 +8226,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         })}
       />
       <OnboardingTour
-        open={tourOpen}
+        open={tourOpen && !creationSession && shellView === 'project'}
         onDismiss={() => {
           try {
             localStorage.setItem(SK.onboarding, '1');

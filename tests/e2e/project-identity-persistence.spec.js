@@ -1,3 +1,4 @@
+import { enterEditorFromHome, openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -19,7 +20,7 @@ const doc = (brand, prompt = '') => ({
 
 async function enter(page) {
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
 }
 
 test('pedido rápido pertence ao projeto e volta após trocar de projeto', async ({ page }) => {
@@ -98,9 +99,10 @@ test('logo base64 antiga sai do localStorage e ganha ID durável no perfil e pro
 
 test('importação v2 não mistura marcas diferentes que usavam o mesmo id default', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
-  // Import starts from the empty library; there is no automatic draft to open.
+  // A conta vazia também permite importar projetos sem criar um rascunho.
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
+  await openProjectLibrary(page);
+  await page.getByRole('button', { name:'Importar ou organizar biblioteca', exact:true }).click();
 
   const legacyBackup = {
     vcVersion: 2,
@@ -179,8 +181,7 @@ test('apagar links e legendas do DNA persiste o estado vazio', async ({ page }) 
   })).toEqual({ urls: [], samples: '', profileUrls: [], profileSamples: '' });
 
   await page.reload();
-  const continueButton = page.getByRole('button', { name: /continuar no editor/i });
-  if (await continueButton.isVisible().catch(() => false)) await continueButton.click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /Usar publicações para extrair o DNA/i }).click();
   await expect(page.getByLabel('Links do perfil e das publicações')).toHaveValue('');
   await expect(page.getByLabel('Legendas publicadas (recomendado)')).toHaveValue('');

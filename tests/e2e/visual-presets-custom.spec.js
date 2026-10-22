@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -9,12 +10,12 @@ const currentDoc = page => page.evaluate(() => {
 test('padrão preserva subtítulo e padrão personalizado entra na biblioteca', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
   await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
   await page.reload();
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
   await page.getByRole('tab', { name: /^Visual$/i }).click({ force: true });
 
   await page.getByTitle(/Case Study Neon/i).click({ force: true });
@@ -33,12 +34,12 @@ test('padrão preserva subtítulo e padrão personalizado entra na biblioteca', 
 test('glass cria uma superfície visível no card e não só um toggle', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
   await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
   await page.reload();
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
   await page.getByRole('tab', { name: /^Layout$/i }).click({ force: true });
   await page.getByRole('button', { name: 'Glass ao redor do conteúdo', exact: true }).click({ force: true });
   await page.getByRole('slider', { name: 'Opacidade do glass' }).fill('69');
@@ -70,7 +71,7 @@ test('glass cria uma superfície visível no card e não só um toggle', async (
 test('duplo clique edita o título no card e a lixeira remove o elemento selecionado', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
 

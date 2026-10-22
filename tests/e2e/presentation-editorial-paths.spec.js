@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
@@ -57,12 +58,11 @@ for (const [label, role, criterion] of routes) {
     });
 
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click();
+    await enterEditorFromHome(page);
     await page.getByRole('button', { name: /Modo atual: Criar rápido/i }).click();
     await page.getByRole('menuitem', { name: /Controle profissional/i }).click();
-    await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).click();
-    await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill(`Teste ${label}`);
-    await page.getByRole('button', { name: 'Criar', exact: true }).click();
+    await page.getByRole('button', { name: 'Apresentação 16:9', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).first().click();
 
     const modal = page.locator('.modal-panel');
     await modal.getByLabel('Qual é o tema da apresentação?', { exact: true }).fill('Uma decisão com critérios verificáveis');

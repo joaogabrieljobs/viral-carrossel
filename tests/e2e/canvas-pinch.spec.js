@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -13,6 +14,7 @@ test('pinça amplia o canvas sem mudar de card nem alterar a exportação', asyn
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const zoom = page.getByLabel('Zoom da área de trabalho');
   await expect(zoom).toHaveText('100%');
   const exportSurface = page.locator('[data-vc-export-tree] [data-vc-card-surface="pinch-1"]');

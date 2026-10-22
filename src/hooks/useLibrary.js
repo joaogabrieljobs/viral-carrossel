@@ -43,7 +43,7 @@ import {
   setEntryPublicationDate,
 } from '../utils/library-organizer.js';
 import { cloneBrandStyleKit } from '../utils/brand-context.js';
-import { normalizeStyleKit, styleKitHasContent } from '../utils/style-kit.js';
+import { normalizeStyleKit } from '../utils/style-kit.js';
 import { rememberDeletedProjectIds } from '../utils/project-deletions.js';
 
 /**
@@ -69,7 +69,10 @@ export function buildSeededLibraryDoc(seedDoc = null, fallbackBrand = DEFAULT_BR
   } else if (hydratedBrand.styleKit) {
     hydratedBrand.styleKit = normalizeStyleKit(hydratedBrand.styleKit);
   }
-  const seedHasKit = seeded.styleKit && styleKitHasContent(seeded.styleKit);
+  // Um pacote explícito pode estar vazio porque a pessoa removeu o briefing,
+  // desativou a logo ou escolheu apenas uma logo. Só a ausência herda a marca.
+  const seedHasKit = seeded.styleKit && typeof seeded.styleKit === 'object'
+    && !Array.isArray(seeded.styleKit);
   const inheritedKit = seedHasKit
     ? normalizeStyleKit(seeded.styleKit)
     : cloneBrandStyleKit(hydratedBrand);
@@ -161,7 +164,7 @@ export function useLibrary({
     setLibraryOpen(false);
     setShellView('project');
   }, []);
-  const newDoc = useCallback((seedDoc = null, name = 'Nova comunicação') => {
+  const newDoc = useCallback((seedDoc = null, name = 'Nova comunicação', { shellView: nextView = 'project' } = {}) => {
     // Aplica brand ativo no doc novo
     const activeBrand = brandRoster.find(b => b.id === activeBrandId) || brandRoster[0] || DEFAULT_BRAND;
     // Projeto novo = contexto próprio vazio, salvo quando o seed traz contexto.
@@ -172,7 +175,8 @@ export function useLibrary({
     setLibrary(prev => [entry, ...snapshotEntries(prev, snapshot)]);
     setActiveDocId(entry.id);
     setLibraryOpen(false);
-    setShellView('project');
+    setShellView(nextView === 'home' ? 'home' : 'project');
+    return entry;
   }, [brandRoster, activeBrandId]);
   const duplicateDoc = useCallback((docId) => {
     const snapshot = live.current;

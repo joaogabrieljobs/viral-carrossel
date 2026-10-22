@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -52,6 +53,7 @@ test('16:9 → Feed, Quadrado e Stories: foto cheia, texto legível, exportaçã
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const card = id => page.locator(`main [data-vc-card-surface="format-${id}"]`);
   await expect(card(1)).toBeVisible();
   const original = await card(1).locator('h1,h2').first().evaluate(el => ({
@@ -106,6 +108,7 @@ test('16:9 → Feed, Quadrado e Stories: foto cheia, texto legível, exportaçã
     JSON.parse(localStorage.getItem('vc_library') || '[]').find(p => p.id === 'format-switch')?.doc?.fmt
   ))).toBe('stories');
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(card(1).locator('[data-vc-photo-zone] [style*="background-image"]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Apresentação 16:9', exact: true }).click();
   await expect(card(1).locator('h1,h2').first()).toHaveCSS('font-size', original.fontSize);

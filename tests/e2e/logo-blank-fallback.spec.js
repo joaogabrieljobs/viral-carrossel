@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -31,6 +32,7 @@ async function seed(page, { blankBrand = false } = {}) {
     } }]));
   }, { blankBrand });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
 }
 
 const logoAt = (page, id, exportTree = false) => page.locator(exportTree ? '[data-vc-export-tree]' : 'main')
@@ -85,6 +87,7 @@ test('cópia branca vazia recupera a marca no card e no PNG, preservando logos p
   await expect.poll(() => logoColor(logoAt(page, 'custom'))).toEqual([18, 191, 207, 255]);
   await expect.poll(() => logoColor(logoAt(page, 'hidden'))).toEqual([18, 191, 207, 255]);
   await page.reload();
+  await enterEditorFromHome(page);
   await expect.poll(() => logoColor(logoAt(page, 'custom'))).toEqual([18, 191, 207, 255]);
   await page.locator('main [data-vc-card-surface="blank"]').first().screenshot({ path: testInfo.outputPath('logo-no-card.png') });
 });

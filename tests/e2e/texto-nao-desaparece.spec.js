@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // "Ao aumentar o subtítulo ele some da área de exibição": templates e geração
 // gravavam canvas.enabled = true, logo o texto nascia preso numa zona de altura
 // fixa com overflow escondido, sem o utilizador ter ligado composição nenhuma.
@@ -39,11 +40,11 @@ async function prepararCardComSubtituloLongo(page) {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.route('https://api.openai.com/**', (r) => r.fulfill({ status: 401, json: { error: { message: 'e2e' } } }));
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+  await enterEditorFromHome(page);
   await page.waitForTimeout(600);
   await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
   await page.reload();
-  await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 4000 }).catch(() => {});
+  await enterEditorFromHome(page);
   await page.waitForTimeout(600);
 
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });

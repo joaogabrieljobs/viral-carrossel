@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 // "Esse template tá muito encavalado": em caixa alta os acentos (Á, Ã, Ó) sobem
 // acima da altura de capitular, logo leading de 100–110% fazia a linha de baixo
 // tocar a de cima. Verificado card a card em escala 1 (1080×1350).
@@ -29,8 +30,7 @@ const PADROES = [
 
 async function tipografiaDoTitulo(page) {
   return page.evaluate(() => {
-    const cards = [...document.querySelectorAll('div')]
-      .filter((e) => e.style.width === '1080px' && e.style.height === '1350px');
+    const cards = [...document.querySelectorAll('[data-vc-export-tree] [data-vc-card-surface]')];
     for (const card of cards) {
       const h1 = card.querySelector('h1');
       if (!h1 || (h1.textContent || '').trim().length < 12) continue;
@@ -42,7 +42,7 @@ async function tipografiaDoTitulo(page) {
         fonte: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(),
         razaoLinha: +(lh / fs).toFixed(3),
         trackingEm: +(parseFloat(cs.letterSpacing || '0') / fs).toFixed(4),
-        linhas: Math.round(h1.getBoundingClientRect().height / lh),
+        linhas: Math.round(h1.offsetHeight / lh),
       };
     }
     return null;
@@ -54,11 +54,11 @@ test.describe('Linhas do título não se colam', () => {
     test.setTimeout(180_000);
     await mockApi(page, { session: SESSAO_ATIVA });
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true });
+    await enterEditorFromHome(page);
     await page.waitForTimeout(600);
     await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
     await page.reload();
-    await page.getByRole('button', { name: /continuar no editor/i }).click({ force: true, timeout: 2000 }).catch(() => {});
+    await enterEditorFromHome(page);
     await page.waitForTimeout(600);
 
     await page.getByRole('tab', { name: 'Narrativa' }).click({ force: true });

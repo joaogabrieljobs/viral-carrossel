@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -109,8 +110,7 @@ for (const { field, label, tag, key, lines } of [
     await mockApi(page, { session: SESSAO_ATIVA });
     await seedClassicCard(page);
     await page.goto('/?app=1');
-    await page.getByRole('button', { name: /continuar no editor/i })
-      .click({ force: true, timeout: 2500 }).catch(() => {});
+    await enterEditorFromHome(page);
 
     const preview = page.locator(`main ${tag}[data-vc-inline-editable="true"]`);
     const exported = page.locator(`[data-vc-export-tree] ${tag}[data-vc-inline-editable="true"]`);
@@ -131,6 +131,7 @@ for (const { field, label, tag, key, lines } of [
     await expectSeparateRenderedLines(exported, lines, 'Exportação após sair da edição');
 
     await page.reload();
+    await enterEditorFromHome(page);
     await expect(preview).toBeVisible();
     await expect.poll(() => savedField(page, field)).toBe(expected);
     await expectSeparateRenderedLines(preview, lines, 'Preview após recarregar');

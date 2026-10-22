@@ -1,10 +1,11 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React from 'react';
+import React, { useId } from 'react';
 import { Sparkles, Flame, Instagram, Target, Camera } from 'lucide-react';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
 import { GEN_MODES, GEN_MODE_BY_ID } from '../../utils/generation-prompts.js';
 import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
 import { REFERENCE_PROFILES } from '../../utils/brand-visuals.js';
+import { NARRATIVE_CHOICES } from '../../utils/create-project-flow.js';
 
 /** Sugestões de voz de referência por modo narrativo (opcional — serve de guia, não de regra fixa). */
 const NARRATIVE_MODE_REF_VOICE_PAIRING = {
@@ -22,83 +23,64 @@ const NARRATIVE_MODE_REF_VOICE_PAIRING = {
 // Seletor visual dos modos narrativos. Cada card mostra ícone + nome + 1-line
 // descrição. Selecionado tem borda accent e background glow.
 function ModePicker({ value, onChange }) {
-  const active = GEN_MODE_BY_ID[value] || GEN_MODES[0];
+  const labelId = useId();
+  const selected = NARRATIVE_CHOICES.find((choice) => choice.id === value) || NARRATIVE_CHOICES[0];
+  const ActiveIcon = GEN_MODE_BY_ID[selected.id]?.Icon || Sparkles;
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-        <label className="vc-label" style={{ marginBottom:0 }}>
-          Modo narrativo
-        </label>
-        <span style={{
-          fontSize:10, color:'var(--text-muted)',
-          fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
-        }}>
-          {GEN_MODES.length} modos
-        </span>
-      </div>
-      <div style={{
-        display:'grid',
-        gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))',
-        gap:6,
-      }}>
-        {GEN_MODES.map(m => {
-          const on = value === m.id;
+      <div id={labelId} className="vc-label" style={{ marginBottom: 4 }}>Como organizar o conteúdo?</div>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Escolha o que você quer provocar em quem lê. Cada opção organiza a sequência de um jeito.
+      </p>
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}
+      >
+        {NARRATIVE_CHOICES.map((choice) => {
+          const on = selected.id === choice.id;
+          const Icon = GEN_MODE_BY_ID[choice.id]?.Icon || Sparkles;
           return (
             <button
-              key={m.id}
+              key={choice.id}
               type="button"
-              onClick={() => onChange(m.id)}
+              onClick={() => onChange(choice.id)}
+              aria-pressed={on}
+              aria-label={choice.label}
+              aria-describedby={`${labelId}-${choice.id}-description`}
               style={{
-                padding:'10px 10px 9px', borderRadius:10, cursor:'pointer', textAlign:'left',
-                border:`1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                padding: '12px', borderRadius: 11, cursor: 'pointer', textAlign: 'left',
+                border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
                 background: on ? 'var(--accent-surface-strong)' : 'var(--bg-card)',
-                transition:'all 0.12s',
-                display:'flex', flexDirection:'column', gap:3, minHeight:60,
+                transition: 'background-color .12s, border-color .12s',
+                display: 'flex', flexDirection: 'column', gap: 7, minHeight: 88,
               }}
-              aria-label={m.desc} title={m.desc}
             >
-              <div style={{
-                fontSize:13, fontWeight:600, fontFamily:'var(--font-ui)',
+              <span style={{
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
                 color: on ? 'var(--accent)' : 'var(--text-primary)',
-                letterSpacing:'-0.011em',
-                display:'flex', alignItems:'center', gap:8,
+                letterSpacing: '-.011em', display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <m.Icon
-                  size={17}
-                  strokeWidth={2}
-                  aria-hidden
-                  style={{
-                    flexShrink:0,
-                    color: on ? 'var(--accent)' : 'var(--text-secondary)',
-                  }}
-                />
-                {genModeUiLabel(m.id, m.label)}
-              </div>
-              <div style={{
-                fontSize:10.5, color:'var(--text-muted)', lineHeight:1.4,
-                fontFamily:'var(--font-ui)',
-              }}>{m.desc}</div>
+                <Icon size={17} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />
+                {choice.label}
+              </span>
+              <span id={`${labelId}-${choice.id}-description`} style={{
+                fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5, fontFamily: 'var(--font-ui)',
+              }}>{choice.desc}</span>
             </button>
           );
         })}
       </div>
-      {/* Resumo do modo selecionado — preview do que será injetado */}
-      <div style={{
-        marginTop:8, fontSize:10.5, color:'var(--text-muted)',
-        fontFamily:'var(--font-ui)', lineHeight:1.5,
-        padding:'7px 10px', background:'var(--bg-card)',
-        border:'1px dashed var(--border)', borderRadius:8,
-        display:'flex', alignItems:'flex-start', gap:8,
+      <div role="status" style={{
+        marginTop: 12, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.5,
+        padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 11,
+        display: 'flex', alignItems: 'flex-start', gap: 9,
       }}>
-        <active.Icon
-          size={16}
-          strokeWidth={2}
-          aria-hidden
-          style={{ flexShrink:0, marginTop:1, color:'var(--accent)' }}
-        />
+        <ActiveIcon size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: 'var(--accent)' }} />
         <span>
-          <span style={{ color:'var(--text-secondary)', fontWeight:600 }}>{active.label}: </span>
-          {active.desc}.
+          <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: 4 }}>{selected.label}</strong>
+          <span style={{ display: 'block' }}>{selected.desc}</span>
+          {selected.example && <span style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)' }}>Exemplo: {selected.example}</span>}
         </span>
       </div>
     </div>
@@ -134,7 +116,7 @@ function ReferenceProfilesCuradoria({ material, setMaterial }) {
                 style={{ flexShrink:0, marginTop:2, color:'var(--text-secondary)' }}
               />
               <span>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{genModeUiLabel(m.id, m.label)}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{NARRATIVE_CHOICES.find((choice) => choice.id === m.id)?.label || genModeUiLabel(m.id, m.label)}</span>
                 {' — '}
                 {NARRATIVE_MODE_REF_VOICE_PAIRING[m.id]}
               </span>

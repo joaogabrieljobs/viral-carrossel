@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -40,8 +41,7 @@ async function openProject(page, width = 1680, photoRegion = 'full') {
     }]));
   }, { projectId: PROJECT_ID, cardIds: [FIRST_CARD, SECOND_CARD], photoRegion });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i })
-    .click({ force: true, timeout: 2500 }).catch(() => {});
+  await enterEditorFromHome(page);
   await expect(surface(page, FIRST_CARD)).toBeVisible();
 }
 
@@ -120,6 +120,7 @@ test('Control + clique cria no segundo card e preserva as linhas no preview, exp
   await expectTwoLines(textArea(page, SECOND_CARD, true), 'IDEIA\nCLARA');
 
   await page.reload();
+  await enterEditorFromHome(page);
   await expectTwoLines(textArea(page, SECOND_CARD), 'IDEIA\nCLARA');
   await expectTwoLines(textArea(page, SECOND_CARD, true), 'IDEIA\nCLARA');
   const reloaded = await savedSlides(page);

@@ -1,3 +1,4 @@
+import { openProjectLibrary, createTextProject } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -108,10 +109,9 @@ async function mockAccount(page, { rejectPut = false } = {}) {
 
 async function createProject(page) {
   await page.goto('/?app=1');
-  await expect(page.getByText('Projeto A', { exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Nova comunicação', exact: true }).click();
-  await page.getByRole('textbox', { name:'Como se chama este projeto?' }).fill('Projeto sem IDB');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+  await openProjectLibrary(page);
+  await expect(page.getByRole('button', { name:'Abrir Projeto A', exact:true }).first()).toBeVisible();
+  await createTextProject(page, { name:'Projeto sem IDB' });
 }
 
 test('IndexedDB indisponível: Salvar confirma PUT direto e não reenvia sem edição', async ({ page }) => {

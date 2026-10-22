@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -35,6 +36,7 @@ test('native evidence stays editable, survives reload and exports with the same 
     } }]));
   });
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   const card = page.locator('main [data-vc-card-surface="native-1"]');
   await expect(card.getByRole('table', { name: 'Comparação' })).toBeVisible();
   await expect(card.locator('[data-vc-photo-zone]')).toHaveCount(0);
@@ -46,6 +48,7 @@ test('native evidence stays editable, survives reload and exports with the same 
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library') || '[]')
     .find(p => p.id === 'native-evidence')?.doc?.slides?.[0]?.presentationBlocks?.[0]?.rows?.[0]?.[1])).toBe('US$ 365/ano · primeiro ano');
   await page.reload();
+  await enterEditorFromHome(page);
   await expect(card).toContainText('US$ 365/ano · primeiro ano');
   // The logo lives in a square contain box; only its measured ink occupies
   // space. Wait for the wordmark to load before comparing actual visible ink.

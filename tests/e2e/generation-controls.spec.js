@@ -13,10 +13,14 @@ const doc = page => page.evaluate(() => {
   const lib = JSON.parse(localStorage.getItem('vc_library') || '[]');
   return (lib.find(e => e.id === localStorage.getItem('vc_active_doc_id')) || lib[0])?.doc;
 });
+async function enterSavedProject(page) {
+  await page.getByRole('button', { name: 'Abrir um projeto', exact: true }).click();
+  await page.getByRole('button', { name: 'Abrir Carrossel', exact: true }).first().click();
+}
 async function openEditor(page, extra) {
   await mockApi(page, { session, extra });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterSavedProject(page);
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
 }
 async function openPanel(page, label) {
@@ -83,7 +87,7 @@ test('analisar meu tom usa somente IA de texto e não inicia carrossel', async (
     },
   });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterSavedProject(page);
   const before = await doc(page);
   await page.getByRole('button', { name: /Usar publicações para extrair o DNA/i }).click();
   await page.getByLabel('Links do perfil e das publicações').fill('https://instagram.com/musa.exemplo');
@@ -138,7 +142,7 @@ test('objetivo do Criar rápido aplica e persiste o modo narrativo sugerido', as
     },
   });
   await page.goto('/?app=1');
-  await page.getByRole('button', { name: /continuar no editor/i }).click();
+  await enterSavedProject(page);
   await page.getByRole('button', { name: 'Educar', exact: true }).click();
   await expect(page.getByLabel('Pedido para gerar carrossel', { exact: true })).toHaveValue(/carrossel educativo/i);
   await expect.poll(async () => (await doc(page))?.quickNarrativeMode).toBe('how_to');
@@ -246,6 +250,7 @@ test('prompt tem modos persistidos, Nenhum não impõe método e só texto não 
   expect(prompts[2]).toContain('MÉTODO STORYTELLING');
   await expect.poll(async () => (await doc(page))?.quickNarrativeMode).toBe('storytelling');
   await page.reload();
+  await enterSavedProject(page);
   await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
   await openPanel(page, /PROMPT PARA GERAR/i);
   await expect(modes).toHaveValue('storytelling');
@@ -411,6 +416,7 @@ test('logo PNG transparente pertence só ao card escolhido e volta no reload/bac
   });
   expect(alpha).toBe(0);
   await page.reload();
+  await enterSavedProject(page);
   await cardLogo(page);
   await expect(page.getByRole('img', { name: 'Logo deste card', exact: true })).toBeVisible();
   await expect(page.getByLabel('Posição da logo neste card')).toHaveValue('bl');
@@ -479,6 +485,7 @@ test('Prender atenção recupera títulos ausentes dos cards 3–5 sem perder te
   await expect(fourth.locator('[data-vc-italic]')).toHaveText('porta de entrada de verdade');
   await expect(fourth).not.toContainText('*');
   await page.reload();
+  await enterSavedProject(page);
   await expect.poll(async () => (await doc(page))?.slides.slice(2).map(slide => slide.title)).toEqual(saved.slides.slice(2).map(slide => slide.title));
   await expect(fourth.locator('[data-vc-italic]')).toHaveText('porta de entrada de verdade');
   expect(prompts).toHaveLength(2);

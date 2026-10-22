@@ -1,3 +1,4 @@
+import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -73,6 +74,7 @@ test('exportação real preserva logo escura e transparência no PNG', async ({ 
   test.setTimeout(90_000);
   await seedLogoCard(page, 'dark');
   await page.goto('/?app=1');
+  await enterEditorFromHome(page);
   await expect(page.locator('[data-vc-export-tree] img[data-vc-logo-tone="dark"]')).toHaveCount(1);
   const pixels = await exportLogoPixel(page, testInfo);
   expect(pixels.width).toBe(3240);
@@ -86,14 +88,16 @@ test('exportação real preserva logo escura e transparência no PNG', async ({ 
   expect(pixels.clear[2]).toBeGreaterThan(140);
 });
 
-test('sem escolha de tom a logo original permanece branca no PNG', async ({ page }, testInfo) => {
+test('sem escolha de tom a logo branca ganha contraste no fundo claro do PNG', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await seedLogoCard(page, 'original');
   await page.goto('/?app=1');
-  await expect(page.locator('[data-vc-export-tree] img[data-vc-logo-tone]')).toHaveCount(0);
+  await enterEditorFromHome(page);
+  await expect(page.locator('[data-vc-export-tree] img[data-vc-logo-tone="dark"]')).toHaveCount(1);
   const pixels = await exportLogoPixel(page, testInfo);
-  expect(pixels.center.slice(0, 3).every(channel => channel > 235)).toBe(true);
-  expect(pixels.halfAlpha[0]).toBeGreaterThan(235);
+  expect(pixels.center.slice(0, 3).every(channel => channel < 20)).toBe(true);
+  expect(pixels.halfAlpha[0]).toBeGreaterThan(80);
+  expect(pixels.halfAlpha[0]).toBeLessThan(170);
   expect(pixels.clear[0]).toBeGreaterThan(200);
   expect(pixels.clear[1]).toBeGreaterThan(180);
   expect(pixels.clear[2]).toBeGreaterThan(140);

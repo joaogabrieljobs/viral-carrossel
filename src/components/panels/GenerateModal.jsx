@@ -806,19 +806,6 @@ function GenerateModal({
               densidade de texto e estilo da foto. Tudo o que afeta a aparência. */}
           {step === 2 && (
             <>
-              {/* Padrão visual: 12 opções selecionadas a partir de referências
-                  reais (NBA editorial, case study neon, luxury, viral hype...).
-                  Altera APENAS cores, fontes e tipografia; não muda o pacote
-                  criativo nem o leiaute dos slides. */}
-              <VisualStylePicker
-                value={visualPreset}
-                onChange={setVisualPresetLocal}
-                presets={availableVisualPresets}
-                title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha um padrão de comunicação 4:5'}
-                suggestedId={isPresentation ? selectedPresentationPath.suggestedVisualPreset : null}
-                aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}
-              />
-
               {/* Quantidade de cards ou slides. */}
               <div>
                 <div className="vc-label" id="generation-card-count-label">
@@ -875,6 +862,19 @@ function GenerateModal({
                   Use Outro para qualquer quantidade entre 1 e 24.
                 </p>
               </div>
+
+              {/* Padrão visual: 12 opções selecionadas a partir de referências
+                  reais (NBA editorial, case study neon, luxury, viral hype...).
+                  Altera APENAS cores, fontes e tipografia; não muda o pacote
+                  criativo nem o leiaute dos slides. */}
+              <VisualStylePicker
+                value={visualPreset}
+                onChange={setVisualPresetLocal}
+                presets={availableVisualPresets}
+                title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha um padrão de comunicação 4:5'}
+                suggestedId={isPresentation ? selectedPresentationPath.suggestedVisualPreset : null}
+                aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}
+              />
 
               {/* Densidade de texto com rótulos amigáveis. O identificador interno
                   permanece para manter a compatibilidade com documentos salvos. */}
