@@ -94,6 +94,41 @@ test('brand scope is explicit and read-only design omits text by default', async
   });
 });
 
+test('text edit requires preview, preserves one plan and can be undone with the generic tool', async () => {
+  const calls = { previews: [], applies: [], undos: [] };
+  const client = {
+    async getProject() {
+      return { ok: true, project: { id: 'p', version: 4, name: 'Projeto', caption: 'Legenda', slides: [{ id: 's1', title: 'Antes', subtitle: 'Apoio' }] } };
+    },
+    async getContentSchema() { return { ok: true, schema: { slideEdits: {} } }; },
+    async previewText(input) {
+      calls.previews.push(input);
+      return { ok: true, changedSlideCount: 1, changes: [{ slideId: 's1', fields: { title: { before: 'Antes', after: 'Depois' } } }] };
+    },
+    async applyText(input) {
+      calls.applies.push(input);
+      return { ok: true, job: { projectId: input.projectId, requestId: input.requestId, status: 'applied', beforeVersion: 4, afterVersion: 5 } };
+    },
+    async undo(input) {
+      calls.undos.push(input);
+      return { ok: true, job: { requestId: input.requestId, status: 'undone' } };
+    },
+  };
+  await withTools(client, async tools => {
+    assert.equal((await tools.invoke('get_project_content', { projectId: 'p' })).project.slides[0].title, 'Antes');
+    assert.ok((await tools.invoke('get_content_schema', {})).schema.slideEdits);
+    const preview = await tools.invoke('preview_text_edit', { projectId: 'p', patch: { slideEdits: [{ slideId: 's1', title: 'Depois' }] } });
+    assert.equal(preview.changedSlideCount, 1);
+    const applied = await tools.invoke('apply_text_edit', { planId: preview.planId });
+    assert.equal(applied.status, 'applied');
+    await tools.invoke('apply_text_edit', { planId: preview.planId });
+    assert.equal(calls.applies.length, 1);
+    const undone = await tools.invoke('undo_project_change', { planId: preview.planId });
+    assert.equal(undone.status, 'undone');
+    assert.equal(calls.undos.length, 1);
+  });
+});
+
 test('undo uses idempotent IDs and stops on a version conflict', async () => {
   const calls = [];
   const client = {

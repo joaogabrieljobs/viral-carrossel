@@ -3,10 +3,11 @@ import { applyCors } from './lib/cors.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import { authenticateAgentRequest } from './lib/agent-token-store.js';
 import {
-  applyAgentVisualBatch, getAgentProject, getAgentVisualJob,
-  listAgentProjects, previewAgentVisualBatch, undoAgentVisualBatch,
+  applyAgentTextEdit, applyAgentVisualBatch, getAgentProject, getAgentVisualJob,
+  listAgentProjects, previewAgentTextEdit, previewAgentVisualBatch, undoAgentVisualBatch,
 } from './lib/agent-visual-batch.js';
 import { VISUAL_PATCH_SCHEMA } from './lib/visual-patch.js';
+import { CONTENT_PATCH_SCHEMA } from './lib/content-patch.js';
 
 export const config = { maxDuration: 60 };
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -66,7 +67,8 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && (!body || typeof body !== 'object' || Array.isArray(body))) {
       return res.status(400).json({ error: 'JSON inválido.', code: 'visual_body_invalid' });
     }
-    const scope = req.method === 'POST' && body.action !== 'preview' ? 'projects:write' : 'projects:read';
+    const previewActions = new Set(['preview', 'preview_text']);
+    const scope = req.method === 'POST' && !previewActions.has(body.action) ? 'projects:write' : 'projects:read';
     const agent = await authenticateAgentRequest(req, { scope });
     const byAccount = await consumeRateLimit(req, {
       limit: 120, windowMs: 60_000, keyPrefix: 'agent-visual-account', subject: agent.tokenId,
@@ -76,6 +78,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const op = req.query?.op || 'projects';
       if (op === 'schema') return res.status(200).json({ ok: true, schema: VISUAL_PATCH_SCHEMA });
+      if (op === 'content_schema') return res.status(200).json({ ok: true, schema: CONTENT_PATCH_SCHEMA });
       if (op === 'projects') {
         const rawLimit = req.query?.limit;
         const limit = rawLimit == null ? 25 : Number(rawLimit);
@@ -100,6 +103,14 @@ export default async function handler(req, res) {
     }
     if (body.action === 'apply') {
       const job = await applyAgentVisualBatch(agent.ownerId, agent.tokenId, body);
+      return res.status(200).json({ ok: true, job });
+    }
+    if (body.action === 'preview_text') {
+      const result = await previewAgentTextEdit(agent.ownerId, body);
+      return res.status(200).json({ ok: true, ...result });
+    }
+    if (body.action === 'apply_text') {
+      const job = await applyAgentTextEdit(agent.ownerId, agent.tokenId, body);
       return res.status(200).json({ ok: true, job });
     }
     if (body.action === 'undo') {

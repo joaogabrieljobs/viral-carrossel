@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { getPostgresConnection } from './postgres-connection.js';
 import { getAccountProject, listAccountProjects } from './library-sync-postgres.js';
 import { applyVisualPatchToEntry, projectDesignView } from './visual-patch.js';
+import { applyContentPatchToEntry } from './content-patch.js';
 
 const PROJECT_ID = /^[^\u0000]{1,500}$/;
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
@@ -137,6 +138,23 @@ export async function previewAgentVisualBatch(ownerValue, input) {
   };
 }
 
+export async function previewAgentTextEdit(ownerValue, input) {
+  const project = await getAccountProject(ownerId(ownerValue), projectId(input?.projectId));
+  if (!project || project.deleted) fail(404, 'content_project_not_found', 'Projeto não encontrado.');
+  const base = version(input?.baseVersion);
+  if (project.version !== base) {
+    fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: project.version });
+  }
+  const result = applyContentPatchToEntry(project.entry, input.patch);
+  return {
+    projectId: project.id,
+    baseVersion: base,
+    changedSlideCount: result.changedSlideCount,
+    changes: result.changes,
+    projectChanges: result.projectChanges,
+  };
+}
+
 export async function getAgentVisualJob(ownerValue, idValue) {
   const owner = ownerId(ownerValue);
   const id = requestId(idValue);
@@ -231,6 +249,52 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
          undo_request_id, undo_version`,
       [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
         result.changes.length, JSON.stringify(result.brandChanges), JSON.stringify(snapshotForUndo(row.entry))],
+    );
+    return safeJob(jobs[0]);
+  });
+}
+
+export async function applyAgentTextEdit(ownerValue, tokenId, input) {
+  const owner = ownerId(ownerValue);
+  const { id, base, rid } = validateApplyInput(input);
+  if (typeof tokenId !== 'string' || !tokenId) fail(401, 'agent_token_invalid', 'Credencial inválida.');
+  const hash = requestHash({ kind: 'content', projectId: id, baseVersion: base, patch: input.patch });
+  await getAccountProject(owner, id);
+  return getPostgresConnection().begin(async tx => {
+    await forgetExpiredVisualJobs(tx, owner);
+    const row = await lockAccountAndProject(tx, owner, id);
+    const existing = await tx.unsafe(
+      `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
+    );
+    if (existing[0]) {
+      if (existing[0].request_hash !== hash || existing[0].project_id !== id) {
+        fail(409, 'content_request_reused', 'requestId já usado para outra alteração.');
+      }
+      return safeJob(existing[0]);
+    }
+    const currentVersion = Number(row.version);
+    if (currentVersion !== base) {
+      fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
+    }
+    const result = applyContentPatchToEntry(row.entry, input.patch);
+    const changed = result.changedSlideCount > 0 || Object.keys(result.projectChanges).length > 0;
+    const afterVersion = changed
+      ? await updateProject(tx, owner, id, result.entry, currentVersion, Date.now())
+      : currentVersion;
+    const changedFields = [
+      ...Object.keys(result.projectChanges),
+      ...new Set(result.changes.flatMap(change => Object.keys(change.fields))),
+    ];
+    const jobs = await tx.unsafe(
+      `INSERT INTO moont.agent_visual_jobs
+       (owner_id, request_id, project_id, token_id, request_hash, before_version,
+        after_version, changed_slide_count, changed_brand_fields, before_entry)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
+       RETURNING request_id, project_id, status, before_version, after_version,
+         changed_slide_count, changed_brand_fields, created_at, undone_at,
+         undo_request_id, undo_version`,
+      [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
+        result.changedSlideCount, JSON.stringify(changedFields), JSON.stringify(snapshotForUndo(row.entry))],
     );
     return safeJob(jobs[0]);
   });

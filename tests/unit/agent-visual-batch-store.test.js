@@ -8,7 +8,8 @@ vi.mock('../../api/lib/library-sync-postgres.js', () => ({
 }));
 
 import {
-  applyAgentVisualBatch, getAgentVisualJob, previewAgentVisualBatch, undoAgentVisualBatch,
+  applyAgentTextEdit, applyAgentVisualBatch, getAgentVisualJob,
+  previewAgentTextEdit, previewAgentVisualBatch, undoAgentVisualBatch,
 } from '../../api/lib/agent-visual-batch.js';
 
 const clone = value => structuredClone(value);
@@ -108,6 +109,26 @@ const applyInput = (requestId = 'janine-batch-01', patch = { titleSize: 112 }) =
 });
 
 describe('agent visual batch store', () => {
+  it('pré-visualiza, aplica e desfaz texto preservando visual e mídia', async () => {
+    const before = clone(rows.get(owner).get(id).entry);
+    const patch = { slideEdits: [{ slideId: 's1', title: 'Título revisado' }], caption: 'Legenda revisada' };
+    const preview = await previewAgentTextEdit(owner, { projectId: id, baseVersion: 4, patch });
+    expect(preview).toMatchObject({ changedSlideCount: 1, projectChanges: { caption: expect.any(Object) } });
+    const applied = await applyAgentTextEdit(owner, tokenId, {
+      projectId: id, baseVersion: 4, requestId: 'janine-text-01', patch,
+    });
+    expect(applied).toMatchObject({ status: 'applied', beforeVersion: 4, afterVersion: 5, changedSlideCount: 1 });
+    const after = rows.get(owner).get(id).entry;
+    expect(after.doc.slides[0]).toMatchObject({ title: 'Título revisado', bgImageAssetId: 'photo-1', titleSize: 100 });
+    expect(after.doc.slides[0].subtitle).toBe(before.doc.slides[0].subtitle);
+    expect(after.doc.caption).toBe('Legenda revisada');
+    await undoAgentVisualBatch(owner, { requestId: 'janine-text-01', undoRequestId: 'janine-text-undo-01' });
+    const restored = rows.get(owner).get(id).entry;
+    expect(restored.doc).toEqual(before.doc);
+    expect(restored.name).toBe(before.name);
+    expect(restored.updatedAt).toBeGreaterThan(before.updatedAt);
+  });
+
   it('aplica todos os cards sem regravar texto, fotos, logo ou legenda; replay é idempotente', async () => {
     const before = clone(rows.get(owner).get(id).entry);
     const first = await applyAgentVisualBatch(owner, tokenId, applyInput());

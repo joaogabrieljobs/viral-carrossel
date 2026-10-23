@@ -33,8 +33,8 @@ async function dispatch(message) {
         result = {
           protocolVersion: supportedVersions.has(params.protocolVersion) ? params.protocolVersion : '2025-06-18',
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'moont', version: '0.1.4' },
-          instructions: 'Consulte get_visual_schema. Faça preview_visual_batch antes de apply_visual_batch. O plugin edita visual e pode copiar explicitamente um CTA existente com copyCtaFrom; outros textos e fotos são preservados.',
+          serverInfo: { name: 'moont', version: '0.2.0' },
+          instructions: 'Para design, consulte get_visual_schema e use preview_visual_batch antes de apply_visual_batch. Para texto, consulte get_content_schema e use preview_text_edit antes de apply_text_edit. Use undo_project_change para reverter. Fotos e logos são preservados.',
         };
         break;
       case 'ping':

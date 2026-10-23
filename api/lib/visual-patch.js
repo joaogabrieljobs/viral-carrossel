@@ -362,9 +362,9 @@ export function applyVisualPatchToEntry(entry, rawPatch, slideIds, { brandScope 
 export function projectDesignView(project, { includeText = false } = {}) {
   const entry = project?.entry || {};
   const doc = entry.doc || {};
-  const safeText = value => {
+  const safeText = (value, maxLength = 500) => {
     if (typeof value !== 'string') return '';
-    return value.replace(/data:[^\s"']+/gi, '[mídia]').slice(0, 500);
+    return value.replace(/data:[^\s"']+/gi, '[mídia]').slice(0, maxLength);
   };
   const safeValue = (key, value) => {
     if (key === 'canvas') {
@@ -405,20 +405,23 @@ export function projectDesignView(project, { includeText = false } = {}) {
     .filter(([, value]) => value !== undefined));
   const brand = record(doc.brand) ? pickVisual(doc.brand, BRAND_VISUAL_FIELDS) : {};
   return {
-    id: project.id, version: project.version, name: safeText(entry.name || entry.title),
+    id: project.id, version: project.version, name: safeText(entry.name || entry.title, 160),
+    ...(includeText ? { caption: safeText(doc.caption, 10000) } : {}),
     slideCount: Array.isArray(doc.slides) ? doc.slides.length : 0,
     brand,
     slides: (Array.isArray(doc.slides) ? doc.slides : []).map((slide, index) => ({
       id: safeText(slide.id), index,
       ...(includeText ? {
-        title: safeText(slide.title),
-        subtitle: safeText(slide.subtitle),
-        bodyAfterImage: safeText(slide.bodyAfterImage),
+        title: safeText(slide.title, 500),
+        subtitle: safeText(slide.subtitle, 4000),
+        bodyAfterImage: safeText(slide.bodyAfterImage, 6000),
+        caption: safeText(slide.caption, 8000),
+        imageQuery: safeText(slide.imageQuery, 1000),
       } : {}),
       visual: pickVisual(slide, SLIDE_VISUAL_FIELDS),
       overlays: Array.isArray(slide.overlays) ? slide.overlays.map(overlay => ({
         id: safeText(overlay.id), type: safeText(overlay.type),
-        ...(includeText ? { text: safeText(overlay.text) } : {}),
+        ...(includeText ? { text: safeText(overlay.text, 2000) } : {}),
         visual: pickVisual(overlay, OVERLAY_STYLE_FIELDS),
       })) : [],
       hasPhoto: Boolean(slide.bgImageAssetId || slide.bgImageId || slide.bgImage),

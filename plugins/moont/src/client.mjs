@@ -158,6 +158,10 @@ export class MoontApiClient {
     return this.request('GET', { op: 'schema' });
   }
 
+  getContentSchema() {
+    return this.request('GET', { op: 'content_schema' });
+  }
+
   getJob(requestId) {
     return this.request('GET', { op: 'job', requestId });
   }
@@ -168,6 +172,14 @@ export class MoontApiClient {
 
   apply({ projectId, baseVersion, slideIds, patch, brandScope, requestId }) {
     return this.request('POST', {}, { action: 'apply', projectId, baseVersion, slideIds, patch, brandScope, requestId });
+  }
+
+  previewText({ projectId, baseVersion, patch }) {
+    return this.request('POST', {}, { action: 'preview_text', projectId, baseVersion, patch });
+  }
+
+  applyText({ projectId, baseVersion, patch, requestId }) {
+    return this.request('POST', {}, { action: 'apply_text', projectId, baseVersion, patch, requestId });
   }
 
   undo({ requestId, undoRequestId }) {

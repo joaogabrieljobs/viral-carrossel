@@ -36,9 +36,54 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'get_project_content',
+    description: 'Lê todos os textos editáveis, IDs dos cards e áreas de texto, além da versão atual. Não retorna bytes de fotos, logos ou referências.',
+    inputSchema: {
+      type: 'object', properties: { projectId: { type: 'string' } },
+      required: ['projectId'], additionalProperties: false,
+    },
+  },
+  {
     name: 'get_visual_schema',
     description: 'Mostra os campos visuais aceitos pelo Moont, tipos e faixas. Consulte antes de preparar uma alteração.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'get_content_schema',
+    description: 'Mostra os campos de texto aceitos, limites e regras de preservação. Consulte antes de editar conteúdo.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'preview_text_edit',
+    description: 'Cria uma prévia de edição textual em um projeto. Pode editar nome, legenda, títulos, apoios, texto inferior, direção de imagem e texto de áreas adicionais. Não altera o projeto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string' },
+        patch: { ...objectSchema, description: 'Patch conforme get_content_schema.' },
+      },
+      required: ['projectId', 'patch'], additionalProperties: false,
+    },
+  },
+  {
+    name: 'apply_text_edit',
+    description: 'Aplica exatamente uma prévia textual. Usa versão e requestId idempotente; se o projeto mudou, exige nova leitura e prévia.',
+    inputSchema: {
+      type: 'object', properties: { planId: { type: 'string' } },
+      required: ['planId'], additionalProperties: false,
+    },
+  },
+  {
+    name: 'undo_project_change',
+    description: 'Desfaz uma alteração visual ou textual aplicada pelo MCP, se o projeto ainda estiver na versão produzida por ela.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        planId: { type: 'string' }, requestIds: { type: 'array', items: { type: 'string' } },
+        resumeUndoPlanId: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'preview_visual_batch',
@@ -247,6 +292,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
       const projectIds = await projectIdsFor(args);
       if (projectIds.length === 0) throw new MoontApiError('Nenhum projeto foi selecionado.', { code: 'empty_selection' });
       plan = {
+        kind: 'visual',
         planId: randomUUID(),
         createdAt: new Date().toISOString(),
         status: 'previewing',
@@ -327,6 +373,7 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
     const planId = requireString(args.planId, 'planId');
     const plan = await plans.get(planId);
     if (!plan) throw new MoontApiError('Prévia não encontrada nesta sessão do plugin. Gere uma nova prévia.', { code: 'preview_not_found' });
+    if (plan.kind && plan.kind !== 'visual') throw new MoontApiError('Esta prévia é de texto. Use apply_text_edit.', { code: 'preview_kind_invalid' });
     if (plan.status !== 'previewed' && plan.status !== 'applying' && plan.status !== 'applied') {
       throw new MoontApiError('A prévia ainda está incompleta. Retome-a antes de aplicar.', { code: 'preview_incomplete' });
     }
@@ -411,6 +458,47 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
     return { ok: true, status: 'applied', planId, appliedCount: results.length, applied: resultPage.items, nextOffset: resultPage.nextOffset };
   }
 
+  async function previewTextEdit(args) {
+    const projectId = requireString(args.projectId, 'projectId');
+    const patch = requirePlainObject(args.patch, 'patch');
+    if (!Object.keys(patch).length) throw new MoontApiError('A mudança de texto está vazia.', { code: 'empty_patch' });
+    const detail = await client.getProject(projectId, { includeText: true });
+    const project = detail.project;
+    if (!project || project.version === undefined) throw new MoontApiError('O projeto veio sem versão.', { code: 'invalid_response' });
+    const preview = await client.previewText({ projectId, baseVersion: project.version, patch });
+    const plan = {
+      kind: 'content', planId: randomUUID(), createdAt: new Date().toISOString(), status: 'previewed',
+      projectIds: [projectId], patch: structuredClone(patch), items: [{
+        projectId, name: project.name, baseVersion: project.version, preview,
+        requestId: `moont:${randomUUID()}`, result: null,
+      }],
+    };
+    await plans.set(plan.planId, plan);
+    return {
+      ok: true, status: 'previewed', planId: plan.planId, projectId,
+      changedSlideCount: preview.changedSlideCount || 0,
+      changes: preview.changes || [], projectChanges: preview.projectChanges || {},
+      instruction: 'Revise a prévia e aplique com apply_text_edit({planId}). O Moont recusará se o projeto mudar.',
+    };
+  }
+
+  async function applyTextEdit(args) {
+    const planId = requireString(args.planId, 'planId');
+    const plan = await plans.get(planId);
+    if (!plan) throw new MoontApiError('Prévia textual não encontrada. Gere uma nova prévia.', { code: 'preview_not_found' });
+    if (plan.kind !== 'content') throw new MoontApiError('Esta prévia é visual. Use apply_visual_batch.', { code: 'preview_kind_invalid' });
+    const item = plan.items?.[0];
+    if (!item) throw new MoontApiError('Prévia textual incompleta.', { code: 'preview_incomplete' });
+    if (item.result?.status === 'applied') return { ok: true, status: 'applied', planId, job: item.result };
+    const response = await client.applyText({
+      projectId: item.projectId, baseVersion: item.baseVersion, patch: plan.patch, requestId: item.requestId,
+    });
+    item.result = response.job || { projectId: item.projectId, requestId: item.requestId, status: 'applied' };
+    plan.status = 'applied';
+    await plans.set(planId, plan);
+    return { ok: true, status: 'applied', planId, job: item.result };
+  }
+
   async function undoRequestIds(args) {
     if (args.planId !== undefined && args.requestIds !== undefined) {
       throw new MoontApiError('Use planId ou requestIds, não ambos.', { code: 'invalid_selection' });
@@ -464,8 +552,18 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
             })),
           } };
         }
+        case 'get_project_content': {
+          const projectId = requireString(args.projectId, 'projectId');
+          return client.getProject(projectId, { includeText: true });
+        }
         case 'get_visual_schema':
           return client.getVisualSchema();
+        case 'get_content_schema':
+          return client.getContentSchema();
+        case 'preview_text_edit':
+          return previewTextEdit(args);
+        case 'apply_text_edit':
+          return applyTextEdit(args);
         case 'preview_visual_batch':
           return previewBatch(args);
         case 'apply_visual_batch':
@@ -505,7 +603,8 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
           }
           return { ok: true, total: page.total, offset: page.offset, nextOffset: page.nextOffset, jobs };
         }
-        case 'undo_visual_batch': {
+        case 'undo_visual_batch':
+        case 'undo_project_change': {
           const startedAt = Date.now();
           let undoPlan;
           if (args.resumeUndoPlanId !== undefined) {

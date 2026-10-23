@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "moont",
-  "version": "0.1.4",
-  "description": "Inspecione projetos do Moont e aplique ajustes visuais em lote com prévia e reversão.",
+  "version": "0.2.0",
+  "description": "Inspecione projetos do Moont e edite design ou conteúdo com prévia, controle de versão e reversão.",
   "author": {
     "name": "Moont"
   },
@@ -13,15 +13,16 @@
       "onboardingSkill": "./skills/setup/SKILL.md",
       "interface": {
         "displayName": "Moont",
-        "shortDescription": "Ajustes visuais em lote nos projetos Moont",
-        "longDescription": "Leia projetos e cards, confira uma prévia e aplique ou reverta ajustes visuais em lote. Textos e imagens não são editáveis por este plugin.",
+        "shortDescription": "Edite design e conteúdo dos projetos Moont",
+        "longDescription": "Leia projetos e cards, confira uma prévia e aplique ou reverta ajustes visuais em lote e edições de texto. Fotos e logos permanecem protegidos.",
         "developerName": "Moont",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],
         "websiteURL": "https://moont.ai",
         "defaultPrompt": [
           "Mostre meus projetos do Moont.",
-          "Pré-visualize ajustes de layout em todos os cards deste projeto antes de aplicar."
+          "Pré-visualize ajustes de layout em todos os cards deste projeto antes de aplicar.",
+          "Revise os títulos e textos deste projeto e mostre a prévia antes de alterar."
         ],
         "brandColor": "#7567F8"
       }

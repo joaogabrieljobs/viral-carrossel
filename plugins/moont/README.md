@@ -1,6 +1,6 @@
 # Moont no Codex
 
-Este plugin conecta o Codex à sua conta Moont para inspecionar projetos e fazer alterações **visuais** em lote. É possível selecionar um projeto, vários projetos ou a biblioteca inteira, incluindo todos os cards. O plugin percorre as páginas da biblioteca e não impõe limite total de projetos ou cards.
+Este plugin conecta o Codex à sua conta Moont para inspecionar projetos, fazer alterações **visuais** em lote e revisar **textos** com prévia. É possível selecionar um projeto, vários projetos ou a biblioteca inteira para ajustes visuais. Edições de conteúdo são aplicadas a um projeto por vez para facilitar a revisão.
 
 ## Instalação local
 
@@ -45,9 +45,17 @@ No macOS, `sh plugins/moont/bin/setup.sh add` grava a mesma chave no Chaves. Em 
 5. `apply_visual_batch` recebe somente o `planId`; o plugin usa as versões capturadas na prévia e para se algum projeto mudou. Cada projeto é gravado de forma atômica pelo Moont.
 6. `get_batch_status` consulta os IDs das operações. `undo_visual_batch` desfaz uma alteração se o projeto ainda estiver na versão produzida por ela.
 
+### Edição de conteúdo
+
+1. `get_project_content` lê textos e IDs editáveis sem transportar as fotos.
+2. `get_content_schema` informa os campos e limites aceitos.
+3. `preview_text_edit` mostra cada alteração antes/depois sem gravar.
+4. `apply_text_edit` aplica exatamente a prévia, com controle de versão e ID idempotente.
+5. `undo_project_change` reverte alterações textuais ou visuais enquanto o projeto ainda estiver na versão produzida pelo MCP.
+
 Um lote interrompido pode ser retomado: uma prévia parcial retorna `planId`, usado como `resumePlanId` na próxima chamada; uma aplicação parcial conserva o mesmo `planId` e os mesmos IDs idempotentes; uma reversão parcial retorna `undoPlanId`, usado como `resumeUndoPlanId` para prosseguir. Os planos ficam em `PLUGIN_DATA/plans` (ou `~/.local/share/moont-codex/plans` fora do Codex) com acesso restrito ao usuário. Eles guardam apenas metadados e ajustes visuais; o token fica somente no Chaves.
 
-Textos dos cards, fotos, referências de mídia e conteúdo narrativo não são editáveis pelo endpoint deste plugin. A exceção `patch.copyCtaFrom` copia um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem: `{ "copyCtaFrom": { "slideId": "origem", "overlayId": "botao", "style": { "x": 30, "y": 84 } } }`. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Prévia e aplicação usam controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
+Fotos, logos e referências de mídia permanecem protegidos contra escrita. O conteúdo editável inclui nome e legenda do projeto, título, subtítulo, texto inferior, legenda e direção de imagem de cada card, além do texto de áreas adicionais. `patch.copyCtaFrom` continua copiando um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Toda prévia e aplicação usa controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
 
 O ajuste visual `{ "procedureLabelEmphasis": true }` destaca o rótulo inicial em maiúsculas do subtítulo apenas nos cards selecionados, mantendo o texto salvo e a edição intactos. Novos cards começam com esse ajuste desligado.
 
