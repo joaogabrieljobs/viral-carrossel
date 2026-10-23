@@ -123,18 +123,21 @@ function publicRow(row, identity = null) {
 }
 
 /** Cria um segredo aleatório de 256 bits; devolve-o uma única vez. */
-export async function createAgentToken(ownerId, { label = 'Codex', scopes = ['projects:read', 'projects:write'] } = {}) {
+export async function createAgentToken(ownerId, { label = 'Codex', scopes = ['projects:read', 'projects:write'], expiresInSec = 90 * 86400 } = {}) {
   const owner = validateOwner(ownerId);
   const cleanLabel = normalizeLabel(label);
   const cleanScopes = normalizeScopes(scopes);
   const identity = await currentAgentIdentity(owner);
   const token = `${TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`;
+  if (!Number.isSafeInteger(expiresInSec) || expiresInSec < 300 || expiresInSec > 90 * 86400) {
+    fail(400, 'agent_expiry_invalid', 'Validade inválida para a integração.');
+  }
   const rows = await getPostgresConnection().unsafe(
     `INSERT INTO moont.agent_tokens
        (owner_id, agent_epoch, account_id, token_hash, label, scopes, expires_at)
-     VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], now() + interval '90 days')
+     VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], now() + ($7 * interval '1 second'))
      RETURNING id, label, scopes, agent_epoch, account_id, created_at, expires_at, revoked_at`,
-    [owner, identity.agentEpoch, identity.accountId, hashToken(token), cleanLabel, cleanScopes],
+    [owner, identity.agentEpoch, identity.accountId, hashToken(token), cleanLabel, cleanScopes, expiresInSec],
   );
   return { token, credential: publicRow(rows[0], identity) };
 }
@@ -162,6 +165,12 @@ export async function revokeAgentToken(ownerId, tokenId) {
     [owner, tokenId],
   );
   if (!rows[0]) fail(404, 'agent_token_not_found', 'Integração não encontrada nesta conta.');
+  if (/ChatGPT|MCP OAuth/i.test(String(rows[0].label || ''))) {
+    await getPostgresConnection().unsafe(
+      `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+       WHERE owner_id = $1 AND revoked_at IS NULL`, [owner],
+    );
+  }
   return publicRow(rows[0]);
 }
 

@@ -63,6 +63,7 @@ describe('credenciais pessoais do agente', () => {
       createHash('sha256').update(created.token).digest('hex'),
       'Meu Codex',
       ['projects:read', 'projects:write'],
+      90 * 86400,
     ]);
     expect(JSON.stringify(params)).not.toContain(created.token);
 
