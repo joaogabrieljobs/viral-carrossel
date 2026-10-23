@@ -244,16 +244,23 @@ describe('outbox durável por projeto', () => {
     expect(await getPendingProjectOp(ALICE, 'janine')).toBeNull();
   });
 
-  it('falha no upload mantém manifesto e bytes pendentes sem publicar referências órfãs', async () => {
+  it('falha no upload vai para revisão e não bloqueia a próxima abertura da biblioteca', async () => {
     const photo = 'data:image/png;base64,cGhvdG8tdXBsb2FkLWZhaWxlZA==';
     const assetId = await originalImageAssetId(photo);
     const entry = { id: 'janine', doc: { slides: [{ id: 's1', bgImageAssetId: assetId }] } };
     const op = await queueProjectPut(ALICE, entry, { assets: new Map([[assetId, photo]]) });
     fetch.mockImplementation(async (url) => url === '/api/auth/session'
       ? session() : json({ error: 'Upload indisponível.' }, 503));
-    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ code: 'project_asset_upload_failed' });
+    expect(await flushProjectOutbox(ALICE)).toEqual({ sent: 0, pending: 1, needsReview: [{
+      projectId: 'janine', projectName: '', kind: 'sync_failed', operation: 'put',
+      code: 'project_asset_upload_failed', status: 0,
+    }] });
     expect(fetch.mock.calls.some(([url]) => url === '/api/projects')).toBe(false);
-    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ opId: op.opId, entry, assets: [[assetId, photo]] });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({ opId: op.opId, kind: 'review_put_failed', entry, assets: [[assetId, photo]] });
+    fetch.mockClear();
+    fetch.mockResolvedValueOnce(session());
+    expect(await flushProjectOutbox(ALICE)).toMatchObject({ pending: 1, needsReview: [{ kind: 'sync_failed' }] });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('adiciona bytes ao mesmo snapshot sem trocar o ID da operação', async () => {

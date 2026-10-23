@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CONTENT_OBJECTIVES, EDITORIAL_STRUCTURES, buildEditorialStrategyBlock, normalizeInstagramCaption } from '../../src/utils/editorial-strategy.js';
 import {
   applyEditorialReview,
+  auditUnsupportedCommercialClaims,
   assertPresentationTextLimits,
   auditPresentationTextLimits,
   buildEditorialReviewPrompt,
@@ -61,6 +62,20 @@ describe('objetivos e biblioteca editorial', () => {
 });
 
 describe('geração com uma revisão editorial', () => {
+  it('marca e remove promessa comercial que não existe no briefing', async () => {
+    const first = draft();
+    first.slides[1].subtitle = 'Publique hoje, sem taxas escondidas.';
+    const configWithSource = { ...config, commercialClaimSource: 'Serviço para organizar e publicar conteúdo.' };
+    expect(auditUnsupportedCommercialClaims(first.slides, configWithSource.commercialClaimSource)).toEqual([
+      expect.objectContaining({ slideIndex: 1, category: 'preço', claim: 'sem taxas escondidas' }),
+    ]);
+    const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits: [{
+      slideIndex: 1, reason: 'Promessa não sustentada', title: 'Publique com clareza', subtitle: 'Revise o conteúdo antes de colocar a campanha no ar.',
+    }] });
+    const output = await generateReviewedCarousel({ prompt: 'briefing', config: configWithSource }, ai);
+    expect(ai.mock.calls[1][0]).toContain('ALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO');
+    expect(output.result.slides[1].subtitle).not.toContain('taxas escondidas');
+  });
   it('faz exatamente duas chamadas e aplica somente os campos de texto reprovados', async () => {
     const first = draft();
     const original = structuredClone(first);

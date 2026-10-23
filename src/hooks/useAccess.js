@@ -513,8 +513,11 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             const billingProjectEdits = outboxReceipt?.needsReview?.filter(
               (review) => review.kind === 'put_billing',
             ) || [];
+            const failedProjectEdits = outboxReceipt?.needsReview?.filter(
+              (review) => review.kind === 'sync_failed',
+            ) || [];
             const deleteReviews = (outboxReceipt?.needsReview?.length || 0)
-              - deletedProjectEdits.length - billingProjectEdits.length;
+              - deletedProjectEdits.length - billingProjectEdits.length - failedProjectEdits.length;
             if (deleteReviews) {
               toast?.(`${deleteReviews} exclusão(ões) precisam de revisão: o projeto mudou em outro dispositivo e continua na sua conta.`, 'warning', 7500);
             }
@@ -523,6 +526,9 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             }
             if (billingProjectEdits.length) {
               toast?.(`${billingProjectEdits.length} edição(ões) continuam neste navegador porque a assinatura não confirmou o envio.`, 'warning', 7500);
+            }
+            if (failedProjectEdits.length) {
+              toast?.(`${failedProjectEdits.length} projeto(s) ficaram salvos neste navegador para revisão porque um arquivo ou dado não pôde ser enviado. A biblioteca foi aberta normalmente.`, 'warning', 9000);
             }
           } catch (error) {
             if (!cancelled && (sessionStillOwnsData()

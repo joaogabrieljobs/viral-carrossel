@@ -1,12 +1,16 @@
 import React, { useEffect } from 'react';
 import { GLOBAL_STYLE } from './styles/global-style.js';
 
-const PAGES = {
+export const LEGAL_PAGES = {
   '/privacidade': {
     eyebrow: 'Privacidade',
     title: 'Política de privacidade',
-    updated: '16 de outubro de 2026',
+    updated: '23 de outubro de 2026',
     sections: [
+      {
+        heading: 'Controlador dos dados',
+        body: 'O controlador dos dados pessoais tratados pelo Moont é ELEVESSY GESTÃO, INOVAÇÃO, TECNOLOGIA E COMÉRCIO LTDA, inscrita no CNPJ sob o nº 52.038.549/0001-79, com sede em São Paulo/SP.',
+      },
       {
         heading: 'O que este texto cobre',
         body: 'Esta página descreve como o Moont (moont.ai) trata os dados da conta, dos projetos e do pagamento. Ela vale para quem visita o site, cria uma conta ou usa o studio.',
@@ -28,15 +32,23 @@ const PAGES = {
         body: 'Usamos esses dados para autenticar, cobrar o plano, sincronizar a biblioteca entre os seus navegadores, gerar e guardar as peças que você pede, e impedir que uma conta acesse o conteúdo de outra. Não vendemos a biblioteca.',
       },
       {
+        heading: 'Operadores e serviços contratados',
+        body: 'Para prestar o serviço, usamos fornecedores que tratam dados sob contrato e conforme a função necessária: Vercel para hospedagem, execução e armazenamento; Stripe para pagamentos; Google quando você escolhe entrar com Google; e os provedores de inteligência artificial escolhidos no Moont para processar as solicitações de texto ou imagem. Esses fornecedores podem usar suboperadores e aplicar transferências internacionais com as salvaguardas exigidas pela legislação aplicável.',
+      },
+      {
+        heading: 'Guarda e exclusão',
+        body: 'Mantemos os dados enquanto a conta estiver ativa e pelo período necessário para prestar o serviço, cumprir obrigações legais, prevenir fraude, exercer direitos e resolver disputas. Quando a exclusão for cabível, removemos ou anonimizamos os dados dos sistemas ativos e os eliminamos dos ciclos de backup conforme os prazos técnicos e legais aplicáveis. Dados fiscais, financeiros e registros necessários à defesa de direitos podem ser conservados pelo prazo legal correspondente.',
+      },
+      {
         heading: 'Os seus pedidos',
-        body: 'Você pode pedir acesso, correção ou exclusão dos dados associados ao e-mail com que entra no Moont. O pedido identifica essa conta. Esta página não publica um e-mail de contato separado. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
+        body: 'Você pode pedir confirmação do tratamento, acesso, correção, portabilidade quando aplicável, informação sobre compartilhamento, revisão de decisões automatizadas, oposição, anonimização, bloqueio ou exclusão nos casos previstos em lei. A resposta simplificada a confirmação ou acesso será dada imediatamente quando possível; a declaração completa será fornecida em até 15 dias, conforme a LGPD. Outros pedidos serão respondidos em prazo razoável, considerando a complexidade e a legislação aplicável. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
       },
     ],
   },
   '/termos': {
     eyebrow: 'Termos',
     title: 'Termos de uso',
-    updated: '16 de outubro de 2026',
+    updated: '23 de outubro de 2026',
     sections: [
       {
         heading: 'O serviço',
@@ -55,6 +67,10 @@ const PAGES = {
         body: 'A cobrança recorrente é feita pela Stripe. Cancelar interrompe a renovação conforme as regras do checkout. O acesso aos recursos pagos depende de uma assinatura ativa.',
       },
       {
+        heading: 'Arrependimento e reembolso',
+        body: 'Quando a contratação estiver sujeita ao Código de Defesa do Consumidor, você pode exercer o direito de arrependimento em até 7 dias contados da assinatura, pelos canais oficiais do Moont. Os valores pagos nesse período serão devolvidos conforme a legislação aplicável e o meio de pagamento. Fora dessa hipótese, pedidos de reembolso serão analisados de acordo com a oferta contratada, o uso efetivo do serviço e os direitos obrigatórios do consumidor. O cancelamento evita novas cobranças, mas não apaga automaticamente a conta ou os projetos.',
+      },
+      {
         heading: 'Uso aceitável',
         body: 'Não use o Moont para invadir outra conta, contornar o limite do plano, ou publicar conteúdo que você não pode usar. Podemos suspender o acesso quando a conta coloca em risco as outras contas ou o serviço.',
       },
@@ -62,13 +78,17 @@ const PAGES = {
         heading: 'Alterações',
         body: 'Estes termos e a política de privacidade podem ser atualizados nesta página. A data no topo indica a versão vigente. Continuar a usar o Moont depois de uma atualização significa aceitar a versão publicada aqui.',
       },
+      {
+        heading: 'Lei aplicável e foro',
+        body: 'Estes termos seguem a legislação brasileira. Em relações de consumo, fica assegurado o foro do domicílio do consumidor e todos os direitos que não podem ser afastados por contrato. Nos demais casos, fica eleito o foro da comarca de São Paulo/SP, salvo regra legal obrigatória diferente.',
+      },
     ],
   },
 };
 
 export default function LegalPage() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  const page = PAGES[path] || PAGES['/privacidade'];
+  const page = LEGAL_PAGES[path] || LEGAL_PAGES['/privacidade'];
 
   useEffect(() => {
     document.title = `${page.title} — Moont`;

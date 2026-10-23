@@ -5071,6 +5071,7 @@ ${jsonShapeLine}`;
         presetId: cp,
         densityId: td,
         narrativeMode: effectiveMode,
+        commercialClaimSource: [topic, materialBlock, material?.context, styleKit.contextMd].filter(Boolean).join('\n'),
         presentationPath: presentationPathId,
         presentationTextLimits,
         presentationPlanning: isPresentationGeneration && !remix,
@@ -6778,6 +6779,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           visualPresets={visualPresets}
           hasOpenAI={hasOpenAI}
           hasAnthropic={hasAnyAI}
+          imageQuota={access.imageQuota}
           onOpenKeys={() => setKeysOpen(true)}
           onCreate={createAndGenerateProject}
           onCancel={leaveCreation}

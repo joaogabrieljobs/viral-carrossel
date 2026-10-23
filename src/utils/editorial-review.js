@@ -5,7 +5,7 @@ import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js
 import { presentationAIOptions, buildPresentationReviewRules } from './presentation.js';
 import { buildPresentationPlanPrompt, validatePresentationPlan, buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
-import { requiresSocialTitles, recoverSocialTitle, missingSocialTitleIndexes } from './social-generation.js';
+import { requiresSocialTitles, recoverSocialTitle, missingSocialTitleIndexes, longSocialSupportIndexes, SOCIAL_SUPPORT_MAX_CHARS, SOCIAL_SUPPORT_MAX_LINES } from './social-generation.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
@@ -167,7 +167,34 @@ function bodyAllowed(index, count, presetId, densityId) {
     : isPersoHybridDensity(presetId, densityId) && index >= 2;
 }
 
-export function validateCarouselDraft(draft, { count, presetId, densityId, presentationPath, nativeBlocks = true, narrativeMode, allowMissingSocialTitles = false }) {
+const COMMERCIAL_CLAIM_PATTERNS = [
+  { category: 'garantia', regex: /\b(?:garanti(?:a|do|mos)|resultado garantido|sem risco)\b[^.!?\n]{0,90}/giu },
+  { category: 'prazo', regex: /\b(?:pronto|entregue|resultado|receba|comece)\s+(?:em|dentro de)\s+\d+\s*(?:hora|dia|semana|m[eê]s)(?:s|es)?\b[^.!?\n]{0,70}/giu },
+  { category: 'preço', regex: /(?:R\$|US\$|\$|€)\s*\d[\d.,]*|\b(?:gr[aá]tis|gratuito|sem taxas?(?: escondidas?)?|sem custo)\b/giu },
+  { category: 'item incluso', regex: /\b(?:inclui|inclus[oa]s?|vem com|acompanha)\b[^.!?\n]{1,100}/giu },
+];
+
+const normalizeClaim = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** Marca promessas objetivas que aparecem no rascunho, mas não no material fornecido. */
+export function auditUnsupportedCommercialClaims(slides, source) {
+  if (typeof source !== 'string' || !source.trim()) return [];
+  const sourceText = normalizeClaim(source);
+  const violations = [];
+  (Array.isArray(slides) ? slides : []).forEach((slide, slideIndex) => {
+    const text = [slide?.title, slide?.subtitle, slide?.bodyAfterImage].filter(Boolean).join(' ');
+    for (const rule of COMMERCIAL_CLAIM_PATTERNS) {
+      for (const match of text.matchAll(rule.regex)) {
+        const claim = String(match[0] || '').trim();
+        if (!claim || sourceText.includes(normalizeClaim(claim))) continue;
+        violations.push({ slideIndex, category: rule.category, claim });
+      }
+    }
+  });
+  return violations;
+}
+
+export function validateCarouselDraft(draft, { count, presetId, densityId, presentationPath, nativeBlocks = true, narrativeMode, allowMissingSocialTitles = false, allowLongSocialSupport = false }) {
   if (!isObject(draft) || !Array.isArray(draft.slides) || draft.slides.length !== count || typeof draft.caption !== 'string') {
     throw new Error('A IA não retornou a quantidade de slides ou a legenda esperada. Tente gerar novamente.');
   }
@@ -209,6 +236,9 @@ export function validateCarouselDraft(draft, { count, presetId, densityId, prese
     if (!allowMissingSocialTitles && missingSocialTitleIndexes([slide], titleConfig).length) {
       throw Object.assign(new Error(`O card ${index + 1} ficou sem título. Seu projeto foi preservado.`), { code: 'social_title_missing' });
     }
+    if (!allowLongSocialSupport && longSocialSupportIndexes([slide], titleConfig).length) {
+      throw Object.assign(new Error(`O apoio do card ${index + 1} ficou longo demais. Seu projeto foi preservado.`), { code: 'social_support_too_long' });
+    }
     return slide;
   });
   const isPresentation = presetId === 'apresentacao';
@@ -241,14 +271,19 @@ Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema con
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
   const missingTitles = missingSocialTitleIndexes(draft?.slides, config);
+  const longSupport = longSocialSupportIndexes(draft?.slides, config);
+  const unsupportedClaims = auditUnsupportedCommercialClaims(draft?.slides, config?.commercialClaimSource);
   const titleRule = requiresSocialTitles(config)
-    ? `\nNo modo Prender atenção, TODOS os cards exigem title curto e específico, nunca vazio nem "Seu título aqui". Separe o gancho de subtitle sem apagar o desenvolvimento.${missingTitles.length ? ` Correção obrigatória: preencha title nos slideIndex ${missingTitles.join(', ')} usando apenas o argumento já escrito.` : ''}`
+    ? `\nTODOS os cards, em qualquer modo narrativo, exigem title curto e específico, nunca vazio nem "Seu título aqui". Separe a ideia principal de subtitle sem apagar o desenvolvimento. Subtitle deve ocupar no máximo ${SOCIAL_SUPPORT_MAX_LINES} linhas curtas e ${SOCIAL_SUPPORT_MAX_CHARS} caracteres.${missingTitles.length ? ` Correção obrigatória: preencha title nos slideIndex ${missingTitles.join(', ')} usando apenas o argumento já escrito.` : ''}${longSupport.length ? ` Correção obrigatória: condense subtitle nos slideIndex ${longSupport.join(', ')} sem perder fatos.` : ''}`
+    : '';
+  const claimsRule = unsupportedClaims.length
+    ? `\nALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO NO BRIEFING — correção obrigatória: ${unsupportedClaims.map(item => `slideIndex ${item.slideIndex}: ${item.claim}`).join('; ')}. Remova a alegação ou qualifique explicitamente como hipótese; não substitua por outra promessa.`
     : '';
   return `REVISÃO EDITORIAL — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o carrossel novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
-Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo.${titleRule}
+Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo.${titleRule}${claimsRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.
@@ -287,6 +322,13 @@ export function applyEditorialReview(draft, review, config) {
   }
   if (hasOwn(review, 'caption') && typeof review.caption !== 'string') throw new Error('Legenda de revisão inválida');
   const result = validateCarouselDraft({ ...draft, slides, caption: review.caption ?? draft.caption }, config);
+  const unsupportedClaims = auditUnsupportedCommercialClaims(result.slides, config?.commercialClaimSource);
+  if (unsupportedClaims.length) {
+    const error = new Error(`A revisão manteve uma promessa comercial sem apoio no briefing: ${unsupportedClaims[0].claim}.`);
+    error.code = 'unsupported_commercial_claim';
+    error.violations = unsupportedClaims;
+    throw error;
+  }
   if (isPresentation) {
     const limits = planned && typeof config.presentationLimitsForPlan === 'function'
       ? config.presentationLimitsForPlan(config.presentationPlan, result.slides)
@@ -318,7 +360,7 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     : prompt;
   // Missing titles get the same existing editorial round, not another paid
   // retry. Complete first sentences can already be moved without losing copy.
-  const draft = validateCarouselDraft(await callAI(generationPrompt, textOptions), { ...config, allowMissingSocialTitles: true });
+  const draft = validateCarouselDraft(await callAI(generationPrompt, textOptions), { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true });
   const draftLimitViolations = isPresentation
     ? auditPresentationTextLimits(draft.slides, config?.presentationTextLimits)
     : [];
@@ -330,11 +372,16 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     return { result, reviewStatus: JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised' };
   } catch (error) {
     if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
-    if (missingSocialTitleIndexes(draft.slides, config).length) {
+    if (missingSocialTitleIndexes(draft.slides, config).length || longSocialSupportIndexes(draft.slides, config).length) {
       // Keep the complete unmodified draft available to callers for recovery;
       // do not replace the current project with known title placeholders.
       throw Object.assign(new Error('A revisão não conseguiu completar os títulos. Seu projeto foi preservado.'), {
-        code: 'social_title_missing', generatedDraft: draft,
+        code: missingSocialTitleIndexes(draft.slides, config).length ? 'social_title_missing' : 'social_support_too_long', generatedDraft: draft,
+      });
+    }
+    if (auditUnsupportedCommercialClaims(draft.slides, config?.commercialClaimSource).length) {
+      throw Object.assign(new Error('A revisão não conseguiu remover promessas comerciais sem apoio no briefing. Seu projeto foi preservado.'), {
+        code: 'unsupported_commercial_claim', generatedDraft: draft,
       });
     }
     // A revisão é a única oportunidade automática de corrigir um primeiro

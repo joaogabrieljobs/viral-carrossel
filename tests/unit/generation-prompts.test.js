@@ -42,13 +42,11 @@ describe('módulo generation-prompts (extração do monólito)', () => {
     expect(GEN_MODE_BY_ID.brand_tone).toBeUndefined();
   });
 
-  it('prosa das regras de layout usa a faixa da fonte única (por modo)', () => {
+  it('prosa das regras de layout preserva a fonte única sem ultrapassar 160 caracteres', () => {
     for (const modeId of ['storytelling', 'pain', 'viral', 'how_to', 'sensacionalista', 'jornalistico', 'editorial']) {
-      const [lo, hi] = midSubtitleBandFor(modeId);
       const rules = buildGenerationSlideLayoutRules(modeId, 'quick_erro_comum', '1_1');
-      expect(rules, `modo ${modeId} deve citar ${lo} E ${hi}`).toMatch(
-        new RegExp(`${lo} E ${hi}`, 'i'),
-      );
+      expect(rules, `modo ${modeId} deve impor o teto visual`).toContain('160 caracteres');
+      expect(rules).not.toMatch(/(?:1[6-9][1-9]|[2-9]\d\d) caracteres/);
     }
   });
 
@@ -85,10 +83,10 @@ describe('contratos editoriais de texto', () => {
       for (const { id: density } of SLIDE_TEXT_DENSITY_OPTIONS) {
         const b = scaledCharBand(...midSubtitleBandFor(mode), density);
         const layout = buildGenerationSlideLayoutRules(mode, 'quick_erro_comum', density);
-        expect(layout).toContain(mode === 'none' ? `até ${b.hi} caracteres` : `${b.lo} E ${b.hi}`);
+        expect(layout).toContain('160 caracteres');
         expect(layout).not.toContain('SUBSTITUI');
         const refine = buildRefineSingleSlideRules(mode, density, { presetId: 'quick_erro_comum', slideIndex: 2, slideCount: 7 });
-        expect(refine).toContain(`${b.lo} e ${b.hi}`);
+        expect(refine).toContain('160 caracteres');
       }
     }
   });
@@ -110,11 +108,11 @@ describe('contratos editoriais de texto', () => {
     }
   });
 
-  it('Cultura termina na posição pedida sem exigir corpo no fecho nem títulos no miolo', () => {
+  it('Cultura termina na posição pedida, exige títulos e não exige corpo no fecho', () => {
     for (const n of [3, 6, 9, 12]) {
       const pack = buildTendenciaCulturaPackBlock(n);
       expect(pack).toContain(`ÚLTIMO SLIDE (posição ${n})`);
-      expect(pack).toContain('title = ""');
+      expect(pack).toContain('use title curto e específico');
       expect(pack).not.toContain('intermediários e fecho COM foto');
       expect(pack).not.toMatch(/50–85|plausible|S9 FECHO/);
     }

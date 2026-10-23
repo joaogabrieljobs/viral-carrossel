@@ -45,6 +45,8 @@
 .vc-create-review dd { margin:0; font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
 .vc-create-review button { border:0; background:none; color:var(--text-primary); text-decoration:underline; cursor:pointer; padding:0 0 6px; font:inherit; font-size:12px; }
 .vc-create-error { border:1px solid var(--danger-text); background:var(--bg-card); padding:14px 16px; border-radius:12px; color:var(--danger-text); font-size:14px; line-height:1.5; }
+.vc-create-generation-cost { margin:0; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:var(--bg-card); color:var(--text-secondary); font-size:13px; line-height:1.5; }
+.vc-create-generation-cost strong { color:var(--text-primary); }
 .vc-create-footer { position:relative; flex-shrink:0; z-index:25; background:var(--bg-sidebar); border-top:1px solid var(--border); padding:16px max(24px,calc((100vw - 984px)/2)); padding-bottom:max(16px,env(safe-area-inset-bottom)); display:flex; align-items:center; gap:14px; }
 .vc-create-footer .vc-create-note { margin-left:auto; }
 .vc-create-footer button { min-height:46px; white-space:nowrap; }

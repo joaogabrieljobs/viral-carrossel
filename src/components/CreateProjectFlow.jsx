@@ -42,7 +42,7 @@ function Option({ selected, label, desc, example, onClick, disabled }) { return 
 export default function CreateProjectFlow({
   onCreate, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
   brandRoster = [], activeBrandId, defaultBrand = {}, initialName = '', initialProductKind = 'carrossel',
-  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress,
+  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, imageQuota = null,
 }) {
   const initial = useRef(neutralCreationIdentity(defaultBrand));
   const identityVisualBase = useRef(captureCreationVisualIdentity(initial.current.brand));
@@ -99,6 +99,12 @@ export default function CreateProjectFlow({
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
   const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady : step === 4 ? countValid : true;
+  const estimatedMinutes = wantImages
+    ? `${Math.max(4, Math.ceil(Number(count || 1) * 0.8))}–${Math.max(8, Math.ceil(Number(count || 1) * 1.8))} min`
+    : '2–5 min';
+  const imageConsumption = wantImages && hasOpenAI
+    ? `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`
+    : 'nenhum crédito de imagem';
   useEffect(() => { alive.current = true; return () => { alive.current = false; asyncVersion.current++; }; }, []);
   useEffect(() => {
     mainRef.current?.focus({ preventScroll:true });
@@ -275,6 +281,7 @@ export default function CreateProjectFlow({
       {step === 6 && <>
         <dl className="vc-create-review">{reviewRow('Projeto', name, 0)}{reviewRow('Identidade', identityLabel, 1)}{reviewRow('Logo e referências', `${identitySummary.logo} · ${identitySummary.references} referências`, 1)}{reviewRow('Tom de voz', identitySummary.tone || 'Sem orientação adicional', 1)}{reviewRow('Tema', topic || 'Usar o material e o briefing fornecidos', 2)}{reviewRow('Material', `${material.content.length.toLocaleString('pt-BR')} caracteres de apoio${material.sources.trim() ? ' · fontes incluídas' : ''}${material.context.trim() ? ' · instruções incluídas' : ''}`, 2)}{reviewRow('Narrativa', selectedNarrative, 3)}{reviewRow('Quantidade', `${count} ${quantityUnit} · ${FORMAT_LABELS[formatId]}`, 4)}{reviewRow('Texto', CREATION_DENSITIES.find(d => d.id === density)?.label, 4)}{reviewRow('Visual', visualPreset ? `${presets.find(p => p.id === visualPreset)?.label || 'Estilo selecionado'}${identityVisualEdited ? ' · ajustado neste projeto' : ''}` : 'Identidade configurada', 5)}{reviewRow('Imagens', wantImages && hasOpenAI ? 'Gerar texto e imagens' : 'Criar o texto primeiro', 5)}</dl>
         {!hasTextAI && <div className="vc-create-details"><p>Configure o acesso à IA para gerar. Suas escolhas ficam mantidas nesta tela.</p>{onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar acesso à IA</button>}</div>}
+        <p className="vc-create-generation-cost"><strong>Antes de gerar:</strong> tempo estimado de {estimatedMinutes} · {imageConsumption}.</p>
         <p className="vc-create-note">O Moont organiza a sequência e revisa o texto. Depois, você pode editar cada detalhe no projeto.</p>
         {!busy && hasDraft && onOpenDraft && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenDraft}>Abrir rascunho no editor</button>}
       </>}

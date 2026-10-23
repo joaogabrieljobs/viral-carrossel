@@ -68,19 +68,23 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
   });
 
   it.each([
-    ['tendencia_cultura', 'viral'], ['apresentacao', 'viral'], ['livre', 'storytelling'], ['livre', 'none'],
-  ])('não reinterpreta títulos vazios de outro contrato: %s/%s', (presetId, narrativeMode) => {
-    expect(requiresSocialTitles({ presetId, narrativeMode })).toBe(false);
+    ['tendencia_cultura', 'viral'], ['livre', 'storytelling'], ['livre', 'none'],
+  ])('exige e recupera título em todo modo social: %s/%s', (presetId, narrativeMode) => {
+    expect(requiresSocialTitles({ presetId, narrativeMode })).toBe(true);
     const first = draft();
     const result = validateCarouselDraft(first, { ...config, presetId, narrativeMode });
-    expect(result.slides[2].title).toBe('');
+    expect(result.slides[2].title).toBe('Fora do algoritmo.');
+  });
+
+  it('mantém apresentação fora do contrato de títulos sociais', () => {
+    expect(requiresSocialTitles({ presetId: 'apresentacao', narrativeMode: 'viral' })).toBe(false);
   });
 
   it('faz apenas as2chamadas existentes e apresenta à revisão todos os títulos recuperados', async () => {
     const ai = vi.fn().mockResolvedValueOnce(draft()).mockResolvedValueOnce({ edits: [] });
     const result = await generateReviewedCarousel({ prompt: 'Campanha Halloween', config }, ai);
     expect(ai).toHaveBeenCalledTimes(2);
-    expect(ai.mock.calls[1][0]).toContain('TODOS os cards exigem title curto');
+    expect(ai.mock.calls[1][0]).toContain('TODOS os cards, em qualquer modo narrativo, exigem title curto');
     expect(result.result.slides.every(slide => slide.title.trim() && slide.title !== 'Seu título aqui')).toBe(true);
   });
 
@@ -88,12 +92,40 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     const first = draft();
     first.slides[2].subtitle = 'Um argumento longo sem pontuação '.repeat(8).trim();
     const originalText = first.slides[2].subtitle;
-    const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits: [{ slideIndex: 2, reason: 'Título ausente', title: 'Um endereço que permanece' }] });
+    const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits: [{ slideIndex: 2, reason: 'Título ausente e apoio longo', title: 'Um endereço que permanece', subtitle: 'Um argumento direto que cabe em até três linhas.' }] });
     const output = await generateReviewedCarousel({ prompt: 'brief', config }, ai);
     expect(ai).toHaveBeenCalledTimes(2);
     expect(ai.mock.calls[1][0]).toContain('preencha title nos slideIndex 2');
     expect(output.result.slides[2].title).toBe('Um endereço que permanece');
-    expect(output.result.slides[2].subtitle).toBe(originalText);
+    expect(output.result.slides[2].subtitle).not.toBe(originalText);
+    expect(output.result.slides[2].subtitle.length).toBeLessThanOrEqual(160);
+  });
+
+  it('Seguir meu pedido entrega 5 cards com título e apoio de no máximo 3 linhas', async () => {
+    const first = draft();
+    first.slides = first.slides.map((slide, index) => ({
+      ...slide,
+      title: '',
+      subtitle: `Card ${index + 1}. ${'Explicação extensa sem criar promessa nova. '.repeat(5)}`,
+    }));
+    const edits = first.slides.map((_, slideIndex) => ({
+      slideIndex,
+      reason: 'Separar título e condensar o apoio',
+      title: `Título específico ${slideIndex + 1}`,
+      subtitle: `Apoio direto ${slideIndex + 1}.\nUma segunda linha útil.\nFecho curto.`,
+    }));
+    const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits });
+    const output = await generateReviewedCarousel({
+      prompt: 'Brief sem modo narrativo imposto',
+      config: { ...config, narrativeMode: 'none' },
+    }, ai);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(output.result.slides).toHaveLength(5);
+    output.result.slides.forEach(slide => {
+      expect(slide.title.trim()).toBeTruthy();
+      expect(slide.subtitle.length).toBeLessThanOrEqual(160);
+      expect(slide.subtitle.split('\n')).toHaveLength(3);
+    });
   });
 
   it.each([new Error('offline'), { edits: [] }])('não aceita um título vazio caso o único reparo falhe, preservando o rascunho completo', async review => {

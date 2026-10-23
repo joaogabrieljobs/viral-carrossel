@@ -157,10 +157,13 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
         // projeto novo após uma escolha explícita da pessoa. Salvar de novo
         // atualiza a cópia durável, mas não a retira da revisão.
         const effectiveKind = previous?.kind === 'review_put_deleted' && kind === 'put'
-          ? 'review_put_deleted' : kind;
+          ? 'review_put_deleted'
+          : previous?.kind === 'review_put_failed' && kind === 'put'
+            ? 'review_put_failed' : kind;
         const keepsEntry = effectiveKind === 'put'
           || effectiveKind === 'review_put_deleted'
-          || effectiveKind === 'review_put_billing';
+          || effectiveKind === 'review_put_billing'
+          || effectiveKind === 'review_put_failed';
         const op = {
           key, owner: ownerId, projectId, kind: effectiveKind,
           entry: keepsEntry ? entry : null,
@@ -171,7 +174,7 @@ function persistOperation(ownerId, projectId, kind, entry, baseVersion, projectN
             ? baseVersion : (previous?.baseVersion ?? baseVersion),
           projectName: kind === 'delete'
             ? String(projectName || previous?.projectName || '').slice(0, 160)
-            : effectiveKind === 'review_put_deleted'
+            : effectiveKind === 'review_put_deleted' || effectiveKind === 'review_put_failed'
               ? String(entry?.name || previous?.projectName || '').slice(0, 160) : '',
           ...(effectiveKind === 'review_put_deleted'
             ? { reviewVersion: previous.reviewVersion } : {}),
@@ -351,6 +354,37 @@ function markPutForBilling(ownerId, sentOp) {
       } catch (error) { fail(error); }
     };
   });
+}
+
+/** Falha permanente fica visível para revisão e deixa de bloquear o boot. */
+function markOperationForFailure(ownerId, sentOp, error) {
+  assertActiveOwner(ownerId);
+  return transaction('readwrite', (store, setResult, fail) => {
+    const read = store.get(operationKey(ownerId, sentOp.projectId));
+    read.onsuccess = () => {
+      try {
+        assertActiveOwner(ownerId);
+        const current = read.result;
+        if (!current || current.opId !== sentOp.opId) { setResult(false); return; }
+        const isPut = current.kind === 'put' || current.kind === 'review_put_billing';
+        store.put({
+          ...current,
+          kind: isPut ? 'review_put_failed' : 'review_delete_failed',
+          projectName: String(current.entry?.name || current.projectName || '').slice(0, 160),
+          reviewCode: String(error?.code || 'project_sync_failed').slice(0, 100),
+          reviewStatus: Number.isInteger(error?.status) ? error.status : null,
+          updatedAt: Date.now(),
+        });
+        setResult(true);
+      } catch (cause) { fail(cause); }
+    };
+  });
+}
+
+function isPermanentOperationFailure(error) {
+  if (error?.code === 'project_asset_upload_failed' || error?.code === 'project_bad_response') return true;
+  return Number.isInteger(error?.status) && error.status >= 400 && error.status < 500
+    && error.status !== 402 && error.status !== 409;
 }
 
 function canonicalJson(value) {
@@ -563,8 +597,9 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   const expectedOwnerId = await verifyProjectOutboxOwner(ownerId, { signal });
   let sent = 0;
   const recoveries = [];
+  const heldForReview = new Set(['review_delete', 'review_put_deleted', 'review_put_failed', 'review_delete_failed']);
   let queue = (await listPendingProjectOps(ownerId))
-    .filter((op) => op.kind !== 'review_delete' && op.kind !== 'review_put_deleted');
+    .filter((op) => !heldForReview.has(op.kind));
   for (let round = 0; round < 20 && queue.length; round += 1) {
     const operations = queue.slice(0, maxOperations);
     queue = queue.slice(maxOperations);
@@ -573,8 +608,16 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
       assertActiveOwner(ownerId);
       const op = await getPendingProjectOp(ownerId, snapshot.projectId);
       if (!op || op.opId !== snapshot.opId) continue;
-      if (op.kind === 'review_delete' || op.kind === 'review_put_deleted') continue;
-      const result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
+      if (heldForReview.has(op.kind)) continue;
+      let result;
+      try {
+        result = await sendOperation(ownerId, op, { signal, expectedOwnerId });
+      } catch (error) {
+        if (!isPermanentOperationFailure(error)) throw error;
+        await markOperationForFailure(ownerId, op, error);
+        queue = queue.filter((item) => item.projectId !== op.projectId);
+        continue;
+      }
       assertActiveOwner(ownerId);
       if (result.billingDeferred) {
         await markPutForBilling(ownerId, op);
@@ -606,11 +649,17 @@ async function flushProjectOutboxSerial(ownerId, { signal, maxOperations = 100, 
   const remaining = await listPendingProjectOps(ownerId);
   const needsReview = remaining.filter((op) => op.kind === 'review_delete'
     || op.kind === 'review_put_deleted'
-    || op.kind === 'review_put_billing').map((op) => ({
+    || op.kind === 'review_put_billing'
+    || op.kind === 'review_put_failed'
+    || op.kind === 'review_delete_failed').map((op) => ({
     projectId: op.projectId, projectName: op.projectName || '',
     ...(op.reviewVersion != null ? { reviewVersion: op.reviewVersion } : {}),
     ...(op.kind === 'review_put_deleted' ? { kind: 'put_deleted' } : {}),
     ...(op.kind === 'review_put_billing' ? { kind: 'put_billing' } : {}),
+    ...(['review_put_failed', 'review_delete_failed'].includes(op.kind) ? {
+      kind: 'sync_failed', operation: op.kind === 'review_put_failed' ? 'put' : 'delete',
+      code: op.reviewCode || 'project_sync_failed', status: op.reviewStatus,
+    } : {}),
   }));
   return {
     sent, pending: remaining.length,

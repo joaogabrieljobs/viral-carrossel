@@ -188,6 +188,7 @@ async function configure(page, { name = 'Novo trabalho guiado', count = 5, prese
   await wizard.getByRole('radio', { name: /^Criar o texto primeiro/ }).click();
   if (detailed) await wizard.getByLabel(/^Direção visual adicional/).fill('Fundo claro, fotografia editorial e títulos em azul.');
   await next(page);
+  await expect(wizard.getByText(/Antes de gerar:.*2–5 min.*nenhum crédito de imagem/i)).toBeVisible();
   await expect(wizard.getByRole('button', { name: `Criar e gerar ${count} ${presentation ? 'slides' : 'cards'}`, exact: true })).toBeVisible();
   return wizard;
 }

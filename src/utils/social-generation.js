@@ -2,12 +2,12 @@ import { markdownBoldAccentIntervalsUtf16, markdownItalicIntervalsUtf16 } from '
 
 const TITLE_PLACEHOLDER = /^(?:seu t[ií]tulo aqui|your title here)[.!…]*$/iu;
 
-/** Cultura intentionally uses the first subtitle sentence as its middle hook. */
 export function requiresSocialTitles(config = {}) {
-  return config.narrativeMode === 'viral'
-    && config.presetId !== 'apresentacao'
-    && config.presetId !== 'tendencia_cultura';
+  return config.presetId !== 'apresentacao';
 }
+
+export const SOCIAL_SUPPORT_MAX_CHARS = 160;
+export const SOCIAL_SUPPORT_MAX_LINES = 3;
 
 export function socialTitleMissing(slide) {
   const title = String(slide?.title || '').trim();
@@ -43,4 +43,13 @@ export function missingSocialTitleIndexes(slides, config = {}) {
   return requiresSocialTitles(config)
     ? (Array.isArray(slides) ? slides : []).flatMap((slide, index) => socialTitleMissing(slide) ? [index] : [])
     : [];
+}
+
+export function longSocialSupportIndexes(slides, config = {}) {
+  if (!requiresSocialTitles(config)) return [];
+  return (Array.isArray(slides) ? slides : []).flatMap((slide, index) => {
+    const support = String(slide?.subtitle || '').trim();
+    const lines = support ? support.split(/\r\n|\r|\n/).length : 0;
+    return support.length > SOCIAL_SUPPORT_MAX_CHARS || lines > SOCIAL_SUPPORT_MAX_LINES ? [index] : [];
+  });
 }
