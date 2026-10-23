@@ -24,8 +24,8 @@ export const LEGAL_PAGES = {
         body: 'Projetos, textos, briefing, marcas e logos ficam associados à sua conta. As fotos ficam num armazenamento privado dessa conta. Um código de equipe permite que outra conta com assinatura leia aquele projeto e as fotos referenciadas nele. A outra conta não passa a ver o resto da sua biblioteca.',
       },
       {
-        heading: 'Integração com o Codex',
-        body: 'Se você criar um token em Perfil, ele autoriza um plugin no seu computador a ler e alterar o visual dos projetos dessa conta. O servidor guarda só o hash do token. Você pode revogar o token a qualquer momento. Trocar a senha encerra as integrações ativas.',
+        heading: 'Integrações com assistentes de IA',
+        body: 'Se você conectar Claude, ChatGPT, Codex ou outro cliente MCP em Perfil, a integração poderá ler e alterar os projetos dessa conta dentro das permissões concedidas. O Moont mostra prévias antes das alterações suportadas e mantém recursos de reversão. Chaves manuais aparecem uma única vez; o servidor guarda somente seu hash. Você pode revogar cada conexão a qualquer momento. Trocar ou recuperar a senha encerra as integrações ativas.',
       },
       {
         heading: 'Para que usamos',

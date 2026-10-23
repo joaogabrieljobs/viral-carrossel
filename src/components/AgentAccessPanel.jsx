@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, KeyRound, Trash2 } from 'lucide-react';
+import { Check, Copy, KeyRound, Link2, Trash2 } from 'lucide-react';
+
+const MCP_URL = 'https://moont.ai/mcp';
 
 async function agentRequest(method, body) {
   const response = await fetch('/api/agent-access', {
@@ -33,9 +35,10 @@ const buttonStyle = {
 export default function AgentAccessPanel() {
   const [credentials, setCredentials] = useState([]);
   const [oneTimeToken, setOneTimeToken] = useState('');
-  const [label, setLabel] = useState('Codex');
+  const [label, setLabel] = useState('Assistente de IA');
   const [confirmId, setConfirmId] = useState('');
   const [copied, setCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
@@ -58,7 +61,7 @@ export default function AgentAccessPanel() {
     setCopied(false);
     try {
       const result = await agentRequest('POST', {
-        label: label.trim() || 'Codex',
+        label: label.trim() || 'Assistente de IA',
         scopes: ['projects:read', 'projects:write'],
       });
       setOneTimeToken(result.token);
@@ -111,17 +114,33 @@ export default function AgentAccessPanel() {
     <section style={{ padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--bg-card)', display: 'grid', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div className="vc-eyebrow" style={{ marginBottom: 5 }}>Integração Codex</div>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Editar projetos em lote</h3>
+          <div className="vc-eyebrow" style={{ marginBottom: 5 }}>Integrações de IA</div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Conecte Claude, ChatGPT ou Codex</h3>
         </div>
         <KeyRound size={19} color="var(--text-muted)" aria-hidden />
       </div>
       <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
-        Crie uma chave para conectar sua conta ao plugin Moont no Codex. Ela permite ler e ajustar seus projetos. Você pode revogá-la aqui a qualquer momento.
+        O MCP remoto do Moont permite que um assistente leia projetos, mostre prévias, edite textos e visual e desfaça alterações. A assinatura precisa estar ativa e cada conexão pode ser revogada aqui.
       </p>
 
+      <div style={{ display: 'grid', gap: 9, padding: 14, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-pearl)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div>
+            <strong style={{ fontSize: 13 }}>Endereço do MCP</strong>
+            <div style={{ marginTop: 3, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{MCP_URL}</div>
+          </div>
+          <button type="button" style={buttonStyle} onClick={() => navigator.clipboard.writeText(MCP_URL).then(() => setUrlCopied(true)).catch(() => setError('Não foi possível copiar o endereço.'))}>
+            {urlCopied ? <Check size={14} aria-hidden /> : <Link2 size={14} aria-hidden />}
+            {urlCopied ? 'Copiado' : 'Copiar endereço'}
+          </button>
+        </div>
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45 }}>
+          No Claude ou Codex, adicione um servidor MCP HTTP com este endereço e use a chave abaixo como Bearer token. A conexão direta do ChatGPT usará o mesmo endereço com o login seguro do Moont.
+        </p>
+      </div>
+
       <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>
-        Nome da chave
+        Nome da conexão
         <input
           aria-label="Nome da chave de integração"
           value={label}
@@ -131,7 +150,7 @@ export default function AgentAccessPanel() {
       </label>
       <div>
         <button type="button" style={{ ...buttonStyle, background: 'var(--text-primary)', color: 'var(--bg-base)', borderColor: 'transparent' }} disabled={!!busy} onClick={create}>
-          <KeyRound size={14} aria-hidden /> {busy === 'create' ? 'Criando…' : 'Criar chave de integração'}
+          <KeyRound size={14} aria-hidden /> {busy === 'create' ? 'Criando…' : 'Criar chave para Claude ou Codex'}
         </button>
       </div>
 
@@ -139,7 +158,7 @@ export default function AgentAccessPanel() {
         <div style={{ display: 'grid', gap: 9, padding: 14, border: '1px solid var(--accent)', borderRadius: 12, background: 'var(--accent-surface)' }}>
           <strong style={{ fontSize: 13 }}>Copie esta chave agora</strong>
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: 'var(--text-secondary)' }}>
-            Por segurança, ela só aparece uma vez. No Mac, rode <span style={{ fontFamily: 'var(--font-mono)' }}>sh plugins/moont/bin/setup.sh add</span> e cole a chave no prompt do Chaves — ele não grava o valor no histórico. Fora do Mac, grave a chave num arquivo com permissão 600 e exporte esse arquivo. Ela vence em 90 dias.
+            Por segurança, ela só aparece uma vez. Use como Bearer token na configuração privada do cliente MCP e não cole a chave em conversas. No plugin local do Codex, você também pode usar o instalador do Moont. Ela vence em 90 dias.
           </p>
           <input
             aria-label="Chave de integração Moont, exibida uma única vez"
@@ -168,7 +187,7 @@ export default function AgentAccessPanel() {
           {visibleTokens.map((item) => (
             <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 11px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-pearl)' }}>
               <div style={{ minWidth: 0 }}>
-                <strong style={{ fontSize: 13 }}>{item.label || 'Codex'}</strong>
+                <strong style={{ fontSize: 13 }}>{item.label || 'Assistente de IA'}</strong>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{expiryNote(item.expiresAt)}</div>
               </div>
               <button type="button" onClick={() => revoke(item.id)} disabled={!!busy} aria-label={confirmId === item.id ? `Confirmar revogação da chave ${item.label}` : `Revogar chave ${item.label}`} style={{ ...buttonStyle, minHeight: 34, padding: '0 10px', color: 'var(--danger, #e34a42)' }}>
