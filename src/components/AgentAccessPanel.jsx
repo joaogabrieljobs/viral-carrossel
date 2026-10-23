@@ -135,7 +135,7 @@ export default function AgentAccessPanel() {
           </button>
         </div>
         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45 }}>
-          No Claude ou Codex, adicione um servidor MCP HTTP com este endereço e use a chave abaixo como Bearer token. A conexão direta do ChatGPT usará o mesmo endereço com o login seguro do Moont.
+          No ChatGPT, adicione um servidor MCP personalizado com este endereço e escolha OAuth: o login e a autorização acontecem no Moont. No Claude ou Codex, você também pode usar este endereço com a chave Bearer criada abaixo.
         </p>
       </div>
 
