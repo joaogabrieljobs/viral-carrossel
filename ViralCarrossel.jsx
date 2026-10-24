@@ -3201,6 +3201,7 @@ export default function App() {
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
   const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
+  const [creationPreviewSlides, setCreationPreviewSlides] = useState([]);
   /** Cancela import de fotos em curso (lote / foto única). */
   const importAbortRef = useRef(null);
   // O drawer mobile e a sidebar desktop desmontam ao mudar a largura da tela.
@@ -3213,6 +3214,7 @@ export default function App() {
     cancelAllAIGeneration();
     generationRef.current = null;
     setGenProgress(null);
+    setCreationPreviewSlides([]);
     slideImgGenIdsRef.current.clear();
     setSlideImgGenBusy({});
     setAnalyzingBrandTone(false);
@@ -4872,6 +4874,7 @@ export default function App() {
       );
     }
     const sourceSlides = slides;
+    if (creationSession) setCreationPreviewSlides([]);
     setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Preparando contexto do projeto…' });
     trackEvent('carousel_generate_start', {
       product: isApresentacaoPreset(requestedPresetId) ? 'apresentacao' : 'carrossel',
@@ -5374,6 +5377,7 @@ ${jsonShapeLine}`;
           : performanceGuidance.preferredStructureId,
       },
     }));
+    if (creationSession && !remix) setCreationPreviewSlides(newSlides);
     setActiveIdx(0); setShellView('project');
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
     // versões antigas podiam deixar `subtitleVisible: false` gravado no projeto e
@@ -5439,7 +5443,7 @@ ${jsonShapeLine}`;
             checkActive();
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
-            if (!abort.cancelled && activeProjectRef.current === generationProjectId)
+            if (!abort.cancelled && activeProjectRef.current === generationProjectId) {
               setSlides(prev => prev.map((sl) => sl.id === slideId ? {
                 ...sl,
                 ...patchImg,
@@ -5451,6 +5455,11 @@ ${jsonShapeLine}`;
                 bgImageError: null,
                 bgImageSource: 'ai',
               } : sl));
+              setCreationPreviewSlides(prev => prev.map((sl) => sl.id === slideId ? {
+                ...sl, ...patchImg, bgFit:'cover', bgX:50, bgY:50, bgZoom:100,
+                bgImageFailed:false, bgImageError:null, bgImageSource:'ai',
+              } : sl));
+            }
           } catch(e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
             imgFailCount++;
@@ -6787,6 +6796,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onOpenDraft={openCreationDraft}
           hasDraft={!!creationTargetRef.current && projectHasCarouselContent(slides)}
           progress={genProgress}
+          previewSlides={creationPreviewSlides}
         />
       ) : shellView === 'home' ? (
         <AccountHomeShell

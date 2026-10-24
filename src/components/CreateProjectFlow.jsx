@@ -42,7 +42,7 @@ function Option({ selected, label, desc, example, onClick, disabled }) { return 
 export default function CreateProjectFlow({
   onCreate, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
   brandRoster = [], activeBrandId, defaultBrand = {}, initialName = '', initialProductKind = 'carrossel',
-  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, imageQuota = null,
+  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], imageQuota = null,
 }) {
   const initial = useRef(neutralCreationIdentity(defaultBrand));
   const identityVisualBase = useRef(captureCreationVisualIdentity(initial.current.brand));
@@ -287,7 +287,11 @@ export default function CreateProjectFlow({
       </>}
       </fieldset>
       {pending && <p role="status" className="vc-create-note" style={{ marginTop:18 }}>Importando arquivo…</p>}
-      {busy && <div role="status" aria-live="polite" className="vc-create-stack" style={{ marginTop:24 }}><strong>{progress?.label || 'Preparando seu projeto…'}</strong><div className="vc-create-progressbar" aria-hidden><span/></div><p className="vc-create-note">As ferramentas de edição vão aparecer quando a geração terminar.</p></div>}
+      {busy && <div role="status" aria-live="polite" className="vc-create-stack" style={{ marginTop:24 }}><strong>{progress?.label || 'Preparando seu projeto…'}</strong><div className="vc-create-progressbar" aria-hidden><span style={progress?.total ? { width:`${Math.max(8, Math.min(100, (Number(progress.current || 0) / Number(progress.total)) * 100))}%`, animation:'none' } : undefined}/></div><p className="vc-create-note">Os {item} prontos aparecem abaixo. A edição completa abre quando a geração terminar.</p>{previewSlides.length > 0 && <div className={`vc-create-live-grid ${isPresentation ? 'is-presentation' : ''}`} aria-label={`${previewSlides.length} ${quantityUnit} prontos`}>
+        {previewSlides.map((slide, index) => <article className="vc-create-live-card" key={slide.id || index} style={{ background:slide.bg || brand.bg || '#111218', color:slide.titleColor || brand.titleColor || '#fff' }}>
+          {slide.bgImage && <img src={slide.bgImage} alt=""/>}<div className="vc-create-live-shade" style={{ opacity:Math.min(.82, Math.max(0, Number(slide.overlay || 0) / 100)) }}/><div className="vc-create-live-copy"><small>{String(index + 1).padStart(2, '0')}</small><strong>{slide.title || 'Conteúdo em preparação'}</strong>{slide.subtitle && <span>{slide.subtitle}</span>}</div>
+        </article>)}
+      </div>}</div>}
       {notice && <p role="status" className="vc-create-note" style={{ marginTop:24 }}>{notice}</p>}
       {error && <div role="alert" className="vc-create-error" style={{ marginTop:24 }}>{error}</div>}
     </main>

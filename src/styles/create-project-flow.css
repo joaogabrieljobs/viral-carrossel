@@ -54,6 +54,15 @@
 .vc-create-primary:disabled { opacity:.5; cursor:default; }
 .vc-create-progressbar { height:5px; border-radius:99px; background:var(--border); overflow:hidden; }
 .vc-create-progressbar span { display:block; height:100%; background:var(--accent); width:65%; animation:vc-create-pulse 1.5s ease-in-out infinite alternate; }
+.vc-create-live-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+.vc-create-live-card { position:relative; isolation:isolate; aspect-ratio:4/5; overflow:hidden; border:1px solid var(--border); border-radius:14px; background:var(--bg-card); }
+.vc-create-live-grid.is-presentation .vc-create-live-card { aspect-ratio:16/9; }
+.vc-create-live-card img { position:absolute; inset:0; z-index:-2; width:100%; height:100%; object-fit:cover; }
+.vc-create-live-shade { position:absolute; inset:0; z-index:-1; background:#000; }
+.vc-create-live-copy { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; gap:7px; padding:16px; }
+.vc-create-live-copy small { font-size:10px; opacity:.75; }
+.vc-create-live-copy strong { font:600 clamp(14px,1.7vw,21px)/1.08 var(--font-display); overflow-wrap:anywhere; }
+.vc-create-live-copy span { font-size:11px; line-height:1.35; opacity:.88; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 @keyframes vc-create-pulse { from { opacity:.35; transform:translateX(-60%); } to { opacity:1; transform:translateX(60%); } }
 @media(prefers-reduced-motion:reduce) { .vc-create-progressbar span { animation:none; } }
 @media(max-width:640px) {
@@ -76,6 +85,8 @@
   .vc-create-footer button { min-width:0; max-width:100%; min-height:48px; padding-inline:14px; white-space:normal; }
   .vc-create-footer .vc-create-primary { width:100%; margin-left:0; padding-inline:16px; font-size:14px; }
   .vc-create-review > div { grid-template-columns:1fr auto; gap:8px; padding:16px; }
+  .vc-create-live-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .vc-create-live-copy { padding:12px; }
   .vc-create-review dt { grid-column:1; }
   .vc-create-review dd { grid-column:1; }
   .vc-create-review button { grid-column:2; grid-row:auto; }
