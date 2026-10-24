@@ -269,7 +269,7 @@ export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister 
         <div id="conteudo-principal" className="moont-lp-container moont-lp-hero__inner">
           <div className="moont-lp-hero__copy">
             <p className="moont-lp-kicker">Para quem cria todos os dias</p>
-            <h1>A pauta chegou.<br /><span>O prazo já está correndo.</span></h1>
+            <h1>Uma plataforma para criar,<br /><span>organizar e aprimorar seus conteúdos.</span></h1>
             <p className="moont-lp-hero__lead">
               Reúna briefing, links e referências na Moont. A plataforma organiza a narrativa, propõe uma direção visual e prepara a primeira versão do carrossel ou da apresentação para você revisar.
             </p>
