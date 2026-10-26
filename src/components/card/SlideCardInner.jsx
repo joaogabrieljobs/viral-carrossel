@@ -554,7 +554,15 @@ function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = 
           onEditEnd?.();
         }
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); commit(); }
-      } : elementProps.onKeyDown}
+      } : (event) => {
+        if (event.key === 'Enter' && onCommit) {
+          event.preventDefault();
+          event.stopPropagation();
+          setEditing(true);
+          return;
+        }
+        elementProps.onKeyDown?.(event);
+      }}
       title={editing ? 'Edite o texto e clique fora para salvar' : `${elementProps.title || ''}${elementProps.title ? ' · ' : ''}Duplo clique para editar`}
       style={{
         ...(elementProps.style || {}),

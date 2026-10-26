@@ -179,7 +179,12 @@ for (const width of [1680, 390]) {
     await expectSavedText(page, 0, 'Área independente');
     await expect(area).toHaveAttribute('contenteditable', 'false');
 
-    await area.dblclick();
+    if (width < 600) {
+      await area.focus();
+      await area.press('Enter');
+    } else {
+      await area.dblclick();
+    }
     await expect(area).toHaveAttribute('contenteditable', 'true');
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.press('Delete');
@@ -194,6 +199,9 @@ for (const width of [1680, 390]) {
 
     await area.click();
     if (width < 600) {
+      const mobileEditor = page.getByRole('dialog', { name: 'Editor do card' });
+      await expect(mobileEditor).toBeVisible();
+      await mobileEditor.getByRole('button', { name: 'Fechar editor', exact: true }).click();
       await page.getByRole('button', { name: 'Excluir elemento selecionado', exact: true }).click();
     } else {
       await page.keyboard.press('Delete');

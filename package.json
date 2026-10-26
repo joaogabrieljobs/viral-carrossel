@@ -19,8 +19,8 @@
     "check:a11y": "node scripts/check-a11y.mjs"
   },
   "dependencies": {
-    "@vercel/blob": "^2.8.0",
-    "@vercel/functions": "^3.9.9",
+    "@vercel/blob": "^2.8.2",
+    "@vercel/functions": "^3.10.3",
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
@@ -33,12 +33,17 @@
     "stripe": "^22.3.2",
     "tesseract.js": "^6.0.1"
   },
+  "overrides": {
+    "dompurify": "3.4.17",
+    "undici": "6.29.1",
+    "zod": "4.6.7"
+  },
   "devDependencies": {
     "@babel/parser": "^8.0.4",
     "@babel/traverse": "^8.0.4",
     "@playwright/test": "^1.62.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.10",
-    "vitest": "^4.1.10"
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
   }
 }

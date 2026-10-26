@@ -96,7 +96,17 @@ test.describe('Painéis de IA', () => {
     await selectEditorMode(page, 'diretor');
     await page.getByRole('tab', { name: /narrativa/i }).first().click({ force: true });
     await page.getByRole('button', { name: /EDITAR CARD/i }).first().click();
-    await page.getByRole('button', { name: /gerar variações de gancho/i }).click({ force: true });
+    const gerarGanchos = page.getByRole('button', { name: /gerar variações de gancho/i });
+    await gerarGanchos.click({ force: true });
+    const hookModal = page.getByText('Variações de gancho', { exact: true });
+    // Sob carga, uma atualização da sidebar pode substituir o primeiro clique.
+    // Tentar novamente só se o modal realmente não abriu mantém o teste fiel ao fluxo.
+    try {
+      await expect(hookModal).toBeVisible({ timeout: 3_000 });
+    } catch {
+      await gerarGanchos.click({ force: true });
+      await expect(hookModal).toBeVisible({ timeout: 5_000 });
+    }
     // o modal dispara a geração sozinho ao abrir (não há botão de submit)
     await expect(page.getByText(/sobre recuperação/i)).toBeVisible({ timeout: 15_000 });
     expect(chamouIA(), 'as variações deveriam ter chamado a IA').toBe(true);

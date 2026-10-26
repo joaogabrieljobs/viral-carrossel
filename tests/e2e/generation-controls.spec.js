@@ -486,7 +486,7 @@ test('Prender atenção recupera títulos ausentes dos cards 3–5 sem perder te
   }
   expect(prompts).toHaveLength(2);
   expect(prompts[0]).toContain('"title" OBRIGATÓRIO');
-  expect(prompts[1]).toContain('TODOS os cards exigem title curto');
+  expect(prompts[1]).toMatch(/TODOS os cards(?:, em qualquer modo narrativo,)? exigem title curto/);
   const fourth = page.locator(`main [data-vc-card-surface="${saved.slides[3].id}"]`);
   await expect(fourth.locator('[data-vc-italic]')).toHaveText('porta de entrada de verdade');
   await expect(fourth).not.toContainText('*');
