@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import metadata from '../../api/oauth/metadata.js';
 import protectedResource from '../../api/oauth-protected-resource.js';
-import { normalizeOAuthResource, normalizeScopes, oauthResource } from '../../api/lib/oauth-store.js';
+import { normalizeOAuthRedirectUri, normalizeOAuthResource, normalizeScopes, oauthResource } from '../../api/lib/oauth-store.js';
 
 function response() {
   const res = { setHeader: vi.fn(), status: vi.fn(), json: vi.fn() };
@@ -29,5 +29,12 @@ describe('descoberta OAuth do MCP', () => {
     expect(normalizeOAuthResource()).toBe(oauthResource);
     expect(normalizeOAuthResource(oauthResource)).toBe(oauthResource);
     expect(() => normalizeOAuthResource('https://outro.example/mcp')).toThrow(/Recurso OAuth inválido/);
+  });
+
+  it('aceita retorno HTTPS e loopback local de aplicativo nativo', () => {
+    expect(normalizeOAuthRedirectUri('https://claude.ai/api/mcp/auth_callback')).toBe('https://claude.ai/api/mcp/auth_callback');
+    expect(normalizeOAuthRedirectUri('http://127.0.0.1:32123/callback')).toBe('http://127.0.0.1:32123/callback');
+    expect(normalizeOAuthRedirectUri('http://localhost:32123/callback')).toBe('http://localhost:32123/callback');
+    expect(() => normalizeOAuthRedirectUri('http://example.com/callback')).toThrow(/retorno inválido/);
   });
 });

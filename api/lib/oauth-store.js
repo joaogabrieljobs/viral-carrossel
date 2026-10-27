@@ -23,13 +23,16 @@ export function normalizeScopes(value) {
   if (!list.length || list.some(item => !SCOPES.has(item))) fail('invalid_scope', 'Permissões inválidas.');
   return [...new Set(list)];
 }
-function redirect(value) {
+export function normalizeOAuthRedirectUri(value) {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error();
+    const loopback = url.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !loopback) || url.username || url.password || url.hash) throw new Error();
     return url.toString();
   } catch { fail('invalid_redirect_uri', 'Endereço de retorno inválido.'); }
 }
+const redirect = normalizeOAuthRedirectUri;
 
 export async function registerOAuthClient(input) {
   let redirectUris = input?.redirect_uris;
