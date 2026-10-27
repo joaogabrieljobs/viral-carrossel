@@ -75,6 +75,23 @@ describe('autorização OAuth do MCP', () => {
     }));
   });
 
+  it('retorna ao callback local do Claude Code sem redirect de formulário bloqueado pelo CSP', async () => {
+    deps.validateOAuthRequest.mockResolvedValue({
+      client:{ client_name:'Claude Code' }, scopes:['projects:read','projects:write'],
+      redirectUri:'http://127.0.0.1:32123/callback',
+    });
+    const req = request();
+    req.method = 'POST';
+    req.body = { ...req.query, redirect_uri:'http://127.0.0.1:32123/callback', decision:'allow' };
+    const res = response();
+    await authorize(req, res);
+    expect(res.redirect).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.setHeader).toHaveBeenCalledWith('Referrer-Policy', 'no-referrer');
+    expect(res.send.mock.calls[0][0]).toContain('Retornando ao Claude Code');
+    expect(res.send.mock.calls[0][0]).toContain('http://127.0.0.1:32123/callback');
+  });
+
   it('explica quando a conta não tem assinatura ativa', async () => {
     deps.findActiveSubscription.mockResolvedValue(null);
     const res = response();
