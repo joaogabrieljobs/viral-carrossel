@@ -32,15 +32,21 @@ function redirect(value) {
 }
 
 export async function registerOAuthClient(input) {
-  const uris = Array.isArray(input?.redirect_uris) ? [...new Set(input.redirect_uris.map(redirect))] : [];
-  if (!uris.length || uris.length > 10) fail('invalid_client_metadata', 'Informe os endereços de retorno.');
+  let redirectUris = input?.redirect_uris;
+  if (typeof redirectUris === 'string') {
+    try { redirectUris = JSON.parse(redirectUris); }
+    catch { redirectUris = redirectUris.split(/\s+/).filter(Boolean); }
+  }
+  const uris = Array.isArray(redirectUris) ? [...new Set(redirectUris.map(redirect))] : [];
+  if (!uris.length || uris.length > 50) fail('invalid_client_metadata', 'Informe os endereços de retorno.');
   const name = String(input?.client_name || 'Cliente MCP').trim().slice(0, 100);
   const rows = await getPostgresConnection().unsafe(
     `INSERT INTO moont.oauth_clients (client_name, redirect_uris) VALUES ($1, $2::text[])
      RETURNING client_id, client_name, redirect_uris`, [name, uris],
   );
   return { client_id: rows[0].client_id, client_name: rows[0].client_name, redirect_uris: rows[0].redirect_uris,
-    token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] };
+    client_id_issued_at: Math.floor(Date.now() / 1000), token_endpoint_auth_method: 'none',
+    grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] };
 }
 
 export async function validateOAuthRequest({ clientId, redirectUri, resource, scope }) {
