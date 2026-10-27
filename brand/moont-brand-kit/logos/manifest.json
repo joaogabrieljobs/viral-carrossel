@@ -1,0 +1,153 @@
+{
+  "identity": "Moont Sequence",
+  "source": "src/components/BrandLogo.jsx",
+  "sourceGeometrySha256": "8b3358915b4270cd3e715e7e22e0d30cd5a3ff53d599f0c1c5b2a5f39482f8ad",
+  "viewBoxes": {
+    "wordmark": "2 5 272 55",
+    "symbol": "0 0 64 64"
+  },
+  "colors": {
+    "midnight": "#090A0F",
+    "graphite": "#181B25",
+    "moonlight": "#F3F0E7",
+    "mist": "#BBB9C7",
+    "orbitalBlue": "#5B53E8",
+    "aurora": "#D7FF5A",
+    "black": "#000000",
+    "white": "#FFFFFF"
+  },
+  "variants": {
+    "color-on-light": {
+      "label": "Colorida para fundo claro",
+      "usage": "superfícies claras",
+      "wordmark": "#090A0F",
+      "tiles": [
+        "#090A0F",
+        "#5B53E8",
+        "#D7FF5A"
+      ]
+    },
+    "color-on-dark": {
+      "label": "Colorida para fundo escuro",
+      "usage": "superfícies escuras",
+      "wordmark": "#F3F0E7",
+      "tiles": [
+        "#F3F0E7",
+        "#5B53E8",
+        "#D7FF5A"
+      ]
+    },
+    "black": {
+      "label": "Monocromática preta",
+      "usage": "produção em uma cor sobre fundo claro",
+      "wordmark": "#000000",
+      "tiles": [
+        "#000000",
+        "#000000",
+        "#000000"
+      ]
+    },
+    "white": {
+      "label": "Monocromática branca",
+      "usage": "produção em uma cor sobre fundo escuro",
+      "wordmark": "#FFFFFF",
+      "tiles": [
+        "#FFFFFF",
+        "#FFFFFF",
+        "#FFFFFF"
+      ]
+    }
+  },
+  "pngSizes": {
+    "wordmark": [
+      {
+        "width": 480,
+        "height": 128
+      },
+      {
+        "width": 960,
+        "height": 256
+      },
+      {
+        "width": 1920,
+        "height": 512
+      }
+    ],
+    "symbol": [
+      {
+        "width": 128,
+        "height": 128
+      },
+      {
+        "width": 256,
+        "height": 256
+      },
+      {
+        "width": 512,
+        "height": 512
+      },
+      {
+        "width": 1024,
+        "height": 1024
+      }
+    ],
+    "presentationWordmark": [
+      {
+        "width": 1600,
+        "height": 600
+      }
+    ],
+    "presentationSymbol": [
+      {
+        "width": 1024,
+        "height": 1024
+      }
+    ]
+  },
+  "files": [
+    "png/symbol/transparent/black/moont-sequence-symbol-black-transparent-1024x1024.png",
+    "png/symbol/transparent/black/moont-sequence-symbol-black-transparent-128x128.png",
+    "png/symbol/transparent/black/moont-sequence-symbol-black-transparent-256x256.png",
+    "png/symbol/transparent/black/moont-sequence-symbol-black-transparent-512x512.png",
+    "png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-1024x1024.png",
+    "png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-128x128.png",
+    "png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-256x256.png",
+    "png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-512x512.png",
+    "png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-1024x1024.png",
+    "png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-128x128.png",
+    "png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-256x256.png",
+    "png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-512x512.png",
+    "png/symbol/transparent/white/moont-sequence-symbol-white-transparent-1024x1024.png",
+    "png/symbol/transparent/white/moont-sequence-symbol-white-transparent-128x128.png",
+    "png/symbol/transparent/white/moont-sequence-symbol-white-transparent-256x256.png",
+    "png/symbol/transparent/white/moont-sequence-symbol-white-transparent-512x512.png",
+    "png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-1920x512.png",
+    "png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-480x128.png",
+    "png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-960x256.png",
+    "png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-1920x512.png",
+    "png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-480x128.png",
+    "png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-960x256.png",
+    "png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-1920x512.png",
+    "png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-480x128.png",
+    "png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-960x256.png",
+    "png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-1920x512.png",
+    "png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-480x128.png",
+    "png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-960x256.png",
+    "presentation/moont-sequence-symbol-on-midnight-1024x1024.png",
+    "presentation/moont-sequence-symbol-on-midnight-1024x1024.svg",
+    "presentation/moont-sequence-symbol-on-moonlight-1024x1024.png",
+    "presentation/moont-sequence-symbol-on-moonlight-1024x1024.svg",
+    "presentation/moont-sequence-wordmark-on-midnight-1600x600.png",
+    "presentation/moont-sequence-wordmark-on-midnight-1600x600.svg",
+    "presentation/moont-sequence-wordmark-on-moonlight-1600x600.png",
+    "presentation/moont-sequence-wordmark-on-moonlight-1600x600.svg",
+    "svg/symbol/moont-sequence-symbol-black-transparent.svg",
+    "svg/symbol/moont-sequence-symbol-color-on-dark-transparent.svg",
+    "svg/symbol/moont-sequence-symbol-color-on-light-transparent.svg",
+    "svg/symbol/moont-sequence-symbol-white-transparent.svg",
+    "svg/wordmark/moont-sequence-wordmark-black-transparent.svg",
+    "svg/wordmark/moont-sequence-wordmark-color-on-dark-transparent.svg",
+    "svg/wordmark/moont-sequence-wordmark-color-on-light-transparent.svg",
+    "svg/wordmark/moont-sequence-wordmark-white-transparent.svg"
+  ]
+}
