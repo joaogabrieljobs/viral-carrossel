@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, KeyRound, Link2, Trash2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, KeyRound, Link2, Trash2 } from 'lucide-react';
 
 const MCP_URL = 'https://moont.ai/mcp';
 
@@ -135,10 +135,32 @@ export default function AgentAccessPanel() {
           </button>
         </div>
         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45 }}>
-          No ChatGPT, adicione um servidor MCP personalizado com este endereço e escolha OAuth: o login e a autorização acontecem no Moont. No Claude ou Codex, você também pode usar este endereço com a chave Bearer criada abaixo.
+          Use este mesmo endereço no Claude, ChatGPT ou outro cliente MCP. Escolha OAuth quando essa opção aparecer: o login, as permissões e a renovação da conexão acontecem com segurança no Moont.
         </p>
       </div>
 
+      <div style={{ display: 'grid', gap: 10, padding: 14, border: '1px solid var(--accent)', borderRadius: 12, background: 'var(--accent-surface)' }}>
+        <div>
+          <strong style={{ fontSize: 13 }}>Conectar no Claude</strong>
+          <p style={{ margin: '5px 0 0', color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5 }}>
+            No Claude, abra Configurações → Conectores → Adicionar conector personalizado. Dê o nome “Moont”, cole o endereço acima e clique em Conectar. O Claude abrirá o Moont para você entrar e autorizar a conta.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a href="https://claude.ai/settings/connectors" target="_blank" rel="noopener noreferrer" style={{ ...buttonStyle, textDecoration: 'none', background: 'var(--text-primary)', color: 'var(--bg-base)', borderColor: 'transparent' }}>
+            <ExternalLink size={14} aria-hidden /> Abrir conectores do Claude
+          </a>
+          <button type="button" style={buttonStyle} onClick={() => navigator.clipboard.writeText(MCP_URL).then(() => setUrlCopied(true)).catch(() => setError('Não foi possível copiar o endereço.'))}>
+            {urlCopied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
+            {urlCopied ? 'Endereço copiado' : 'Copiar para o Claude'}
+          </button>
+        </div>
+        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.45 }}>
+          Disponível no Claude e Claude Desktop para contas Pro, Max, Team e Enterprise. Em contas Team ou Enterprise, um administrador precisa liberar o conector da organização.
+        </p>
+      </div>
+
+      <div className="vc-eyebrow">Opção avançada · chave manual</div>
       <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600 }}>
         Nome da conexão
         <input
@@ -150,7 +172,7 @@ export default function AgentAccessPanel() {
       </label>
       <div>
         <button type="button" style={{ ...buttonStyle, background: 'var(--text-primary)', color: 'var(--bg-base)', borderColor: 'transparent' }} disabled={!!busy} onClick={create}>
-          <KeyRound size={14} aria-hidden /> {busy === 'create' ? 'Criando…' : 'Criar chave para Claude ou Codex'}
+          <KeyRound size={14} aria-hidden /> {busy === 'create' ? 'Criando…' : 'Criar chave Bearer'}
         </button>
       </div>
 

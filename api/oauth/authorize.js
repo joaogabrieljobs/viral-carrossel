@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (!['GET','POST'].includes(req.method)) return res.status(405).end();
   const p = params(req);
   try {
-    if (p.response_type !== 'code' || p.code_challenge_method !== 'S256' || p.resource !== oauthResource || !p.state) throw Object.assign(new Error('Solicitação OAuth incompleta.'), { code:'invalid_request' });
-    const valid = await validateOAuthRequest({ clientId:p.client_id, redirectUri:p.redirect_uri, resource:p.resource, scope:p.scope });
+    if (p.response_type !== 'code' || p.code_challenge_method !== 'S256' || !p.state) throw Object.assign(new Error('Solicitação OAuth incompleta.'), { code:'invalid_request' });
+    const valid = await validateOAuthRequest({ clientId:p.client_id, redirectUri:p.redirect_uri, resource:p.resource || oauthResource, scope:p.scope });
     const access = await readCurrentAccessCookie(req);
     if (!access) return page(res, 'Entre no Moont', '<h1>Entre primeiro no Moont</h1><p>Abra o Moont, entre na sua conta e volte para esta janela para continuar a conexão.</p><a href="https://moont.ai" target="_blank" rel="noopener">Abrir Moont</a><a class="muted" href="javascript:location.reload()">Tentar novamente</a>', 401);
     if (!billingDisabled()) {

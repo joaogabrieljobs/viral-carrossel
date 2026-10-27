@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import metadata from '../../api/oauth/metadata.js';
 import protectedResource from '../../api/oauth-protected-resource.js';
-import { normalizeScopes, oauthResource } from '../../api/lib/oauth-store.js';
+import { normalizeOAuthResource, normalizeScopes, oauthResource } from '../../api/lib/oauth-store.js';
 
 function response() {
   const res = { setHeader: vi.fn(), status: vi.fn(), json: vi.fn() };
@@ -23,5 +23,11 @@ describe('descoberta OAuth do MCP', () => {
   it('aceita somente os escopos conhecidos', () => {
     expect(normalizeScopes('projects:read projects:write')).toEqual(['projects:read', 'projects:write']);
     expect(() => normalizeScopes('projects:read admin')).toThrow(/Permissões inválidas/);
+  });
+
+  it('aceita clientes MCP 2025-03-26 sem resource e recusa outro destino', () => {
+    expect(normalizeOAuthResource()).toBe(oauthResource);
+    expect(normalizeOAuthResource(oauthResource)).toBe(oauthResource);
+    expect(() => normalizeOAuthResource('https://outro.example/mcp')).toThrow(/Recurso OAuth inválido/);
   });
 });

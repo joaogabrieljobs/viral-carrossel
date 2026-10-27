@@ -14,7 +14,8 @@ export default async function handler(req, res) {
       : p.grant_type === 'refresh_token'
         ? await rotateRefreshToken({ token:p.refresh_token, clientId:p.client_id, resource:p.resource })
         : (() => { throw Object.assign(new Error('Grant não suportado.'), { code:'unsupported_grant_type' }); })();
-    const issued = await createAgentToken(grant.ownerId,{ label:'ChatGPT / MCP OAuth', scopes:grant.scopes, expiresInSec:3600 });
+    const client = String(grant.clientName || 'Assistente').trim().slice(0, 60);
+    const issued = await createAgentToken(grant.ownerId,{ label:`MCP OAuth — ${client}`, scopes:grant.scopes, expiresInSec:3600 });
     const refresh = await createRefreshToken({ clientId:p.client_id, ownerId:grant.ownerId, scopes:grant.scopes });
     return res.status(200).json({ access_token:issued.token, token_type:'Bearer', expires_in:3600, refresh_token:refresh, scope:grant.scopes.join(' '), resource:oauthResource });
   } catch (cause) { return res.status(cause.status || 400).json({ error:cause.code || 'invalid_grant', error_description:cause.message }); }

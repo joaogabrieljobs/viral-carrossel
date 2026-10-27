@@ -57,6 +57,24 @@ describe('autorização OAuth do MCP', () => {
     expect(res.send.mock.calls[0][0]).toContain('Conectar ChatGPT');
   });
 
+  it('aceita o callback OAuth do Claude no fluxo MCP sem resource explícito', async () => {
+    deps.validateOAuthRequest.mockResolvedValue({
+      client:{ client_name:'Claude' }, scopes:['projects:read','projects:write'],
+      redirectUri:'https://claude.ai/api/mcp/auth_callback',
+    });
+    const req = request();
+    delete req.query.resource;
+    req.query.redirect_uri = 'https://claude.ai/api/mcp/auth_callback';
+    const res = response();
+    await authorize(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send.mock.calls[0][0]).toContain('Conectar Claude');
+    expect(deps.validateOAuthRequest).toHaveBeenCalledWith(expect.objectContaining({
+      resource: 'https://moont.ai/mcp',
+      redirectUri: 'https://claude.ai/api/mcp/auth_callback',
+    }));
+  });
+
   it('explica quando a conta não tem assinatura ativa', async () => {
     deps.findActiveSubscription.mockResolvedValue(null);
     const res = response();

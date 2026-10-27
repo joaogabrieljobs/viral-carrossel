@@ -165,7 +165,7 @@ export async function revokeAgentToken(ownerId, tokenId) {
     [owner, tokenId],
   );
   if (!rows[0]) fail(404, 'agent_token_not_found', 'Integração não encontrada nesta conta.');
-  if (/ChatGPT|MCP OAuth/i.test(String(rows[0].label || ''))) {
+  if (/MCP OAuth|ChatGPT/i.test(String(rows[0].label || ''))) {
     await getPostgresConnection().unsafe(
       `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
        WHERE owner_id = $1 AND revoked_at IS NULL`, [owner],
