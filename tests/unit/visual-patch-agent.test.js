@@ -223,6 +223,25 @@ describe('visual-only agent patch', () => {
     expect(withText.slides[0].overlays[0].text).toBe('Agende sua avaliação');
   });
 
+  it('expõe o link oficial de compartilhamento quando o projeto possui shareCode', () => {
+    const entry = sampleEntry();
+    entry.doc.shareCode = 'f5m3cgpb';
+    expect(projectDesignView({ id: 'gisr5t9', version: 23, entry }, { includeText: true }))
+      .toMatchObject({
+        id: 'gisr5t9',
+        shareCode: 'F5M3CGPB',
+        shareUrl: 'https://moont.ai/?share=F5M3CGPB&app=1',
+      });
+  });
+
+  it('não expõe código de compartilhamento inválido', () => {
+    const entry = sampleEntry();
+    entry.doc.shareCode = 'inválido';
+    const view = projectDesignView({ id: 'gisr5t9', version: 23, entry });
+    expect(view.shareCode).toBeUndefined();
+    expect(view.shareUrl).toBeUndefined();
+  });
+
   it('não aceita áreas extras ausentes em cards selecionados', () => {
     expect(() => applyVisualPatchToEntry(sampleEntry(), {
       overlayStyles: { cta1: { x: 55 } },

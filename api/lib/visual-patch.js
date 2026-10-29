@@ -362,6 +362,10 @@ export function applyVisualPatchToEntry(entry, rawPatch, slideIds, { brandScope 
 export function projectDesignView(project, { includeText = false } = {}) {
   const entry = project?.entry || {};
   const doc = entry.doc || {};
+  const shareCode = typeof doc.shareCode === 'string'
+    && /^[A-Z2-9]{8,12}$/.test(doc.shareCode.trim().toUpperCase())
+    ? doc.shareCode.trim().toUpperCase()
+    : '';
   const safeText = (value, maxLength = 500) => {
     if (typeof value !== 'string') return '';
     return value.replace(/data:[^\s"']+/gi, '[mídia]').slice(0, maxLength);
@@ -406,6 +410,10 @@ export function projectDesignView(project, { includeText = false } = {}) {
   const brand = record(doc.brand) ? pickVisual(doc.brand, BRAND_VISUAL_FIELDS) : {};
   return {
     id: project.id, version: project.version, name: safeText(entry.name || entry.title, 160),
+    ...(shareCode ? {
+      shareCode,
+      shareUrl: `https://moont.ai/?share=${encodeURIComponent(shareCode)}&app=1`,
+    } : {}),
     ...(includeText ? { caption: safeText(doc.caption, 10000) } : {}),
     slideCount: Array.isArray(doc.slides) ? doc.slides.length : 0,
     brand,
