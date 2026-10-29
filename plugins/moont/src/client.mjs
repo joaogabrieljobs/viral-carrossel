@@ -72,7 +72,7 @@ export class MoontApiClient {
     }
   }
 
-  async request(method, query = {}, body, timeoutMs = 45000) {
+  async request(method, query = {}, body) {
     const url = new URL('/api/agent-visual-batch', this.origin);
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
@@ -93,7 +93,7 @@ export class MoontApiClient {
           },
           body: body === undefined ? undefined : JSON.stringify(body),
           redirect: 'error',
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: AbortSignal.timeout(45000),
         });
       } catch {
         throw new MoontApiError('Não foi possível conectar ao Moont. Verifique a conexão e tente novamente.', { code: 'network_error' });
@@ -182,8 +182,8 @@ export class MoontApiClient {
     return this.request('POST', {}, { action: 'apply_text', projectId, baseVersion, patch, requestId });
   }
 
-  generateImage({ projectId, baseVersion, slideId, requestId, aspectRatio }) {
-    return this.request('POST', {}, { action: 'generate_image', projectId, baseVersion, slideId, requestId, aspectRatio }, 295000);
+  generateImage({ projectId, baseVersion, slideIds, requestId }) {
+    return this.request('POST', {}, { action: 'generate_image', projectId, baseVersion, slideIds, requestId });
   }
 
   undo({ requestId, undoRequestId }) {

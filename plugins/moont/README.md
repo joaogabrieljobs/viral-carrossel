@@ -56,10 +56,13 @@ No macOS, `sh plugins/moont/bin/setup.sh add` grava a mesma chave no Chaves. Em 
 ### Imagens
 
 1. `get_project_content` mostra `imageQuery` e `hasPhoto` em cada card.
-2. `generate_slide_image` recebe `projectId`, `slideId`, a `baseVersion` recém-lida e um `requestId` único.
-3. Cada chamada gera e salva uma imagem, consome um crédito do plano e incrementa a versão do projeto.
-4. Releia o projeto antes do card seguinte, pois a nova `baseVersion` será a versão retornada pela operação anterior.
-5. Repetir o mesmo `requestId` devolve a operação concluída sem gerar ou cobrar outra imagem. Conflitos preservam a edição mais recente.
+2. `generate_slide_image` recebe `projectId`, a `baseVersion` recém-lida, um `requestId` único e, opcionalmente, `slideIds` (sem ele, todos os cards sem foto, até 8 por chamada). A imagem sai da `imageQuery` salva no card; para outra imagem, edite a `imageQuery` com `apply_text_edit` antes.
+3. A chamada é **paga e lenta**: reserva 1 crédito de imagem do plano por card e responde na hora com `status: "pending"` e um estado por card. A geração continua no servidor por alguns minutos.
+4. Acompanhe com `get_batch_status({ requestIds: [requestId] })` (no MCP hospedado, `get_change_status`). Ao terminar, `status` vira `applied` com `afterVersion` (uma única versão nova) e cada card fica `done` ou `failed`; se nenhum card sair, `failed`. Crédito de card `done` é confirmado; crédito de card `failed` é devolvido.
+5. Repetir o mesmo `requestId` devolve o job atual sem reservar nem gerar de novo. Conflito de versão responde `project_conflict` com `cloudVersion`, sem cobrar. Sem saldo para todos os cards do job, `quota_exhausted` com `needed` e `remaining`, sem cobrar.
+6. `undo_project_change` reverte o job concluído enquanto o projeto estiver na versão produzida por ele.
+
+Códigos de recusa específicos: `image_slide_missing`, `image_already_present`, `image_query_missing`, `image_nothing_to_generate`, `image_too_many_slides`, `image_request_reused`, `quota_exhausted`, `plan_no_images`, `subscription_inactive`, `sjinn_unconfigured`, `quota_store_error`. Em um job concluído, cada card pode trazer `errorCode` como `sjinn_timeout`, `sjinn_failed`, `image_result_missing`, `project_conflict` ou `image_job_timeout` (job travado por mais de 12 minutos, marcado `failed` na próxima consulta e com os créditos devolvidos).
 
 Um lote interrompido pode ser retomado: uma prévia parcial retorna `planId`, usado como `resumePlanId` na próxima chamada; uma aplicação parcial conserva o mesmo `planId` e os mesmos IDs idempotentes; uma reversão parcial retorna `undoPlanId`, usado como `resumeUndoPlanId` para prosseguir. Os planos ficam em `PLUGIN_DATA/plans` (ou `~/.local/share/moont-codex/plans` fora do Codex) com acesso restrito ao usuário. Eles guardam apenas metadados e ajustes visuais; o token fica somente no Chaves.
 

@@ -22,11 +22,11 @@ flowchart LR
 - **Mídia:** Vercel Blob privado mantém os bytes de fotos e logos. O banco guarda referências, não data URLs grandes. A API de assets ainda é `/api/library-sync`.
 - **Cobrança:** Stripe continua sendo a fonte para customer, plano, período e estado da assinatura. O Postgres guarda a identidade própria da conta e a quota operacional de imagens quando as flags correspondentes estão ativas.
 - **Navegador:** IndexedDB guarda mídia/cache e, quando disponível, uma fila durável por projeto/conta; `localStorage` continua como cache de interface. Nenhum dos dois decide sozinho quais projetos existem na conta. Se o IndexedDB falhar, o app ainda abre a biblioteca da nuvem e salva online por PUT versionado, mas não promete uma fila offline que não conseguiu gravar.
-- **Codex:** o plugin local `moont@moont-local` usa um token pessoal revogável, guardado no Chaves do macOS. A API recebe apenas alterações visuais permitidas; o plugin não recebe credenciais do banco nem pode escrever texto ou substituir fotos. Uma prévia antecede a aplicação; cada projeto é gravado atomicamente e o lote pode ser retomado.
+- **Codex e MCP hospedado:** o plugin local `moont@moont-local` usa um token pessoal revogável, guardado no Chaves do macOS; `https://moont.ai/mcp` usa OAuth com escopos `projects:read` e `projects:write`. A API recebe alterações visuais e textuais permitidas e gera imagens só a partir da `imageQuery` salva (`generate_slide_image`); o plugin não recebe credenciais do banco nem pode substituir fotos por upload. Uma prévia antecede a aplicação; cada projeto é gravado atomicamente e o lote pode ser retomado. A geração de imagem é um job: reserva 1 crédito por card na mesma quota do editor, responde `pending`, continua em `waitUntil` e grava todos os cards prontos numa única versão nova; `get_change_status` expira jobs travados e devolve os créditos.
 
 ## Modelo de dados
 
-As migrações estão em `db/migrations/001_account_library.sql` a `007_agent_visual_jobs.sql`.
+As migrações estão em `db/migrations/001_account_library.sql` a `009_agent_image_jobs.sql`.
 
 | Tabela | Função | Chave e proteção principal |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ As migrações estão em `db/migrations/001_account_library.sql` a `007_agent_vi
 | `moont.rate_limit_buckets` | Limite de pedidos partilhado entre funções | Hash de IP/rota e janela; limpeza limitada de janelas vencidas |
 | `moont.ocr_daily_quotas` e `moont.ocr_daily_operations` | Teto diário de OCR por conta e reembolso idempotente | `(owner_id, quota_day)` e identificador de operação |
 | `moont.agent_tokens` | Chaves pessoais da integração Codex; somente hash, escopo, vencimento e revogação | `token_hash` único; vinculadas à revisão de segurança da conta |
-| `moont.agent_visual_jobs` | Histórico privado para desfazer uma alteração visual | `(owner_id, request_id)` único; snapshot anterior e versões antes/depois |
+| `moont.agent_visual_jobs` | Histórico privado para desfazer uma alteração do MCP e estado dos jobs de imagem (`pending`, `applied`, `failed`, `undone`, com `slides` por card) | `(owner_id, request_id)` único; snapshot anterior e versões antes/depois |
 
 **Distinção atual de IDs:** a identidade já possui UUID próprio, mas a biblioteca, os assets e a quota ainda usam preferencialmente o `customerId` Stripe como `owner_id`, preservando as chaves legadas. O UUID ainda não substitui essa chave em todos os dados. O cliente local também usa aliases de owner; uma futura troca para UUID exige migração explícita desses aliases e dos caminhos do Blob. Dois customers com o mesmo e-mail não devem ser mesclados automaticamente.
 

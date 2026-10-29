@@ -34,7 +34,7 @@ async function dispatch(message) {
           protocolVersion: supportedVersions.has(params.protocolVersion) ? params.protocolVersion : '2025-06-18',
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: 'moont', version: '0.3.0' },
-          instructions: 'Leia o projeto antes de editar. Para design e texto, faça prévia antes de aplicar. Para imagens, use generate_slide_image com a versão atual e um requestId único; cada imagem consome um crédito. Use undo_project_change para reverter.',
+          instructions: 'Leia o projeto antes de editar. Para design e texto, faça prévia antes de aplicar. Para imagens, use generate_slide_image com a versão atual e um requestId único: consome 1 crédito por card, responde pending e termina em minutos; acompanhe com get_batch_status. Use undo_project_change para reverter.',
         };
         break;
       case 'ping':

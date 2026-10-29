@@ -55,16 +55,16 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'generate_slide_image',
-    description: 'Gera e salva uma imagem para um card usando a imageQuery atual. Consome 1 crédito de imagem e pode levar alguns minutos. Leia o projeto imediatamente antes; a versão base evita sobrescrever edições concorrentes.',
+    description: 'Gera imagens para cards a partir da imageQuery salva em cada um e grava no projeto. Lento (minutos) e pago: consome 1 crédito de imagem do plano por card; sem crédito, recusa sem cobrar. Sem slideIds, atende todos os cards sem foto (até 8 por chamada). Leia o projeto imediatamente antes e informe a versão atual. Responde na hora com status pending; acompanhe com get_batch_status({ requestIds }) até applied ou failed, que traz o estado por card e a versão nova. Para outra imagem, edite a imageQuery com apply_text_edit antes.',
     inputSchema: {
       type: 'object',
       properties: {
-        projectId: { type: 'string' }, slideId: { type: 'string' },
+        projectId: { type: 'string' },
         baseVersion: { type: 'integer', minimum: 1 },
+        slideIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 },
         requestId: { type: 'string', minLength: 8, maxLength: 128 },
-        aspectRatio: { type: 'string', enum: ['1:1', '16:9', '9:16', '2:3'] },
       },
-      required: ['projectId', 'slideId', 'baseVersion', 'requestId'], additionalProperties: false,
+      required: ['projectId', 'baseVersion', 'requestId'], additionalProperties: false,
     },
   },
   {
@@ -576,11 +576,17 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
           return client.getContentSchema();
         case 'generate_slide_image': {
           const projectId = requireString(args.projectId, 'projectId');
-          const slideId = requireString(args.slideId, 'slideId');
           const requestId = requireString(args.requestId, 'requestId');
           const baseVersion = Number(args.baseVersion);
           if (!Number.isSafeInteger(baseVersion) || baseVersion < 1) throw new MoontApiError('baseVersion inválida.', { code: 'invalid_input' });
-          return client.generateImage({ projectId, slideId, requestId, baseVersion, aspectRatio: args.aspectRatio });
+          let slideIds;
+          if (args.slideIds !== undefined) {
+            if (!Array.isArray(args.slideIds) || !args.slideIds.length || args.slideIds.some((id) => typeof id !== 'string' || !id.trim())) {
+              throw new MoontApiError('slideIds deve ser uma lista de IDs de card.', { code: 'invalid_input' });
+            }
+            slideIds = args.slideIds;
+          }
+          return client.generateImage({ projectId, baseVersion, slideIds, requestId });
         }
         case 'preview_text_edit':
           return previewTextEdit(args);
