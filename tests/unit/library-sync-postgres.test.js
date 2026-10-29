@@ -198,6 +198,28 @@ describe('biblioteca Postgres por conta', () => {
     expect(result.meta.assetIds).toContain('image_old');
   });
 
+  it('não deixa um salvamento com foto indisponível apagar a referência do asset', async () => {
+    const adapter = store(fakeDatabase());
+    await adapter.putAccountProject('cus_guard', {
+      id: 'p', name: 'Guarda', doc: { slides: [{ id: 's1', title: 'A', bgImageAssetId: 'original_x', bgImageId: 'img_1' }] },
+    }, { baseVersion: 0 });
+    const saved = await adapter.putAccountProject('cus_guard', {
+      id: 'p', name: 'Guarda', doc: { slides: [{ id: 's1', title: 'A2', bgImage: null, bgImageId: null,
+        bgImageFailed: true, bgImageError: 'stored_image_missing' }] },
+    }, { baseVersion: 1 });
+    expect(saved.version).toBe(2);
+    const project = await adapter.getAccountProject('cus_guard', 'p');
+    expect(project.entry.doc.slides[0]).toMatchObject({
+      title: 'A2', bgImageAssetId: 'original_x', bgImageFailed: false, bgImageError: null,
+    });
+    const removed = await adapter.putAccountProject('cus_guard', {
+      id: 'p', name: 'Guarda', doc: { slides: [{ id: 's1', title: 'A2', bgImage: null, bgImageId: null,
+        bgImageFailed: false, bgImageError: null, bgImageSource: null }] },
+    }, { baseVersion: 2 });
+    expect(removed.version).toBe(3);
+    expect((await adapter.getAccountProject('cus_guard', 'p')).entry.doc.slides[0].bgImageAssetId).toBeUndefined();
+  });
+
   it('suporta escrita granular versionada, exclusão, paginação leve e isolamento', async () => {
     const db = fakeDatabase();
     const adapter = store(db);

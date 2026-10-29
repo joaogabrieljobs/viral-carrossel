@@ -4,6 +4,7 @@
  * é interpretada como biblioteca vazia ou motivo para voltar a gravar no Blob.
  */
 import { getPostgresConnection } from './postgres-connection.js';
+import { preserveDroppedMediaReferences } from './media-reference-guard.js';
 
 const MAX_ASSETS = 800;
 const MAX_PROJECT_ID = 500;
@@ -446,8 +447,9 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
           if (previous?.deleted_at != null) continue; // tombstone definitivo
           if (previous && !opts.replace && entryUpdatedAt(entry) < entryUpdatedAt(previous.entry)) continue;
           if (previous && JSON.stringify(previous.entry) === JSON.stringify(entry)) continue;
+          const kept = previous ? preserveDroppedMediaReferences(previous.entry, entry).entry : entry;
           const row = {
-            project_id: id, entry, version: previous ? previous.version + 1 : 1,
+            project_id: id, entry: kept, version: previous ? previous.version + 1 : 1,
             updated_at: entryUpdatedAt(entry) || timestamp, deleted_at: null,
             sort_order: previous ? previous.sort_order : nextOrder++,
           };
@@ -552,7 +554,12 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
         if (previous?.deleted_at != null) throw deletedConflict(previous, state);
         if ((previous?.version || 0) !== base) throw conflict(previous, state);
         const timestamp = now();
-        const stored = { ...entry, updatedAt: timestamp };
+        // Uma foto que o navegador não carregou não pode sumir da conta.
+        const guarded = preserveDroppedMediaReferences(previous?.entry, entry);
+        if (guarded.restored.length) {
+          console.warn('[account-projects] media_reference_preserved', id, guarded.restored.length);
+        }
+        const stored = { ...guarded.entry, updatedAt: timestamp };
         const nextOrder = previous ? integer(state.next_order) : integer(state.next_order) + 1;
         const row = {
           project_id: id, entry: stored, version: base + 1,
