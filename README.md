@@ -45,6 +45,14 @@ Valores e saldo de imagens vêm de [`shared/plans.js`](shared/plans.js), compart
 
 Todos incluem o editor e texto com IA pela plataforma. Imagens inclusas usam o serviço do plano; imagens próprias podem ser importadas. Chaves próprias de IA são opcionais e seu consumo é cobrado pelo provedor. As opções e modelos disponíveis estão em [`src/config/ai-providers.js`](src/config/ai-providers.js).
 
+## Integrações por MCP
+
+O Moont pode ser conectado ao ChatGPT, Claude Code e Codex pelo MCP hospedado em `https://moont.ai/mcp`. A conexão usa OAuth com os escopos `projects:read` e `projects:write`; no Codex também existe o plugin local em [`plugins/moont`](plugins/moont/README.md).
+
+O agente pode listar e ler projetos, revisar texto e composição com prévia, aplicar alterações versionadas, desfazer uma aplicação e gerar as fotos dos cards. `generate_slide_image` usa a `imageQuery` já salva em cada card, aceita até oito cards sem foto por job e consome um crédito de imagem por card. A chamada responde `pending`; o agente acompanha o trabalho até `applied` ou `failed`. Créditos de cards que falham são devolvidos, e repetir o mesmo `requestId` consulta o mesmo job sem gerar ou cobrar novamente.
+
+O MCP não recebe os bytes das fotos nem expõe credenciais de banco. A imagem gerada é armazenada na conta e incorporada ao projeto. Logos, referências e uploads permanecem protegidos contra substituição por esse fluxo.
+
 ## Persistência e backup
 
 - O documento e a biblioteca ficam no `localStorage`; bytes de imagens, referências e logos de projeto/cards ficam no `IndexedDB`.
@@ -98,6 +106,8 @@ Base publicada em 28/09/2026: `d2043b6`, **343 testes de código + 66 testes de 
 - [Revisão editorial dos prompts](docs/revisao-prompts-texto.md)
 - [Revisão do kit por projeto — caso MUSA](docs/revisao-style-kit-musa.md)
 - [Referências de imagem do plano](docs/engineering/referencias-imagem-plano.md)
+- [Plugin e fluxo MCP, incluindo geração de imagens](plugins/moont/README.md)
+- [Arquitetura de conta, assets, quota e MCP](docs/moont-architecture.md)
 - [Recuperação de senha](docs/engineering/recuperacao-senha.md)
 - [Objetivos editoriais](docs/product/geracao-editorial-por-objetivo.md) e [registro de resultados](docs/product/resultados-editoriais.md)
 - [Design dos slides](docs/SLIDE-DESIGN.md)
