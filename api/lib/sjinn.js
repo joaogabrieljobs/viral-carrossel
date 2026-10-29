@@ -100,12 +100,30 @@ export function extractSjinnOutputUrl(data) {
   return null;
 }
 
+/** MIME pelos bytes: o CDN do SJinn pode responder `application/octet-stream`. */
+export function sniffImageMime(bytes) {
+  if (!bytes || bytes.length < 12) return null;
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 export async function downloadImageAsBase64(url) {
   // Revalida a URL devolvida pelo upstream (mesmo padrão de api/ai/compatible.js).
   const safe = assertPublicHttpUrl(url);
   const res = await fetch(safe, { redirect: 'error', signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`Download da imagem falhou (${res.status})`);
-  const mime = (res.headers.get('content-type') || 'image/png').split(';')[0].trim() || 'image/png';
   const bytes = Buffer.from(await res.arrayBuffer());
+  const header = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  // O data URL só é aceito pelo editor e pela nuvem com MIME image/*; o cabeçalho
+  // do CDN não é confiável, então os bytes decidem.
+  const sniffed = sniffImageMime(bytes);
+  const mime = sniffed || (header.startsWith('image/') ? header : null);
+  if (!mime) {
+    const err = new Error('A geração devolveu um arquivo que não é uma imagem.');
+    err.code = 'image_result_invalid';
+    throw err;
+  }
   return { b64_json: bytes.toString('base64'), mime };
 }
