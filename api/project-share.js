@@ -78,6 +78,38 @@ function referencedShareAssetIds(doc) {
   return ids;
 }
 
+function assetOwnersForRevision(doc, actor, fallbackOwnerId = '') {
+  const ownerId = String(actor?.customerId || fallbackOwnerId || '').trim();
+  if (!ownerId) return {};
+  return Object.fromEntries([...referencedShareAssetIds(doc)].map((assetId) => [assetId, ownerId]));
+}
+
+function assetOwnerCandidates(share, assetId) {
+  const candidates = [];
+  const add = (value) => {
+    const ownerId = String(value || '').trim();
+    // IDs Stripe/dev não contêm @. E-mails legados nunca viram namespace de assets.
+    if (!ownerId || ownerId.includes('@') || candidates.includes(ownerId)) return;
+    candidates.push(ownerId);
+  };
+  add(share?.assetOwners?.[assetId]);
+  add(share?.ownerId);
+  for (const member of share?.members || []) add(member);
+  return candidates;
+}
+
+async function getSharedAsset(share, assetId, options) {
+  for (const ownerId of assetOwnerCandidates(share, assetId)) {
+    // Uma revisão antiga não guardava a origem por asset. Procurar apenas no
+    // dono e nos membros da própria partilha recupera essas fotos sem abrir
+    // acesso a bibliotecas arbitrárias.
+    // eslint-disable-next-line no-await-in-loop
+    const asset = await getLibraryAsset(ownerId, assetId, options);
+    if (asset) return asset;
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -109,14 +141,14 @@ export default async function handler(req, res) {
       if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
       const assetId = String(req.query?.asset || req.query?.a || '').trim();
       if (assetId) {
-        if (!referencedShareAssetIds(share.doc).has(assetId) || !share.ownerId) {
+        if (!referencedShareAssetIds(share.doc).has(assetId)) {
           return res.status(404).json({ error: 'Asset não encontrado.' });
         }
         const rawPart = req.query?.part;
         if (rawPart !== undefined && (typeof rawPart !== 'string' || !/^\d{1,2}$/.test(rawPart))) {
           return res.status(400).json({ error: 'Índice da parte inválido.', code: 'library_bad_asset' });
         }
-        const asset = await getLibraryAsset(share.ownerId, assetId, {
+        const asset = await getSharedAsset(share, assetId, {
           part: rawPart === undefined ? undefined : Number(rawPart),
         });
         if (!asset) return res.status(404).json({ error: 'Asset não encontrado.' });
@@ -176,6 +208,7 @@ export default async function handler(req, res) {
         return {
           ...existing,
           doc: body.doc,
+          assetOwners: assetOwnersForRevision(body.doc, actor, existing.ownerId),
           name: typeof body.name === 'string' && body.name.trim()
             ? body.name.trim().slice(0, 120)
             : existing.name,
@@ -210,6 +243,7 @@ export default async function handler(req, res) {
         : 'Projeto partilhado',
       ownerEmail: actor.email || null,
       ownerId: actor.customerId || (actor.billingDisabled && billingDisabled() ? 'dev:billing-disabled' : null),
+      assetOwners: assetOwnersForRevision(body.doc, actor),
       members: writableIdentity(actor) ? [writableIdentity(actor)] : [],
       revision: 0,
     });

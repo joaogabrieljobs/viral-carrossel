@@ -224,4 +224,62 @@ describe('POST /api/project-share', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
+
+  it('guarda a conta que publicou cada revisão e lê a foto no Blob do membro', async () => {
+    await putSharedProject({
+      code: 'MEMBER01',
+      ownerId: 'cus_owner',
+      ownerEmail: 'dona@teste.exemplo',
+      members: ['cus_owner', 'cus_member'],
+      doc: { slides: [{ id: 's1', title: 'Antes' }] },
+      revision: 1,
+      keepRevision: true,
+    });
+
+    const published = makeRes();
+    await handler(post({
+      action: 'push',
+      code: 'MEMBER01',
+      doc: { slides: [{ id: 's1', title: 'Foto do membro', bgImageAssetId: 'member-photo' }] },
+    }, 'cus_member', 'membro@teste.exemplo'), published);
+    expect(published.statusCode).toBe(200);
+
+    const spy = vi.spyOn(librarySyncStore, 'getLibraryAsset').mockImplementation(async (ownerId, assetId) => (
+      ownerId === 'cus_member' && assetId === 'member-photo'
+        ? { dataUrl: 'data:image/jpeg;base64,MEMBER' }
+        : null
+    ));
+    const result = makeRes();
+    const req = makeReq({ cookie: cookieFor('cus_guest', 'guest@teste.exemplo') });
+    req.query = { code: 'MEMBER01', asset: 'member-photo' };
+    await handler(req, result);
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body.asset.dataUrl).toContain('MEMBER');
+    expect(spy).toHaveBeenCalledWith('cus_member', 'member-photo', { part: undefined });
+    spy.mockRestore();
+  });
+
+  it('recupera foto de revisão antiga procurando apenas entre dono e membros', async () => {
+    await putSharedProject({
+      code: 'LEGPHOTO',
+      ownerId: 'cus_owner',
+      members: ['cus_owner', 'cus_member', 'legado@teste.exemplo'],
+      doc: { slides: [{ id: 's1', bgImageAssetId: 'legacy-member-photo' }] },
+      revision: 3,
+      keepRevision: true,
+    });
+    const spy = vi.spyOn(librarySyncStore, 'getLibraryAsset').mockImplementation(async (ownerId) => (
+      ownerId === 'cus_member' ? { dataUrl: 'data:image/jpeg;base64,LEGACY' } : null
+    ));
+    const result = makeRes();
+    const req = makeReq({ cookie: cookieFor('cus_guest', 'guest@teste.exemplo') });
+    req.query = { code: 'LEGPHOTO', asset: 'legacy-member-photo' };
+    await handler(req, result);
+
+    expect(result.statusCode).toBe(200);
+    expect(spy.mock.calls.map(([ownerId]) => ownerId)).toEqual(['cus_owner', 'cus_member']);
+    expect(spy.mock.calls.some(([ownerId]) => ownerId.includes('@'))).toBe(false);
+    spy.mockRestore();
+  });
 });

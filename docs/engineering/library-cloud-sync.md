@@ -6,6 +6,8 @@ Atualizado em 2026-10-13.
 
 Cada conta autenticada (Stripe `customerId`) tem a sua biblioteca na nuvem. Login / logout / botão **Sync na nuvem** mantêm projetos entre browsers do mesmo utilizador. Contas diferentes nunca partilham o mesmo slot.
 
+O compartilhamento de equipe não mistura esses slots. O registro do link mantém o documento e a origem dos assets citados na revisão. `/api/project-share?code=…&asset=…` só entrega um asset que esteja referenciado nessa revisão e busca seus bytes na conta que publicou a imagem. A conta convidada importa a foto para o armazenamento local e, no salvamento seguinte, envia uma cópia para o próprio namespace. `/api/library-sync?asset=…` continua restrito à conta autenticada.
+
 ## API
 
 - `GET /api/library-sync` — meta
