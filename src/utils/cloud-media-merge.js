@@ -78,3 +78,60 @@ export function mergeHydratedProjectMedia(current, hydrated) {
     && brand === current.doc.brand && styleKit === current.doc.styleKit) return current;
   return { ...current, doc: { ...current.doc, slides, brand, styleKit } };
 }
+
+const SLIDE_MEDIA_KEYS = [
+  ['bgImageAssetId', 'bgImageId', 'bgImage', 'bgImageFailed'],
+  ['logoImageAssetId', 'logoImageId', 'logoImage', 'logoImageFailed'],
+  ['refImageAssetId', 'refImageId', 'refImage', 'refImageFailed'],
+];
+
+/**
+ * Uma troca feita pelo editor deixa de apontar para o asset antigo da conta.
+ * Um patch de falha (`*Failed: true`, bytes e ID zerados) não é troca: a
+ * referência da conta continua válida e permite hidratar de novo da nuvem.
+ */
+export function clearReplacedSlideAssets(before, after) {
+  if (!Array.isArray(after)) return after;
+  const previous = new Map((before || []).map((slide) => [slide?.id, slide]));
+  return after.map((slide) => {
+    const old = previous.get(slide?.id);
+    if (!old || !slide) return slide;
+    let next = slide;
+    for (const [assetKey, idKey, imageKey, failedKey] of SLIDE_MEDIA_KEYS) {
+      if (!old[assetKey] || slide[assetKey] !== old[assetKey]
+        || (slide[idKey] === old[idKey] && slide[imageKey] === old[imageKey])) continue;
+      if (slide[failedKey] === true && !slide[idKey] && !slide[imageKey]) continue;
+      next = { ...next, [assetKey]: null };
+    }
+    return next;
+  });
+}
+
+/**
+ * Depois que a conta confirma um envio, o documento local passa a conhecer o
+ * asset de cada foto que subiu. Sem isso, só a nuvem sabia o `assetId`, e um
+ * navegador sem os bytes locais salvava o card como foto perdida.
+ */
+export function mergeConfirmedAssetIds(current, confirmed) {
+  if (!current || !confirmed || current.id !== confirmed.id) return current;
+  const existing = current.doc?.slides;
+  const saved = confirmed.doc?.slides;
+  if (!Array.isArray(existing) || !Array.isArray(saved)) return current;
+  const byId = new Map(saved.map((slide) => [slide?.id, slide]));
+  let changed = false;
+  const slides = existing.map((slide) => {
+    const remote = byId.get(slide?.id);
+    if (!slide || !remote) return slide;
+    let next = slide;
+    for (const [assetKey, idKey] of SLIDE_MEDIA_KEYS) {
+      if (next[assetKey] || typeof remote[assetKey] !== 'string' || !remote[assetKey]) continue;
+      // Só adota o asset da mesma imagem; uma foto trocada enquanto o envio
+      // corria mantém a identidade nova e será enviada na próxima gravação.
+      if (!slide[idKey] || slide[idKey] !== remote[idKey]) continue;
+      next = { ...next, [assetKey]: remote[assetKey] };
+    }
+    if (next !== slide) changed = true;
+    return next;
+  });
+  return changed ? { ...current, doc: { ...current.doc, slides } } : current;
+}

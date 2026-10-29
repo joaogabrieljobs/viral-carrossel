@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from '../../src/utils/cloud-media-merge.js';
+import { clearReplacedSlideAssets, mergeConfirmedAssetIds, mergeHydratedBrandMedia, mergeHydratedProjectMedia } from '../../src/utils/cloud-media-merge.js';
 
 describe('mídia da nuvem após restaurar textos', () => {
   it('preenche a foto atrasada sem trocar textos nem a foto editada pelo usuário', () => {
@@ -84,5 +84,42 @@ describe('mídia da nuvem após restaurar textos', () => {
       },
     } };
     expect(mergeHydratedProjectMedia(current, hydrated)).toBe(current);
+  });
+});
+
+describe('referências de asset no documento local', () => {
+  const before = [
+    { id: 'a', bgImageAssetId: 'asset-a', bgImageId: 'img-a', bgImage: 'blob:a' },
+    { id: 'b', bgImageAssetId: 'asset-b', bgImageId: 'img-b', bgImage: 'blob:b' },
+    { id: 'c', bgImageAssetId: 'asset-c', bgImageId: 'img-c', bgImage: 'blob:c' },
+  ];
+
+  it('troca e remoção intencional soltam o asset; falha de carregamento não', () => {
+    const after = clearReplacedSlideAssets(before, [
+      { ...before[0], bgImageId: 'img-new', bgImage: 'blob:new' },
+      { ...before[1], bgImage: null, bgImageId: null, bgImageFailed: false, bgImageError: null, bgImageSource: null },
+      { ...before[2], bgImage: null, bgImageId: null, bgImageFailed: true, bgImageError: 'stored_image_missing' },
+    ]);
+    expect(after[0].bgImageAssetId).toBeNull();
+    expect(after[1].bgImageAssetId).toBeNull();
+    expect(after[2]).toMatchObject({ bgImageAssetId: 'asset-c', bgImageFailed: true });
+  });
+
+  it('adota o assetId confirmado só para a mesma imagem local', () => {
+    const current = { id: 'p', doc: { slides: [
+      { id: 'a', bgImageId: 'img-a', bgImage: 'blob:a' },
+      { id: 'b', bgImageId: 'img-b-novo' },
+      { id: 'c', bgImageAssetId: 'asset-c-atual', bgImageId: 'img-c' },
+    ] } };
+    const confirmed = { id: 'p', doc: { slides: [
+      { id: 'a', bgImageId: 'img-a', bgImageAssetId: 'original_a' },
+      { id: 'b', bgImageId: 'img-b', bgImageAssetId: 'original_b' },
+      { id: 'c', bgImageId: 'img-c', bgImageAssetId: 'original_c' },
+    ] } };
+    const merged = mergeConfirmedAssetIds(current, confirmed);
+    expect(merged.doc.slides[0]).toMatchObject({ bgImageAssetId: 'original_a', bgImage: 'blob:a' });
+    expect(merged.doc.slides[1].bgImageAssetId).toBeUndefined();
+    expect(merged.doc.slides[2].bgImageAssetId).toBe('asset-c-atual');
+    expect(mergeConfirmedAssetIds(merged, confirmed)).toBe(merged);
   });
 });

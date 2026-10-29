@@ -99,7 +99,7 @@ import PromptDialog, { ConfirmDialog } from './src/components/PromptDialog.jsx';
 import { resolveSlideBrandBg } from './src/utils/brand-helpers.js';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from './src/utils/library-helpers.js';
 import { normalizeLibraryEntry, normalizeLibraryFolders } from './src/utils/library-organizer.js';
-import { mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
+import { clearReplacedSlideAssets, mergeConfirmedAssetIds, mergeHydratedBrandMedia, mergeHydratedProjectMedia } from './src/utils/cloud-media-merge.js';
 // Persistência precisa estar disponível desde a abertura do editor. Chunks lazy
 // podem desaparecer no próximo deploy enquanto esta aba continua com edições.
 import * as projectCloudSync from './src/utils/projects-cloud-sync.js';
@@ -560,27 +560,6 @@ function projectCacheFingerprint(entry) {
   if (!entry) return '';
   const { updatedAt: _updatedAt, ...stable } = projectContentSnapshot([entry])[0] || {};
   return JSON.stringify(stable);
-}
-
-/** Uma troca feita pelo editor deixa de apontar para o asset antigo da conta. */
-function clearReplacedSlideAssets(before, after) {
-  if (!Array.isArray(after)) return after;
-  const previous = new Map((before || []).map((slide) => [slide?.id, slide]));
-  return after.map((slide) => {
-    const old = previous.get(slide?.id);
-    if (!old || !slide) return slide;
-    let next = slide;
-    for (const [assetKey, idKey, imageKey] of [
-      ['bgImageAssetId', 'bgImageId', 'bgImage'],
-      ['logoImageAssetId', 'logoImageId', 'logoImage'],
-      ['refImageAssetId', 'refImageId', 'refImage'],
-    ]) {
-      if (!old[assetKey] || slide[assetKey] !== old[assetKey]
-        || (slide[idKey] === old[idKey] && slide[imageKey] === old[imageKey])) continue;
-      next = { ...next, [assetKey]: null };
-    }
-    return next;
-  });
 }
 
 function accountBrandsContentSnapshot(brands) {
@@ -1093,6 +1072,7 @@ export default function App() {
   const [openingDocId, setOpeningDocId] = useState(null);
   const photoHydrationFlightsRef = useRef(new Map());
   const hydrateProjectMediaRef = useRef(null);
+  const adoptConfirmedAssetIdsRef = useRef(null);
   // Versões só vêm de uma leitura autenticada da conta. Uma versão ausente
   // significa criação (0) apenas depois dessa leitura ter sido confirmada.
   const v2ObservedOwnerRef = useRef(null);
@@ -2137,7 +2117,7 @@ export default function App() {
         throw new Error('A conta mudou durante o envio. Sincronize novamente.');
       }
       v2VersionsRef.current.set(entry.id, saved.version);
-      v2BaselinesRef.current.set(entry.id, fingerprint);
+      v2BaselinesRef.current.set(entry.id, adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry) || fingerprint);
       v2RecoveredProjectsRef.current.delete(entry.id);
       return { saved: true, direct: true, version: saved.version };
     }
@@ -2151,10 +2131,26 @@ export default function App() {
       throw new Error('A conta ainda não confirmou a versão deste projeto. Suas alterações continuam no editor.');
     }
     v2VersionsRef.current.set(entry.id, confirmedVersion);
-    v2BaselinesRef.current.set(entry.id, fingerprint);
+    v2BaselinesRef.current.set(entry.id, adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry) || fingerprint);
     v2RecoveredProjectsRef.current.delete(entry.id);
     return { saved: true, version: confirmedVersion };
   }, []);
+
+  /** O documento local passa a conhecer os assets confirmados pela conta. */
+  const adoptConfirmedAssetIds = useCallback((projectId, confirmedEntry) => {
+    const before = (libraryPersistRef.current || []).find((project) => project?.id === projectId);
+    if (!before) return null;
+    const merged = mergeConfirmedAssetIds(before, confirmedEntry);
+    if (merged !== before) {
+      libraryPersistRef.current = libraryPersistRef.current.map((project) => (project?.id === projectId ? merged : project));
+      setLibrary((current) => current.map((project) => (project?.id === projectId ? mergeConfirmedAssetIds(project, confirmedEntry) : project)));
+      if (editorSyncStateRef.current.activeDocId === projectId) {
+        history.setSilent((currentDoc) => mergeConfirmedAssetIds({ id: projectId, doc: currentDoc }, confirmedEntry).doc);
+      }
+    }
+    return projectCacheFingerprint(merged);
+  }, [history.setSilent]);
+  adoptConfirmedAssetIdsRef.current = adoptConfirmedAssetIds;
 
   const persistAccountMetadataV2 = useCallback(async (pending, { owner, expectedOwnerId } = {}) => {
     if (v2ObservedOwnerRef.current !== owner || !Number.isSafeInteger(v2MetaRevisionRef.current)) {
