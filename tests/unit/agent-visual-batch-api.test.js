@@ -6,7 +6,7 @@ const mocked = vi.hoisted(() => ({
   previewText: vi.fn(), applyText: vi.fn(),
   image: vi.fn(),
 }));
-vi.mock('../../api/lib/agent-image-generation.js', () => ({ generateAndApplyAgentSlideImage: mocked.image }));
+vi.mock('../../api/lib/agent-image-generation.js', () => ({ startAgentImageJob: mocked.image, getAgentChangeStatus: mocked.job }));
 vi.mock('../../api/lib/agent-token-store.js', () => ({ authenticateAgentRequest: mocked.auth }));
 vi.mock('../../api/lib/rate-limit.js', () => ({
   consumeRateLimit: mocked.limit, rateLimitResponse: mocked.rateResponse,
@@ -50,7 +50,7 @@ describe('/api/agent-visual-batch', () => {
     mocked.undo.mockResolvedValue({ requestId: 'request-01', status: 'undone' });
     mocked.previewText.mockResolvedValue({ projectId: 'p', changedSlideCount: 1, changes: [] });
     mocked.applyText.mockResolvedValue({ requestId: 'request-text-01', status: 'applied' });
-    mocked.image.mockResolvedValue({ requestId: 'request-image-01', status: 'applied', hasPhoto: true });
+    mocked.image.mockResolvedValue({ requestId: 'request-image-01', status: 'pending', slides: [] });
     await request('GET', { query: { op: 'projects' } });
     await request('GET', { query: { op: 'project', id: 'p' } });
     await request('POST', { body: { action: 'preview', projectId: 'p' } });
@@ -58,12 +58,12 @@ describe('/api/agent-visual-batch', () => {
     await request('POST', { body: { action: 'undo', requestId: 'request-01' } });
     await request('POST', { body: { action: 'preview_text', projectId: 'p' } });
     await request('POST', { body: { action: 'apply_text', projectId: 'p' } });
-    await request('POST', { body: { action: 'generate_image', projectId: 'p', slideId: 's1' } });
+    await request('POST', { body: { action: 'generate_image', projectId: 'p', slideIds: ['s1'] } });
     expect(mocked.auth.mock.calls.map(call => call[1].scope))
       .toEqual(['projects:read', 'projects:read', 'projects:read', 'projects:write', 'projects:write', 'projects:read', 'projects:write', 'projects:write']);
     expect(mocked.apply).toHaveBeenCalledWith('cus_alice', 'token-1', { action: 'apply', projectId: 'p' });
     expect(mocked.applyText).toHaveBeenCalledWith('cus_alice', 'token-1', { action: 'apply_text', projectId: 'p' });
-    expect(mocked.image).toHaveBeenCalledWith('cus_alice', 'token-1', { action: 'generate_image', projectId: 'p', slideId: 's1' });
+    expect(mocked.image).toHaveBeenCalledWith('cus_alice', 'token-1', { action: 'generate_image', projectId: 'p', slideIds: ['s1'] });
   });
 
   it('bloqueia antes de consultar o projeto quando o Bearer não é válido', async () => {

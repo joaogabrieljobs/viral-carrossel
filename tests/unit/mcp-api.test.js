@@ -5,7 +5,7 @@ const mocked = vi.hoisted(() => ({
   previewText: vi.fn(), applyText: vi.fn(), previewVisual: vi.fn(), applyVisual: vi.fn(), undo: vi.fn(),
   image: vi.fn(),
 }));
-vi.mock('../../api/lib/agent-image-generation.js', () => ({ generateAndApplyAgentSlideImage: mocked.image }));
+vi.mock('../../api/lib/agent-image-generation.js', () => ({ startAgentImageJob: mocked.image, getAgentChangeStatus: mocked.job }));
 vi.mock('../../api/lib/agent-token-store.js', async () => {
   class AgentTokenError extends Error { constructor(status, code, message) { super(message); this.status = status; this.code = code; } }
   return { AgentTokenError, authenticateAgentRequest: mocked.auth };
@@ -60,13 +60,27 @@ describe('remote MCP endpoint', () => {
     expect(mocked.auth.mock.calls.map(call => call[1].scope)).toEqual(['projects:read', 'projects:write']);
   });
 
-  it('gera imagem com escopo de escrita e resposta estruturada', async () => {
-    mocked.image.mockResolvedValue({ requestId: 'image-request-01', slideId: 's1', hasPhoto: true });
+  it('inicia o job de imagem com escopo de escrita e expõe o acompanhamento', async () => {
+    mocked.image.mockResolvedValue({ requestId: 'image-request-01', status: 'pending', slides: [{ slideId: 's1', status: 'pending' }] });
     const result = await send({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: {
-      name: 'generate_slide_image', arguments: { projectId: 'p1', baseVersion: 2, slideId: 's1', requestId: 'image-request-01' },
+      name: 'generate_slide_image', arguments: { projectId: 'p1', baseVersion: 2, slideIds: ['s1'], requestId: 'image-request-01' },
     } });
-    expect(result.body.result.structuredContent).toMatchObject({ hasPhoto: true, slideId: 's1' });
+    expect(result.body.result.structuredContent).toMatchObject({ status: 'pending', slides: [{ slideId: 's1', status: 'pending' }] });
+    expect(mocked.image).toHaveBeenCalledWith('cus_test', 'token-id', { projectId: 'p1', baseVersion: 2, slideIds: ['s1'], requestId: 'image-request-01' });
     expect(mocked.auth).toHaveBeenCalledWith(expect.anything(), { scope: 'projects:write' });
+    mocked.job.mockResolvedValue({ requestId: 'image-request-01', status: 'applied', afterVersion: 3, slides: [{ slideId: 's1', status: 'done' }] });
+    const status = await send({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'get_change_status', arguments: { requestId: 'image-request-01' } } });
+    expect(status.body.result.structuredContent).toMatchObject({ status: 'applied', afterVersion: 3 });
+    expect(mocked.auth.mock.calls.at(-1)[1]).toEqual({ scope: 'projects:read' });
+  });
+
+  it('devolve os detalhes de recusa da geração sem vazar a stack', async () => {
+    mocked.image.mockRejectedValue(Object.assign(new Error('Quota insuficiente.'), { code: 'quota_exhausted', needed: 3, remaining: 1 }));
+    const result = await send({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: {
+      name: 'generate_slide_image', arguments: { projectId: 'p1', baseVersion: 2, requestId: 'image-request-02' },
+    } });
+    expect(result.body.result.isError).toBe(true);
+    expect(result.body.result.structuredContent).toEqual({ error: 'Quota insuficiente.', code: 'quota_exhausted', needed: 3, remaining: 1 });
   });
 
   it('responde 401 com descoberta OAuth quando a credencial falta', async () => {

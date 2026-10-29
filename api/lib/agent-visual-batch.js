@@ -49,20 +49,52 @@ function requestHash(input) {
   return createHash('sha256').update(JSON.stringify(stable(input))).digest('hex');
 }
 
+/** Colunas devolvidas ao agente. `before_entry`, `token_id` e `request_hash` ficam privados. */
+const JOB_COLUMNS = `request_id, project_id, status, before_version, after_version,
+         changed_slide_count, changed_brand_fields, created_at, undone_at,
+         undo_request_id, undo_version, slides, meta, error_code, finished_at`;
+export const IMAGE_JOB_POLL_MS = 30_000;
+
+function publicSlideState(slide) {
+  if (!slide || typeof slide !== 'object') return null;
+  return {
+    slideId: slide.slideId,
+    status: slide.status,
+    ...(slide.errorCode ? { errorCode: slide.errorCode } : {}),
+    ...(slide.assetId ? { assetId: slide.assetId } : {}),
+  };
+}
+
 function safeJob(row) {
   if (!row) return null;
+  const slides = Array.isArray(row.slides) ? row.slides.map(publicSlideState).filter(Boolean) : [];
+  const pending = row.status === 'pending';
   return {
     requestId: row.request_id,
     projectId: row.project_id,
     status: row.status,
     beforeVersion: Number(row.before_version),
-    afterVersion: Number(row.after_version),
+    afterVersion: pending ? null : Number(row.after_version),
     changedSlideCount: Number(row.changed_slide_count),
     changedBrandFields: row.changed_brand_fields || [],
     createdAt: row.created_at,
     undoneAt: row.undone_at || null,
     undoRequestId: row.undo_request_id || null,
     undoVersion: row.undo_version == null ? null : Number(row.undo_version),
+    ...(row.meta?.kind ? { kind: row.meta.kind } : {}),
+    ...(slides.length ? { slides } : {}),
+    ...(row.error_code ? { errorCode: row.error_code } : {}),
+    ...(row.finished_at ? { finishedAt: row.finished_at } : {}),
+    ...(pending ? { pollAfterMs: IMAGE_JOB_POLL_MS } : {}),
+  };
+}
+
+/** Estado interno do job, com os identificadores de crédito que o agente não vê. */
+function internalJob(row) {
+  return {
+    job: safeJob(row),
+    slides: Array.isArray(row.slides) ? row.slides : [],
+    meta: row.meta && typeof row.meta === 'object' ? row.meta : {},
   };
 }
 
@@ -159,9 +191,7 @@ export async function getAgentVisualJob(ownerValue, idValue) {
   const owner = ownerId(ownerValue);
   const id = requestId(idValue);
   const rows = await getPostgresConnection().unsafe(
-    `SELECT request_id, project_id, status, before_version, after_version,
-       changed_slide_count, changed_brand_fields, created_at, undone_at,
-       undo_request_id, undo_version
+    `SELECT ${JOB_COLUMNS}
      FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`,
     [owner, id],
   );
@@ -244,9 +274,7 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
        (owner_id, request_id, project_id, token_id, request_hash, before_version,
         after_version, changed_slide_count, changed_brand_fields, before_entry)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
-       RETURNING request_id, project_id, status, before_version, after_version,
-         changed_slide_count, changed_brand_fields, created_at, undone_at,
-         undo_request_id, undo_version`,
+       RETURNING ${JOB_COLUMNS}`,
       [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
         result.changes.length, JSON.stringify(result.brandChanges), JSON.stringify(snapshotForUndo(row.entry))],
     );
@@ -290,9 +318,7 @@ export async function applyAgentTextEdit(ownerValue, tokenId, input) {
        (owner_id, request_id, project_id, token_id, request_hash, before_version,
         after_version, changed_slide_count, changed_brand_fields, before_entry)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
-       RETURNING request_id, project_id, status, before_version, after_version,
-         changed_slide_count, changed_brand_fields, created_at, undone_at,
-         undo_request_id, undo_version`,
+       RETURNING ${JOB_COLUMNS}`,
       [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
         result.changedSlideCount, JSON.stringify(changedFields), JSON.stringify(snapshotForUndo(row.entry))],
     );
@@ -300,17 +326,88 @@ export async function applyAgentTextEdit(ownerValue, tokenId, input) {
   });
 }
 
-export async function applyAgentImageEdit(ownerValue, tokenId, input) {
+const MAX_IMAGE_SLIDES = 8;
+const IMAGE_JOB_STALE_MS = 12 * 60_000;
+
+export function slideHasPhoto(slide) {
+  return Boolean(slide?.bgImageAssetId || slide?.bgImageId || slide?.bgImage);
+}
+
+/** Mesmo conjunto de campos que o editor grava após gerar uma imagem. */
+function withGeneratedImage(slide, assetId) {
+  const next = {
+    ...slide, bgImageAssetId: assetId, bgImageSource: 'ai', bgImageFailed: false, bgImageError: null,
+    imgMode: 'dalle', bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100,
+  };
+  delete next.bgImage;
+  delete next.bgImageId;
+  return next;
+}
+
+function imageSlideIds(value) {
+  if (value == null) return null;
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string' || !item.trim() || item.length > 200)) {
+    fail(400, 'image_slide_ids_invalid', 'slideIds deve ser uma lista de IDs de card.');
+  }
+  const ids = [...new Set(value.map(item => item.trim()))];
+  if (!ids.length) fail(400, 'image_slide_ids_invalid', 'slideIds não pode ser vazio.');
+  return ids;
+}
+
+/**
+ * Escolhe os cards que vão receber imagem. Sem `slideIds`, todos os cards sem
+ * foto. Recusa cards inexistentes, com foto, ou sem `imageQuery` utilizável.
+ */
+export function selectImageSlides(entry, slideIdsValue) {
+  const requested = imageSlideIds(slideIdsValue);
+  const slides = Array.isArray(entry?.doc?.slides) ? entry.doc.slides : [];
+  let chosen;
+  if (requested) {
+    const byId = new Map(slides.filter(slide => slide?.id).map(slide => [slide.id, slide]));
+    const missing = requested.filter(id => !byId.has(id));
+    if (missing.length) fail(404, 'image_slide_missing', 'Card não encontrado neste projeto.', { slideIds: missing });
+    chosen = requested.map(id => byId.get(id));
+  } else {
+    chosen = slides.filter(slide => slide?.id && !slideHasPhoto(slide));
+  }
+  const withPhoto = chosen.filter(slideHasPhoto).map(slide => slide.id);
+  if (withPhoto.length) {
+    fail(409, 'image_already_present', 'Estes cards já possuem imagem.', { slideIds: withPhoto });
+  }
+  const withoutQuery = chosen.filter(slide => String(slide.imageQuery || '').trim().length < 8).map(slide => slide.id);
+  if (withoutQuery.length) {
+    fail(422, 'image_query_missing', 'Estes cards não têm imageQuery utilizável. Edite a imageQuery com apply_text_edit antes de gerar.',
+      { slideIds: withoutQuery });
+  }
+  if (!chosen.length) fail(409, 'image_nothing_to_generate', 'Nenhum card sem imagem neste projeto.');
+  if (chosen.length > MAX_IMAGE_SLIDES) {
+    fail(400, 'image_too_many_slides', `No máximo ${MAX_IMAGE_SLIDES} cards por chamada. Repita com outro requestId para os demais.`,
+      { max: MAX_IMAGE_SLIDES, slideIds: chosen.map(slide => slide.id) });
+  }
+  return chosen.map(slide => ({ slideId: slide.id, imageQuery: String(slide.imageQuery).trim().slice(0, 4000) }));
+}
+
+export function imageJobHash({ projectId: id, baseVersion: base, slideIds }) {
+  return requestHash({ kind: 'image', projectId: id, baseVersion: base, slideIds: slideIds ?? null });
+}
+
+/**
+ * Registra o job de imagem como `pending` com CAS na versão do projeto. Os
+ * créditos já foram reservados pelo chamador, que devolve tudo se isto falhar.
+ * Repetir o mesmo requestId devolve o job existente sem reservar de novo.
+ */
+export async function createAgentImageJob(ownerValue, tokenId, input) {
   const owner = ownerId(ownerValue);
   const id = projectId(input?.projectId);
   const base = version(input?.baseVersion);
   const rid = requestId(input?.requestId);
-  const slideId = String(input?.slideId || '').trim();
-  const assetId = String(input?.assetId || '').trim();
-  if (!slideId || slideId.length > 200) fail(400, 'image_slide_id_invalid', 'ID do card inválido.');
-  if (!/^[A-Za-z0-9._-]{1,120}$/.test(assetId)) fail(400, 'image_asset_id_invalid', 'Asset de imagem inválido.');
   if (typeof tokenId !== 'string' || !tokenId) fail(401, 'agent_token_invalid', 'Credencial inválida.');
-  const hash = requestHash({ kind: 'image', projectId: id, baseVersion: base, slideId, assetId });
+  const slides = Array.isArray(input?.slides) ? input.slides : [];
+  if (!slides.length || slides.some(slide => !slide?.slideId || !slide?.operationId)) {
+    fail(400, 'image_slide_ids_invalid', 'Cards do job inválidos.');
+  }
+  const hash = imageJobHash({ projectId: id, baseVersion: base, slideIds: input?.slideIds });
+  const meta = { kind: 'image', ...(input?.meta || {}) };
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
     await forgetExpiredVisualJobs(tx, owner);
@@ -320,38 +417,119 @@ export async function applyAgentImageEdit(ownerValue, tokenId, input) {
     );
     if (existing[0]) {
       if (existing[0].request_hash !== hash || existing[0].project_id !== id) {
-        fail(409, 'image_request_reused', 'requestId já usado para outra imagem.');
+        fail(409, 'image_request_reused', 'requestId já usado para outra alteração.');
       }
-      return safeJob(existing[0]);
+      return { ...internalJob(existing[0]), existing: true };
     }
     const currentVersion = Number(row.version);
     if (currentVersion !== base) fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
-    const slides = Array.isArray(row.entry?.doc?.slides) ? row.entry.doc.slides : [];
-    let found = false;
-    const nextSlides = slides.map(slide => {
-      if (slide?.id !== slideId) return slide;
-      found = true;
-      const next = { ...slide, bgImageAssetId: assetId, bgImageSource: 'ai', bgImageFailed: false, bgImageError: null,
-        imgMode: 'dalle', bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100 };
-      delete next.bgImage;
-      delete next.bgImageId;
-      return next;
-    });
-    if (!found) fail(404, 'image_slide_missing', 'Card não encontrado neste projeto.');
-    const nextEntry = { ...row.entry, doc: { ...row.entry.doc, slides: nextSlides } };
-    const afterVersion = await updateProject(tx, owner, id, nextEntry, currentVersion, Date.now());
+    const current = new Map((row.entry?.doc?.slides || []).filter(slide => slide?.id).map(slide => [slide.id, slide]));
+    const missing = slides.filter(slide => !current.has(slide.slideId)).map(slide => slide.slideId);
+    if (missing.length) fail(404, 'image_slide_missing', 'Card não encontrado neste projeto.', { slideIds: missing });
+    const withPhoto = slides.filter(slide => slideHasPhoto(current.get(slide.slideId))).map(slide => slide.slideId);
+    if (withPhoto.length) fail(409, 'image_already_present', 'Estes cards já possuem imagem.', { slideIds: withPhoto });
+    const state = slides.map(slide => ({ slideId: slide.slideId, status: 'pending', operationId: slide.operationId }));
     const jobs = await tx.unsafe(
       `INSERT INTO moont.agent_visual_jobs
        (owner_id, request_id, project_id, token_id, request_hash, before_version,
-        after_version, changed_slide_count, changed_brand_fields, before_entry)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8::jsonb, $9::jsonb)
-       RETURNING request_id, project_id, status, before_version, after_version,
-         changed_slide_count, changed_brand_fields, created_at, undone_at,
-         undo_request_id, undo_version`,
-      [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
-        JSON.stringify([`image:${slideId}`]), JSON.stringify(snapshotForUndo(row.entry))],
+        after_version, changed_slide_count, changed_brand_fields, before_entry, status, slides, meta)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, 0, '[]'::jsonb, $7::jsonb, 'pending', $8::jsonb, $9::jsonb)
+       RETURNING ${JOB_COLUMNS}`,
+      [owner, rid, id, tokenId, hash, currentVersion, JSON.stringify(snapshotForUndo(row.entry)),
+        JSON.stringify(state), JSON.stringify(meta)],
     );
-    return safeJob(jobs[0]);
+    return { ...internalJob(jobs[0]), existing: false };
+  });
+}
+
+function mergeOutcomes(slides, outcomes, fallbackError) {
+  const byId = new Map((outcomes || []).map(item => [item.slideId, item]));
+  return slides.map(slide => {
+    if (slide.status !== 'pending') return slide;
+    const outcome = byId.get(slide.slideId);
+    if (outcome?.assetId) return { ...slide, status: 'done', assetId: outcome.assetId };
+    return { ...slide, status: 'failed', errorCode: outcome?.errorCode || fallbackError };
+  });
+}
+
+async function settleImageJob(tx, owner, rid, { status, afterVersion, slides, errorCode }) {
+  const done = slides.filter(slide => slide.status === 'done');
+  const updated = await tx.unsafe(
+    `UPDATE moont.agent_visual_jobs
+     SET status = $3, after_version = $4, changed_slide_count = $5, changed_brand_fields = $6::jsonb,
+         slides = $7::jsonb, error_code = $8, finished_at = now()
+     WHERE owner_id = $1 AND request_id = $2
+     RETURNING ${JOB_COLUMNS}`,
+    [owner, rid, status, afterVersion, done.length, JSON.stringify(done.map(slide => `image:${slide.slideId}`)),
+      JSON.stringify(slides), errorCode || null],
+  );
+  return internalJob(updated[0]);
+}
+
+/**
+ * Fecha o job com os resultados por card. Grava as imagens prontas numa única
+ * versão nova se o projeto ainda estiver na versão base; caso contrário tudo
+ * falha com `project_conflict`. Devolve o estado interno para o chamador
+ * confirmar ou devolver cada crédito.
+ */
+export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) {
+  const owner = ownerId(ownerValue);
+  const rid = requestId(requestIdValue);
+  const found = await getAgentVisualJob(owner, rid);
+  await getAccountProject(owner, found.projectId);
+  return getPostgresConnection().begin(async tx => {
+    const row = await lockAccountAndProject(tx, owner, found.projectId);
+    const jobs = await tx.unsafe(
+      `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2 FOR UPDATE`, [owner, rid],
+    );
+    const job = jobs[0];
+    if (!job) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
+    if (job.status !== 'pending') return { ...internalJob(job), finished: false };
+    const currentVersion = Number(row.version);
+    const base = Number(job.before_version);
+    const slides = Array.isArray(job.slides) ? job.slides : [];
+    if (currentVersion !== base) {
+      const failed = slides.map(slide => (slide.status === 'pending'
+        ? { ...slide, status: 'failed', errorCode: 'project_conflict' } : slide));
+      return { ...await settleImageJob(tx, owner, rid, { status: 'failed', afterVersion: base, slides: failed,
+        errorCode: 'project_conflict' }), finished: true };
+    }
+    const merged = mergeOutcomes(slides, outcomes, 'image_generation_failed');
+    const assets = new Map(merged.filter(slide => slide.status === 'done').map(slide => [slide.slideId, slide.assetId]));
+    let afterVersion = currentVersion;
+    if (assets.size) {
+      const nextSlides = (row.entry?.doc?.slides || []).map(slide => (assets.has(slide?.id)
+        ? withGeneratedImage(slide, assets.get(slide.id)) : slide));
+      const nextEntry = { ...row.entry, doc: { ...row.entry.doc, slides: nextSlides } };
+      afterVersion = await updateProject(tx, owner, found.projectId, nextEntry, currentVersion, Date.now());
+    }
+    return { ...await settleImageJob(tx, owner, rid, {
+      status: assets.size ? 'applied' : 'failed', afterVersion, slides: merged,
+      errorCode: assets.size ? null : 'image_generation_failed',
+    }), finished: true };
+  });
+}
+
+export function isImageJobStale(job, now = Date.now()) {
+  if (job?.status !== 'pending') return false;
+  const createdAt = new Date(job.createdAt).getTime();
+  return Number.isFinite(createdAt) && now - createdAt > IMAGE_JOB_STALE_MS;
+}
+
+/** Marca como `failed` um job `pending` que a função não conseguiu concluir. */
+export async function expireAgentImageJob(ownerValue, requestIdValue) {
+  const owner = ownerId(ownerValue);
+  const rid = requestId(requestIdValue);
+  return getPostgresConnection().begin(async tx => {
+    const jobs = await tx.unsafe(
+      `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2 FOR UPDATE`, [owner, rid],
+    );
+    const job = jobs[0];
+    if (!job) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
+    if (!isImageJobStale(safeJob(job))) return { ...internalJob(job), expired: false };
+    const slides = mergeOutcomes(Array.isArray(job.slides) ? job.slides : [], [], 'image_job_timeout');
+    return { ...await settleImageJob(tx, owner, rid, { status: 'failed', afterVersion: Number(job.before_version),
+      slides, errorCode: 'image_job_timeout' }), expired: true };
   });
 }
 
@@ -382,6 +560,8 @@ export async function undoAgentVisualBatch(ownerValue, input) {
       if (job.undo_request_id !== undoId) fail(409, 'visual_already_undone', 'Esta alteração já foi desfeita.');
       return safeJob(job);
     }
+    if (job.status === 'pending') fail(409, 'visual_job_pending', 'Esta geração ainda está em andamento; aguarde a conclusão.');
+    if (job.status === 'failed') fail(409, 'visual_undo_not_applicable', 'Esta alteração falhou e não mudou o projeto.');
     const currentVersion = Number(row.version);
     if (currentVersion !== Number(job.after_version)) {
       fail(409, 'project_conflict', 'O projeto foi editado depois dessa alteração; não é seguro desfazê-la automaticamente.',
@@ -395,9 +575,7 @@ export async function undoAgentVisualBatch(ownerValue, input) {
       `UPDATE moont.agent_visual_jobs SET status = 'undone', undone_at = now(),
          undo_request_id = $3, undo_version = $4
        WHERE owner_id = $1 AND request_id = $2
-       RETURNING request_id, project_id, status, before_version, after_version,
-         changed_slide_count, changed_brand_fields, created_at, undone_at,
-         undo_request_id, undo_version`,
+       RETURNING ${JOB_COLUMNS}`,
       [owner, rid, undoId, undoVersion],
     );
     return safeJob(updated[0]);

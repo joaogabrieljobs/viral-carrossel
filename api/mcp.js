@@ -1,10 +1,10 @@
 /** Streamable HTTP MCP endpoint for authenticated Moont subscribers. */
 import { authenticateAgentRequest, AgentTokenError } from './lib/agent-token-store.js';
 import {
-  applyAgentTextEdit, applyAgentVisualBatch, getAgentProject, getAgentVisualJob,
+  applyAgentTextEdit, applyAgentVisualBatch, getAgentProject,
   listAgentProjects, previewAgentTextEdit, previewAgentVisualBatch, undoAgentVisualBatch,
 } from './lib/agent-visual-batch.js';
-import { generateAndApplyAgentSlideImage } from './lib/agent-image-generation.js';
+import { getAgentChangeStatus, startAgentImageJob } from './lib/agent-image-generation.js';
 import { CONTENT_PATCH_SCHEMA } from './lib/content-patch.js';
 import { VISUAL_PATCH_SCHEMA } from './lib/visual-patch.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
@@ -47,14 +47,14 @@ const tools = [
     slideIds: { type: 'array', items: { type: 'string' } }, patch: object,
     brandScope: { type: 'string', enum: ['project'] }, requestId: { type: 'string', minLength: 8, maxLength: 128 },
   }, ['projectId', 'baseVersion', 'patch', 'requestId'], false),
-  tool('get_change_status', 'Consulta uma alteração aplicada pelo seu requestId.', {
+  tool('get_change_status', 'Consulta uma alteração pelo seu requestId. Para generate_slide_image, mostra status (pending, applied, failed), o estado de cada card e afterVersion ao concluir.', {
     requestId: { type: 'string' },
   }, ['requestId'], true),
-  tool('generate_slide_image', 'Gera e salva uma imagem para um card usando sua imageQuery. Consome 1 crédito de imagem. Leia o projeto imediatamente antes e informe a versão atual; a operação recusa conflito e pode levar alguns minutos.', {
+  tool('generate_slide_image', 'Gera imagens para cards a partir da imageQuery salva em cada um e grava no projeto. Lento (minutos) e pago: consome 1 crédito de imagem do plano por card; sem crédito, recusa sem cobrar. Sem slideIds, atende todos os cards sem foto (até 8 por chamada). Leia o projeto imediatamente antes e informe a versão atual; conflito é recusado. Responde na hora com status pending; acompanhe com get_change_status(requestId) até applied ou failed, que traz o estado por card e a versão nova. Para outra imagem, edite a imageQuery com apply_text_edit antes.', {
     projectId: { type: 'string' }, baseVersion: { type: 'integer', minimum: 1 },
-    slideId: { type: 'string' }, requestId: { type: 'string', minLength: 8, maxLength: 128 },
-    aspectRatio: { type: 'string', enum: ['1:1', '16:9', '9:16', '2:3'] },
-  }, ['projectId', 'baseVersion', 'slideId', 'requestId'], false),
+    slideIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 },
+    requestId: { type: 'string', minLength: 8, maxLength: 128 },
+  }, ['projectId', 'baseVersion', 'requestId'], false),
   tool('undo_project_change', 'Desfaz uma alteração do MCP quando o projeto continua na versão produzida por ela.', {
     requestId: { type: 'string' }, undoRequestId: { type: 'string' },
   }, ['requestId', 'undoRequestId'], false),
@@ -93,8 +93,8 @@ async function call(name, args, agent) {
     case 'apply_text_edit': return applyAgentTextEdit(agent.ownerId, agent.tokenId, args);
     case 'preview_visual_edit': return previewAgentVisualBatch(agent.ownerId, args);
     case 'apply_visual_edit': return applyAgentVisualBatch(agent.ownerId, agent.tokenId, args);
-    case 'get_change_status': return getAgentVisualJob(agent.ownerId, args.requestId);
-    case 'generate_slide_image': return generateAndApplyAgentSlideImage(agent.ownerId, agent.tokenId, args);
+    case 'get_change_status': return getAgentChangeStatus(agent.ownerId, args.requestId);
+    case 'generate_slide_image': return startAgentImageJob(agent.ownerId, agent.tokenId, args);
     case 'undo_project_change': return undoAgentVisualBatch(agent.ownerId, args);
     default: throw Object.assign(new Error('Ferramenta desconhecida.'), { code: 'mcp_tool_unknown', status: 404 });
   }
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
   if (method?.startsWith('notifications/')) return res.status(202).end();
   if (method === 'initialize') return res.status(200).json(rpc(id, {
     protocolVersion: PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-    instructions: 'Leia o projeto antes de editar. Faça preview antes de apply para texto e design. Para imagens, use generate_slide_image com a versão atual; cada chamada consome um crédito. Use requestId único; em conflito, leia novamente.',
+    instructions: 'Leia o projeto antes de editar. Faça preview antes de apply para texto e design. Para imagens, use generate_slide_image com a versão atual: consome 1 crédito por card, responde pending e termina em minutos; acompanhe com get_change_status. Use requestId único; em conflito, leia novamente.',
   }));
   if (method === 'ping') return res.status(200).json(rpc(id, {}));
   if (method === 'tools/list') return res.status(200).json(rpc(id, { tools }));
@@ -141,6 +141,7 @@ export default async function handler(req, res) {
   } catch (cause) {
     const safe = { error: cause?.message || 'Não foi possível executar a ferramenta.', code: cause?.code || 'mcp_tool_error' };
     if (cause?.cloudVersion) safe.cloudVersion = cause.cloudVersion;
+    for (const key of ['slideIds', 'needed', 'remaining', 'limit', 'max']) if (cause?.[key] !== undefined) safe[key] = cause[key];
     return res.status(200).json(rpc(id, content(safe, true)));
   }
 }

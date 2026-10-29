@@ -3,12 +3,12 @@ import { applyCors } from './lib/cors.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 import { authenticateAgentRequest } from './lib/agent-token-store.js';
 import {
-  applyAgentTextEdit, applyAgentVisualBatch, getAgentProject, getAgentVisualJob,
+  applyAgentTextEdit, applyAgentVisualBatch, getAgentProject,
   listAgentProjects, previewAgentTextEdit, previewAgentVisualBatch, undoAgentVisualBatch,
 } from './lib/agent-visual-batch.js';
 import { VISUAL_PATCH_SCHEMA } from './lib/visual-patch.js';
 import { CONTENT_PATCH_SCHEMA } from './lib/content-patch.js';
-import { generateAndApplyAgentSlideImage } from './lib/agent-image-generation.js';
+import { getAgentChangeStatus, startAgentImageJob } from './lib/agent-image-generation.js';
 
 export const config = { maxDuration: 300 };
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -40,6 +40,8 @@ function errorResponse(res, cause) {
     : cause.message || 'Não foi possível concluir a alteração.';
   return res.status(status).json({ error: safeMessage, code,
     ...(Number.isSafeInteger(cause?.cloudVersion) ? { cloudVersion: cause.cloudVersion } : {}),
+    ...(Array.isArray(cause?.slideIds) ? { slideIds: cause.slideIds } : {}),
+    ...(Number.isSafeInteger(cause?.needed) ? { needed: cause.needed, remaining: cause.remaining ?? null } : {}),
     ...(status === 400 && cause?.path ? { path: cause.path } : {}),
   });
 }
@@ -92,7 +94,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, project });
       }
       if (op === 'job') {
-        const job = await getAgentVisualJob(agent.ownerId, req.query?.requestId);
+        const job = await getAgentChangeStatus(agent.ownerId, req.query?.requestId);
         return res.status(200).json({ ok: true, job });
       }
       return res.status(400).json({ error: 'Operação inválida.', code: 'visual_operation_invalid' });
@@ -115,8 +117,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, job });
     }
     if (body.action === 'generate_image') {
-      const result = await generateAndApplyAgentSlideImage(agent.ownerId, agent.tokenId, body);
-      return res.status(200).json({ ok: true, job: result });
+      const job = await startAgentImageJob(agent.ownerId, agent.tokenId, body);
+      return res.status(200).json({ ok: true, job });
     }
     if (body.action === 'undo') {
       const job = await undoAgentVisualBatch(agent.ownerId, body);
