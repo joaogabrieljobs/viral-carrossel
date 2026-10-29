@@ -33,8 +33,8 @@ async function dispatch(message) {
         result = {
           protocolVersion: supportedVersions.has(params.protocolVersion) ? params.protocolVersion : '2025-06-18',
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'moont', version: '0.2.0' },
-          instructions: 'Para design, consulte get_visual_schema e use preview_visual_batch antes de apply_visual_batch. Para texto, consulte get_content_schema e use preview_text_edit antes de apply_text_edit. Use undo_project_change para reverter. Fotos e logos são preservados.',
+          serverInfo: { name: 'moont', version: '0.3.0' },
+          instructions: 'Leia o projeto antes de editar. Para design e texto, faça prévia antes de aplicar. Para imagens, use generate_slide_image com a versão atual e um requestId único; cada imagem consome um crédito. Use undo_project_change para reverter.',
         };
         break;
       case 'ping':

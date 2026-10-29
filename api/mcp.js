@@ -4,13 +4,14 @@ import {
   applyAgentTextEdit, applyAgentVisualBatch, getAgentProject, getAgentVisualJob,
   listAgentProjects, previewAgentTextEdit, previewAgentVisualBatch, undoAgentVisualBatch,
 } from './lib/agent-visual-batch.js';
+import { generateAndApplyAgentSlideImage } from './lib/agent-image-generation.js';
 import { CONTENT_PATCH_SCHEMA } from './lib/content-patch.js';
 import { VISUAL_PATCH_SCHEMA } from './lib/visual-patch.js';
 import { consumeRateLimit, rateLimitResponse } from './lib/rate-limit.js';
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 const PROTOCOL_VERSION = '2025-06-18';
-const SERVER = { name: 'moont', version: '0.2.0' };
+const SERVER = { name: 'moont', version: '0.3.0' };
 const object = { type: 'object', additionalProperties: true };
 
 const tools = [
@@ -49,6 +50,11 @@ const tools = [
   tool('get_change_status', 'Consulta uma alteração aplicada pelo seu requestId.', {
     requestId: { type: 'string' },
   }, ['requestId'], true),
+  tool('generate_slide_image', 'Gera e salva uma imagem para um card usando sua imageQuery. Consome 1 crédito de imagem. Leia o projeto imediatamente antes e informe a versão atual; a operação recusa conflito e pode levar alguns minutos.', {
+    projectId: { type: 'string' }, baseVersion: { type: 'integer', minimum: 1 },
+    slideId: { type: 'string' }, requestId: { type: 'string', minLength: 8, maxLength: 128 },
+    aspectRatio: { type: 'string', enum: ['1:1', '16:9', '9:16', '2:3'] },
+  }, ['projectId', 'baseVersion', 'slideId', 'requestId'], false),
   tool('undo_project_change', 'Desfaz uma alteração do MCP quando o projeto continua na versão produzida por ela.', {
     requestId: { type: 'string' }, undoRequestId: { type: 'string' },
   }, ['requestId', 'undoRequestId'], false),
@@ -88,6 +94,7 @@ async function call(name, args, agent) {
     case 'preview_visual_edit': return previewAgentVisualBatch(agent.ownerId, args);
     case 'apply_visual_edit': return applyAgentVisualBatch(agent.ownerId, agent.tokenId, args);
     case 'get_change_status': return getAgentVisualJob(agent.ownerId, args.requestId);
+    case 'generate_slide_image': return generateAndApplyAgentSlideImage(agent.ownerId, agent.tokenId, args);
     case 'undo_project_change': return undoAgentVisualBatch(agent.ownerId, args);
     default: throw Object.assign(new Error('Ferramenta desconhecida.'), { code: 'mcp_tool_unknown', status: 404 });
   }
@@ -107,7 +114,7 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return res.status(400).json(rpcError(null, -32700, 'JSON inválido.'));
-  const writeNames = new Set(['apply_text_edit', 'apply_visual_edit', 'undo_project_change']);
+  const writeNames = new Set(['apply_text_edit', 'apply_visual_edit', 'generate_slide_image', 'undo_project_change']);
   const requestedTool = body?.method === 'tools/call' ? body?.params?.name : '';
   const scope = writeNames.has(requestedTool) ? 'projects:write' : 'projects:read';
   let agent;
@@ -123,7 +130,7 @@ export default async function handler(req, res) {
   if (method?.startsWith('notifications/')) return res.status(202).end();
   if (method === 'initialize') return res.status(200).json(rpc(id, {
     protocolVersion: PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-    instructions: 'Leia o projeto antes de editar. Faça preview antes de apply. Preserve fotos e logos. Use requestId único; em conflito, leia novamente.',
+    instructions: 'Leia o projeto antes de editar. Faça preview antes de apply para texto e design. Para imagens, use generate_slide_image com a versão atual; cada chamada consome um crédito. Use requestId único; em conflito, leia novamente.',
   }));
   if (method === 'ping') return res.status(200).json(rpc(id, {}));
   if (method === 'tools/list') return res.status(200).json(rpc(id, { tools }));

@@ -410,6 +410,7 @@ export function projectDesignView(project, { includeText = false } = {}) {
   const brand = record(doc.brand) ? pickVisual(doc.brand, BRAND_VISUAL_FIELDS) : {};
   return {
     id: project.id, version: project.version, name: safeText(entry.name || entry.title, 160),
+    format: safeText(doc.format || doc.formatId, 40),
     ...(shareCode ? {
       shareCode,
       shareUrl: `https://moont.ai/?share=${encodeURIComponent(shareCode)}&app=1`,

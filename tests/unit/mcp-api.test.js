@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocked = vi.hoisted(() => ({
   auth: vi.fn(), limit: vi.fn(), list: vi.fn(), project: vi.fn(), job: vi.fn(),
   previewText: vi.fn(), applyText: vi.fn(), previewVisual: vi.fn(), applyVisual: vi.fn(), undo: vi.fn(),
+  image: vi.fn(),
 }));
+vi.mock('../../api/lib/agent-image-generation.js', () => ({ generateAndApplyAgentSlideImage: mocked.image }));
 vi.mock('../../api/lib/agent-token-store.js', async () => {
   class AgentTokenError extends Error { constructor(status, code, message) { super(message); this.status = status; this.code = code; } }
   return { AgentTokenError, authenticateAgentRequest: mocked.auth };
@@ -42,6 +44,8 @@ describe('remote MCP endpoint', () => {
     expect(listed.body.result.tools).toHaveLength(MCP_TOOLS.length);
     expect(listed.body.result.tools.find(item => item.name === 'apply_text_edit'))
       .toMatchObject({ annotations: { readOnlyHint: false }, securitySchemes: [{ scopes: ['projects:write'] }] });
+    expect(listed.body.result.tools.find(item => item.name === 'generate_slide_image'))
+      .toMatchObject({ annotations: { readOnlyHint: false }, securitySchemes: [{ scopes: ['projects:write'] }] });
   });
 
   it('separa escopo de leitura e escrita e retorna conteúdo estruturado', async () => {
@@ -54,6 +58,15 @@ describe('remote MCP endpoint', () => {
     } });
     expect(write.body.result.isError).toBeUndefined();
     expect(mocked.auth.mock.calls.map(call => call[1].scope)).toEqual(['projects:read', 'projects:write']);
+  });
+
+  it('gera imagem com escopo de escrita e resposta estruturada', async () => {
+    mocked.image.mockResolvedValue({ requestId: 'image-request-01', slideId: 's1', hasPhoto: true });
+    const result = await send({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: {
+      name: 'generate_slide_image', arguments: { projectId: 'p1', baseVersion: 2, slideId: 's1', requestId: 'image-request-01' },
+    } });
+    expect(result.body.result.structuredContent).toMatchObject({ hasPhoto: true, slideId: 's1' });
+    expect(mocked.auth).toHaveBeenCalledWith(expect.anything(), { scope: 'projects:write' });
   });
 
   it('responde 401 com descoberta OAuth quando a credencial falta', async () => {

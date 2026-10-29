@@ -8,8 +8,9 @@ import {
 } from './lib/agent-visual-batch.js';
 import { VISUAL_PATCH_SCHEMA } from './lib/visual-patch.js';
 import { CONTENT_PATCH_SCHEMA } from './lib/content-patch.js';
+import { generateAndApplyAgentSlideImage } from './lib/agent-image-generation.js';
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 function parseBody(req) {
@@ -112,6 +113,10 @@ export default async function handler(req, res) {
     if (body.action === 'apply_text') {
       const job = await applyAgentTextEdit(agent.ownerId, agent.tokenId, body);
       return res.status(200).json({ ok: true, job });
+    }
+    if (body.action === 'generate_image') {
+      const result = await generateAndApplyAgentSlideImage(agent.ownerId, agent.tokenId, body);
+      return res.status(200).json({ ok: true, job: result });
     }
     if (body.action === 'undo') {
       const job = await undoAgentVisualBatch(agent.ownerId, body);

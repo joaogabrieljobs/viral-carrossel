@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "moont",
-  "version": "0.2.0",
-  "description": "Inspecione projetos do Moont e edite design ou conteúdo com prévia, controle de versão e reversão.",
+  "version": "0.3.0",
+  "description": "Inspecione projetos do Moont, edite design e conteúdo e gere imagens por card com controle de versão.",
   "author": {
     "name": "Moont"
   },
@@ -13,8 +13,8 @@
       "onboardingSkill": "./skills/setup/SKILL.md",
       "interface": {
         "displayName": "Moont",
-        "shortDescription": "Edite design e conteúdo dos projetos Moont",
-        "longDescription": "Leia projetos e cards, confira uma prévia e aplique ou reverta ajustes visuais em lote e edições de texto. Fotos e logos permanecem protegidos.",
+        "shortDescription": "Edite projetos e gere imagens no Moont",
+        "longDescription": "Leia projetos e cards, confira prévias, aplique ou reverta ajustes visuais e textuais e gere imagens por card com quota e controle de versão.",
         "developerName": "Moont",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],

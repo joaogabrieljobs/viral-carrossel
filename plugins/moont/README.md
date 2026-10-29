@@ -1,6 +1,6 @@
 # Moont no Codex
 
-Este plugin conecta o Codex à sua conta Moont para inspecionar projetos, fazer alterações **visuais** em lote e revisar **textos** com prévia. É possível selecionar um projeto, vários projetos ou a biblioteca inteira para ajustes visuais. Edições de conteúdo são aplicadas a um projeto por vez para facilitar a revisão.
+Este plugin conecta o Codex à sua conta Moont para inspecionar projetos, fazer alterações **visuais** em lote, revisar **textos** com prévia e **gerar imagens** para cards. É possível selecionar um projeto, vários projetos ou a biblioteca inteira para ajustes visuais. Edições de conteúdo e imagens são aplicadas a um projeto por vez.
 
 ## Instalação local
 
@@ -53,9 +53,17 @@ No macOS, `sh plugins/moont/bin/setup.sh add` grava a mesma chave no Chaves. Em 
 4. `apply_text_edit` aplica exatamente a prévia, com controle de versão e ID idempotente.
 5. `undo_project_change` reverte alterações textuais ou visuais enquanto o projeto ainda estiver na versão produzida pelo MCP.
 
+### Imagens
+
+1. `get_project_content` mostra `imageQuery` e `hasPhoto` em cada card.
+2. `generate_slide_image` recebe `projectId`, `slideId`, a `baseVersion` recém-lida e um `requestId` único.
+3. Cada chamada gera e salva uma imagem, consome um crédito do plano e incrementa a versão do projeto.
+4. Releia o projeto antes do card seguinte, pois a nova `baseVersion` será a versão retornada pela operação anterior.
+5. Repetir o mesmo `requestId` devolve a operação concluída sem gerar ou cobrar outra imagem. Conflitos preservam a edição mais recente.
+
 Um lote interrompido pode ser retomado: uma prévia parcial retorna `planId`, usado como `resumePlanId` na próxima chamada; uma aplicação parcial conserva o mesmo `planId` e os mesmos IDs idempotentes; uma reversão parcial retorna `undoPlanId`, usado como `resumeUndoPlanId` para prosseguir. Os planos ficam em `PLUGIN_DATA/plans` (ou `~/.local/share/moont-codex/plans` fora do Codex) com acesso restrito ao usuário. Eles guardam apenas metadados e ajustes visuais; o token fica somente no Chaves.
 
-Fotos, logos e referências de mídia permanecem protegidos contra escrita. O conteúdo editável inclui nome e legenda do projeto, título, subtítulo, texto inferior, legenda e direção de imagem de cada card, além do texto de áreas adicionais. `patch.copyCtaFrom` continua copiando um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Toda prévia e aplicação usa controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
+Logos e referências de mídia permanecem protegidos contra escrita. Fotos só são gravadas pela ferramenta específica `generate_slide_image`. O conteúdo editável inclui nome e legenda do projeto, título, subtítulo, texto inferior, legenda e direção de imagem de cada card, além do texto de áreas adicionais. `patch.copyCtaFrom` continua copiando um botão CTA existente de outro card do mesmo projeto, com estilo opcional, sem alterar o card de origem. Quando `patch.brand` é usado, indique `brandScope: "project"`: a marca afeta o projeto inteiro, inclusive cards fora da seleção. Toda prévia e aplicação usa controle de versão para evitar sobrescrever mudanças feitas em outro aparelho.
 
 O ajuste visual `{ "procedureLabelEmphasis": true }` destaca o rótulo inicial em maiúsculas do subtítulo apenas nos cards selecionados, mantendo o texto salvo e a edição intactos. Novos cards começam com esse ajuste desligado.
 

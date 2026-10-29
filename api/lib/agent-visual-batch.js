@@ -300,6 +300,61 @@ export async function applyAgentTextEdit(ownerValue, tokenId, input) {
   });
 }
 
+export async function applyAgentImageEdit(ownerValue, tokenId, input) {
+  const owner = ownerId(ownerValue);
+  const id = projectId(input?.projectId);
+  const base = version(input?.baseVersion);
+  const rid = requestId(input?.requestId);
+  const slideId = String(input?.slideId || '').trim();
+  const assetId = String(input?.assetId || '').trim();
+  if (!slideId || slideId.length > 200) fail(400, 'image_slide_id_invalid', 'ID do card inválido.');
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(assetId)) fail(400, 'image_asset_id_invalid', 'Asset de imagem inválido.');
+  if (typeof tokenId !== 'string' || !tokenId) fail(401, 'agent_token_invalid', 'Credencial inválida.');
+  const hash = requestHash({ kind: 'image', projectId: id, baseVersion: base, slideId, assetId });
+  await getAccountProject(owner, id);
+  return getPostgresConnection().begin(async tx => {
+    await forgetExpiredVisualJobs(tx, owner);
+    const row = await lockAccountAndProject(tx, owner, id);
+    const existing = await tx.unsafe(
+      `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
+    );
+    if (existing[0]) {
+      if (existing[0].request_hash !== hash || existing[0].project_id !== id) {
+        fail(409, 'image_request_reused', 'requestId já usado para outra imagem.');
+      }
+      return safeJob(existing[0]);
+    }
+    const currentVersion = Number(row.version);
+    if (currentVersion !== base) fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
+    const slides = Array.isArray(row.entry?.doc?.slides) ? row.entry.doc.slides : [];
+    let found = false;
+    const nextSlides = slides.map(slide => {
+      if (slide?.id !== slideId) return slide;
+      found = true;
+      const next = { ...slide, bgImageAssetId: assetId, bgImageSource: 'ai', bgImageFailed: false, bgImageError: null,
+        imgMode: 'dalle', bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100 };
+      delete next.bgImage;
+      delete next.bgImageId;
+      return next;
+    });
+    if (!found) fail(404, 'image_slide_missing', 'Card não encontrado neste projeto.');
+    const nextEntry = { ...row.entry, doc: { ...row.entry.doc, slides: nextSlides } };
+    const afterVersion = await updateProject(tx, owner, id, nextEntry, currentVersion, Date.now());
+    const jobs = await tx.unsafe(
+      `INSERT INTO moont.agent_visual_jobs
+       (owner_id, request_id, project_id, token_id, request_hash, before_version,
+        after_version, changed_slide_count, changed_brand_fields, before_entry)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8::jsonb, $9::jsonb)
+       RETURNING request_id, project_id, status, before_version, after_version,
+         changed_slide_count, changed_brand_fields, created_at, undone_at,
+         undo_request_id, undo_version`,
+      [owner, rid, id, tokenId, hash, currentVersion, afterVersion,
+        JSON.stringify([`image:${slideId}`]), JSON.stringify(snapshotForUndo(row.entry))],
+    );
+    return safeJob(jobs[0]);
+  });
+}
+
 export async function undoAgentVisualBatch(ownerValue, input) {
   const owner = ownerId(ownerValue);
   const rid = requestId(input?.requestId);

@@ -129,6 +129,23 @@ test('text edit requires preview, preserves one plan and can be undone with the 
   });
 });
 
+test('generate_slide_image forwards version, card and idempotency key', async () => {
+  const calls = [];
+  const client = {
+    async generateImage(input) {
+      calls.push(input);
+      return { ok: true, job: { requestId: input.requestId, slideId: input.slideId, hasPhoto: true, afterVersion: 8 } };
+    },
+  };
+  await withTools(client, async tools => {
+    const result = await tools.invoke('generate_slide_image', {
+      projectId: 'p', baseVersion: 7, slideId: 's1', requestId: 'image-request-01', aspectRatio: '2:3',
+    });
+    assert.equal(result.job.hasPhoto, true);
+    assert.deepEqual(calls, [{ projectId: 'p', baseVersion: 7, slideId: 's1', requestId: 'image-request-01', aspectRatio: '2:3' }]);
+  });
+});
+
 test('undo uses idempotent IDs and stops on a version conflict', async () => {
   const calls = [];
   const client = {

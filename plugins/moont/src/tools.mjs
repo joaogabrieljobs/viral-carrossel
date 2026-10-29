@@ -54,6 +54,20 @@ export const TOOL_DEFINITIONS = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'generate_slide_image',
+    description: 'Gera e salva uma imagem para um card usando a imageQuery atual. Consome 1 crédito de imagem e pode levar alguns minutos. Leia o projeto imediatamente antes; a versão base evita sobrescrever edições concorrentes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string' }, slideId: { type: 'string' },
+        baseVersion: { type: 'integer', minimum: 1 },
+        requestId: { type: 'string', minLength: 8, maxLength: 128 },
+        aspectRatio: { type: 'string', enum: ['1:1', '16:9', '9:16', '2:3'] },
+      },
+      required: ['projectId', 'slideId', 'baseVersion', 'requestId'], additionalProperties: false,
+    },
+  },
+  {
     name: 'preview_text_edit',
     description: 'Cria uma prévia de edição textual em um projeto. Pode editar nome, legenda, títulos, apoios, texto inferior, direção de imagem e texto de áreas adicionais. Não altera o projeto.',
     inputSchema: {
@@ -560,6 +574,14 @@ export function createMoontTools(client, { plans = new FilePlanStore(), timeBudg
           return client.getVisualSchema();
         case 'get_content_schema':
           return client.getContentSchema();
+        case 'generate_slide_image': {
+          const projectId = requireString(args.projectId, 'projectId');
+          const slideId = requireString(args.slideId, 'slideId');
+          const requestId = requireString(args.requestId, 'requestId');
+          const baseVersion = Number(args.baseVersion);
+          if (!Number.isSafeInteger(baseVersion) || baseVersion < 1) throw new MoontApiError('baseVersion inválida.', { code: 'invalid_input' });
+          return client.generateImage({ projectId, slideId, requestId, baseVersion, aspectRatio: args.aspectRatio });
+        }
         case 'preview_text_edit':
           return previewTextEdit(args);
         case 'apply_text_edit':
