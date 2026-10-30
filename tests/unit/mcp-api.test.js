@@ -60,6 +60,22 @@ describe('remote MCP endpoint', () => {
     expect(mocked.auth.mock.calls.map(call => call[1].scope)).toEqual(['projects:read', 'projects:write']);
   });
 
+  it('entrega ao assistente o catálogo local de fontes com valores aplicáveis', async () => {
+    const result = await send({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: {
+      name: 'get_visual_schema', arguments: {},
+    } });
+    const catalog = result.body.result.structuredContent.schema.fontCatalog;
+    expect(catalog.usage).toContain('patch.brand.titleFont');
+    expect(catalog.titleFonts.length).toBeGreaterThanOrEqual(80);
+    expect(catalog.bodyFonts.length).toBeGreaterThanOrEqual(20);
+    expect(catalog.titleFonts).toContainEqual(expect.objectContaining({
+      name: 'Migra', val: '"Moont Library Migra", serif', local: true,
+    }));
+    expect(catalog.bodyFonts).toContainEqual(expect.objectContaining({
+      name: 'Aeonik', val: '"Moont Library Aeonik", sans-serif', local: true,
+    }));
+  });
+
   it('inicia o job de imagem com escopo de escrita e expõe o acompanhamento', async () => {
     mocked.image.mockResolvedValue({ requestId: 'image-request-01', status: 'pending', slides: [{ slideId: 's1', status: 'pending' }] });
     const result = await send({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: {

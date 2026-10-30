@@ -25,6 +25,13 @@ function sampleEntry() {
 }
 
 describe('visual-only agent patch', () => {
+  it('publica no schema as fontes locais com nome, categoria e valor CSS exato', () => {
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.titleFonts).toHaveLength(82);
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.bodyFonts).toHaveLength(21);
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.titleFonts.find(font => font.name === 'The Signature'))
+      .toMatchObject({ val: '"Moont Library The Signature", sans-serif', cat: 'editorial', local: true });
+  });
+
   it('altera geometria, fonte, marca e CTA sem tocar texto, mídia, IDs ou campos não relacionados', () => {
     const before = sampleEntry();
     const frozen = JSON.stringify(before);
