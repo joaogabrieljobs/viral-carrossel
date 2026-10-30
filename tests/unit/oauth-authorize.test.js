@@ -56,6 +56,7 @@ describe('autorização OAuth do MCP', () => {
     expect(res.send.mock.calls[0][0]).toContain('pessoa@empresa.com');
     expect(res.send.mock.calls[0][0]).toContain('Conectar ChatGPT');
     expect(res.send.mock.calls[0][0]).toContain('/landing/moont-v3/source/02-crossing-evening.webp');
+    expect(res.send.mock.calls[0][0]).toContain('/moont-wordmark.svg');
     expect(res.send.mock.calls[0][0]).toContain('Precisa de ajuda?');
     expect(res.send.mock.calls[0][0]).toContain('Autorizar conexão');
   });

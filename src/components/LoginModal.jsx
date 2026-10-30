@@ -3,6 +3,7 @@ import { Loader2, X } from 'lucide-react';
 import PasswordField from './PasswordField.jsx';
 import { requestPasswordReset } from '../lib/password-recovery.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
+import BrandLogo from './BrandLogo.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
 import { dismissOnboardingLanding } from '../utils/landing-gate.js';
 import './LoginModal.css';
@@ -92,8 +93,7 @@ export default function LoginModal({
   return (
     <div className="moont-auth" role="presentation" onClick={onClose}>
       <div className="moont-auth__brand" aria-label="Moont">
-        <span className="moont-auth__mark" aria-hidden><i /><i /><i /></span>
-        moont
+        <BrandLogo height={31} alt="Moont" />
       </div>
       <a className="moont-auth__help" href="mailto:contato@moont.ai">Precisa de ajuda?</a>
       <span className="moont-auth__legal">© 2026 Moont · Elevessy</span>
