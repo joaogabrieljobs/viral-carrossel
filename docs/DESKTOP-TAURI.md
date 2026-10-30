@@ -105,21 +105,34 @@ faltam certificado Developer ID Application e notarização da Apple.
 
 ## Verificação
 
-### Provado pelo desenvolvimento
+### Provado pelo desenvolvimento em 29/10/2026
 
+- worktree limpo no commit `79b29b3`; suíte completa com 168 arquivos e 1.691
+  testes verdes; `cargo test` 6/6;
 - invariantes de origem, ausência de loopback, capability vazia, CSP, versão,
   `on_new_window`, `on_download` e single-instance;
-- testes puros de classificação de URLs, nome seguro e destino numerado;
-- suíte do projeto, `cargo test`, build `.app`/`.dmg`, conteúdo do Info.plist,
-  assinatura e ausência de padrões de segredo;
-- abertura do aplicativo, processo único e carregamento de rede da produção.
+- `Moont.app` arm64 com `ai.moont.desktop`, versão 1.0.0, mínimo macOS 11.3,
+  assinatura ad hoc e `TeamIdentifier` ausente;
+- `Contents/Resources/version.json` com commit, branch, canal `desktop`, origem
+  e `sujo: false`; nenhum padrão de segredo encontrado no binário;
+- aplicativo aberto e área WebKit `~/Library/WebKit/ai.moont.desktop` criada
+  com LocalStorage e IndexedDB;
+- página real do Google aberta dentro do aplicativo: “Faça login · Prosseguir
+  para moont.ai”, usando o callback `https://moont.ai/api/auth/google/callback`,
+  sem `disallowed_useragent` ou “Something went wrong”;
+- `open -n` manteve um único processo do Moont;
+- `.dmg` final de 3,2 MB, SHA-256
+  `d739374da993be81121f49ea99a477af8c5c7b4e0f780a18998a70f9fe6b1b34`,
+  copiado para `~/Downloads/Moont_1.0.0_aarch64.dmg`.
 
-Os itens acima devem ser atualizados com o resultado real de cada build, sem
-registrar como provado algo que tenha sido apenas revisado no código.
+O empacotador visual do Tauri compilou o `.app`, mas seu AppleScript do Finder
+expirou ao montar o DMG. O instalador final foi criado com `hdiutil` diretamente,
+contendo `Moont.app` e o atalho para `/Applications`.
 
 ### A confirmar pelo dono dentro do aplicativo
 
-- login Google completo e retorno ao projeto;
+- login Google completo e retorno ao projeto (a tela real do Google foi
+  alcançada; credenciais não foram preenchidas pelo desenvolvimento);
 - exportação/download de PNG, ZIP e PDF;
 - checkout e retorno de pagamento;
 - abertura de link externo no navegador do sistema.
