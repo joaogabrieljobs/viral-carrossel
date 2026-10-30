@@ -1,0 +1,20 @@
+[package]
+name = "moont-desktop"
+version = "1.0.0"
+description = "O Moont no desktop: janela nativa (Tauri 2) sobre o app web de produção"
+authors = ["Elevessy"]
+edition = "2021"
+publish = false
+
+[lib]
+name = "moont_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+url = "2"

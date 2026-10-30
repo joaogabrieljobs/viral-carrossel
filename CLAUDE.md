@@ -14,6 +14,7 @@ Studio de narrativas visuais com IA para comunicação e apresentações. Vite +
 - TDD: docs/engineering/TDD-suite-testes-confianca.md
 - Épicos e specs: docs/epics/
 - Billing/auth: docs/STRIPE.md
+- Desktop Tauri 2: **docs/DESKTOP-TAURI.md** (casca nativa aponta para `https://moont.ai`; sem servidor local, porta ou API Tauri exposta).
 
 Regra: antes de implementar qualquer task, leia a spec correspondente e os documentos acima. Divergência entre código e documento → parar e reportar.
 

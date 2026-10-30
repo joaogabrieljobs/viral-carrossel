@@ -16,7 +16,10 @@
     "test:e2e:ui": "playwright test --ui",
     "check:undef": "node scripts/check-undefined.mjs",
     "check:props": "node scripts/check-props.mjs",
-    "check:a11y": "node scripts/check-a11y.mjs"
+    "check:a11y": "node scripts/check-a11y.mjs",
+    "desktop:check": "./scripts/build-desktop.sh --so-conferir",
+    "desktop:dev": "./scripts/build-desktop.sh --dev",
+    "desktop:build": "./scripts/build-desktop.sh"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",

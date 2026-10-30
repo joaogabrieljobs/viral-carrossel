@@ -1,0 +1,6 @@
+# Artefatos do app desktop (Tauri). O crate é código; isto é saída.
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+# Gerado pelo portão (scripts/build-desktop.sh) a cada build: commit, branch, data.
+src-tauri/resources/version.json
