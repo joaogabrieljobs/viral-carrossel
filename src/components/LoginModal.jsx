@@ -5,6 +5,7 @@ import { requestPasswordReset } from '../lib/password-recovery.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
 import { dismissOnboardingLanding } from '../utils/landing-gate.js';
+import './LoginModal.css';
 
 /**
  * Login / criar conta — e-mail+senha + Google opcional.
@@ -81,183 +82,77 @@ export default function LoginModal({
     }
   };
 
+  const heading = mode === 'forgot' ? 'Recupere seu acesso' : mode === 'register' ? 'Crie sua conta' : 'Entre no Moont';
+  const intro = mode === 'forgot'
+    ? 'Informe o e-mail da conta. Enviaremos um link seguro para definir uma nova senha.'
+    : mode === 'register'
+      ? 'Crie, organize e aprimore seus conteúdos em um só lugar.'
+      : 'Continue de onde parou e acesse seus projetos, marcas e apresentações.';
+
   return (
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      role="presentation"
-      style={{ zIndex: 12000 }}
-    >
-      <div
-        className="modal-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="login-title"
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          maxWidth: 420,
-          width: 'min(420px, calc(100vw - 24px))',
-          padding: 0,
-          overflow: 'hidden',
-        }}
-      >
-        <header style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 12,
-          padding: '20px 20px 0',
-        }}>
-          <div>
-            <p className="vc-eyebrow" style={{ margin: '0 0 6px' }}>
-              {mode === 'forgot' ? 'Recuperar acesso' : mode === 'register' ? 'Nova conta' : 'Já tem conta'}
-            </p>
-            <h2 id="login-title" style={{
-              margin: 0,
-              fontSize: 20,
-              fontWeight: 600,
-              letterSpacing: '-0.022em',
-              lineHeight: 1.2,
-            }}>
-              {mode === 'forgot' ? 'Esqueci minha senha' : mode === 'register' ? 'Criar conta' : 'Entrar no studio'}
-            </h2>
-            <p style={{
-              margin: '8px 0 0',
-              fontSize: 13,
-              lineHeight: 1.45,
-              color: 'var(--text-muted)',
-            }}>
-              {mode === 'forgot' ? 'Informe o e-mail da sua conta para receber o link de recuperação.' : mode === 'register'
-                ? 'Crie uma conta nova com e-mail e senha. Se você já assinou, entre na conta existente.'
-                : 'Usa o e-mail da assinatura + senha, ou Google.'}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
-            <X size={17} />
-          </button>
-        </header>
+    <div className="moont-auth" role="presentation" onClick={onClose}>
+      <div className="moont-auth__brand" aria-label="Moont">
+        <span className="moont-auth__mark" aria-hidden><i /><i /><i /></span>
+        moont
+      </div>
+      <a className="moont-auth__help" href="mailto:contato@moont.ai">Precisa de ajuda?</a>
+      <span className="moont-auth__legal">© 2026 Moont · Elevessy</span>
 
-        <div style={{ padding: 20, display: 'grid', gap: 14 }}>
-          {mode !== 'forgot' && <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 6,
-            padding: 4,
-            borderRadius: 12,
-            background: 'var(--bg-pearl, #f1f1f1)',
-          }}>
-            {[
-              { id: 'login', label: 'Entrar' },
-              { id: 'register', label: 'Criar conta' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                disabled={loading}
-                onClick={() => changeMode(tab.id)}
-                style={{
-                  height: 36,
-                  borderRadius: 10,
-                  border: 'none',
-                  background: mode === tab.id ? 'var(--bg-base, #fff)' : 'transparent',
-                  color: 'var(--text-primary)',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  boxShadow: mode === tab.id ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>}
+      <main className="moont-auth__panel" role="dialog" aria-modal="true" aria-labelledby="login-title"
+        onClick={(event) => event.stopPropagation()}>
+        <div className="moont-auth__top">
+          <button type="button" onClick={onClose} className="moont-auth__close" aria-label="Fechar"><X size={17} /></button>
+        </div>
 
-          {error && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: '#ff6b8a', lineHeight: 1.4 }}>{error}</p>
-          )}
-          {notice && <p role="status" style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: '#a4e8c0' }}>{notice}</p>}
-          {checkoutReady && <button type="button" className="vc-btn" onClick={() => {
+        {mode !== 'forgot' && <div className="moont-auth__tabs" role="tablist" aria-label="Acesso à conta">
+          {[{ id: 'register', label: 'Criar conta' }, { id: 'login', label: 'Entrar' }].map((tab) => (
+            <button key={tab.id} type="button" role="tab" aria-selected={mode === tab.id}
+              disabled={loading} onClick={() => changeMode(tab.id)}
+              className={`moont-auth__tab ${mode === tab.id ? 'is-active' : ''}`}>{tab.label}</button>
+          ))}
+        </div>}
+
+        <p className="moont-auth__eyebrow">{mode === 'forgot' ? 'Recuperar acesso' : 'Sua criação continua aqui'}</p>
+        <h2 id="login-title">{heading}</h2>
+        <p className="moont-auth__intro">{intro}</p>
+
+        <div className="moont-auth__body" role="tabpanel" aria-live="polite">
+          {error && <p role="alert" className="moont-auth__alert">{error}</p>}
+          {notice && <p role="status" className="moont-auth__notice">{notice}</p>}
+          {checkoutReady && <button type="button" className="moont-auth__submit" onClick={() => {
             dismissOnboardingLanding();
             window.location.assign('/?app=1&login=no_subscription');
-          }} style={{ minHeight: 44 }}>Escolher plano</button>}
+          }}>Escolher plano</button>}
 
-          {!notice && <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+          {!notice && <form onSubmit={submit} className="moont-auth__form">
             <label style={{ display: 'grid', gap: 6 }}>
               <span className="vc-label">E-mail</span>
-              <input
-                type="email"
-                required
-                disabled={loading}
-                maxLength={254}
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@empresa.com"
-                className="vc-input"
-                style={{ height: 44, borderRadius: 9999, padding: '0 16px' }}
-              />
+              <input type="email" required disabled={loading} maxLength={254} autoComplete="email"
+                value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@empresa.com"
+                className="vc-input" />
             </label>
-
             {mode !== 'forgot' && <PasswordField key={mode} value={password} onChange={e => setPassword(e.target.value)}
               disabled={loading} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />}
             {mode === 'login' && <button type="button" disabled={loading} onClick={() => changeMode('forgot')}
-              style={{ justifySelf: 'end', background: 'transparent', border: 0, padding: '6px 0', color: '#ff87bb', textDecoration: 'underline', fontSize: 13, cursor: 'pointer' }}>
-              Esqueci minha senha
-            </button>}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="vc-btn"
-              style={{
-                height: 48,
-                borderRadius: 9999,
-                border: 'none',
-                background: '#000',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 15,
-                cursor: loading ? 'wait' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
+              className="moont-auth__forgot">Esqueci minha senha</button>}
+            <button type="submit" disabled={loading} className="moont-auth__submit">
               {loading && <Loader2 size={16} className="spin" />}
-              {mode === 'forgot' ? 'Enviar link de recuperação' : mode === 'register' ? 'Criar conta' : 'Entrar'}
+              {mode === 'forgot' ? 'Enviar link de recuperação' : mode === 'register' ? 'Criar minha conta' : 'Entrar no Moont'}
             </button>
           </form>}
 
           {mode === 'forgot' && <button type="button" disabled={loading} onClick={() => changeMode('login')}
-            className="vc-btn" style={{ minHeight: 44 }}>Voltar para entrar</button>}
+            className="moont-auth__submit">Voltar para entrar</button>}
 
-          {mode !== 'forgot' && <><div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto 1fr',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ height: 1, background: 'var(--hairline, #e6e6e6)' }} />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>ou</span>
-            <span style={{ height: 1, background: 'var(--hairline, #e6e6e6)' }} />
-          </div>
-
-          <GoogleSignInButton fullWidth label="Continuar com Google" />
-
-          <p style={{
-            margin: 0,
-            fontSize: 13,
-            lineHeight: 1.45,
-            color: 'var(--text-muted)',
-            textAlign: 'center',
-          }}>
-            Ao criar a conta, você aceita os <a href="/termos" style={{ color: 'inherit' }}>termos</a> e a <a href="/privacidade" style={{ color: 'inherit' }}>política de privacidade</a>.
-            {' '}Novo e ainda sem plano? Crie a conta e depois escolha o plano em Começar agora.
-          </p>
+          {mode !== 'forgot' && <>
+            <div className="moont-auth__divider">ou continue com</div>
+            <GoogleSignInButton fullWidth label="Google" />
+            <p className="moont-auth__terms">
+              Ao continuar, você aceita os <a href="/termos">Termos de Uso</a> e reconhece nossa <a href="/privacidade">Política de Privacidade</a>.
+            </p>
           </>}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
