@@ -1,3 +1,5 @@
+import { LOCAL_TITLE_FONTS } from './font-library.generated.js';
+
 // Paletas de cor, fontes de título e templates prontos — dados estáticos
 // compartilhados entre o editor principal e o TemplatesModal.
 
@@ -93,6 +95,7 @@ export const TITLE_FONTS = [
   { name:'Major Mono',     val:'"Major Mono Display", monospace',     cat:'mono' },
   { name:'JetBrains Mono', val:'"JetBrains Mono", monospace',         cat:'mono' },
   { name:'DM Mono',        val:'"DM Mono", monospace',               cat:'mono' },
+  ...LOCAL_TITLE_FONTS,
 ];
 
 /**

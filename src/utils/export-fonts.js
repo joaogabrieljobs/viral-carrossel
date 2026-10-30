@@ -1,8 +1,13 @@
 import { TITLE_FONTS } from './design-data.js';
 import { BODY_FONTS } from './brand-visuals.js';
+import { LOCAL_FONT_FAMILIES } from './font-library.generated.js';
 
 const firstFamily = (value) => String(value || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '');
-const WEB_FAMILIES = new Set([...TITLE_FONTS, ...BODY_FONTS].map(({ val }) => firstFamily(val)));
+const WEB_FAMILIES = new Set(
+  [...TITLE_FONTS, ...BODY_FONTS]
+    .map(({ val }) => firstFamily(val))
+    .filter((family) => !LOCAL_FONT_FAMILIES.has(family)),
+);
 
 function fontError(family) {
   const label = family.startsWith('VCBrand') ? 'a fonte da marca' : `a fonte “${family}”`;

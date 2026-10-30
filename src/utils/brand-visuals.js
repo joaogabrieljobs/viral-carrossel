@@ -1,4 +1,5 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
+import { LOCAL_BODY_FONTS } from './font-library.generated.js';
 import { Plus } from 'lucide-react';
 import { hydrateBrandTextColors } from './brand-helpers.js';
 import { DARK_CREAM } from './slide-design-system.js';
@@ -171,6 +172,7 @@ const BODY_FONTS = [
   { name:'Space Mono',    val:'"Space Mono", monospace',     cat:'mono' },
   { name:'IBM Plex Mono', val:'"IBM Plex Mono", monospace',  cat:'mono' },
   { name:'DM Mono',       val:'"DM Mono", monospace',        cat:'mono' },
+  ...LOCAL_BODY_FONTS,
 ];
 
 function vcBgPatternDivStyle(pattern) {
