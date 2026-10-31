@@ -173,8 +173,21 @@ for (const width of [1680, 390]) {
     await expectFont(page, 'Detalhe 1', 'Arial');
     await expectFont(page, 'IDEIA 1', 'Playfair Display');
     await selectFont(page, 'subtitle', SUBTITLE_FONT);
-    await expect.poll(async () => (await savedDoc(page))?.slides?.[0]?.textFonts).toEqual({
-      title: TITLE_FONT, subtitle: SUBTITLE_FONT,
+    await expect.poll(async () => {
+      const doc = await savedDoc(page);
+      return {
+        firstCardFonts: doc?.slides?.[0]?.textFonts,
+        secondCardFonts: doc?.slides?.[1]?.textFonts || {},
+        firstOverlayFont: doc?.slides?.[0]?.overlays?.[0]?.fontFamily,
+        secondOverlayFont: doc?.slides?.[0]?.overlays?.[1]?.fontFamily,
+        ctaOverlayFont: doc?.slides?.[0]?.overlays?.[2]?.fontFamily,
+      };
+    }).toEqual({
+      firstCardFonts: { title: TITLE_FONT, subtitle: SUBTITLE_FONT },
+      secondCardFonts: {},
+      firstOverlayFont: EXTRA_FONT,
+      secondOverlayFont: undefined,
+      ctaOverlayFont: CTA_FONT,
     });
     const beforeReload = await savedDoc(page);
     expect(beforeReload.brand.titleFont).toBe('Arial, sans-serif');
