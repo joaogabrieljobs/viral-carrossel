@@ -66,13 +66,13 @@ describe('remote MCP endpoint', () => {
     } });
     const catalog = result.body.result.structuredContent.schema.fontCatalog;
     expect(catalog.usage).toContain('patch.brand.titleFont');
-    expect(catalog.titleFonts.length).toBeGreaterThanOrEqual(80);
-    expect(catalog.bodyFonts.length).toBeGreaterThanOrEqual(20);
+    expect(catalog.titleFonts).toHaveLength(2);
+    expect(catalog.bodyFonts).toHaveLength(2);
     expect(catalog.titleFonts).toContainEqual(expect.objectContaining({
-      name: 'Migra', val: '"Moont Library Migra", serif', local: true,
+      name: 'Inter', val: '"Moont Library Inter", sans-serif', local: true,
     }));
     expect(catalog.bodyFonts).toContainEqual(expect.objectContaining({
-      name: 'Aeonik', val: '"Moont Library Aeonik", sans-serif', local: true,
+      name: 'Roboto', val: '"Moont Library Roboto", sans-serif', local: true,
     }));
   });
 
