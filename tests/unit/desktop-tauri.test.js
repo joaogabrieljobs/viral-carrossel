@@ -28,6 +28,7 @@ describe('casca desktop Tauri', () => {
   });
 
   it('trata janela externa, download e segunda instância', () => {
+    expect(rust).toContain('open_js_links_on_click(false)');
     expect(rust).toContain('.on_new_window(');
     expect(rust).toContain('NewWindowResponse::Deny');
     expect(rust).toContain('.on_download(');

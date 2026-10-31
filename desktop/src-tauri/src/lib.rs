@@ -41,7 +41,9 @@ pub fn run() {
                 let _ = janela.set_focus();
             }
         }))
-        .plugin(tauri_plugin_opener::init())
+        // A página remota não recebe IPC. Deixe o WKWebView entregar _blank ao
+        // on_new_window abaixo, que decide com segurança o que abre fora.
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .manage(Downloads(Mutex::new(HashMap::new())))
         .setup(|app| {
             let abre_fora = app.handle().clone();
