@@ -98,15 +98,16 @@ export default function LoginModal({
       <a className="moont-auth__help" href="mailto:contato@moont.ai">Precisa de ajuda?</a>
       <span className="moont-auth__legal">© 2026 Moont · Elevessy</span>
 
-      <main className="moont-auth__panel" role="dialog" aria-modal="true" aria-labelledby="login-title"
+      <main className="moont-auth__panel" role="dialog" aria-modal="true"
+        aria-label={mode === 'forgot' ? 'Esqueci minha senha' : mode === 'register' ? 'Criar conta' : 'Entrar no studio'}
         onClick={(event) => event.stopPropagation()}>
         <div className="moont-auth__top">
           <button type="button" onClick={onClose} className="moont-auth__close" aria-label="Fechar"><X size={17} /></button>
         </div>
 
-        {mode !== 'forgot' && <div className="moont-auth__tabs" role="tablist" aria-label="Acesso à conta">
+        {mode !== 'forgot' && <div className="moont-auth__tabs" role="group" aria-label="Acesso à conta">
           {[{ id: 'register', label: 'Criar conta' }, { id: 'login', label: 'Entrar' }].map((tab) => (
-            <button key={tab.id} type="button" role="tab" aria-selected={mode === tab.id}
+            <button key={tab.id} type="button" aria-pressed={mode === tab.id}
               disabled={loading} onClick={() => changeMode(tab.id)}
               className={`moont-auth__tab ${mode === tab.id ? 'is-active' : ''}`}>{tab.label}</button>
           ))}
@@ -135,7 +136,8 @@ export default function LoginModal({
               disabled={loading} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />}
             {mode === 'login' && <button type="button" disabled={loading} onClick={() => changeMode('forgot')}
               className="moont-auth__forgot">Esqueci minha senha</button>}
-            <button type="submit" disabled={loading} className="moont-auth__submit">
+            <button type="submit" disabled={loading} className="moont-auth__submit"
+              aria-label={mode === 'forgot' ? 'Enviar link de recuperação' : mode === 'register' ? 'Criar conta' : 'Entrar'}>
               {loading && <Loader2 size={16} className="spin" />}
               {mode === 'forgot' ? 'Enviar link de recuperação' : mode === 'register' ? 'Criar minha conta' : 'Entrar no Moont'}
             </button>
@@ -146,7 +148,7 @@ export default function LoginModal({
 
           {mode !== 'forgot' && <>
             <div className="moont-auth__divider">ou continue com</div>
-            <GoogleSignInButton fullWidth label="Google" />
+            <GoogleSignInButton fullWidth label="Continuar com Google" />
             <p className="moont-auth__terms">
               Ao continuar, você aceita os <a href="/termos">Termos de Uso</a> e reconhece nossa <a href="/privacidade">Política de Privacidade</a>.
             </p>
