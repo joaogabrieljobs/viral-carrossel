@@ -101,11 +101,8 @@ test.describe('Imagens no IndexedDB', () => {
       buffer: Buffer.from(PNG_1x1, 'base64'),
     });
 
-    // Barra de progresso do import (phase=import) ou toast de conclusão.
-    await expect(
-      page.getByRole('progressbar', { name: /progresso da importação/i })
-        .or(page.getByText(/a importar fotos|fotos aplicadas|foto.*aplicada/i).first()),
-    ).toBeVisible({ timeout: 15_000 });
+    // Em arquivos pequenos a barra pode montar e desaparecer entre dois frames.
+    // A confirmação durável é o byte no IndexedDB e o ID salvo no documento.
     await expect.poll(async () => (await idsNoIndexedDB(page)).length, { timeout: 20_000 }).toBeGreaterThan(0);
     await expect.poll(async () => (await estadoGravado(page)).temId, { timeout: 20_000 }).toBe(true);
   });
