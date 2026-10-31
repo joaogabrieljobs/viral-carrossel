@@ -8,7 +8,7 @@ const css = fs.readFileSync(path.join(root, 'src/styles/font-library.css'), 'utf
 
 describe('biblioteca local de fontes', () => {
   it('expõe todas as famílias importadas sem valores duplicados', () => {
-    expect(LOCAL_TITLE_FONTS.length).toBeGreaterThanOrEqual(80);
+    expect(LOCAL_TITLE_FONTS.map(({ name }) => name)).toEqual(['Inter', 'Roboto']);
     expect(new Set(LOCAL_TITLE_FONTS.map(({ val }) => val)).size).toBe(LOCAL_TITLE_FONTS.length);
     expect(LOCAL_FONT_FAMILIES.size).toBe(LOCAL_TITLE_FONTS.length);
     expect(LOCAL_BODY_FONTS.every(({ val }) => LOCAL_TITLE_FONTS.some((font) => font.val === val))).toBe(true);
@@ -21,6 +21,7 @@ describe('biblioteca local de fontes', () => {
     }
     const urls = [...css.matchAll(/url\('([^']+)'\)/g)].map((match) => match[1]);
     expect(urls.length).toBeGreaterThan(LOCAL_TITLE_FONTS.length);
+    expect(css).toContain('font-weight: 900;');
     for (const url of urls) {
       expect(fs.existsSync(path.join(root, 'public', url.replace(/^\//, '')))).toBe(true);
     }

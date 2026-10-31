@@ -26,6 +26,12 @@ CSS_PATH = ROOT / "src" / "styles" / "font-library.css"
 CATALOG_PATH = ROOT / "src" / "utils" / "font-library.generated.js"
 FONT_EXTENSIONS = {".woff", ".otf", ".ttf"}
 FORMAT_PRIORITY = {".woff": 0, ".otf": 1, ".ttf": 2}
+APPROVED_FAMILIES = {"Inter", "Roboto"}
+WEIGHT_HINTS = (
+    ("thin", 100), ("extralight", 200), ("light", 300),
+    ("medium", 500), ("semibold", 600), ("extrabold", 800),
+    ("bold", 700), ("black", 900),
+)
 
 SERIF_HINTS = {"argent", "belgiano", "cloister", "migra", "seagram"}
 SANS_HINTS = {
@@ -92,8 +98,14 @@ def inspect(path: Path, source_dir: Path) -> Face | None:
         font = TTFont(path, lazy=True)
         internal_family = font_name(font, 16, 1)
         family = catalog_family(path, source_dir, internal_family)
+        if family not in APPROVED_FAMILIES:
+            return None
+        if "condensed" in path.stem.lower():
+            return None
         subfamily = font_name(font, 17, 2).lower()
         weight = int(getattr(font.get("OS/2"), "usWeightClass", 400) or 400)
+        compact_stem = re.sub(r"[^a-z]", "", path.stem.lower())
+        weight = next((value for hint, value in WEIGHT_HINTS if hint in compact_stem), weight)
         style = "italic" if ("italic" in subfamily or "oblique" in subfamily) else "normal"
         font.close()
         if not family:
@@ -205,9 +217,11 @@ def main() -> int:
     )
     (OUT_DIR / "README.md").write_text(
         "# Biblioteca de fontes do Moont\n\n"
-        "Arquivos gerados por `scripts/import-font-library.py` a partir da pasta fornecida ao projeto. "
-        "O importador não concede licenças: a autorização de uso e distribuição de cada família deve "
-        "ser mantida pela operação do Moont.\n",
+        "O importador aceita somente as famílias gratuitas aprovadas abaixo e ignora todas as demais.\n\n"
+        "- Inter — SIL Open Font License 1.1 — https://github.com/rsms/inter/blob/master/LICENSE.txt\n"
+        "- Roboto — Apache License 2.0 — https://github.com/googlefonts/roboto-2-classic/blob/main/LICENSE\n\n"
+        "Os arquivos são derivados da pasta fornecida ao projeto. Não inclua trial, demo, personal use "
+        "ou qualquer família sem licença comercial comprovada.\n",
         encoding="utf-8",
     )
     print(f"{len(entries)} famílias, {imported} faces, {sum(path.stat().st_size for path in OUT_DIR.glob('*.woff')) / 1024 / 1024:.1f} MB")
