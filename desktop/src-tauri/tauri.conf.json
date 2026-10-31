@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Moont",
+  "version": "1.0.0",
+  "identifier": "ai.moont.desktop",
+  "build": {
+    "frontendDist": "../placeholder"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "category": "GraphicsAndDesign",
+    "publisher": "Elevessy",
+    "copyright": "© Elevessy",
+    "shortDescription": "O Moont no desktop",
+    "longDescription": "Plataforma para criar, organizar e aprimorar conteúdos e apresentações. A janela carrega o Moont de produção; conta, projetos, créditos e geração continuam protegidos no servidor.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/version.json": "version.json"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.3"
+    }
+  }
+}

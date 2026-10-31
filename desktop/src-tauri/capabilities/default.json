@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "A janela principal carrega https://moont.ai (origem remota): nenhuma API do Tauri é exposta à página. Nenhuma permissão.",
+  "windows": ["main"],
+  "permissions": []
+}
