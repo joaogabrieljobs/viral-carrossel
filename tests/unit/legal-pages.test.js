@@ -8,6 +8,7 @@ describe('páginas legais do Moont', () => {
     const privacy = pageText('/privacidade');
     expect(privacy).toContain('ELEVESSY GESTÃO, INOVAÇÃO, TECNOLOGIA E COMÉRCIO LTDA');
     expect(privacy).toContain('52.038.549/0001-79');
+    expect(privacy).toContain('contato@moont.ai');
     expect(privacy).toContain('até 15 dias');
     for (const operator of ['Vercel', 'Stripe', 'Google']) expect(privacy).toContain(operator);
   });

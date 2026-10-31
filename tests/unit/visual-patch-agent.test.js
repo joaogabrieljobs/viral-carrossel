@@ -25,6 +25,13 @@ function sampleEntry() {
 }
 
 describe('visual-only agent patch', () => {
+  it('publica no schema as fontes locais com nome, categoria e valor CSS exato', () => {
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.titleFonts).toHaveLength(2);
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.bodyFonts).toHaveLength(2);
+    expect(VISUAL_PATCH_SCHEMA.fontCatalog.titleFonts.find(font => font.name === 'Roboto'))
+      .toMatchObject({ val: '"Moont Library Roboto", sans-serif', cat: 'sans', local: true });
+  });
+
   it('altera geometria, fonte, marca e CTA sem tocar texto, mídia, IDs ou campos não relacionados', () => {
     const before = sampleEntry();
     const frozen = JSON.stringify(before);

@@ -1,6 +1,7 @@
 /** A small, explicit vocabulary for visual-only edits made by the Moont agent. */
 import { createHash } from 'node:crypto';
 import { MAX_CARD_OVERLAYS, normalizeOverlay } from '../../src/utils/card-overlays.js';
+import { LOCAL_BODY_FONTS, LOCAL_TITLE_FONTS } from '../../src/utils/font-library.generated.js';
 
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value)
   && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
@@ -74,6 +75,11 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
   overlayStyles: OVERLAY_STYLE_FIELDS,
   copyCtaFrom: { slideId: 'ID do card de origem', overlayId: 'ID do botão CTA existente',
     style: CTA_COPY_STYLE_FIELDS },
+  fontCatalog: {
+    usage: 'Use exatamente o valor de `val` em patch.brand.titleFont, patch.brand.bodyFont, patch.brand.subtitleFont ou em um campo de fonte do card.',
+    titleFonts: LOCAL_TITLE_FONTS,
+    bodyFonts: LOCAL_BODY_FONTS,
+  },
   notes: [
     'A patch is a flat slide style object; patch.brand is an explicit project-wide style object.',
     'patch.brand requires brandScope="project" even when a subset of slideIds is selected.',
@@ -82,6 +88,7 @@ export const VISUAL_PATCH_SCHEMA = Object.freeze({
     'slide.titleColor and slide.subtitleColor override brand ink for selected cards, including photo cards.',
     'slide.textBlockWidth narrows the main full-bleed text group in percent of the available card width.',
     'slide.procedureLabelEmphasis highlights a leading uppercase category in that card subtitle without changing its stored text or other projects.',
+    'fontCatalog lists the local Moont font library. Choose by name, but send the exact `val`; titleFonts are display choices and bodyFonts are the readable subset.',
     'A project is applied atomically. Repeat requestId to resume safely after a network failure.',
   ],
 });

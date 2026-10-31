@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { shouldShowOnboardingLanding } from './utils/landing-gate.js';
 import BootScreen from './components/BootScreen.jsx';
+import './styles/font-library.css';
 
 const CHUNK_RELOAD_KEY = 'vc_chunk_reload';
 

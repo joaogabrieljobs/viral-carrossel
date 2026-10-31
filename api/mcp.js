@@ -29,7 +29,7 @@ const tools = [
     projectId: { type: 'string' }, includeText: { type: 'boolean' },
   }, ['projectId'], true),
   tool('get_content_schema', 'Mostra os campos de conteúdo aceitos e seus limites.', {}, [], true),
-  tool('get_visual_schema', 'Mostra os campos visuais aceitos e seus limites.', {}, [], true),
+  tool('get_visual_schema', 'Mostra os campos visuais aceitos, seus limites e o catálogo de fontes locais do Moont com os valores exatos para aplicar.', {}, [], true),
   tool('preview_text_edit', 'Mostra antes e depois de uma edição textual sem gravar.', {
     projectId: { type: 'string' }, baseVersion: { type: 'integer', minimum: 1 }, patch: object,
   }, ['projectId', 'baseVersion', 'patch'], true),
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
   if (method?.startsWith('notifications/')) return res.status(202).end();
   if (method === 'initialize') return res.status(200).json(rpc(id, {
     protocolVersion: PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-    instructions: 'Leia o projeto antes de editar. Faça preview antes de apply para texto e design. Para imagens, use generate_slide_image com a versão atual: consome 1 crédito por card, responde pending e termina em minutos; acompanhe com get_change_status. Use requestId único; em conflito, leia novamente.',
+    instructions: 'Leia o projeto antes de editar. Para design, consulte get_visual_schema: ele contém o catálogo de fontes locais e os valores exatos aceitos; escolha fontes de título e corpo coerentes com a intenção e use preview antes de apply. Para imagens, use generate_slide_image com a versão atual: consome 1 crédito por card, responde pending e termina em minutos; acompanhe com get_change_status. Use requestId único; em conflito, leia novamente.',
   }));
   if (method === 'ping') return res.status(200).json(rpc(id, {}));
   if (method === 'tools/list') return res.status(200).json(rpc(id, { tools }));

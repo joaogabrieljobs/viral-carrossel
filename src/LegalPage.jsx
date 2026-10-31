@@ -41,7 +41,7 @@ export const LEGAL_PAGES = {
       },
       {
         heading: 'Os seus pedidos',
-        body: 'Você pode pedir confirmação do tratamento, acesso, correção, portabilidade quando aplicável, informação sobre compartilhamento, revisão de decisões automatizadas, oposição, anonimização, bloqueio ou exclusão nos casos previstos em lei. A resposta simplificada a confirmação ou acesso será dada imediatamente quando possível; a declaração completa será fornecida em até 15 dias, conforme a LGPD. Outros pedidos serão respondidos em prazo razoável, considerando a complexidade e a legislação aplicável. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
+        body: 'Você pode pedir confirmação do tratamento, acesso, correção, portabilidade quando aplicável, informação sobre compartilhamento, revisão de decisões automatizadas, oposição, anonimização, bloqueio ou exclusão nos casos previstos em lei. Envie o pedido para contato@moont.ai. A resposta simplificada a confirmação ou acesso será dada imediatamente quando possível; a declaração completa será fornecida em até 15 dias, conforme a LGPD. Outros pedidos serão respondidos em prazo razoável, considerando a complexidade e a legislação aplicável. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
       },
     ],
   },

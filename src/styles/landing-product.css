@@ -985,6 +985,13 @@
   .moont-lp-demo { padding: 16px; }
 }
 
+@media (max-width: 760px) and (max-height: 700px) {
+  .moont-lp-hero { padding-top: 12px; }
+  .moont-lp-kicker { margin-bottom: 6px; }
+  .moont-lp-hero h1 { margin-bottom: 8px; font-size: clamp(34px, 10.5vw, 40px); line-height: 0.96; }
+  .moont-lp-hero__lead { margin-bottom: 10px; font-size: 14px; line-height: 1.32; }
+}
+
 @media (min-width: 360px) and (max-width: 760px) {
   .moont-lp-scope { grid-template-columns: 1fr 1fr; }
 }
