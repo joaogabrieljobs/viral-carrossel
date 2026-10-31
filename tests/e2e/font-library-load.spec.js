@@ -4,10 +4,8 @@ test('fontes locais carregam no navegador sem depender do Google Fonts', async (
   await page.goto('/');
   const results = await page.evaluate(async () => {
     const families = [
-      'Moont Library Aeonik',
-      'Moont Library Mango Grotesque',
-      'Moont Library Migra',
-      'Moont Library The Signature',
+      'Moont Library Inter',
+      'Moont Library Roboto',
     ];
     return Promise.all(families.map(async (family) => ({
       family,
