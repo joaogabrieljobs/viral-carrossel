@@ -1,0 +1,6 @@
+SNAPSHOT 9912e61d2db5fcdfdf7411c2df595f46ee6106a8
+commit=9912e61d2db5fcdfdf7411c2df595f46ee6106a8
+snapshot=/tmp/moont-audit-9912e61
+efeitos=nenhum (sem deploy, sem SQL de escrita, sem pagamento, sem login de conta real)
+banco_vivo=nao consultado
+app_loja=nao (web Vercel moont.ai)

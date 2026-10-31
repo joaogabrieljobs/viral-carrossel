@@ -1,0 +1,7 @@
+Auditoria somente leitura. Commit 80a74bd3b322348b581faa022491620516376bf4.
+Snapshot: git archive HEAD extraído em /tmp/moont-audit-80a74bd (741 arquivos no tar; 742 no git ls-files após o próprio artefato ainda não commitado).
+Nenhum deploy, migração, pagamento, seed ou mensagem foi executado nesta auditoria.
+Banco: o app não usa Supabase/PostgREST. escrita-cliente.sql não se aplica (não há role anon/authenticated). Não foi aberta conexão de produção: DATABASE_URL não foi lida nem impressa. A escrita no Postgres foi auditada pelo código das rotas api/projects.js, api/library-sync.js e api/lib/*-postgres.js.
+App de loja: não há build EAS/App Store. Produção é o site https://moont.ai. A skill app-publicado-nao-regredir de loja não se aplica.
+Testes: npm test em 2026-10-18 — 135 arquivos, 1306 testes, 1 falha (tests/unit/agent-token-store.test.js, plano inativo).
+npm audit: 0 critical, 3 high, 4 moderate. High de vite/browserslist/source-map-js avaliados quanto ao caminho de produção, não pela nota do scanner.

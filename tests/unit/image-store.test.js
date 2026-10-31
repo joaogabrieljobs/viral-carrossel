@@ -104,10 +104,10 @@ describe('idsDeImagemEmUso', () => {
 
   it('junta ids de todos os projetos, sem repetir', () => {
     const l = [
-      { doc: { slides: [{ bgImageId: 'a' }, { bgImageId: 'b' }] } },
+      { doc: { slides: [{ bgImageId: 'a', bgImageAssetId: 'asset-a' }, { bgImageId: 'b' }] } },
       { doc: { slides: [{ bgImageId: 'b', refImageId: 'ref' }, { title: 'sem foto' }], brand: { logoImageId: 'logo' } } },
     ];
-    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'b', 'logo', 'ref']);
+    expect(idsDeImagemEmUso(l).sort()).toEqual(['a', 'asset-a', 'b', 'logo', 'ref']);
     expect(idsDeImagemEmUso([], [{ logoImageId: 'perfil' }])).toEqual(['perfil']);
     expect(idsDeImagemEmUso(lib([{ refImageAssetId: 'ref_cloud' }]))).toEqual(['ref_cloud']);
     expect(idsDeImagemEmUso(null)).toEqual([]);

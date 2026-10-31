@@ -1,0 +1,4 @@
+2026-10-15T03:42:33Z
+commit=d777cc540539800dc8889205c859d1ef360014c6
+modo=somente-leitura
+efeitos_autorizados=nenhum

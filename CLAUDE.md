@@ -1,5 +1,15 @@
 # Moont
 
+## Estado conferido em 30/10/2026
+
+- Produção web: commit `c7cad93` na Vercel; `main` e `origin/main` estavam iguais no início da revisão.
+- Trabalho em revisão: PR #1 (desktop Tauri), PR #2 (login e integrações) e PR #3 (fontes/MCP). Nenhum deles estava no tronco ou em produção.
+- Fontes só podem ser publicadas com licença comercial gratuita comprovada; arquivos trial, demo ou personal use não entram.
+- Push autorizado para `main` inclui o deploy automático correspondente. Merge e deploy continuam dependendo da autorização dada para a entrega específica.
+- Handoff completo: `docs/SESSAO-2026-10-30-REVISAO.md`.
+
+Antes: o último estado publicado documentado no código era a correção de fotos compartilhadas de 29/10/2026.
+
 Studio de narrativas visuais com IA para comunicação e apresentações. Vite + React 18; monólito legado `ViralCarrossel.jsx` + módulos em `src/`; serverless Vercel em `api/` (Stripe + Google OAuth + proxies IA). Produção: **Vercel** com domínio oficial **https://moont.ai** (hosts `*.vercel.app`, `www.moont.ai` e `moont.com.br` redirecionam para o oficial). `viralcarrossel.com.br` permanece ativo temporariamente para migrar dados locais salvos no navegador; não redirecionar esse host até confirmar a migração. Netlify aposentado em 2026-08-07 — só redireciona 301. O acesso usa cookie `vc_access` e Stripe; a biblioteca sincronizada usa Postgres quando `LIBRARY_SYNC_BACKEND=postgres`, mantendo dados locais no navegador. Imagens dos cards vivem em IndexedDB no browser (`src/utils/image-store.js`) e têm sincronização de mídia em nuvem quando configurada.
 
 ## Documentos de contexto (spec-driven)

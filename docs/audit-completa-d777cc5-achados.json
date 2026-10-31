@@ -1,0 +1,135 @@
+{
+  "commit": "d777cc540539800dc8889205c859d1ef360014c6",
+  "short": "d777cc5",
+  "date": "2026-10-15",
+  "tests": { "files": 103, "passed": 1007, "failed": 0 },
+  "contagem": { "P0": 1, "P1": 5, "P2": 8, "P3": 6 },
+  "fase7": "actualizado após subagentes e0a6f615, 0ec09403, e2850380, e274dca6",
+  "achados": [
+    {
+      "id": "SHARE-001",
+      "prioridade": "P0",
+      "frente": "backend",
+      "titulo": "Push de projeto partilhado sem checagem de membro/dono",
+      "evidencia": "api/project-share.js:84-98",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "esforco": "P",
+      "canal": "servidor",
+      "aceite": "non-member push → 403; owner/member → 200",
+      "aliases": ["BE-SHARE-007"]
+    },
+    {
+      "id": "SHARE-RNG-001",
+      "prioridade": "P1",
+      "frente": "backend",
+      "titulo": "Código de partilha com Math.random",
+      "evidencia": "api/lib/project-share-store.js:60-67",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "canal": "servidor",
+      "aceite": "makeCode usa crypto.getRandomValues"
+    },
+    {
+      "id": "BE-BILL-001",
+      "prioridade": "P1",
+      "frente": "backend",
+      "titulo": "Confirm de checkout reutilizável via session_id na URL",
+      "evidencia": "api/lib/billing-handlers.js:185,210-264",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "canal": "servidor",
+      "aceite": "segundo confirm do mesmo cs_ → 409; session_id fora da query"
+    },
+    {
+      "id": "BE-AUTH-002",
+      "prioridade": "P1",
+      "frente": "backend",
+      "titulo": "Logout não revoga a sessão no servidor",
+      "evidencia": "api/lib/billing-handlers.js:300-310",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "canal": "servidor",
+      "aceite": "cookie antigo falha em readCurrentAccessCookie após logout"
+    },
+    {
+      "id": "BE-QUOTA-003",
+      "prioridade": "P1",
+      "frente": "backend",
+      "titulo": "Quota segue metadata.tier e ignora mudança de price",
+      "evidencia": "api/lib/plans.js:39-45",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "canal": "servidor",
+      "aceite": "troca de price no Portal altera imageQuota.limit"
+    },
+    {
+      "id": "OAUTH-HOST-001",
+      "prioridade": "P1",
+      "frente": "backend",
+      "titulo": "Redirect URI Google ainda usa X-Forwarded-Host",
+      "evidencia": "api/lib/google-auth.js:26-36",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "media",
+      "esforco": "P",
+      "canal": "servidor",
+      "aceite": "x-forwarded-host evil → URI = APP_URL",
+      "aliases": ["WEB-001-oauth-residual"]
+    },
+    {
+      "id": "RL-001",
+      "prioridade": "P2",
+      "frente": "backend",
+      "titulo": "Rate-limit falha para memória por instância",
+      "evidencia": "api/lib/rate-limit.js:95-101",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "esforco": "P",
+      "canal": "servidor",
+      "aceite": "Upstash down em prod → 503/429",
+      "aliases": ["BE-004"]
+    },
+    {
+      "id": "SYNC-OPS-001",
+      "prioridade": "P2",
+      "frente": "sync",
+      "titulo": "Risco operacional Blob vs Redis no library-sync",
+      "evidencia": "docs/engineering/library-cloud-sync.md:32-34",
+      "natureza": "confirmado_por_codigo_e_doc",
+      "confianca": "alta",
+      "esforco": "P",
+      "canal": "ops",
+      "aceite": "LIBRARY_SYNC_STORAGE=blob + Sync 5 projetos em QA",
+      "aliases": []
+    },
+    {
+      "id": "CACHE-SUB-001",
+      "prioridade": "P2",
+      "frente": "backend",
+      "titulo": "Cache de assinatura 2s sem invalidação no webhook",
+      "evidencia": "api/lib/require-access.js:11-12; api/stripe/webhook.js:47-69",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "alta",
+      "esforco": "P",
+      "canal": "servidor",
+      "aceite": "subscription.deleted invalida cache do customer",
+      "aliases": ["BE-003"]
+    },
+    {
+      "id": "SHARE-ENUM-001",
+      "prioridade": "P2",
+      "frente": "backend",
+      "titulo": "GET partilha devolve doc completo só com código",
+      "evidencia": "api/project-share.js:39-52",
+      "natureza": "confirmado_por_codigo",
+      "confianca": "media",
+      "esforco": "P",
+      "canal": "servidor",
+      "aceite": "código curto rate-limited; opcional join-before-GET",
+      "aliases": []
+    }
+  ],
+  "ja_corrigidos_desde_7a24e03": [
+    "FE-001", "FE-002", "FE-003", "WEB-001", "WEB-006", "BE-001", "BE-005", "SYNC-asset-404-pull"
+  ]
+}
