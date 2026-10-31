@@ -1,0 +1,658 @@
+arquivo,nivel_leitura,motivo
+.agents/skills/carrossel-cultura/SKILL.md,triagem,documentação
+.agents/skills/carrossel-cultura/html-template.md,triagem,documentação
+.agents/skills/cinematic-ui/.cursor/rules/cinematic-ui.mdc,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.github/ISSUE_TEMPLATE/bug_report.yml,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.github/ISSUE_TEMPLATE/feature_request.yml,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.github/PULL_REQUEST_TEMPLATE.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.github/copilot-instructions.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.gitignore,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/.windsurf/rules/cinematic-ui.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/AGENTS.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/CHANGELOG.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/CLAUDE.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/CODEX.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/CODE_OF_CONDUCT.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/CONTRIBUTING.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/GEMINI.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/LICENSE,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/README.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/README.zh-CN.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/README.zh-TW.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/SECURITY.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/SKILL.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/agents/openai.yaml,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/directors-library.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/docs/banner.svg,excluído,asset binário/marketing
+.agents/skills/cinematic-ui/docs/demo.mp4,excluído,asset binário/marketing
+.agents/skills/cinematic-ui/references/anti-convergence.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/anti-garbage.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/README.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/background-techniques.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/camera-shots-50.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/color-grades.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/compositions.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/design-dna-db.txt,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/directors-200.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/dna-index.tsv,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/font-moods.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/hero-archetypes.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/image-direction.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/interaction-effects-50.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/narrative-beats.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/section-archetypes.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/section-functions.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/textures.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/typography-cinema.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/visual-elements.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/data/visual-styles.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/implementation-guardrails.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/library-index.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/output-templates.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/premium-calibration.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/references/reference-protocol.md,excluído,skill vendor cinematográfica
+.agents/skills/cinematic-ui/skill.json,excluído,skill vendor cinematográfica
+.agents/skills/influ-cinematic-landing/SKILL.md,triagem,documentação
+.agents/skills/polish/README.md,triagem,documentação
+.agents/skills/polish/SKILL.md,triagem,documentação
+.claude/launch.json,estrutura,tooling/config
+.claude/skills/polish,triagem,resto
+.cursor/rules/design-system.mdc,triagem,resto
+.cursor/rules/skills-bridge.mdc,triagem,resto
+.env.example,triagem,resto
+.github/workflows/ci.yml,estrutura,tooling/config
+.gitignore,triagem,resto
+.vercelignore,triagem,resto
+AGENTS.md,triagem,documentação
+CLAUDE.md,triagem,documentação
+DESIGN.md,triagem,documentação
+README.md,triagem,documentação
+ViralCarrossel.jsx,integral,dinheiro/auth/sync/persistência
+api/ai/compatible.js,integral,dinheiro/auth/sync/persistência
+api/ai/ocr.js,integral,dinheiro/auth/sync/persistência
+api/ai/sjinn-image.js,integral,dinheiro/auth/sync/persistência
+api/anthropic/v1/messages.js,integral,dinheiro/auth/sync/persistência
+api/auth/forgot-password.js,integral,dinheiro/auth/sync/persistência
+api/auth/google.js,integral,dinheiro/auth/sync/persistência
+api/auth/google/callback.js,integral,dinheiro/auth/sync/persistência
+api/auth/login.js,integral,dinheiro/auth/sync/persistência
+api/auth/logout.js,integral,dinheiro/auth/sync/persistência
+api/auth/register.js,integral,dinheiro/auth/sync/persistência
+api/auth/reset-password.js,integral,dinheiro/auth/sync/persistência
+api/auth/session.js,integral,dinheiro/auth/sync/persistência
+api/auth/set-password.js,integral,dinheiro/auth/sync/persistência
+api/cron/cleanup-image-references.js,integral,dinheiro/auth/sync/persistência
+api/fetch-source.js,integral,dinheiro/auth/sync/persistência
+api/lib/access.js,integral,dinheiro/auth/sync/persistência
+api/lib/billing-handlers.js,integral,dinheiro/auth/sync/persistência
+api/lib/cors.js,integral,dinheiro/auth/sync/persistência
+api/lib/google-auth.js,integral,dinheiro/auth/sync/persistência
+api/lib/image-quota.js,integral,dinheiro/auth/sync/persistência
+api/lib/image-references.js,integral,dinheiro/auth/sync/persistência
+api/lib/library-sync-store.js,integral,dinheiro/auth/sync/persistência
+api/lib/ocr-quota.js,integral,dinheiro/auth/sync/persistência
+api/lib/password-auth.js,integral,dinheiro/auth/sync/persistência
+api/lib/password-reset.js,integral,dinheiro/auth/sync/persistência
+api/lib/plans.js,integral,dinheiro/auth/sync/persistência
+api/lib/project-share-store.js,integral,dinheiro/auth/sync/persistência
+api/lib/quota-stripe-store.js,integral,dinheiro/auth/sync/persistência
+api/lib/rate-limit.js,integral,dinheiro/auth/sync/persistência
+api/lib/require-access.js,integral,dinheiro/auth/sync/persistência
+api/lib/sjinn.js,integral,dinheiro/auth/sync/persistência
+api/lib/stripe.js,integral,dinheiro/auth/sync/persistência
+api/library-sync.js,integral,dinheiro/auth/sync/persistência
+api/project-share.js,integral,dinheiro/auth/sync/persistência
+api/status.js,integral,dinheiro/auth/sync/persistência
+api/stripe/checkout.js,integral,dinheiro/auth/sync/persistência
+api/stripe/confirm.js,integral,dinheiro/auth/sync/persistência
+api/stripe/portal.js,integral,dinheiro/auth/sync/persistência
+api/stripe/webhook.js,integral,dinheiro/auth/sync/persistência
+assets/brand/moont-sequence/README.md,excluído,asset binário/marketing
+assets/brand/moont-sequence/checksums.sha256,excluído,asset binário/marketing
+assets/brand/moont-sequence/manifest.json,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-128x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-256x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-512x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-128x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-256x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-512x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-128x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-256x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-512x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-128x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-256x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-512x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-1920x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-480x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-960x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-1920x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-480x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-960x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-1920x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-480x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-960x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-1920x512.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-480x128.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-960x256.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-midnight-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-midnight-1024x1024.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-moonlight-1024x1024.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-moonlight-1024x1024.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-midnight-1600x600.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-midnight-1600x600.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-moonlight-1600x600.png,excluído,asset binário/marketing
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-moonlight-1600x600.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-black-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-color-on-dark-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-color-on-light-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-white-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-black-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-color-on-dark-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-color-on-light-transparent.svg,excluído,asset binário/marketing
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-white-transparent.svg,excluído,asset binário/marketing
+design/moont-logo-explorations/board-overview.png,excluído,asset binário/marketing
+design/moont-logo-explorations/index.html,triagem,resto
+design/moont-logo-explorations/selected-sequence.png,excluído,asset binário/marketing
+docs/LANDING-COPY.md,triagem,documentação
+docs/PROMPT-AUDITORIA-IA.md,triagem,documentação
+docs/SLIDE-DESIGN.md,triagem,documentação
+docs/STRIPE.md,triagem,documentação
+docs/audit-completa-7a24e03.md,triagem,documentação
+docs/audit-ia-2026-09-15.md,triagem,documentação
+docs/audit-produto.md,triagem,documentação
+docs/audit.md,triagem,documentação
+docs/brand/moont-carousel-story-v3.md,triagem,documentação
+docs/brand/moont-daily-use-image-prompts.md,triagem,documentação
+docs/brand/moont-demo-images-v3.md,triagem,documentação
+docs/brand/moont-gallery-images-v3.md,triagem,documentação
+docs/brand/moont-identity.md,triagem,documentação
+docs/brand/moont-product-assets-v3.md,triagem,documentação
+docs/brand/moont-visual-library-v2.md,triagem,documentação
+docs/engineering/SPIKE-sjinn-image.md,triagem,documentação
+docs/engineering/TDD-suite-testes-confianca.md,triagem,documentação
+docs/engineering/controles-geracao-projeto.md,triagem,documentação
+docs/engineering/library-cloud-sync.md,triagem,documentação
+docs/engineering/recuperacao-senha.md,triagem,documentação
+docs/engineering/referencias-imagem-plano.md,triagem,documentação
+docs/epics/suite-testes-confianca/README.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/01-walking-skeleton-vitest-ci/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/02-unit-utils-puros/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/03-integracao-auth/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/04-integracao-stripe/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/05-seguranca-regressao/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/06-concorrencia-multiusuario/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/07-e2e-skeleton-playwright/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/08-e2e-jornadas-billing/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/09-e2e-produto-export/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/10-e2e-multiusuario/spec.md,triagem,documentação
+docs/epics/suite-testes-confianca/tasks/11-fechamento-ci-cobertura/spec.md,triagem,documentação
+docs/presentation/README.md,triagem,documentação
+docs/presentation/presentation-design-system.json,triagem,documentação
+docs/presentation/presentation-design-system.schema.json,triagem,documentação
+docs/product/PRD-planos-imagem-sjinn.md,triagem,documentação
+docs/product/PRD-suite-testes-confianca.md,triagem,documentação
+docs/product/duas-profundidades-criacao.md,triagem,documentação
+docs/product/geracao-editorial-por-objetivo.md,triagem,documentação
+docs/product/guia-projetos-geracao.md,triagem,documentação
+docs/product/organizacao-calendario.md,triagem,documentação
+docs/product/resultados-editoriais.md,triagem,documentação
+docs/revisao-prompts-texto.md,triagem,documentação
+docs/revisao-style-kit-musa.md,triagem,documentação
+docs/ux-audit-editor-2026-09-16.md,triagem,documentação
+docs/ux-audit-report.md,triagem,documentação
+figma/DESIGN.md,triagem,documentação
+index.html,triagem,resto
+manual_conteudo_estrategico_carrosseis.md,triagem,documentação
+middleware.js,triagem,resto
+netlify.toml,estrutura,tooling/config
+package-lock.json,estrutura,tooling/config
+package.json,estrutura,tooling/config
+playwright.config.js,triagem,resto
+public/_redirects,excluído,asset binário/marketing
+public/apple-touch-icon.png,excluído,asset binário/marketing
+public/favicon-32.png,excluído,asset binário/marketing
+public/favicon.png,excluído,asset binário/marketing
+public/icon-192.png,excluído,asset binário/marketing
+public/icon-512.png,excluído,asset binário/marketing
+public/landing/analytics-screen.png,excluído,asset binário/marketing
+public/landing/carousel-01.png,excluído,asset binário/marketing
+public/landing/carousel-02.png,excluído,asset binário/marketing
+public/landing/carousel-03.png,excluído,asset binário/marketing
+public/landing/carousel-04.png,excluído,asset binário/marketing
+public/landing/carousel-05.png,excluído,asset binário/marketing
+public/landing/carousel-06.png,excluído,asset binário/marketing
+public/landing/carousel-07.png,excluído,asset binário/marketing
+public/landing/creator-filming.png,excluído,asset binário/marketing
+public/landing/creator-reaction.png,excluído,asset binário/marketing
+public/landing/hero-creator-photo.jpg,excluído,asset binário/marketing
+public/landing/hero-slide-1.png,excluído,asset binário/marketing
+public/landing/hero-slide-2.png,excluído,asset binário/marketing
+public/landing/hero-slide-3.png,excluído,asset binário/marketing
+public/landing/hero-stage-segredo.webp,excluído,asset binário/marketing
+public/landing/logo-viral-carrossel-studio.png,excluído,asset binário/marketing
+public/landing/mobile-reels.png,excluído,asset binário/marketing
+public/landing/modos-platform.png,excluído,asset binário/marketing
+public/landing/moont-product/01-interface-comunica-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-product/02-interface-apresenta-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-product/03-interface-mobile.webp,excluído,asset binário/marketing
+public/landing/moont-product/04-carousel-output.webp,excluído,asset binário/marketing
+public/landing/moont-product/05-presentation-output.webp,excluído,asset binário/marketing
+public/landing/moont-users/01-social-media.webp,excluído,asset binário/marketing
+public/landing/moont-users/02-brand-owner.webp,excluído,asset binário/marketing
+public/landing/moont-users/03-doctor.webp,excluído,asset binário/marketing
+public/landing/moont-users/04-advertising.webp,excluído,asset binário/marketing
+public/landing/moont-users/05-creator.webp,excluído,asset binário/marketing
+public/landing/moont-v2/output-contact-sheet.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/carousel-b2b.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/carousel-editorial.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/carousel-health.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/carousel-launch.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/presentation-brand.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/presentation-medical.webp,excluído,asset binário/marketing
+public/landing/moont-v2/outputs/presentation-pitch.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portrait-contact-sheet.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/01-social-strategist.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/02-designer-overhead.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/03-brand-founder-beauty.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/04-doctor-profile.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/05-creator-low-angle.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/06-creative-director-urban.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/07-team-critique.webp,excluído,asset binário/marketing
+public/landing/moont-v2/portraits/08-founder-coffee.webp,excluído,asset binário/marketing
+public/landing/moont-v3/carousel-source/01-product-codes.webp,excluído,asset binário/marketing
+public/landing/moont-v3/carousel-source/02-founder-presence.webp,excluído,asset binário/marketing
+public/landing/moont-v3/carousel-source/03-creator-campaign.webp,excluído,asset binário/marketing
+public/landing/moont-v3/demo-source/01-direction.webp,excluído,asset binário/marketing
+public/landing/moont-v3/demo-source/02-detail.webp,excluído,asset binário/marketing
+public/landing/moont-v3/demo-source/03-campaign-system.webp,excluído,asset binário/marketing
+public/landing/moont-v3/formats/01-comunica-panel.webp,excluído,asset binário/marketing
+public/landing/moont-v3/formats/02-apresenta-panel.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/01-editorial-discovery.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/02-editorial-choice.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/03-health-consultation.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/04-beauty-launch.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/05-logistics-hub.webp,excluído,asset binário/marketing
+public/landing/moont-v3/gallery-source/06-coffee-education.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/01-interface-comunica-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/02-interface-apresenta-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/03-interface-mobile.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/04-interface-workflow-desktop-v2.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/04-interface-workflow-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/05-interface-responsive-mobile.webp,excluído,asset binário/marketing
+public/landing/moont-v3/product/06-interface-hero-desktop.webp,excluído,asset binário/marketing
+public/landing/moont-v3/source/01-founder-editorial.webp,excluído,asset binário/marketing
+public/landing/moont-v3/source/02-crossing-evening.webp,excluído,asset binário/marketing
+public/landing/moont-v3/source/03-product-still-life.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/01-pauta-no-dia-a-dia.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/03-revisao-em-equipe.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/04-direcao-cultura.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/05-direcao-creator.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/06-direcao-educacao.webp,excluído,asset binário/marketing
+public/landing/moont-v4/story/07-versao-final.webp,excluído,asset binário/marketing
+public/landing/phone-feed.png,excluído,asset binário/marketing
+public/landing/sample-01.webp,excluído,asset binário/marketing
+public/landing/sample-02.webp,excluído,asset binário/marketing
+public/landing/sample-03.webp,excluído,asset binário/marketing
+public/landing/sample-04.webp,excluído,asset binário/marketing
+public/landing/sample-05.webp,excluído,asset binário/marketing
+public/landing/sample-06.webp,excluído,asset binário/marketing
+public/landing/sample-07.webp,excluído,asset binário/marketing
+public/landing/sample-08.webp,excluído,asset binário/marketing
+public/landing/sample-09.webp,excluído,asset binário/marketing
+public/landing/sample-10.webp,excluído,asset binário/marketing
+public/landing/sample-11.webp,excluído,asset binário/marketing
+public/landing/sample-12.webp,excluído,asset binário/marketing
+public/landing/sample-13.webp,excluído,asset binário/marketing
+public/landing/sample-14.webp,excluído,asset binário/marketing
+public/landing/sample-15.webp,excluído,asset binário/marketing
+public/landing/sample-16.webp,excluído,asset binário/marketing
+public/landing/section-problem.png,excluído,asset binário/marketing
+public/landing/showcase-phone-nike.jpg,excluído,asset binário/marketing
+public/landing/showcase-phone-rosa.webp,excluído,asset binário/marketing
+public/landing/showcase-window-phone.jpg,excluído,asset binário/marketing
+public/landing/step-01-imersao.webp,excluído,asset binário/marketing
+public/landing/step-02-refine.webp,excluído,asset binário/marketing
+public/landing/step-03-publicar.webp,excluído,asset binário/marketing
+public/moont-mark.svg,excluído,asset binário/marketing
+public/ocr/LICENSE-tesseract.md,excluído,asset binário/marketing
+public/ocr/core/tesseract-core-lstm.wasm.js,excluído,asset binário/marketing
+public/ocr/core/tesseract-core-simd-lstm.wasm.js,excluído,asset binário/marketing
+public/ocr/lang/por.traineddata.gz,excluído,asset binário/marketing
+public/ocr/worker.min.js,excluído,asset binário/marketing
+qa-session/security-report.md,triagem,documentação
+qa-session/sjinn-spike/gpt-image-2-2x3.png,excluído,asset binário/marketing
+qa-session/sjinn-spike/report.json,estrutura,tooling/config
+scripts/build-moont-landing-gallery.mjs,estrutura,tooling/config
+scripts/build-moont-product-assets.mjs,estrutura,tooling/config
+scripts/build-presentation-design-system.mjs,estrutura,tooling/config
+scripts/check-a11y.mjs,estrutura,tooling/config
+scripts/check-props.mjs,estrutura,tooling/config
+scripts/check-undefined.mjs,estrutura,tooling/config
+scripts/extract-module.mjs,estrutura,tooling/config
+scripts/generate-moont-brand-kit.mjs,estrutura,tooling/config
+scripts/generate-moont-logo-assets.py,estrutura,tooling/config
+scripts/spike-sjinn-image.mjs,estrutura,tooling/config
+shared/ai-models.js,integral,dinheiro/auth/sync/persistência
+shared/image-references.js,triagem,resto
+shared/plans.js,integral,dinheiro/auth/sync/persistência
+skills-lock.json,estrutura,tooling/config
+skills/polish,triagem,resto
+src/LandingFirst.jsx,triagem,resto
+src/PasswordRecoveryPage.jsx,triagem,resto
+src/components/AccountHomeShell.jsx,lógica integral,UI produto
+src/components/AccountProfile.jsx,lógica integral,UI produto
+src/components/AccountUsage.jsx,lógica integral,UI produto
+src/components/AutoFitText.jsx,lógica integral,UI produto
+src/components/BootScreen.jsx,lógica integral,UI produto
+src/components/BrandLogo.jsx,lógica integral,UI produto
+src/components/BrandsModal.jsx,lógica integral,UI produto
+src/components/GenerationScopePicker.jsx,lógica integral,UI produto
+src/components/GenerationStatus.jsx,lógica integral,UI produto
+src/components/GoogleSignInButton.jsx,lógica integral,UI produto
+src/components/HelpModal.jsx,lógica integral,UI produto
+src/components/ImageCropModal.jsx,lógica integral,UI produto
+src/components/KeysModal.jsx,lógica integral,UI produto
+src/components/LibraryModal.jsx,lógica integral,UI produto
+src/components/LoginModal.jsx,lógica integral,UI produto
+src/components/ModesIntroModal.jsx,lógica integral,UI produto
+src/components/OnboardingLanding.jsx,lógica integral,UI produto
+src/components/OnboardingLandingProduct.jsx,lógica integral,UI produto
+src/components/OnboardingTour.jsx,lógica integral,UI produto
+src/components/PasswordField.jsx,lógica integral,UI produto
+src/components/Paywall.jsx,lógica integral,UI produto
+src/components/PhotoPositionModal.jsx,lógica integral,UI produto
+src/components/ProjectContextBanner.jsx,lógica integral,UI produto
+src/components/PromptDialog.jsx,lógica integral,UI produto
+src/components/SidebarContent.jsx,lógica integral,UI produto
+src/components/TemplatesModal.jsx,lógica integral,UI produto
+src/components/VisualStylePicker.jsx,lógica integral,UI produto
+src/components/WcagBadge.jsx,lógica integral,UI produto
+src/components/card/CanvasZonesOverlay.jsx,lógica integral,UI produto
+src/components/card/FullscreenImageAdjustBar.jsx,lógica integral,UI produto
+src/components/card/FullscreenViewer.jsx,lógica integral,UI produto
+src/components/card/SlideCard.jsx,lógica integral,UI produto
+src/components/card/SlideCardInner.jsx,lógica integral,UI produto
+src/components/card/render-primitives.jsx,lógica integral,UI produto
+src/components/card/useElementDrag.js,lógica integral,UI produto
+src/components/landing/FloatingParticles.jsx,lógica integral,UI produto
+src/components/landing/LandingPlans.jsx,lógica integral,UI produto
+src/components/landing/ProductNarrativesShowcase.jsx,lógica integral,UI produto
+src/components/landing/ProjectWorkflowShowcase.jsx,lógica integral,UI produto
+src/components/panels/BrandTonePanel.jsx,lógica integral,UI produto
+src/components/panels/BrandWorkspacePanel.jsx,lógica integral,UI produto
+src/components/panels/CardTextFontPanel.jsx,lógica integral,UI produto
+src/components/panels/ContextStatusBar.jsx,lógica integral,UI produto
+src/components/panels/CriarRapidoHome.jsx,lógica integral,UI produto
+src/components/panels/ElementsPanel.jsx,lógica integral,UI produto
+src/components/panels/ExportMoreFormats.jsx,lógica integral,UI produto
+src/components/panels/GenerateModal.jsx,lógica integral,UI produto
+src/components/panels/HookVariationsModal.jsx,lógica integral,UI produto
+src/components/panels/ImagesLibraryPanel.jsx,lógica integral,UI produto
+src/components/panels/ImportTextModal.jsx,lógica integral,UI produto
+src/components/panels/NarrativaStudioPanels.jsx,lógica integral,UI produto
+src/components/panels/ObjectiveTemplateChips.jsx,lógica integral,UI produto
+src/components/panels/OrganizeForPublish.jsx,lógica integral,UI produto
+src/components/panels/PerSlideImageRefBlock.jsx,lógica integral,UI produto
+src/components/panels/ProjectStyleKitPanel.jsx,lógica integral,UI produto
+src/components/panels/PublicationResultsModal.jsx,lógica integral,UI produto
+src/components/panels/RemixPanel.jsx,lógica integral,UI produto
+src/components/panels/ResearchPanel.jsx,lógica integral,UI produto
+src/components/panels/SeriesPanel.jsx,lógica integral,UI produto
+src/components/panels/SlideLogoPanel.jsx,lógica integral,UI produto
+src/components/panels/TeamSharePanel.jsx,lógica integral,UI produto
+src/components/panels/TextAreaPanel.jsx,lógica integral,UI produto
+src/components/panels/generate-modal-parts.jsx,lógica integral,UI produto
+src/components/ui/SectionLabel.jsx,lógica integral,UI produto
+src/components/ui/editor-chrome.jsx,lógica integral,UI produto
+src/components/ui/font-pickers.jsx,lógica integral,UI produto
+src/components/ui/mini-icons.jsx,lógica integral,UI produto
+src/components/ui/primitives.jsx,lógica integral,UI produto
+src/config/ai-providers.js,triagem,resto
+src/config/moont-brand.js,triagem,resto
+src/generated/presentation-design-system.generated.js,triagem,resto
+src/hooks/gsapSetup.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useAccess.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useAiSettings.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useExport.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useHistory.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useLandingGsapEffects.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useLibrary.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useScrollLock.js,integral,dinheiro/auth/sync/persistência
+src/hooks/useToasts.js,integral,dinheiro/auth/sync/persistência
+src/lib/billing.js,integral,dinheiro/auth/sync/persistência
+src/lib/password-recovery.js,integral,dinheiro/auth/sync/persistência
+src/main.jsx,triagem,resto
+src/styles/global-style.js,lógica integral,UI produto
+src/styles/landing-product.css,lógica integral,UI produto
+src/styles/presentation-presets.jsx,lógica integral,UI produto
+src/styles/visual-presets.jsx,lógica integral,UI produto
+src/utils/account-data-owner.js,integral,dinheiro/auth/sync/persistência
+src/utils/account-usage.js,integral,dinheiro/auth/sync/persistência
+src/utils/account-vault-store.js,integral,dinheiro/auth/sync/persistência
+src/utils/account-vault.js,integral,dinheiro/auth/sync/persistência
+src/utils/ai-client.js,integral,dinheiro/auth/sync/persistência
+src/utils/batch-photos.js,integral,dinheiro/auth/sync/persistência
+src/utils/brand-context.js,integral,dinheiro/auth/sync/persistência
+src/utils/brand-helpers.js,integral,dinheiro/auth/sync/persistência
+src/utils/brand-tone.js,integral,dinheiro/auth/sync/persistência
+src/utils/brand-visuals.js,integral,dinheiro/auth/sync/persistência
+src/utils/browser-ocr.js,integral,dinheiro/auth/sync/persistência
+src/utils/canvas-layout.js,integral,dinheiro/auth/sync/persistência
+src/utils/canvas-zones.js,integral,dinheiro/auth/sync/persistência
+src/utils/card-elements.js,integral,dinheiro/auth/sync/persistência
+src/utils/card-header.js,integral,dinheiro/auth/sync/persistência
+src/utils/card-overlays.js,integral,dinheiro/auth/sync/persistência
+src/utils/card-text-fonts.js,integral,dinheiro/auth/sync/persistência
+src/utils/carousel-ocr.js,integral,dinheiro/auth/sync/persistência
+src/utils/carousel-remix.js,integral,dinheiro/auth/sync/persistência
+src/utils/clear-account-data.js,integral,dinheiro/auth/sync/persistência
+src/utils/cloud-image-assets.js,integral,dinheiro/auth/sync/persistência
+src/utils/cloud-upload-receipts.js,integral,dinheiro/auth/sync/persistência
+src/utils/color-extraction.js,integral,dinheiro/auth/sync/persistência
+src/utils/context-status.js,integral,dinheiro/auth/sync/persistência
+src/utils/custom-visual-presets.js,integral,dinheiro/auth/sync/persistência
+src/utils/design-data.js,integral,dinheiro/auth/sync/persistência
+src/utils/doc-schema.js,integral,dinheiro/auth/sync/persistência
+src/utils/editorial-review.js,integral,dinheiro/auth/sync/persistência
+src/utils/editorial-strategy.js,integral,dinheiro/auth/sync/persistência
+src/utils/export-fonts.js,integral,dinheiro/auth/sync/persistência
+src/utils/export-helpers.js,integral,dinheiro/auth/sync/persistência
+src/utils/export-package.js,integral,dinheiro/auth/sync/persistência
+src/utils/formats.js,integral,dinheiro/auth/sync/persistência
+src/utils/generation-control.js,integral,dinheiro/auth/sync/persistência
+src/utils/generation-prompts.js,integral,dinheiro/auth/sync/persistência
+src/utils/hooks-library.js,integral,dinheiro/auth/sync/persistência
+src/utils/image-generation-readiness.js,integral,dinheiro/auth/sync/persistência
+src/utils/image-reference-upload.js,integral,dinheiro/auth/sync/persistência
+src/utils/image-storage.js,integral,dinheiro/auth/sync/persistência
+src/utils/image-store.js,integral,dinheiro/auth/sync/persistência
+src/utils/import-text.js,integral,dinheiro/auth/sync/persistência
+src/utils/landing-gate.js,integral,dinheiro/auth/sync/persistência
+src/utils/library-helpers.js,integral,dinheiro/auth/sync/persistência
+src/utils/library-organizer.js,integral,dinheiro/auth/sync/persistência
+src/utils/library-sync.js,integral,dinheiro/auth/sync/persistência
+src/utils/objective-templates.js,integral,dinheiro/auth/sync/persistência
+src/utils/parsers.js,integral,dinheiro/auth/sync/persistência
+src/utils/presentation-state.js,integral,dinheiro/auth/sync/persistência
+src/utils/presentation.js,integral,dinheiro/auth/sync/persistência
+src/utils/preset-tokens.js,integral,dinheiro/auth/sync/persistência
+src/utils/project-deletions.js,integral,dinheiro/auth/sync/persistência
+src/utils/project-share.js,integral,dinheiro/auth/sync/persistência
+src/utils/publication-results.js,integral,dinheiro/auth/sync/persistência
+src/utils/research-prompts.js,integral,dinheiro/auth/sync/persistência
+src/utils/schema-migration.js,integral,dinheiro/auth/sync/persistência
+src/utils/series-drafts.js,integral,dinheiro/auth/sync/persistência
+src/utils/server-status.js,integral,dinheiro/auth/sync/persistência
+src/utils/slide-design-system.js,integral,dinheiro/auth/sync/persistência
+src/utils/slide-logo.js,integral,dinheiro/auth/sync/persistência
+src/utils/slide-reference.js,integral,dinheiro/auth/sync/persistência
+src/utils/social-tone.js,integral,dinheiro/auth/sync/persistência
+src/utils/storage.js,integral,dinheiro/auth/sync/persistência
+src/utils/style-kit-design.js,integral,dinheiro/auth/sync/persistência
+src/utils/style-kit-storage.js,integral,dinheiro/auth/sync/persistência
+src/utils/style-kit.js,integral,dinheiro/auth/sync/persistência
+src/utils/telemetry.js,integral,dinheiro/auth/sync/persistência
+src/utils/text-spans.js,integral,dinheiro/auth/sync/persistência
+src/utils/ui-depth-labels.js,integral,dinheiro/auth/sync/persistência
+src/utils/user-profile.js,integral,dinheiro/auth/sync/persistência
+src/utils/video-store.js,integral,dinheiro/auth/sync/persistência
+src/utils/wcag.js,integral,dinheiro/auth/sync/persistência
+tests/e2e/account-usage.spec.js,estrutura,testes (executados à parte)
+tests/e2e/billing-jornadas.spec.js,estrutura,testes (executados à parte)
+tests/e2e/card-elements-individual.spec.js,estrutura,testes (executados à parte)
+tests/e2e/card-text-fonts.spec.js,estrutura,testes (executados à parte)
+tests/e2e/destaque-texto.spec.js,estrutura,testes (executados à parte)
+tests/e2e/editor-ux-2026-09-16.spec.js,estrutura,testes (executados à parte)
+tests/e2e/export-lettering-quality.spec.js,estrutura,testes (executados à parte)
+tests/e2e/export-sem-ui.spec.js,estrutura,testes (executados à parte)
+tests/e2e/generate-modal-flow.spec.js,estrutura,testes (executados à parte)
+tests/e2e/generation-controls.spec.js,estrutura,testes (executados à parte)
+tests/e2e/geracao-editorial.spec.js,estrutura,testes (executados à parte)
+tests/e2e/header-editor.spec.js,estrutura,testes (executados à parte)
+tests/e2e/helpers/api-mock.js,estrutura,testes (executados à parte)
+tests/e2e/ia-paineis.spec.js,estrutura,testes (executados à parte)
+tests/e2e/image-generation-readiness.spec.js,estrutura,testes (executados à parte)
+tests/e2e/imagens-e-salvar.spec.js,estrutura,testes (executados à parte)
+tests/e2e/imagens-indexeddb.spec.js,estrutura,testes (executados à parte)
+tests/e2e/inline-line-breaks.spec.js,estrutura,testes (executados à parte)
+tests/e2e/landing.spec.js,estrutura,testes (executados à parte)
+tests/e2e/library-calendar.spec.js,estrutura,testes (executados à parte)
+tests/e2e/library-cloud-idle.spec.js,estrutura,testes (executados à parte)
+tests/e2e/library-cloud-sync.spec.js,estrutura,testes (executados à parte)
+tests/e2e/logo-cloud-transparency.spec.js,estrutura,testes (executados à parte)
+tests/e2e/logo-storage-fallback.spec.js,estrutura,testes (executados à parte)
+tests/e2e/marca-assinatura.spec.js,estrutura,testes (executados à parte)
+tests/e2e/marca-tamanhos.spec.js,estrutura,testes (executados à parte)
+tests/e2e/multiusuario.spec.js,estrutura,testes (executados à parte)
+tests/e2e/ocr-local-fallback.spec.js,estrutura,testes (executados à parte)
+tests/e2e/onboarding-tour.spec.js,estrutura,testes (executados à parte)
+tests/e2e/password-recovery.spec.js,estrutura,testes (executados à parte)
+tests/e2e/paywall.spec.js,estrutura,testes (executados à parte)
+tests/e2e/photo-quality.spec.js,estrutura,testes (executados à parte)
+tests/e2e/presentation-test-case.spec.js,estrutura,testes (executados à parte)
+tests/e2e/produto-export.spec.js,estrutura,testes (executados à parte)
+tests/e2e/project-identity-persistence.spec.js,estrutura,testes (executados à parte)
+tests/e2e/resultados-editoriais.spec.js,estrutura,testes (executados à parte)
+tests/e2e/sem-sobreposicao.spec.js,estrutura,testes (executados à parte)
+tests/e2e/slide-reference-backup.spec.js,estrutura,testes (executados à parte)
+tests/e2e/smoke-ui.spec.js,estrutura,testes (executados à parte)
+tests/e2e/style-kit.spec.js,estrutura,testes (executados à parte)
+tests/e2e/text-areas.spec.js,estrutura,testes (executados à parte)
+tests/e2e/texto-nao-desaparece.spec.js,estrutura,testes (executados à parte)
+tests/e2e/titulo-linhas-nao-colam.spec.js,estrutura,testes (executados à parte)
+tests/e2e/titulo-nao-corta.spec.js,estrutura,testes (executados à parte)
+tests/e2e/visual-presets-custom.spec.js,estrutura,testes (executados à parte)
+tests/helpers/env.js,estrutura,testes (executados à parte)
+tests/helpers/http.js,estrutura,testes (executados à parte)
+tests/helpers/stripe-mock.js,estrutura,testes (executados à parte)
+tests/integration/access.test.js,estrutura,testes (executados à parte)
+tests/integration/auth.test.js,estrutura,testes (executados à parte)
+tests/integration/carousel-ocr.test.js,estrutura,testes (executados à parte)
+tests/integration/concorrencia.test.js,estrutura,testes (executados à parte)
+tests/integration/image-reference-upload.test.js,estrutura,testes (executados à parte)
+tests/integration/image-usage-session.test.js,estrutura,testes (executados à parte)
+tests/integration/password-recovery.test.js,estrutura,testes (executados à parte)
+tests/integration/proxies-ia.test.js,estrutura,testes (executados à parte)
+tests/integration/quota-stripe.test.js,estrutura,testes (executados à parte)
+tests/integration/seguranca.test.js,estrutura,testes (executados à parte)
+tests/integration/stripe-webhook.test.js,estrutura,testes (executados à parte)
+tests/integration/stripe.test.js,estrutura,testes (executados à parte)
+tests/unit/account-data-owner.test.js,estrutura,testes (executados à parte)
+tests/unit/account-usage.test.js,estrutura,testes (executados à parte)
+tests/unit/account-vault-durable.test.js,estrutura,testes (executados à parte)
+tests/unit/account-vault-store.test.js,estrutura,testes (executados à parte)
+tests/unit/account-vault.test.js,estrutura,testes (executados à parte)
+tests/unit/ai-client-prompt.test.js,estrutura,testes (executados à parte)
+tests/unit/batch-photos.test.js,estrutura,testes (executados à parte)
+tests/unit/billing.test.js,estrutura,testes (executados à parte)
+tests/unit/brand-context.test.js,estrutura,testes (executados à parte)
+tests/unit/brand-helpers.test.js,estrutura,testes (executados à parte)
+tests/unit/brand-tone.test.js,estrutura,testes (executados à parte)
+tests/unit/canvas-toggle.test.js,estrutura,testes (executados à parte)
+tests/unit/canvas-zones.test.js,estrutura,testes (executados à parte)
+tests/unit/card-elements-unlock-ui.test.js,estrutura,testes (executados à parte)
+tests/unit/card-elements.test.js,estrutura,testes (executados à parte)
+tests/unit/card-header.test.js,estrutura,testes (executados à parte)
+tests/unit/card-overlays.test.js,estrutura,testes (executados à parte)
+tests/unit/card-text-fonts.test.js,estrutura,testes (executados à parte)
+tests/unit/carousel-ocr.test.js,estrutura,testes (executados à parte)
+tests/unit/carousel-remix.test.js,estrutura,testes (executados à parte)
+tests/unit/clear-account-data.test.js,estrutura,testes (executados à parte)
+tests/unit/cloud-image-quality.test.js,estrutura,testes (executados à parte)
+tests/unit/cloud-original-assets.test.js,estrutura,testes (executados à parte)
+tests/unit/cloud-upload-receipts.test.js,estrutura,testes (executados à parte)
+tests/unit/context-status.test.js,estrutura,testes (executados à parte)
+tests/unit/custom-visual-presets.test.js,estrutura,testes (executados à parte)
+tests/unit/editorial-generation.test.js,estrutura,testes (executados à parte)
+tests/unit/export-background-images.test.js,estrutura,testes (executados à parte)
+tests/unit/export-fonts.test.js,estrutura,testes (executados à parte)
+tests/unit/export-helpers-text-clip.test.js,estrutura,testes (executados à parte)
+tests/unit/export-image-quality.test.js,estrutura,testes (executados à parte)
+tests/unit/export-package.test.js,estrutura,testes (executados à parte)
+tests/unit/fatia3-eficiencia.test.js,estrutura,testes (executados à parte)
+tests/unit/formats.test.js,estrutura,testes (executados à parte)
+tests/unit/generate-modal-flow.test.js,estrutura,testes (executados à parte)
+tests/unit/generation-control.test.js,estrutura,testes (executados à parte)
+tests/unit/generation-prompts.test.js,estrutura,testes (executados à parte)
+tests/unit/get-app-url.test.js,estrutura,testes (executados à parte)
+tests/unit/home-product-selector.test.js,estrutura,testes (executados à parte)
+tests/unit/hooks-library.test.js,estrutura,testes (executados à parte)
+tests/unit/image-aspect-ratio.test.js,estrutura,testes (executados à parte)
+tests/unit/image-crop-format.test.js,estrutura,testes (executados à parte)
+tests/unit/image-crop-quality.test.js,estrutura,testes (executados à parte)
+tests/unit/image-generation-readiness.test.js,estrutura,testes (executados à parte)
+tests/unit/image-quota.test.js,estrutura,testes (executados à parte)
+tests/unit/image-reference-upload.test.js,estrutura,testes (executados à parte)
+tests/unit/image-references.test.js,estrutura,testes (executados à parte)
+tests/unit/image-storage-quality.test.js,estrutura,testes (executados à parte)
+tests/unit/image-store-lifecycle.test.js,estrutura,testes (executados à parte)
+tests/unit/image-store.test.js,estrutura,testes (executados à parte)
+tests/unit/import-text.test.js,estrutura,testes (executados à parte)
+tests/unit/landing-gate.test.js,estrutura,testes (executados à parte)
+tests/unit/library-organizer.test.js,estrutura,testes (executados à parte)
+tests/unit/library-sync-client.test.js,estrutura,testes (executados à parte)
+tests/unit/library-sync-store.test.js,estrutura,testes (executados à parte)
+tests/unit/logo-cloud-transparency.test.js,estrutura,testes (executados à parte)
+tests/unit/logo-isolation.test.js,estrutura,testes (executados à parte)
+tests/unit/logout-protection.test.js,estrutura,testes (executados à parte)
+tests/unit/ocr-quota.test.js,estrutura,testes (executados à parte)
+tests/unit/overflow-scaler.test.js,estrutura,testes (executados à parte)
+tests/unit/parsers.test.js,estrutura,testes (executados à parte)
+tests/unit/password-auth.test.js,estrutura,testes (executados à parte)
+tests/unit/plan-periods.test.js,estrutura,testes (executados à parte)
+tests/unit/presentation-card-render.test.js,estrutura,testes (executados à parte)
+tests/unit/presentation-design-system-compiler.test.js,estrutura,testes (executados à parte)
+tests/unit/presentation-presets.test.js,estrutura,testes (executados à parte)
+tests/unit/presentation-state.test.js,estrutura,testes (executados à parte)
+tests/unit/presentation.test.js,estrutura,testes (executados à parte)
+tests/unit/project-deletions.test.js,estrutura,testes (executados à parte)
+tests/unit/project-share-store.test.js,estrutura,testes (executados à parte)
+tests/unit/project-share.test.js,estrutura,testes (executados à parte)
+tests/unit/prompt-densidade-tom.test.js,estrutura,testes (executados à parte)
+tests/unit/prompt-regressao.test.js,estrutura,testes (executados à parte)
+tests/unit/publication-results.test.js,estrutura,testes (executados à parte)
+tests/unit/rate-limit.test.js,estrutura,testes (executados à parte)
+tests/unit/research-prompts.test.js,estrutura,testes (executados à parte)
+tests/unit/schema-migration.test.js,estrutura,testes (executados à parte)
+tests/unit/sidebar-presentation-product.test.js,estrutura,testes (executados à parte)
+tests/unit/slide-design-system.test.js,estrutura,testes (executados à parte)
+tests/unit/slide-logo.test.js,estrutura,testes (executados à parte)
+tests/unit/slide-reference.test.js,estrutura,testes (executados à parte)
+tests/unit/social-tone.test.js,estrutura,testes (executados à parte)
+tests/unit/storage-quota.test.js,estrutura,testes (executados à parte)
+tests/unit/style-kit-storage.test.js,estrutura,testes (executados à parte)
+tests/unit/style-kit.test.js,estrutura,testes (executados à parte)
+tests/unit/templates.test.js,estrutura,testes (executados à parte)
+tests/unit/ui-a11y-regressions.test.js,estrutura,testes (executados à parte)
+tests/unit/url-source-fetch.test.js,estrutura,testes (executados à parte)
+tests/unit/viral-ai-marca.test.js,estrutura,testes (executados à parte)
+tests/unit/visual-presets.test.js,estrutura,testes (executados à parte)
+tests/unit/wcag.test.js,estrutura,testes (executados à parte)
+urlSourceFetch.js,triagem,resto
+vercel.json,integral,dinheiro/auth/sync/persistência
+vite.config.js,triagem,resto
+vitest.config.js,triagem,resto

@@ -1,0 +1,743 @@
+arquivo,nivel,motivo
+.agents/plugins/marketplace.json,triagem,configuração ou estático
+.agents/skills/carrossel-cultura/SKILL.md,triagem,documento ou estilo
+.agents/skills/carrossel-cultura/html-template.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/.cursor/rules/cinematic-ui.mdc,triagem,configuração ou estático
+.agents/skills/cinematic-ui/.github/ISSUE_TEMPLATE/bug_report.yml,triagem,configuração ou estático
+.agents/skills/cinematic-ui/.github/ISSUE_TEMPLATE/feature_request.yml,triagem,configuração ou estático
+.agents/skills/cinematic-ui/.github/PULL_REQUEST_TEMPLATE.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/.github/copilot-instructions.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/.gitignore,triagem,configuração ou estático
+.agents/skills/cinematic-ui/.windsurf/rules/cinematic-ui.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/AGENTS.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/CHANGELOG.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/CLAUDE.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/CODEX.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/CODE_OF_CONDUCT.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/CONTRIBUTING.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/GEMINI.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/LICENSE,triagem,configuração ou estático
+.agents/skills/cinematic-ui/README.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/README.zh-CN.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/README.zh-TW.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/SECURITY.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/SKILL.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/agents/openai.yaml,triagem,configuração ou estático
+.agents/skills/cinematic-ui/directors-library.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/docs/banner.svg,triagem,configuração ou estático
+.agents/skills/cinematic-ui/docs/demo.mp4,triagem,configuração ou estático
+.agents/skills/cinematic-ui/references/anti-convergence.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/anti-garbage.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/README.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/background-techniques.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/camera-shots-50.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/color-grades.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/compositions.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/design-dna-db.txt,triagem,configuração ou estático
+.agents/skills/cinematic-ui/references/data/directors-200.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/dna-index.tsv,triagem,configuração ou estático
+.agents/skills/cinematic-ui/references/data/font-moods.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/hero-archetypes.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/image-direction.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/interaction-effects-50.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/narrative-beats.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/section-archetypes.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/section-functions.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/textures.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/typography-cinema.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/visual-elements.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/data/visual-styles.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/implementation-guardrails.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/library-index.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/output-templates.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/premium-calibration.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/references/reference-protocol.md,triagem,documento ou estilo
+.agents/skills/cinematic-ui/skill.json,triagem,configuração ou estático
+.agents/skills/influ-cinematic-landing/SKILL.md,triagem,documento ou estilo
+.agents/skills/polish/README.md,triagem,documento ou estilo
+.agents/skills/polish/SKILL.md,triagem,documento ou estilo
+.claude/launch.json,triagem,configuração ou estático
+.claude/skills/polish,triagem,configuração ou estático
+.codex/config.toml,triagem,configuração ou estático
+.cursor/rules/design-system.mdc,triagem,configuração ou estático
+.cursor/rules/skills-bridge.mdc,triagem,configuração ou estático
+.env.example,triagem,configuração ou estático
+.github/workflows/ci.yml,triagem,configuração ou estático
+.gitignore,triagem,configuração ou estático
+.vercelignore,triagem,configuração ou estático
+AGENTS.md,triagem,documento ou estilo
+CLAUDE.md,triagem,documento ou estilo
+DESIGN.md,triagem,documento ou estilo
+README.md,triagem,documento ou estilo
+ViralCarrossel.jsx,lógica integral,"fluxos de salvar, sair, partilha e geração; layout não foi lido linha a linha"
+api/account-library-meta.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/agent-access.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/agent-visual-batch.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/ai/compatible.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/ai/ocr.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/ai/sjinn-image.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/anthropic/v1/messages.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/forgot-password.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/google.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/google/callback.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/login.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/logout.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/register.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/reset-password.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/session.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/auth/set-password.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/cron/cleanup-image-references.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/fetch-source.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/access.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/account-identity-postgres.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/agent-token-store.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/agent-visual-batch.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/billing-handlers.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/certs/prod-ca-2021.crt,triagem,configuração ou estático
+api/lib/cors.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/google-auth.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/image-quota-postgres.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/image-quota.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/image-references.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/library-sync-postgres.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/library-sync-store.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/ocr-quota-postgres.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/ocr-quota.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/password-auth.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/password-reset.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/plans.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/postgres-connection.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/project-share-store.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/quota-stripe-store.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/rate-limit-postgres.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/rate-limit.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/require-access.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/sjinn.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/stripe.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/upstash-config.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/lib/visual-patch.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/library-sync.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/project-share.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/projects.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/status.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/stripe/checkout.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/stripe/confirm.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/stripe/portal.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+api/stripe/webhook.js,lógica integral,"rota ou lib de sessão, dinheiro, partilha ou armazenamento"
+assets/brand/moont-sequence/README.md,triagem,documento ou estilo
+assets/brand/moont-sequence/checksums.sha256,triagem,configuração ou estático
+assets/brand/moont-sequence/manifest.json,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-128x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-256x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/black/moont-sequence-symbol-black-transparent-512x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-128x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-256x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-dark/moont-sequence-symbol-color-on-dark-transparent-512x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-128x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-256x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/color-on-light/moont-sequence-symbol-color-on-light-transparent-512x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-128x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-256x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/symbol/transparent/white/moont-sequence-symbol-white-transparent-512x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-1920x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-480x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/black/moont-sequence-wordmark-black-transparent-960x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-1920x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-480x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-dark/moont-sequence-wordmark-color-on-dark-transparent-960x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-1920x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-480x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/color-on-light/moont-sequence-wordmark-color-on-light-transparent-960x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-1920x512.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-480x128.png,triagem,configuração ou estático
+assets/brand/moont-sequence/png/wordmark/transparent/white/moont-sequence-wordmark-white-transparent-960x256.png,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-midnight-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-midnight-1024x1024.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-moonlight-1024x1024.png,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-symbol-on-moonlight-1024x1024.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-midnight-1600x600.png,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-midnight-1600x600.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-moonlight-1600x600.png,triagem,configuração ou estático
+assets/brand/moont-sequence/presentation/moont-sequence-wordmark-on-moonlight-1600x600.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-black-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-color-on-dark-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-color-on-light-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/symbol/moont-sequence-symbol-white-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-black-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-color-on-dark-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-color-on-light-transparent.svg,triagem,configuração ou estático
+assets/brand/moont-sequence/svg/wordmark/moont-sequence-wordmark-white-transparent.svg,triagem,configuração ou estático
+db/migrations/001_account_library.sql,triagem,configuração ou estático
+db/migrations/002_image_quota.sql,triagem,configuração ou estático
+db/migrations/003_accounts.sql,triagem,configuração ou estático
+db/migrations/004_account_metadata.sql,triagem,configuração ou estático
+db/migrations/005_request_limits.sql,triagem,configuração ou estático
+db/migrations/006_agent_tokens.sql,triagem,configuração ou estático
+db/migrations/007_agent_visual_jobs.sql,triagem,configuração ou estático
+design/moont-logo-explorations/board-overview.png,triagem,configuração ou estático
+design/moont-logo-explorations/index.html,triagem,documento ou estilo
+design/moont-logo-explorations/selected-sequence.png,triagem,configuração ou estático
+docs/LANDING-COPY.md,triagem,documento ou estilo
+docs/PROMPT-AUDITORIA-IA.md,triagem,documento ou estilo
+docs/SLIDE-DESIGN.md,triagem,documento ou estilo
+docs/STRIPE.md,triagem,documento ou estilo
+docs/audit-completa-7a24e03.md,triagem,documento ou estilo
+docs/audit-ia-2026-09-15.md,triagem,documento ou estilo
+docs/audit-produto.md,triagem,documento ou estilo
+docs/audit.md,triagem,documento ou estilo
+docs/brand/moont-carousel-story-v3.md,triagem,documento ou estilo
+docs/brand/moont-daily-use-image-prompts.md,triagem,documento ou estilo
+docs/brand/moont-demo-images-v3.md,triagem,documento ou estilo
+docs/brand/moont-gallery-images-v3.md,triagem,documento ou estilo
+docs/brand/moont-identity.md,triagem,documento ou estilo
+docs/brand/moont-product-assets-v3.md,triagem,documento ou estilo
+docs/brand/moont-visual-library-v2.md,triagem,documento ou estilo
+docs/engineering/SPIKE-sjinn-image.md,triagem,documento ou estilo
+docs/engineering/TDD-suite-testes-confianca.md,triagem,documento ou estilo
+docs/engineering/controles-geracao-projeto.md,triagem,documento ou estilo
+docs/engineering/library-cloud-sync.md,triagem,documento ou estilo
+docs/engineering/recuperacao-senha.md,triagem,documento ou estilo
+docs/engineering/referencias-imagem-plano.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/README.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/01-walking-skeleton-vitest-ci/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/02-unit-utils-puros/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/03-integracao-auth/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/04-integracao-stripe/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/05-seguranca-regressao/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/06-concorrencia-multiusuario/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/07-e2e-skeleton-playwright/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/08-e2e-jornadas-billing/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/09-e2e-produto-export/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/10-e2e-multiusuario/spec.md,triagem,documento ou estilo
+docs/epics/suite-testes-confianca/tasks/11-fechamento-ci-cobertura/spec.md,triagem,documento ou estilo
+docs/moont-architecture.md,triagem,documento ou estilo
+docs/presentation/README.md,triagem,documento ou estilo
+docs/presentation/presentation-design-system.json,triagem,documento ou estilo
+docs/presentation/presentation-design-system.schema.json,triagem,documento ou estilo
+docs/product/PRD-planos-imagem-sjinn.md,triagem,documento ou estilo
+docs/product/PRD-suite-testes-confianca.md,triagem,documento ou estilo
+docs/product/duas-profundidades-criacao.md,triagem,documento ou estilo
+docs/product/geracao-editorial-por-objetivo.md,triagem,documento ou estilo
+docs/product/guia-projetos-geracao.md,triagem,documento ou estilo
+docs/product/organizacao-calendario.md,triagem,documento ou estilo
+docs/product/resultados-editoriais.md,triagem,documento ou estilo
+docs/revisao-prompts-texto.md,triagem,documento ou estilo
+docs/revisao-style-kit-musa.md,triagem,documento ou estilo
+docs/ux-audit-editor-2026-09-16.md,triagem,documento ou estilo
+docs/ux-audit-report.md,triagem,documento ou estilo
+figma/DESIGN.md,triagem,documento ou estilo
+index.html,triagem,documento ou estilo
+manual_conteudo_estrategico_carrosseis.md,triagem,documento ou estilo
+middleware.js,triagem,configuração ou estático
+netlify.toml,triagem,configuração ou estático
+package-lock.json,triagem,configuração ou estático
+package.json,triagem,configuração ou estático
+playwright.config.js,triagem,configuração ou estático
+plugins/moont/README.md,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/bin/moont-mcp.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/bin/setup.sh,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/mcp.json,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/plugin.json,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/skills/batch-design/SKILL.md,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/skills/setup/SKILL.md,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/src/client.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/src/plan-store.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/src/tools.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/test/client.test.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+plugins/moont/test/tools.test.mjs,lógica integral,"token, aplicar e desfazer do plugin"
+public/_redirects,triagem,configuração ou estático
+public/apple-touch-icon.png,triagem,configuração ou estático
+public/favicon-32.png,triagem,configuração ou estático
+public/favicon.png,triagem,configuração ou estático
+public/icon-192.png,triagem,configuração ou estático
+public/icon-512.png,triagem,configuração ou estático
+public/landing/analytics-screen.png,triagem,configuração ou estático
+public/landing/carousel-01.png,triagem,configuração ou estático
+public/landing/carousel-02.png,triagem,configuração ou estático
+public/landing/carousel-03.png,triagem,configuração ou estático
+public/landing/carousel-04.png,triagem,configuração ou estático
+public/landing/carousel-05.png,triagem,configuração ou estático
+public/landing/carousel-06.png,triagem,configuração ou estático
+public/landing/carousel-07.png,triagem,configuração ou estático
+public/landing/creator-filming.png,triagem,configuração ou estático
+public/landing/creator-reaction.png,triagem,configuração ou estático
+public/landing/hero-creator-photo.jpg,triagem,configuração ou estático
+public/landing/hero-slide-1.png,triagem,configuração ou estático
+public/landing/hero-slide-2.png,triagem,configuração ou estático
+public/landing/hero-slide-3.png,triagem,configuração ou estático
+public/landing/hero-stage-segredo.webp,triagem,configuração ou estático
+public/landing/logo-viral-carrossel-studio.png,triagem,configuração ou estático
+public/landing/mobile-reels.png,triagem,configuração ou estático
+public/landing/modos-platform.png,triagem,configuração ou estático
+public/landing/moont-product/01-interface-comunica-desktop.webp,triagem,configuração ou estático
+public/landing/moont-product/02-interface-apresenta-desktop.webp,triagem,configuração ou estático
+public/landing/moont-product/03-interface-mobile.webp,triagem,configuração ou estático
+public/landing/moont-product/04-carousel-output.webp,triagem,configuração ou estático
+public/landing/moont-product/05-presentation-output.webp,triagem,configuração ou estático
+public/landing/moont-users/01-social-media.webp,triagem,configuração ou estático
+public/landing/moont-users/02-brand-owner.webp,triagem,configuração ou estático
+public/landing/moont-users/03-doctor.webp,triagem,configuração ou estático
+public/landing/moont-users/04-advertising.webp,triagem,configuração ou estático
+public/landing/moont-users/05-creator.webp,triagem,configuração ou estático
+public/landing/moont-v2/output-contact-sheet.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/carousel-b2b.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/carousel-editorial.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/carousel-health.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/carousel-launch.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/presentation-brand.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/presentation-medical.webp,triagem,configuração ou estático
+public/landing/moont-v2/outputs/presentation-pitch.webp,triagem,configuração ou estático
+public/landing/moont-v2/portrait-contact-sheet.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/01-social-strategist.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/02-designer-overhead.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/03-brand-founder-beauty.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/04-doctor-profile.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/05-creator-low-angle.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/06-creative-director-urban.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/07-team-critique.webp,triagem,configuração ou estático
+public/landing/moont-v2/portraits/08-founder-coffee.webp,triagem,configuração ou estático
+public/landing/moont-v3/carousel-source/01-product-codes.webp,triagem,configuração ou estático
+public/landing/moont-v3/carousel-source/02-founder-presence.webp,triagem,configuração ou estático
+public/landing/moont-v3/carousel-source/03-creator-campaign.webp,triagem,configuração ou estático
+public/landing/moont-v3/demo-source/01-direction.webp,triagem,configuração ou estático
+public/landing/moont-v3/demo-source/02-detail.webp,triagem,configuração ou estático
+public/landing/moont-v3/demo-source/03-campaign-system.webp,triagem,configuração ou estático
+public/landing/moont-v3/formats/01-comunica-panel.webp,triagem,configuração ou estático
+public/landing/moont-v3/formats/02-apresenta-panel.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/01-editorial-discovery.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/02-editorial-choice.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/03-health-consultation.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/04-beauty-launch.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/05-logistics-hub.webp,triagem,configuração ou estático
+public/landing/moont-v3/gallery-source/06-coffee-education.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/01-interface-comunica-desktop.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/02-interface-apresenta-desktop.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/03-interface-mobile.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/04-interface-workflow-desktop-v2.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/04-interface-workflow-desktop.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/05-interface-responsive-mobile.webp,triagem,configuração ou estático
+public/landing/moont-v3/product/06-interface-hero-desktop.webp,triagem,configuração ou estático
+public/landing/moont-v3/source/01-founder-editorial.webp,triagem,configuração ou estático
+public/landing/moont-v3/source/02-crossing-evening.webp,triagem,configuração ou estático
+public/landing/moont-v3/source/03-product-still-life.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/01-pauta-no-dia-a-dia.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/03-revisao-em-equipe.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/04-direcao-cultura.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/05-direcao-creator.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/06-direcao-educacao.webp,triagem,configuração ou estático
+public/landing/moont-v4/story/07-versao-final.webp,triagem,configuração ou estático
+public/landing/phone-feed.png,triagem,configuração ou estático
+public/landing/sample-01.webp,triagem,configuração ou estático
+public/landing/sample-02.webp,triagem,configuração ou estático
+public/landing/sample-03.webp,triagem,configuração ou estático
+public/landing/sample-04.webp,triagem,configuração ou estático
+public/landing/sample-05.webp,triagem,configuração ou estático
+public/landing/sample-06.webp,triagem,configuração ou estático
+public/landing/sample-07.webp,triagem,configuração ou estático
+public/landing/sample-08.webp,triagem,configuração ou estático
+public/landing/sample-09.webp,triagem,configuração ou estático
+public/landing/sample-10.webp,triagem,configuração ou estático
+public/landing/sample-11.webp,triagem,configuração ou estático
+public/landing/sample-12.webp,triagem,configuração ou estático
+public/landing/sample-13.webp,triagem,configuração ou estático
+public/landing/sample-14.webp,triagem,configuração ou estático
+public/landing/sample-15.webp,triagem,configuração ou estático
+public/landing/sample-16.webp,triagem,configuração ou estático
+public/landing/section-problem.png,triagem,configuração ou estático
+public/landing/showcase-phone-nike.jpg,triagem,configuração ou estático
+public/landing/showcase-phone-rosa.webp,triagem,configuração ou estático
+public/landing/showcase-window-phone.jpg,triagem,configuração ou estático
+public/landing/step-01-imersao.webp,triagem,configuração ou estático
+public/landing/step-02-refine.webp,triagem,configuração ou estático
+public/landing/step-03-publicar.webp,triagem,configuração ou estático
+public/moont-mark.svg,triagem,configuração ou estático
+public/ocr/LICENSE-tesseract.md,triagem,documento ou estilo
+public/ocr/core/tesseract-core-lstm.wasm.js,triagem,configuração ou estático
+public/ocr/core/tesseract-core-simd-lstm.wasm.js,triagem,configuração ou estático
+public/ocr/lang/por.traineddata.gz,triagem,configuração ou estático
+public/ocr/worker.min.js,triagem,configuração ou estático
+public/robots.txt,triagem,configuração ou estático
+public/sitemap.xml,triagem,configuração ou estático
+qa-session/security-report.md,triagem,documento ou estilo
+qa-session/sjinn-spike/gpt-image-2-2x3.png,triagem,configuração ou estático
+qa-session/sjinn-spike/report.json,triagem,configuração ou estático
+scripts/build-moont-landing-gallery.mjs,triagem,configuração ou estático
+scripts/build-moont-product-assets.mjs,triagem,configuração ou estático
+scripts/build-presentation-design-system.mjs,triagem,configuração ou estático
+scripts/check-a11y.mjs,triagem,configuração ou estático
+scripts/check-props.mjs,triagem,configuração ou estático
+scripts/check-undefined.mjs,triagem,configuração ou estático
+scripts/extract-module.mjs,triagem,configuração ou estático
+scripts/generate-moont-brand-kit.mjs,triagem,configuração ou estático
+scripts/generate-moont-logo-assets.py,triagem,configuração ou estático
+scripts/spike-sjinn-image.mjs,triagem,configuração ou estático
+shared/ai-models.js,integral,contrato de planos
+shared/image-references.js,integral,contrato de planos
+shared/plans.js,integral,contrato de planos
+skills-lock.json,triagem,configuração ou estático
+skills/polish,triagem,configuração ou estático
+src/LandingFirst.jsx,estrutura,UI lida por contrato e pontos de risco
+src/LegalPage.jsx,estrutura,UI lida por contrato e pontos de risco
+src/PasswordRecoveryPage.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/AccountHomeShell.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/AccountProfile.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/AccountUsage.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/AgentAccessPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/AutoFitText.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/BootScreen.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/BrandLogo.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/BrandsModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/CloudPhotoProgress.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/GenerationScopePicker.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/GenerationStatus.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/GoogleSignInButton.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/HelpModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ImageCropModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/KeysModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/LibraryModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/LoginModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ModesIntroModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/OnboardingLanding.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/OnboardingLandingProduct.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/OnboardingTour.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/PasswordField.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/Paywall.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/PhotoPositionModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ProjectContextBanner.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/PromptDialog.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/SidebarContent.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/TemplatesModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/VisualStylePicker.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/WcagBadge.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/CanvasZonesOverlay.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/FullscreenImageAdjustBar.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/FullscreenViewer.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/SlideCard.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/SlideCardInner.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/render-primitives.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/card/useElementDrag.js,estrutura,UI lida por contrato e pontos de risco
+src/components/landing/FloatingParticles.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/landing/LandingPlans.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/landing/ProductNarrativesShowcase.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/landing/ProjectWorkflowShowcase.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/BrandTonePanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/BrandWorkspacePanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/CardTextFontPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ContextStatusBar.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/CriarRapidoHome.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ElementsPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ExportMoreFormats.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/GenerateModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/HookVariationsModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ImagesLibraryPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ImportTextModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/NarrativaStudioPanels.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ObjectiveTemplateChips.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/OrganizeForPublish.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/PerSlideImageRefBlock.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ProjectStyleKitPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/PublicationResultsModal.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/RemixPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/ResearchPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/SeriesPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/SlideLogoPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/TeamSharePanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/TextAreaPanel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/panels/generate-modal-parts.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/SectionLabel.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/editor-chrome.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/font-family-select.css,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/font-pickers.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/mini-icons.jsx,estrutura,UI lida por contrato e pontos de risco
+src/components/ui/primitives.jsx,estrutura,UI lida por contrato e pontos de risco
+src/config/ai-providers.js,estrutura,UI lida por contrato e pontos de risco
+src/config/moont-brand.js,estrutura,UI lida por contrato e pontos de risco
+src/generated/presentation-design-system.generated.js,estrutura,UI lida por contrato e pontos de risco
+src/hooks/gsapSetup.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useAccess.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useAiSettings.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useExport.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useHistory.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useLandingGsapEffects.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useLibrary.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useScrollLock.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/hooks/useToasts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/lib/billing.js,estrutura,UI lida por contrato e pontos de risco
+src/lib/password-recovery.js,estrutura,UI lida por contrato e pontos de risco
+src/main.jsx,estrutura,UI lida por contrato e pontos de risco
+src/styles/global-style.js,estrutura,UI lida por contrato e pontos de risco
+src/styles/landing-product.css,estrutura,UI lida por contrato e pontos de risco
+src/styles/presentation-presets.jsx,estrutura,UI lida por contrato e pontos de risco
+src/styles/visual-presets.jsx,estrutura,UI lida por contrato e pontos de risco
+src/utils/account-data-owner.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/account-library-meta.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/account-usage.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/account-vault-store.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/account-vault.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/ai-client.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/batch-photos.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/brand-context.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/brand-helpers.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/brand-tone.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/brand-visuals.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/browser-ocr.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/canvas-layout.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/canvas-zones.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/card-elements.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/card-header.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/card-overlays.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/card-text-fonts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/carousel-ocr.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/carousel-remix.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/clear-account-data.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/cloud-image-assets.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/cloud-media-merge.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/cloud-upload-receipts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/color-extraction.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/context-status.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/custom-visual-presets.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/design-data.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/doc-schema.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/editorial-review.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/editorial-strategy.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/export-fonts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/export-helpers.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/export-package.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/formats.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/generation-control.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/generation-prompts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/hooks-library.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/image-generation-readiness.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/image-reference-upload.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/image-storage.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/image-store.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/import-text.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/landing-gate.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/library-helpers.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/library-organizer.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/library-sync.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/objective-templates.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/parsers.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/presentation-state.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/presentation.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/preset-tokens.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/project-deletions.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/project-share.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/project-sync-control.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/projects-client.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/projects-cloud-sync.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/projects-outbox.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/publication-results.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/research-prompts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/schema-migration.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/series-drafts.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/server-status.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/slide-design-system.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/slide-logo.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/slide-reference.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/social-tone.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/storage.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/style-kit-design.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/style-kit-storage.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/style-kit.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/subtitle-label.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/telemetry.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/text-spans.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/ui-depth-labels.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/user-profile.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/video-store.js,lógica integral,"estado, fila, partilha, geração e acesso"
+src/utils/wcag.js,lógica integral,"estado, fila, partilha, geração e acesso"
+tests/e2e/account-usage.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/billing-jornadas.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/card-elements-individual.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/card-text-fonts.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/destaque-texto.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/editor-ux-2026-09-16.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/export-lettering-quality.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/export-sem-ui.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/generate-modal-flow.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/generation-controls.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/geracao-editorial.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/header-editor.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/helpers/api-mock.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/ia-paineis.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/image-generation-readiness.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/imagens-e-salvar.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/imagens-indexeddb.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/inline-line-breaks.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/landing.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/library-calendar.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/library-cloud-idle.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/library-cloud-sync.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/logo-cloud-transparency.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/logo-storage-fallback.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/logo-tone-export.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/marca-assinatura.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/marca-tamanhos.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/multiusuario.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/ocr-local-fallback.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/onboarding-tour.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/password-recovery.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/paywall.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/photo-quality.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/presentation-test-case.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/produto-export.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/project-identity-persistence.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/projects-v2-outbox-fallback.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/projects-v2.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/resultados-editoriais.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/sem-sobreposicao.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/slide-reference-backup.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/smoke-ui.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/style-kit.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/text-areas.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/texto-nao-desaparece.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/titulo-linhas-nao-colam.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/titulo-nao-corta.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/e2e/visual-presets-custom.spec.js,triagem,teste; execução não conta como leitura do produto
+tests/helpers/env.js,triagem,teste; execução não conta como leitura do produto
+tests/helpers/http.js,triagem,teste; execução não conta como leitura do produto
+tests/helpers/stripe-mock.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/access.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/account-identity-auth.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/account-identity-billing.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/auth.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/carousel-ocr.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/concorrencia.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/google-canonical.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/image-quota-postgres-routing.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/image-reference-upload.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/image-usage-session.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/password-recovery.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/project-share.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/proxies-ia.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/quota-stripe.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/seguranca.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/stripe-webhook.test.js,triagem,teste; execução não conta como leitura do produto
+tests/integration/stripe.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-data-owner.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-identity-postgres.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-library-meta-api.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-library-meta-client.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-media-isolation.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-usage.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-vault-durable.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-vault-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-vault.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/account-write-lock.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/agent-access-api.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/agent-token-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/agent-visual-batch-api.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/agent-visual-batch-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/ai-client-prompt.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/batch-photos.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/billing.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/brand-context.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/brand-helpers.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/brand-tone.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/canvas-toggle.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/canvas-zones.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-elements-unlock-ui.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-elements.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-header.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-overlays.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-slide-ink-overrides.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/card-text-fonts.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/carousel-ocr.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/carousel-remix.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/clear-account-data.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/cloud-image-quality.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/cloud-media-merge.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/cloud-original-assets.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/cloud-upload-receipts.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/context-status.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/custom-visual-presets.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/editorial-generation.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/export-background-images.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/export-fonts.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/export-helpers-text-clip.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/export-image-quality.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/export-package.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/fatia3-eficiencia.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/formats.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/generate-modal-flow.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/generation-control.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/generation-prompts.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/get-app-url.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/home-product-selector.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/hooks-library.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-aspect-ratio.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-crop-format.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-crop-quality.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-generation-readiness.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-quota-postgres.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-quota.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-reference-upload.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-references.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-storage-quality.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-store-lifecycle.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/image-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/import-text.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/landing-gate.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-organizer.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-sync-authoritative.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-sync-backend.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-sync-client.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-sync-postgres.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/library-sync-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/logo-cloud-transparency.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/logo-isolation.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/logout-protection.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/ocr-quota.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/overflow-scaler.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/parsers.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/password-auth.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/plan-periods.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/presentation-card-render.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/presentation-design-system-compiler.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/presentation-presets.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/presentation-state.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/presentation.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/procedure-label-visual-patch.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/project-deletions.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/project-share-store.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/project-share.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/project-sync-control.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/projects-api.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/projects-client.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/projects-cloud-sync.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/projects-outbox.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/prompt-densidade-tom.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/prompt-regressao.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/publication-results.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/rate-limit.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/request-limits-postgres.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/research-prompts.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/schema-migration.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/sidebar-presentation-product.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/slide-design-system.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/slide-logo.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/slide-reference.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/social-tone.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/status-upstash-cutover.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/storage-quota.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/style-kit-storage.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/style-kit.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/subtitle-label-render.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/subtitle-label.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/templates.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/ui-a11y-regressions.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/url-source-fetch.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/use-access-outbox-boot.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/viral-ai-marca.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/visual-patch-agent.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/visual-presets.test.js,triagem,teste; execução não conta como leitura do produto
+tests/unit/wcag.test.js,triagem,teste; execução não conta como leitura do produto
+urlSourceFetch.js,triagem,configuração ou estático
+vercel.json,triagem,configuração ou estático
+vite.config.js,triagem,configuração ou estático
+vitest.config.js,triagem,configuração ou estático
