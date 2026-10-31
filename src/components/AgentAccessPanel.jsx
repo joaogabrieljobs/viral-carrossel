@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, KeyRound, Link2, Trash2 } from 'lucide-react';
+import './AgentAccessPanel.css';
 
 const MCP_URL = 'https://moont.ai/mcp';
 
@@ -111,19 +112,33 @@ export default function AgentAccessPanel() {
   }
 
   return (
-    <section style={{ padding: 18, borderRadius: 16, border: '1px solid var(--border)', background: 'var(--bg-card)', display: 'grid', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
-        <div>
-          <div className="vc-eyebrow" style={{ marginBottom: 5 }}>Integrações de IA</div>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Conecte Claude, ChatGPT ou Codex</h3>
+    <section className="moont-integrations">
+      <div className="moont-integrations__hero">
+        <div className="moont-integrations__head">
+          <div>
+            <div className="moont-integrations__eyebrow">Integrações de IA</div>
+            <h3>Leve o Moont para o seu assistente</h3>
+          </div>
+          <KeyRound size={20} color="rgba(255,255,255,.7)" aria-hidden />
         </div>
-        <KeyRound size={19} color="var(--text-muted)" aria-hidden />
+        <p className="moont-integrations__lead">
+          Conecte sua conta para criar, revisar e organizar projetos sem sair do Claude, ChatGPT ou Codex. Você controla as permissões e pode encerrar cada acesso quando quiser.
+        </p>
+        <div className="moont-integrations__providers" aria-label="Assistentes compatíveis">
+          {[
+            { mark: 'C', name: 'Claude', note: 'OAuth · conexão recomendada' },
+            { mark: '✦', name: 'ChatGPT', note: 'OAuth · conector MCP' },
+            { mark: '⌘', name: 'Codex', note: 'OAuth ou chave manual' },
+          ].map((provider) => (
+            <div key={provider.name} className="moont-integrations__provider">
+              <div className="moont-integrations__provider-top"><span className="moont-integrations__provider-mark">{provider.mark}</span><strong>{provider.name}</strong></div>
+              <span>{provider.note}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
-        O MCP remoto do Moont permite que um assistente leia projetos, mostre prévias, edite textos e visual e desfaça alterações. A assinatura precisa estar ativa e cada conexão pode ser revogada aqui.
-      </p>
 
-      <div style={{ display: 'grid', gap: 9, padding: 14, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-pearl)' }}>
+      <div className="moont-integrations__card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div>
             <strong style={{ fontSize: 13 }}>Endereço do MCP</strong>
@@ -139,7 +154,7 @@ export default function AgentAccessPanel() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gap: 10, padding: 14, border: '1px solid var(--accent)', borderRadius: 12, background: 'var(--accent-surface)' }}>
+      <div className="moont-integrations__card moont-integrations__card--accent">
         <div>
           <strong style={{ fontSize: 13 }}>Conectar no Claude</strong>
           <p style={{ margin: '5px 0 0', color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5 }}>
