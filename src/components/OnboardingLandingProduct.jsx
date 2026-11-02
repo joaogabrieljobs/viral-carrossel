@@ -548,6 +548,21 @@ export default function OnboardingLandingProduct({ onEnter, onLogin, onRegister 
           <a href="/termos">Termos</a>
           <button type="button" onClick={onLogin}>Entrar</button>
         </div>
+        <nav className="moont-lp-container moont-lp-platforms" aria-label="Conheça nossas plataformas">
+          <span>Conheça nossas plataformas</span>
+          <ul>
+            <li>
+              <a href="https://musacontent.com.br" target="_blank" rel="noopener" aria-label="MUSA">
+                <img src="/landing/plataformas/musa.png" alt="MUSA" width="160" height="26" loading="lazy" />
+              </a>
+            </li>
+            <li>
+              <a href="https://branddy.app" target="_blank" rel="noopener" aria-label="Branddy">
+                <img src="/landing/plataformas/branddy.svg" alt="Branddy" width="85" height="26" loading="lazy" />
+              </a>
+            </li>
+          </ul>
+        </nav>
       </footer>
     </main>
   );
