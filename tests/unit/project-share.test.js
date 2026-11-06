@@ -205,13 +205,13 @@ describe('packDocWithImagesForShare', () => {
   it('leva múltiplas referências do prompt e mantém assets remotos leves', async () => {
     const { doc, packedImages } = await packDocWithImagesForShare({ slides:[{
       id:'s1', imageReferences:[
-        { id:'one', imageId:'id1', name:'Produto' },
-        { id:'two', assetId:'remote-reference', name:'Ambiente' },
+        { id:'one', imageId:'id1', name:'Produto', mention:'produto' },
+        { id:'two', assetId:'remote-reference', name:'Ambiente', mention:'ambiente' },
       ],
     }] });
     expect(doc.slides[0].imageReferences).toEqual([
-      { id:'one', name:'Produto', dataUrl:'data:image/png;base64,AAAA' },
-      { id:'two', name:'Ambiente', assetId:'remote-reference' },
+      { id:'one', name:'Produto', mention:'produto', dataUrl:'data:image/png;base64,AAAA' },
+      { id:'two', name:'Ambiente', mention:'ambiente', assetId:'remote-reference' },
     ]);
     expect(packedImages).toBe(1);
   });
@@ -230,13 +230,13 @@ describe('packDocWithImagesForShare', () => {
   it('importa todas as referências novas do prompt para a biblioteca local', async () => {
     const imported = await hydrateSharedDocImages({ slides:[{
       id:'s1', imageReferences:[
-        { id:'one', name:'Produto', dataUrl:'data:image/png;base64,AAAA' },
-        { id:'two', name:'Ambiente', dataUrl:'data:image/png;base64,BBBB' },
+        { id:'one', name:'Produto', mention:'produto', dataUrl:'data:image/png;base64,AAAA' },
+        { id:'two', name:'Ambiente', mention:'ambiente', dataUrl:'data:image/png;base64,BBBB' },
       ],
     }] });
     expect(imported.slides[0].imageReferences).toEqual([
-      { id:'one', name:'Produto', imageId:'new-reference-id' },
-      { id:'two', name:'Ambiente', imageId:'new-reference-id' },
+      { id:'one', name:'Produto', mention:'produto', imageId:'new-reference-id' },
+      { id:'two', name:'Ambiente', mention:'ambiente', imageId:'new-reference-id' },
     ]);
   });
 

@@ -95,7 +95,7 @@ function stripDocImages(doc) {
       imageReferences:Array.isArray(s?.imageReferences)
         ? s.imageReferences.map(ref => (
           typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
-            ? (ref.assetId ? { id:ref.id, name:ref.name, assetId:ref.assetId } : null)
+            ? (ref.assetId ? { id:ref.id, name:ref.name, ...(ref.mention ? { mention:ref.mention } : {}), assetId:ref.assetId } : null)
             : ref
         )).filter(Boolean)
         : [],

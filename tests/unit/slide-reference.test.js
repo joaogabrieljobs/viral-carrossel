@@ -5,6 +5,10 @@ vi.mock('../../src/utils/image-store.js', async (importOriginal) => ({
 import { imagePut, imageGet, semImagensDeRuntime } from '../../src/utils/image-store.js';
 import {
   MAX_SLIDE_IMAGE_REFERENCES,
+  normalizeSlideReferenceMention,
+  uniqueSlideReferenceMention,
+  slideReferenceDescriptors,
+  composeSlideReferencePrompt,
   normalizeSlideImageReferences,
   storeSlideImageReference,
   storeSlideReference,
@@ -68,6 +72,26 @@ describe('referência por card', () => {
       'data:image/png;base64,Mg==',
       'data:image/png;base64,Mw==',
     ]);
+  });
+
+  it('cria @nomes legíveis, únicos e explica a correspondência ao modelo', () => {
+    expect(normalizeSlideReferenceMention('@Produto Principal')).toBe('produto_principal');
+    expect(normalizeSlideReferenceMention('01 frente')).toBe('imagem_01_frente');
+    expect(uniqueSlideReferenceMention('produto', ['produto'])).toBe('produto2');
+    const slide = {
+      refImage:'data:image/png;base64,MA==',
+      refImageMention:'capa',
+      imageReferences:[
+        { dataUrl:'data:image/png;base64,MQ==', name:'Pessoa.png', mention:'pessoa' },
+        { dataUrl:'data:image/png;base64,Mg==', name:'Ambiente.png' },
+      ],
+    };
+    expect(slideReferenceDescriptors(slide).map(ref => ref.mention)).toEqual(['capa', 'pessoa', 'imagem3']);
+    const prompt = composeSlideReferencePrompt(slide, 'Coloque @pessoa no @ambiente');
+    expect(prompt).toContain('@capa = reference image 1');
+    expect(prompt).toContain('@pessoa = reference image 2 (Pessoa.png)');
+    expect(prompt).toContain('@imagem3 = reference image 3 (Ambiente.png)');
+    expect(prompt).toContain('Coloque @pessoa no @ambiente');
   });
 
   it('não publica um ID falso quando o armazenamento falha', async () => {

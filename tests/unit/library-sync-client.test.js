@@ -177,14 +177,14 @@ describe('library-sync client pack', () => {
     const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
     const packed = await packLibraryForCloud({ library:[{ id:'p1', doc:{ slides:[{
       id:'s1', imageReferences:[
-        { id:'one', imageId:'ref-1', name:'Produto' },
-        { id:'two', imageId:'ref-2', name:'Ambiente' },
+        { id:'one', imageId:'ref-1', name:'Produto', mention:'produto' },
+        { id:'two', imageId:'ref-2', name:'Ambiente', mention:'ambiente' },
       ],
     }] } }], brandRoster:[], libraryFolders:[] });
     const refs = packed.manifest.docs[0].doc.slides[0].imageReferences;
     expect(refs).toEqual([
-      { id:'one', name:'Produto', assetId:await originalImageAssetId(first) },
-      { id:'two', name:'Ambiente', assetId:await originalImageAssetId(second) },
+      { id:'one', name:'Produto', mention:'produto', assetId:await originalImageAssetId(first) },
+      { id:'two', name:'Ambiente', mention:'ambiente', assetId:await originalImageAssetId(second) },
     ]);
     expect(packed.assets.get(refs[0].assetId)).toBe(first);
     expect(packed.assets.get(refs[1].assetId)).toBe(second);

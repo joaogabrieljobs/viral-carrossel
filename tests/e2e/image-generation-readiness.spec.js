@@ -169,9 +169,16 @@ test('seleciona múltiplas referências, envia todas ao prompt e permite remover
   await expect(page.getByRole('img', { name:'ambiente.png', exact:true }).first()).toBeVisible();
   await expect(page.getByRole('img', { name:'estilo.png', exact:true }).first()).toBeVisible();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.length)).toBe(3);
+  await expect(page.getByRole('textbox', { name:'Nome no prompt da referência 1', exact:true }).first()).toHaveValue('imagem1');
+  await expect(page.getByRole('textbox', { name:'Nome no prompt da referência 2', exact:true }).first()).toHaveValue('imagem2');
+  await page.getByRole('textbox', { name:'Nome no prompt da referência 2', exact:true }).first().fill('pessoa');
+  await page.getByRole('button', { name:'Inserir @pessoa no prompt', exact:true }).first().click();
+  await expect(page.getByRole('textbox', { name:/Direção da imagem/ }).first()).toHaveValue(`${DIRECTION} @pessoa`);
   await page.getByRole('button', { name:'Gerar imagem', exact:true }).first().click();
   await expect.poll(() => requests.length).toBe(1);
   expect(requests[0].imageList).toHaveLength(3);
+  expect(requests[0].prompt).toContain('@imagem1 = reference image 1 (produto.png)');
+  expect(requests[0].prompt).toContain('@pessoa = reference image 2 (ambiente.png)');
   await page.getByRole('button', { name:'Remover ambiente.png', exact:true }).first().click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.length)).toBe(2);
   await expect(page.getByRole('img', { name:'ambiente.png', exact:true })).toHaveCount(0);

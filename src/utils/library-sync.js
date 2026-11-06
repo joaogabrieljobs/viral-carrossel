@@ -133,6 +133,7 @@ async function packReferenceListForCloud(refs, assets) {
     if (assetId || ref?.assetId) packed.push({
       id:ref?.id || ref?.imageId || ref?.assetId,
       name:ref?.name,
+      ...(ref?.mention ? { mention:ref.mention } : {}),
       assetId:assetId || ref.assetId,
     });
   }

@@ -53,6 +53,7 @@ function normalizeStyleKit(raw) {
       .map((r) => ({
         id: typeof r.id === 'string' && r.id ? r.id : uid(),
         name: asString(r.name).slice(0, REF_NAME_MAX) || 'referência',
+        ...(asString(r.mention).trim() ? { mention:asString(r.mention).trim().slice(0, 24) } : {}),
         ...(asString(r.assetId) ? { assetId: r.assetId } : {}),
         ...(asString(r.imageId) ? { imageId: r.imageId }
           : asString(r.dataUrl).startsWith('data:image/') ? { dataUrl: r.dataUrl } : {}),

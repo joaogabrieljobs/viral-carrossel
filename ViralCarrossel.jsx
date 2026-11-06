@@ -60,6 +60,10 @@ import {
 import {
   MAX_SLIDE_IMAGE_REFERENCES,
   normalizeSlideImageReferences,
+  normalizeSlideReferenceMention,
+  uniqueSlideReferenceMention,
+  slideReferenceDescriptors,
+  composeSlideReferencePrompt,
   storeSlideImageReference,
   importSlideReference,
 } from './src/utils/slide-reference.js';
@@ -4629,7 +4633,7 @@ export default function App() {
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage, snap.refImageId || snap.refImageAssetId, snap.imageReferences), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, imageState.extraPrompt),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(snap, imageState.extraPrompt)),
         aspectRatio: imageAspectRatioForFormat(fmt),
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
@@ -4732,8 +4736,14 @@ export default function App() {
     }
     const request = ++referenceUploadRef.current;
     try {
-      const stored = await Promise.all(acceptedFiles.map(storeSlideImageReference));
+      const storedRaw = await Promise.all(acceptedFiles.map(storeSlideImageReference));
       if (request !== referenceUploadRef.current || editorSyncStateRef.current.activeDocId !== projectId) return;
+      const usedMentions = slideReferenceDescriptors(source).map(ref => ref.mention);
+      const stored = storedRaw.map((reference, index) => {
+        const mention = uniqueSlideReferenceMention('', usedMentions, `imagem${legacyCount + existing.length + index + 1}`);
+        usedMentions.push(mention);
+        return { ...reference, mention };
+      });
       history.set(current => ({ ...current, slides: current.slides.map(slide => (
         slide.id === source.id
           ? { ...slide, imageReferences:[...normalizeSlideImageReferences(slide.imageReferences), ...stored].slice(0, MAX_SLIDE_IMAGE_REFERENCES) }
@@ -4747,16 +4757,36 @@ export default function App() {
   const removeSlideReference = useCallback((idx, key = 'all') => {
     referenceUploadRef.current += 1;
     if (key === 'all') {
-      updateSlideAt(idx, { imageReferences:[], refImage:null, refImageId:null, refImageAssetId:null, refImageFailed:false, refImageError:null });
+      updateSlideAt(idx, { imageReferences:[], refImage:null, refImageId:null, refImageAssetId:null, refImageName:null, refImageMention:null, refImageFailed:false, refImageError:null });
       return;
     }
     if (key === 'legacy') {
-      updateSlideAt(idx, { refImage:null, refImageId:null, refImageAssetId:null, refImageFailed:false, refImageError:null });
+      updateSlideAt(idx, { refImage:null, refImageId:null, refImageAssetId:null, refImageName:null, refImageMention:null, refImageFailed:false, refImageError:null });
       return;
     }
     updateSlideAt(idx, {
       imageReferences:normalizeSlideImageReferences(slidesLiveRef.current[idx]?.imageReferences)
         .filter(ref => (ref.id || ref.imageId || ref.assetId) !== key),
+    });
+  }, [updateSlideAt]);
+  const renameSlideReference = useCallback((idx, key, value) => {
+    const source = slidesLiveRef.current[idx];
+    if (!source) return;
+    const current = slideReferenceDescriptors(source).find(ref => ref.key === key);
+    const used = slideReferenceDescriptors(source).filter(ref => ref.key !== key).map(ref => ref.mention);
+    const mention = uniqueSlideReferenceMention(
+      normalizeSlideReferenceMention(value, current?.mention || 'imagem1'),
+      used,
+      current?.mention || 'imagem1',
+    );
+    if (key === 'legacy') {
+      updateSlideAt(idx, { refImageMention:mention });
+      return;
+    }
+    updateSlideAt(idx, {
+      imageReferences:normalizeSlideImageReferences(source.imageReferences).map(ref => (
+        (ref.id || ref.imageId || ref.assetId) === key ? { ...ref, mention } : ref
+      )),
     });
   }, [updateSlideAt]);
 
@@ -5473,9 +5503,9 @@ ${jsonShapeLine}`;
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
-              imgExtraPrompt: composeImgExtraPrompt(styleKit, [newSlides[i]?.imgExtraPrompt,
+              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt,
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
-              ].filter(Boolean).join('\n')),
+              ].filter(Boolean).join('\n'))),
               aspectRatio: generationPlan ? presentationPhotoAspectRatio(newSlides[i]) : isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
             });
             checkActive();
@@ -6373,7 +6403,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
             signal: templateJob.signal,
             refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
-            imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
+            imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
             aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
           });
           const patchImg = await guardarImagemDoSlide(url);
@@ -6594,6 +6624,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     onRemoveVideo: removeVideoFromActiveSlide,
     openRefImagePicker,
     removeSlideReference,
+    renameSlideReference,
     slideImgGenBusy,
     generateSlideImageAt,
     creativePreset,
@@ -7830,6 +7861,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   width={Math.min(vw - 48, f.w * previewScale)}
                   onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
                   onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
+                  onRenameRef={(key, value) => renameSlideReference(activeIdx, key, value)}
                   onPickRef={() => openRefImagePicker(activeIdx)}
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
@@ -8022,6 +8054,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       width={desktopThumbWidth}
                       onChangeExtra={(v) => updateSlideAt(i, { imgExtraPrompt: v })}
                       onRemoveRef={(key) => removeSlideReference(i, key)}
+                      onRenameRef={(key, value) => renameSlideReference(i, key, value)}
                       onPickRef={() => openRefImagePicker(i)}
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}

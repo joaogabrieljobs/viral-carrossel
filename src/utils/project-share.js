@@ -137,7 +137,7 @@ function stripEmbeddedImages(doc) {
       imageReferences:Array.isArray(s?.imageReferences)
         ? s.imageReferences.map(ref => (
           ref && typeof ref.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
-            ? (ref.assetId ? { id:ref.id, name:ref.name, assetId:ref.assetId } : null)
+            ? (ref.assetId ? { id:ref.id, name:ref.name, ...(ref.mention ? { mention:ref.mention } : {}), assetId:ref.assetId } : null)
             : ref
         )).filter(ref => ref && (ref.imageId || ref.assetId || ref.dataUrl))
         : [],
@@ -263,7 +263,7 @@ export async function packDocWithImagesForShare(doc) {
       const portable = [];
       for (const reference of next.imageReferences) {
         if (reference?.assetId) {
-          portable.push({ id:reference.id, name:reference.name, assetId:reference.assetId });
+          portable.push({ id:reference.id, name:reference.name, ...(reference.mention ? { mention:reference.mention } : {}), assetId:reference.assetId });
           continue;
         }
         const exported = await exportProjectReferences({ refImages:[reference] });

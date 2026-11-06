@@ -1,10 +1,10 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Sparkles, Loader2, Image as ImageIcon, ChevronDown, Plus, X } from 'lucide-react';
 import {
   MAX_SLIDE_IMAGE_REFERENCES,
-  normalizeSlideImageReferences,
   resolveSlideReference,
+  slideReferenceDescriptors,
 } from '../../utils/slide-reference.js';
 
 function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide') {
@@ -34,28 +34,14 @@ function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide')
 
 function PerSlideImageRefBlock({
   slide, width, onChangeExtra, onRemoveRef, onPickRef,
+  onRenameRef,
   onGenerateImage, generateImageBusy,
   generationState,
   itemLabel = 'slide',
   collapsible = false,
 }) {
   const extra = slide.imgExtraPrompt ?? '';
-  const refSource = typeof slide.refImage === 'string' ? slide.refImage : '';
-  const refImageId = slide.refImageId || slide.refImageAssetId || null;
-  const imageReferences = normalizeSlideImageReferences(slide.imageReferences);
-  const referenceItems = [
-    ...(refSource || refImageId || slide.refImageFailed ? [{
-      key:'legacy', name:'Referência 1', refImageId, refImageAssetId:slide.refImageAssetId,
-      refImage:refSource, refImageFailed:slide.refImageFailed,
-    }] : []),
-    ...imageReferences.map((ref, index) => ({
-      key:ref.id || ref.imageId || ref.assetId || `ref-${index}`,
-      name:ref.name || `Referência ${index + 1}`,
-      refImageId:ref.imageId || ref.assetId,
-      refImageAssetId:ref.assetId,
-      refImage:ref.dataUrl || '',
-    })),
-  ].slice(0, MAX_SLIDE_IMAGE_REFERENCES);
+  const referenceItems = slideReferenceDescriptors(slide);
   const hasReference = referenceItems.length > 0;
   const referenceSignature = referenceItems.map(item => (
     `${item.key}:${item.refImageId || ''}:${item.refImage || ''}:${item.refImageFailed ? 1 : 0}`
@@ -85,10 +71,30 @@ function PerSlideImageRefBlock({
     : (generationState?.message || refError || `Abra Direção e descreva a imagem deste ${itemLabel}.`);
   const reasonId = useId();
   const promptId = useId();
+  const promptRef = useRef(null);
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao
   // mesmo tempo repetia a mesma caixa 7 vezes e empurrava os cards para baixo.
   // Abre sozinho quando o slide já tem referência ou prompt extra.
   const [aberto, setAberto] = useState(() => !collapsible || hasReference || Boolean(extra.trim()));
+
+  const insertMention = (mention) => {
+    const field = promptRef.current;
+    const fieldHasFocus = typeof document !== 'undefined' && document.activeElement === field;
+    const start = fieldHasFocus ? (field?.selectionStart ?? extra.length) : extra.length;
+    const end = fieldHasFocus ? (field?.selectionEnd ?? start) : start;
+    const before = extra.slice(0, start);
+    const after = extra.slice(end);
+    const lead = before && !/\s$/.test(before) ? ' ' : '';
+    const tail = after && !/^\s/.test(after) ? ' ' : '';
+    const token = `@${mention}`;
+    const next = `${before}${lead}${token}${tail}${after}`;
+    const caret = before.length + lead.length + token.length + tail.length;
+    onChangeExtra(next);
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(caret, caret);
+    });
+  };
 
   const gerarBtn = typeof onGenerateImage === 'function' && (
     <button
@@ -187,17 +193,28 @@ function PerSlideImageRefBlock({
         )}
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, minWidth:0 }}>
-        <div style={{ width:124, flexShrink:0 }}>
+        <div style={{ width:136, flexShrink:0 }}>
           <div className="vc-label-sm" style={{ marginBottom:5 }}>Referências do prompt ({referenceItems.length}/{MAX_SLIDE_IMAGE_REFERENCES})</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 56px)', gap:6 }}>
-            {referenceItems.map((item) => {
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 64px)', gap:6 }}>
+            {referenceItems.map((item, index) => {
               const preview = previews[item.key];
-              return <div key={item.key} style={{ position:'relative', width:56, height:56 }}>
-                <div style={{ width:'100%', height:'100%', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-card)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', color:'var(--text-muted)' }} title={item.name}>
+              return <div key={item.key} style={{ position:'relative', width:64, minWidth:0 }}>
+                <div style={{ width:56, height:56, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-card)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', color:'var(--text-muted)' }} title={item.name}>
                   {preview?.url ? <img src={preview.url} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                     : preview?.error ? <ImageIcon size={18} aria-label="Referência indisponível"/>
                       : <Loader2 size={18} aria-label="Carregando referência" style={{ animation:'spin 0.8s linear infinite' }}/>}</div>
-                <button type="button" onClick={() => onRemoveRef?.(item.key)} aria-label={`Remover ${item.name}`} title={`Remover ${item.name}`} style={{ position:'absolute', top:-5, right:-5, width:22, height:22, padding:0, borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--text-primary)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><X size={12}/></button>
+                <button type="button" onClick={() => onRemoveRef?.(item.key)} aria-label={`Remover ${item.name}`} title={`Remover ${item.name}`} style={{ position:'absolute', top:-5, right:3, width:22, height:22, padding:0, borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--text-primary)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><X size={12}/></button>
+                <label title={`Nome desta imagem no prompt. Arquivo: ${item.name}`} style={{ marginTop:4, width:64, height:24, border:'1px solid var(--border)', borderRadius:6, display:'flex', alignItems:'center', padding:'0 4px', boxSizing:'border-box', background:'var(--bg-card)', color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
+                  <span aria-hidden="true">@</span>
+                  <input
+                    value={item.mention}
+                    onChange={(event) => onRenameRef?.(item.key, event.target.value)}
+                    aria-label={`Nome no prompt da referência ${index + 1}`}
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    style={{ width:'100%', minWidth:0, padding:0, border:0, outline:0, background:'transparent', color:'var(--text-primary)', font:'inherit' }}
+                  />
+                </label>
               </div>;
             })}
             {referenceItems.length < MAX_SLIDE_IMAGE_REFERENCES && <button
@@ -212,7 +229,18 @@ function PerSlideImageRefBlock({
           <label htmlFor={promptId} className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
             {slide.imageQuery?.trim() ? 'Prompt extra' : 'Direção da imagem'} (este {itemLabel})
           </label>
+          {referenceItems.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:5, margin:'0 0 6px' }} aria-label="Inserir referência no prompt">
+            {referenceItems.map(item => <button
+              key={`mention-${item.key}`}
+              type="button"
+              onClick={() => insertMention(item.mention)}
+              aria-label={`Inserir @${item.mention} no prompt`}
+              title={`Inserir @${item.mention} no prompt (${item.name})`}
+              style={{ minHeight:24, padding:'2px 7px', borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-secondary)', fontSize:10, fontFamily:'var(--font-mono)', cursor:'pointer' }}
+            >@{item.mention}</button>)}
+          </div>}
           <textarea
+            ref={promptRef}
             id={promptId}
             value={extra}
             onChange={(e) => onChangeExtra(e.target.value)}

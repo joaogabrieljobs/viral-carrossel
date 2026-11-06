@@ -54,6 +54,7 @@ import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
 import { composeImgExtraPrompt } from '../utils/style-kit.js';
 import { resolveImageReferences } from '../utils/style-kit-storage.js';
+import { composeSlideReferencePrompt } from '../utils/slide-reference.js';
 import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
 
 function guessFontFileFormat(file) {
@@ -270,6 +271,7 @@ function SidebarContent({
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
   removeSlideReference = () => {},
+  renameSlideReference = () => {},
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
   creativePreset = 'livre',
@@ -477,7 +479,7 @@ function SidebarContent({
       const url = await generateDALLE(q, openaiKey, imgParams, {
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage, slide.refImageId || slide.refImageAssetId, slide.imageReferences), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, slide.imgExtraPrompt),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(slide, slide.imgExtraPrompt)),
         aspectRatio: isPresentationProject ? '16:9' : (fmt === 'quadrado' ? '1:1' : fmt === 'stories' ? '9:16' : '4:5'),
       });
       // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
@@ -1489,6 +1491,7 @@ function SidebarContent({
                 itemLabel={itemLabel}
                 onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
                 onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
+                onRenameRef={(key, value) => renameSlideReference(activeIdx, key, value)}
                 onPickRef={() => openRefImagePicker(activeIdx)}
                 onGenerateImage={() => generateSlideImageAt(activeIdx)}
                 generateImageBusy={!!slideImgGenBusy[slide.id]}
