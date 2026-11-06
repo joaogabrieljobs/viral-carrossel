@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloneCreationBrand, creationMaterialHasContent, NARRATIVE_CHOICES, readCreationTextFile, validCreationCount, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice } from '../../src/utils/create-project-flow.js';
+import { cloneCreationBrand, creationMaterialHasContent, NARRATIVE_CHOICES, readCreationTextFile, validCreationCount, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, estimateCreationMinutes } from '../../src/utils/create-project-flow.js';
 
 describe('novo projeto: escolhas e material local', () => {
   it('isola a identidade e as referências do perfil salvo', () => {
@@ -117,4 +117,24 @@ describe('novo projeto: escolhas e material local', () => {
     expect(applyCreationVisualChoice(explored, updatedBase).accent).toBe('#335577');
   });
 
+});
+
+describe('estimativa de tempo antes de gerar', () => {
+  it('cobre os tempos medidos: carrossel de 7 cards e apresentação de 8 slides', () => {
+    const carousel = estimateCreationMinutes({ count: 7, productKind: 'carrossel' });
+    expect(carousel.min).toBeLessThanOrEqual(3);
+    expect(carousel.max).toBeGreaterThanOrEqual(5);
+    const deck = estimateCreationMinutes({ count: 8, productKind: 'apresentacao' });
+    expect(deck.min).toBeGreaterThanOrEqual(5);
+    expect(deck.max).toBeGreaterThanOrEqual(8);
+    expect(deck.label).toBe(`${deck.min} a ${deck.max} min`);
+    expect(deck.label).not.toMatch(/[\u2013\u2014]/);
+  });
+  it('cresce com a quantidade e com imagens', () => {
+    const small = estimateCreationMinutes({ count: 8, productKind: 'apresentacao' });
+    const large = estimateCreationMinutes({ count: 20, productKind: 'apresentacao' });
+    expect(large.max).toBeGreaterThan(small.max);
+    const withImages = estimateCreationMinutes({ count: 7, productKind: 'carrossel', wantImages: true });
+    expect(withImages.max).toBeGreaterThan(estimateCreationMinutes({ count: 7, productKind: 'carrossel' }).max);
+  });
 });

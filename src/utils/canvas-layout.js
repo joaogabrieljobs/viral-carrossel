@@ -11,6 +11,27 @@ const SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT = 20;
 /** Altura mínima das zonas de texto topo/fundo no sanduíche — evita molduras tipo faixa que cortam parágrafos. */
 const SANDWICH_TEXT_ZONE_MIN_H_PCT = 14;
 
+/**
+ * O sanduíche fluido precisa reagir à quantidade real de texto. Quando os três
+ * blocos são curtos, ampliar a foto e centralizar o conjunto evita concentrar
+ * tudo na metade superior. Ajustes manuais mantêm a geometria original.
+ */
+function sandwichFlowMetrics(slide, { hasPhoto = true } = {}) {
+  const chars = ['title', 'subtitle', 'bodyAfterImage']
+    .reduce((total, key) => total + String(slide?.[key] || '').trim().length, 0);
+  const offsets = Object.values(slide?.elementOffsets || {});
+  const manuallyPositioned = offsets.some(offset => (
+    Number(offset?.x) !== 0 || Number(offset?.y) !== 0
+  ));
+  const sparse = hasPhoto && !manuallyPositioned && chars > 0 && chars <= 240;
+  return {
+    sparse,
+    justifyContent: sparse ? 'center' : 'flex-start',
+    photoHeightPct: sparse ? 38 : SANDWICH_PHOTO_ZONE_MIN_H_PCT,
+    photoMaxHeightPct: sparse ? 40 : SANDWICH_PHOTO_ZONE_MIN_H_PCT,
+  };
+}
+
 function clampRect(r) {
   const x = Math.max(0, Math.min(100 - CANVAS_ZONE_MIN.w, r.x));
   const y = Math.max(0, Math.min(100 - CANVAS_ZONE_MIN.h, r.y));
@@ -399,6 +420,7 @@ export {
   SANDWICH_PHOTO_ZONE_MIN_H_PCT,
   SANDWICH_PHOTO_ZONE_ABSOLUTE_MIN_H_PCT,
   SANDWICH_TEXT_ZONE_MIN_H_PCT,
+  sandwichFlowMetrics,
   clampRect,
   DEFAULT_CANVAS_ZONES_CLASSIC,
   DEFAULT_CANVAS_ZONES_SANDWICH,

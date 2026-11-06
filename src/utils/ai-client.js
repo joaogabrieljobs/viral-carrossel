@@ -13,6 +13,7 @@ import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 import { PITCH_SYSTEM_PT } from './pitch-content.js';
 import { buildPresentationSystemPrompt } from './presentation.js';
+import { buildOutputLanguageSystemInstruction } from './output-language.js';
 
 // Acima do orçamento do proxy (240 s em api/ai/compatible.js): se o cliente
 // abortasse primeiro, o utilizador perdia uma geração que o servidor ainda ia
@@ -107,7 +108,7 @@ function sessionGateError(status, data) {
   return e;
 }
 
-const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês. Escreva com naturalidade brasileira, verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
+const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês. Quando o pedido trouxer o bloco IDIOMA DE SAÍDA, todo o texto visível segue esse idioma. Escreva com naturalidade brasileira, verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
 
 // Configuração selecionada no modal. Mantida em módulo para as funções de geração,
 // que vivem fora do componente React, lerem a preferência atual sem prop drilling.
@@ -261,10 +262,20 @@ function translateProviderError(provider, status, data, raw) {
   return msg || `${provider === 'zai' ? 'Moont AI' : 'Kimi'} HTTP ${status}`;
 }
 
+/**
+ * GLM models think by default and the reasoning tokens are billed against the
+ * same max_tokens as the answer. Callers that run a bounded JSON task (the
+ * editorial review) pass reasoning: false so the whole budget goes to the JSON.
+ * Other providers keep their defaults.
+ */
+export function compatibleReasoningPayload(provider, reasoning) {
+  return provider === 'zai' && reasoning === false ? { thinking: { type: 'disabled' } } : {};
+}
+
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8 } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8, reasoning } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -283,6 +294,7 @@ const callCompatibleChat = async (
     temperature: Number.isFinite(temperature) ? Math.max(0, Math.min(1, temperature)) : 0.8,
   };
   if (json) basePayload.response_format = { type: 'json_object' };
+  Object.assign(basePayload, compatibleReasoningPayload(provider, reasoning));
 
   const url = useDirect ? COMPATIBLE_DIRECT_URLS[provider] : COMPATIBLE_AI_URL;
   let lastError = null;
@@ -356,9 +368,11 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, temperature, signal: parentSignal } = {}) => runAIJob(async (signal) => {
-  const systemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, outputLanguage, temperature, reasoning, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+  const baseSystemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT
     : contentMode === 'presentation' ? buildPresentationSystemPrompt(presentationPath) : AI_SYSTEM_PT;
+  const languageOverride = buildOutputLanguageSystemInstruction(outputLanguage);
+  const systemPrompt = languageOverride ? `${baseSystemPrompt}\n\n${languageOverride}` : baseSystemPrompt;
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
@@ -369,7 +383,7 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
     return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature, reasoning });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);

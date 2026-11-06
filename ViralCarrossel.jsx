@@ -1,3 +1,4 @@
+import { resolveOutputLanguage, OUTPUT_LANGUAGE_LABELS } from './src/utils/output-language.js';
 import { useCaptionDelivery } from './src/hooks/useCaptionDelivery.js';
 import { copyTextToClipboard } from './src/utils/export-package.js';
 import { GenerationScopePicker } from './src/components/GenerationScopePicker.jsx';
@@ -15,6 +16,8 @@ import {
   assertPresentationTextLimits,
   buildPresentationLimitsBlock,
   generateReviewedCarousel,
+  generationMaxTokens,
+  socialIssuesMessage,
   presentationTextLimitsFromSlides,
 } from './src/utils/editorial-review.js';
 import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
@@ -119,6 +122,7 @@ import * as accountLibraryMeta from './src/utils/account-library-meta.js';
 
 import { FORMATS } from './src/utils/formats.js';
 import { usePhotoFraming } from './src/hooks/usePhotoFraming.js';
+import { automaticPhotoFramingPatch } from './src/utils/photo-framing.js';
 import { applyBrandEdit, applyFormatEdit, brandForFormatDisplay, slideForFormatDisplay, transformFormatVisuals } from './src/utils/format-view.js';
 import { PALETTES, TITLE_FONTS, TEMPLATES } from './src/utils/design-data.js';
 import { getServerStatus } from './src/utils/server-status.js';
@@ -572,6 +576,11 @@ function projectContentSnapshot(library) {
     }
     return { ...entry, doc: { ...doc, slides, brand, styleKit } };
   });
+}
+
+/** Brief que define o idioma de saída nos refinamentos: o mesmo texto da geração inicial. */
+function projectTopicForLanguage(doc) {
+  return String(doc?.editorialContext?.topic || doc?.quickPromptDraft || doc?.styleKit?.contextMd || '').trim();
 }
 
 function projectCacheFingerprint(entry) {
@@ -1730,7 +1739,11 @@ export default function App() {
     if (!entry) return;
     const owner = readDataOwner();
     const at = Date.now();
-    setCloudReceipts(current => ({ ...current, ...Object.fromEntries(snapshot.library.map(item => [item.id, { owner, at, fingerprint:projectCacheFingerprint(item) }])) }));
+    // Depois do envio, a foto ganha o ID da conta (adoptConfirmedAssetIds). O comprovante
+    // usa a mesma impressão confirmada, senão o indicador fica em "pendente na conta"
+    // até a pessoa clicar em Salvar, sem nada novo a enviar.
+    const confirmedFingerprint = (item) => (PROJECTS_V2 && v2BaselinesRef.current.get(item.id)) || projectCacheFingerprint(item);
+    setCloudReceipts(current => ({ ...current, ...Object.fromEntries(snapshot.library.map(item => [item.id, { owner, at, fingerprint:confirmedFingerprint(item) }])) }));
     setCloudUnsaved(false);
   }, []);
 
@@ -3931,12 +3944,12 @@ export default function App() {
         if (patch.bgImageId && patch.bgImage) {
           imagemUrlsRef.current.set(patch.bgImageId, patch.bgImage);
         }
-        updateSlideAt(sIdx, {
+        updateSlideAt(sIdx, automaticPhotoFramingPatch({
           ...patch,
           bgImageSource: 'imported',
           bgImageFailed: false,
           bgImageError: null,
-        });
+        }, slidesLiveRef.current[sIdx]));
         setGenProgress({ phase: 'import', current: 1, total: 1, label: 'Foto importada · 1/1' });
         toast('Foto importada.', 'success', 2500);
       } catch (err) {
@@ -4511,7 +4524,7 @@ export default function App() {
       if (zone === 'photo') {
         const imageKeys = [
           'bgImage', 'bgImageId', 'bgImageSource', 'bgImageFailed', 'bgImageError',
-          'bgFit', 'bgZoom', 'bgPosX', 'bgPosY', 'bgFlipX', 'bgFlipY', 'bgOpacity',
+          'photoFraming', 'bgFit', 'bgZoom', 'bgX', 'bgY', 'bgMirror', 'bgOpacity',
         ];
         const imagePatch = (source) => Object.fromEntries(
           imageKeys.map((key) => [key, source[key] ?? (key === 'bgImageId' ? null : undefined)]),
@@ -4649,17 +4662,13 @@ export default function App() {
       setSlides(prev => activeProjectRef.current !== generationProjectId ? prev : applySlidePatchIfImageCurrent(prev, {
         id: slideId,
         expectedImageIdentity,
-        patch: {
+        patch: automaticPhotoFramingPatch({
           ...patchImg,
           imgMode: 'dalle',
-          bgFit: 'cover',
-          bgX: 50,
-          bgY: 50,
-          bgZoom: 100,
           bgImageFailed: false,
           bgImageError: null,
           bgImageSource: 'ai',
-        },
+        }, liveTarget),
       }));
       toast(`${itemLabel === 'slide' ? 'Slide' : 'Card'} ${idx + 1}: imagem gerada`, 'success');
       return { ok: true, slideId };
@@ -5046,10 +5055,16 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
     const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null, presentationPathId);
 
+    const outputLang = resolveOutputLanguage({
+      instructions: material?.context,
+      content: [material?.content, styleKit?.contextMd].filter(Boolean).join('\n'),
+      topic,
+    });
+    const outputLangLabel = OUTPUT_LANGUAGE_LABELS[outputLang] || OUTPUT_LANGUAGE_LABELS.pt;
     const idiomaRegra = `
 REGRA DE IDIOMA (obrigatória):
-- Redija em português brasileiro: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
-- Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
+- Redija em ${outputLangLabel}: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
+- Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo.
 `;
 
     const contextoModoPerso =
@@ -5125,7 +5140,7 @@ ${jsonShapeLine}`;
 
     setGenProgress({ phase: 'text', current: 1, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 1 de 5 · Organizando o roteiro e as evidências' : 'Etapa 1 de 3 · Escrevendo o texto' });
     // Orçamento de saída cresce com o número de cards (T/C 1/1 traz subtitle + bodyAfterImage por slide) — auditoria M2.
-    const genMaxTokens = Math.min(8192, 3072 + Math.max(1, Number(count) || 1) * 512);
+    const genMaxTokens = generationMaxTokens(count, { presentation: isPresentationGeneration });
     const planningBrief = [
       buildGenerationTaskBlock(topic, announcement),
       n ? `Área ou contexto: ${n}` : '',
@@ -5135,7 +5150,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan } = await generateReviewedCarousel({
+    const { result, reviewStatus, socialIssues, plan: generationPlan } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -5163,7 +5178,7 @@ ${jsonShapeLine}`;
           });
         },
       },
-      aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
+      aiOptions: { maxTokens: genMaxTokens, openaiKey, outputLanguage: outputLang, signal: job.signal },
       onStage: stage => {
         checkActive();
         const stages = {
@@ -5180,7 +5195,7 @@ ${jsonShapeLine}`;
     checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
-    if (reviewStatus === 'needs_attention') toast('Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.', 'warning', 8000);
+    if (reviewStatus === 'needs_attention') toast(socialIssues ? socialIssuesMessage(socialIssues) : 'Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.', 'warning', 9000);
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: isPresentationGeneration ? 4 : 3, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 4 de 5 · Compondo a apresentação' : 'Etapa 3 de 3 · Montando os cards' });
 
@@ -5895,7 +5910,7 @@ ${jsonShapeLine}`;
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationRefine ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationRefine ? presentationPath : null, topic: projectTopicForLanguage(doc) }), job.signal);
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const nSl = slides.length;
       const presentationRefineTextLimits = isPresentationRefine
@@ -5982,7 +5997,7 @@ Retorne exatamente: ${singleJson}`,
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const isPresentationSummary = isApresentacaoPreset(creativePreset);
       const capRules = buildCaptionVoiceRules(creativePreset, mode);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null, topic: projectTopicForLanguage(doc) }), job.signal);
       const r = await callAI(
         `${isPresentationSummary
           ? 'Atue como editor de apresentações. Crie um resumo executivo e notas breves para acompanhar este deck em português brasileiro.'
@@ -6220,7 +6235,7 @@ ${isPresentationSummary
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: refiningPresentation ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: refiningPresentation ? presentationPath : null, topic: projectTopicForLanguage(doc) }), job.signal);
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath);
       const refinePrompt = refiningPresentation
@@ -8365,12 +8380,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
         imageSrc={slide.bgImage || ''}
         fmt={fmt}
         onClose={() => setImageCropOpen(false)}
-        onApply={(dataUrl) => { void guardarImagemDoSlide(dataUrl).then((patch) => updateSlide({
+        onApply={(dataUrl) => { void guardarImagemDoSlide(dataUrl).then((patch) => updateSlide(automaticPhotoFramingPatch({
           ...patch,
           bgImageSource: 'edited',
           bgImageFailed: false,
           bgImageError: null,
-        })); }}
+        }, panelSlide))); }}
       />
       <PhotoPositionModal
         open={photoPositionOpen}

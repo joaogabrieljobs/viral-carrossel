@@ -5,11 +5,26 @@ import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 // Plano com imagens: escolher Gerar só texto adia as fotos sem apagar a direção.
 const session = { ...SESSAO_ATIVA, tier: 'creator', imageQuota: { used: 0, limit: 50, remaining: 50, tier: 'creator' } };
 const completion = payload => ({ choices: [{ message: { content: JSON.stringify(payload) } }] });
+const uniqueSupport = [
+  'A pauta define o resultado esperado.',
+  'Cada tema recebe um tempo de discussão.',
+  'O facilitador registra os próximos passos.',
+  'As pendências ganham uma data de retorno.',
+  'O resumo circula entre os participantes.',
+  'A equipe encerra sabendo o que acontece depois.',
+];
+const uniqueEvidence = [
+  '', '',
+  'O registro evita versões conflitantes.',
+  'O calendário torna o acompanhamento visível.',
+  'A síntese reduz dúvidas depois do encontro.',
+  'O fechamento conecta a conversa à execução.',
+];
 const generated = {
   slides: Array.from({ length: 6 }, (_, i) => ({
-    title: `Reunião: argumento ${i + 1}`, subtitle: `A decisão tem responsável ${i + 1}.`,
+    title: `Reunião: argumento ${i + 1}`, subtitle: uniqueSupport[i],
     imageQuery: 'a quiet meeting room with a notebook on the table',
-    bodyAfterImage: i < 2 ? '' : `Consequência do argumento ${i + 1}.`,
+    bodyAfterImage: uniqueEvidence[i],
   })),
   caption: 'Uma decisão concreta. #gestão #equipes #reuniões #trabalho #liderança #extra',
 };

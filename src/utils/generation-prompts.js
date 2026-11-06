@@ -4,6 +4,7 @@
  * Único consumidor: ViralCarrossel.jsx. attachGenerationCanvasLayouts ficou no
  * monólito (acoplado ao motor de canvas), importando os helpers daqui.
  */
+import { buildOutputLanguageBlock } from './output-language.js';
 import {
   Newspaper, Brain, HeartHandshake, TrendingUp, BookOpen,
   GraduationCap, ScrollText, Megaphone,
@@ -493,11 +494,11 @@ async function resolveMaterialPromptParts(material, toastCb, options = {}) {
     if (options.presentationPath != null) {
       const result = presentationMaterialParts(material, [], options);
       if (result.partial) toastCb?.('O material é extenso. Selecionamos trechos relevantes de todo o conteúdo para planejar a apresentação.', 'info', 6000);
-      return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, []) };
+      return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, [], options.topic) };
     }
     return {
       materialBlock: buildMaterialBlock(material, [], options),
-      materialPriorityBlock: buildMaterialPriorityBlock(material, []),
+      materialPriorityBlock: buildMaterialPriorityBlock(material, [], options.topic),
     };
   }
   toastCb?.('Lendo o texto dos links…', 'info', 2600);
@@ -517,11 +518,11 @@ async function resolveMaterialPromptParts(material, toastCb, options = {}) {
   if (options.presentationPath != null) {
     const result = presentationMaterialParts(material, urlSnippets, options);
     if (result.partial) toastCb?.('O material é extenso. Selecionamos trechos relevantes de todo o conteúdo para planejar a apresentação.', 'info', 6000);
-    return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets) };
+    return { ...result, materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets, options.topic) };
   }
   return {
     materialBlock: buildMaterialBlock(material, urlSnippets, options),
-    materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets),
+    materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets, options.topic),
   };
 }
 
@@ -566,7 +567,7 @@ const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
     if (blobs.length) {
       fetchedBody = blobs.join('\n\n').slice(0, fetchedLimit);
       parts.push(
-        `TEXTO OBTIDO DAS FONTES (extraído automaticamente pelo app a partir das URL(s); use como BASE FACTUAL principal — sintetize com palavras próprias nos slides em português, sem cópia longa nem plagio):\n"""\n${fetchedBody}\n"""`,
+        `TEXTO OBTIDO DAS FONTES (extraído automaticamente pelo app a partir das URL(s); use como BASE FACTUAL principal — sintetize com palavras próprias nos slides, no idioma de saída, sem cópia longa nem plagio):\n"""\n${fetchedBody}\n"""`,
       );
     }
   }
@@ -584,7 +585,7 @@ const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
           : presentation ? 'FONTES & REFERÊNCIAS (conferência factual interna; não mencione a origem na apresentação final):' : 'FONTES & REFERÊNCIAS (você pode citar/integrar quando relevante):';
     parts.push(`${srcLabel}\n${s.slice(0, 2000)}`);
   }
-  if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (orientam recorte e estilo; preserve idioma, veracidade e schema solicitado):\n${x.slice(0, 1500)}`);
+  if (x) parts.push(`INSTRUÇÕES ESPECÍFICAS DO USUÁRIO (orientam recorte e estilo; preserve veracidade e schema solicitado; pedido de idioma aqui vale para o texto final):\n${x.slice(0, 1500)}`);
   if (ref?.promptBlock) {
     parts.push(
       `VOZ DE REFERÊNCIA — curadoria interna (inspire-se no ritmo, cadência e tom abaixo; não cite nomes de perfis nem reproduza posts reais):\n${ref.promptBlock}`,
@@ -597,10 +598,11 @@ const buildMaterialBlock = (material, urlSnippets = [], options = {}) => {
 };
 
 /** Material sustenta fatos; tema delimita o recorte. Instrução de voz não troca o assunto. */
-function buildMaterialPriorityBlock(material, urlSnippets = []) {
+function buildMaterialPriorityBlock(material, urlSnippets = [], topic = '') {
   const { c, s, x } = normalizedMaterialPieces(material);
   const fetchedOk = Array.isArray(urlSnippets) && urlSnippets.some((p) => p && String(p.text || '').trim().length >= 80);
-  if (!c && !s && !x && !fetchedOk) return '';
+  const languageBlock = buildOutputLanguageBlock(material, topic);
+  if (!c && !s && !x && !fetchedOk) return languageBlock;
 
   return `
 PRIORIDADE DO MATERIAL E DO TEMA:
@@ -608,7 +610,7 @@ PRIORIDADE DO MATERIAL E DO TEMA:
 - Instruções de estilo, assinatura e voz de referência não são evidência e não substituem o tema. Mudança de assunto só quando explicitamente pedida nas instruções do usuário.
 - Se o material não sustentar uma afirmação, omita-a ou apresente-a como hipótese; não force conexão nem fabrique dados, cenas reais ou citações.
 - ${fetchedOk ? 'TEXTO EXTRAÍDO disponível: sintetize os trechos pertinentes com palavras próprias.' : 'URLs sem texto transcrito: você não navega na web; o endereço não comprova o conteúdo da página. Trabalhe com o tema e o texto disponível, sem atribuir fatos ao link.'}
-`;
+${languageBlock}`;
 
 }
 
@@ -1088,7 +1090,7 @@ ${hookVisualHint}
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   const rules = buildGenerationSlideLayoutRulesBody(narrativeModeId, creativePresetId, textDensityId, slideCount, presentationPath);
   if (creativePresetId === 'apresentacao') return rules;
-  return `${rules}\n\nREGRA DE LEGIBILIDADE PARA TODOS OS MODOS SOCIAIS:\n- Cada card deve ter title curto, específico e não vazio. Nunca use “Seu título aqui”.\n- subtitle desenvolve a ideia em no máximo 3 linhas curtas e 160 caracteres; distribua conteúdo adicional em outro card ou bodyAfterImage quando o layout permitir.`;
+  return `${rules}\n\nREGRAS PARA TODOS OS MODOS SOCIAIS:\n- Cada card deve ter title curto, específico e não vazio. Nunca use “Seu título aqui”.\n- subtitle desenvolve a ideia em no máximo 3 linhas curtas e 160 caracteres; distribua conteúdo adicional em outro card ou bodyAfterImage quando o layout permitir.\n- FIDELIDADE AO BRIEFING: preserve os termos exatos usados para público, produto e serviço. Não invente canal de resposta (comentários, DM), “sem compromisso”, política de banco de imagens, item incluído/excluído ou promessa de conversão. Não troque cliente por paciente sem apoio explícito.\n- Cada fato, exemplo ou expressão distintiva aparece em um só card. Cards seguintes avançam o arco; não repita números, diagnósticos ou frases para preencher espaço.`;
 }
 
 function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto') {

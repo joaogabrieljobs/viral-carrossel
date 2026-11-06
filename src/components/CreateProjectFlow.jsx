@@ -14,7 +14,7 @@ import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx'
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
-import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice } from '../utils/create-project-flow.js';
+import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, estimateCreationMinutes } from '../utils/create-project-flow.js';
 import '../styles/create-project-flow.css';
 
 const PATH_LABELS = { auto:'Deixar o Moont organizar', pitch:'Apresentar um negócio — Pitch', aula_workshop:'Ensinar — Aula ou workshop', proposta_comercial:'Vender uma solução — Proposta', relatorio_executivo:'Mostrar resultados — Relatório', estudo_de_caso:'Demonstrar uma transformação — Caso', keynote_manifesto:'Defender uma visão — Palestra' };
@@ -81,6 +81,7 @@ export default function CreateProjectFlow({
   const pendingRef = useRef(false);
   const busyRef = useRef(false);
   const mainRef = useRef(null);
+  const errorRef = useRef(null);
   const isPresentation = productKind === 'apresentacao';
   const item = isPresentation ? 'slides' : 'cards';
   const quantityUnit = !isPresentation && Number(count) === 1 ? 'card' : item;
@@ -99,12 +100,17 @@ export default function CreateProjectFlow({
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
   const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady : step === 4 ? countValid : true;
-  const estimatedMinutes = wantImages
-    ? `${Math.max(4, Math.ceil(Number(count || 1) * 0.8))}–${Math.max(8, Math.ceil(Number(count || 1) * 1.8))} min`
-    : '2–5 min';
+  const estimatedMinutes = estimateCreationMinutes({ count, productKind, wantImages }).label;
   const imageConsumption = wantImages && hasOpenAI
     ? `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`
     : 'nenhum crédito de imagem';
+  // The review step is long and the error box renders after it: bring it
+  // into view and move focus so a failed generation is never silent.
+  useEffect(() => {
+    if (!error || !errorRef.current) return;
+    errorRef.current.scrollIntoView?.({ block:'center', behavior:'smooth' });
+    errorRef.current.focus?.({ preventScroll:true });
+  }, [error]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; asyncVersion.current++; }; }, []);
   useEffect(() => {
     mainRef.current?.focus({ preventScroll:true });
@@ -309,7 +315,7 @@ export default function CreateProjectFlow({
         </article>)}
       </div>}</div>}
       {notice && <p role="status" className="vc-create-note" style={{ marginTop:24 }}>{notice}</p>}
-      {error && <div role="alert" className="vc-create-error" style={{ marginTop:24 }}>{error}</div>}
+      {error && <div ref={errorRef} role="alert" tabIndex={-1} className="vc-create-error" style={{ marginTop:24 }}>{error}</div>}
     </main>
     <footer className="vc-create-footer"><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || (busy && !onCancelGeneration)} onClick={busy ? onCancelGeneration : step > 0 ? () => go(step - 1) : onCancel}><ArrowLeft size={15} aria-hidden/>{busy ? 'Cancelar geração' : step > 0 ? 'Voltar' : 'Cancelar'}</button><span className="vc-create-note">{step + 1} de {CREATION_STEPS.length}{step >= 4 && countValid ? ` · ${count} ${quantityUnit}` : ''}</span>{step < 6 ? <button type="button" className="vc-create-primary" disabled={!canContinue || pending || busy} onClick={() => go(step + 1)}>Continuar <ArrowRight size={14} aria-hidden/></button> : <button type="button" className="vc-create-primary" disabled={busy || pending || !countValid || !sourceReady || !hasTextAI} onClick={create}>{busy ? <Loader2 size={15} aria-hidden/> : <Sparkles size={15} aria-hidden/>} {busy ? 'Gerando…' : `Criar e gerar ${count} ${quantityUnit}`}</button>}</footer>
   </section>;

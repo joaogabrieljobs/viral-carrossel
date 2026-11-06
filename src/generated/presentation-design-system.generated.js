@@ -423,13 +423,13 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         },
         "demo": {
           "title": {
-            "role": "folio",
-            "fontFamily": "\"Libre Franklin\", sans-serif",
-            "sizePercent": 11.16,
-            "leadingPercent": 100,
-            "weight": 500,
-            "tracking": 13,
-            "case": "upper",
+            "role": "h1",
+            "fontFamily": "\"Playfair Display\", serif",
+            "sizePercent": 49.6,
+            "leadingPercent": 105,
+            "weight": 700,
+            "tracking": 2,
+            "case": "normal",
             "italic": false
           },
           "subtitle": {
@@ -471,7 +471,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "content": 49.6,
         "divider": 49.6,
         "data": 29.76,
-        "demo": 11.16,
+        "demo": 49.6,
         "closing": 86.81
       },
       "presentationTitleLeadingByComposition": {
@@ -479,7 +479,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "content": 105,
         "divider": 105,
         "data": 110,
-        "demo": 100,
+        "demo": 105,
         "closing": 95
       },
       "textBg": false,
@@ -2050,11 +2050,11 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         },
         "demo": {
           "title": {
-            "role": "caption",
-            "fontFamily": "\"Jost\", sans-serif",
-            "sizePercent": 12.4,
-            "leadingPercent": 140,
-            "weight": 300,
+            "role": "h1",
+            "fontFamily": "\"Cormorant Garamond\", serif",
+            "sizePercent": 44.64,
+            "leadingPercent": 105,
+            "weight": 500,
             "tracking": 3,
             "case": "normal",
             "italic": false
@@ -2098,7 +2098,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "content": 44.64,
         "divider": 44.64,
         "data": 59.52,
-        "demo": 12.4,
+        "demo": 44.64,
         "closing": 27.28
       },
       "presentationTitleLeadingByComposition": {
@@ -2106,7 +2106,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
         "content": 105,
         "divider": 105,
         "data": 100,
-        "demo": 140,
+        "demo": 105,
         "closing": 115
       },
       "textBg": false,
@@ -3301,7 +3301,7 @@ export const GENERATED_PRESENTATION_COMPOSITIONS = Object.freeze({
     "archetypeId": "gallery-captions",
     "evidenceFallback": true,
     "evidenceGlass": false,
-    "titleTypographyRole": "folio",
+    "titleTypographyRole": "h1",
     "subtitleTypographyRole": "subtitle",
     "titleTypographyItalic": false,
     "subtitleTypographyItalic": false,
@@ -5245,7 +5245,7 @@ export const GENERATED_PRESENTATION_COMPOSITIONS = Object.freeze({
     "archetypeId": "single-mat",
     "evidenceFallback": false,
     "evidenceGlass": false,
-    "titleTypographyRole": "caption",
+    "titleTypographyRole": "h1",
     "subtitleTypographyRole": "subtitle",
     "titleTypographyItalic": false,
     "subtitleTypographyItalic": false,

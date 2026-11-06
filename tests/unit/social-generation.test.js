@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildGenerationSlideLayoutRules, buildRefineSingleSlideRules, buildGenerationJsonContract } from '../../src/utils/generation-prompts.js';
-import { validateCarouselDraft, generateReviewedCarousel } from '../../src/utils/editorial-review.js';
-import { recoverSocialTitle, requiresSocialTitles } from '../../src/utils/social-generation.js';
+import { validateCarouselDraft, generateReviewedCarousel, generationMaxTokens, editorialReviewMaxTokens, socialIssuesMessage } from '../../src/utils/editorial-review.js';
+import { auditRepeatedSocialPhrases, recoverSocialTitle, recoverSocialTitleAtClause, requiresSocialTitles } from '../../src/utils/social-generation.js';
+import { compatibleReasoningPayload } from '../../src/utils/ai-client.js';
 import { cultureAccentRenderablePieces } from '../../src/utils/text-spans.js';
 
 const config = { count: 5, presetId: 'livre', densityId: '1_1', narrativeMode: 'viral' };
@@ -80,6 +81,19 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     expect(requiresSocialTitles({ presetId: 'apresentacao', narrativeMode: 'viral' })).toBe(false);
   });
 
+  it('identifica número e expressão repetidos entre cards sem contar repetição interna', () => {
+    const slides = [
+      { title: 'A história começou', subtitle: '22 anos de prática construíram confiança.' },
+      { title: 'O problema antigo', subtitle: 'Botões em outro idioma afastavam clientes.' },
+      { title: 'O diagnóstico', subtitle: 'Mesmo com 22 anos de prática, o site confundia.' },
+      { title: 'A reconstrução', subtitle: 'Corrigimos os botões em outro idioma antes do lançamento.' },
+    ];
+    expect(auditRepeatedSocialPhrases(slides, config)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ phrase: '22 anos de pratica', slideIndexes: [0, 2] }),
+      expect.objectContaining({ phrase: 'botoes em outro idioma', slideIndexes: [1, 3] }),
+    ]));
+  });
+
   it('faz apenas as2chamadas existentes e apresenta à revisão todos os títulos recuperados', async () => {
     const ai = vi.fn().mockResolvedValueOnce(draft()).mockResolvedValueOnce({ edits: [] });
     const result = await generateReviewedCarousel({ prompt: 'Campanha Halloween', config }, ai);
@@ -128,16 +142,87 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     });
   });
 
-  it.each([new Error('offline'), { edits: [] }])('não aceita um título vazio caso o único reparo falhe, preservando o rascunho completo', async review => {
+  it.each([new Error('offline'), { edits: [] }])('abre o rascunho completo com aviso quando o único reparo falha, sem título inventado', async review => {
     const first = draft();
     first.slides[2].subtitle = 'Um argumento longo sem pontuação '.repeat(8).trim();
     const ai = vi.fn().mockResolvedValueOnce(first);
     if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review);
-    const error = await generateReviewedCarousel({ prompt: 'brief', config }, ai).catch(value => value);
+    const output = await generateReviewedCarousel({ prompt: 'brief', config }, ai);
     expect(ai).toHaveBeenCalledTimes(2);
-    expect(error.code).toBe('social_title_missing');
-    expect(error.generatedDraft.slides[2].subtitle).toBe(first.slides[2].subtitle);
-    expect(error.generatedDraft.slides[2].bodyAfterImage).toBe(first.slides[2].bodyAfterImage);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.socialIssues.missingTitles).toEqual([2]);
+    expect(output.result.slides).toHaveLength(5);
+    expect(output.result.slides[2].title).toBe('');
+    expect(output.result.slides[2].subtitle).toBe(first.slides[2].subtitle);
+    expect(output.result.slides[2].bodyAfterImage).toBe(first.slides[2].bodyAfterImage);
+    expect(socialIssuesMessage(output.socialIssues)).toContain('card 3');
+  });
+
+  it('carrossel de 7 cards: revisão truncada não descarta o rascunho pago e completa títulos pela oração existente', async () => {
+    const seven = { ...config, count: 7 };
+    const first = draft();
+    first.slides = [...first.slides, ...draft().slides.slice(0, 2)];
+    first.slides[5] = { ...first.slides[5], title: '', subtitle: 'Quando o cliente procura no Google, o site responde com horário, endereço e contato em um só lugar sem depender de algoritmo nenhum para aparecer' };
+    first.slides[6] = { ...first.slides[6], subtitle: 'Long support '.repeat(16).trim() };
+    const truncated = Object.assign(new Error('A resposta da IA ficou incompleta.'), { code: 'ai_output_truncated' });
+    const ai = vi.fn().mockResolvedValueOnce(first).mockRejectedValueOnce(truncated);
+    const output = await generateReviewedCarousel({ prompt: 'brief', config: seven, aiOptions: { maxTokens: generationMaxTokens(7) } }, ai);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(ai.mock.calls[1][1]).toMatchObject({ maxTokens: editorialReviewMaxTokens(7), reasoning: false, json: true });
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.reviewError).toBe('ai_output_truncated');
+    expect(output.result.slides).toHaveLength(7);
+    expect(output.result.slides[5].title).toBe('Quando o cliente procura no Google');
+    expect(`${output.result.slides[5].title}, ${output.result.slides[5].subtitle}`).toBe(first.slides[5].subtitle);
+    expect(output.socialIssues).toMatchObject({
+      missingTitles: [],
+      longSupport: [6],
+      repeatedPhrases: [expect.objectContaining({ phrase: 'um endereco da sua marca', slideIndexes: [1, 6] })],
+    });
+    expect(output.result.slides[6].subtitle).toBe(first.slides[6].subtitle);
+  });
+
+  it('revisão que deixa um apoio longo abre o texto revisado com aviso, em vez de lançar erro', async () => {
+    const first = draft();
+    first.slides[1].subtitle = 'Apoio longo '.repeat(20).trim();
+    const ai = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce({ edits: [{ slideIndex: 0, reason: 'Capa', title: 'Seu negócio aparece no mapa?' }] });
+    const output = await generateReviewedCarousel({ prompt: 'brief', config }, ai);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.result.slides[0].title).toBe('Seu negócio aparece no mapa?');
+    expect(output.socialIssues.longSupport).toEqual([1]);
+    expect(socialIssuesMessage(output.socialIssues)).toBe('Texto gerado e preservado. Revise o apoio do card 2 antes de publicar.');
+  });
+
+  it('mantém o bloqueio de promessa comercial sem apoio mesmo quando a revisão falha', async () => {
+    const first = draft();
+    first.slides[1].subtitle = 'Resultado garantido para sua loja.';
+    const ai = vi.fn().mockResolvedValueOnce(first).mockRejectedValueOnce(new Error('offline'));
+    const error = await generateReviewedCarousel({ prompt: 'brief', config: { ...config, commercialClaimSource: 'Site para restaurantes.' } }, ai).catch(value => value);
+    expect(error.code).toBe('unsupported_commercial_claim');
+    expect(error.generatedDraft.slides[1].subtitle).toBe(first.slides[1].subtitle);
+  });
+
+  it('move a primeira oração para o título só quando não há frase completa, sem perder palavras', () => {
+    expect(recoverSocialTitleAtClause({ title: '', subtitle: 'Sem site próprio, o cliente some no feed e ninguém encontra o horário certo da sua loja nem o telefone para pedir um orçamento rápido' }))
+      .toEqual({ title: 'Sem site próprio', subtitle: 'o cliente some no feed e ninguém encontra o horário certo da sua loja nem o telefone para pedir um orçamento rápido' });
+    expect(recoverSocialTitleAtClause({ title: '', subtitle: 'Frase completa. Resto.' })).toEqual({ title: 'Frase completa.', subtitle: 'Resto.' });
+    const noBoundary = { title: '', subtitle: 'palavras '.repeat(30).trim() };
+    expect(recoverSocialTitleAtClause(noBoundary)).toBe(noBoundary);
+  });
+
+  it('dimensiona o orçamento do rascunho e da revisão pelo número de cards, no teto da plataforma', () => {
+    expect(generationMaxTokens(7)).toBeGreaterThan(3072 + 7 * 512);
+    expect(generationMaxTokens(7)).toBeLessThanOrEqual(8192);
+    expect(generationMaxTokens(24)).toBe(8192);
+    expect(generationMaxTokens(8, { presentation: true })).toBe(3072 + 8 * 512);
+    expect(editorialReviewMaxTokens(3)).toBeLessThan(editorialReviewMaxTokens(7));
+    expect(editorialReviewMaxTokens(7)).toBe(8192);
+  });
+
+  it('desliga o raciocínio só na Z.ai e só quando pedido', () => {
+    expect(compatibleReasoningPayload('zai', false)).toEqual({ thinking: { type: 'disabled' } });
+    expect(compatibleReasoningPayload('zai', undefined)).toEqual({});
+    expect(compatibleReasoningPayload('kimi', false)).toEqual({});
   });
 
   it('o contrato de markup corresponde ao suporte real sem remover underscores de URLs', () => {

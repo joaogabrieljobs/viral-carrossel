@@ -14,6 +14,7 @@ describe('applyBatchPhotosToSlides', () => {
     const next = applyBatchPhotosToSlides(slides, payloads, mkSlide, null);
     expect(next).toHaveLength(3);
     expect(next.map((s) => s.bgImage)).toEqual(['a', 'b', 'c']);
+    expect(next.every((s) => s.photoFraming === 'auto')).toBe(true);
     expect(next[1].title).toBe('');
     expect(next[2].num).toBe(3);
   });
@@ -26,7 +27,11 @@ describe('applyBatchPhotosToSlides', () => {
   });
 
   it('mantém slides sobrantes quando há menos fotos', () => {
-    const slides = [mkSlide(1), mkSlide(2), mkSlide(3)];
+    const slides = [
+      { ...mkSlide(1), bgX: 82, bgY: 25, bgZoom: 140, photoFraming: 'manual', elementOffsets: { title: { x: 4, y: 2 }, photo: { x: 9, y: 1 } } },
+      mkSlide(2),
+      mkSlide(3),
+    ];
     const next = applyBatchPhotosToSlides(slides, [{ bgImage: 'x', bgImageId: 'idx' }], mkSlide, null);
     // patch vazio não apaga foto existente
     const kept = applyBatchPhotosToSlides(
@@ -39,6 +44,10 @@ describe('applyBatchPhotosToSlides', () => {
     expect(kept[0].bgImageId).toBe('k1');
     expect(next).toHaveLength(3);
     expect(next[0].bgImage).toBe('x');
+    expect(next[0]).toMatchObject({
+      photoFraming: 'auto', bgX: 50, bgY: 50, bgZoom: 100,
+      elementOffsets: { title: { x: 4, y: 2 }, photo: { x: 0, y: 0 } },
+    });
     expect(next[1].title).toBe('T2');
   });
 });

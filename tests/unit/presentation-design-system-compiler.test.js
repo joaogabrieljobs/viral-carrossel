@@ -330,4 +330,20 @@ describe('compilador do design system de apresentações', () => {
     expect(GENERATED_PRESENTATION_COMPOSITIONS['presentation_premium_dark:content'])
       .toMatchObject({ titleTypographyRole: 'h1', evidenceGlass: true });
   });
+  it('títulos de zonas sintetizadas usam a fonte de título do padrão, não a da legenda', () => {
+    for (const [patternId, profile] of [['presentation_editorial_magazine', 'demo'], ['presentation_photo_essay', 'demo']]) {
+      expect(GENERATED_PRESENTATION_COMPOSITIONS[`${patternId}:${profile}`].titleTypographyRole).toBe('h1');
+      const pattern = Object.values(GENERATED_PRESENTATION_PATTERNS).find(p => p.id === patternId);
+      const find = (o) => {
+        if (!o || typeof o !== 'object') return null;
+        if (o.presentationTypographyByComposition) return o.presentationTypographyByComposition;
+        for (const v of Object.values(o)) { const r = find(v); if (r) return r; }
+        return null;
+      };
+      const map = find(pattern);
+      expect(map[profile].title.fontFamily).toBe(map.content.title.fontFamily);
+      expect(map[profile].title.fontFamily).toMatch(/serif/);
+      expect(map[profile].title.fontFamily).not.toMatch(/sans-serif/);
+    }
+  });
 });

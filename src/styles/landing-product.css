@@ -791,6 +791,12 @@
   .moont-lp-hero__copy,
   .moont-lp-hero h1,
   .moont-lp-hero__lead { min-width: 0; max-width: 100%; }
+  .moont-lp-hero__copy { display: flex; flex-direction: column; }
+  .moont-lp-hero__copy .moont-lp-kicker { order: 1; }
+  .moont-lp-hero__copy h1 { order: 2; }
+  .moont-lp-hero__copy .moont-lp-hero__actions { order: 3; }
+  .moont-lp-hero__copy .moont-lp-hero__lead { order: 4; margin: 24px 0 0; }
+  .moont-lp-hero__copy .moont-lp-hero__proof { order: 5; }
   .moont-lp-hero h1 { font-size: clamp(48px, 13.5vw, 56px); }
   .moont-lp-hero__lead { font-size: 18px; }
   .moont-lp-hero__actions { display: grid; grid-template-columns: 1fr; }

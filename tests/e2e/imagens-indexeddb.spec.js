@@ -104,7 +104,8 @@ test.describe('Imagens no IndexedDB', () => {
     // Barra de progresso do import (phase=import) ou toast de conclusão.
     await expect(
       page.getByRole('progressbar', { name: /progresso da importação/i })
-        .or(page.getByText(/a importar fotos|fotos aplicadas|foto.*aplicada/i).first()),
+        .or(page.getByText(/a importar fotos|fotos aplicadas|foto.*aplicada/i).first())
+        .first(),
     ).toBeVisible({ timeout: 15_000 });
     await expect.poll(async () => (await idsNoIndexedDB(page)).length, { timeout: 20_000 }).toBeGreaterThan(0);
     await expect.poll(async () => (await estadoGravado(page)).temId, { timeout: 20_000 }).toBe(true);

@@ -384,7 +384,11 @@ function resolveTextZones(patternId, profile, slots, photo) {
     title,
     subtitle,
     align: override.align || sourceAlign || fallback.align,
-    titleTypographyRole: titleSlot?.[1]?.role || 'h1',
+    // A safe-zone override synthesizes a real title where the source archetype
+    // only had captions/folios. Its typography must follow the pattern title,
+    // not the caption slot it replaced (photo-essay and magazine demo slides
+    // rendered their title in the light body sans).
+    titleTypographyRole: override.title ? 'h1' : (titleSlot?.[1]?.role || 'h1'),
     subtitleTypographyRole: subtitleSlot?.[1]?.role || 'subtitle',
     titleSlot,
     subtitleSlot,

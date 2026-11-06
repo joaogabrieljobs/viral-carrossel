@@ -94,3 +94,21 @@ export function applyCreationVisualChoice(currentBrand, identityVisuals, preset 
   }
   return next;
 }
+
+/**
+ * Honest time range shown before generating. Measured in production
+ * (2026-11-03): text-only carousels of 7 cards took 3 to 4.5 min and an
+ * 8-slide presentation took 7.5 min, because presentations run planning,
+ * writing, review and a rendered-layout check. Images add their own time.
+ */
+export function estimateCreationMinutes({ count, productKind, wantImages = false } = {}) {
+  const n = Math.max(1, Math.floor(Number(count) || 1));
+  const presentation = productKind === 'apresentacao';
+  let min = presentation ? Math.max(5, Math.ceil(n * 0.7)) : Math.max(2, Math.ceil(n * 0.4));
+  let max = presentation ? Math.max(10, Math.ceil(n * 1.3)) : Math.max(5, Math.ceil(n * 0.8));
+  if (wantImages) {
+    min += Math.ceil(n * 0.4);
+    max += Math.ceil(n * 1.0);
+  }
+  return { min, max, label: `${min} a ${max} min` };
+}

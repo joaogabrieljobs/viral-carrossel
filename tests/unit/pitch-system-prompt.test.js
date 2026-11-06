@@ -46,6 +46,18 @@ describe('papel do Pitch no transporte real de texto', () => {
     expect(envelope.provider).toBe('zai');
     expect(systemOf(envelope.payload)).toContain(PITCH_SYSTEM_PT);
   });
+
+  it('reforça no sistema o idioma explícito sem trocar o papel do conteúdo', async () => {
+    setAIRuntimeSettings({ textProvider: 'zai', keys: { zai: 'synthetic-test-key' } });
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(response({ ok: true })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callAI('gere o carrossel', { json: true, outputLanguage: 'en' });
+    const system = systemOf(requestBody(fetchMock));
+    expect(system).toContain(AI_SYSTEM_PT);
+    expect(system).toContain('OUTPUT LANGUAGE OVERRIDE');
+    expect(system).toContain('natural English');
+  });
 });
 
 describe('geração e segunda leitura do Pitch', () => {

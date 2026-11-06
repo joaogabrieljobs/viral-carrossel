@@ -148,7 +148,9 @@ describe('regressão MUSA: pedido, brief e identidade', () => {
     const photo = { bgImage: 'blob:foto', overlay: 70, photoRegion: 'full' };
     expect(needsLightPhotoText(photo)).toBe(true);
     expect(needsLightPhotoText({ ...photo, bgImage: null })).toBe(false);
-    expect(needsLightPhotoText({ ...photo, canvas: { zones: { photo: { w: 90, h: 40 } } } })).toBe(false);
+    expect(needsLightPhotoText({ ...photo, canvas: { enabled: true, zones: { photo: { w: 90, h: 40 } } } })).toBe(false);
+    // Zona guardada de uma composição desligada não encolhe a foto: a foto continua de fundo.
+    expect(needsLightPhotoText({ ...photo, canvas: { enabled: false, zones: { photo: { w: 100, h: 34 } } } })).toBe(true);
     expect(needsLightPhotoText({ ...photo, useCultureLayout: true })).toBe(false);
   });
 });

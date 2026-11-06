@@ -89,7 +89,7 @@ const profileFor = route => PROFILES[route?.id] || PROFILES.auto;
 
 export function presentationSystemForRoute(route) {
   const profile = profileFor(route);
-  return `Você é ${profile.role}. Produza e revise apresentações profissionais em português brasileiro para o público e objetivo solicitados.
+  return `Você é ${profile.role}. Produza e revise apresentações profissionais em português brasileiro para o público e objetivo solicitados. Se o pedido trouxer o bloco IDIOMA DE SAÍDA, todo o texto visível segue esse idioma.
 Caminho: ${route.label}. Finalidade: ${route.intent}
 ${profile.depth}
 Priorize clareza, mecanismo, evidência e aplicação. Diferencie fato, plano, hipótese e informação ausente. O tom da marca não autoriza exageros.

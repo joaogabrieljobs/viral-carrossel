@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cropToBackgroundPosition, photoFramingRequest, waitForPhotoFraming } from '../../src/utils/photo-framing.js';
+import { automaticPhotoFramingPatch, cropToBackgroundPosition, photoFramingRequest, usesAutomaticPhotoFraming, waitForPhotoFraming } from '../../src/utils/photo-framing.js';
 import { applyFormatEdit, slideForFormatDisplay } from '../../src/utils/format-view.js';
 import { slideAutoAdjustPatch } from '../../src/utils/canvas-zones.js';
 
@@ -23,6 +23,26 @@ describe('enquadramento por conteúdo', () => {
     expect(photoFramingRequest({ ...slide, photoFraming: 'manual' }, 'stories')).toBeNull();
     expect(photoFramingRequest({ ...slide, bgFit: 'contain' }, 'stories')).toBeNull();
     expect(photoFramingRequest({ ...slide, bgImage: null }, 'stories')).toBeNull();
+  });
+
+  it('ativa o assunto em projetos antigos intactos sem apagar ajustes manuais', () => {
+    const legacy = { bgImage: 'blob:legacy', bgFit: 'cover', bgX: 50, bgY: 50, bgZoom: 100 };
+    expect(usesAutomaticPhotoFraming(legacy)).toBe(true);
+    expect(photoFramingRequest(legacy, 'stories')).not.toBeNull();
+    expect(usesAutomaticPhotoFraming({ ...legacy, bgX: 63 })).toBe(false);
+    expect(usesAutomaticPhotoFraming({ ...legacy, elementOffsets: { photo: { x: 4, y: 0 } } })).toBe(false);
+    expect(usesAutomaticPhotoFraming({ ...legacy, photoFraming: 'manual' })).toBe(false);
+  });
+
+  it('uma nova foto começa em enquadramento automático e não herda o recorte anterior', () => {
+    expect(automaticPhotoFramingPatch(
+      { bgImage: 'blob:new', bgX: 91, bgMirror: true },
+      { elementOffsets: { title: { x: 3, y: 4 }, photo: { x: 8, y: 9 } } },
+    )).toMatchObject({
+      bgImage: 'blob:new', photoFraming: 'auto', bgFit: 'cover', bgX: 50, bgY: 50,
+      bgZoom: 100, bgMirror: false,
+      elementOffsets: { title: { x: 3, y: 4 }, photo: { x: 0, y: 0 } },
+    });
   });
 
   const slide = { id: 's1', bgImage: 'blob:photo', bgFit: 'cover', bgX: 50, bgY: 50, title: 'Título', subtitle: 'Detalhe' };

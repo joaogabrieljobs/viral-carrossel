@@ -3,10 +3,12 @@ import { CONTENT_OBJECTIVES, EDITORIAL_STRUCTURES, buildEditorialStrategyBlock, 
 import {
   applyEditorialReview,
   auditUnsupportedCommercialClaims,
+  auditUnsupportedSpecifics,
   assertPresentationTextLimits,
   auditPresentationTextLimits,
   buildEditorialReviewPrompt,
   buildPresentationLimitsBlock,
+  editorialReviewMaxTokens,
   generateReviewedCarousel,
   normalizePresentationTextLimits,
   presentationTextLimitsFromSlides,
@@ -62,6 +64,20 @@ describe('objetivos e biblioteca editorial', () => {
 });
 
 describe('geração com uma revisão editorial', () => {
+  it('marca detalhes operacionais e troca de cliente por paciente sem apoio', () => {
+    const slides = [{
+      title: 'Fale com a equipe',
+      subtitle: 'Envie nos comentários ou na DM, sem compromisso.',
+      bodyAfterImage: 'Uma máquina de agendamentos para pacientes.',
+    }];
+    const issues = auditUnsupportedSpecifics(slides, 'A Black Frog cria sites para clientes locais.');
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'canal de resposta' }),
+      expect.objectContaining({ category: 'compromisso' }),
+      expect.objectContaining({ category: 'promessa de conversão' }),
+      expect.objectContaining({ category: 'termo do público', claim: 'pacientes' }),
+    ]));
+  });
   it('marca e remove promessa comercial que não existe no briefing', async () => {
     const first = draft();
     first.slides[1].subtitle = 'Publique hoje, sem taxas escondidas.';
@@ -87,7 +103,8 @@ describe('geração com uma revisão editorial', () => {
     expect(ai).toHaveBeenCalledTimes(2);
     expect(ai.mock.calls[1][0]).toContain('Uma consequência');
     expect(ai.mock.calls[1][0]).toContain('promessa da capa');
-    expect(ai.mock.calls[1][1]).toEqual({ maxTokens: 4608, json: true });
+    expect(ai.mock.calls[0][1]).toEqual({ maxTokens: 4608, json: true });
+    expect(ai.mock.calls[1][1]).toEqual({ maxTokens: editorialReviewMaxTokens(config.count), json: true, reasoning: false });
     expect(onReview).toHaveBeenCalledTimes(1);
     expect(output.reviewStatus).toBe('revised');
     expect(output.result.slides[1].subtitle).toBe('Um exemplo concreto');

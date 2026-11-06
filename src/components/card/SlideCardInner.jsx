@@ -27,7 +27,7 @@ import { splitLeadingUppercaseLabel } from '../../utils/subtitle-label.js';
 import { headerCenterText, dedupeHeaderColumns } from '../../utils/card-header.js';
 import { useElementDrag } from './useElementDrag.js';
 import { slideHasPendingPhotoIntent, inferCanvasDefaults, sandwichPhotoZoneImgStyle } from '../../utils/canvas-zones.js';
-import { DEFAULT_SLIDE_TEXT_INSET, SANDWICH_PHOTO_ZONE_MIN_H_PCT, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
+import { DEFAULT_SLIDE_TEXT_INSET, sandwichFlowMetrics, clampRect, DEFAULT_CANVAS_ZONES_CLASSIC, CANVAS_AUTO_EDGE_PCT } from '../../utils/canvas-layout.js';
 
 /**
  * Texto com os trechos de "Marcar destaque" pintados na cor de acento.
@@ -261,6 +261,39 @@ const VC_PHOTO_ZONE_HIT_LAYER_STYLE = {
   display: 'block',
   boxSizing: 'border-box',
 };
+
+/**
+ * Camada de toque da zona de foto. O `<input>` continua cobrindo a zona (iOS e testes),
+ * e um `<label htmlFor>` por cima ativa o mesmo input. No app desktop (WKWebView) o
+ * clique direto num input quase invisível não abria o seletor; o label é o mesmo
+ * caminho do botão "Importar foto" do painel, que funciona lá.
+ */
+function PhotoZoneFileHit({ onChange, style }) {
+  const id = React.useId();
+  const stop = (e) => e.stopPropagation();
+  return (
+    <>
+      <input
+        id={id}
+        type="file"
+        accept="image/*"
+        onChange={onChange}
+        onTouchStart={stop}
+        className="vc-photo-hit"
+        style={style}
+        aria-label="Importar imagem na zona da foto"
+      />
+      <label
+        htmlFor={id}
+        aria-hidden="true"
+        data-vc-photo-hit-label=""
+        onClick={stop}
+        onTouchStart={stop}
+        style={{ ...style, opacity: 1, background: 'transparent', zIndex: (style?.zIndex ?? 4) + 1 }}
+      />
+    </>
+  );
+}
 
 /** Superfície glass compartilhada por todos os renderizadores de card.
  * A cor semitransparente continua visível no PNG mesmo quando o motor de
@@ -922,15 +955,7 @@ const ClassicCanvasInner = React.forwardRef(({
       >
         {photoZoneChildren}
         {photoZoneNativeHit ? (
-          <input
-            type="file"
-            accept="image/*"
-            onChange={onPhotoZoneFileChange}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="vc-photo-hit"
-            style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
-            aria-label="Importar imagem na zona da foto"
-          />
+          <PhotoZoneFileHit onChange={onPhotoZoneFileChange} style={VC_PHOTO_ZONE_HIT_LAYER_STYLE} />
         ) : null}
       </div>}
 
@@ -2046,6 +2071,7 @@ const SlideCardInner = React.forwardRef(({
     (!!slide.bgImage || slideHasPendingPhotoIntent(slide)) &&
     !sandwich &&
     !cultureStatFlat;
+  const sandwichFlow = sandwichFlowMetrics(slide, { hasPhoto: sandwich });
   // Badge classic (com avatar circular + handle) deve aparecer em TODOS os modos —
   // o usuário controla via toggle "Mostrar @ nos slides" e posição via sliders handleBadgeX/Y.
   // (Antes era escondido em culturePack assumindo que o handle iria na editorial bar,
@@ -2656,15 +2682,7 @@ const SlideCardInner = React.forwardRef(({
               </div>
             )}
             {sandwichPhotoNativeHit ? (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onPhotoZoneFileInputChange}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="vc-photo-hit"
-                style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
-                aria-label="Importar imagem na zona da foto"
-              />
+              <PhotoZoneFileHit onChange={onPhotoZoneFileInputChange} style={VC_PHOTO_ZONE_HIT_LAYER_STYLE} />
             ) : null}
           </div>
         )}
@@ -2767,9 +2785,9 @@ const SlideCardInner = React.forwardRef(({
     const flatPhotoPlaceholderStyle = {
       width: '100%',
       borderRadius: f.w * 0.017,
-      height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
+      height: f.h * (sandwichFlow.photoHeightPct / 100),
       minHeight: f.h * 0.22,
-      maxHeight: f.h * 0.32,
+      maxHeight: f.h * (sandwichFlow.photoMaxHeightPct / 100),
       flex: '0 1 auto',
       flexShrink: 1,
       background: cr.solidBgIsLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)',
@@ -2843,10 +2861,10 @@ const SlideCardInner = React.forwardRef(({
             display:'flex',
             flexDirection:'column',
             gap: f.h * 0.024,
-            // Sempre flex-start: space-between empurrava o primeiro item PRA CIMA quando havia
-            // overflow. Agrupado, o scaler reduz e a zona recorta o excesso; separado, filhos
-            // deslocados podem atravessar a antiga zona e só a borda do card os limita.
-            justifyContent: 'flex-start',
+            // Texto curto ocupa o card como composição, não como um bloco preso
+            // ao topo. Conteúdo longo continua em flex-start para o scaler medir
+            // o transbordo sem empurrar o primeiro item para fora da área.
+            justifyContent: sandwichFlow.justifyContent,
             ...VC_TEXT_ZONE_STYLE,
             overflow: overflowDosElementosSeparados(
               elementsUnlocked,
@@ -2956,26 +2974,18 @@ const SlideCardInner = React.forwardRef(({
             >
               {forExport ? '' : (slide.bgImageFailed ? 'Imagem indisponível — toque para substituir' : 'Toque para inserir foto')}
               {flatPhotoNativeHit ? (
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onPhotoZoneFileInputChange}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="vc-photo-hit"
-                  style={{
+                <PhotoZoneFileHit onChange={onPhotoZoneFileInputChange} style={{
                     ...VC_PHOTO_ZONE_HIT_LAYER_STYLE,
                     borderRadius: f.w * 0.017,
-                  }}
-                  aria-label="Importar imagem na zona da foto"
-                />
+                  }} />
               ) : null}
             </div>
           )}
           {sandwich && slide.videoId && getVideoUrl(slide.videoId) && (
             <div data-vc-photo-zone="1" {...movSeparate('photo', {
               width:'100%', flex: '0 1 auto',
-              height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
-              minHeight: f.h * 0.22, maxHeight: f.h * 0.32,
+              height: f.h * (sandwichFlow.photoHeightPct / 100),
+              minHeight: f.h * 0.22, maxHeight: f.h * (sandwichFlow.photoMaxHeightPct / 100),
               borderRadius: f.w * 0.017, overflow:'hidden', flexShrink:1, position:'relative',
               background: cr.solidBgIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
               boxShadow: 'var(--shadow-product)',
@@ -3009,9 +3019,9 @@ const SlideCardInner = React.forwardRef(({
             <div data-vc-photo-zone="1" {...movSeparate('photo', {
               width:'100%',
               flex: '0 1 auto',
-              height: f.h * (SANDWICH_PHOTO_ZONE_MIN_H_PCT / 100),
+              height: f.h * (sandwichFlow.photoHeightPct / 100),
               minHeight: f.h * 0.22,
-              maxHeight: f.h * 0.32,
+              maxHeight: f.h * (sandwichFlow.photoMaxHeightPct / 100),
               borderRadius: f.w * 0.017,
               overflow:'hidden',
               flexShrink:1,
@@ -3314,15 +3324,7 @@ const SlideCardInner = React.forwardRef(({
         >
           {slide.bgImageFailed ? 'Imagem indisponível — toque para substituir' : 'Toque para inserir foto'}
           {fullBleedNativeHit ? (
-            <input
-              type="file"
-              accept="image/*"
-              onChange={onPhotoZoneFileInputChange}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="vc-photo-hit"
-              style={VC_PHOTO_ZONE_HIT_LAYER_STYLE}
-              aria-label="Importar imagem na zona da foto"
-            />
+            <PhotoZoneFileHit onChange={onPhotoZoneFileInputChange} style={VC_PHOTO_ZONE_HIT_LAYER_STYLE} />
           ) : null}
         </div>
       )}

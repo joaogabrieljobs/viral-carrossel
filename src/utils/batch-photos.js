@@ -2,6 +2,7 @@
  * Importação em lote: cada imagem vira (ou atualiza) um card.
  * Sem teto — se houver mais fotos do que slides, cria slides novos.
  */
+import { automaticPhotoFramingPatch } from './photo-framing.js';
 
 /**
  * @param {object[]} slides
@@ -47,7 +48,7 @@ export function applyBatchPhotosToSlides(slides, imagePayloads, mkSlide, brand, 
     if (hasPhoto) {
       base = {
         ...base,
-        ...data,
+        ...automaticPhotoFramingPatch(data, base),
         num: i + 1,
         bgImageSource: 'imported',
         bgImageFailed: false,

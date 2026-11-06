@@ -63,7 +63,8 @@ export function projectDesignBrandPatch(raw) {
 /** Fotos com overlay escuro precisam de texto claro; não altera a paleta salva. */
 export function needsLightPhotoText(slide) {
   const fullPhoto = slide?.photoRegion == null || slide.photoRegion === 'full';
-  const photo = slide?.canvas?.zones?.photo;
+  // Zona de foto só vale com a composição ligada; zonas guardadas de um layout desligado não contam.
+  const photo = slide?.canvas?.enabled ? slide?.canvas?.zones?.photo : null;
   const canvasFullPhoto = !photo || (photo.w >= 90 && photo.h >= 90);
   return !!slide?.bgImage && fullPhoto && canvasFullPhoto && !slide?.useCultureLayout && (slide.overlay ?? 0) >= 38;
 }

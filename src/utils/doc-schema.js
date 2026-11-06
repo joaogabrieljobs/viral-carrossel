@@ -77,6 +77,8 @@ const mkSlide = (n = 1, brand = null) => {
   bgX: 50, bgY: 50, bgZoom: 100,
   /** 'cover' = preenche o card | 'contain' = imagem inteira visível | 'custom' = zoom % legado */
   bgFit: 'cover',
+  /** Por padrão, toda foto nova procura manter rosto/produto/assunto dentro do quadro. */
+  photoFraming: 'auto',
   bgOpacity: 100, bgMirror: false,
   /**
    * Layout clássico: `full` = foto a fundo atrás do texto.
