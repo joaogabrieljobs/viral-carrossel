@@ -442,7 +442,10 @@ export function idsDeImagemEmUso(library, brands = []) {
   const brandIds = (brand) => [brand?.logoImageId, ...kitIds(brand?.styleKit)];
   return [...new Set([
     ...(library || []).flatMap((e) => [
-      ...(e?.doc?.slides || []).flatMap(s => [s?.bgImageId, s?.logoImageId, s?.refImageId || s?.refImageAssetId]),
+      ...(e?.doc?.slides || []).flatMap(s => [
+        s?.bgImageId, s?.logoImageId, s?.refImageId || s?.refImageAssetId,
+        ...(s?.imageReferences || []).map(ref => ref?.imageId || ref?.assetId),
+      ]),
       ...kitIds(e?.doc?.styleKit),
       ...brandIds(e?.doc?.brand),
     ]),

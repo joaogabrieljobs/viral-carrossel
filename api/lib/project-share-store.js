@@ -92,6 +92,13 @@ function stripDocImages(doc) {
     ? doc.slides.map((s) => ({
       ...s,
       bgImage: typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:') ? null : s?.bgImage,
+      imageReferences:Array.isArray(s?.imageReferences)
+        ? s.imageReferences.map(ref => (
+          typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
+            ? (ref.assetId ? { id:ref.id, name:ref.name, assetId:ref.assetId } : null)
+            : ref
+        )).filter(Boolean)
+        : [],
     }))
     : doc.slides;
   const brand = doc.brand && typeof doc.brand === 'object'

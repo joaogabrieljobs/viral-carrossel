@@ -3,7 +3,16 @@ vi.mock('../../src/utils/image-store.js', async (importOriginal) => ({
   ...(await importOriginal()), imagePut: vi.fn(), imageGet: vi.fn(), newImageId: () => 'ref_new',
 }));
 import { imagePut, imageGet, semImagensDeRuntime } from '../../src/utils/image-store.js';
-import { storeSlideReference, importSlideReference, resolveSlideReference, exportSlideReference } from '../../src/utils/slide-reference.js';
+import {
+  MAX_SLIDE_IMAGE_REFERENCES,
+  normalizeSlideImageReferences,
+  storeSlideImageReference,
+  storeSlideReference,
+  importSlideReference,
+  resolveSlideImageReferences,
+  resolveSlideReference,
+  exportSlideReference,
+} from '../../src/utils/slide-reference.js';
 
 const DATA = 'data:image/png;base64,YWJj';
 const file = () => new Blob(['abc'], { type: 'image/png' });
@@ -35,6 +44,30 @@ describe('referência por card', () => {
     const stored = await pending;
     expect(stored).toEqual({ refImageId: 'ref_new', refImage: null, refImageAssetId: null });
     expect(JSON.stringify(semImagensDeRuntime([{ doc: { slides: [stored] } }])).length).toBeLessThan(200);
+  });
+
+  it('guarda a coleção nova com nome e resolve até quatro referências na ordem do editor', async () => {
+    const named = file();
+    Object.defineProperty(named, 'name', { value:'produto.png' });
+    expect(await storeSlideImageReference(named)).toEqual({ id:'ref_new', imageId:'ref_new', name:'produto.png' });
+    const refs = normalizeSlideImageReferences([
+      { dataUrl:'data:image/png;base64,MQ==', name:'Uma' },
+      { dataUrl:'data:image/png;base64,Mg==', name:'Duas' },
+      { dataUrl:'data:image/png;base64,Mw==', name:'Três' },
+      { dataUrl:'data:image/png;base64,NA==', name:'Quatro' },
+      { dataUrl:'data:image/png;base64,NQ==', name:'Cinco' },
+    ]);
+    expect(refs).toHaveLength(MAX_SLIDE_IMAGE_REFERENCES);
+    expect(refs.map(ref => ref.id)).toEqual(['inline-1', 'inline-2', 'inline-3', 'inline-4']);
+    expect(await resolveSlideImageReferences({
+      refImage:'data:image/png;base64,MA==',
+      imageReferences:refs,
+    })).toEqual([
+      'data:image/png;base64,MA==',
+      'data:image/png;base64,MQ==',
+      'data:image/png;base64,Mg==',
+      'data:image/png;base64,Mw==',
+    ]);
   });
 
   it('não publica um ID falso quando o armazenamento falha', async () => {

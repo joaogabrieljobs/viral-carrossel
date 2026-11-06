@@ -32,8 +32,16 @@ vi.mock('../../src/utils/slide-logo.js', () => ({
 }));
 
 vi.mock('../../src/utils/style-kit-storage.js', () => ({
-  exportProjectReferences: vi.fn(async (k) => k),
-  migrateProjectReferences: vi.fn(async (k) => k),
+  exportProjectReferences: vi.fn(async (k) => ({ ...k, refImages:(k.refImages || []).map(ref => {
+    if (!ref.imageId) return ref;
+    const { imageId, ...rest } = ref;
+    return { ...rest, dataUrl:'data:image/png;base64,AAAA' };
+  }) })),
+  migrateProjectReferences: vi.fn(async (k) => ({ ...k, refImages:(k.refImages || []).map(ref => {
+    if (!ref.dataUrl) return ref;
+    const { dataUrl, ...rest } = ref;
+    return { ...rest, imageId:'new-reference-id' };
+  }) })),
 }));
 
 describe('sanitizeDocForShare', () => {
@@ -194,6 +202,20 @@ describe('packDocWithImagesForShare', () => {
     expect(doc.slides[0].imgExtraPrompt).toBe('Preserve a composição.');
   });
 
+  it('leva múltiplas referências do prompt e mantém assets remotos leves', async () => {
+    const { doc, packedImages } = await packDocWithImagesForShare({ slides:[{
+      id:'s1', imageReferences:[
+        { id:'one', imageId:'id1', name:'Produto' },
+        { id:'two', assetId:'remote-reference', name:'Ambiente' },
+      ],
+    }] });
+    expect(doc.slides[0].imageReferences).toEqual([
+      { id:'one', name:'Produto', dataUrl:'data:image/png;base64,AAAA' },
+      { id:'two', name:'Ambiente', assetId:'remote-reference' },
+    ]);
+    expect(packedImages).toBe(1);
+  });
+
   it('importa uma referência já embutida para um ID novo desta conta', async () => {
     const imported = await hydrateSharedDocImages({ slides: [{
       id: 's1', title: 'Direção com referência', refImage: 'data:image/png;base64,AAAA',
@@ -203,6 +225,19 @@ describe('packDocWithImagesForShare', () => {
       refImage: null, refImageId: 'new-reference-id', imgExtraPrompt: 'Preserve a composição.',
     });
     expect(imported.slides[0].refImageAssetId).toBeFalsy();
+  });
+
+  it('importa todas as referências novas do prompt para a biblioteca local', async () => {
+    const imported = await hydrateSharedDocImages({ slides:[{
+      id:'s1', imageReferences:[
+        { id:'one', name:'Produto', dataUrl:'data:image/png;base64,AAAA' },
+        { id:'two', name:'Ambiente', dataUrl:'data:image/png;base64,BBBB' },
+      ],
+    }] });
+    expect(imported.slides[0].imageReferences).toEqual([
+      { id:'one', name:'Produto', imageId:'new-reference-id' },
+      { id:'two', name:'Ambiente', imageId:'new-reference-id' },
+    ]);
   });
 
   it('publica um projeto de muitos cards sem repetir a logo em cada um', async () => {

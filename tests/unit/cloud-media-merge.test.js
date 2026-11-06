@@ -61,6 +61,28 @@ describe('mídia da nuvem após restaurar textos', () => {
     expect(current.doc.styleKit.refImages[0].imageId).toBeUndefined();
   });
 
+  it('recupera as referências do card por asset sem reverter texto nem substituir uma edição local', () => {
+    const current = { id:'p', doc:{ slides:[{
+      id:'s1', title:'Texto editado', imageReferences:[
+        { id:'one', assetId:'ref-1', name:'Produto' },
+        { id:'two', assetId:'ref-2', name:'Ambiente', imageId:'local-editada' },
+      ],
+    }] } };
+    const hydrated = { id:'p', doc:{ slides:[{
+      id:'s1', title:'Texto antigo', imageReferences:[
+        { assetId:'ref-1', imageId:'download-1' },
+        { assetId:'ref-2', imageId:'download-2' },
+      ],
+    }] } };
+    const merged = mergeHydratedProjectMedia(current, hydrated);
+    expect(merged.doc.slides[0]).toMatchObject({
+      title:'Texto editado', imageReferences:[
+        { id:'one', assetId:'ref-1', name:'Produto', imageId:'download-1' },
+        { id:'two', assetId:'ref-2', name:'Ambiente', imageId:'local-editada' },
+      ],
+    });
+  });
+
   it('não ressuscita referências removidas nem substitui logo ou referência editada durante o download', () => {
     const current = { id: 'janine', doc: {
       slides: [{ id: 'a' }],

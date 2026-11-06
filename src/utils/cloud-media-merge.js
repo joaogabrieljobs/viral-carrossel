@@ -2,6 +2,20 @@
  * Insere apenas mídia que chegou depois do restore dos textos. Edições feitas
  * enquanto o download estava em andamento continuam prevalecendo.
  */
+function mergeReferenceMedia(existingRefs, arrivals) {
+  if (!Array.isArray(existingRefs) || !Array.isArray(arrivals)) return existingRefs;
+  const byAsset = new Map(arrivals.filter(ref => ref?.assetId).map(ref => [ref.assetId, ref]));
+  return existingRefs.map((ref) => {
+    const incoming = ref?.assetId && byAsset.get(ref.assetId);
+    if (!incoming || ref.imageId || ref.dataUrl || (!incoming.imageId && !incoming.dataUrl)) return ref;
+    return {
+      ...ref,
+      ...(incoming.imageId ? { imageId:incoming.imageId } : {}),
+      ...(incoming.dataUrl ? { dataUrl:incoming.dataUrl } : {}),
+    };
+  });
+}
+
 function mergeSlideMedia(current, hydrated) {
   if (!current || !hydrated || current.id !== hydrated.id) return current;
   let next = current;
@@ -22,6 +36,10 @@ function mergeSlideMedia(current, hydrated) {
   copy('bgImageAssetId', 'bgImage', 'bgImageId', 'bgImageFailed', 'bgImageError');
   copy('logoImageAssetId', 'logoImage', 'logoImageId', 'logoImageFailed', 'logoImageError');
   copy('refImageAssetId', 'refImage', 'refImageId', 'refImageFailed', 'refImageError', true);
+  const refs = mergeReferenceMedia(current.imageReferences, hydrated.imageReferences);
+  if (refs !== current.imageReferences && refs.some((ref, index) => ref !== current.imageReferences[index])) {
+    next = { ...next, imageReferences:refs };
+  }
   return next;
 }
 
@@ -46,21 +64,7 @@ function mergeStyleKitMedia(current, hydrated) {
     };
   }
   const existingRefs = current.refImages;
-  const arrivals = hydrated.refImages;
-  let refs = existingRefs;
-  if (Array.isArray(existingRefs) && Array.isArray(arrivals)) {
-    const byAsset = new Map(arrivals.filter((ref) => ref?.assetId)
-      .map((ref) => [ref.assetId, ref]));
-    refs = existingRefs.map((ref) => {
-      const incoming = ref?.assetId && byAsset.get(ref.assetId);
-      if (!incoming || ref.imageId || ref.dataUrl || (!incoming.imageId && !incoming.dataUrl)) return ref;
-      return {
-        ...ref,
-        ...(incoming.imageId ? { imageId: incoming.imageId } : {}),
-        ...(incoming.dataUrl ? { dataUrl: incoming.dataUrl } : {}),
-      };
-    });
-  }
+  const refs = mergeReferenceMedia(existingRefs, hydrated.refImages);
   if (logo === current.logo && (!refs || refs.every((ref, index) => ref === existingRefs[index]))) return current;
   return { ...current, ...(logo !== current.logo ? { logo } : {}), refImages: refs };
 }

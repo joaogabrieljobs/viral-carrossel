@@ -170,6 +170,27 @@ describe('library-sync client pack', () => {
     expect(JSON.stringify(packed.manifest)).not.toContain('data:image');
   });
 
+  it('pack envia todas as referências novas do card como assets separados', async () => {
+    const first = 'data:image/jpeg;base64,cmVmMQ==';
+    const second = 'data:image/jpeg;base64,cmVmMg==';
+    imageMocks.read.mockImplementation(async id => ({ 'ref-1':first, 'ref-2':second }[id] || null));
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const packed = await packLibraryForCloud({ library:[{ id:'p1', doc:{ slides:[{
+      id:'s1', imageReferences:[
+        { id:'one', imageId:'ref-1', name:'Produto' },
+        { id:'two', imageId:'ref-2', name:'Ambiente' },
+      ],
+    }] } }], brandRoster:[], libraryFolders:[] });
+    const refs = packed.manifest.docs[0].doc.slides[0].imageReferences;
+    expect(refs).toEqual([
+      { id:'one', name:'Produto', assetId:await originalImageAssetId(first) },
+      { id:'two', name:'Ambiente', assetId:await originalImageAssetId(second) },
+    ]);
+    expect(packed.assets.get(refs[0].assetId)).toBe(first);
+    expect(packed.assets.get(refs[1].assetId)).toBe(second);
+    expect(JSON.stringify(packed.manifest)).not.toContain('imageId');
+  });
+
   it('pack migra referência data URL legada para um asset e preserva anexo remoto ausente', async () => {
     const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
     const reference = 'data:image/jpeg;base64,cmVm';
@@ -252,6 +273,26 @@ describe('library-sync client pack', () => {
     expect(pulled.snapshot.library[0].doc.slides[0]).toMatchObject({
       refImageId: 'reference-1', refImageAssetId: 'reference-1', refImage: null, refImageFailed: false,
     });
+  });
+
+  it('pull restaura múltiplas referências do prompt e preserva os bytes se o disco estiver bloqueado', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id:'s1', imageReferences:[
+      { id:'one', name:'Produto', assetId:'reference-1' },
+      { id:'two', name:'Ambiente', assetId:'reference-2' },
+    ] };
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => {
+      if (url.includes('asset=reference-1')) return response({ asset:{ dataUrl:'data:image/jpeg;base64,MQ==' } });
+      if (url.includes('asset=reference-2')) return response({ asset:{ dataUrl:'data:image/jpeg;base64,Mg==' } });
+      return normalFetch(url, opts);
+    });
+    const pulled = await pullLibraryFromCloud();
+    expect(pulled.snapshot.library[0].doc.slides[0].imageReferences).toEqual([
+      expect.objectContaining({ id:'one', name:'Produto', assetId:'reference-1', dataUrl:'data:image/jpeg;base64,MQ==' }),
+      expect.objectContaining({ id:'two', name:'Ambiente', assetId:'reference-2', dataUrl:'data:image/jpeg;base64,Mg==' }),
+    ]);
   });
 
   it('404 da referência não derruba a lista nem apaga a referência local correspondente', async () => {

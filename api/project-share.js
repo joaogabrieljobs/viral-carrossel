@@ -71,6 +71,7 @@ function referencedShareAssetIds(doc) {
     add(slide?.bgImageAssetId);
     add(slide?.logoImageAssetId);
     add(slide?.refImageAssetId);
+    for (const ref of slide?.imageReferences || []) add(ref?.assetId);
   }
   add(doc?.brand?.logoAssetId);
   add(doc?.styleKit?.logo?.assetId);

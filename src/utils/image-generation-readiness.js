@@ -37,7 +37,8 @@ export function slideImageInstruction(slide = {}, styleKit = {}) {
   if (query) return { query, extraPrompt: extra };
   if (extra) return { query: extra, extraPrompt: '' };
 
-  const hasReference = Boolean(slide.refImage || slide.refImageId || slide.refImageAssetId || styleKit.refImages?.length);
+  const hasReference = Boolean(slide.refImage || slide.refImageId || slide.refImageAssetId
+    || slide.imageReferences?.length || styleKit.refImages?.length);
   const content = [slide.title, slide.subtitle, slide.bodyAfterImage].map(text).filter(Boolean).join('\n');
   if (hasReference && content) {
     return {

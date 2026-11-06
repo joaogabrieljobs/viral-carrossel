@@ -269,6 +269,7 @@ function SidebarContent({
   onCreateText = null,
   onPickVideo = () => {}, onRemoveVideo = () => {},
   openRefImagePicker = () => {},
+  removeSlideReference = () => {},
   slideImgGenBusy = {},
   generateSlideImageAt = () => {},
   creativePreset = 'livre',
@@ -475,7 +476,7 @@ function SidebarContent({
     try {
       const url = await generateDALLE(q, openaiKey, imgParams, {
         signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage, slide.refImageId || slide.refImageAssetId), job.signal),
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage, slide.refImageId || slide.refImageAssetId, slide.imageReferences), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, slide.imgExtraPrompt),
         aspectRatio: isPresentationProject ? '16:9' : (fmt === 'quadrado' ? '1:1' : fmt === 'stories' ? '9:16' : '4:5'),
       });
@@ -1487,7 +1488,7 @@ function SidebarContent({
                 slide={slide}
                 itemLabel={itemLabel}
                 onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
-                onRemoveRef={() => updateSlide({ refImage: null, refImageId: null, refImageAssetId: null, refImageFailed: false, refImageError: null })}
+                onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
                 onPickRef={() => openRefImagePicker(activeIdx)}
                 onGenerateImage={() => generateSlideImageAt(activeIdx)}
                 generateImageBusy={!!slideImgGenBusy[slide.id]}

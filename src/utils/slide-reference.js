@@ -5,19 +5,52 @@ const referenceUnavailable = () => Object.assign(
   { code: 'slide_reference_unavailable' },
 );
 const legacyReference = (slide) => typeof slide?.refImage === 'string' ? slide.refImage.trim() : '';
+export const MAX_SLIDE_IMAGE_REFERENCES = 4;
+
+function validReferenceFile(file) {
+  return file && typeof file.arrayBuffer === 'function' && file.size
+    && String(file.type || '').startsWith('image/');
+}
+
+export function normalizeSlideImageReferences(value) {
+  return (Array.isArray(value) ? value : [])
+    .filter((ref) => ref && typeof ref === 'object'
+      && (ref.imageId || ref.assetId || (typeof ref.dataUrl === 'string' && ref.dataUrl.startsWith('data:image/'))))
+    .slice(0, MAX_SLIDE_IMAGE_REFERENCES)
+    .map((ref, index) => ({
+      id:String(ref.id || ref.imageId || ref.assetId || `inline-${index + 1}`),
+      name:String(ref.name || 'Referência').slice(0, 80),
+      ...(ref.imageId ? { imageId:String(ref.imageId) } : {}),
+      ...(ref.assetId ? { assetId:String(ref.assetId) } : {}),
+      ...(typeof ref.dataUrl === 'string' && ref.dataUrl.startsWith('data:image/') ? { dataUrl:ref.dataUrl } : {}),
+    }));
+}
+
+/** Nova coleção por card: cada item mantém seu próprio ID e nome. */
+export async function storeSlideImageReference(file) {
+  if (!validReferenceFile(file)) {
+    throw new Error('Escolha um arquivo de imagem válido para usar como referência.');
+  }
+  const imageId = newImageId();
+  try {
+    await imagePut(imageId, file);
+  } catch {
+    throw new Error('Não foi possível guardar a referência neste navegador. Tente novamente; as imagens anteriores foram preservadas.');
+  }
+  return { id:imageId, imageId, name:String(file.name || 'Referência').slice(0, 80) };
+}
 
 /** Guarda os bytes originais; o documento só recebe o ID após o commit no IndexedDB. */
 export async function storeSlideReference(file) {
-  if (!file || typeof file.arrayBuffer !== 'function' || !file.size || !String(file.type || '').startsWith('image/')) {
-    throw new Error('Escolha um arquivo de imagem válido para usar como referência.');
-  }
-  const refImageId = newImageId();
   try {
-    await imagePut(refImageId, file);
-  } catch {
-    throw new Error('Não foi possível guardar a referência neste navegador. Tente novamente; a imagem anterior foi preservada.');
+    const stored = await storeSlideImageReference(file);
+    return { refImageId:stored.imageId, refImage:null, refImageAssetId:null };
+  } catch (error) {
+    if (error?.message?.includes('as imagens anteriores foram preservadas')) {
+      throw new Error('Não foi possível guardar a referência neste navegador. Tente novamente; a imagem anterior foi preservada.');
+    }
+    throw error;
   }
-  return { refImageId, refImage: null, refImageAssetId: null };
 }
 
 /** Migração do formato antigo/backup, sem apagar a única cópia se o disco falhar. */
@@ -48,6 +81,24 @@ export async function resolveSlideReference(slide = {}) {
   if (source) return source;
   if (imageId || slide.refImageFailed) throw referenceUnavailable();
   return null;
+}
+
+/** Referência legada + coleção nova, na ordem visível no editor. */
+export async function resolveSlideImageReferences(slide = {}) {
+  const resolved = [];
+  if (slide.refImageId || slide.refImageAssetId || legacyReference(slide) || slide.refImageFailed) {
+    resolved.push(await resolveSlideReference(slide));
+  }
+  const remaining = Math.max(0, MAX_SLIDE_IMAGE_REFERENCES - resolved.length);
+  const extras = normalizeSlideImageReferences(slide.imageReferences).slice(0, remaining);
+  for (const ref of extras) {
+    resolved.push(await resolveSlideReference({
+      refImageId:ref.imageId || ref.assetId,
+      refImageAssetId:ref.assetId,
+      refImage:ref.dataUrl,
+    }));
+  }
+  return resolved.filter(Boolean);
 }
 
 /** Backup portátil: embute a referência e não leva IDs específicos deste navegador. */

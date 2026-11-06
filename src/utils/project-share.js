@@ -134,6 +134,13 @@ function stripEmbeddedImages(doc) {
     ? doc.slides.map((s) => ({
       ...s,
       bgImage: typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:') ? null : s?.bgImage,
+      imageReferences:Array.isArray(s?.imageReferences)
+        ? s.imageReferences.map(ref => (
+          ref && typeof ref.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
+            ? (ref.assetId ? { id:ref.id, name:ref.name, assetId:ref.assetId } : null)
+            : ref
+        )).filter(ref => ref && (ref.imageId || ref.assetId || ref.dataUrl))
+        : [],
     }))
     : [];
   const brand = doc?.brand && typeof doc.brand === 'object'
@@ -167,7 +174,13 @@ function countPackedDataImages(doc) {
   let n = 0;
   for (const s of doc?.slides || []) {
     if (typeof s?.bgImage === 'string' && s.bgImage.startsWith('data:')) n += 1;
+    n += (s?.imageReferences || []).filter(ref => (
+      typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
+    )).length;
   }
+  n += (doc?.styleKit?.refImages || []).filter(ref => (
+    typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
+  )).length;
   return n;
 }
 
@@ -246,6 +259,18 @@ export async function packDocWithImagesForShare(doc) {
     } else {
       next = await exportSlideReference(next);
     }
+    if (Array.isArray(next.imageReferences) && next.imageReferences.length) {
+      const portable = [];
+      for (const reference of next.imageReferences) {
+        if (reference?.assetId) {
+          portable.push({ id:reference.id, name:reference.name, assetId:reference.assetId });
+          continue;
+        }
+        const exported = await exportProjectReferences({ refImages:[reference] });
+        if (exported.refImages[0]) portable.push(exported.refImages[0]);
+      }
+      next = { ...next, imageReferences:portable };
+    }
     // A foto já está na nuvem de quem publica. Embutir aqui a reduziria a
     // 720 px. A outra conta lê o arquivo original pelo código.
     if (next.bgImageAssetId) {
@@ -307,6 +332,7 @@ export async function packDocWithImagesForShare(doc) {
   }
 
   let clean = dedupeRepeatedLogos(stripRuntimeBlobs(working));
+  packedImages = countPackedDataImages(clean);
   let serialized = JSON.stringify(clean);
 
   // Remove fotos uma a uma até caber (em vez de tirar todas de uma vez).
@@ -444,6 +470,21 @@ export async function hydrateSharedDocImages(doc, { code } = {}) {
       if (ref) {
         sl = { ...sl, refImage: ref, refImageAssetId: undefined, refImageId: undefined };
         try { sl = await importSlideReference(sl); } catch { /* */ }
+      }
+    }
+    if (Array.isArray(sl?.imageReferences) && sl.imageReferences.length) {
+      const refs = [];
+      for (const reference of sl.imageReferences) {
+        if (shareCode && reference?.assetId && !reference.dataUrl) {
+          const dataUrl = await fetchShareAssetDataUrl(shareCode, reference.assetId);
+          refs.push(dataUrl ? { ...reference, dataUrl } : reference);
+        } else refs.push(reference);
+      }
+      try {
+        const migrated = await migrateProjectReferences({ refImages:refs });
+        sl = { ...sl, imageReferences:migrated.refImages };
+      } catch {
+        sl = { ...sl, imageReferences:refs };
       }
     }
 

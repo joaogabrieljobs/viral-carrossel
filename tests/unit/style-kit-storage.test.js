@@ -32,6 +32,16 @@ describe('moodboard armazenado e transportado', () => {
     imageGet.mockClear();
     expect(await resolveImageReferences(kit, 'data:image/png;base64,c2xpZGU=')).toEqual(['data:image/png;base64,c2xpZGU=']);
     expect(imageGet).not.toHaveBeenCalled();
+    expect(await resolveImageReferences(kit, null, null, [
+      { id:'r1', dataUrl:'data:image/png;base64,MQ==' },
+      { id:'r2', dataUrl:'data:image/png;base64,Mg==' },
+      { id:'r3', dataUrl:'data:image/png;base64,Mw==' },
+    ])).toEqual([
+      'data:image/png;base64,MQ==',
+      'data:image/png;base64,Mg==',
+      'data:image/png;base64,Mw==',
+    ]);
+    expect(imageGet).not.toHaveBeenCalled();
     imageGet.mockResolvedValueOnce(null);
     await expect(resolveImageReferences({ refImages: [{ imageId: 'missing' }] })).rejects.toThrow(/Reenvie/);
   });

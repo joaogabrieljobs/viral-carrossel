@@ -57,7 +57,12 @@ import {
   idsDeImagemEmUso,
   dataUrlParaBlob,
 } from './src/utils/image-store.js';
-import { storeSlideReference, importSlideReference } from './src/utils/slide-reference.js';
+import {
+  MAX_SLIDE_IMAGE_REFERENCES,
+  normalizeSlideImageReferences,
+  storeSlideImageReference,
+  importSlideReference,
+} from './src/utils/slide-reference.js';
 import { makeTextOverlay, addOverlayToSlide, updateOverlayOnSlide, normalizeOverlays, MAX_CARD_OVERLAYS } from './src/utils/card-overlays.js';
 import { cardElementEditorTarget } from './src/utils/card-editor-target.js';
 import { getAccountVaultImageIds, snapshotAccountVaultForOwners } from './src/utils/account-vault.js';
@@ -529,6 +534,15 @@ function projectContentSnapshot(library) {
         if (typeof next[imageKey] === 'string' && /^(blob:|data:image\/)/.test(next[imageKey])) {
           delete next[imageKey];
         }
+      }
+      if (Array.isArray(next.imageReferences)) {
+        next.imageReferences = next.imageReferences.map((ref) => {
+          if (!ref?.assetId) return ref;
+          const clean = { ...ref };
+          delete clean.imageId;
+          delete clean.dataUrl;
+          return clean;
+        });
       }
       return next;
     });
@@ -4614,7 +4628,7 @@ export default function App() {
     try {
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage, snap.refImageId || snap.refImageAssetId), job.signal),
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage, snap.refImageId || snap.refImageAssetId, snap.imageReferences), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, imageState.extraPrompt),
         aspectRatio: imageAspectRatioForFormat(fmt),
       });
@@ -4692,30 +4706,58 @@ export default function App() {
     refImageInputRef.current?.click();
   }, []);
   const handleRefImageFile = useCallback(async (e) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     const idx = refImageTargetIdxRef.current;
     refImageTargetIdxRef.current = null;
     e.target.value = '';
-    if (!file || idx == null) return;
+    if (!files.length || idx == null) return;
     const projectId = activeDocId;
     const source = slides[idx];
     if (!source) return;
+    const validFiles = files.filter(file => file?.size && String(file.type || '').startsWith('image/'));
+    if (!validFiles.length) {
+      toast('Escolha arquivos de imagem válidos para usar como referência.', 'warning', 5000);
+      return;
+    }
+    const existing = normalizeSlideImageReferences(source.imageReferences);
+    const legacyCount = source.refImage || source.refImageId || source.refImageAssetId ? 1 : 0;
+    const capacity = MAX_SLIDE_IMAGE_REFERENCES - legacyCount - existing.length;
+    if (capacity <= 0) {
+      toast(`Este card já tem o limite de ${MAX_SLIDE_IMAGE_REFERENCES} referências.`, 'warning', 5000);
+      return;
+    }
+    const acceptedFiles = validFiles.slice(0, capacity);
+    if (validFiles.length > capacity) {
+      toast(`O Moont adicionará ${capacity} imagens. O limite é de ${MAX_SLIDE_IMAGE_REFERENCES} referências por card.`, 'info', 5000);
+    }
     const request = ++referenceUploadRef.current;
     try {
-      const stored = await storeSlideReference(file);
+      const stored = await Promise.all(acceptedFiles.map(storeSlideImageReference));
       if (request !== referenceUploadRef.current || editorSyncStateRef.current.activeDocId !== projectId) return;
       history.set(current => ({ ...current, slides: current.slides.map(slide => (
-        slide.id === source.id && slide.refImage === source.refImage
-          && slide.refImageId === source.refImageId && slide.refImageAssetId === source.refImageAssetId
-          ? { ...slide, ...stored, refImageFailed: false, refImageError: null } : slide
+        slide.id === source.id
+          ? { ...slide, imageReferences:[...normalizeSlideImageReferences(slide.imageReferences), ...stored].slice(0, MAX_SLIDE_IMAGE_REFERENCES) }
+          : slide
       )) }));
+      toast(`${stored.length} referência${stored.length === 1 ? '' : 's'} adicionada${stored.length === 1 ? '' : 's'} ao prompt.`, 'success', 3000);
     } catch (error) {
       toast(error.message, 'warning', 6000);
     }
   }, [activeDocId, slides, history.set, toast]);
-  const removeSlideReference = useCallback((idx) => {
+  const removeSlideReference = useCallback((idx, key = 'all') => {
     referenceUploadRef.current += 1;
-    updateSlideAt(idx, { refImage: null, refImageId: null, refImageAssetId: null, refImageFailed: false, refImageError: null });
+    if (key === 'all') {
+      updateSlideAt(idx, { imageReferences:[], refImage:null, refImageId:null, refImageAssetId:null, refImageFailed:false, refImageError:null });
+      return;
+    }
+    if (key === 'legacy') {
+      updateSlideAt(idx, { refImage:null, refImageId:null, refImageAssetId:null, refImageFailed:false, refImageError:null });
+      return;
+    }
+    updateSlideAt(idx, {
+      imageReferences:normalizeSlideImageReferences(slidesLiveRef.current[idx]?.imageReferences)
+        .filter(ref => (ref.id || ref.imageId || ref.assetId) !== key),
+    });
   }, [updateSlideAt]);
 
   // Repara histórico se `slides` estiver vazio (storage/import estragado) — sem novo passo de undo.
@@ -5430,7 +5472,7 @@ ${jsonShapeLine}`;
             checkActive();
             const url = await generateDALLEWithRetry(q, openaiKey, effectiveAxes, {
               signal: job.signal,
-              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId),
+              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, [newSlides[i]?.imgExtraPrompt,
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
               ].filter(Boolean).join('\n')),
@@ -5634,6 +5676,51 @@ ${jsonShapeLine}`;
     setTab('texto');
     setShellView('project');
   }, [setAppMode, setShellView]);
+
+  const createBlankProject = useCallback(async ({ name = '', productKind = 'carrossel' } = {}) => {
+    if (!creationSession || creationRequestRef.current || getAIGenerationCount() > 0) return false;
+    if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()
+      || readDataOwner() !== creationSession.owner) {
+      throw new Error('A conta ainda está carregando. Aguarde antes de abrir o editor.');
+    }
+    const isPresentation = productKind === 'apresentacao';
+    const brandId = uid();
+    const identity = hydrateBrandTextColors({ ...DEFAULT_BRAND, id:brandId, name:'' });
+    const emptySlide = {
+      ...mkSlide(1, identity),
+      title:'', subtitle:'', bodyAfterImage:'', imageQuery:'', imgExtraPrompt:'',
+      bgImage:null, bgImageId:null, bgImageAssetId:null,
+      ...(isPresentation ? {
+        layout:'ml', align:'left', photoRegion:'full', showSwipeCue:false,
+      } : {}),
+    };
+    const seed = {
+      ...(isPresentation ? presentationDocPatch() : {}),
+      productKind:isPresentation ? 'apresentacao' : 'carrossel',
+      fmt:isPresentation ? 'apresentacao' : 'carrossel',
+      brand:identity,
+      styleKit:normalizeStyleKit({}),
+      material:{ content:'', sources:'', context:'', refProfileId:null },
+      slides:[emptySlide],
+      caption:'',
+      quickCardCount:1,
+      quickPromptDraft:'',
+      visualPreset:isPresentation ? DEFAULT_PRESENTATION_VISUAL_PRESET_ID : null,
+    };
+    const projectName = String(name || '').trim()
+      || (isPresentation ? 'Nova apresentação' : 'Novo carrossel');
+    flushSync(() => {
+      newDoc(seed, projectName, { shellView:'project' });
+      setCreationSession(null);
+      creationTargetRef.current = null;
+      setAppMode('studio');
+      setTab('texto');
+      setShellView('project');
+    });
+    window.setTimeout(() => flushPersistRef.current?.(), 0);
+    trackEvent('blank_project_created', { product:isPresentation ? 'apresentacao' : 'carrossel' });
+    return true;
+  }, [creationSession, newDoc, setAppMode, setShellView]);
 
   // Um submit cria um único destino. Falha/cancelamento conservam esse rascunho
   // para repetir a tentativa; nunca reutilizamos o projeto anterior.
@@ -6285,7 +6372,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         try {
           const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
             signal: templateJob.signal,
-            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId),
+            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
             imgExtraPrompt: composeImgExtraPrompt(styleKit, newSlides[i]?.imgExtraPrompt),
             aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
           });
@@ -6506,6 +6593,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     onPickVideo: () => videoFileInputRef.current?.click(),
     onRemoveVideo: removeVideoFromActiveSlide,
     openRefImagePicker,
+    removeSlideReference,
     slideImgGenBusy,
     generateSlideImageAt,
     creativePreset,
@@ -6787,6 +6875,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           imageQuota={access.imageQuota}
           onOpenKeys={() => setKeysOpen(true)}
           onCreate={createAndGenerateProject}
+          onCreateBlank={createBlankProject}
           onCancel={leaveCreation}
           onCancelGeneration={cancelGeneration}
           onOpenDraft={openCreationDraft}
@@ -7740,7 +7829,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   slide={slide}
                   width={Math.min(vw - 48, f.w * previewScale)}
                   onChangeExtra={(v) => updateSlide({ imgExtraPrompt: v })}
-                  onRemoveRef={() => removeSlideReference(activeIdx)}
+                  onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
                   onPickRef={() => openRefImagePicker(activeIdx)}
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
@@ -7932,7 +8021,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       slide={s}
                       width={desktopThumbWidth}
                       onChangeExtra={(v) => updateSlideAt(i, { imgExtraPrompt: v })}
-                      onRemoveRef={() => removeSlideReference(i)}
+                      onRemoveRef={(key) => removeSlideReference(i, key)}
                       onPickRef={() => openRefImagePicker(i)}
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}
@@ -8047,7 +8136,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
       <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
       <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
       <input id={VC_PHOTO_ZONE_FILE_INPUT_ID} ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
-      <input ref={refImageInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
+      <input ref={refImageInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
       <input ref={videoFileInputRef} type="file" accept="video/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importVideoToActiveSlide(f); }}/>
 
       {/* Toast notifications */}

@@ -217,6 +217,42 @@ test('entrada tem duas escolhas, abrir preserva o editor e cancelar não cria pr
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vc_brands')).find(b => b.id === 'creation-new-brand').name)).toBe(newBrand.name);
 });
 
+test('ir para o editor cria um único card vazio sem chamar a IA', async ({ page }) => {
+  let aiCalls = 0;
+  await setup(page, { withProject:false, ai: route => {
+    aiCalls += 1;
+    return route.fulfill({ json:completion(generated(5)) });
+  } });
+  await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
+  const wizard = flow(page);
+  await wizard.getByLabel(/^Nome do projeto/).fill('Rascunho manual');
+  await wizard.getByRole('button', { name:/^Ir para o editor/ }).click();
+  await expect(wizard).toHaveCount(0);
+  await expect(page.getByRole('tab', { name:'Texto', exact:true }).first()).toBeVisible();
+  await expect.poll(async () => (await library(page)).find(project => project.name === 'Rascunho manual')?.doc?.slides?.length).toBe(1);
+  const [created] = await library(page);
+  expect(created.name).toBe('Rascunho manual');
+  expect(created.doc).toMatchObject({ productKind:'carrossel', quickCardCount:1, caption:'', slides:[{
+    title:'', subtitle:'', bodyAfterImage:'', imageQuery:'', imgExtraPrompt:'',
+    bgImage:null, bgImageId:null, imageReferences:[],
+  }] });
+  expect(aiCalls).toBe(0);
+});
+
+test('ir para o editor respeita apresentação e cria um slide vazio', async ({ page }) => {
+  await setup(page, { withProject:false });
+  await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
+  const wizard = flow(page);
+  await wizard.getByRole('radio', { name:/^Apresentação/ }).click();
+  await wizard.getByRole('button', { name:/^Ir para o editor/ }).click();
+  await expect(wizard).toHaveCount(0);
+  const [created] = await library(page);
+  expect(created.name).toBe('Nova apresentação');
+  expect(created.doc).toMatchObject({ productKind:'apresentacao', fmt:'apresentacao', quickCardCount:1, slides:[{
+    title:'', subtitle:'', photoRegion:'full', showSwipeCue:false,
+  }] });
+});
+
 test('novo carrossel usa quantidade, narrativa, marca, material e estilo sem sobrescrever o anterior', async ({ page }) => {
   test.setTimeout(60_000);
   const prompts = [];

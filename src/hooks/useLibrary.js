@@ -347,6 +347,10 @@ export function useLibrary({
         const novos = await Promise.all(slides.map(async (sl) => {
           sl = await exportSlideLogo(sl);
           sl = await exportSlideReference(sl);
+          if (Array.isArray(sl.imageReferences) && sl.imageReferences.length) {
+            const portable = await exportProjectReferences({ refImages:sl.imageReferences });
+            sl = { ...sl, imageReferences:portable.refImages };
+          }
           if (!sl?.bgImageId) return sl;
           try {
             const dataUrl = await imagemComoDataUrl(sl.bgImageId);
@@ -545,6 +549,10 @@ export function useLibrary({
             slides: await Promise.all(slides.map(async (sl) => {
               sl = await importSlideLogo(sl);
               sl = await importSlideReference(sl);
+              if (Array.isArray(sl.imageReferences) && sl.imageReferences.length) {
+                const migrated = await migrateProjectReferences({ refImages:sl.imageReferences });
+                sl = { ...sl, imageReferences:migrated.refImages };
+              }
               if (typeof sl?.bgImage !== 'string' || !sl.bgImage.startsWith('data:')) return sl;
               try {
                 return {

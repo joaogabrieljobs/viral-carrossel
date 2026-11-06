@@ -40,7 +40,7 @@ function navigateChoices(event) {
 function Option({ selected, label, desc, example, onClick, disabled }) { return <button type="button" className="vc-create-option" role="radio" aria-checked={selected} disabled={disabled} onKeyDown={navigateChoices} onClick={onClick}><strong>{label}{selected && <Check size={14} aria-hidden style={{ marginLeft:8 }}/>}</strong>{desc && <span>{desc}</span>}{example && <em>Exemplo: {example}</em>}</button>; }
 
 export default function CreateProjectFlow({
-  onCreate, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
+  onCreate, onCreateBlank, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
   brandRoster = [], activeBrandId, defaultBrand = {}, initialName = '', initialProductKind = 'carrossel',
   hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], imageQuota = null,
 }) {
@@ -215,6 +215,22 @@ export default function CreateProjectFlow({
     } catch (e) { if (alive.current) setError(e.message || 'Não foi possível gerar. Suas escolhas continuam aqui para tentar novamente.'); }
     finally { busyRef.current = false; if (alive.current) setBusy(false); }
   };
+  const createBlank = async () => {
+    if (busyRef.current || pendingRef.current || typeof onCreateBlank !== 'function') return;
+    busyRef.current = true; setBusy(true); setError(''); setNotice('');
+    try {
+      await onCreateBlank({
+        name:name.trim(),
+        productKind,
+        formatId:productKind === 'apresentacao' ? 'apresentacao' : 'carrossel',
+      });
+    } catch (e) {
+      if (alive.current) setError(e.message || 'Não foi possível abrir o projeto vazio. Tente novamente.');
+    } finally {
+      busyRef.current = false;
+      if (alive.current) setBusy(false);
+    }
+  };
   const reviewRow = (label, value, target) => <div key={label}><dt>{label}</dt><dd>{value}</dd><button type="button" disabled={busy || pending} onClick={() => go(target)} aria-label={`Alterar ${label.toLowerCase()}`}>Alterar</button></div>;
   const identityEditor = <div className="vc-create-stack">
     <Field label={brandId === '__new__' ? 'Nome da nova marca' : 'Nome da marca no projeto'} hint={brandId === '__new__' ? 'Dê um nome para guardar esta marca. Se não quiser salvar, escolha Somente neste projeto.' : 'Opcional. Pode ficar vazio.'}><input className="vc-input" value={brand.name || ''} onChange={e => setBrand(b => ({ ...b, name:e.target.value }))} maxLength={80} placeholder="Ex.: Clínica Janine Araújo"/></Field>
@@ -232,7 +248,7 @@ export default function CreateProjectFlow({
     <main className="vc-create-main" ref={mainRef} tabIndex={-1} aria-labelledby="vc-create-title">
       <p className="vc-create-kicker">Passo {step + 1} de {CREATION_STEPS.length} · {CREATION_STEPS[step]}</p><h1 id="vc-create-title">{step === 4 ? `Quantos ${item} vamos criar?` : TITLE[step]}</h1><p className="vc-create-intro">{INTRO[step]}</p>
       <fieldset disabled={busy} className="vc-create-group vc-create-stack">
-      {step === 0 && <><div className="vc-create-grid" role="radiogroup" aria-label="Tipo de projeto"><Option label="Carrossel para redes" desc="Conteúdo em sequência para feed, quadrado ou Stories." selected={!isPresentation} onClick={() => chooseProduct('carrossel')}/><Option label="Apresentação" desc="Slides para uma reunião, proposta, aula, relatório ou pitch." selected={isPresentation} onClick={() => chooseProduct('apresentacao')}/></div><Field label="Nome do projeto" hint="Um nome para encontrar este trabalho depois."><input className="vc-input" value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoComplete="off"/></Field></>}
+      {step === 0 && <><div className="vc-create-grid" role="radiogroup" aria-label="Tipo de projeto"><Option label="Carrossel para redes" desc="Conteúdo em sequência para feed, quadrado ou Stories." selected={!isPresentation} onClick={() => chooseProduct('carrossel')}/><Option label="Apresentação" desc="Slides para uma reunião, proposta, aula, relatório ou pitch." selected={isPresentation} onClick={() => chooseProduct('apresentacao')}/></div><Field label="Nome do projeto" hint="Opcional no editor vazio. Se deixar em branco, o Moont cria um nome provisório."><input className="vc-input" value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoComplete="off"/></Field><div className="vc-create-editor-shortcut"><div><strong>Quer começar do zero?</strong><span>Abra agora um projeto com um único {isPresentation ? 'slide' : 'card'}, sem texto e sem imagem.</span></div><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || busy || !onCreateBlank} onClick={createBlank}>Ir para o editor <ArrowRight size={14} aria-hidden/></button></div></>}
       {step === 1 && <>
         <div className="vc-create-grid vc-create-identity-paths" role="radiogroup" aria-label="Como começar a identidade">
           <Option label="Usar um preset salvo" desc="Reaproveite uma marca completa ou um padrão visual que você já criou." selected={identityPath === 'saved'} disabled={pending} onClick={() => chooseIdentityPath('saved')}/>

@@ -91,7 +91,7 @@ test('miniatura e geração usam referência do IndexedDB sem embutir foto na bi
     slide: { refImageId: 'ref_stored', refImage: null, imgExtraPrompt: DIRECTION },
     storedReference: { id: 'ref_stored', base64: PNG },
   });
-  const preview = page.getByRole('button', { name: 'Adicionar imagem de referência', exact: true }).first().locator('img');
+  const preview = page.getByRole('img', { name:'Referência 1', exact:true }).first();
   await expect(preview).toHaveAttribute('src', `data:image/png;base64,${PNG}`);
   await page.getByRole('button', { name: 'Gerar imagem', exact: true }).first().click();
   await expect.poll(() => requests.length).toBe(1);
@@ -109,7 +109,7 @@ test('miniatura ausente explica a referência faltante e impede geração sem a 
   const requests = await openImageProject(page, { slide: { refImageId: 'ref_missing', imgExtraPrompt: DIRECTION } });
   await expect(page.getByRole('status').filter({ hasText: 'Reenvie a referência deste card' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Gerar imagem', exact: true }).first()).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Remover referência', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remover todas as referências', exact: true }).first()).toBeVisible();
   expect(requests).toHaveLength(0);
 });
 
@@ -120,18 +120,19 @@ test('upload de referência grande preserva bytes originais no IndexedDB e fica 
   const original = Buffer.concat([Buffer.from(PNG, 'base64'), Buffer.alloc(1_800_000, 37)]);
   const expectedHash = createHash('sha256').update(original).digest('hex');
   const choosing = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Adicionar imagem de referência', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Adicionar imagens de referência', exact: true }).first().click();
   await (await choosing).setFiles({ name: 'referencia-grande.png', mimeType: 'image/png', buffer: original });
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].refImageId)).toBeTruthy();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.[0]?.imageId)).toBeTruthy();
   const saved = await page.evaluate(async () => {
     const raw = localStorage.getItem('vc_library');
     const slide = JSON.parse(raw)[0].doc.slides[0];
+    const reference = slide.imageReferences[0];
     const entry = await new Promise((resolve, reject) => {
       const open = indexedDB.open('viral-carrossel-img', 1);
       open.onerror = () => reject(open.error);
       open.onsuccess = () => {
         const db = open.result;
-        const request = db.transaction('images', 'readonly').objectStore('images').get(slide.refImageId);
+        const request = db.transaction('images', 'readonly').objectStore('images').get(reference.imageId);
         request.onsuccess = () => { db.close(); resolve(request.result); };
         request.onerror = () => { db.close(); reject(request.error); };
       };
@@ -139,20 +140,41 @@ test('upload de referência grande preserva bytes originais no IndexedDB e fica 
     const hash = await crypto.subtle.digest('SHA-256', await entry.blob.arrayBuffer());
     return { slide, libraryLength: raw.length, size: entry.blob.size, hash: [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('') };
   });
-  expect(saved.slide.refImage).toBeFalsy();
+  expect(saved.slide.imageReferences[0].dataUrl).toBeFalsy();
   expect(saved.libraryLength).toBeLessThan(200_000);
   expect(saved.size).toBe(original.length);
   expect(saved.hash).toBe(expectedHash);
-  const preview = page.getByRole('button', { name: 'Adicionar imagem de referência', exact: true }).first().locator('img');
+  const preview = page.getByRole('img', { name:'referencia-grande.png', exact:true }).first();
   await expect.poll(() => preview.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   await page.reload();
   await enterEditorFromHome(page);
   await expect(preview).toBeVisible();
   await expect.poll(() => preview.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0]);
-  expect(after.refImageId).toBe(saved.slide.refImageId);
-  expect(after.refImage).toBeFalsy();
+  expect(after.imageReferences[0].imageId).toBe(saved.slide.imageReferences[0].imageId);
+  expect(after.imageReferences[0].dataUrl).toBeFalsy();
   expect(requests).toHaveLength(0);
+});
+
+test('seleciona múltiplas referências, envia todas ao prompt e permite remover uma', async ({ page }) => {
+  const requests = await openImageProject(page, { slide:{ imgExtraPrompt:DIRECTION } });
+  const choosing = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name:'Adicionar imagens de referência', exact:true }).first().click();
+  await (await choosing).setFiles([
+    { name:'produto.png', mimeType:'image/png', buffer:Buffer.from(PNG, 'base64') },
+    { name:'ambiente.png', mimeType:'image/png', buffer:Buffer.from(PNG, 'base64') },
+    { name:'estilo.png', mimeType:'image/png', buffer:Buffer.from(PNG, 'base64') },
+  ]);
+  await expect(page.getByRole('img', { name:'produto.png', exact:true }).first()).toBeVisible();
+  await expect(page.getByRole('img', { name:'ambiente.png', exact:true }).first()).toBeVisible();
+  await expect(page.getByRole('img', { name:'estilo.png', exact:true }).first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.length)).toBe(3);
+  await page.getByRole('button', { name:'Gerar imagem', exact:true }).first().click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0].imageList).toHaveLength(3);
+  await page.getByRole('button', { name:'Remover ambiente.png', exact:true }).first().click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vc_library'))[0].doc.slides[0].imageReferences?.length)).toBe(2);
+  await expect(page.getByRole('img', { name:'ambiente.png', exact:true })).toHaveCount(0);
 });
 
 test('saldo indisponível não aparece como quota esgotada nem IA pronta para imagem', async ({ page }) => {

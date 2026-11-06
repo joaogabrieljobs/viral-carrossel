@@ -21,6 +21,11 @@
 .vc-create-option span { font-size:13px; line-height:1.5; color:var(--text-secondary); }
 .vc-create-option em { margin-top:4px; font-size:12px; line-height:1.5; font-style:normal; color:var(--text-muted); }
 .vc-create-option:disabled { cursor:wait; opacity:.65; }
+.vc-create-editor-shortcut { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:18px 20px; border:1px solid var(--border); border-radius:16px; background:linear-gradient(110deg,var(--bg-card),var(--accent-surface)); }
+.vc-create-editor-shortcut > div { display:grid; gap:5px; min-width:0; }
+.vc-create-editor-shortcut strong { font-size:15px; line-height:1.35; }
+.vc-create-editor-shortcut span { color:var(--text-secondary); font-size:13px; line-height:1.5; }
+.vc-create-editor-shortcut button { flex-shrink:0; min-height:42px; white-space:nowrap; }
 .vc-create-group { border:0; margin:0; padding:0; min-width:0; }
 .vc-create-group legend { margin-bottom:12px; font-size:14px; font-weight:600; }
 .vc-create-details { border:1px solid var(--border); border-radius:14px; background:var(--bg-card); padding:16px; }
@@ -77,6 +82,8 @@
   .vc-create-intro { font-size:15px; overflow-wrap:anywhere; }
   .vc-create-group,.vc-create-stack,.vc-create-field,.vc-create-grid,.vc-create-details,.vc-create-upload { min-width:0; max-width:100%; }
   .vc-create-grid { grid-template-columns:minmax(0,1fr); }
+  .vc-create-editor-shortcut { align-items:stretch; flex-direction:column; gap:14px; padding:16px; }
+  .vc-create-editor-shortcut button { width:100%; justify-content:center; }
   .vc-create-flow .vc-input { font-size:16px; }
   .vc-create-flow textarea.vc-input { width:100%; min-height:128px; padding:16px; border-radius:18px; }
   .vc-create-flow textarea.vc-input[rows="7"] { min-height:210px; }

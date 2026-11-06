@@ -121,6 +121,24 @@ async function collectAsset(dataUrl, bag) {
   return assetId;
 }
 
+async function packReferenceListForCloud(refs, assets) {
+  const packed = [];
+  for (const ref of (Array.isArray(refs) ? refs : [])) {
+    let dataUrl = typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:image/')
+      ? ref.dataUrl : null;
+    if (!dataUrl && ref?.imageId) {
+      try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* mantém o asset já conhecido */ }
+    }
+    const assetId = await collectAsset(dataUrl, assets);
+    if (assetId || ref?.assetId) packed.push({
+      id:ref?.id || ref?.imageId || ref?.assetId,
+      name:ref?.name,
+      assetId:assetId || ref.assetId,
+    });
+  }
+  return packed;
+}
+
 async function packSlideForCloud(slide, assets) {
   let sl = slide;
   try { sl = await exportSlideLogo(slide); } catch { /* logo local em falta não bloqueia os textos */ }
@@ -151,9 +169,11 @@ async function packSlideForCloud(slide, assets) {
   const refAssetId = await collectAsset(refDataUrl, assets);
   const refIdentity = refAssetId || sl.refImageAssetId || sl.refImageId
     || (refDataUrl ? newImageId() : undefined);
+  const imageReferences = await packReferenceListForCloud(sl.imageReferences, assets);
 
   const clean = stripRuntime({
     ...sl,
+    imageReferences,
     bgImage: null,
     logoImage: null,
     refImage: typeof sl.refImage === 'string' && /^https:\/\//i.test(sl.refImage) ? sl.refImage : null,
@@ -185,17 +205,7 @@ async function packBrandForCloud(brand, assets) {
 
 async function packStyleKitForCloud(styleKit, assets) {
   const kit = styleKit;
-  const refs = [];
-  for (const ref of (kit?.refImages || [])) {
-    let dataUrl = typeof ref?.dataUrl === 'string' && ref.dataUrl.startsWith('data:')
-      ? ref.dataUrl
-      : null;
-    if (!dataUrl && ref?.imageId) {
-      try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* */ }
-    }
-    const assetId = await collectAsset(dataUrl, assets);
-    if (assetId || ref?.assetId) refs.push({ name: ref?.name, assetId: assetId || ref.assetId });
-  }
+  const refs = await packReferenceListForCloud(kit?.refImages, assets);
   let logoAssetId = null;
   if (kit?.logo?.dataUrl) {
     logoAssetId = await collectAsset(kit.logo.dataUrl, assets);
@@ -711,6 +721,34 @@ async function resolveCloudLogo(assetId, assetCache, local = {}) {
   return remote;
 }
 
+async function hydrateReferenceListFromCloud(refs, assetCache, localRefs = []) {
+  const localByAsset = new Map((Array.isArray(localRefs) ? localRefs : [])
+    .filter(ref => ref?.assetId).map(ref => [ref.assetId, ref]));
+  const hydrated = [];
+  for (const ref of (Array.isArray(refs) ? refs : [])) {
+    if (!ref?.assetId) { hydrated.push(ref); continue; }
+    const local = localByAsset.get(ref.assetId);
+    if (local?.imageId || local?.dataUrl) {
+      hydrated.push({ ...ref, ...(local.imageId ? { imageId:local.imageId } : {}), ...(local.dataUrl ? { dataUrl:local.dataUrl } : {}) });
+      continue;
+    }
+    try {
+      const dataUrl = await resolveCachedAsset(ref.assetId, assetCache);
+      if (dataUrl) {
+        try {
+          const imported = await migrateProjectReferences({ refImages:[{ id:ref.id, name:ref.name, dataUrl }] });
+          hydrated.push({ ...ref, ...imported.refImages[0], assetId:ref.assetId });
+        } catch {
+          // Se o IndexedDB estiver bloqueado, os bytes continuam no documento
+          // e uma próxima abertura pode concluir a migração sem perder a referência.
+          hydrated.push({ ...ref, dataUrl });
+        }
+      } else hydrated.push({ ...ref });
+    } catch { hydrated.push({ ...ref }); }
+  }
+  return hydrated;
+}
+
 async function hydrateSlideFromCloud(slide, assetCache, localSlide, imageResult) {
   try {
     if (imageResult) imageResult.loaded = false;
@@ -808,6 +846,14 @@ async function hydrateSlideFromCloud(slide, assetCache, localSlide, imageResult)
     } else {
       try { sl = await importSlideReference(sl); } catch { /* preserva o anexo legado */ }
     }
+    sl = {
+      ...sl,
+      imageReferences:await hydrateReferenceListFromCloud(
+        sl.imageReferences,
+        assetCache,
+        localSlide?.imageReferences,
+      ),
+    };
     return sl;
   } catch {
     if (imageResult) imageResult.loaded = false;
@@ -855,20 +901,7 @@ export async function hydrateCloudBrandRoster(brands, { signal, localBrands = []
 async function hydrateStyleKitFromCloud(styleKit, assetCache, localStyleKit) {
   try {
     let kit = { ...(styleKit || {}) };
-    const refs = [];
-    for (const ref of (kit.refImages || [])) {
-      if (!ref?.assetId) {
-        refs.push(ref);
-        continue;
-      }
-      try {
-        const dataUrl = await resolveCachedAsset(ref.assetId, assetCache);
-        if (dataUrl) {
-          const imported = await migrateProjectReferences({ refImages: [{ name: ref.name, dataUrl }] });
-          refs.push({ ...imported.refImages[0], assetId: ref.assetId });
-        } else refs.push({ ...ref });
-      } catch { refs.push({ ...ref }); }
-    }
+    const refs = await hydrateReferenceListFromCloud(kit.refImages, assetCache, localStyleKit?.refImages);
     kit.refImages = [];
     const logoAssetId = kit.logo?.assetId;
     if (kit.logo?.assetId) {

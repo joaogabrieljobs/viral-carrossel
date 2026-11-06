@@ -1,7 +1,11 @@
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useEffect, useId, useState } from 'react';
-import { Sparkles, Loader2, Image as ImageIcon, ChevronDown } from 'lucide-react';
-import { resolveSlideReference } from '../../utils/slide-reference.js';
+import { Sparkles, Loader2, Image as ImageIcon, ChevronDown, Plus, X } from 'lucide-react';
+import {
+  MAX_SLIDE_IMAGE_REFERENCES,
+  normalizeSlideImageReferences,
+  resolveSlideReference,
+} from '../../utils/slide-reference.js';
 
 function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide') {
   if (busy) {
@@ -38,25 +42,41 @@ function PerSlideImageRefBlock({
   const extra = slide.imgExtraPrompt ?? '';
   const refSource = typeof slide.refImage === 'string' ? slide.refImage : '';
   const refImageId = slide.refImageId || slide.refImageAssetId || null;
-  const hasReference = Boolean(refSource || refImageId || slide.refImageFailed);
-  const [preview, setPreview] = useState({ imageId: null, source: '', url: '', error: '' });
-  const currentPreview = preview.imageId === refImageId && preview.source === refSource;
-  const ref = refImageId ? (currentPreview ? preview.url : '') : refSource;
-  const refError = currentPreview ? preview.error : '';
+  const imageReferences = normalizeSlideImageReferences(slide.imageReferences);
+  const referenceItems = [
+    ...(refSource || refImageId || slide.refImageFailed ? [{
+      key:'legacy', name:'Referência 1', refImageId, refImageAssetId:slide.refImageAssetId,
+      refImage:refSource, refImageFailed:slide.refImageFailed,
+    }] : []),
+    ...imageReferences.map((ref, index) => ({
+      key:ref.id || ref.imageId || ref.assetId || `ref-${index}`,
+      name:ref.name || `Referência ${index + 1}`,
+      refImageId:ref.imageId || ref.assetId,
+      refImageAssetId:ref.assetId,
+      refImage:ref.dataUrl || '',
+    })),
+  ].slice(0, MAX_SLIDE_IMAGE_REFERENCES);
+  const hasReference = referenceItems.length > 0;
+  const referenceSignature = referenceItems.map(item => (
+    `${item.key}:${item.refImageId || ''}:${item.refImage || ''}:${item.refImageFailed ? 1 : 0}`
+  )).join('|');
+  const [previews, setPreviews] = useState({});
   useEffect(() => {
-    if (!refImageId) {
-      setPreview({ imageId: null, source: '', url: '', error: '' });
-      return undefined;
-    }
+    if (!referenceItems.length) { setPreviews({}); return undefined; }
     let cancelled = false;
-    setPreview({ imageId: refImageId, source: refSource, url: '', error: '' });
-    resolveSlideReference({ refImageId, refImage: refSource }).then((url) => {
-      if (!cancelled) setPreview({ imageId: refImageId, source: refSource, url, error: '' });
-    }).catch((error) => {
-      if (!cancelled) setPreview({ imageId: refImageId, source: refSource, url: '', error: error.message });
-    });
+    Promise.all(referenceItems.map(async item => {
+      try {
+        const url = await resolveSlideReference(item);
+        return [item.key, { url:url || '', error:'' }];
+      } catch (error) {
+        return [item.key, { url:'', error:error.message }];
+      }
+    })).then(entries => { if (!cancelled) setPreviews(Object.fromEntries(entries)); });
     return () => { cancelled = true; };
-  }, [refImageId, refSource]);
+    // A assinatura representa os campos de referência; objetos são recriados no render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referenceSignature]);
+  const refError = referenceItems.map(item => previews[item.key]?.error).find(Boolean) || '';
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
   const disabled = (generationState ? !generationState.canGenerate : false) || Boolean(refError);
   const planWithoutImages = generationState?.reason === 'plan_without_images';
@@ -166,35 +186,28 @@ function PerSlideImageRefBlock({
           </button>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>
-        <button
-          type="button"
-          onClick={onPickRef}
-          style={{
-            flexShrink: 0,
-            width: 56,
-            height: 56,
-            borderRadius: 8,
-            border: '1px dashed var(--border)',
-            background: 'var(--bg-card)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            transition: 'border-color 0.12s, color 0.12s',
-          }}
-          title="Enviar foto de referência (produto, embalagem, mood)"
-          aria-label="Adicionar imagem de referência"
-        >
-          {ref ? (
-            <img src={ref} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
-          ) : refImageId && !refError ? (
-            <Loader2 size={20} aria-label="Carregando referência" style={{ animation: 'spin 0.8s linear infinite' }} />
-          ) : (
-            <ImageIcon size={20} strokeWidth={1.75} />
-          )}
-        </button>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, minWidth:0 }}>
+        <div style={{ width:124, flexShrink:0 }}>
+          <div className="vc-label-sm" style={{ marginBottom:5 }}>Referências do prompt ({referenceItems.length}/{MAX_SLIDE_IMAGE_REFERENCES})</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 56px)', gap:6 }}>
+            {referenceItems.map((item) => {
+              const preview = previews[item.key];
+              return <div key={item.key} style={{ position:'relative', width:56, height:56 }}>
+                <div style={{ width:'100%', height:'100%', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-card)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', color:'var(--text-muted)' }} title={item.name}>
+                  {preview?.url ? <img src={preview.url} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                    : preview?.error ? <ImageIcon size={18} aria-label="Referência indisponível"/>
+                      : <Loader2 size={18} aria-label="Carregando referência" style={{ animation:'spin 0.8s linear infinite' }}/>}</div>
+                <button type="button" onClick={() => onRemoveRef?.(item.key)} aria-label={`Remover ${item.name}`} title={`Remover ${item.name}`} style={{ position:'absolute', top:-5, right:-5, width:22, height:22, padding:0, borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--text-primary)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><X size={12}/></button>
+              </div>;
+            })}
+            {referenceItems.length < MAX_SLIDE_IMAGE_REFERENCES && <button
+              type="button" onClick={onPickRef}
+              style={{ width:56, height:56, borderRadius:8, border:'1px dashed var(--border)', background:'var(--bg-card)', cursor:'pointer', display:'flex', flexDirection:'column', gap:2, alignItems:'center', justifyContent:'center', color:'var(--text-muted)' }}
+              title={`Adicionar até ${MAX_SLIDE_IMAGE_REFERENCES - referenceItems.length} referências`}
+              aria-label="Adicionar imagens de referência"
+            ><Plus size={17}/><span style={{ fontSize:9 }}>Adicionar</span></button>}
+          </div>
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <label htmlFor={promptId} className="vc-label-sm" style={{ display: 'block', marginBottom: 4 }}>
             {slide.imageQuery?.trim() ? 'Prompt extra' : 'Direção da imagem'} (este {itemLabel})
@@ -215,7 +228,7 @@ function PerSlideImageRefBlock({
       {hasReference && (
         <button
           type="button"
-          onClick={onRemoveRef}
+          onClick={() => onRemoveRef?.('all')}
           style={{
             fontSize: 11,
             fontWeight: 600,
@@ -228,7 +241,7 @@ function PerSlideImageRefBlock({
             letterSpacing: '-0.011em',
           }}
         >
-          Remover referência
+          Remover todas as referências
         </button>
       )}
     </div>
