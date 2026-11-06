@@ -43,7 +43,7 @@ import { MOVABLE_ELEMENTS, hasElementOffset, resetElementOffsetsPatch, unlockGro
 import { suggestVisualPresetForCreative } from '../utils/slide-design-system.js';
 import { FontPairingPicker, FontPicker } from './ui/font-pickers.jsx';
 import { LayoutMiniIcon, ImageFocalMiniIcon, PhotoRegionMiniIcon } from './ui/mini-icons.jsx';
-import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
+import { MOONT_NARRATIVES, moontNarrative, moontProjectFormat } from '../config/moont-brand.js';
 import { Slider, Toggle, ColorRow } from './ui/primitives.jsx';
 import { brandMatchesPalette, BODY_FONTS } from '../utils/brand-visuals.js';
 import { slideAutoAdjustPatch, slideHasPendingPhotoIntent } from '../utils/canvas-zones.js';
@@ -1280,7 +1280,13 @@ function SidebarContent({
                 </label>
                 <textarea
                   ref={titleTaRef}
-                  onFocus={() => { lastTextFieldRef.current = 'title'; }}
+                  onFocus={(e) => {
+                    lastTextFieldRef.current = 'title';
+                    if (e.currentTarget.value.trim() === 'Seu título aqui') e.currentTarget.select();
+                  }}
+                  onClick={(e) => {
+                    if (e.currentTarget.value.trim() === 'Seu título aqui') e.currentTarget.select();
+                  }}
                   onSelect={(e) => captureSelection('title', e.currentTarget)}
                   onKeyUp={(e) => captureSelection('title', e.currentTarget)}
                   value={slide.title}
@@ -1295,6 +1301,7 @@ function SidebarContent({
                     });
                   }}
                   rows={2}
+                  placeholder="Seu título aqui"
                   className="vc-input vc-textarea"
                   style={{ fontSize:17, fontWeight:600 }}
                 />
@@ -3499,7 +3506,7 @@ function SidebarContent({
                     const projectKind = projectKindOf(entry);
                     const isPresentation = projectKind === 'apresentacao';
                     const product = moontNarrative(projectKind);
-                    const typeLabel = product.format;
+                    const typeLabel = moontProjectFormat(entry.doc);
                     return (
                       <button
                         key={entry.id}

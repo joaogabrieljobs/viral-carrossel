@@ -41,3 +41,16 @@ export const MOONT_NARRATIVES = Object.freeze({
 export function moontNarrative(kind) {
   return MOONT_NARRATIVES[kind === 'apresentacao' ? 'apresentacao' : 'carrossel'];
 }
+
+const PROJECT_FORMAT_LABELS = Object.freeze({
+  carrossel: 'Feed 4:5',
+  quadrado: 'Quadrado',
+  stories: 'Stories',
+  apresentacao: 'Apresentação 16:9',
+});
+
+/** O formato salvo no projeto prevalece sobre o nome genérico do produto. */
+export function moontProjectFormat(doc = {}) {
+  const format = String(doc?.fmt || 'carrossel');
+  return PROJECT_FORMAT_LABELS[format] || PROJECT_FORMAT_LABELS.carrossel;
+}

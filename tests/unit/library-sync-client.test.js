@@ -295,6 +295,27 @@ describe('library-sync client pack', () => {
     ]);
   });
 
+  it('baixa novamente referência cujo ID local existe no documento mas perdeu os bytes', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id:'s1', imageReferences:[
+      { id:'one', name:'Produto', assetId:'reference-1' },
+    ] };
+    const localDoc = structuredClone(manifest.docs[0]);
+    localDoc.doc.slides[0].imageReferences[0].imageId = 'cache-apagado';
+    local.setItem(SK.library, JSON.stringify([localDoc]));
+    imageMocks.read.mockResolvedValue(null);
+    const { fetchMock } = installCloudApi(manifest);
+    const normalFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation((url, opts) => url.includes('asset=reference-1')
+      ? response({ asset:{ dataUrl:'data:image/jpeg;base64,MQ==' } })
+      : normalFetch(url, opts));
+    const pulled = await pullLibraryFromCloud();
+    expect(fetchMock.mock.calls.some(([url]) => url.includes('asset=reference-1'))).toBe(true);
+    expect(pulled.snapshot.library[0].doc.slides[0].imageReferences[0]).toEqual(
+      expect.objectContaining({ assetId:'reference-1', dataUrl:'data:image/jpeg;base64,MQ==' }),
+    );
+  });
+
   it('404 da referência não derruba a lista nem apaga a referência local correspondente', async () => {
     const manifest = cloudLibrary(1);
     manifest.docs[0].doc.slides[0] = { id: 's1', title: 'Texto preservado', refImageAssetId: 'reference-1' };

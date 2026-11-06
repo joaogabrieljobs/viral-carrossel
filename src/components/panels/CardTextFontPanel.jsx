@@ -179,6 +179,13 @@ export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdat
           value={draft}
           readOnly={!canEdit}
           rows={6}
+          placeholder={target.key === 'title' ? 'Seu título aqui' : undefined}
+          onFocus={event => {
+            if (target.key === 'title' && event.currentTarget.value.trim() === 'Seu título aqui') event.currentTarget.select();
+          }}
+          onClick={event => {
+            if (target.key === 'title' && event.currentTarget.value.trim() === 'Seu título aqui') event.currentTarget.select();
+          }}
           onChange={event => writeDraft(event.target.value)}
           onMouseUp={event => setBoxHeight(clampTextBox(event.currentTarget.offsetHeight))}
           style={{

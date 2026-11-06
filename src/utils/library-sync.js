@@ -730,8 +730,14 @@ async function hydrateReferenceListFromCloud(refs, assetCache, localRefs = []) {
     if (!ref?.assetId) { hydrated.push(ref); continue; }
     const local = localByAsset.get(ref.assetId);
     if (local?.imageId || local?.dataUrl) {
-      hydrated.push({ ...ref, ...(local.imageId ? { imageId:local.imageId } : {}), ...(local.dataUrl ? { dataUrl:local.dataUrl } : {}) });
-      continue;
+      let localData = local.dataUrl || null;
+      if (!localData && local.imageId) {
+        try { localData = await imagemComoDataUrl(local.imageId); } catch { /* baixa novamente abaixo */ }
+      }
+      if (localData) {
+        hydrated.push({ ...ref, ...(local.imageId ? { imageId:local.imageId } : {}), ...(local.dataUrl ? { dataUrl:local.dataUrl } : {}) });
+        continue;
+      }
     }
     try {
       const dataUrl = await resolveCachedAsset(ref.assetId, assetCache);

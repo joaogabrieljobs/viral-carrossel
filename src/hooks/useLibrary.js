@@ -46,6 +46,11 @@ import { cloneBrandStyleKit } from '../utils/brand-context.js';
 import { normalizeStyleKit } from '../utils/style-kit.js';
 import { rememberDeletedProjectIds } from '../utils/project-deletions.js';
 
+export const INVALID_BACKUP_MESSAGE = 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pela Moont.';
+export function reportInvalidBackup(toast) {
+  toast?.(INVALID_BACKUP_MESSAGE, 'error', 6500);
+}
+
 /**
  * Monta um documento novo sem perder a identidade que veio no seed.
  * Mantida pura e exportada para cobrir a herança de séries por teste unitário.
@@ -582,16 +587,17 @@ export function useLibrary({
         setLibraryOpen(false);
         setShellView('project');
       } catch {
-        window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-          detail: 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pela Moont.',
-        }));
+        // Um backup inválido não é quota de armazenamento. O evento de quota
+        // cria deliberadamente um aviso persistente até `quota-recovered`;
+        // para arquivo ruim, informe e desapareça automaticamente.
+        reportInvalidBackup(toast);
       }
     };
     reader.readAsText(file);
   }, [
     libraryFolders, brandRoster,
     setLibrary, setLibraryFolders, setBrandRoster,
-    setActiveDocId, setActiveBrandId, setLibraryOpen, setShellView,
+    setActiveDocId, setActiveBrandId, setLibraryOpen, setShellView, toast,
   ]);
 
   return {

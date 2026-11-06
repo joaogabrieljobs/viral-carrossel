@@ -219,6 +219,7 @@ test('entrada tem duas escolhas, abrir preserva o editor e cancelar não cria pr
 
 test('ir para o editor cria um único card vazio sem chamar a IA', async ({ page }) => {
   let aiCalls = 0;
+  await page.setViewportSize({ width:1280, height:713 });
   await setup(page, { withProject:false, ai: route => {
     aiCalls += 1;
     return route.fulfill({ json:completion(generated(5)) });
@@ -226,7 +227,11 @@ test('ir para o editor cria um único card vazio sem chamar a IA', async ({ page
   await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
   const wizard = flow(page);
   await wizard.getByLabel(/^Nome do projeto/).fill('Rascunho manual');
-  await wizard.getByRole('button', { name:/^Ir para o editor/ }).click();
+  const blankEditor = wizard.getByRole('button', { name:/^Ir para o editor/ });
+  const blankBox = await blankEditor.boundingBox();
+  const footerBox = await wizard.locator('footer').boundingBox();
+  expect(blankBox.y + blankBox.height).toBeLessThanOrEqual(footerBox.y);
+  await blankEditor.click();
   await expect(wizard).toHaveCount(0);
   await expect(page.getByRole('tab', { name:'Texto', exact:true }).first()).toBeVisible();
   await expect.poll(async () => (await library(page)).find(project => project.name === 'Rascunho manual')?.doc?.slides?.length).toBe(1);
@@ -237,6 +242,20 @@ test('ir para o editor cria um único card vazio sem chamar a IA', async ({ page
     bgImage:null, bgImageId:null, imageReferences:[],
   }] });
   expect(aiCalls).toBe(0);
+});
+
+test('primeira edição substitui o título inicial do card novo', async ({ page }) => {
+  await setup(page, { withProject:false });
+  await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
+  await flow(page).getByRole('button', { name:/^Ir para o editor/ }).click();
+  await page.getByRole('button', { name:'Adicionar card ao carrossel', exact:true }).click();
+  await page.getByRole('tab', { name:'Texto', exact:true }).first().click();
+  const title = page.getByRole('textbox', { name:'Caixa de texto', exact:true });
+  await expect(title).toHaveValue('Seu título aqui');
+  await title.click();
+  await page.keyboard.type('Título de teste');
+  await expect(title).toHaveValue('Título de teste');
+  await expect(title).not.toHaveValue(/Seu título aqui/);
 });
 
 test('ir para o editor respeita apresentação e cria um slide vazio', async ({ page }) => {

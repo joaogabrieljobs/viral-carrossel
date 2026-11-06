@@ -5,7 +5,7 @@ import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js
 import { presentationAIOptions, buildPresentationReviewRules } from './presentation.js';
 import { buildPresentationPlanPrompt, validatePresentationPlan, buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
-import { requiresSocialTitles, recoverSocialTitle, missingSocialTitleIndexes, longSocialSupportIndexes, SOCIAL_SUPPORT_MAX_CHARS, SOCIAL_SUPPORT_MAX_LINES } from './social-generation.js';
+import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, longSocialSupportIndexes, SOCIAL_SUPPORT_MAX_CHARS, SOCIAL_SUPPORT_MAX_LINES } from './social-generation.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
@@ -342,9 +342,9 @@ export function applyEditorialReview(draft, review, config) {
  * No máximo duas chamadas: geração + revisão. Falha da revisão preserva apenas
  * um rascunho que já tenha passado pelos limites editoriais da apresentação.
  */
-export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview, onStage }, callAI) {
+export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview, onStage, onDraft }, callAI) {
   if (config?.presetId === 'apresentacao' && config.presentationPlanning) {
-    return generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview }, callAI);
+    return generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview, onDraft }, callAI);
   }
   const isPresentation = config?.presetId === 'apresentacao';
   const textOptions = {
@@ -365,6 +365,7 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     ? auditPresentationTextLimits(draft.slides, config?.presentationTextLimits)
     : [];
   throwIfGenerationCancelled(aiOptions?.signal);
+  onDraft?.(draft);
   onReview?.();
   try {
     const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
@@ -372,17 +373,33 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     return { result, reviewStatus: JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised' };
   } catch (error) {
     if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
-    if (missingSocialTitleIndexes(draft.slides, config).length || longSocialSupportIndexes(draft.slides, config).length) {
-      // Keep the complete unmodified draft available to callers for recovery;
-      // do not replace the current project with known title placeholders.
-      throw Object.assign(new Error('A revisão não conseguiu completar os títulos. Seu projeto foi preservado.'), {
-        code: missingSocialTitleIndexes(draft.slides, config).length ? 'social_title_missing' : 'social_support_too_long', generatedDraft: draft,
-      });
-    }
+    const missingTitles = missingSocialTitleIndexes(draft.slides, config);
+    const longSupport = longSocialSupportIndexes(draft.slides, config);
+    // Guardrails factuais continuam fatais: preservar o rascunho nunca pode
+    // publicar preço, prazo ou garantia que não existiam no briefing.
     if (auditUnsupportedCommercialClaims(draft.slides, config?.commercialClaimSource).length) {
       throw Object.assign(new Error('A revisão não conseguiu remover promessas comerciais sem apoio no briefing. Seu projeto foi preservado.'), {
         code: 'unsupported_commercial_claim', generatedDraft: draft,
       });
+    }
+    if (missingTitles.length || longSupport.length) {
+      // A resposta principal é conteúdo útil e editável. Uma revisão inválida
+      // não pode apagar esse trabalho depois de vários minutos. Recuperamos os
+      // títulos apenas movendo texto existente e mantemos apoios longos por
+      // inteiro, sinalizados para conferência no editor.
+      const recoveredSlides = draft.slides.map(recoverSocialTitleForEditing);
+      const result = validateCarouselDraft(
+        { ...draft, slides:recoveredSlides },
+        { ...config, allowMissingSocialTitles:true, allowLongSocialSupport:true },
+      );
+      return {
+        result,
+        reviewStatus:'needs_attention',
+        issues:[
+          ...missingTitles.map(slideIndex => ({ slideIndex, code:'social_title_recovered' })),
+          ...longSupport.map(slideIndex => ({ slideIndex, code:'social_support_too_long' })),
+        ],
+      };
     }
     // A revisão é a única oportunidade automática de corrigir um primeiro
     // rascunho acima dos limites. Se ela falhar ou continuar inválida, não
@@ -399,7 +416,7 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
 /** A bounded pipeline: outline → draft → review, with one targeted text repair.
  * Source documents remain data. The validated plan, rather than model-supplied
  * layout code, drives the allowlisted compositions in the editor. */
-export async function generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview }, callAI) {
+export async function generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview, onDraft }, callAI) {
   const textOptions = { ...aiOptions, ...presentationAIOptions('apresentacao', config.presentationPath), json: true, temperature: 0.2 };
   const planning = config.planningContext || {};
   const sources = Array.isArray(planning.sources) ? planning.sources : [];
@@ -442,6 +459,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       speakerNotes: [slide.speakerNotes, slide.bodyAfterImage].filter(Boolean).join('\n\n'),
     };
   }) }, plannedConfig);
+  onDraft?.(draft);
   const violations = auditPresentationTextLimits(draft.slides, plannedConfig.presentationTextLimits);
   onStage?.('reviewing');
   onReview?.();

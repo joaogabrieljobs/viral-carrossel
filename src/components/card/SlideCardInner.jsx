@@ -517,7 +517,8 @@ function InlineEditableText({ as: Tag = 'span', value, onCommit, elementProps = 
     const range = document.createRange?.();
     if (selection && range) {
       range.selectNodeContents(ref.current);
-      if (!autoEdit) range.collapse(false);
+      const replaceStarterTitle = String(value ?? '').trim() === 'Seu título aqui';
+      if (!autoEdit && !replaceStarterTitle) range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
     }

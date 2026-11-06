@@ -72,6 +72,7 @@ function PerSlideImageRefBlock({
   const reasonId = useId();
   const promptId = useId();
   const promptRef = useRef(null);
+  const promptSelectionRef = useRef(null);
   // Na grelha de cards o painel começa fechado: aberto em todos os cards ao
   // mesmo tempo repetia a mesma caixa 7 vezes e empurrava os cards para baixo.
   // Abre sozinho quando o slide já tem referência ou prompt extra.
@@ -79,9 +80,9 @@ function PerSlideImageRefBlock({
 
   const insertMention = (mention) => {
     const field = promptRef.current;
-    const fieldHasFocus = typeof document !== 'undefined' && document.activeElement === field;
-    const start = fieldHasFocus ? (field?.selectionStart ?? extra.length) : extra.length;
-    const end = fieldHasFocus ? (field?.selectionEnd ?? start) : start;
+    const remembered = promptSelectionRef.current;
+    const start = Math.max(0, Math.min(extra.length, remembered?.start ?? extra.length));
+    const end = Math.max(start, Math.min(extra.length, remembered?.end ?? start));
     const before = extra.slice(0, start);
     const after = extra.slice(end);
     const lead = before && !/\s$/.test(before) ? ' ' : '';
@@ -89,6 +90,7 @@ function PerSlideImageRefBlock({
     const token = `@${mention}`;
     const next = `${before}${lead}${token}${tail}${after}`;
     const caret = before.length + lead.length + token.length + tail.length;
+    promptSelectionRef.current = { start:caret, end:caret };
     onChangeExtra(next);
     requestAnimationFrame(() => {
       field?.focus();
@@ -233,6 +235,16 @@ function PerSlideImageRefBlock({
             {referenceItems.map(item => <button
               key={`mention-${item.key}`}
               type="button"
+              onPointerDown={(event) => {
+                const field = promptRef.current;
+                if (field) {
+                  promptSelectionRef.current = {
+                    start:field.selectionStart ?? field.value.length,
+                    end:field.selectionEnd ?? field.value.length,
+                  };
+                }
+                event.preventDefault();
+              }}
               onClick={() => insertMention(item.mention)}
               aria-label={`Inserir @${item.mention} no prompt`}
               title={`Inserir @${item.mention} no prompt (${item.name})`}
@@ -243,7 +255,25 @@ function PerSlideImageRefBlock({
             ref={promptRef}
             id={promptId}
             value={extra}
-            onChange={(e) => onChangeExtra(e.target.value)}
+            onChange={(e) => {
+              promptSelectionRef.current = {
+                start:e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+                end:e.currentTarget.selectionEnd ?? e.currentTarget.value.length,
+              };
+              onChangeExtra(e.target.value);
+            }}
+            onSelect={(e) => {
+              promptSelectionRef.current = {
+                start:e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+                end:e.currentTarget.selectionEnd ?? e.currentTarget.value.length,
+              };
+            }}
+            onBlur={(e) => {
+              promptSelectionRef.current = {
+                start:e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+                end:e.currentTarget.selectionEnd ?? e.currentTarget.value.length,
+              };
+            }}
             rows={3}
             placeholder="Ex.: fundo branco minimalista, garrafa centralizada, sombra suave, estética skincare premium…"
             className="vc-input vc-textarea"

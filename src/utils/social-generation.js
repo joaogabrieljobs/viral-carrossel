@@ -39,6 +39,25 @@ export function recoverSocialTitle(slide) {
   return slide;
 }
 
+/**
+ * Última barreira local quando a revisão externa fica indisponível ou devolve
+ * um JSON inválido. Move um trecho inteiro do apoio para o título e mantém o
+ * restante no subtítulo: nenhum caractere do rascunho é descartado.
+ */
+export function recoverSocialTitleForEditing(slide) {
+  const recovered = recoverSocialTitle(slide);
+  if (!socialTitleMissing(recovered)) return recovered;
+  const subtitle = String(recovered?.subtitle || '').trim();
+  if (!subtitle) return recovered;
+  const preferredMax = Math.min(96, subtitle.length);
+  const sample = subtitle.slice(0, preferredMax);
+  const boundary = sample.lastIndexOf(' ');
+  const end = boundary >= 32 ? boundary : preferredMax;
+  const title = subtitle.slice(0, end).trim();
+  const remainder = subtitle.slice(end).trim();
+  return title ? { ...recovered, title, subtitle:remainder } : recovered;
+}
+
 export function missingSocialTitleIndexes(slides, config = {}) {
   return requiresSocialTitles(config)
     ? (Array.isArray(slides) ? slides : []).flatMap((slide, index) => socialTitleMissing(slide) ? [index] : [])

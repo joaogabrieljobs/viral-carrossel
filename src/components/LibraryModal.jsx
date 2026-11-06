@@ -29,7 +29,7 @@ import {
   localDateKey,
   buildEditorialQueue,
 } from '../utils/library-organizer.js';
-import { MOONT_NARRATIVES, moontNarrative } from '../config/moont-brand.js';
+import { MOONT_NARRATIVES, moontNarrative, moontProjectFormat } from '../config/moont-brand.js';
 
 const controlStyle = {
   minHeight: 36,
@@ -121,8 +121,8 @@ const projectKindCopy = (entry) => {
   const kind = projectKindOf(entry);
   const narrative = moontNarrative(kind);
   return kind === 'apresentacao'
-    ? { ...narrative, kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
-    : { ...narrative, kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+    ? { ...narrative, format:moontProjectFormat(entry?.doc), kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { ...narrative, format:moontProjectFormat(entry?.doc), kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
 };
 
 function useModalKeyboard(open, onClose) {

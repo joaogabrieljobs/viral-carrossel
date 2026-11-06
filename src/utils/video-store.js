@@ -14,6 +14,30 @@ import { SK, isAccountDataWriteOwnerCurrent } from './storage.js';
 const DB_NAME = 'viral-carrossel';
 const STORE_NAME = 'videos';
 const DB_VERSION = 1;
+const SUPPORTED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+const SUPPORTED_VIDEO_EXTENSION = /\.(mp4|mov|webm)$/i;
+
+/**
+ * `accept="video/*"` só orienta o seletor; automações, drag/drop e alguns
+ * browsers ainda conseguem entregar qualquer File. Valide antes do IndexedDB.
+ */
+export function validateVideoFile(file) {
+  if (!file || typeof file !== 'object' || !Number(file.size)) {
+    return { valid:false, message:'Escolha um vídeo MP4, MOV ou WebM válido.' };
+  }
+  const type = String(file.type || '').trim().toLowerCase();
+  const name = String(file.name || '').trim();
+  const hasKnownType = SUPPORTED_VIDEO_MIME_TYPES.has(type);
+  const hasKnownExtension = SUPPORTED_VIDEO_EXTENSION.test(name);
+  // MIME explícito tem precedência: um JPEG renomeado para .mp4 continua JPEG.
+  if ((type && !hasKnownType) || (!type && !hasKnownExtension)) {
+    return { valid:false, message:'Este arquivo não é um vídeo compatível. Use MP4, MOV ou WebM.' };
+  }
+  if (name && /\.[a-z0-9]+$/i.test(name) && !hasKnownExtension) {
+    return { valid:false, message:'Formato de vídeo não compatível. Use MP4, MOV ou WebM.' };
+  }
+  return { valid:true, mime:type || (name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : name.toLowerCase().endsWith('.webm') ? 'video/webm' : 'video/mp4') };
+}
 
 let _dbPromise = null;
 

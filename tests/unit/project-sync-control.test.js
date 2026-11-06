@@ -1,10 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  accountMetadataContentKey, cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
   selectRestoredProjectId,
 } from '../../src/utils/project-sync-control.js';
 
 describe('gatilho de salvamento automático', () => {
+  it('trocar somente o projeto aberto não conta como edição pendente', () => {
+    const current = { brands:[{ id:'marca' }], folders:[], activeBrandId:'marca', activeDocId:'projeto-a' };
+    expect(accountMetadataContentKey(current)).toBe(accountMetadataContentKey({
+      ...current, activeDocId:'projeto-b',
+    }));
+    expect(accountMetadataContentKey(current)).not.toBe(accountMetadataContentKey({
+      ...current, activeBrandId:'outra-marca',
+    }));
+  });
+
   it('não reenvia o mesmo conteúdo quando o botão deixa de estar ocupado', () => {
     const first = decideCloudAutoPush({ key: 'edit-1', lastKey: 'boot', dirty: true, inFlight: false });
     expect(first).toMatchObject({ lastKey: 'edit-1', schedule: true, defer: false });

@@ -8,7 +8,7 @@ import CloudPhotoProgress from './CloudPhotoProgress.jsx';
 import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
-import { moontNarrative } from '../config/moont-brand.js';
+import { moontNarrative, moontProjectFormat } from '../config/moont-brand.js';
 import '../styles/project-entry.css';
 
 const projectKindOf = (entry) => (
@@ -23,8 +23,8 @@ const projectKindCopy = (entry) => {
   const kind = projectKindOf(entry);
   const narrative = moontNarrative(kind);
   return kind === 'apresentacao'
-    ? { ...narrative, kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
-    : { ...narrative, kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
+    ? { ...narrative, format:moontProjectFormat(entry?.doc), kind, singular: 'Apresentação', unit: 'slide', plural: 'slides' }
+    : { ...narrative, format:moontProjectFormat(entry?.doc), kind, singular: 'Carrossel', unit: 'card', plural: 'cards' };
 };
 
 // The initial account entry offers two paths. Editor project-list links can

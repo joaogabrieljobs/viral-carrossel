@@ -42,7 +42,7 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
-import { videoPut, videoGet, videoDelete, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap } from './src/utils/video-store.js';
+import { videoPut, videoGet, videoDelete, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile } from './src/utils/video-store.js';
 import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
@@ -510,7 +510,7 @@ import {
 } from './src/utils/slide-logo.js';
 import { appModeLabel } from './src/utils/ui-depth-labels.js';
 import {
-  cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
+  accountMetadataContentKey, cloudSaveContinuation, decideCloudAutoPush, isProjectOutboxUnavailable, putProjectDirectly,
 } from './src/utils/project-sync-control.js';
 import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 
@@ -605,7 +605,7 @@ function accountMetaFingerprint(snapshot) {
     if (onboardingDone === undefined) onboardingDone = localStorage.getItem(SK.onboarding) || null;
     if (modesIntroDone === undefined) modesIntroDone = localStorage.getItem(SK.modesIntro) || null;
   } catch { /* cache bloqueada: a revisão remota continua protegida */ }
-  return JSON.stringify({
+  return accountMetadataContentKey({
     brands: accountBrandsContentSnapshot(snapshot.brandRoster || []),
     folders: snapshot.libraryFolders || [],
     activeBrandId: snapshot.activeBrandId || '',
@@ -2548,12 +2548,22 @@ export default function App() {
   // abrindo o deck com os primeiros slides escondidos. A identidade do primeiro
   // slide também muda ao gerar novamente no mesmo projeto, por isso participa da
   // dependência.
+  const boardProjectRef = useRef(activeDocId);
   useLayoutEffect(() => {
+    const projectChanged = boardProjectRef.current !== activeDocId;
+    boardProjectRef.current = activeDocId;
+    // Desfazer pode restaurar outro conjunto de IDs sem trocar de projeto.
+    // Nesse caso preserve o card ativo em vez de jogar a visão para o card 1.
+    if (!projectChanged && activeIdx > 0) {
+      const frame = requestAnimationFrame(() => revealBoardCard(activeIdx));
+      return () => cancelAnimationFrame(frame);
+    }
     const quadro = boardScrollRef.current;
     if (quadro) quadro.scrollTo({ left: 0, behavior: 'auto' });
     const faixa = thumbnailStripRef.current;
     if (faixa) faixa.scrollTo({ left: 0, behavior: 'auto' });
-  }, [activeDocId, slides[0]?.id]);
+    return undefined;
+  }, [activeDocId, slides[0]?.id, activeIdx, revealBoardCard]);
 
   // A miniatura ativa precisa acompanhar a navegação em decks longos.
   useEffect(() => {
@@ -3300,7 +3310,7 @@ export default function App() {
     if (!PROJECTS_V2 || !accountLibraryReady || !activeDocId) return undefined;
     let cancelled = false;
     const check = async () => {
-      if (cancelled || cloudSyncInFlightRef.current || document.visibilityState === 'hidden') return;
+      if (cancelled || cloudSyncInFlightRef.current || getAIGenerationCount() > 0 || document.visibilityState === 'hidden') return;
       const known = v2VersionsRef.current.get(activeDocId);
       const expectedOwnerId = accessSessionRef.current?.customerId;
       if (!Number.isSafeInteger(known) || !expectedOwnerId) return;
@@ -3993,6 +4003,11 @@ export default function App() {
   // Importar vídeo no slide ativo — guarda blob no IndexedDB, atualiza slide.videoId
   const importVideoToActiveSlide = useCallback(async (file) => {
     if (!file) return;
+    const videoValidation = validateVideoFile(file);
+    if (!videoValidation.valid) {
+      toast(videoValidation.message, 'error', 6000);
+      return;
+    }
     const MAX_BYTES = 60 * 1024 * 1024; // 60MB — Safari iOS quebra acima disso
     if (file.size > MAX_BYTES) {
       toast(`Vídeo grande demais (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: 60 MB. Comprima antes (CapCut, HandBrake).`, 'error', 6000);
@@ -4006,7 +4021,7 @@ export default function App() {
     const expectedVideoId = targetSlide.videoId || null;
     try {
       const id = newVideoId();
-      await videoPut(id, file, { mime: file.type, name: file.name });
+      await videoPut(id, file, { mime: videoValidation.mime, name: file.name });
       const liveTarget = activeProjectRef.current === targetProjectId
         ? slidesLiveRef.current?.find((slide) => slide.id === targetSlideId)
         : null;
@@ -4033,7 +4048,7 @@ export default function App() {
           expectedImageIdentity,
           patch: {
             videoId: id,
-            videoMime: file.type || 'video/mp4',
+            videoMime: videoValidation.mime,
             videoName: file.name,
             bgImage: null,
             bgImageId: null,
@@ -4779,6 +4794,10 @@ export default function App() {
       used,
       current?.mention || 'imagem1',
     );
+    const requested = normalizeSlideReferenceMention(value, current?.mention || 'imagem1');
+    if (mention !== requested) {
+      toast(`@${requested} já estava em uso. Esta referência foi nomeada @${mention}.`, 'info', 4200);
+    }
     if (key === 'legacy') {
       updateSlideAt(idx, { refImageMention:mention });
       return;
@@ -4788,7 +4807,7 @@ export default function App() {
         (ref.id || ref.imageId || ref.assetId) === key ? { ...ref, mention } : ref
       )),
     });
-  }, [updateSlideAt]);
+  }, [toast, updateSlideAt]);
 
   // Repara histórico se `slides` estiver vazio (storage/import estragado) — sem novo passo de undo.
   useLayoutEffect(() => {
@@ -5174,6 +5193,17 @@ ${jsonShapeLine}`;
         };
         const [current, label] = stages[stage] || stages.writing;
         setGenProgress({ phase: 'text', current, total: 5, label: `Etapa ${current} de 5 · ${label}` });
+      },
+      onDraft: draft => {
+        checkActive();
+        if (creationSession && !remix) {
+          setCreationPreviewSlides((draft?.slides || []).map((item, index) => ({
+            ...item,
+            id:item.id || `draft-${index + 1}`,
+            bg:item.bg || brand.bg,
+            titleColor:item.titleColor || brand.titleColor,
+          })));
+        }
       },
       onReview: () => { checkActive(); if (!isPresentationGeneration || remix) setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Revisando clareza e coerência' }); },
     }, callAI);

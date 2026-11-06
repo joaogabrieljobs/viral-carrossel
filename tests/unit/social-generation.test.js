@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildGenerationSlideLayoutRules, buildRefineSingleSlideRules, buildGenerationJsonContract } from '../../src/utils/generation-prompts.js';
 import { validateCarouselDraft, generateReviewedCarousel } from '../../src/utils/editorial-review.js';
-import { recoverSocialTitle, requiresSocialTitles } from '../../src/utils/social-generation.js';
+import { recoverSocialTitle, recoverSocialTitleForEditing, requiresSocialTitles } from '../../src/utils/social-generation.js';
 import { cultureAccentRenderablePieces } from '../../src/utils/text-spans.js';
 
 const config = { count: 5, presetId: 'livre', densityId: '1_1', narrativeMode: 'viral' };
@@ -128,16 +128,38 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     });
   });
 
-  it.each([new Error('offline'), { edits: [] }])('não aceita um título vazio caso o único reparo falhe, preservando o rascunho completo', async review => {
+  it.each([new Error('offline'), { edits: [] }])('abre o rascunho completo para edição caso a revisão de título falhe', async review => {
     const first = draft();
     first.slides[2].subtitle = 'Um argumento longo sem pontuação '.repeat(8).trim();
     const ai = vi.fn().mockResolvedValueOnce(first);
     if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review);
-    const error = await generateReviewedCarousel({ prompt: 'brief', config }, ai).catch(value => value);
+    const onDraft = vi.fn();
+    const output = await generateReviewedCarousel({ prompt: 'brief', config, onDraft }, ai);
     expect(ai).toHaveBeenCalledTimes(2);
-    expect(error.code).toBe('social_title_missing');
-    expect(error.generatedDraft.slides[2].subtitle).toBe(first.slides[2].subtitle);
-    expect(error.generatedDraft.slides[2].bodyAfterImage).toBe(first.slides[2].bodyAfterImage);
+    expect(onDraft).toHaveBeenCalledWith(expect.objectContaining({ slides:expect.any(Array) }));
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.result.slides).toHaveLength(5);
+    expect(output.result.slides[2].title).toBeTruthy();
+    expect(`${output.result.slides[2].title} ${output.result.slides[2].subtitle}`.trim()).toBe(first.slides[2].subtitle);
+    expect(output.result.slides[2].bodyAfterImage).toBe(first.slides[2].bodyAfterImage);
+  });
+
+  it('recupera título sem pontuação por fronteira de palavra sem perder texto', () => {
+    const slide = { title:'', subtitle:'Uma explicação extensa sem pontuação que ainda precisa permanecer inteira para edição' };
+    const recovered = recoverSocialTitleForEditing(slide);
+    expect(recovered.title).toBeTruthy();
+    expect(`${recovered.title} ${recovered.subtitle}`.trim()).toBe(slide.subtitle);
+  });
+
+  it('não abre automaticamente um rascunho com promessa comercial sem apoio', async () => {
+    const first = draft();
+    first.slides[2] = { ...first.slides[2], title:'', subtitle:`Grátis para sempre. ${'Texto longo sem pontuação '.repeat(8)}` };
+    const ai = vi.fn().mockResolvedValueOnce(first).mockRejectedValueOnce(new Error('offline'));
+    const error = await generateReviewedCarousel({
+      prompt:'brief',
+      config:{ ...config, commercialClaimSource:'Brief sem preço ou gratuidade.' },
+    }, ai).catch(value => value);
+    expect(error.code).toBe('unsupported_commercial_claim');
   });
 
   it('o contrato de markup corresponde ao suporte real sem remover underscores de URLs', () => {

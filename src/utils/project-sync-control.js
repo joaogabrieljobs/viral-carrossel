@@ -4,6 +4,15 @@ export function decideCloudAutoPush({ key, lastKey, dirty, inFlight }) {
   return { lastKey: key, schedule: !inFlight, defer: inFlight };
 }
 
+/**
+ * Navegar entre projetos é estado local da interface, não uma edição da conta.
+ * O projeto ativo ainda pode viajar num salvamento real, mas nunca dispara o
+ * aviso "pendente" sozinho.
+ */
+export function accountMetadataContentKey({ activeDocId: _activeDocId, ...content } = {}) {
+  return JSON.stringify(content);
+}
+
 /** Abrir uma biblioteca não troca silenciosamente o projeto que a pessoa escolheu. */
 export function selectRestoredProjectId({ library = [], preferredId, metadataActiveId, manifestActiveId } = {}) {
   const live = Array.isArray(library) ? library.filter((entry) => entry?.id) : [];

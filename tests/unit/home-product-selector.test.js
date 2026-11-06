@@ -57,6 +57,19 @@ describe('seletor de produto na Home e na Biblioteca', () => {
     expect(html).toContain('Criar um projeto');
   });
 
+  it('mostra na biblioteca o formato salvo, inclusive Quadrado e Stories', () => {
+    const html = renderToStaticMarkup(React.createElement(AccountHomeShell, {
+      library: [
+        { id:'square', name:'Post quadrado', status:'draft', doc:{ productKind:'carrossel', fmt:'quadrado', slides:[{}] } },
+        { id:'story', name:'Story', status:'draft', doc:{ productKind:'carrossel', fmt:'stories', slides:[{}] } },
+      ],
+      initialProjectView:'library',
+      onStartCreation() {},
+    }));
+    expect(html).toContain('Moont Comunica · Quadrado · Carrossel');
+    expect(html).toContain('Moont Comunica · Stories · Carrossel');
+  });
+
   it('offers guided creation when the library is empty without displaying a false empty state while loading', () => {
     const empty = renderToStaticMarkup(React.createElement(AccountHomeShell, { initialProjectView: 'library' }));
     expect(empty).toContain('Criar meu primeiro projeto');
