@@ -1,6 +1,7 @@
 import { sanitizeCustomVisualPresetBrand } from './custom-visual-presets.js';
 import { normalizeBrandTone } from './brand-tone.js';
 import { normalizeStyleKit } from './style-kit.js';
+import { PRESENTATION_INSTRUCTIONS_MAX_CHARS } from './presentation-material.js';
 
 export const CREATION_STEPS = ['Projeto', 'Marca', 'Conteúdo', 'Narrativa', 'Quantidade', 'Visual', 'Revisão'];
 export const NARRATIVE_CHOICES = [
@@ -21,6 +22,74 @@ export const CREATION_DENSITIES = [
   { id: '1_2', label: 'Balanceado', desc: 'Explicação e exemplos com espaço para o visual.' },
   { id: '1_1', label: 'Detalhado', desc: 'Mais desenvolvimento, mantendo o texto organizado.' },
 ];
+
+export const CREATION_MATERIAL_LIMITS = Object.freeze({
+  carrossel:Object.freeze({ content:8000, sources:2000, context:1500 }),
+  apresentacao:Object.freeze({ content:200000, sources:50000, context:PRESENTATION_INSTRUCTIONS_MAX_CHARS }),
+});
+
+export function creationMaterialLimits(productKind = 'carrossel') {
+  return productKind === 'apresentacao'
+    ? CREATION_MATERIAL_LIMITS.apresentacao
+    : CREATION_MATERIAL_LIMITS.carrossel;
+}
+
+/** Mantém no estado somente o material que realmente entra no prompt. */
+export function clampCreationMaterial(material = {}, productKind = 'carrossel') {
+  const limits = creationMaterialLimits(productKind);
+  return {
+    ...material,
+    content:String(material?.content || '').slice(0, limits.content),
+    sources:String(material?.sources || '').slice(0, limits.sources),
+    context:String(material?.context || '').slice(0, limits.context),
+  };
+}
+
+/** Campos que ultrapassam o contrato real do prompt; nunca corta texto em silêncio. */
+export function creationMaterialOverages(material = {}, productKind = 'carrossel') {
+  const limits = creationMaterialLimits(productKind);
+  return Object.fromEntries(
+    Object.entries(limits)
+      .map(([field, limit]) => {
+        const length = String(material?.[field] || '').length;
+        return [field, { length, limit, excess: Math.max(0, length - limit) }];
+      })
+      .filter(([, detail]) => detail.excess > 0),
+  );
+}
+
+const CREATION_MATERIAL_FIELD_LABELS = Object.freeze({
+  content:'Texto de apoio',
+  sources:'Links e fontes',
+  context:'Instruções adicionais',
+});
+
+/** Mensagem única para impedir que uma troca de produto corte material já digitado. */
+export function creationMaterialOverageMessage(material = {}, productKind = 'carrossel') {
+  const overages = creationMaterialOverages(material, productKind);
+  const details = Object.entries(overages).map(([field, value]) => (
+    `${CREATION_MATERIAL_FIELD_LABELS[field] || field}: reduza ${value.excess.toLocaleString('pt-BR')} caracteres`
+  ));
+  if (!details.length) return '';
+  return `O material ultrapassa o limite deste formato (${details.join('; ')}). O texto completo foi preservado; reduza-o na etapa Conteúdo antes de criar.`;
+}
+
+/**
+ * Prepara o material para persistência sem truncar. A UI limita novas entradas,
+ * mas um texto maior pode existir depois de trocar Apresentação por Carrossel.
+ */
+export function creationMaterialForSubmission(material = {}, productKind = 'carrossel') {
+  const message = creationMaterialOverageMessage(material, productKind);
+  if (message) {
+    throw Object.assign(new Error(message), { code:'creation_material_over_limit' });
+  }
+  return {
+    ...material,
+    content:String(material?.content || ''),
+    sources:String(material?.sources || ''),
+    context:String(material?.context || ''),
+  };
+}
 export function cloneCreationBrand(profile = {}) {
   // Never retain shared object references to an existing saved brand.
   const copy = JSON.parse(JSON.stringify(profile || {}));

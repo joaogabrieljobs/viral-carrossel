@@ -79,6 +79,24 @@ describe('cancelamento global', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it('reutiliza o mesmo operationId quando a resposta da primeira tentativa se perde', async () => {
+    vi.useFakeTimers();
+    setAIRuntimeSettings({ useOwnImageKey: false });
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ b64_json: 'result' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = generateDALLEWithRetry('a scene', '', null, {}, { retries: 1, backoffMs: 10 });
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(result).resolves.toBe('data:image/png;base64,result');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const operationIds = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).operationId);
+    expect(operationIds[0]).toMatch(/^[A-Za-z0-9._:-]{1,160}$/);
+    expect(operationIds[1]).toBe(operationIds[0]);
+  });
+
   it('cancelar a revisão não publica o rascunho como revisão indisponível', async () => {
     const parent = startAIJob();
     const ai = vi.fn().mockResolvedValueOnce({ slides: [{ title: 'Rascunho', subtitle: '', imageQuery: '' }], caption: '' })

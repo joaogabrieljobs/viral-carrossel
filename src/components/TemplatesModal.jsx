@@ -23,6 +23,12 @@ const FAMILIAS = [
   { id: 'angulo', label: 'Por ângulo' },
 ];
 
+export function templateImageCreditCount(template) {
+  return Array.isArray(template?.slides)
+    ? template.slides.filter(slide => String(slide?.q || '').trim()).length
+    : 0;
+}
+
 /** Mini-card 4:5 com a assinatura do template — mesma linguagem do picker visual. */
 function PreviewTemplate({ tpl }) {
   const p = PALETTES[tpl.palette] || PALETTES[0];
@@ -105,8 +111,17 @@ function PreviewTemplate({ tpl }) {
 
 export default function TemplatesModal({ open, onClose, onApply }) {
   const [familia, setFamilia] = React.useState('todos');
+  const [pendingTemplate, setPendingTemplate] = React.useState(null);
+  React.useEffect(() => { if (!open) setPendingTemplate(null); }, [open]);
   if (!open) return null;
   const lista = familia === 'todos' ? TEMPLATES : TEMPLATES.filter((t) => t.categoria === familia);
+  const pendingCredits = templateImageCreditCount(pendingTemplate);
+  const apply = (generateImages) => {
+    if (!pendingTemplate) return;
+    onApply(pendingTemplate, { generateImages });
+    setPendingTemplate(null);
+    onClose();
+  };
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel modal-panel-wide" onClick={(e) => e.stopPropagation()}>
@@ -161,13 +176,29 @@ export default function TemplatesModal({ open, onClose, onApply }) {
           })}
         </div>
 
+        {pendingTemplate && <div role="group" aria-label={`Como aplicar ${pendingTemplate.name}`} style={{
+          margin:'14px 20px 0', padding:14, border:'1px solid var(--accent)', borderRadius:10,
+          background:'var(--accent-surface)', display:'grid', gap:10,
+        }}>
+          <strong style={{ color:'var(--text-primary)' }}>Aplicar “{pendingTemplate.name}”</strong>
+          <span style={{ color:'var(--text-secondary)', fontSize:12, lineHeight:1.45 }}>
+            O layout e o texto não consomem créditos. Gerar as imagens usa {pendingCredits} crédito{pendingCredits === 1 ? '' : 's'} do plano.
+          </span>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+            <button type="button" className="vc-btn vc-btn-ghost" onClick={() => apply(false)}>Aplicar só layout</button>
+            {pendingCredits > 0 && <button type="button" className="vc-btn vc-btn-primary" onClick={() => apply(true)}>Aplicar e gerar {pendingCredits} imagens</button>}
+            <button type="button" className="vc-btn vc-btn-ghost" onClick={() => setPendingTemplate(null)}>Voltar</button>
+          </div>
+        </div>}
+
         <div style={{ padding: 20, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
           {lista.map((t) => {
             const palette = PALETTES[t.palette] || PALETTES[0];
             return (
               <button
                 key={t.id}
-                onClick={() => { onApply(t); onClose(); }}
+                onClick={() => setPendingTemplate(t)}
+                aria-pressed={pendingTemplate?.id === t.id}
                 style={{
                   background: 'var(--bg-card)', border: '1px solid var(--border)',
                   borderRadius: 12, padding: 8, cursor: 'pointer', textAlign: 'left',

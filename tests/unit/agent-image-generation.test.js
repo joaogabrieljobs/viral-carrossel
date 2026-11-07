@@ -4,6 +4,7 @@ const mocked = vi.hoisted(() => ({
   subscription: vi.fn(), usage: vi.fn(), consume: vi.fn(), refund: vi.fn(), settle: vi.fn(),
   create: vi.fn(), wait: vi.fn(), download: vi.fn(), put: vi.fn(), putChunk: vi.fn(),
   project: vi.fn(), job: vi.fn(), createJob: vi.fn(), finishJob: vi.fn(), expireJob: vi.fn(),
+  listSettlement: vi.fn(), markSettled: vi.fn(),
   waitUntil: vi.fn(),
 }));
 vi.mock('@vercel/functions', () => ({ waitUntil: mocked.waitUntil }));
@@ -29,15 +30,19 @@ vi.mock('../../api/lib/agent-visual-batch.js', async importOriginal => {
   const actual = await importOriginal();
   return {
     selectImageSlides: actual.selectImageSlides, isImageJobStale: actual.isImageJobStale,
-    getAgentVisualJob: mocked.job, createAgentImageJob: mocked.createJob,
+    imageJobHash: actual.imageJobHash,
+    getAgentVisualJobInternal: mocked.job, createAgentImageJob: mocked.createJob,
     finishAgentImageJob: mocked.finishJob, expireAgentImageJob: mocked.expireJob,
+    listAgentImageJobsForSettlement: mocked.listSettlement,
+    markAgentImageJobCreditsSettled: mocked.markSettled,
   };
 });
 
 import {
   startAgentImageJob, runAgentImageJob, getAgentChangeStatus, imageAspectRatio,
-  imageOperationId, storeGeneratedAsset,
+  imageOperationId, reconcileAgentImageCredits, storeGeneratedAsset,
 } from '../../api/lib/agent-image-generation.js';
+import { imageJobHash } from '../../api/lib/agent-visual-batch.js';
 
 const owner = 'cus_1';
 const requestId = 'image-request-01';
@@ -58,7 +63,8 @@ function pendingJob(slides = ['s1', 's2']) {
     job: { requestId, projectId: 'p', status: 'pending', kind: 'image', beforeVersion: 3, afterVersion: null,
       slides: slides.map(slideId => ({ slideId, status: 'pending' })), createdAt: new Date().toISOString() },
     slides: slides.map(slideId => ({ slideId, status: 'pending', operationId: op(slideId) })),
-    meta: { kind: 'image', periodStartSec: 100 },
+    meta: { kind: 'image', periodStartSec: 100, creditsSettled:false },
+    requestHash:imageJobHash({ projectId:'p', baseVersion:3, slideIds:undefined }),
   };
 }
 
@@ -74,9 +80,21 @@ beforeEach(() => {
   mocked.download.mockResolvedValue({ b64_json: 'QUJD', mime: 'image/png' });
   mocked.put.mockResolvedValue({ assetId: 'ok' });
   mocked.putChunk.mockImplementation(async (_owner, assetId, body) => ({ assetId, complete: body.index === body.total - 1 }));
+  mocked.listSettlement.mockResolvedValue([]);
+  mocked.markSettled.mockResolvedValue(true);
   mocked.job.mockRejectedValue(notFound());
   mocked.project.mockResolvedValue(project());
   mocked.createJob.mockResolvedValue({ ...pendingJob(), existing: false });
+  mocked.finishJob.mockImplementation(async (_owner, _request, outcomes = []) => ({
+    finished:true,
+    job:{ requestId, projectId:'p', status:'failed', beforeVersion:3, afterVersion:3 },
+    slides:outcomes.map(outcome => ({
+      ...outcome,
+      status:outcome.assetId ? 'done' : 'failed',
+      operationId:op(outcome.slideId),
+    })),
+    meta:{ kind:'image', periodStartSec:100 },
+  }));
 });
 
 describe('startAgentImageJob', () => {
@@ -126,20 +144,39 @@ describe('startAgentImageJob', () => {
       .mockResolvedValueOnce({ allowed: false, reason: 'exhausted', used: 50, limit: 50, remaining: 0 });
     await expect(startAgentImageJob(owner, 'token', input, { schedule }))
       .rejects.toMatchObject({ code: 'quota_exhausted' });
-    expect(mocked.refund).toHaveBeenCalledTimes(1);
+    expect(mocked.refund).toHaveBeenCalledTimes(2);
     expect(mocked.refund.mock.calls[0][0]).toMatchObject({ customerId: owner, periodStartSec: 100, operationId: op('s1') });
     expect(schedule).not.toHaveBeenCalled();
   });
 
-  it('devolve os créditos se o registro do job falhar e repete pelo requestId sem cobrar', async () => {
+  it('compensa a operação corrente quando a confirmação da reserva é ambígua', async () => {
+    const schedule = vi.fn();
+    mocked.consume.mockRejectedValueOnce(Object.assign(new Error('conexão caiu no commit'), {
+      code:'quota_store_unavailable',
+    }));
+
+    await expect(startAgentImageJob(owner, 'token', input, { schedule }))
+      .rejects.toMatchObject({ code:'quota_store_error', ownedReservations:[op('s1')] });
+
+    expect(mocked.refund).toHaveBeenCalledTimes(2);
+    expect(mocked.refund.mock.calls.every(call => call[0].operationId === op('s1'))).toBe(true);
+    expect(mocked.finishJob).toHaveBeenCalledWith(owner, requestId, [
+      expect.objectContaining({ slideId:'s1', creditReserved:true }),
+      expect.objectContaining({ slideId:'s2', creditReserved:false }),
+    ]);
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('não toca na quota se o registro do job falhar e repete pelo requestId sem cobrar', async () => {
     const schedule = vi.fn();
     mocked.createJob.mockRejectedValueOnce(Object.assign(new Error('mudou'), { code: 'project_conflict', cloudVersion: 4 }));
     await expect(startAgentImageJob(owner, 'token', input, { schedule })).rejects.toMatchObject({ code: 'project_conflict' });
-    expect(mocked.refund.mock.calls.map(call => call[0].operationId).sort()).toEqual([op('s1'), op('s2')].sort());
+    expect(mocked.consume).not.toHaveBeenCalled();
+    expect(mocked.refund).not.toHaveBeenCalled();
     expect(schedule).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
-    mocked.job.mockResolvedValue(pendingJob().job);
+    mocked.job.mockResolvedValue(pendingJob());
     const replay = await startAgentImageJob(owner, 'token', input, { schedule });
     expect(replay).toMatchObject({ requestId, status: 'pending' });
     expect(mocked.consume).not.toHaveBeenCalled();
@@ -147,8 +184,62 @@ describe('startAgentImageJob', () => {
     expect(schedule).not.toHaveBeenCalled();
     await expect(startAgentImageJob(owner, 'token', { ...input, slideIds: ['s1'] }, { schedule }))
       .rejects.toMatchObject({ code: 'image_request_reused' });
+    await expect(startAgentImageJob(owner, 'token', { ...input, baseVersion: 4 }, { schedule }))
+      .rejects.toMatchObject({ code: 'image_request_reused' });
     await expect(startAgentImageJob(owner, 'token', { ...input, projectId: 'other' }, { schedule }))
       .rejects.toMatchObject({ code: 'image_request_reused' });
+  });
+
+  it('não reutiliza uma operação já reembolsada para gerar imagem grátis', async () => {
+    const schedule = vi.fn();
+    mocked.consume.mockResolvedValue({
+      allowed: false,
+      replayed: true,
+      reason: 'already_refunded',
+      used: 1,
+      limit: 50,
+      remaining: 49,
+    });
+
+    await expect(startAgentImageJob(owner, 'token', input, { schedule }))
+      .rejects.toMatchObject({ code: 'image_request_closed', status: 409 });
+
+    expect(mocked.createJob).toHaveBeenCalledTimes(1);
+    expect(mocked.finishJob).toHaveBeenCalledTimes(1);
+    expect(schedule).not.toHaveBeenCalled();
+    expect(mocked.refund).not.toHaveBeenCalled();
+  });
+
+  it('uma chamada concorrente acompanha o placeholder sem tocar na quota', async () => {
+    const schedule = vi.fn();
+    mocked.consume.mockResolvedValue({
+      allowed: false, replayed: true, reason: 'already_reserved',
+      used: 3, limit: 50, remaining: 47,
+    });
+    mocked.createJob.mockResolvedValueOnce({ ...pendingJob(), existing: true });
+    mocked.job.mockRejectedValueOnce(notFound()).mockResolvedValueOnce(pendingJob());
+
+    const result = await startAgentImageJob(owner, 'token', input, { schedule });
+
+    expect(result).toMatchObject({ requestId, status: 'pending' });
+    expect(mocked.consume).not.toHaveBeenCalled();
+    expect(mocked.refund).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('serializa a corrida antes de qualquer combinação de reservas', async () => {
+    const schedule = vi.fn();
+    mocked.consume
+      .mockResolvedValueOnce({ allowed: true, replayed: false, used: 2, limit: 50, remaining: 48 })
+      .mockResolvedValueOnce({ allowed: false, replayed: true, reason: 'already_reserved', used: 3, limit: 50, remaining: 47 });
+    mocked.createJob.mockResolvedValueOnce({ ...pendingJob(), existing: true });
+    mocked.job.mockRejectedValueOnce(notFound()).mockResolvedValueOnce(pendingJob());
+
+    await startAgentImageJob(owner, 'token', input, { schedule });
+
+    expect(mocked.consume).not.toHaveBeenCalled();
+    expect(mocked.refund).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
   });
 
   it('recusa plano sem imagens e assinatura inativa antes de reservar', async () => {
@@ -211,17 +302,90 @@ describe('runAgentImageJob', () => {
 
 describe('getAgentChangeStatus', () => {
   it('devolve o job como está e só expira um pendente antigo, devolvendo os créditos', async () => {
-    mocked.job.mockResolvedValue(pendingJob().job);
+    mocked.job.mockResolvedValue(pendingJob());
     expect(await getAgentChangeStatus(owner, requestId)).toMatchObject({ status: 'pending' });
     expect(mocked.expireJob).not.toHaveBeenCalled();
     const stale = pendingJob();
     stale.job.createdAt = new Date(Date.now() - 20 * 60_000).toISOString();
-    mocked.job.mockResolvedValue(stale.job);
+    mocked.job.mockResolvedValue(stale);
     mocked.expireJob.mockResolvedValue({ expired: true, job: { ...stale.job, status: 'failed', errorCode: 'image_job_timeout' },
       slides: stale.slides.map(slide => ({ ...slide, status: 'failed', errorCode: 'image_job_timeout' })), meta: stale.meta });
     const expired = await getAgentChangeStatus(owner, requestId);
     expect(expired).toMatchObject({ status: 'failed', errorCode: 'image_job_timeout' });
     expect(mocked.refund.mock.calls.map(call => call[0].operationId).sort()).toEqual([op('s1'), op('s2')].sort());
+  });
+
+  it('repete de forma idempotente a liquidação de um job terminal após falha transitória', async () => {
+    const terminal = pendingJob();
+    terminal.job = { ...terminal.job, status:'failed', afterVersion:3, errorCode:'image_generation_failed' };
+    terminal.slides = terminal.slides.map(slide => ({ ...slide, status:'failed', creditReserved:true }));
+    mocked.job.mockResolvedValue(terminal);
+    mocked.refund.mockRejectedValueOnce(new Error('quota offline')).mockResolvedValue({ refunded:true });
+
+    await expect(getAgentChangeStatus(owner, requestId)).resolves.toMatchObject({ status:'failed' });
+    await expect(getAgentChangeStatus(owner, requestId)).resolves.toMatchObject({ status:'failed' });
+
+    expect(mocked.refund).toHaveBeenCalledTimes(4);
+    expect(new Set(mocked.refund.mock.calls.map(call => call[0].operationId)))
+      .toEqual(new Set([op('s1'), op('s2')]));
+  });
+});
+
+describe('reconcileAgentImageCredits', () => {
+  it('devolve créditos de job terminal sem depender de novo polling do cliente', async () => {
+    const terminal = pendingJob(['s1']);
+    terminal.ownerId = owner;
+    terminal.job = { ...terminal.job, status:'failed', afterVersion:3, errorCode:'image_generation_failed' };
+    terminal.slides = terminal.slides.map(slide => ({ ...slide, status:'failed', creditReserved:true }));
+    mocked.listSettlement.mockResolvedValue([terminal]);
+
+    await expect(reconcileAgentImageCredits()).resolves.toEqual({
+      scanned:1, settled:1, pending:0, failed:0,
+    });
+
+    expect(mocked.refund).toHaveBeenCalledWith(expect.objectContaining({
+      customerId:owner, periodStartSec:100, operationId:op('s1'),
+    }));
+    expect(mocked.markSettled).toHaveBeenCalledWith(owner, requestId);
+    expect(mocked.job).not.toHaveBeenCalled();
+  });
+
+  it('mantém o job pendente para uma nova passagem se a quota continuar indisponível', async () => {
+    const terminal = pendingJob(['s1']);
+    terminal.ownerId = owner;
+    terminal.job = { ...terminal.job, status:'failed', afterVersion:3, errorCode:'image_generation_failed' };
+    terminal.slides = terminal.slides.map(slide => ({ ...slide, status:'failed', creditReserved:true }));
+    mocked.listSettlement.mockResolvedValue([terminal]);
+    mocked.refund.mockRejectedValueOnce(new Error('quota offline'));
+
+    await expect(reconcileAgentImageCredits()).resolves.toEqual({
+      scanned:1, settled:0, pending:1, failed:0,
+    });
+    expect(mocked.markSettled).not.toHaveBeenCalled();
+
+    await expect(reconcileAgentImageCredits()).resolves.toEqual({
+      scanned:1, settled:1, pending:0, failed:0,
+    });
+    expect(mocked.markSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it('expira job abandonado antes de devolver a reserva', async () => {
+    const stale = pendingJob(['s1']);
+    stale.ownerId = owner;
+    stale.job.createdAt = new Date(Date.now() - 20 * 60_000).toISOString();
+    const expired = {
+      expired:true,
+      job:{ ...stale.job, status:'failed', afterVersion:3, errorCode:'image_job_timeout' },
+      slides:stale.slides.map(slide => ({ ...slide, status:'failed', errorCode:'image_job_timeout' })),
+      meta:stale.meta,
+    };
+    mocked.listSettlement.mockResolvedValue([stale]);
+    mocked.expireJob.mockResolvedValue(expired);
+
+    await expect(reconcileAgentImageCredits()).resolves.toMatchObject({ settled:1 });
+    expect(mocked.expireJob).toHaveBeenCalledWith(owner, requestId);
+    expect(mocked.refund).toHaveBeenCalledTimes(1);
+    expect(mocked.markSettled).toHaveBeenCalledWith(owner, requestId);
   });
 });
 

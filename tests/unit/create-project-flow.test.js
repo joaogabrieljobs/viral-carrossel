@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cloneCreationBrand, creationMaterialHasContent, NARRATIVE_CHOICES, readCreationTextFile, validCreationCount, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice } from '../../src/utils/create-project-flow.js';
+import { cloneCreationBrand, creationMaterialHasContent, NARRATIVE_CHOICES, readCreationTextFile, validCreationCount, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, clampCreationMaterial, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage, creationMaterialOverages } from '../../src/utils/create-project-flow.js';
+import { PRESENTATION_INSTRUCTIONS_MAX_CHARS } from '../../src/utils/presentation-material.js';
 
 describe('novo projeto: escolhas e material local', () => {
   it('isola a identidade e as referências do perfil salvo', () => {
@@ -33,6 +34,37 @@ describe('novo projeto: escolhas e material local', () => {
     expect(creationMaterialHasContent({ content:'Notas reais' })).toBe(true);
     expect(creationMaterialHasContent({ sources:'https://exemplo.com' })).toBe(true);
     expect(creationMaterialHasContent({ context:'Apresente os serviços desta marca.' })).toBe(true);
+  });
+  it('usa no carrossel exatamente os limites mostrados antes da geração', () => {
+    expect(creationMaterialLimits('carrossel')).toEqual({ content:8000, sources:2000, context:1500 });
+    const material = clampCreationMaterial({
+      content:'c'.repeat(8100), sources:'s'.repeat(2100), context:'i'.repeat(1600), refProfileId:'voz',
+    }, 'carrossel');
+    expect(material.content).toHaveLength(8000);
+    expect(material.sources).toHaveLength(2000);
+    expect(material.context).toHaveLength(1500);
+    expect(material.refProfileId).toBe('voz');
+    expect(creationMaterialOverages({ content:'c'.repeat(8100) }, 'carrossel')).toEqual({
+      content:{ length:8100, limit:8000, excess:100 },
+    });
+    expect(creationMaterialOverages({ content:'c'.repeat(8000) }, 'carrossel')).toEqual({});
+  });
+  it('anuncia para apresentação o mesmo limite real usado pelo prompt', () => {
+    expect(creationMaterialLimits('apresentacao').context).toBe(PRESENTATION_INSTRUCTIONS_MAX_CHARS);
+    expect(clampCreationMaterial({ context:'i'.repeat(PRESENTATION_INSTRUCTIONS_MAX_CHARS + 100) }, 'apresentacao').context)
+      .toHaveLength(PRESENTATION_INSTRUCTIONS_MAX_CHARS);
+  });
+  it('não corta silenciosamente material válido para apresentação ao trocar para carrossel', () => {
+    const material = {
+      content:'c'.repeat(8100),
+      sources:'https://example.com',
+      context:'Escreva em inglês.',
+      refProfileId:'voz',
+    };
+    expect(creationMaterialForSubmission(material, 'apresentacao')).toEqual(material);
+    expect(() => creationMaterialForSubmission(material, 'carrossel')).toThrow(/texto completo foi preservado/i);
+    expect(creationMaterialOverageMessage(material, 'carrossel')).toContain('Texto de apoio: reduza 100 caracteres');
+    expect(material.content).toHaveLength(8100);
   });
   it('importa texto completo e preserva quebras, sem simular leitura de PDF ou Word', async () => {
     const content = '# Material\n\nInformação com acento.\n\nFim.';

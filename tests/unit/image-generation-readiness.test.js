@@ -37,6 +37,16 @@ describe('instrução e habilitação da imagem por slide', () => {
     expect(slideImageGenerationState({ imageQuery: 'Coffee', refImageAssetId: 'cloud', refImageFailed: true }, available)).toMatchObject({ canGenerate: false, reason: 'reference_unavailable' });
     expect(slideImageGenerationState({ imageQuery: 'Coffee', refImageFailed: true, refImage: 'data:image/png;base64,YQ==' }, available).canGenerate).toBe(true);
     expect(slideImageGenerationState({ title:'Café', imageReferences:[{ imageId:'stored' }] }, available).canGenerate).toBe(true);
+    const missing = { imageQuery:'Coffee', imageReferences:[{
+      id:'product', assetId:'cloud-missing', name:'Produto', mention:'produto', missing:true,
+    }] };
+    const missingState = slideImageGenerationState(missing, available);
+    expect(missingState).toMatchObject({ canGenerate:false, reason:'reference_unavailable' });
+    const html = renderToStaticMarkup(React.createElement(PerSlideImageRefBlock, {
+      slide:missing, generationState:missingState, onGenerateImage() {}, onReuploadRef() {},
+    }));
+    expect(html).toContain('Reenviar');
+    expect(html).toContain('Reenviar Produto');
   });
 
   it('referência sozinha não habilita uma geração sem instrução', () => {

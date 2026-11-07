@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const put = vi.fn();
 const get = vi.fn();
 const head = vi.fn();
+const del = vi.fn();
 
 vi.mock('@vercel/blob', () => ({
   put: (...args) => put(...args),
   get: (...args) => get(...args),
   head: (...args) => head(...args),
+  del: (...args) => del(...args),
 }));
 
 describe('project-share-store', () => {
@@ -32,6 +34,127 @@ describe('project-share-store', () => {
     expect(saved.code).toBe('ABCD1234');
     const loaded = await getSharedProject('ABCD1234');
     expect(loaded?.doc?.slides?.[0]?.title).toBe('A');
+  });
+
+  it('mantém expiração absoluta mesmo depois de uma entrada atualizar a partilha', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const { putSharedProject, mutateSharedProject, getSharedProject, SHARE_TTL_SEC } =
+      await import('../../api/lib/project-share-store.js');
+    const created = await putSharedProject({
+      code: 'ABSOLUTE', members: ['cus_owner'], doc: { slides: [] }, revision: 0,
+    });
+    const originalExpiry = created.expiresAt;
+    vi.setSystemTime(new Date(Date.now() + 29 * 24 * 60 * 60 * 1000));
+    const joined = await mutateSharedProject('ABSOLUTE', (current) => ({
+      ...current, members: [...current.members, 'cus_member'], keepRevision: true,
+    }));
+    expect(joined.expiresAt).toBe(originalExpiry);
+    expect(joined.updatedAt).toBeGreaterThan(created.updatedAt);
+    vi.setSystemTime(new Date(created.createdAt + SHARE_TTL_SEC * 1000 + 1));
+    expect(await getSharedProject('ABSOLUTE')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('revoga o código guardado em memória', async () => {
+    const { putSharedProject, getSharedProject, deleteSharedProject } =
+      await import('../../api/lib/project-share-store.js');
+    await putSharedProject({ code: 'REVOKE01', doc: { slides: [] }, revision: 0 });
+    expect(await deleteSharedProject('REVOKE01')).toBe(true);
+    expect(await getSharedProject('REVOKE01')).toBeNull();
+  });
+
+  it('remove o arquivo privado do Blob ao revogar em produção', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+    del.mockResolvedValue(undefined);
+    const { deleteSharedProject } = await import('../../api/lib/project-share-store.js');
+    expect(await deleteSharedProject('BLOBDEL1')).toBe(true);
+    expect(del).toHaveBeenCalledWith('project-shares/BLOBDEL1.json');
+  });
+
+  it('mantém a revogação fechada quando o Redis confirma e a exclusão do Blob falha', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-test');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    let stored = null;
+    let failRedisRead = false;
+    let redisKeyMissing = false;
+    let blobSerialized = JSON.stringify({
+      code:'REVFAIL1', doc:{ slides:[{ title:'ainda no blob' }] },
+    });
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      const [command, key, value] = JSON.parse(init.body);
+      if (command === 'SET' && key.endsWith(':mutation-lock')) {
+        return { ok:true, json:async () => ({ result:'OK' }) };
+      }
+      if (command === 'SET') {
+        stored = value;
+        return { ok:true, json:async () => ({ result:'OK' }) };
+      }
+      if (command === 'GET') {
+        if (failRedisRead) throw new Error('Redis temporariamente indisponível');
+        return { ok:true, json:async () => ({ result:redisKeyMissing ? null : stored }) };
+      }
+      if (command === 'EVAL') return { ok:true, json:async () => ({ result:1 }) };
+      throw new Error(`comando inesperado: ${command}`);
+    }));
+    del.mockRejectedValue(new Error('Blob temporariamente indisponível'));
+    put.mockImplementation(async (_pathname, body) => { blobSerialized = body; });
+    get.mockImplementation(async () => ({
+      stream:new Response(blobSerialized).body,
+      blob:{ etag:'old' },
+    }));
+
+    const { deleteSharedProject, getSharedProject } =
+      await import('../../api/lib/project-share-store.js');
+    await expect(deleteSharedProject('REVFAIL1')).resolves.toBe(true);
+    await expect(getSharedProject('REVFAIL1')).resolves.toBeNull();
+    expect(JSON.parse(stored)).toMatchObject({ revoked:true });
+    expect(get).not.toHaveBeenCalled();
+
+    // O Blob antigo ainda existe. Se o Redis falhar depois de confirmar a
+    // revogação, a leitura deve fechar em erro em vez de ressuscitar o projeto.
+    failRedisRead = true;
+    await expect(getSharedProject('REVFAIL1'))
+      .rejects.toMatchObject({ code:'share_storage_unconfigured' });
+    expect(get).not.toHaveBeenCalled();
+
+    // Mesmo se a chave Redis for perdida, o Blob antigo já foi substituído
+    // por um tombstone e não pode reaparecer como projeto válido.
+    failRedisRead = false;
+    redisKeyMissing = true;
+    await expect(getSharedProject('REVFAIL1')).resolves.toBeNull();
+    expect(JSON.parse(blobSerialized)).toMatchObject({ code:'REVFAIL1', revoked:true });
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('não confirma revogação se não remover nem substituir o Blob antigo', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-test');
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test');
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      const [command, key] = JSON.parse(init.body);
+      if (command === 'SET' && key.endsWith(':mutation-lock')) {
+        return { ok:true, json:async () => ({ result:'OK' }) };
+      }
+      if (command === 'SET') return { ok:true, json:async () => ({ result:'OK' }) };
+      if (command === 'EVAL') return { ok:true, json:async () => ({ result:1 }) };
+      throw new Error(`comando inesperado: ${command}`);
+    }));
+    del.mockRejectedValue(new Error('Blob indisponível'));
+    put.mockRejectedValue(new Error('Blob continua indisponível'));
+
+    const { deleteSharedProject } = await import('../../api/lib/project-share-store.js');
+    await expect(deleteSharedProject('REVFAIL2'))
+      .rejects.toMatchObject({ code:'share_storage_unconfigured' });
   });
 
   it('em produção sem Blob/Redis falha em vez de gravar só em memória', async () => {

@@ -134,6 +134,23 @@ export function mergeConfirmedAssetIds(current, confirmed) {
       if (!slide[idKey] || slide[idKey] !== remote[idKey]) continue;
       next = { ...next, [assetKey]: remote[assetKey] };
     }
+    if (Array.isArray(slide.imageReferences) && Array.isArray(remote.imageReferences)) {
+      const remoteById = new Map(remote.imageReferences
+        .filter((ref) => ref?.id).map((ref) => [String(ref.id), ref]));
+      let refsChanged = false;
+      const imageReferences = slide.imageReferences.map((ref) => {
+        const savedRef = ref?.id ? remoteById.get(String(ref.id)) : null;
+        if (!savedRef?.assetId || ref.assetId) return ref;
+        refsChanged = true;
+        return { ...ref, assetId:savedRef.assetId };
+      });
+      const removalConfirmed = Object.prototype.hasOwnProperty.call(slide, 'removedImageReferenceIds')
+        && !Object.prototype.hasOwnProperty.call(remote, 'removedImageReferenceIds');
+      if (refsChanged || removalConfirmed) {
+        const { removedImageReferenceIds: _removed, ...clean } = next;
+        next = { ...clean, imageReferences };
+      }
+    }
     if (next !== slide) changed = true;
     return next;
   });

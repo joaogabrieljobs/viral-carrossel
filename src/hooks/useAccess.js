@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   fetchAccessSession,
+  isAccessSessionUnavailable,
   confirmCheckoutSession,
   clearPendingCheckoutSessionId,
   openBillingPortal,
@@ -35,6 +36,37 @@ const LOGOUT_PRESERVED_KEYS = new Set([
   'vc_account_write_lock', 'vc_account_write_lock_token',
   'vc_logout_warning', LOGOUT_CLEANUP_PENDING_KEY,
 ]);
+
+export function accessStateFromSession(session = {}, current = {}) {
+  if (isAccessSessionUnavailable(session)) {
+    const wasActive = current?.active === true;
+    return {
+      ...current,
+      // No boot, manter `loading` leva à tela segura com “Tentar novamente”
+      // em vez do paywall. Durante o uso, mantém a conta aberta localmente.
+      status: wasActive ? session.status : 'loading',
+      sessionStatus: session.status,
+      verificationUnavailable: true,
+      verificationError: session.error || 'Não foi possível verificar sua conta. Tente novamente.',
+      active: wasActive,
+    };
+  }
+  return {
+    status: session.billingDisabled ? 'disabled' : (session.active ? 'active' : 'inactive'),
+    sessionStatus: session.status || null,
+    verificationUnavailable: false,
+    verificationError: '',
+    active: !!session.active,
+    email: session.email || null,
+    customerId: session.customerId || null,
+    billingDisabled: !!session.billingDisabled,
+    currentPeriodEnd: session.currentPeriodEnd || null,
+    currentPeriodStart: session.currentPeriodStart || null,
+    tier: session.tier || null,
+    plan: session.plan || null,
+    imageQuota: session.imageQuota || null,
+  };
+}
 
 function hasAccountDataResidue() {
   try {
@@ -239,18 +271,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
   const refreshAccess = useCallback(async () => {
     const session = await fetchAccessSession();
-    setAccess({
-      status: session.billingDisabled ? 'disabled' : (session.active ? 'active' : 'inactive'),
-      active: !!session.active,
-      email: session.email || null,
-      customerId: session.customerId || null,
-      billingDisabled: !!session.billingDisabled,
-      currentPeriodEnd: session.currentPeriodEnd || null,
-      currentPeriodStart: session.currentPeriodStart || null,
-      tier: session.tier || null,
-      plan: session.plan || null,
-      imageQuota: session.imageQuota || null,
-    });
+    setAccess((current) => accessStateFromSession(session, current));
     return session;
   }, []);
 
@@ -260,6 +281,17 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     const owner = latestAccessRef.current.email;
     const session = await fetchAccessSession();
     if (latestAccessRef.current.email !== owner || !latestAccessRef.current.active) return null;
+    if (isAccessSessionUnavailable(session)) {
+      setAccess((current) => ({
+        ...current,
+        status: session.status,
+        sessionStatus: session.status,
+        verificationUnavailable: true,
+        verificationError: session.error || 'Não foi possível verificar sua conta. Tente novamente.',
+        imageQuota: { ...current.imageQuota, status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
+      }));
+      throw new Error(session.error || 'Não foi possível consultar o uso da conta.');
+    }
     if (!session.active || session.email !== owner) {
       setAccess((current) => ({
         ...current,
@@ -341,6 +373,11 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
       const session = await refreshAccess();
       if (cancelled) return;
+      if (isAccessSessionUnavailable(session)) {
+        libraryCallbacksRef.current.onLibraryBlocked?.(session.error
+          || 'Não foi possível verificar sua conta. Confira a conexão e tente novamente.');
+        return;
+      }
       if (PROJECTS_V2 && session.active) {
         bootDeadline = new Promise((_, reject) => {
           bootDeadlineTimer = setTimeout(() => {
@@ -639,6 +676,10 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
 
   const completeLanding = useCallback(async () => {
     const session = await refreshAccess();
+    if (isAccessSessionUnavailable(session)) {
+      toast?.(session.error || 'Não foi possível verificar sua conta. Tente novamente.', 'warning', 7000);
+      return;
+    }
     if (session.active) {
       enterStudio();
       return;
@@ -646,7 +687,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     setLandingOpen(false);
     setPaywallOpen(true);
     trackEvent('paywall_open');
-  }, [refreshAccess, enterStudio]);
+  }, [refreshAccess, enterStudio, toast]);
 
   const reopenLanding = useCallback(() => {
     try { sessionStorage.removeItem(SK.landingDismissed); } catch { /* */ }

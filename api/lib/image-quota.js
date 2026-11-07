@@ -306,15 +306,26 @@ export async function refundImageCredit({ customerId, periodStartSec, operationI
   return withQuotaStore(
     async () => {
       if (opKey) {
-        const status = await upstash(['GET', opKey]);
-        if (status === 'refunded') return Number(await upstash(['GET', key])) || 0;
+        // GET -> DECR -> SET permitiria dois reconciliadores devolverem o
+        // mesmo crédito. Lua torna a verificação e a mudança uma operação
+        // atómica; operationId ausente é no-op para commits ambíguos.
+        const script = `
+          local status = redis.call('GET', KEYS[2])
+          local used = tonumber(redis.call('GET', KEYS[1]) or '0')
+          if not status or status == 'refunded' then return used end
+          if used > 0 then used = tonumber(redis.call('DECR', KEYS[1]) or '0') end
+          if used < 0 then redis.call('SET', KEYS[1], '0'); used = 0 end
+          redis.call('SET', KEYS[2], 'refunded', 'EX', ARGV[1])
+          return used
+        `;
+        return Number(await upstash(['EVAL', script, '2', key, opKey, String(ttlSeconds(0))])) || 0;
       }
       const n = Number(await upstash(['DECR', key])) || 0;
       if (n < 0) await upstash(['SET', key, '0']);
-      if (opKey) await upstash(['SET', opKey, 'refunded', 'EX', String(ttlSeconds(0))]);
       return Math.max(0, n);
     },
     async () => {
+      if (opKey && !imageOps.has(opKey)) return memory.get(key) || 0;
       if (opKey && imageOps.get(opKey) === 'refunded') return memory.get(key) || 0;
       const next = await memoryDecr(key);
       if (opKey && imageOps.has(opKey)) imageOps.set(opKey, 'refunded');

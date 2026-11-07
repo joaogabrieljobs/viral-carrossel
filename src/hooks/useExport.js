@@ -5,7 +5,7 @@
  * Renderiza a partir dos refs OFFSCREEN (`slideRefs`), nunca do preview escalado,
  * então o resultado sai sempre nas dimensões reais do formato × 3 (retina).
  */
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -26,6 +26,14 @@ export function exportFileStem(projectName, isPresentation = false) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100);
   const kind = isPresentation ? 'apresentacao' : 'carrossel';
   return name ? `${kind}-${name}` : kind;
+}
+
+/** PDFs longos precisam de uma escala menor em aparelhos com pouca memória. */
+export function pdfCanvasScale({
+  viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280,
+  deviceMemory = typeof navigator !== 'undefined' ? navigator.deviceMemory : undefined,
+} = {}) {
+  return viewportWidth <= 760 || (Number.isFinite(deviceMemory) && deviceMemory <= 4) ? 2 : 3;
 }
 
 /** Extrai todas as URLs de `background-image`, inclusive em camadas múltiplas. */
@@ -218,6 +226,8 @@ export function useExport({
   setError,
   toast,
 }) {
+  const exportInFlightRef = useRef(false);
+  const cancelExportRef = useRef(false);
   const isPresentation = productKind === 'apresentacao' || fmt === 'apresentacao';
   const itemLabel = isPresentation ? 'slide' : 'card';
   const fileStem = exportFileStem(projectName, isPresentation);
@@ -234,14 +244,39 @@ export function useExport({
     if (isPresentation) assertPresentationExportQuality(scope);
   };
 
-  const renderSlideToCanvas = async (slideObj) => {
+  const beginExport = () => {
+    if (exportInFlightRef.current) {
+      toast('Uma exportação já está em andamento.', 'info');
+      return false;
+    }
+    exportInFlightRef.current = true;
+    cancelExportRef.current = false;
+    return true;
+  };
+  const finishExport = () => {
+    exportInFlightRef.current = false;
+    cancelExportRef.current = false;
+    setExporting(false);
+  };
+  const throwIfExportCancelled = () => {
+    if (cancelExportRef.current) {
+      throw Object.assign(new Error('Exportação cancelada.'), { code: 'export_cancelled' });
+    }
+  };
+  const cancelExport = useCallback(() => {
+    if (!exportInFlightRef.current) return;
+    cancelExportRef.current = true;
+    toast('Cancelando após o arquivo atual…', 'info');
+  }, [toast]);
+
+  const renderSlideToCanvas = async (slideObj, { scale = 3 } = {}) => {
     const el = slideRefs.current[slideObj.id];
     if (!el) throw new Error('Elemento de export não encontrado');
     const f = FORMATS[fmt] || FORMATS.carrossel;
     const w = Math.max(1, Math.round(el.offsetWidth || el.scrollWidth || f.w));
     const h = Math.max(1, Math.round(el.offsetHeight || el.scrollHeight || f.h));
     return html2canvas(el, {
-      scale: 3,                 // 3× — logos finas e CTAs saem nítidos no PNG
+      scale,
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -259,8 +294,10 @@ export function useExport({
   };
 
   const exportSlide = async (idx) => {
+    if (!beginExport()) return false;
     setExporting(true); setExportProgress({current:1,total:1});
     try {
+      throwIfExportCancelled();
       const slide = slides[idx];
       // Se card tem vídeo, baixa o vídeo bruto + uma cópia PNG do card sem o vídeo
       // (pra você sobrepor manualmente no CapCut/InShot)
@@ -270,18 +307,23 @@ export function useExport({
           const ext = (entry.mime || 'video/mp4').split('/')[1].split(';')[0] || 'mp4';
           await downloadBlob(entry.blob, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}-video.${ext}`);
           toast(`Vídeo do ${itemLabel} ${idx+1} baixado. Adicione o texto no editor de vídeo (CapCut, InShot, etc).`, 'success', 6000);
-          return;
+          return true;
         }
       }
       await waitForRender([idx]);
       const canvas = await renderSlideToCanvas(slide);
       await downloadCanvasPng(canvas, `${isPresentation ? `${fileStem}-` : ''}slide-${String(idx+1).padStart(2,'0')}.png`);
       toast(`${isPresentation ? 'Slide' : 'Card'} ${idx+1} baixado`, 'success');
-    } catch(e) { setError('Erro ao exportar: '+e.message); }
-    finally { setExporting(false); }
+      return true;
+    } catch(e) {
+      if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
+      return false;
+    }
+    finally { finishExport(); }
   };
 
   const exportAll = async () => {
+    if (!beginExport()) return false;
     setExporting(true);
     setExportProgress({current:0,total:slides.length});
     try {
@@ -289,6 +331,7 @@ export function useExport({
       const zip = new JSZip();
       const videoSlides = [];
       for (let i=0; i<slides.length; i++) {
+        throwIfExportCancelled();
         setExportProgress({current:i+1,total:slides.length});
         const slide = slides[i];
         if (slide?.videoId) {
@@ -343,13 +386,17 @@ export function useExport({
         zip.file('LEIA-ME.md', readme);
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      throwIfExportCancelled();
       await downloadBlob(zipBlob, `${fileStem}.zip`);
       const videoNote = videoSlides.length > 0 ? ` (${videoSlides.length} c/ vídeo — veja LEIA-ME.md)` : '';
       toast(`ZIP com ${slides.length} ${itemLabel}s pronto${videoNote}`, 'success');
       trackEvent('export_zip', { card_count: String(slides.length), videos: String(videoSlides.length) });
       return true;
-    } catch(e) { setError('Erro ao exportar: '+e.message); return false; }
-    finally { setExporting(false); }
+    } catch(e) {
+      if (e?.code !== 'export_cancelled') setError('Erro ao exportar: '+e.message);
+      return false;
+    }
+    finally { finishExport(); }
   };
 
   // Baixa as imagens RAW (sem texto/overlay) — útil pra guardar geração IA paga.
@@ -362,12 +409,14 @@ export function useExport({
       toast(`Nenhum ${itemLabel} tem foto para baixar.`, 'info');
       return;
     }
+    if (!beginExport()) return false;
     setExporting(true);
     setExportProgress({ current: 0, total: withPhotos.length });
     try {
       const zip = new JSZip();
       let aiCount = 0;
       for (let k = 0; k < withPhotos.length; k++) {
+        throwIfExportCancelled();
         setExportProgress({ current: k + 1, total: withPhotos.length });
         const { s, i } = withPhotos[k];
         try {
@@ -384,6 +433,7 @@ export function useExport({
         }
       }
       const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      throwIfExportCancelled();
       await downloadBlob(zipBlob, `${fileStem}-fotos.zip`);
       toast(
         aiCount > 0
@@ -392,15 +442,18 @@ export function useExport({
         'success',
         5000,
       );
+      return true;
     } catch (e) {
-      setError('Erro ao baixar fotos: ' + e.message);
+      if (e?.code !== 'export_cancelled') setError('Erro ao baixar fotos: ' + e.message);
+      return false;
     } finally {
-      setExporting(false);
+      finishExport();
     }
   };
 
   // Exporta todos os slides em UM único PDF (1 slide por página, dimensões reais)
   const exportPDF = async () => {
+    if (!beginExport()) return false;
     setExporting(true);
     setExportProgress({current:0,total:slides.length});
     try {
@@ -408,19 +461,28 @@ export function useExport({
       const f = FORMATS[fmt] || FORMATS.carrossel;
       const pdf = new jsPDF({ unit:'px', format:[f.w, f.h], orientation: f.h > f.w ? 'portrait' : 'landscape', compress:true });
       pdf.setProperties({ title: projectName || (isPresentation ? 'Apresentação' : 'Carrossel') });
+      const scale = pdfCanvasScale();
       for (let i=0; i<slides.length; i++) {
+        throwIfExportCancelled();
         setExportProgress({current:i+1,total:slides.length});
-        const canvas = await renderSlideToCanvas(slides[i]);
+        const canvas = await renderSlideToCanvas(slides[i], { scale });
         // PNG no PDF: JPEG a 0.92 esborratava logo branca e CTAs.
-        const dataUrl = canvas.toDataURL('image/png');
+        let dataUrl = canvas.toDataURL('image/png');
         if (i > 0) pdf.addPage([f.w, f.h], f.h > f.w ? 'portrait' : 'landscape');
         pdf.addImage(dataUrl, 'PNG', 0, 0, f.w, f.h);
+        dataUrl = null;
+        canvas.width = 1;
+        canvas.height = 1;
       }
+      throwIfExportCancelled();
       await downloadBlob(pdf.output('blob'), `${fileStem}.pdf`);
       toast(`PDF com ${slides.length} ${itemLabel}s gerado`, 'success');
       return true;
-    } catch(e) { setError('Erro ao gerar PDF: '+e.message); return false; }
-    finally { setExporting(false); }
+    } catch(e) {
+      if (e?.code !== 'export_cancelled') setError('Erro ao gerar PDF: '+e.message);
+      return false;
+    }
+    finally { finishExport(); }
   };
 
   return {
@@ -430,5 +492,6 @@ export function useExport({
     exportAll,
     exportPhotosOnly,
     exportPDF,
+    cancelExport,
   };
 }

@@ -50,6 +50,7 @@ export function normalizeSlideImageReferences(value) {
       ...(ref.imageId ? { imageId:String(ref.imageId) } : {}),
       ...(ref.assetId ? { assetId:String(ref.assetId) } : {}),
       ...(typeof ref.dataUrl === 'string' && ref.dataUrl.startsWith('data:image/') ? { dataUrl:ref.dataUrl } : {}),
+      ...(ref.missing === true ? { missing:true, error:String(ref.error || 'Referência indisponível') } : {}),
     }));
 }
 
@@ -84,6 +85,7 @@ export function slideReferenceDescriptors(slide = {}) {
         refImageId:ref.imageId || ref.assetId,
         refImageAssetId:ref.assetId,
         refImage:ref.dataUrl || '',
+        refImageFailed:ref.missing === true,
       });
     });
   return descriptors;

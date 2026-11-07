@@ -5,7 +5,7 @@
  */
 
 import { randomBytes } from 'crypto';
-import { put, get, head } from '@vercel/blob';
+import { put, get, head, del } from '@vercel/blob';
 import { isUpstashDisabled } from './upstash-config.js';
 
 const SHARE_PREFIX = 'vc:project-share:';
@@ -15,8 +15,29 @@ const SHARE_TTL_SEC = 60 * 60 * 24 * 30; // 30 dias
 const MAX_REDIS_CHARS = 450_000;
 const MAX_BLOB_CHARS = 12_000_000;
 const MAX_PAYLOAD_CHARS = MAX_BLOB_CHARS;
+const REVOKED_SHARE_TOMBSTONE = Object.freeze({ revoked:true, version:1 });
 const memory = new Map();
 const localMutations = new Map();
+
+function absoluteExpiry(record, now = Date.now()) {
+  const explicit = Number(record?.expiresAt);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const created = Number(record?.createdAt);
+  if (Number.isFinite(created) && created > 0) return created + SHARE_TTL_SEC * 1000;
+  const legacyUpdated = Number(record?.updatedAt);
+  if (Number.isFinite(legacyUpdated) && legacyUpdated > 0) {
+    return legacyUpdated + SHARE_TTL_SEC * 1000;
+  }
+  return now + SHARE_TTL_SEC * 1000;
+}
+
+function shareExpired(record, now = Date.now()) {
+  return now >= absoluteExpiry(record, now);
+}
+
+function remainingTtlSec(record) {
+  return Math.max(1, Math.ceil((absoluteExpiry(record) - Date.now()) / 1000));
+}
 
 function hasUpstash() {
   if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return false;
@@ -149,8 +170,8 @@ async function readBlobPrivate(pathname) {
   return (await readBlobPrivateVersioned(pathname))?.record || null;
 }
 
-async function putRedis(key, serialized) {
-  const result = await upstash(['SET', key, serialized, 'EX', String(SHARE_TTL_SEC)]);
+async function putRedis(key, serialized, ttlSec = SHARE_TTL_SEC) {
+  const result = await upstash(['SET', key, serialized, 'EX', String(Math.max(1, ttlSec))]);
   if (result !== 'OK') throw new Error('Redis não confirmou a gravação.');
 }
 
@@ -161,10 +182,18 @@ export async function putSharedProject(record, {
   failClosedOnRedisError = false,
 } = {}) {
   const code = String(record.code || makeCode()).toUpperCase();
+  const now = Date.now();
+  const createdAt = Number.isFinite(Number(record.createdAt)) && Number(record.createdAt) > 0
+    ? Number(record.createdAt)
+    : (Number.isFinite(Number(record.updatedAt)) && Number(record.updatedAt) > 0
+      ? Number(record.updatedAt) : now);
+  const expiresAt = absoluteExpiry({ ...record, createdAt }, now);
   const payload = {
     ...record,
     code,
-    updatedAt: Date.now(),
+    createdAt,
+    expiresAt,
+    updatedAt: now,
     revision: record.keepRevision
       ? Math.max(1, Number(record.revision || 1))
       : Number(record.revision || 0) + 1,
@@ -176,11 +205,12 @@ export async function putSharedProject(record, {
   const pathname = `${BLOB_PREFIX}${code}.json`;
   const tooBigForRedis = serialized.length > MAX_REDIS_CHARS;
   const errors = [];
+  const ttlSec = remainingTtlSec(payload);
 
   // 1) Redis quando cabe — mais fiável e barato.
   if (!blobOnly && hasUpstash() && !tooBigForRedis) {
     try {
-      await putRedis(key, serialized);
+      await putRedis(key, serialized, ttlSec);
       return payload;
     } catch (e) {
       // Uma mutação que leu a versão vigente no Redis não pode mudar de
@@ -204,8 +234,9 @@ export async function putSharedProject(record, {
           blobPath: pathname,
           revision: payload.revision,
           updatedAt: payload.updatedAt,
+          expiresAt: payload.expiresAt,
           name: payload.name,
-        }));
+        }), ttlSec);
       }
       return payload;
     } catch (e) {
@@ -236,7 +267,7 @@ export async function putSharedProject(record, {
       };
       serialized = JSON.stringify(light);
       if (serialized.length <= MAX_REDIS_CHARS) {
-        await putRedis(key, serialized);
+        await putRedis(key, serialized, ttlSec);
         return light;
       }
     } catch (e) {
@@ -250,7 +281,7 @@ export async function putSharedProject(record, {
     || process.env.NODE_ENV === 'test'
     || process.env.NODE_ENV === 'development';
   if (allowMemory) {
-    memory.set(key, { value: serialized, expiresAt: Date.now() + SHARE_TTL_SEC * 1000 });
+    memory.set(key, { value: serialized, expiresAt: payload.expiresAt });
     return payload;
   }
 
@@ -267,12 +298,6 @@ export async function putSharedProject(record, {
 function validCode(code) {
   const normalized = String(code || '').trim().toUpperCase();
   return /^[A-Z0-9]{6,12}$/.test(normalized) ? normalized : '';
-}
-
-function shareExpired(record) {
-  const updatedAt = Number(record?.updatedAt);
-  return Number.isFinite(updatedAt) && updatedAt > 0
-    && Date.now() - updatedAt >= SHARE_TTL_SEC * 1000;
 }
 
 function storageReadUnavailable() {
@@ -297,6 +322,7 @@ async function readBlobForMutation(pathname) {
     if (error?.name !== 'BlobAccessError') throw storageReadUnavailable();
   }
   if (versioned) {
+    if (versioned.record?.revoked === true) return null;
     if (!versioned.etag || !versioned.record?.doc) throw storageReadUnavailable();
     return shareExpired(versioned.record) ? null : versioned;
   }
@@ -313,6 +339,7 @@ async function readBlobForMutation(pathname) {
     const response = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
     if (!response.ok) throw new Error('Blob público inacessível.');
     const record = await response.json();
+    if (record?.revoked === true) return null;
     if (!record?.doc) throw new Error('Documento inválido.');
     return shareExpired(record) ? null : { record, etag: strongBlobEtag(meta.etag) };
   } catch {
@@ -331,6 +358,7 @@ async function readCurrentForMutation(code) {
       let parsed;
       try { parsed = JSON.parse(raw); }
       catch { throw storageReadUnavailable(); }
+      if (parsed?.revoked === true) return null;
       if (parsed?.blobPath) {
         if (!hasBlob()) throw storageReadUnavailable();
         const versioned = await readBlobForMutation(parsed.blobPath);
@@ -338,6 +366,7 @@ async function readCurrentForMutation(code) {
         return { ...versioned, source: 'blob' };
       }
       if (!parsed?.doc) throw storageReadUnavailable();
+      if (shareExpired(parsed)) return null;
       return { record: parsed, source: 'redis' };
     }
     // Sem chave Redis, apenas um Blob realmente legível pode recuperar uma
@@ -445,6 +474,58 @@ export async function mutateSharedProject(code, change) {
   return withLocalMutationLock(normalized, mutate);
 }
 
+/** Revoga definitivamente um código em todos os backends configurados. */
+export async function deleteSharedProject(code) {
+  const normalized = validCode(code);
+  if (!normalized) return false;
+  const key = `${SHARE_PREFIX}${normalized}`;
+  const pathname = `${BLOB_PREFIX}${normalized}.json`;
+
+  const remove = async () => {
+    const existedInMemory = memory.has(key);
+    let removedRemote = false;
+    // Proteja/remova primeiro o Blob. Assim, se esta etapa falhar, o Redis
+    // continua apontando para o projeto e o dono ainda consegue repetir a
+    // revogação; um tombstone Redis prematuro bloquearia esse retry.
+    if (hasBlob()) {
+      try {
+        await del(pathname);
+        removedRemote = true;
+      } catch (error) {
+        if (blobNotFound(error)) {
+          removedRemote = true;
+        } else {
+          // Redis pode ser limpo/evictado. Se o Blob antigo não foi removido,
+          // substitua-o por um tombstone durável antes de confirmar a revogação.
+          const durableTombstone = {
+            ...REVOKED_SHARE_TOMBSTONE,
+            code:normalized,
+            revokedAt:Date.now(),
+          };
+          try {
+            await putBlobPrivate(pathname, JSON.stringify(durableTombstone));
+            removedRemote = true;
+          } catch (tombstoneError) {
+            throw Object.assign(
+              new Error('Não foi possível confirmar a revogação no armazenamento do projeto.'),
+              { code:'share_storage_unconfigured', cause:tombstoneError },
+            );
+          }
+        }
+      }
+    }
+    if (hasUpstash()) {
+      await upstash(['SET', key, JSON.stringify(REVOKED_SHARE_TOMBSTONE), 'EX', String(SHARE_TTL_SEC)]);
+      removedRemote = true;
+    }
+    memory.delete(key);
+    return existedInMemory || removedRemote;
+  };
+
+  if (hasUpstash()) return withRedisMutationLock(normalized, remove);
+  return withLocalMutationLock(normalized, remove);
+}
+
 export async function getSharedProject(code) {
   const normalized = validCode(code);
   if (!normalized) return null;
@@ -453,24 +534,34 @@ export async function getSharedProject(code) {
 
   // Redis primeiro (doc completo ou ponteiro blobPath).
   if (hasUpstash()) {
-    try {
-      const raw = await upstash(['GET', key]);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed?.blobPath && hasBlob()) {
-            const fromBlob = await readBlobPrivate(parsed.blobPath).catch(() => null);
-            if (fromBlob && !shareExpired(fromBlob)) return fromBlob;
-          }
-          if (parsed?.doc) return parsed;
-        } catch { /* ignore */ }
+    let raw;
+    try { raw = await upstash(['GET', key]); }
+    catch { throw storageReadUnavailable(); }
+    if (raw) {
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch { throw storageReadUnavailable(); }
+      // Uma chave Redis existente e autoritativa nunca cai para um Blob antigo:
+      // isso impediria que uma revogação reaparecesse durante uma falha do Redis.
+      if (parsed?.revoked === true || shareExpired(parsed)) return null;
+      if (parsed?.blobPath) {
+        if (!hasBlob()) throw storageReadUnavailable();
+        let fromBlob;
+        try { fromBlob = await readBlobPrivate(parsed.blobPath); }
+        catch { throw storageReadUnavailable(); }
+        if (!fromBlob) throw storageReadUnavailable();
+        if (fromBlob.revoked === true) return null;
+        return shareExpired(fromBlob) ? null : fromBlob;
       }
-    } catch { /* tenta Blob */ }
+      if (parsed?.doc) return parsed;
+      throw storageReadUnavailable();
+    }
   }
 
   if (hasBlob()) {
     try {
       const fromBlob = await readBlobPrivate(pathname);
+      if (fromBlob?.revoked === true) return null;
       if (fromBlob && !shareExpired(fromBlob)) return fromBlob;
     } catch { /* ignore */ }
     // Compat: blobs antigos públicos (se existirem).
@@ -480,6 +571,7 @@ export async function getSharedProject(code) {
         const res = await fetch(meta.url, { signal: AbortSignal.timeout(20_000) });
         if (res.ok) {
           const legacy = await res.json();
+          if (legacy?.revoked === true) return null;
           if (!shareExpired(legacy)) {
             try { await putBlobPrivate(pathname, JSON.stringify(legacy)); } catch { /* a leitura antiga continua válida */ }
             return legacy;

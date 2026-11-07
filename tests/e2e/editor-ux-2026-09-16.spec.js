@@ -20,6 +20,7 @@ test.describe('Editor — revisão de UX', () => {
     await entrarNoEditor(page);
     await page.getByRole('button', { name: /templates prontos/i }).click({ force: true });
     await page.getByText('Erro Comum', { exact: true }).first().click({ force: true });
+    await page.getByRole('button', { name: /aplicar só layout/i }).click();
     await page.waitForTimeout(1200);
 
     await expect(page.getByPlaceholder(/fundo branco minimalista/i)).toHaveCount(0);

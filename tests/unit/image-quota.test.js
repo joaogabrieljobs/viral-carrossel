@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   consumeImageCredit,
   getQuotaUsage,
@@ -112,5 +112,53 @@ describe('image-quota memory', () => {
     await refundImageCredit({ customerId: 'cus_d', periodStartSec: 1000, operationId: 'generation-1' });
     await refundImageCredit({ customerId: 'cus_d', periodStartSec: 1000, operationId: 'generation-1' });
     expect((await getQuotaUsage(args)).used).toBe(0);
+  });
+
+  it('não devolve crédito para operationId que nunca foi reservado', async () => {
+    const args = {
+      customerId: 'cus_e', periodStartSec: 1000, periodEndSec: 2000,
+      limit: 2, operationId: 'generation-real',
+    };
+    await consumeImageCredit(args);
+    await refundImageCredit({
+      customerId:'cus_e', periodStartSec:1000, operationId:'generation-missing',
+    });
+    expect((await getQuotaUsage(args)).used).toBe(1);
+  });
+});
+
+describe('image-quota Upstash', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('reembolsa o mesmo operationId atomicamente uma única vez', async () => {
+    vi.stubEnv('VITEST', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('UPSTASH_DISABLED', '');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'redis-test');
+    let used = 1;
+    let status = 'reserved';
+    const fetchMock = vi.fn(async (_url, init) => {
+      const command = JSON.parse(init.body);
+      expect(command[0]).toBe('EVAL');
+      if (status === 'reserved') {
+        used = Math.max(0, used - 1);
+        status = 'refunded';
+      }
+      return new Response(JSON.stringify({ result:used }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const args = {
+      customerId:'cus_upstash', periodStartSec:1000, operationId:'generation-upstash',
+    };
+    await Promise.all([refundImageCredit(args), refundImageCredit(args)]);
+
+    expect(used).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

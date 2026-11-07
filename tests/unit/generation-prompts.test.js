@@ -27,12 +27,44 @@ import {
   buildRefineSingleSlideRules,
   buildCaptionOutlineInstructions,
   buildMaterialPriorityBlock,
+  buildMaterialBlock,
   buildGenerationJsonContract,
   buildCarouselTextContext,
+  buildContentLanguageRule,
+  resolveRequestedContentLanguage,
+  GENERATION_TOPIC_MAX_CHARS,
 } from '../../src/utils/generation-prompts.js';
 import { AI_SYSTEM_PT } from '../../src/utils/ai-client.js';
 
 describe('módulo generation-prompts (extração do monólito)', () => {
+  it('mantém um teto explícito para o tema antes de montar o prompt', () => {
+    expect(GENERATION_TOPIC_MAX_CHARS).toBe(1500);
+  });
+  it('respeita idioma explícito e infere inglês do briefing sem traduzir imageQuery', () => {
+    expect(resolveRequestedContentLanguage({ instructions:'Write everything in English.' }))
+      .toMatchObject({ code:'en', source:'instructions' });
+    expect(resolveRequestedContentLanguage({
+      topic:'How local businesses can improve their customer experience',
+      content:'The audience wants a clear service, and the brand needs to explain what changes for the customer.',
+    })).toMatchObject({ code:'en', source:'brief' });
+    const rule = buildContentLanguageRule({ instructions:'Language: English. All titles and texts in English.' });
+    expect(rule).toContain('natural English');
+    expect(rule).toContain('não invente provérbios');
+    expect(rule).toContain('não combine ditados');
+    expect(rule).toContain('"imageQuery" permanece em INGLÊS');
+    expect(buildContentLanguageRule({ topic:'Conteúdo para a nossa marca' })).toContain('português brasileiro');
+  });
+  it('trata contexto como instrução legítima e fontes como dados no idioma escolhido', () => {
+    const block = buildMaterialBlock({
+      content:'Base factual',
+      sources:'https://example.com',
+      context:'Write everything in English.',
+    }, [{ url:'https://example.com', text:'A sufficiently long extracted source text that supports the requested topic and can be summarized.' }]);
+    expect(block).toContain('no idioma definido para o conteúdo');
+    expect(block).not.toContain('nos slides em português');
+    expect(block).toContain('INSTRUÇÕES ESPECÍFICAS DO USUÁRIO são legítimas para definir idioma');
+    expect(block).toContain('MATÉRIA-PRIMA, FONTES, REFERÊNCIAS');
+  });
   it('8 modos narrativos e opção Nenhum com orientação explícita', () => {
     expect(GEN_MODES).toHaveLength(9);
     for (const m of GEN_MODES) {

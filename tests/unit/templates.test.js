@@ -6,8 +6,15 @@ import {
   suggestVisualPresetForCreative, suggestCreativePresetForVisual,
 } from '../../src/utils/slide-design-system.js';
 import { PRESET_BRAND_SIGNATURE_KEYS, VISUAL_PRESETS } from '../../src/styles/visual-presets.jsx';
+import { templateImageCreditCount } from '../../src/components/TemplatesModal.jsx';
 
 describe('templates — integridade estrutural', () => {
+  it('expõe o custo real antes de uma aplicação com imagens', () => {
+    for (const template of TEMPLATES) {
+      expect(templateImageCreditCount(template)).toBe(template.slides.filter(slide => String(slide.q || '').trim()).length);
+    }
+    expect(templateImageCreditCount(null)).toBe(0);
+  });
   it('todo template referencia paleta, pairing e composições existentes', () => {
     for (const t of TEMPLATES) {
       expect(PALETTES[t.palette], `${t.id}: palette ${t.palette}`).toBeTruthy();

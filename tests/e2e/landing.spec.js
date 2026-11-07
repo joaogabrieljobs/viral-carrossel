@@ -172,6 +172,15 @@ test.describe('Landing (RF-01)', () => {
     });
   }
 
+  test('ação principal permanece na primeira dobra de um notebook 1280×713', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 713 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockApi(page);
+    await page.goto('/?landing=1');
+    const primaryHeroCta = await page.locator('.moont-lp-hero__actions .moont-lp-button').first().boundingBox();
+    expect(primaryHeroCta.y + primaryHeroCta.height).toBeLessThanOrEqual(713);
+  });
+
   test('movimento reduzido pula direto para a seção', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });

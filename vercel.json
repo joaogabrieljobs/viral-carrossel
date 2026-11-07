@@ -3,7 +3,10 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "crons": [{ "path": "/api/cron/cleanup-image-references", "schedule": "0 4 * * *" }],
+  "crons": [
+    { "path": "/api/cron/cleanup-image-references", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/reconcile-image-credits", "schedule": "*/15 * * * *" }
+  ],
   "build": {
     "env": {
       "VITE_ANTHROPIC_PROXY": "true"
@@ -11,31 +14,31 @@
   },
   "redirects": [
     {
-      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "source": "/((?!api/cron/(cleanup-image-references|reconcile-image-credits)$).*)",
       "has": [{ "type": "host", "value": "viral-carrossel.vercel.app" }],
       "destination": "https://moont.ai/$1",
       "permanent": true
     },
     {
-      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "source": "/((?!api/cron/(cleanup-image-references|reconcile-image-credits)$).*)",
       "has": [{ "type": "host", "value": "viral-carrossel-elevessy-s-projects.vercel.app" }],
       "destination": "https://moont.ai/$1",
       "permanent": true
     },
     {
-      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "source": "/((?!api/cron/(cleanup-image-references|reconcile-image-credits)$).*)",
       "has": [{ "type": "host", "value": "www.moont.ai" }],
       "destination": "https://moont.ai/$1",
       "permanent": true
     },
     {
-      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "source": "/((?!api/cron/(cleanup-image-references|reconcile-image-credits)$).*)",
       "has": [{ "type": "host", "value": "moont.com.br" }],
       "destination": "https://moont.ai/$1",
       "permanent": true
     },
     {
-      "source": "/((?!api/cron/cleanup-image-references$).*)",
+      "source": "/((?!api/cron/(cleanup-image-references|reconcile-image-credits)$).*)",
       "has": [{ "type": "host", "value": "www.moont.com.br" }],
       "destination": "https://moont.ai/$1",
       "permanent": true

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { getCurrentAgentSecurityContext } from './agent-token-store.js';
 import { getPostgresConnection } from './postgres-connection.js';
 
 const RESOURCE = 'https://moont.ai/mcp';
@@ -66,11 +67,14 @@ export async function validateOAuthRequest({ clientId, redirectUri, resource, sc
 export async function createAuthorizationCode({ clientId, ownerId, redirectUri, scopes, codeChallenge }) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(String(codeChallenge || ''))) fail('invalid_request', 'PKCE S256 obrigatório.');
   const code = secret('moont_code_');
+  const identity = await getCurrentAgentSecurityContext(ownerId);
   await getPostgresConnection().unsafe(
     `INSERT INTO moont.oauth_codes
-      (code_hash, client_id, owner_id, redirect_uri, resource, scopes, code_challenge, expires_at)
-     VALUES ($1, $2::uuid, $3, $4, $5, $6::text[], $7, now() + interval '5 minutes')`,
-    [hash(code), clientId, ownerId, redirectUri, RESOURCE, scopes, codeChallenge],
+      (code_hash, client_id, owner_id, redirect_uri, resource, scopes, code_challenge,
+       agent_epoch, account_id, expires_at)
+     VALUES ($1, $2::uuid, $3, $4, $5, $6::text[], $7, $8, $9::uuid, now() + interval '5 minutes')`,
+    [hash(code), clientId, ownerId, redirectUri, RESOURCE, scopes, codeChallenge,
+      identity.agentEpoch, identity.accountId],
   );
   return code;
 }
@@ -79,7 +83,16 @@ export async function consumeAuthorizationCode({ code, clientId, redirectUri, re
   normalizeOAuthResource(resource);
   if (!UUID.test(String(clientId || '')) || !/^[A-Za-z0-9._~-]{43,128}$/.test(String(verifier || ''))) fail('invalid_grant', 'Código inválido.');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
-  return getPostgresConnection().begin(async tx => {
+  const sql = getPostgresConnection();
+  const ownerRows = await sql.unsafe(
+    `SELECT owner_id FROM moont.oauth_codes
+     WHERE code_hash = $1 AND used_at IS NULL AND expires_at > now()`,
+    [hash(code)],
+  );
+  const ownerId = ownerRows[0]?.owner_id;
+  if (!ownerId) fail('invalid_grant', 'Código inválido ou expirado.');
+  const identity = await getCurrentAgentSecurityContext(ownerId);
+  return sql.begin(async tx => {
     const rows = await tx.unsafe(
       `SELECT c.*, client.client_name
        FROM moont.oauth_codes c
@@ -91,26 +104,77 @@ export async function consumeAuthorizationCode({ code, clientId, redirectUri, re
       || row.redirect_uri !== redirect(redirectUri) || row.resource !== RESOURCE || row.code_challenge !== challenge) {
       fail('invalid_grant', 'Código inválido ou expirado.');
     }
+    if (row.agent_epoch == null
+      || String(row.agent_epoch || '') !== String(identity.agentEpoch || '')
+      || String(row.account_id || '') !== String(identity.accountId || '')) {
+      fail('invalid_grant', 'Código encerrado após uma alteração de segurança.');
+    }
     await tx.unsafe(`UPDATE moont.oauth_codes SET used_at = now() WHERE code_hash = $1`, [hash(code)]);
-    return { ownerId: row.owner_id, scopes: row.scopes, clientName: row.client_name };
+    return { ownerId: row.owner_id, scopes: row.scopes, clientName: row.client_name,
+      securitySnapshot:identity };
   });
 }
 
 export async function createRefreshToken({ clientId, ownerId, scopes }) {
   const token = secret('moont_refresh_');
-  await getPostgresConnection().unsafe(
-    `INSERT INTO moont.oauth_refresh_tokens
-      (token_hash, client_id, owner_id, resource, scopes, expires_at)
-     VALUES ($1, $2::uuid, $3, $4, $5::text[], now() + interval '30 days')`,
-    [hash(token), clientId, ownerId, RESOURCE, scopes],
-  );
+  const identity = await getCurrentAgentSecurityContext(ownerId);
+  const sql = getPostgresConnection();
+  try {
+    await sql.unsafe(
+      `INSERT INTO moont.oauth_refresh_tokens
+        (token_hash, client_id, owner_id, resource, scopes, agent_epoch, account_id, expires_at)
+       VALUES ($1, $2::uuid, $3, $4, $5::text[], $6, $7::uuid, now() + interval '30 days')`,
+      [hash(token), clientId, ownerId, RESOURCE, scopes, identity.agentEpoch, identity.accountId],
+    );
+  } catch (error) {
+    // Compatibilidade durante a implantação: mesmo antes da migração, o
+    // `created_at` é comparado com `session_revoked_before` na renovação.
+    if (error?.code !== '42703') throw error;
+    await sql.unsafe(
+      `INSERT INTO moont.oauth_refresh_tokens
+        (token_hash, client_id, owner_id, resource, scopes, expires_at)
+       VALUES ($1, $2::uuid, $3, $4, $5::text[], now() + interval '30 days')`,
+      [hash(token), clientId, ownerId, RESOURCE, scopes],
+    );
+  }
   return token;
+}
+
+/** Revoga a credencial recém-emitida ou, apó mudança de segurança, toda a família. */
+export async function revokeRefreshToken({ token, ownerId, revokeFamily = false }) {
+  if (typeof ownerId !== 'string' || !ownerId || ownerId.length > 255) return false;
+  const sql = getPostgresConnection();
+  const rows = revokeFamily
+    ? await sql.unsafe(
+      `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+       WHERE owner_id = $1 AND revoked_at IS NULL RETURNING token_hash`, [ownerId],
+    )
+    : await sql.unsafe(
+      `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+       WHERE owner_id = $1 AND token_hash = $2 AND revoked_at IS NULL RETURNING token_hash`,
+      [ownerId, hash(token)],
+    );
+  return rows.length > 0;
 }
 
 export async function rotateRefreshToken({ token, clientId, resource }) {
   normalizeOAuthResource(resource);
   if (!UUID.test(String(clientId || ''))) fail('invalid_grant', 'Renovação inválida.');
-  return getPostgresConnection().begin(async tx => {
+  const sql = getPostgresConnection();
+  // Resolva o contexto da conta antes de abrir a transação. A consulta de
+  // identidade também usa o pool Postgres; executá-la com a linha de refresh
+  // bloqueada pode esgotar um pool pequeno quando duas renovações concorrem.
+  const ownerRows = await sql.unsafe(
+    `SELECT owner_id FROM moont.oauth_refresh_tokens
+     WHERE token_hash = $1 AND client_id = $2::uuid AND resource = $3
+       AND revoked_at IS NULL AND expires_at > now()`,
+    [hash(token), clientId, RESOURCE],
+  );
+  const ownerId = ownerRows[0]?.owner_id;
+  if (!ownerId) fail('invalid_grant', 'Renovação inválida ou expirada.');
+  const identity = await getCurrentAgentSecurityContext(ownerId);
+
+  const result = await sql.begin(async tx => {
     const rows = await tx.unsafe(
       `SELECT r.*, client.client_name
        FROM moont.oauth_refresh_tokens r
@@ -118,8 +182,36 @@ export async function rotateRefreshToken({ token, clientId, resource }) {
        WHERE r.token_hash = $1 FOR UPDATE OF r`, [hash(token)],
     );
     const row = rows[0];
-    if (!row || row.client_id !== clientId || row.resource !== RESOURCE || row.revoked_at || Date.parse(row.expires_at) <= Date.now()) fail('invalid_grant', 'Renovação inválida ou expirada.');
+    if (!row || row.owner_id !== ownerId || row.client_id !== clientId || row.resource !== RESOURCE || row.revoked_at || Date.parse(row.expires_at) <= Date.now()) fail('invalid_grant', 'Renovação inválida ou expirada.');
+    const createdAt = Date.parse(row.created_at);
+    const revokedBefore = Number(identity.sessionRevokedBefore || 0);
+    // `session_revoked_before` muda também no logout comum. Tokens novos têm
+    // `agent_epoch`, que só muda em recuperação/troca de identidade; portanto
+    // o timestamp é apenas a ponte de segurança para linhas legadas.
+    const legacyWithoutAgentEpoch = row.agent_epoch == null;
+    const securityChangedAfterIssue = legacyWithoutAgentEpoch && revokedBefore > 0
+      && (!Number.isFinite(createdAt) || createdAt <= revokedBefore);
+    const epochChanged = row.agent_epoch != null
+      && String(row.agent_epoch || '') !== String(identity.agentEpoch || '');
+    const accountChanged = Boolean(row.account_id)
+      && String(row.account_id) !== String(identity.accountId || '');
+    if (securityChangedAfterIssue || epochChanged || accountChanged) {
+      await tx.unsafe(
+        `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+         WHERE owner_id = $1 AND revoked_at IS NULL`, [row.owner_id],
+      );
+      return { invalidatedBySecurityChange: true };
+    }
     await tx.unsafe(`UPDATE moont.oauth_refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, [hash(token)]);
-    return { ownerId: row.owner_id, scopes: row.scopes, clientName: row.client_name };
+    return {
+      ownerId: row.owner_id,
+      scopes: row.scopes,
+      clientName: row.client_name,
+      securitySnapshot: identity,
+    };
   });
+  if (result?.invalidatedBySecurityChange) {
+    fail('invalid_grant', 'Renovação encerrada após uma alteração de segurança.');
+  }
+  return result;
 }

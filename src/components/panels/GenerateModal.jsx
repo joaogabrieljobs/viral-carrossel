@@ -4,7 +4,7 @@ import { Sparkles, Loader2, Bookmark, X, ChevronRight, ChevronLeft, Check, Setti
 import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
 import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
-import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset } from '../../utils/generation-prompts.js';
+import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset, resolveRequestedContentLanguage } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
 import { PhotoRegionMiniIcon } from '../ui/mini-icons.jsx';
 import { CONTENT_OBJECTIVES, normalizeContentObjective } from '../../utils/editorial-strategy.js';
@@ -92,11 +92,37 @@ export function resolveCreativePresetForProduct(presetId, productKind) {
   return presetId === APRESENTACAO_PRESET_ID ? 'livre' : (presetId || 'livre');
 }
 
+const GENERATION_SCOPE_STORAGE_PREFIX = 'moont:generation-scope';
+
+export function readGenerationScopePreference(productKind = 'carrossel', fallbackWithImages = false) {
+  if (typeof window === 'undefined') return !!fallbackWithImages;
+  try {
+    const stored = window.localStorage.getItem(`${GENERATION_SCOPE_STORAGE_PREFIX}:${productKind}`);
+    if (stored === 'images') return true;
+    if (stored === 'text') return false;
+  } catch {
+    // Navegação privada ou armazenamento bloqueado: mantém o padrão seguro.
+  }
+  return !!fallbackWithImages;
+}
+
+export function saveGenerationScopePreference(productKind = 'carrossel', withImages = false) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      `${GENERATION_SCOPE_STORAGE_PREFIX}:${productKind}`,
+      withImages ? 'images' : 'text',
+    );
+  } catch {
+    // A preferência é opcional; a geração não pode depender do storage.
+  }
+}
+
 function GenerateModal({
   open, onClose, onGenerate, onCancelGeneration,
   defaultNiche='', defaultTopic='', defaultTone='', defaultAudience='',
   hasOpenAI=false, hasAnthropic=false, onOpenKeys,
-  defaultWithImages = true,
+  defaultWithImages = false,
   imageProviderLabel = 'GPT Image 2',
   brandSummary, materialSummary,
   onGoToMaterial,
@@ -130,7 +156,7 @@ function GenerateModal({
     () => filterVisualPresetsForProduct(visualPresets, productKind),
     [visualPresets, productKind],
   );
-  const [topic, setTopic] = useState(defaultTopic);
+  const [topic, setTopic] = useState(() => String(defaultTopic || '').slice(0, GENERATION_TOPIC_MAX_CHARS));
   const [count, setCount] = useState(() => (
     isPresentation ? getPresentationPath(initialPresentationPath).defaultSlideCount : 6
   ));
@@ -185,10 +211,19 @@ function GenerateModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   // Etapa 3: a pessoa escolhe entre gerar só o texto ou texto e imagens.
-  const [wantImages, setWantImages] = useState(!!hasOpenAI && !!defaultWithImages);
+  const [wantImages, setWantImages] = useState(() => (
+    !!hasOpenAI && readGenerationScopePreference(productKind, defaultWithImages)
+  ));
   useEffect(() => {
-    if (open) setWantImages(!!hasOpenAI && !!defaultWithImages);
-  }, [open, hasOpenAI, defaultWithImages]);
+    if (open) {
+      setWantImages(!!hasOpenAI && readGenerationScopePreference(productKind, defaultWithImages));
+    }
+  }, [open, hasOpenAI, defaultWithImages, productKind]);
+  const chooseGenerationScope = (withImages) => {
+    const next = !!hasOpenAI && !!withImages;
+    setWantImages(next);
+    saveGenerationScopePreference(productKind, next);
+  };
   const [creativePresetsOpen, setCreativePresetsOpen] = useState(false);
   useEffect(() => { if (open) setCreativePresetsOpen(false); }, [open]);
 
@@ -218,7 +253,7 @@ function GenerateModal({
     setErr('');
     // Também copia valores vazios: ao trocar de projeto, nenhum rascunho do
     // projeto anterior pode sobreviver no modal.
-    setTopic(defaultTopic || '');
+    setTopic(String(defaultTopic || '').slice(0, GENERATION_TOPIC_MAX_CHARS));
     setNiche(defaultNiche || '');
     setAudience(defaultAudience || '');
   }, [open, defaultTopic, defaultNiche, defaultAudience]);
@@ -300,6 +335,16 @@ function GenerateModal({
     if (hasContextPack) return 'Conteúdo baseado no material de referência e na identidade da marca.';
     return '';
   })();
+  const requestedContentLanguage = resolveRequestedContentLanguage({
+    instructions: material?.context,
+    topic: resolvedGenerationTopic || topic,
+    content: material?.content,
+  });
+  const requestedLanguageSource = requestedContentLanguage.source === 'instructions'
+    ? 'definido nas instruções'
+    : requestedContentLanguage.source === 'brief'
+      ? 'identificado no briefing'
+      : 'padrão do projeto';
 
   // A etapa 1 exige tema válido (resolvedGenerationTopic já cobre alternativas
   // de nicho e contexto). As demais etapas permitem revisar os valores padrão.
@@ -537,12 +582,14 @@ function GenerateModal({
                 <textarea
                   id="generation-topic"
                   aria-label={isPresentation ? 'Qual é o tema da apresentação?' : 'Sobre o que é o conteúdo?'}
-                  value={topic} onChange={e=>setTopic(e.target.value)} rows={3}
+                  value={topic} onChange={e=>setTopic(e.target.value.slice(0, GENERATION_TOPIC_MAX_CHARS))} rows={3}
+                  maxLength={GENERATION_TOPIC_MAX_CHARS}
                   placeholder={isPresentation
                     ? 'Ex: proposta de expansão para o mercado brasileiro em 2027'
                     : 'Ex: como freelancers usam IA para triplicar a produtividade sem estresse'}
                   className="vc-input vc-textarea"
                 />
+                <div style={{ marginTop:6, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)' }}>{topic.length.toLocaleString('pt-BR')} de {GENERATION_TOPIC_MAX_CHARS.toLocaleString('pt-BR')} caracteres usados pela geração.</div>
                 {/* Ganchos salvos para este nicho; um clique preenche o tema. */}
                 {!isPresentation && (() => {
                   const suggestions = getHooksForNiche(hookLibrary, niche, 3);
@@ -558,7 +605,7 @@ function GenerateModal({
                           <button
                             key={h.id}
                             type="button"
-                            onClick={() => setTopic(h.hook)}
+                            onClick={() => setTopic(String(h.hook || '').slice(0, GENERATION_TOPIC_MAX_CHARS))}
                             title={`Usado ${h.usageCount}× · salvo ${new Date(h.savedAt).toLocaleDateString('pt-BR')}`}
                             style={{
                               textAlign: 'left', padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
@@ -987,7 +1034,7 @@ function GenerateModal({
                       },
                       {
                         id:'text_images', label:'Texto e imagens', withImages:true,
-                        description:`Gera o conteúdo e as imagens com ${imageProviderLabel}.`,
+                        description:`Gera o conteúdo e as imagens com ${imageProviderLabel}. Usa até ${count} crédito${count === 1 ? '' : 's'} de imagem (1 por ${isPresentation ? 'slide' : 'card'}).`,
                       },
                     ].map((option) => {
                       const selected = wantImages === option.withImages;
@@ -1007,7 +1054,7 @@ function GenerateModal({
                             name="generate-modal-scope"
                             value={option.id}
                             checked={selected}
-                            onChange={() => setWantImages(option.withImages)}
+                            onChange={() => chooseGenerationScope(option.withImages)}
                             aria-label={option.label}
                             style={{ width:18, height:18, margin:'1px 0 0', flexShrink:0, accentColor:'var(--accent)' }}
                           />
@@ -1142,6 +1189,16 @@ function GenerateModal({
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
                     {hasOpenAI && wantImages ? 'Texto e imagens' : 'Só texto'}
                   </span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Idioma</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
+                    {requestedContentLanguage.label} · {requestedLanguageSource}
+                  </span>
+
+                  <span style={{ color:'var(--text-muted)' }}>Créditos de imagem</span>
+                  <span style={{ color:'var(--text-primary)', fontWeight:500, fontVariantNumeric:'tabular-nums' }}>
+                    {hasOpenAI && wantImages ? `${count} (1 por ${isPresentation ? 'slide' : 'card'})` : '0'}
+                  </span>
                 </div>
               </div>
 
@@ -1171,7 +1228,7 @@ function GenerateModal({
               }}>
                 {hasOpenAI && wantImages ? (
                   <>
-                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto e imagens:</span> a geração leva mais tempo e usa créditos do provedor de imagem.
+                    <span style={{ fontWeight:600, color:'var(--text-secondary)' }}>Texto e imagens:</span> a geração leva mais tempo e usa até {count} crédito{count === 1 ? '' : 's'} de imagem — 1 por {isPresentation ? 'slide' : 'card'}.
                   </>
                 ) : (
                   <>

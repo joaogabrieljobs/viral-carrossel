@@ -31,6 +31,7 @@ test.describe('Produto (RF-02)', () => {
     const modal = page.locator('.modal-panel');
     await expect(modal).toBeVisible({ timeout: 10_000 });
     await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+    await modal.getByRole('button', { name: /aplicar só layout/i }).click();
 
     // editor montado com slides do template (strip de thumbnails presente)
     await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeAttached({ timeout: 10_000 });

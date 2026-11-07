@@ -264,7 +264,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8 } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8, onRetry } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -325,6 +325,9 @@ const callCompatibleChat = async (
     try { data = JSON.parse(raw); }
     catch {
       lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'}: resposta inválida (HTTP ${res.status})`);
+      if (i < modelCandidates.length - 1) {
+        onRetry?.({ attempt:i + 2, total:modelCandidates.length, reason:'resposta inválida do serviço' });
+      }
       continue;
     }
 
@@ -336,6 +339,7 @@ const callCompatibleChat = async (
       lastError = new Error(translateProviderError(provider, res.status, data, raw));
       // Flash/grátis em overload → tenta modelo pago seguinte.
       if (provider === 'zai' && isZaiOverloadError(res.status, data, raw) && i < modelCandidates.length - 1) {
+        onRetry?.({ attempt:i + 2, total:modelCandidates.length, reason:'serviço temporariamente ocupado' });
         continue;
       }
       throw lastError;
@@ -345,7 +349,10 @@ const callCompatibleChat = async (
     const text = data.choices?.[0]?.message?.content || '';
     if (!text.trim()) {
       lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'} retornou conteúdo vazio.`);
-      if (i < modelCandidates.length - 1) continue;
+      if (i < modelCandidates.length - 1) {
+        onRetry?.({ attempt:i + 2, total:modelCandidates.length, reason:'resposta vazia do serviço' });
+        continue;
+      }
       throw lastError;
     }
     return parseStructuredText(text, json, jsonParser);
@@ -356,7 +363,7 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, temperature, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, temperature, onRetry, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   const systemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT
     : contentMode === 'presentation' ? buildPresentationSystemPrompt(presentationPath) : AI_SYSTEM_PT;
   let provider = _aiRuntimeSettings.textProvider;
@@ -369,7 +376,7 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
     return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature, onRetry });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);
@@ -823,11 +830,20 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
 /** Wrapper que tenta `generateDALLE` até N+1 vezes com backoff curto. Útil para rate-limits transitórios.
  *  Erros 4xx persistentes (auth, conteúdo, modelo indisponível) NÃO retentam — só rede / 5xx / 429. */
 const generateDALLEWithRetry = (q, apiKey, imgParams = null, options = {}, { retries = 1, backoffMs = 1200 } = {}) => runAIJob(async (signal) => {
+  // A operação identifica o pedido do usuário, não cada tentativa de rede.
+  // Reutilizá-la permite que o servidor reconheça uma resposta perdida sem
+  // reservar um segundo crédito na retentativa.
+  const operationId = typeof options.operationId === 'string'
+    && /^[A-Za-z0-9._:-]{1,160}$/.test(options.operationId)
+    ? options.operationId
+    : (globalThis.crypto?.randomUUID?.()
+      || `img_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`);
+  const retryOptions = { ...options, operationId };
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     throwIfGenerationCancelled(signal);
     try {
-      return await generateDALLE(q, apiKey, imgParams, { ...options, signal });
+      return await generateDALLE(q, apiKey, imgParams, { ...retryOptions, signal });
     } catch (e) {
       if (isGenerationCancelled(e)) throw e;
       lastErr = e;

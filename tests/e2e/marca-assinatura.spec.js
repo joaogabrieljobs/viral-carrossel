@@ -15,6 +15,7 @@ async function abrirEditorComTemplate(page) {
   const modal = page.locator('.modal-panel');
   await expect(modal).toBeVisible({ timeout: 10_000 });
   await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+  await modal.getByRole('button', { name: /aplicar só layout/i }).click();
   await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeAttached({ timeout: 10_000 });
   await page.waitForTimeout(800);
 }

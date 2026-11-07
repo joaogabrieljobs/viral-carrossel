@@ -56,6 +56,7 @@ import { composeImgExtraPrompt } from '../utils/style-kit.js';
 import { resolveImageReferences } from '../utils/style-kit-storage.js';
 import { composeSlideReferencePrompt } from '../utils/slide-reference.js';
 import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
+import { creationMaterialLimits, creationMaterialOverages } from '../utils/create-project-flow.js';
 
 function guessFontFileFormat(file) {
   const n = (file?.name || '').toLowerCase();
@@ -337,6 +338,7 @@ function SidebarContent({
   /** Accordion da aba Narrativa: context | prompt | card | null */
   const [narrativaPanel, setNarrativaPanel] = React.useState('prompt');
   const [selectedSlideIds, setSelectedSlideIds] = React.useState([]);
+  const [imageBatchConfirmOpen, setImageBatchConfirmOpen] = React.useState(false);
   const [objectiveTemplateId, setObjectiveTemplateId] = React.useState(null);
   const [visualScope, setVisualScope] = React.useState('all');
   const [customPresetName, setCustomPresetName] = React.useState('');
@@ -352,10 +354,31 @@ function SidebarContent({
   const isPresentationProject = activeEntry?.doc?.productKind === 'apresentacao'
     || creativePreset === 'apresentacao'
     || fmt === 'apresentacao';
+  const materialProductKind = isPresentationProject ? 'apresentacao' : 'carrossel';
+  const materialLimits = creationMaterialLimits(materialProductKind);
+  const materialOverages = creationMaterialOverages(material, materialProductKind);
+  const contentLength = String(material?.content || '').length;
+  const contentOverage = materialOverages.content;
+  const hasMaterialOverage = Object.keys(materialOverages).length > 0;
+  const updateBoundedMaterialField = (field, value) => {
+    const next = String(value || '');
+    const previous = String(material?.[field] || '');
+    const limit = materialLimits[field];
+    if (Number.isFinite(limit) && next.length > limit && next.length >= previous.length) {
+      toast?.(`Limite de ${limit.toLocaleString('pt-BR')} caracteres. Nada foi cortado; reduza o texto antes de continuar.`, 'warning', 6000);
+      return;
+    }
+    setMaterial({ ...material, [field]: next });
+  };
   const itemLabel = isPresentationProject ? 'slide' : 'card';
   const itemsLabel = isPresentationProject ? 'slides' : 'cards';
   const editorTabs = visibleEditorTabs(appMode);
   const storyboardThumb = storyboardThumbDimensions(isPresentationProject);
+  const pendingImageCreditCount = slides.filter((candidate) => (
+    String(candidate?.imageQuery || '').trim()
+    && !candidate?.bgImage
+    && (!selectedSlideIds.length || selectedSlideIds.includes(candidate.id))
+  )).length;
   const editorScrollRef = useRef(null);
   useLayoutEffect(() => {
     if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0;
@@ -1031,7 +1054,7 @@ function SidebarContent({
 
             {(tab==='imagem'||tab==='slide') && (<S
               title="Importar imagens"
-              hint={`Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do ${itemLabel}. O primeiro ficheiro vai para o ${itemLabel} 1, o segundo para o ${itemLabel} 2, e assim por diante.`}
+              hint={`Separa da tipografia: só afeta a foto de fundo mostrada na zona de imagem do ${itemLabel}. O primeiro arquivo vai para o ${itemLabel} 1, o segundo para o ${itemLabel} 2, e assim por diante.`}
             >
               {/* Polish: 3 botões com mesmo padrão drop-zone (ícone num
                   círculo accent + label primary + subtítulo). Hover puxa
@@ -1076,7 +1099,7 @@ function SidebarContent({
                     <input
                       id={batchInputId}
                       type="file"
-                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                       multiple
                       className="vc-batch-photo-input"
                       aria-label="Importar imagens em lote"
@@ -1500,6 +1523,7 @@ function SidebarContent({
                 onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
                 onRenameRef={(key, value) => renameSlideReference(activeIdx, key, value)}
                 onPickRef={() => openRefImagePicker(activeIdx)}
+                onReuploadRef={(key) => openRefImagePicker(activeIdx, key)}
                 onGenerateImage={() => generateSlideImageAt(activeIdx)}
                 generateImageBusy={!!slideImgGenBusy[slide.id]}
                 generationState={slideImageGenerationState(slide, imageGenerationAvailability || {
@@ -3328,19 +3352,30 @@ function SidebarContent({
               </button>
               <textarea
                 value={material.content || ''}
-                onChange={e => setMaterial({ ...material, content: e.target.value })}
+                onChange={e => updateBoundedMaterialField('content', e.target.value)}
                 rows={8}
+                aria-invalid={!!contentOverage}
+                aria-describedby="vc-material-content-count"
                 placeholder={'Ex: cole aqui sua transcrição de aula, post antigo, outline do tema, ' +
                   'pesquisa de mercado, depoimentos de clientes, notas de leitura...\n\n' +
                   'A IA usa este texto como base de fatos antes de inventar.'}
                 className="vc-input vc-textarea"
                 style={{ minHeight:140, resize:'vertical', lineHeight:1.5 }}
               />
-              {normalizeMaterialField(material.content) ? (
-                <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', letterSpacing:'0.04em', textAlign:'right' }}>
-                  {normalizeMaterialField(material.content).length.toLocaleString('pt-BR')} caracteres
-                </div>
-              ) : null}
+              <div
+                id="vc-material-content-count"
+                role={contentOverage ? 'alert' : 'status'}
+                style={{
+                  fontSize:10,
+                  color:contentOverage ? 'var(--danger-text)' : 'var(--text-muted)',
+                  fontFamily:'var(--font-mono)', letterSpacing:'0.04em', textAlign:'right', lineHeight:1.45,
+                }}
+              >
+                {contentLength.toLocaleString('pt-BR')} / {materialLimits.content.toLocaleString('pt-BR')} caracteres
+                {contentOverage
+                  ? ` · reduza ${contentOverage.excess.toLocaleString('pt-BR')} para gerar; seu texto completo foi preservado.`
+                  : ''}
+              </div>
             </S>
 
             <S
@@ -3349,7 +3384,7 @@ function SidebarContent({
             >
               <textarea
                 value={material.sources || ''}
-                onChange={e => setMaterial({ ...material, sources: e.target.value })}
+                onChange={e => updateBoundedMaterialField('sources', e.target.value)}
                 rows={6}
                 placeholder={'https://hbr.org/...\n' +
                   'Pesquisa Edelman Trust Barometer 2026\n' +
@@ -3366,7 +3401,7 @@ function SidebarContent({
             >
               <textarea
                 value={material.context || ''}
-                onChange={e => setMaterial({ ...material, context: e.target.value })}
+                onChange={e => updateBoundedMaterialField('context', e.target.value)}
                 rows={4}
                 placeholder={'Ex: "Evite jargão técnico, foque em casos brasileiros. ' +
                   'Use linguagem mais informal. Cite dados quando relevante. ' +
@@ -3381,13 +3416,17 @@ function SidebarContent({
                   Era grid 1fr-1fr que forçava 'Gerar com este material' a
                   quebrar em 2 linhas (apertado e feio). */}
               <button
-                onClick={() => setSetupOpen(true)}
+                onClick={() => !hasMaterialOverage && setSetupOpen(true)}
+                disabled={hasMaterialOverage}
+                title={hasMaterialOverage ? 'Reduza os campos acima até os limites indicados para gerar sem perder conteúdo.' : undefined}
                 style={{
-                  width:'100%', height:44, borderRadius:9999, cursor:'pointer',
+                  width:'100%', height:44, borderRadius:9999,
                   background:'var(--accent)', border:'none',
                   color:'#fff', fontSize:12,
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                   whiteSpace:'nowrap',
+                  opacity:hasMaterialOverage ? 0.55 : 1,
+                  cursor:hasMaterialOverage ? 'not-allowed' : 'pointer',
                   transition:'background-color 0.15s var(--ease-smooth), transform 0.1s var(--ease-smooth)',
                   ...BTN_CAPS,
                 }}
@@ -3884,16 +3923,60 @@ function SidebarContent({
                   );
                 })}
               </div>
+              {imageBatchConfirmOpen ? (
+                <div
+                  role="group"
+                  aria-label="Confirmar geração de imagens"
+                  style={{
+                    marginTop: 10, padding: 10, borderRadius: 11,
+                    border: '1px solid var(--accent)', background: 'var(--accent-surface)',
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-primary)' }}>
+                    Gerar {pendingImageCreditCount} imagem{pendingImageCreditCount === 1 ? '' : 's'} agora?
+                    {' '}Esta ação usa até <strong>{pendingImageCreditCount} crédito{pendingImageCreditCount === 1 ? '' : 's'} de imagem</strong> — 1 por {itemLabel}.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="vc-btn vc-btn-ghost"
+                      onClick={() => setImageBatchConfirmOpen(false)}
+                      style={{ minHeight: 36, flex: 1, fontSize: 11 }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="vc-btn vc-btn-primary"
+                      disabled={imagesBatchBusy || pendingImageCreditCount < 1}
+                      onClick={async () => {
+                        setImageBatchConfirmOpen(false);
+                        await generateMissingImages?.(selectedSlideIds.length ? selectedSlideIds : null);
+                      }}
+                      style={{ minHeight: 36, flex: 1, fontSize: 11 }}
+                    >
+                      Confirmar · {pendingImageCreditCount} crédito{pendingImageCreditCount === 1 ? '' : 's'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                 <button
                   type="button"
                   className="vc-btn vc-btn-ghost"
                   disabled={imagesBatchBusy || !generateMissingImages}
-                  onClick={() => generateMissingImages?.(selectedSlideIds.length ? selectedSlideIds : null)}
+                  onClick={() => {
+                    if (pendingImageCreditCount < 1) {
+                      generateMissingImages?.(selectedSlideIds.length ? selectedSlideIds : null);
+                      return;
+                    }
+                    setImageBatchConfirmOpen(true);
+                  }}
                   style={{ minHeight: 44, fontSize: 11 }}
                 >
                   {imagesBatchBusy ? <Loader2 size={14} style={{ animation:'spin .8s linear infinite' }}/> : <ImageIcon size={14}/>}
-                  {selectedSlideIds.length ? `Gerar imagens (${selectedSlideIds.length})` : 'Gerar imagens pendentes'}
+                  {selectedSlideIds.length ? `Gerar imagens (${pendingImageCreditCount})` : `Gerar imagens pendentes (${pendingImageCreditCount})`}
                 </button>
                 <button
                   type="button"

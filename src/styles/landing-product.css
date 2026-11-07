@@ -786,13 +786,14 @@
   .moont-lp-header__cta { display: none; }
   .moont-lp-login { min-width: 56px; padding-right: 0; }
   .moont-lp-logo svg { height: 31px !important; }
-  .moont-lp-hero { padding: 52px 0 76px; background: var(--lp-paper); }
+  .moont-lp-hero { padding: 24px 0 76px; background: var(--lp-paper); }
   .moont-lp-hero__inner { gap: 48px; }
   .moont-lp-hero__copy,
   .moont-lp-hero h1,
   .moont-lp-hero__lead { min-width: 0; max-width: 100%; }
-  .moont-lp-hero h1 { font-size: clamp(48px, 13.5vw, 56px); }
-  .moont-lp-hero__lead { font-size: 18px; }
+  .moont-lp-kicker { margin-bottom: 10px; }
+  .moont-lp-hero h1 { margin-bottom: 16px; font-size: clamp(42px, 12vw, 52px); line-height: 0.94; }
+  .moont-lp-hero__lead { margin-bottom: 16px; font-size: 16px; line-height: 1.4; }
   .moont-lp-hero__actions { display: grid; grid-template-columns: 1fr; }
   .moont-lp-hero__proof { gap: 10px 16px; font-size: 12px; }
   .moont-lp-hero__product { width: 100%; min-width: 0; padding: 0 10px 48px 0; }
@@ -971,11 +972,35 @@
   .moont-lp-footer p { width: 100%; order: 3; }
 }
 
+/* Notebooks com pouca altura precisam mostrar a promessa e a ação principal
+   sem depender da fonte exata instalada no sistema/runner de CI. */
+@media (min-width: 761px) and (max-height: 800px) {
+  .moont-lp-hero { padding: 30px 0 64px; }
+  .moont-lp-hero__inner {
+    grid-template-columns: minmax(440px, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+    gap: 40px;
+  }
+  .moont-lp-kicker { margin-bottom: 10px; }
+  .moont-lp-hero h1 {
+    margin-bottom: 14px;
+    font-size: clamp(42px, 4.2vw, 58px);
+    line-height: 0.95;
+  }
+  .moont-lp-hero__lead {
+    margin-bottom: 16px;
+    font-size: 16px;
+    line-height: 1.38;
+  }
+  .moont-lp-hero__proof { margin-top: 16px; }
+  .moont-lp-hero__product { padding-top: 0; }
+}
+
 @media (max-width: 340px) {
   .moont-lp-hero { padding-top: 16px; }
   .moont-lp-kicker { margin-bottom: 8px; }
-  .moont-lp-hero h1 { margin-bottom: 12px; font-size: 46px; }
-  .moont-lp-hero__lead { margin-bottom: 12px; font-size: 16px; line-height: 1.4; }
+  .moont-lp-hero h1 { margin-bottom: 12px; font-size: 40px; }
+  .moont-lp-hero__lead { margin-bottom: 12px; font-size: 15px; line-height: 1.38; }
   .moont-lp-section { padding: 64px 0; }
   .moont-lp-section-heading h2,
   .moont-lp-context h2,

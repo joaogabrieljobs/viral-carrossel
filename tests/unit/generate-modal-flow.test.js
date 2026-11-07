@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   filterVisualPresetsForProduct,
+  readGenerationScopePreference,
   resolveCreativePresetForProduct,
   resolveInitialVisualPreset,
+  saveGenerationScopePreference,
 } from '../../src/components/panels/GenerateModal.jsx';
 
 const source = readFileSync(
@@ -36,7 +38,7 @@ describe('fluxo do modal de geração', () => {
 
   it('preserva os padrões e valores iniciais do fluxo profissional', () => {
     expect(source).toContain('resolveCreativePresetForProduct(defaultCreativePreset, productKind)');
-    expect(source).toContain('useState(!!hasOpenAI && !!defaultWithImages)');
+    expect(source).toContain('readGenerationScopePreference(productKind, defaultWithImages)');
     expect(source).toContain('<ModePicker value={mode} onChange={setMode}/>');
     expect(source).toContain('<ReferenceProfilesCuradoria material={material} setMaterial={setMaterial} />');
     expect(source).toContain('<VisualStylePicker');
@@ -44,7 +46,7 @@ describe('fluxo do modal de geração', () => {
   });
 
   it('limpa rascunhos de outro projeto e oferece um diálogo acessível', () => {
-    expect(source).toContain("setTopic(defaultTopic || '')");
+    expect(source).toContain("setTopic(String(defaultTopic || '').slice(0, GENERATION_TOPIC_MAX_CHARS))");
     expect(source).toContain("setNiche(defaultNiche || '')");
     expect(source).toContain("setAudience(defaultAudience || '')");
     expect(source).toContain('role="dialog"');
@@ -72,6 +74,36 @@ describe('fluxo do modal de geração', () => {
     expect(review).toContain("{hasOpenAI && wantImages ? 'Texto e imagens' : 'Só texto'}");
     expect(source.match(/onClick=\{\(\) => run\(\{/g) || []).toHaveLength(1);
     expect(source).not.toContain('withImages: !wantImages');
+  });
+
+  it('começa sem custo e lembra a última escolha de escopo por produto', () => {
+    expect(source).toContain('defaultWithImages = false');
+    expect(source).toContain('saveGenerationScopePreference(productKind, next)');
+    expect(readGenerationScopePreference('carrossel', false)).toBe(false);
+
+    const previousWindow = globalThis.window;
+    const values = new Map();
+    globalThis.window = {
+      localStorage: {
+        getItem: (key) => values.get(key) ?? null,
+        setItem: (key, value) => values.set(key, value),
+      },
+    };
+    try {
+      saveGenerationScopePreference('carrossel', true);
+      expect(readGenerationScopePreference('carrossel', false)).toBe(true);
+      expect(readGenerationScopePreference('apresentacao', false)).toBe(false);
+    } finally {
+      globalThis.window = previousWindow;
+    }
+  });
+
+  it('mostra idioma e consumo de créditos antes da geração', () => {
+    const review = sectionBetween('ETAPA 4 — REVISÃO', 'RODAPÉ FIXO');
+    expect(review).toContain('Idioma');
+    expect(review).toContain('requestedContentLanguage.label');
+    expect(review).toContain('Créditos de imagem');
+    expect(review).toContain("1 por ${isPresentation ? 'slide' : 'card'}");
   });
 
   it('mantém a redação do escopo consistente em português', () => {

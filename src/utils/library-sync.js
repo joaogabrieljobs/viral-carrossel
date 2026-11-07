@@ -129,13 +129,21 @@ async function packReferenceListForCloud(refs, assets) {
     if (!dataUrl && ref?.imageId) {
       try { dataUrl = await imagemComoDataUrl(ref.imageId); } catch { /* mantém o asset já conhecido */ }
     }
+    const failuresBefore = Number(assets.packingFailed || 0);
     const assetId = await collectAsset(dataUrl, assets);
-    if (assetId || ref?.assetId) packed.push({
+    const knownAssetId = assetId || ref?.assetId;
+    if (knownAssetId) packed.push({
       id:ref?.id || ref?.imageId || ref?.assetId,
       name:ref?.name,
       ...(ref?.mention ? { mention:ref.mention } : {}),
-      assetId:assetId || ref.assetId,
+      assetId:knownAssetId,
     });
+    else if (Number(assets.packingFailed || 0) === failuresBefore) {
+      // Uma referência escolhida pelo usuário não pode desaparecer só porque
+      // o IndexedDB demorou, foi bloqueado por outra aba ou perdeu os bytes.
+      // O save será interrompido antes do PUT e poderá ser tentado novamente.
+      assets.packingFailed = failuresBefore + 1;
+    }
   }
   return packed;
 }
@@ -735,7 +743,11 @@ async function hydrateReferenceListFromCloud(refs, assetCache, localRefs = []) {
         try { localData = await imagemComoDataUrl(local.imageId); } catch { /* baixa novamente abaixo */ }
       }
       if (localData) {
-        hydrated.push({ ...ref, ...(local.imageId ? { imageId:local.imageId } : {}), ...(local.dataUrl ? { dataUrl:local.dataUrl } : {}) });
+        hydrated.push({
+          ...ref, missing:false, error:null,
+          ...(local.imageId ? { imageId:local.imageId } : {}),
+          ...(local.dataUrl ? { dataUrl:local.dataUrl } : {}),
+        });
         continue;
       }
     }
@@ -744,14 +756,22 @@ async function hydrateReferenceListFromCloud(refs, assetCache, localRefs = []) {
       if (dataUrl) {
         try {
           const imported = await migrateProjectReferences({ refImages:[{ id:ref.id, name:ref.name, dataUrl }] });
-          hydrated.push({ ...ref, ...imported.refImages[0], assetId:ref.assetId });
+          hydrated.push({ ...ref, ...imported.refImages[0], assetId:ref.assetId, missing:false, error:null });
         } catch {
           // Se o IndexedDB estiver bloqueado, os bytes continuam no documento
           // e uma próxima abertura pode concluir a migração sem perder a referência.
-          hydrated.push({ ...ref, dataUrl });
+          hydrated.push({ ...ref, dataUrl, missing:false, error:null });
         }
-      } else hydrated.push({ ...ref });
-    } catch { hydrated.push({ ...ref }); }
+      } else hydrated.push({
+        ...ref, missing:true,
+        error:'A referência deste card está indisponível. Reenvie o arquivo para manter o @nome.',
+      });
+    } catch {
+      hydrated.push({
+        ...ref, missing:true,
+        error:'A referência deste card está indisponível. Reenvie o arquivo para manter o @nome.',
+      });
+    }
   }
   return hydrated;
 }

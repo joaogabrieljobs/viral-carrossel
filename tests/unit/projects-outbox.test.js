@@ -263,6 +263,23 @@ describe('outbox durável por projeto', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it.each([401, 408, 425, 429])('mantém a edição reenviável após erro temporário %s', async (status) => {
+    const entry = { id: 'janine', doc: { title: `Ainda pendente ${status}` } };
+    const op = await queueProjectPut(ALICE, entry, { baseVersion: 2 });
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ error: 'Tente novamente.', code: 'project_temporarily_unavailable' }, status));
+
+    await expect(flushProjectOutbox(ALICE)).rejects.toMatchObject({ status });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toMatchObject({
+      opId: op.opId, kind: 'put', entry,
+    });
+
+    fetch.mockResolvedValueOnce(session())
+      .mockResolvedValueOnce(json({ ok: true, project: { id: 'janine', version: 3, entry } }));
+    await expect(flushProjectOutbox(ALICE)).resolves.toEqual({ sent: 1, pending: 0 });
+    expect(await getPendingProjectOp(ALICE, 'janine')).toBeNull();
+  });
+
   it('adiciona bytes ao mesmo snapshot sem trocar o ID da operação', async () => {
     const photo = 'data:image/png;base64,c2FtZS1vcC1hc3NldA==';
     const assetId = await originalImageAssetId(photo);

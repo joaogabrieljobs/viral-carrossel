@@ -11,7 +11,9 @@ ALTER TABLE moont.agent_visual_jobs
   ADD COLUMN IF NOT EXISTS finished_at timestamptz;
 
 ALTER TABLE moont.agent_visual_jobs
-  DROP CONSTRAINT IF EXISTS agent_visual_jobs_status_check;
+  DROP CONSTRAINT IF EXISTS agent_visual_jobs_status_check,
+  DROP CONSTRAINT IF EXISTS agent_visual_jobs_slides_check,
+  DROP CONSTRAINT IF EXISTS agent_visual_jobs_meta_check;
 ALTER TABLE moont.agent_visual_jobs
   ADD CONSTRAINT agent_visual_jobs_status_check
   CHECK (status IN ('pending', 'applied', 'failed', 'undone'));

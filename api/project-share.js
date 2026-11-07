@@ -7,6 +7,7 @@ import {
   getSharedProject,
   putSharedProject,
   mutateSharedProject,
+  deleteSharedProject,
   makeCode,
 } from './lib/project-share-store.js';
 import { getLibraryAsset } from './lib/library-sync-store.js';
@@ -47,6 +48,9 @@ async function callerCanWrite(share, access) {
   if (sameIdentity(access?.customerId, share?.ownerId)) return true;
   if (access?.billingDisabled && billingDisabled()
     && sameIdentity(share?.ownerId, 'dev:billing-disabled')) return true;
+  const blocked = Array.isArray(share?.blockedMembers) ? share.blockedMembers : [];
+  if (blocked.some((member) => sameIdentity(member, access?.customerId)
+    || sameIdentity(member, access?.email))) return false;
   const members = Array.isArray(share?.members) ? share.members : [];
   if (members.some((member) => sameIdentity(member, access?.customerId))) return true;
   // E-mail é apenas fallback para partilhas antigas sem ID, após prova Google.
@@ -54,6 +58,39 @@ async function callerCanWrite(share, access) {
     || members.some((member) => sameIdentity(member, access?.email)
       && !(share?.ownerId && sameIdentity(member, share?.ownerEmail)));
   return legacyEmailMatch && hasVerifiedEmail(access);
+}
+
+function callerIsOwner(share, access) {
+  if (sameIdentity(access?.customerId, share?.ownerId)) return true;
+  return !!(access?.billingDisabled && billingDisabled()
+    && sameIdentity(share?.ownerId, 'dev:billing-disabled'));
+}
+
+function callerIsBlocked(share, access) {
+  const blocked = Array.isArray(share?.blockedMembers) ? share.blockedMembers : [];
+  return blocked.some((member) => sameIdentity(member, access?.customerId)
+    || sameIdentity(member, access?.email));
+}
+
+function memberCount(share) {
+  return new Set((Array.isArray(share?.members) ? share.members : [])
+    .map((member) => String(member || '').trim().toLowerCase())
+    .filter(Boolean)).size;
+}
+
+async function publicShareResponse(share, actor, { includeDoc = true } = {}) {
+  return {
+    ok: true,
+    code: share.code,
+    name: share.name,
+    revision: share.revision,
+    updatedAt: share.updatedAt,
+    expiresAt: share.expiresAt || null,
+    isOwner: callerIsOwner(share, actor),
+    isMember: await callerCanWrite(share, actor),
+    memberCount: memberCount(share),
+    ...(includeDoc ? { doc: share.doc } : {}),
+  };
 }
 
 function writableIdentity(access) {
@@ -140,6 +177,11 @@ export default async function handler(req, res) {
       const code = req.query?.code || req.query?.c || '';
       const share = await getSharedProject(code);
       if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
+      if (callerIsBlocked(share, actor)) {
+        throw Object.assign(new Error('O acesso desta conta foi removido pelo dono do projeto.'), {
+          code: 'share_forbidden',
+        });
+      }
       const assetId = String(req.query?.asset || req.query?.a || '').trim();
       if (assetId) {
         if (!referencedShareAssetIds(share.doc).has(assetId)) {
@@ -155,16 +197,7 @@ export default async function handler(req, res) {
         if (!asset) return res.status(404).json({ error: 'Asset não encontrado.' });
         return res.status(200).json({ ok: true, asset });
       }
-      return res.status(200).json({
-        ok: true,
-        code: share.code,
-        name: share.name,
-        revision: share.revision,
-        updatedAt: share.updatedAt,
-        ownerEmail: share.ownerEmail || null,
-        members: share.members || [],
-        doc: share.doc,
-      });
+      return res.status(200).json(await publicShareResponse(share, actor));
     }
 
     const body = parseBody(req);
@@ -173,6 +206,11 @@ export default async function handler(req, res) {
     if (action === 'join' || action === 'pull') {
       const identity = writableIdentity(actor);
       const share = await mutateSharedProject(body.code, (current) => {
+        if (callerIsBlocked(current, actor)) {
+          throw Object.assign(new Error('O acesso desta conta foi removido pelo dono do projeto.'), {
+            code: 'share_forbidden',
+          });
+        }
         const members = Array.isArray(current.members) ? current.members : [];
         if (!identity || members.some((member) => sameIdentity(member, identity))) {
           return current;
@@ -184,16 +222,41 @@ export default async function handler(req, res) {
         };
       });
       if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
-      return res.status(200).json({
-        ok: true,
-        code: share.code,
-        name: share.name,
-        revision: share.revision,
-        updatedAt: share.updatedAt,
-        ownerEmail: share.ownerEmail || null,
-        members: share.members || [],
-        doc: share.doc,
+      return res.status(200).json(await publicShareResponse(share, actor));
+    }
+
+    if (action === 'removemember' || action === 'remove_member') {
+      const target = String(body.memberId || body.member || '').trim();
+      if (!target || target.length > 254) {
+        return res.status(400).json({ error: 'Membro inválido.' });
+      }
+      const share = await mutateSharedProject(body.code, (current) => {
+        if (!callerIsOwner(current, actor)) {
+          throw Object.assign(new Error('Só o dono pode remover membros.'), { code: 'share_forbidden' });
+        }
+        if (sameIdentity(target, current.ownerId) || sameIdentity(target, current.ownerEmail)) {
+          return current;
+        }
+        const members = (Array.isArray(current.members) ? current.members : [])
+          .filter((member) => !sameIdentity(member, target));
+        const blockedMembers = Array.from(new Set([
+          ...(Array.isArray(current.blockedMembers) ? current.blockedMembers : []),
+          target,
+        ]));
+        return { ...current, members, blockedMembers, keepRevision: true };
       });
+      if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
+      return res.status(200).json(await publicShareResponse(share, actor, { includeDoc: false }));
+    }
+
+    if (action === 'revoke' || action === 'delete') {
+      const share = await getSharedProject(body.code);
+      if (!share) return res.status(404).json({ error: 'Código inválido ou expirado.' });
+      if (!callerIsOwner(share, actor)) {
+        throw Object.assign(new Error('Só o dono pode revogar esta partilha.'), { code: 'share_forbidden' });
+      }
+      await deleteSharedProject(body.code);
+      return res.status(200).json({ ok: true, code: share.code, revoked: true });
     }
 
     if (action === 'push' || action === 'update') {

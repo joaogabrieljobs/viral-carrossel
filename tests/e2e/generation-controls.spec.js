@@ -342,7 +342,7 @@ test('cancelar Gerar imagens do Criador não inicia o card seguinte', async ({ p
   await page.getByRole('tab', { name: /^Início$/i }).first().click();
   await page.getByRole('button', { name: 'Gerar imagens', exact: true }).click();
   await expect(page.getByText('Quais cards terão imagem?')).toBeVisible();
-  await page.getByRole('button', { name: 'Gerar 3 imagens', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar: gerar 3 imagens · 3 créditos', exact: true }).click();
   await expect.poll(() => imageCalls).toBe(1);
   await page.getByRole('button', { name: /Cancelar (?:geração|operação)/i }).click();
   releaseFirstImage();
@@ -370,6 +370,9 @@ test('ações globais dos cards geram, excluem imagem e limpam texto selecionado
   await page.getByRole('button', { name: 'Selecionar card 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Desmarcar card 1', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Gerar imagens (1)', exact: true }).click();
+  await page.getByRole('group', { name: 'Confirmar geração de imagens' })
+    .getByRole('button', { name: 'Confirmar · 1 crédito', exact: true })
+    .click();
   await expect.poll(async () => !!(await doc(page))?.slides[0]?.bgImageId).toBe(true);
 
   await page.getByRole('button', { name: 'Excluir imagens', exact: true }).click();

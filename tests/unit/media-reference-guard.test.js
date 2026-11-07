@@ -40,6 +40,44 @@ describe('preserveDroppedMediaReferences', () => {
     expect(result.entry).toBe(next);
   });
 
+  it('preserva referências múltiplas omitidas e o assetId de uma referência conhecida', () => {
+    const previousRefs = structuredClone(previous);
+    previousRefs.doc.slides[0].imageReferences = [
+      { id:'product', name:'Produto', mention:'produto', assetId:'original_ref_product' },
+      { id:'room', name:'Ambiente', mention:'ambiente', assetId:'original_ref_room' },
+    ];
+    const next = { id:'p', doc:{ slides:[{
+      id:'s1', title:'A2', imageReferences:[
+        { id:'product', name:'Produto novo', mention:'produto' },
+      ],
+    }] } };
+    const result = preserveDroppedMediaReferences(previousRefs, next);
+    expect(result.entry.doc.slides[0].imageReferences).toEqual([
+      { id:'product', name:'Produto novo', mention:'produto', assetId:'original_ref_product' },
+      { id:'room', name:'Ambiente', mention:'ambiente', assetId:'original_ref_room' },
+    ]);
+    expect(result.restored).toEqual([
+      { slideId:'s1', field:'imageReferences', assetId:'original_ref_product' },
+      { slideId:'s1', field:'imageReferences', assetId:'original_ref_room' },
+    ]);
+  });
+
+  it('aceita remoção explícita de referências e consome o marcador de uma gravação', () => {
+    const previousRefs = structuredClone(previous);
+    previousRefs.doc.slides[0].imageReferences = [
+      { id:'product', name:'Produto', mention:'produto', assetId:'original_ref_product' },
+      { id:'room', name:'Ambiente', mention:'ambiente', assetId:'original_ref_room' },
+    ];
+    const next = { id:'p', doc:{ slides:[{
+      id:'s1', title:'A2', imageReferences:[],
+      removedImageReferenceIds:['product', 'original_ref_room'],
+    }] } };
+    const result = preserveDroppedMediaReferences(previousRefs, next);
+    expect(result.entry.doc.slides[0].imageReferences).toEqual([]);
+    expect(result.entry.doc.slides[0].removedImageReferenceIds).toBeUndefined();
+    expect(result.restored).toEqual([]);
+  });
+
   it('não altera um asset já presente nem entradas sem slides', () => {
     const next = { id: 'p', doc: { slides: [{ id: 's1', bgImageAssetId: 'original_chunks_ccc', bgImageFailed: true }] } };
     expect(preserveDroppedMediaReferences(previous, next).entry).toBe(next);

@@ -8,6 +8,7 @@ import {
   buildEditorialReviewPrompt,
   buildPresentationLimitsBlock,
   generateReviewedCarousel,
+  normalizeCarouselDraftInput,
   normalizePresentationTextLimits,
   presentationTextLimitsFromSlides,
   validateCarouselDraft,
@@ -62,6 +63,13 @@ describe('objetivos e biblioteca editorial', () => {
 });
 
 describe('geração com uma revisão editorial', () => {
+  it('manda a revisão corrigir expressões inventadas ou sem sentido', () => {
+    const prompt = buildEditorialReviewPrompt('briefing', draft(), config);
+    expect(prompt).toContain('linguagem idiomática e natural');
+    expect(prompt).toContain('provérbios inventados');
+    expect(prompt).toContain('metáforas ambíguas ou sem sentido');
+  });
+
   it('marca e remove promessa comercial que não existe no briefing', async () => {
     const first = draft();
     first.slides[1].subtitle = 'Publique hoje, sem taxas escondidas.';
@@ -100,25 +108,77 @@ describe('geração com uma revisão editorial', () => {
     expect((await generateReviewedCarousel({ prompt: '', config }, ai)).reviewStatus).toBe('unchanged');
   });
   it.each([
-    ['falha de rede', new Error('offline')],
-    ['índice fora do arco', { edits: [{ slideIndex: 9, reason: 'x', title: 'Outro' }] }],
-    ['mudança de imagem', { edits: [{ slideIndex: 1, reason: 'x', imageQuery: 'new image' }] }],
-    ['corpo na capa', { edits: [{ slideIndex: 0, reason: 'x', bodyAfterImage: 'Não cabe' }] }],
-    ['campo não textual', { edits: [{ slideIndex: 1, reason: 'x', subtitle: null }] }],
-    ['índices duplicados', { edits: [{ slideIndex: 1, reason: 'x', subtitle: 'A' }, { slideIndex: 1, reason: 'x', subtitle: 'B' }] }],
-    ['legenda inválida', { edits: [], caption: [] }],
-  ])('mantém a primeira versão quando houver %s, sem tentar novamente', async (_, review) => {
+    ['falha de rede', new Error('offline'), 'unavailable'],
+    ['índice fora do arco', { edits: [{ slideIndex: 9, reason: 'x', title: 'Outro' }] }, 'unavailable'],
+    ['mudança de imagem', { edits: [{ slideIndex: 1, reason: 'x', imageQuery: 'new image' }] }, 'unchanged'],
+    ['corpo na capa', { edits: [{ slideIndex: 0, reason: 'x', bodyAfterImage: 'Não cabe' }] }, 'unavailable'],
+    ['campo não textual', { edits: [{ slideIndex: 1, reason: 'x', subtitle: null }] }, 'unavailable'],
+    ['índices duplicados', { edits: [{ slideIndex: 1, reason: 'x', subtitle: 'A' }, { slideIndex: 1, reason: 'x', subtitle: 'B' }] }, 'unavailable'],
+    ['legenda inválida', { edits: [], caption: [] }, 'unavailable'],
+  ])('mantém a primeira versão quando houver %s, sem tentar novamente', async (_, review, expectedStatus) => {
     const ai = vi.fn().mockResolvedValueOnce(draft());
     if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review);
     const output = await generateReviewedCarousel({ prompt: '', config }, ai);
     expect(ai).toHaveBeenCalledTimes(2);
-    expect(output.reviewStatus).toBe('unavailable');
+    expect(output.reviewStatus).toBe(expectedStatus);
     expect(output.result).toEqual(validateCarouselDraft(draft(), config));
   });
-  it('não revisa nem publica geração com quantidade errada', async () => {
-    const ai = vi.fn().mockResolvedValue({ slides: [], caption: '' });
-    await expect(generateReviewedCarousel({ prompt: '', config }, ai)).rejects.toThrow('quantidade');
+  it('preserva como rascunho editável uma geração com um card a menos', async () => {
+    const short = draft();
+    short.slides.pop();
+    const ai = vi.fn().mockResolvedValueOnce(short).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: '', config }, ai);
+    expect(ai).toHaveBeenCalledTimes(2);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.result.slides).toHaveLength(3);
+    expect(output.result.slides[2]).toMatchObject({ title:'', subtitle:'', imageQuery:'' });
+    expect(output.issues).toContainEqual({ slideIndex:null, code:'missing_slides_padded' });
+  });
+
+  it('não transforma uma resposta sem nenhum card em rascunho vazio', async () => {
+    const ai = vi.fn()
+      .mockResolvedValueOnce({ slides:[], caption:null })
+      .mockRejectedValueOnce(new Error('revisão indisponível'));
+    await expect(generateReviewedCarousel({ prompt:'', config }, ai)).rejects.toThrow('conteúdo suficiente');
     expect(ai).toHaveBeenCalledTimes(1);
+  });
+
+  it('desembrulha, normaliza campos nulos e apara cards excedentes', () => {
+    const source = draft();
+    source.caption = null;
+    source.slides[0].subtitle = null;
+    source.slides[0].imageQuery = null;
+    source.slides.push({ title:'Extra', subtitle:'Não entra', imageQuery:'extra', bodyAfterImage:'' });
+    const normalized = normalizeCarouselDraftInput({ carrossel:source }, config);
+    expect(normalized.draft.slides).toHaveLength(3);
+    expect(normalized.draft.slides[0]).toMatchObject({ subtitle:'', imageQuery:'' });
+    expect(normalized.draft.caption).toBe('');
+    expect(normalized.issues).toContain('extra_slides_trimmed');
+  });
+
+  it('ignora notas extras da revisão e aplica as edições válidas', () => {
+    const first = validateCarouselDraft(draft(), config);
+    const reviewed = applyEditorialReview(first, {
+      notes:'Resumo interno do modelo',
+      edits:[{ slideIndex:1, reason:'Concretizar', title:'Um argumento concreto', confidence:0.9 }],
+    }, config);
+    expect(reviewed.slides[1].title).toBe('Um argumento concreto');
+  });
+  it('aceita revisão embrulhada pelo provedor', () => {
+    const first = validateCarouselDraft(draft(), config);
+    const reviewed = applyEditorialReview(first, {
+      result:{ edits:[{ slideIndex:1, reason:'Clareza', title:'Título revisado' }] },
+    }, config);
+    expect(reviewed.slides[1].title).toBe('Título revisado');
+  });
+  it('mantém contagem excedente como rascunho que pede conferência', async () => {
+    const long = draft();
+    long.slides.push({ title:'Extra', subtitle:'Pode conter informação importante', imageQuery:'extra image', bodyAfterImage:'' });
+    const ai = vi.fn().mockResolvedValueOnce({ data:long }).mockResolvedValueOnce({ review:{ edits:[] } });
+    const output = await generateReviewedCarousel({ prompt:'', config }, ai);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.result.slides).toHaveLength(3);
+    expect(output.issues).toContainEqual({ slideIndex:null, code:'extra_slides_trimmed' });
   });
   it('respeita as diferentes posições de bodyAfterImage no híbrido', () => {
     const hybrid = { ...config, presetId: 'livre' };

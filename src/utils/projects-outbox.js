@@ -383,8 +383,13 @@ function markOperationForFailure(ownerId, sentOp, error) {
 
 function isPermanentOperationFailure(error) {
   if (error?.code === 'project_asset_upload_failed' || error?.code === 'project_bad_response') return true;
+  // Sessão expirada, timeout e limitação são estados recuperáveis. Marcar um
+  // 401/408/425/429 como revisão permanente prende todas as edições seguintes
+  // deste projeto no navegador, mesmo depois de a conta ou a rede voltarem.
+  const retryableStatuses = new Set([401, 408, 425, 429]);
   return Number.isInteger(error?.status) && error.status >= 400 && error.status < 500
-    && error.status !== 402 && error.status !== 409;
+    && error.status !== 402 && error.status !== 409
+    && !retryableStatuses.has(error.status);
 }
 
 function canonicalJson(value) {

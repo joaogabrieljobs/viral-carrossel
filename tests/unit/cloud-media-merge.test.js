@@ -144,4 +144,19 @@ describe('referências de asset no documento local', () => {
     expect(merged.doc.slides[2].bgImageAssetId).toBe('asset-c-atual');
     expect(mergeConfirmedAssetIds(merged, confirmed)).toBe(merged);
   });
+
+  it('adota assetIds confirmados das referências múltiplas e limpa o marcador de remoção', () => {
+    const current = { id:'p1', doc:{ slides:[{
+      id:'s1', imageReferences:[{ id:'local-ref', imageId:'local-ref', name:'Produto' }],
+      removedImageReferenceIds:['old-ref'],
+    }] } };
+    const confirmed = { id:'p1', doc:{ slides:[{
+      id:'s1', imageReferences:[{ id:'local-ref', name:'Produto', assetId:'original_ref' }],
+    }] } };
+    const merged = mergeConfirmedAssetIds(current, confirmed);
+    expect(merged.doc.slides[0].imageReferences[0]).toMatchObject({
+      id:'local-ref', imageId:'local-ref', assetId:'original_ref',
+    });
+    expect(merged.doc.slides[0].removedImageReferenceIds).toBeUndefined();
+  });
 });

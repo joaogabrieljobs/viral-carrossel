@@ -80,4 +80,16 @@ describe('cliente de projetos por conta', () => {
     await expect(listProjectsPage({ limit: 101 })).rejects.toMatchObject({ code: 'project_bad_limit' });
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('libera o salvamento quando a API não responde em 30 segundos', async () => {
+    vi.useFakeTimers();
+    fetch.mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+    const pending = putProject({ id: 'janine', doc: {} }, { baseVersion: 1 });
+    const timedOut = expect(pending).rejects.toMatchObject({ code: 'project_request_timeout' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await timedOut;
+    vi.useRealTimers();
+  });
 });

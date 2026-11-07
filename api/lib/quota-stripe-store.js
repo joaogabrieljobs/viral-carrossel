@@ -145,6 +145,9 @@ export async function stripeQuotaRefund({ customerId, periodStartSec, operationI
     const usadas = Number.isFinite(atual) && atual > 0 ? Math.floor(atual) : 0;
     const operacao = idDeOperacao(operationId);
     const ops = lerOperacoes(metadados, periodStartSec);
+    // Uma operação ausente não prova uma reserva. Isso também torna segura
+    // a repetição tardia do reconciliador depois de o mapa limitado ser podado.
+    if (operacao && !ops.has(operacao)) return usadas;
     if (operacao && ops.get(operacao) === 'F') return usadas;
     const proximo = Math.max(0, usadas - 1);
     if (operacao && ops.has(operacao)) ops.set(operacao, 'F');

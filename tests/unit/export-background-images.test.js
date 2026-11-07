@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   exportRenderScope,
   extractCssBackgroundUrls,
+  pdfCanvasScale,
   presentationOverflowAtFloor,
   slideImageUrls,
   waitForExportAssets,
@@ -9,6 +10,12 @@ import {
 } from '../../src/hooks/useExport.js';
 
 describe('espera de imagens antes da exportação', () => {
+  it('reduz a escala do PDF no celular e em aparelhos com pouca memória', () => {
+    expect(pdfCanvasScale({ viewportWidth: 390, deviceMemory: 8 })).toBe(2);
+    expect(pdfCanvasScale({ viewportWidth: 1280, deviceMemory: 4 })).toBe(2);
+    expect(pdfCanvasScale({ viewportWidth: 1280, deviceMemory: 8 })).toBe(3);
+  });
+
   it('extrai URLs de múltiplas camadas CSS sem confundir gradientes', () => {
     const css = 'linear-gradient(#0008, #0008), url("blob:foto-1"), url(\'https://cdn.exemplo/foto-2.webp\')';
     expect(extractCssBackgroundUrls(css)).toEqual([

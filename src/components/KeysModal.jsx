@@ -9,6 +9,7 @@ import {
   normalizeAISettings,
   TEXT_PROVIDERS,
 } from '../config/ai-providers.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 const PRESETS = [
   {
@@ -159,6 +160,10 @@ export default function KeysModal({
   const [draft, setDraft] = useState(() => normalizeAISettings(aiSettings));
   const [tab, setTab] = useState('setup');
   const [section, setSection] = useState('text');
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
+    open,
+    onClose,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -209,13 +214,16 @@ export default function KeysModal({
     || [...requiredKeys].every((providerId) => draft.keys[providerId]?.trim());
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="modal-panel"
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-settings-title"
+        tabIndex={-1}
         style={{ maxWidth: 680, width: 'min(680px, calc(100vw - 24px))', maxHeight: 'min(780px, calc(100vh - 24px))' }}
       >
         <header style={{

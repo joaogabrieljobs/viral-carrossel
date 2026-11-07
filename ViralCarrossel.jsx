@@ -4,6 +4,7 @@ import { GenerationScopePicker } from './src/components/GenerationScopePicker.js
 import { joinSlideCaptions } from './src/utils/import-text.js';
 import { applyVisualPresetToCard, editCardVisualBrand, preserveVisualPresetContent } from './src/utils/visual-scope.js';
 import { ProjectSaveStatus } from './src/components/ProjectSaveStatus.jsx';
+import CardThumbnail from './src/components/card/CardThumbnail.jsx';
 import { cloudSyncFailureMessage, isModuleLoadError } from './src/utils/cloud-sync-feedback.js';
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
@@ -156,6 +157,7 @@ import {
   buildMaterialPriorityBlock,
   CREATIVE_PRESETS,
   CREATIVE_PRESET_BY_ID,
+  GENERATION_TOPIC_MAX_CHARS,
   SLIDE_TEXT_DENSITY_OPTIONS,
   SLIDE_TEXT_DENSITY_BY_ID,
   TEXT_DENSITY_TARGET_MULT,
@@ -176,6 +178,7 @@ import {
   buildGenerationJsonContract,
   buildGenerationIntroLine,
   buildGenerationLanguageLayer,
+  buildContentLanguageRule,
   buildGenerationSlideLayoutRules,
   buildGenerationImageLayer,
   buildNarrativeModeReminder,
@@ -205,8 +208,11 @@ import {
 import {
   applyBatchPhotosToSlides,
   summarizeBatchPhotoImport,
+  validateImportedPhotoFile,
 } from './src/utils/batch-photos.js';
+import { mergeGeneratedSlidesWithConcurrentMedia } from './src/utils/generation-media-merge.js';
 import { applyImportedTextToSlides } from './src/utils/import-text.js';
+import { creationMaterialOverages } from './src/utils/create-project-flow.js';
 import {
   DEFAULT_CAROUSEL_VISUAL_PRESET_ID,
   applyCarouselVisualPresetToDoc,
@@ -3348,6 +3354,7 @@ export default function App() {
   const photoZoneInputRef = useRef(null);
   const photoZoneTargetIdxRef = useRef(null);
   const refImageInputRef = useRef(null);
+  const refImageReplaceKeyRef = useRef(null);
   const videoFileInputRef = useRef(null);
   const refImageTargetIdxRef = useRef(null);
   const referenceUploadRef = useRef(0);
@@ -3903,17 +3910,20 @@ export default function App() {
       toast('Não foi possível aplicar a foto a este slide.', 'error', 4000);
       return;
     }
-    // Import no card cancela job GPT desse lote (overlay falso bloqueava o toque).
-    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
-    cancelAllAIGeneration();
-    slideImgGenIdsRef.current.clear();
-    setSlideImgGenBusy({});
+    // A foto manual vence apenas neste card. Jobs dos outros cards e a geração
+    // de texto continuam; a guarda de identidade descarta uma resposta antiga
+    // que tente voltar para este card depois da importação.
     const job = { cancelled: false };
     importAbortRef.current = job;
     setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Importando a foto… 0/1' });
     void (async () => {
       try {
         if (job.cancelled) return;
+        const validation = await validateImportedPhotoFile(file);
+        if (!validation.valid) {
+          toast(validation.message, 'error', 6000);
+          return;
+        }
         setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Lendo a foto… 0/1' });
         const url = await vcImageFileToStorageDataUrl(file);
         if (job.cancelled) return;
@@ -3922,7 +3932,7 @@ export default function App() {
           return;
         }
         if (!url.startsWith('data:')) {
-          toast('Formato não reconhecido após leitura. Tente outro ficheiro.', 'error', 4500);
+          toast('Formato não reconhecido após a leitura. Tente outro arquivo PNG, JPEG ou WebP.', 'error', 4500);
           return;
         }
         setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Salvando a foto… 0/1' });
@@ -4359,12 +4369,9 @@ export default function App() {
     e.target.value = '';
     if (!files.length) return;
 
-    // Import manual ganha à geração GPT em curso — evita overlay «Gerando…»
-    // em todos os cards e corrida por quota enquanto o utilizador cola fotos.
-    if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
-    cancelAllAIGeneration();
-    slideImgGenIdsRef.current.clear();
-    setSlideImgGenBusy({});
+    // A importação em lote altera apenas os cards correspondentes. As guardas
+    // por identidade impedem que uma resposta antiga sobrescreva essas fotos,
+    // sem cancelar texto ou imagens que pertencem aos demais cards.
 
     const job = { cancelled: false };
     importAbortRef.current = job;
@@ -4378,10 +4385,12 @@ export default function App() {
 
     const readOne = async (file) => {
       try {
+        const validation = await validateImportedPhotoFile(file);
+        if (!validation.valid) return { dataUrl:null, rejected:true };
         const url = await vcImageFileToStorageDataUrl(file);
-        return typeof url === 'string' && url.length >= 32 ? url : null;
+        return { dataUrl:typeof url === 'string' && url.length >= 32 ? url : null, rejected:false };
       } catch {
-        return null;
+        return { dataUrl:null, rejected:true };
       }
     };
 
@@ -4389,6 +4398,8 @@ export default function App() {
       try {
         // Sequencial: evita saturar canvas/IDB e falhas silenciosas em lote grande.
         const urls = [];
+        let rejected = 0;
+        const rejectedFiles = [];
         for (let i = 0; i < files.length; i += 1) {
           if (job.cancelled) break;
           const file = files[i];
@@ -4398,9 +4409,20 @@ export default function App() {
             total,
             label: `Importando fotos… ${i}/${total}`,
           });
-          const dataUrl = await readOne(file);
+          const read = await readOne(file);
+          const dataUrl = read.dataUrl;
+          if (read.rejected) {
+            rejected += 1;
+            rejectedFiles.push(file?.name || `arquivo ${i + 1}`);
+          }
           if (job.cancelled) break;
           if (!dataUrl) {
+            if (!read.rejected) {
+              rejected += 1;
+              rejectedFiles.push(file?.name || `arquivo ${i + 1}`);
+            }
+            // Mantém a relação 1 arquivo = 1 card. Se o primeiro arquivo for
+            // recusado, o segundo continua pertencendo ao card 2.
             urls.push(null);
             setGenProgress({
               phase: 'import',
@@ -4458,14 +4480,18 @@ export default function App() {
           ));
         }
 
-        const created = Math.max(0, validCount - beforeCount);
-        const leftoverSlides = Math.max(0, beforeCount - validCount);
-        const skippedNulls = urls.length - validCount;
+        const hasStoredPhoto = (candidate) => !!(candidate && (candidate.bgImage || candidate.bgImageId));
+        const created = urls.slice(beforeCount).filter(hasStoredPhoto).length;
+        const appliedToExisting = urls.slice(0, beforeCount).filter(hasStoredPhoto).length;
+        const leftoverSlides = Math.max(0, beforeCount - appliedToExisting);
+        const skippedNulls = rejected;
         const summary = summarizeBatchPhotoImport({
           applied: validCount,
           created,
           leftoverSlides,
           skippedNulls,
+          rejected,
+          rejectedFiles,
         });
         toast(summary.message, summary.tone, 5000);
         if (validCount > 0) setActiveIdx(0);
@@ -4720,14 +4746,17 @@ export default function App() {
     return () => window.removeEventListener('vc:image-quota', onQuota);
   }, [setAccess]);
 
-  const openRefImagePicker = useCallback((slideIdx) => {
+  const openRefImagePicker = useCallback((slideIdx, replaceKey = null) => {
     refImageTargetIdxRef.current = slideIdx;
+    refImageReplaceKeyRef.current = replaceKey;
     refImageInputRef.current?.click();
   }, []);
   const handleRefImageFile = useCallback(async (e) => {
     const files = Array.from(e.target.files || []);
     const idx = refImageTargetIdxRef.current;
+    const replaceKey = refImageReplaceKeyRef.current;
     refImageTargetIdxRef.current = null;
+    refImageReplaceKeyRef.current = null;
     e.target.value = '';
     if (!files.length || idx == null) return;
     const projectId = activeDocId;
@@ -4740,7 +4769,7 @@ export default function App() {
     }
     const existing = normalizeSlideImageReferences(source.imageReferences);
     const legacyCount = source.refImage || source.refImageId || source.refImageAssetId ? 1 : 0;
-    const capacity = MAX_SLIDE_IMAGE_REFERENCES - legacyCount - existing.length;
+    const capacity = replaceKey ? 1 : MAX_SLIDE_IMAGE_REFERENCES - legacyCount - existing.length;
     if (capacity <= 0) {
       toast(`Este card já tem o limite de ${MAX_SLIDE_IMAGE_REFERENCES} referências.`, 'warning', 5000);
       return;
@@ -4753,18 +4782,37 @@ export default function App() {
     try {
       const storedRaw = await Promise.all(acceptedFiles.map(storeSlideImageReference));
       if (request !== referenceUploadRef.current || editorSyncStateRef.current.activeDocId !== projectId) return;
-      const usedMentions = slideReferenceDescriptors(source).map(ref => ref.mention);
+      const descriptors = slideReferenceDescriptors(source);
+      const replacing = replaceKey ? descriptors.find(ref => ref.key === replaceKey) : null;
+      const usedMentions = descriptors.filter(ref => ref.key !== replaceKey).map(ref => ref.mention);
       const stored = storedRaw.map((reference, index) => {
-        const mention = uniqueSlideReferenceMention('', usedMentions, `imagem${legacyCount + existing.length + index + 1}`);
+        const mention = uniqueSlideReferenceMention(
+          replacing?.mention || '', usedMentions, `imagem${legacyCount + existing.length + index + 1}`,
+        );
         usedMentions.push(mention);
         return { ...reference, mention };
       });
       history.set(current => ({ ...current, slides: current.slides.map(slide => (
-        slide.id === source.id
-          ? { ...slide, imageReferences:[...normalizeSlideImageReferences(slide.imageReferences), ...stored].slice(0, MAX_SLIDE_IMAGE_REFERENCES) }
-          : slide
+        slide.id !== source.id ? slide
+          : replaceKey === 'legacy' ? {
+            ...slide,
+            refImageId:stored[0].imageId, refImage:null, refImageAssetId:null,
+            refImageName:stored[0].name, refImageMention:stored[0].mention,
+            refImageFailed:false, refImageError:null,
+          }
+            : replaceKey ? {
+              ...slide,
+              imageReferences:normalizeSlideImageReferences(slide.imageReferences).map(ref => (
+                (ref.id || ref.imageId || ref.assetId) === replaceKey
+                  ? { ...stored[0], id:ref.id || stored[0].id, mention:replacing?.mention || stored[0].mention }
+                  : ref
+              )),
+            }
+              : { ...slide, imageReferences:[...normalizeSlideImageReferences(slide.imageReferences), ...stored].slice(0, MAX_SLIDE_IMAGE_REFERENCES) }
       )) }));
-      toast(`${stored.length} referência${stored.length === 1 ? '' : 's'} adicionada${stored.length === 1 ? '' : 's'} ao prompt.`, 'success', 3000);
+      toast(replaceKey
+        ? `Referência @${stored[0].mention} reenviada.`
+        : `${stored.length} referência${stored.length === 1 ? '' : 's'} adicionada${stored.length === 1 ? '' : 's'} ao prompt.`, 'success', 3000);
     } catch (error) {
       toast(error.message, 'warning', 6000);
     }
@@ -4772,16 +4820,30 @@ export default function App() {
   const removeSlideReference = useCallback((idx, key = 'all') => {
     referenceUploadRef.current += 1;
     if (key === 'all') {
-      updateSlideAt(idx, { imageReferences:[], refImage:null, refImageId:null, refImageAssetId:null, refImageName:null, refImageMention:null, refImageFailed:false, refImageError:null });
+      const source = slidesLiveRef.current[idx];
+      const removed = normalizeSlideImageReferences(source?.imageReferences)
+        .flatMap(ref => [ref.id, ref.assetId, ref.imageId]).filter(Boolean);
+      updateSlideAt(idx, {
+        imageReferences:[],
+        removedImageReferenceIds:[...new Set([...(source?.removedImageReferenceIds || []), ...removed])],
+        refImage:null, refImageId:null, refImageAssetId:null, refImageName:null, refImageMention:null, refImageFailed:false, refImageError:null,
+      });
       return;
     }
     if (key === 'legacy') {
       updateSlideAt(idx, { refImage:null, refImageId:null, refImageAssetId:null, refImageName:null, refImageMention:null, refImageFailed:false, refImageError:null });
       return;
     }
+    const source = slidesLiveRef.current[idx];
+    const target = normalizeSlideImageReferences(source?.imageReferences)
+      .find(ref => (ref.id || ref.imageId || ref.assetId) === key);
     updateSlideAt(idx, {
-      imageReferences:normalizeSlideImageReferences(slidesLiveRef.current[idx]?.imageReferences)
+      imageReferences:normalizeSlideImageReferences(source?.imageReferences)
         .filter(ref => (ref.id || ref.imageId || ref.assetId) !== key),
+      removedImageReferenceIds:[...new Set([
+        ...(source?.removedImageReferenceIds || []),
+        key, target?.id, target?.assetId, target?.imageId,
+      ].filter(Boolean))],
     });
   }, [updateSlideAt]);
   const renameSlideReference = useCallback((idx, key, value) => {
@@ -4932,6 +4994,18 @@ export default function App() {
     announcement = false,
     remix = false,
   }) => {
+    topic = String(topic || '').slice(0, GENERATION_TOPIC_MAX_CHARS);
+    const materialProductKind = isApresentacaoPreset(presetArg ?? creativePreset ?? 'livre')
+      ? 'apresentacao'
+      : 'carrossel';
+    const materialOverages = creationMaterialOverages(material, materialProductKind);
+    if (Object.keys(materialOverages).length) {
+      const labels = { content:'Conteúdo base', sources:'Fontes e referências', context:'Contexto extra' };
+      const detail = Object.entries(materialOverages)
+        .map(([field, value]) => `${labels[field] || field}: reduza ${value.excess.toLocaleString('pt-BR')} caracteres`)
+        .join('; ');
+      throw new Error(`O material ultrapassa o limite usado pela IA (${detail}). O texto completo foi preservado; reduza-o para gerar sem cortes.`);
+    }
     if (generationRef.current && !generationRef.current.signal.aborted) return { cancelled: true };
     if (getAIGenerationCount() > 0) {
       toast('Há outra operação de IA em andamento. Conclua ou cancele antes de iniciar uma nova geração.', 'info', 4800);
@@ -5065,11 +5139,11 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
     const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null, presentationPathId);
 
-    const idiomaRegra = `
-REGRA DE IDIOMA (obrigatória):
-- Redija em português brasileiro: "title", "subtitle", "bodyAfterImage" (se existir) e "caption".
-- Exceção: cada "imageQuery" permanece em INGLÊS (8–15 palavras), conforme a seção de direção de imagem — não traduza esse campo para o português.
-`;
+    const idiomaRegra = buildContentLanguageRule({
+      instructions: material?.context,
+      topic,
+      content: material?.content,
+    });
 
     const contextoModoPerso =
       isPresentationGeneration
@@ -5182,7 +5256,20 @@ ${jsonShapeLine}`;
           });
         },
       },
-      aiOptions: { maxTokens: genMaxTokens, openaiKey, signal: job.signal },
+      aiOptions: {
+        maxTokens: genMaxTokens,
+        openaiKey,
+        signal: job.signal,
+        onRetry: ({ attempt, total, reason }) => {
+          checkActive();
+          setGenProgress((previous) => ({
+            phase:'text',
+            current:Number(previous?.current) || 1,
+            total:Number(previous?.total) || (isPresentationGeneration ? 5 : 3),
+            label:`Nova tentativa ${attempt} de ${total} · ${reason || 'resposta temporariamente indisponível'}`,
+          }));
+        },
+      },
       onStage: stage => {
         checkActive();
         const stages = {
@@ -5430,6 +5517,16 @@ ${jsonShapeLine}`;
       newSlides = visualQuality.slides;
       if (!visualQuality.ok) toast('A apresentação foi montada. Revise a composição antes de exportar.', 'warning', 6500);
     }
+    // Uma foto enviada ou reposicionada enquanto o texto era gerado pertence
+    // ao usuário. Mesclamos essa mídia antes do commit e não geramos outra
+    // imagem para o mesmo card; os demais cards continuam normalmente.
+    const concurrentMedia = mergeGeneratedSlidesWithConcurrentMedia(
+      newSlides,
+      sourceSlides,
+      slidesLiveRef.current,
+    );
+    newSlides = concurrentMedia.slides;
+    const concurrentMediaSlideIds = concurrentMedia.protectedSlideIds;
     checkActive();
     if (!remix) {
       lastGenerateArgsRef.current = {
@@ -5513,13 +5610,16 @@ ${jsonShapeLine}`;
 
     if (fetchImagesNow) {
       if (hasOpenAI) {
-        const slidesWithImage = newSlides.map((sl, i) => ({ sl, slideId: sl.id, i, q: result.slides[i]?.imageQuery || sl.imageQuery }))
-                                          .filter(x => !!(x.q && String(x.q).trim()));
+        const slidesWithImage = newSlides.map((sl, i) => ({
+          sl, slideId:sl.id, i, q:result.slides[i]?.imageQuery || sl.imageQuery,
+          expectedImageIdentity:slideImageIdentity(sl),
+        }))
+          .filter(x => !concurrentMediaSlideIds.has(x.slideId) && !!(x.q && String(x.q).trim()));
         const totalImgs = slidesWithImage.length;
         let doneImgs = 0;
         const attemptedImageSlideIds = new Set();
         setGenProgress({ phase: 'images', current: 0, total: totalImgs, label: `Gerando imagens (0/${totalImgs})…` });
-        for (const { slideId, i, q } of slidesWithImage) {
+        for (const { slideId, i, q, expectedImageIdentity } of slidesWithImage) {
           if (abort.cancelled || activeProjectRef.current !== generationProjectId) break;
           attemptedImageSlideIds.add(slideId);
           setGenProgress({
@@ -5541,33 +5641,33 @@ ${jsonShapeLine}`;
             checkActive();
             const patchImg = await guardarImagemDoSlide(url);
             checkActive();
-            if (!abort.cancelled && activeProjectRef.current === generationProjectId) {
-              setSlides(prev => prev.map((sl) => sl.id === slideId ? {
-                ...sl,
-                ...patchImg,
-                bgFit: 'cover',
-                bgX: 50,
-                bgY: 50,
-                bgZoom: 100,
-                bgImageFailed: false,
-                bgImageError: null,
-                bgImageSource: 'ai',
-              } : sl));
-              setCreationPreviewSlides(prev => prev.map((sl) => sl.id === slideId ? {
-                ...sl, ...patchImg, bgFit:'cover', bgX:50, bgY:50, bgZoom:100,
+            const liveTarget = activeProjectRef.current === generationProjectId
+              ? slidesLiveRef.current?.find((slide) => slide.id === slideId)
+              : null;
+            if (!liveTarget || slideImageIdentity(liveTarget) !== expectedImageIdentity) {
+              if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
+            } else if (!abort.cancelled) {
+              const imagePatch = {
+                ...patchImg, bgFit:'cover', bgX:50, bgY:50, bgZoom:100,
                 bgImageFailed:false, bgImageError:null, bgImageSource:'ai',
-              } : sl));
+              };
+              setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+                id:slideId, expectedImageIdentity, patch:imagePatch,
+              }));
+              setCreationPreviewSlides(prev => applySlidePatchIfImageCurrent(prev, {
+                id:slideId, expectedImageIdentity, patch:imagePatch,
+              }));
             }
           } catch(e) {
             if (isGenerationCancelled(e) || job.signal.aborted) throw e;
             imgFailCount++;
             console.warn(`Image gen slide ${i+1}:`, e.message);
             if (!abort.cancelled && activeProjectRef.current === generationProjectId)
-              setSlides(prev => prev.map((sl) => sl.id === slideId ? {
-                ...sl,
-                bgImageFailed: true,
-                bgImageError: e?.code || e?.message || 'generation_failed',
-              } : sl));
+              setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+                id:slideId,
+                expectedImageIdentity,
+                patch:{ bgImageFailed:true, bgImageError:e?.code || e?.message || 'generation_failed' },
+              }));
             // Quota esgotada / plano sem imagens / sessão: os restantes cards falhariam igual — pára aqui (auditoria H6).
             if (['reference_unsupported', 'reference_invalid', 'reference_storage_unconfigured', 'reference_upload_failed', 'quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
               if (!abort.cancelled) toast(e.message, 'error', 7000);
@@ -5586,18 +5686,15 @@ ${jsonShapeLine}`;
           setGenProgress({ phase: 'images', current: doneImgs, total: totalImgs, label: `Gerando imagens (${doneImgs}/${totalImgs})…` });
         }
         if (imgQuotaStop) {
-          const remainingIds = new Set(
-            slidesWithImage
-              .filter(({ slideId }) => !attemptedImageSlideIds.has(slideId))
-              .map(({ slideId }) => slideId),
-          );
-          if (remainingIds.size) {
-            imgFailCount += remainingIds.size;
-            setSlides(prev => prev.map((sl) => remainingIds.has(sl.id) ? {
-              ...sl,
-              bgImageFailed: true,
-              bgImageError: 'batch_generation_stopped',
-            } : sl));
+          const remainingTargets = slidesWithImage
+            .filter(({ slideId }) => !attemptedImageSlideIds.has(slideId));
+          if (remainingTargets.length) {
+            imgFailCount += remainingTargets.length;
+            setSlides(prev => remainingTargets.reduce((current, target) => applySlidePatchIfImageCurrent(current, {
+              id:target.slideId,
+              expectedImageIdentity:target.expectedImageIdentity,
+              patch:{ bgImageFailed:true, bgImageError:'batch_generation_stopped' },
+            }), prev));
           }
         }
       }
@@ -6012,11 +6109,18 @@ Retorne exatamente: ${singleJson}`,
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const isPresentationSummary = isApresentacaoPreset(creativePreset);
       const capRules = buildCaptionVoiceRules(creativePreset, mode);
+      const captionLanguageRule = buildContentLanguageRule({
+        instructions:material?.context,
+        topic:doc.editorialContext?.topic || '',
+        content:[material?.content, ctx].filter(Boolean).join('\n'),
+      });
       const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null }), job.signal);
       const r = await callAI(
         `${isPresentationSummary
-          ? 'Atue como editor de apresentações. Crie um resumo executivo e notas breves para acompanhar este deck em português brasileiro.'
-          : 'Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel em português brasileiro.'}
+          ? 'Atue como editor de apresentações. Crie um resumo executivo e notas breves para acompanhar este deck.'
+          : 'Atue como estrategista de conteúdo para Instagram. Crie a legenda para este carrossel.'}
+
+${captionLanguageRule}
 
 ${isPresentationSummary ? '' : buildNarrativeModeReminder(mode)}
 ${isPresentationSummary ? '' : buildContentObjectiveReminder(contentObjective)}
@@ -6063,6 +6167,7 @@ ${isPresentationSummary
     exportAll,
     exportPhotosOnly,
     exportPDF,
+    cancelExport,
   } = useExport({
     slides, fmt, slideRefs,
     projectName: activeEntry?.name,
@@ -6150,7 +6255,7 @@ ${isPresentationSummary
         count,
         niche: styleKit.contextMd.trim() ? '' : (niche || ''),
         tone: styleKit.contextMd.trim() && !(brandToneIsReady(brand) && brand.useBrandVoice !== false)
-          ? 'Use a voz do brief do projeto; na ausência, PT-BR direto e concreto'
+          ? 'Use a voz do brief do projeto; na ausência, seja direto e concreto no idioma definido para o conteúdo'
           : (toneFromBrand || 'direto e concreto'),
         audience: styleKit.contextMd.trim() ? '' : (brand.defaultAudience || ''),
         imgMode: 'dalle',
@@ -6336,7 +6441,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
   }, [slides, setSlides, setError, toast, openaiKey, brand, material, styleKit, creativePreset, mode, slideTextDensity, contentObjective, presentationPath]);
 
   // Aplica um template pronto (preenche slides + brand + composições)
-  const applyTemplate = useCallback((tpl) => {
+  const applyTemplate = useCallback((tpl, { generateImages = false } = {}) => {
     if (activeProductKind === 'apresentacao') {
       setTemplatesOpen(false);
       toast('Os templates prontos são de carrossel. Abra ou crie um carrossel para aplicá-los.', 'info', 5200);
@@ -6413,7 +6518,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
     });
     setActiveIdx(0);
     toast(`Template "${tpl.name}" aplicado`, 'success');
-    trackEvent('template_applied', { template: tpl.id || tpl.name, slides: tpl.slides.length });
+    trackEvent('template_applied', { template: tpl.id || tpl.name, slides: tpl.slides.length, images: generateImages ? 'confirmed' : 'layout_only' });
+    if (!generateImages) return;
+    if (!hasOpenAI) {
+      toast('O layout foi aplicado, mas a geração de imagens não está disponível nesta conta.', 'warning', 6000);
+      return;
+    }
     // Guard contra race-condition (mesmo padrão do handleGenerate)
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
     const templateJob = startAIJob();
@@ -6421,44 +6531,69 @@ Retorne APENAS JSON: ${refineAllWantsBody
     templateJob.signal.addEventListener('abort', () => { abort.cancelled = true; }, { once: true });
     imgGenAbortRef.current = abort;
     (async () => {
-      // Modo plano (SJinn) não usa chave OpenAI — o gate antigo por `openaiKey` deixava templates sem foto (auditoria H7).
-      if (!hasOpenAI) { templateJob.finish(); return; }
       let failCount = 0;
-      for (let i = 0; i < tpl.slides.length; i++) {
-        if (abort.cancelled || activeProjectRef.current !== projectId) break;
-        const q = tpl.slides[i]?.q;
-        if (!q) continue;
-        const slideId = newSlides[i]?.id;
-        try {
-          const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
-            signal: templateJob.signal,
-            refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
-            imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
-            aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
-          });
-          const patchImg = await guardarImagemDoSlide(url);
-          if (!abort.cancelled && activeProjectRef.current === projectId)
-            setSlides(prev => prev.map((sl) => sl.id === slideId ? {
-              ...sl,
-              ...patchImg,
-              bgImageFailed: false,
-              bgImageError: null,
-              bgImageSource: 'ai',
-            } : sl));
-        } catch (e) {
-          if (isGenerationCancelled(e)) break;
-          failCount++;
-          console.warn(`Template imagem slide ${i + 1}:`, e.message);
-          if (!abort.cancelled && activeProjectRef.current === projectId)
-            setSlides(prev => prev.map((sl) => sl.id === slideId ? {
-              ...sl,
-              bgImageFailed: true,
-              bgImageError: e?.code || e?.message || 'generation_failed',
-            } : sl));
+      let stoppedByQuota = false;
+      const targets = tpl.slides.map((slide, index) => ({
+        index,
+        q:String(slide?.q || '').trim(),
+        slideId:newSlides[index]?.id,
+        expectedImageIdentity:slideImageIdentity(newSlides[index]),
+      })).filter(item => item.q && item.slideId);
+      let completed = 0;
+      setGenProgress({ phase:'template_images', current:0, total:targets.length, label:`Gerando imagens do template (0/${targets.length})…` });
+      try {
+        for (const { index:i, q, slideId, expectedImageIdentity } of targets) {
+          if (abort.cancelled || activeProjectRef.current !== projectId) break;
+          slideImgGenIdsRef.current.add(slideId);
+          setSlideImgGenBusy(prev => ({ ...prev, [slideId]:true }));
+          setGenProgress({ phase:'template_images', current:completed, total:targets.length, label:`Gerando imagem do card ${i + 1} (${completed + 1}/${targets.length})…` });
+          try {
+            const url = await generateDALLEWithRetry(q, openaiKey, imgParams, {
+              signal: templateJob.signal,
+              refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
+              imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
+              aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
+            });
+            const patchImg = await guardarImagemDoSlide(url);
+            const liveTarget = activeProjectRef.current === projectId
+              ? slidesLiveRef.current?.find((slide) => slide.id === slideId)
+              : null;
+            if (!liveTarget || slideImageIdentity(liveTarget) !== expectedImageIdentity) {
+              if (patchImg.bgImageId) imageDelete(patchImg.bgImageId).catch(() => {});
+            } else if (!abort.cancelled) {
+              setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+                id:slideId,
+                expectedImageIdentity,
+                patch:{ ...patchImg, bgImageFailed:false, bgImageError:null, bgImageSource:'ai' },
+              }));
+            }
+          } catch (e) {
+            if (isGenerationCancelled(e)) break;
+            failCount++;
+            console.warn(`Template imagem slide ${i + 1}:`, e.message);
+            if (!abort.cancelled && activeProjectRef.current === projectId)
+              setSlides(prev => applySlidePatchIfImageCurrent(prev, {
+                id:slideId,
+                expectedImageIdentity,
+                patch:{ bgImageFailed:true, bgImageError:e?.code || e?.message || 'generation_failed' },
+              }));
+            if (['quota_exhausted', 'plan_no_images', 'session_required', 'subscription_inactive', 'rate_limited'].includes(e?.code)) {
+              stoppedByQuota = true;
+              toast(e.message || 'A geração parou porque não há créditos disponíveis.', 'error', 7000);
+              break;
+            }
+          } finally {
+            completed += 1;
+            slideImgGenIdsRef.current.delete(slideId);
+            setSlideImgGenBusy(prev => { const next = { ...prev }; delete next[slideId]; return next; });
+            setGenProgress({ phase:'template_images', current:completed, total:targets.length, label:`Gerando imagens do template (${completed}/${targets.length})…` });
+          }
         }
+      } finally {
+        templateJob.finish();
+        setGenProgress(prev => prev?.phase === 'template_images' ? null : prev);
       }
-      templateJob.finish();
-      if (!abort.cancelled && failCount > 0)
+      if (!abort.cancelled && failCount > 0 && !stoppedByQuota)
         toast(failCount === 1
           ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
           : `${failCount} imagens do template não carregaram. Toque no card para tentar de novo.`, 'warning', 5000);
@@ -7267,7 +7402,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
               ref={thumbnailStripRef}
               style={{ display:'flex', alignItems:'center', gap:6, overflowX:'auto', paddingBottom:2, scrollPaddingInline:8 }}
             >
-              {slides.map((s, i) => {
+              {displaySlides.map((s, i) => {
                 const stripThumbFil = slideStoredPresentationCssFilter(s);
                 return (
                 <button
@@ -7292,43 +7427,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   title="Clique para selecionar · arraste para reordenar"
                   aria-label={`${isPresentationProject ? 'Slide' : 'Card'} ${i+1} de ${slides.length}`}
                 >
-                  <div style={{
-                    width:stripThumbWidth, height:stripThumbHeight, borderRadius:4, overflow:'hidden', position:'relative',
-                    background: resolveSlideBrandBg(brand, i, s),
-                    ...(stripThumbFil ? { filter: stripThumbFil } : {}),
-                  }}>
-                    <span style={{
-                      position:'absolute', left:5, right:5, top:'50%', transform:'translateY(-50%)',
-                      fontSize:isPresentationProject ? 5.5 : 5, lineHeight:1.14, fontWeight:700,
-                      color:'rgba(255,255,255,0.82)', overflow:'hidden', display:'-webkit-box',
-                      WebkitLineClamp: isPresentationProject ? 2 : 3, WebkitBoxOrient:'vertical',
-                      textAlign:'left', overflowWrap:'anywhere',
-                    }}>
-                      {s.bgImageFailed ? 'Imagem pendente' : (s.title || 'Sem título')}
-                    </span>
-                    {s.bgImage ? (
-                      <div style={{ position:'absolute', inset:0, overflow:'hidden' }}>
-                        <img
-                          src={s.bgImage}
-                          alt=""
-                          loading="eager"
-                          onError={(event) => { event.currentTarget.parentElement.style.display = 'none'; }}
-                          style={{
-                            position:'absolute', inset:0, width:'100%', height:'100%',
-                            objectFit:s.bgFit === 'contain' ? 'contain' : 'cover',
-                            objectPosition:`${s.bgX ?? 50}% ${s.bgY ?? 50}%`,
-                            transform:`scale(${Math.max(0.5, (s.bgZoom ?? 100) / 100)}) scaleX(${s.bgMirror ? -1 : 1})`,
-                          }}
-                        />
-                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.10)' }}/>
-                      </div>
-                    ) : null}
-                    <span style={{
-                      position:'absolute', bottom:3, left:4,
-                      fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.7)',
-                      fontFamily:'var(--font-mono)', letterSpacing:'0.04em',
-                    }}>{String(i+1).padStart(2,'0')}</span>
-                  </div>
+                  <CardThumbnail
+                    slide={s}
+                    brand={displayBrand}
+                    index={i}
+                    width={stripThumbWidth}
+                    height={stripThumbHeight}
+                    isPresentation={isPresentationProject}
+                    imageFilter={stripThumbFil}
+                  />
                 </button>
                 );
               })}
@@ -7893,6 +8000,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   onRemoveRef={(key) => removeSlideReference(activeIdx, key)}
                   onRenameRef={(key, value) => renameSlideReference(activeIdx, key, value)}
                   onPickRef={() => openRefImagePicker(activeIdx)}
+                  onReuploadRef={(key) => openRefImagePicker(activeIdx, key)}
                   onGenerateImage={() => generateSlideImageAt(activeIdx)}
                   generateImageBusy={!!slideImgGenBusy[slide.id]}
                   itemLabel={isPresentationProject ? 'slide' : 'card'}
@@ -8086,6 +8194,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onRemoveRef={(key) => removeSlideReference(i, key)}
                       onRenameRef={(key, value) => renameSlideReference(i, key, value)}
                       onPickRef={() => openRefImagePicker(i)}
+                      onReuploadRef={(key) => openRefImagePicker(i, key)}
                       onGenerateImage={() => generateSlideImageAt(i)}
                       generateImageBusy={!!slideImgGenBusy[s.id]}
                       itemLabel={isPresentationProject ? 'slide' : 'card'}
@@ -8197,7 +8306,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
 
       {/* File inputs: evitar hidden (Safari iOS bloqueia .click() via JS). */}
       <input ref={fileInputRef} type="file" accept="image/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleImageUpload}/>
-      <input ref={batchPhotoInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
+      <input ref={batchPhotoInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleBatchPhotos}/>
       <input id={VC_PHOTO_ZONE_FILE_INPUT_ID} ref={photoZoneInputRef} type="file" accept="image/*" style={VC_PHOTO_ZONE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handlePhotoZoneBgFile}/>
       <input ref={refImageInputRef} type="file" accept="image/*" multiple style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={handleRefImageFile}/>
       <input ref={videoFileInputRef} type="file" accept="video/*" style={VC_TRIGGERABLE_FILE_INPUT_STYLE} aria-hidden="true" tabIndex={-1} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) importVideoToActiveSlide(f); }}/>
@@ -8242,7 +8351,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         defaultAudience={brand.defaultAudience || ''}
         hasOpenAI={hasOpenAI}
         hasAnthropic={hasAnthropic}
-        defaultWithImages={appMode !== 'criador'}
+        defaultWithImages={false}
         imageProviderLabel={
           aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2'
         }
@@ -8585,11 +8694,20 @@ Retorne APENAS JSON: ${refineAllWantsBody
         <div className="export-fab">
           <div style={{ width:28, height:28, borderRadius:'50%', border:'2px solid var(--border)', borderTopColor:'var(--accent)', animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>A exportar cards</div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-ui)', letterSpacing:'-0.011em' }}>
+              Exportando {isPresentationProject ? 'slides' : 'cards'}
+            </div>
             <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'var(--font-mono)', marginTop:2, letterSpacing:'0.04em' }}>
               {exportProgress.current} / {exportProgress.total}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={cancelExport}
+            style={{ marginLeft:8, minHeight:36, padding:'0 12px', borderRadius:9, border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-primary)', cursor:'pointer', fontWeight:600 }}
+          >
+            Cancelar
+          </button>
         </div>
       )}
     </div>

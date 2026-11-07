@@ -153,6 +153,9 @@ describe('montagem final dos prompts de texto', () => {
     expect(bulk).toContain('assertPresentationTextLimits(');
     expect(bulk.indexOf('assertPresentationTextLimits(')).toBeLessThan(bulk.indexOf('setSlides(prev => applyRefinedSlides(prev))'));
     expect(caption).toContain('buildCarouselTextContext(slides)');
+    expect(caption).toContain('buildContentLanguageRule({');
+    expect(caption).toContain('content:[material?.content, ctx]');
+    expect(caption).not.toContain('em português brasileiro');
     expect(caption).toContain('buildCaptionOutlineInstructions(mode, creativePreset)');
     expect(caption).not.toContain('8-12 linhas');
     expect(src).toContain('buildGenerationSlideLayoutRules(effectiveMode, cp, td, count, presentationPathId)');
@@ -162,5 +165,6 @@ describe('montagem final dos prompts de texto', () => {
     expect(bulk).toContain('...presentationAIOptions(creativePreset, presentationPath)');
     expect(caption).toContain('...presentationAIOptions(creativePreset, presentationPath)');
     expect(caption).toContain('buildPresentationSummaryRules(presentationPath)');
+    expect(src).toContain("topic = String(topic || '').slice(0, GENERATION_TOPIC_MAX_CHARS)");
   });
 });

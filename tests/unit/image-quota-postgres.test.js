@@ -137,6 +137,15 @@ describe('quota transacional de imagens', () => {
     expect(db.snapshot().periods[0][1].legacy_used).toBe(7);
   });
 
+  it('trata reembolso de commit ambíguo sem reserva como no-op', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db, async () => ({ used:7 }));
+    await adapter.getQuotaUsage(args);
+    expect(await adapter.refundImageCredit({ ...args, operationId:'missing-operation' }))
+      .toEqual({ used:7, refunded:false, reason:'not_found' });
+    expect((await adapter.getQuotaUsage(args)).used).toBe(7);
+  });
+
   it('falha fechado quando não consegue consultar o contador antigo', async () => {
     const db = fakeDatabase();
     const adapter = quota(db, async () => { throw new Error('Stripe indisponível'); });

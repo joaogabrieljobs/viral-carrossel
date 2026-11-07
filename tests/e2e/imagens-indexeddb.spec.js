@@ -17,6 +17,7 @@ async function abrirEditor(page) {
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await expect(page.locator('.modal-panel')).toBeVisible({ timeout: 10_000 });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+  await page.locator('.modal-panel').getByRole('button', { name: /aplicar só layout/i }).click();
   await expect(page.locator('[data-vc-tour="thumbnails"]')).toBeAttached({ timeout: 10_000 });
   await page.waitForTimeout(1000);
 }

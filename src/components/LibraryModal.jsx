@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
-import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
+import CardThumbnail, { projectThumbnailView } from './card/CardThumbnail.jsx';
 import { STATUS_DEFS, STATUS_BY_ID, fmtDate, isDefault } from '../utils/library-helpers.js';
 import {
   UNFILED_FOLDER_ID,
@@ -1077,8 +1077,7 @@ export default function LibraryModal({
               const isActive = entry.id === activeDocId;
               const status = STATUS_BY_ID[entry.status] || STATUS_BY_ID.draft;
               const slides = entry.doc?.slides || [];
-              const firstSlide = slides[0];
-              const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {}) || '#0a0a0a';
+              const thumbnail = projectThumbnailView(entry.doc);
               const product = projectKindCopy(entry);
               const isPresentation = product.kind === 'apresentacao';
               const editing = editingId === entry.id;
@@ -1099,17 +1098,22 @@ export default function LibraryModal({
                       type="button"
                       onClick={() => openProject(entry.id)}
                       style={{
-                        width: isPresentation ? 92 : 56, height: isPresentation ? 52 : 70, borderRadius: 6, flexShrink: 0, cursor: 'pointer',
-                        background: bg, backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
-                        backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.06)',
-                        position: 'relative', overflow: 'hidden',
+                        width: isPresentation ? 92 : 56, height: isPresentation ? 52 : 70,
+                        padding:0, borderRadius:6, flexShrink:0, cursor:'pointer',
+                        background:'none', border:'1px solid rgba(255,255,255,0.06)',
+                        position:'relative', overflow:'hidden',
                       }}
                       aria-label={`Abrir ${entry.name}`}
                     >
-                      {firstSlide?.bgImage ? <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}/> : null}
-                      <span style={{ position: 'absolute', bottom: 3, left: 5, fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
-                        {String(slides.length).padStart(2, '0')}
-                      </span>
+                      <CardThumbnail
+                        slide={thumbnail.slide}
+                        brand={thumbnail.brand}
+                        index={0}
+                        count={slides.length}
+                        width="100%"
+                        height="100%"
+                        isPresentation={isPresentation}
+                      />
                     </button>
 
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>

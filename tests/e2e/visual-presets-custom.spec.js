@@ -13,6 +13,7 @@ test('padrão preserva subtítulo e padrão personalizado entra na biblioteca', 
   await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+  await page.locator('.modal-panel').getByRole('button', { name: /aplicar só layout/i }).click();
   await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
   await page.reload();
   await enterEditorFromHome(page);
@@ -37,6 +38,7 @@ test('glass cria uma superfície visível no card e não só um toggle', async (
   await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+  await page.locator('.modal-panel').getByRole('button', { name: /aplicar só layout/i }).click();
   await page.evaluate(() => localStorage.setItem('vc_app_mode', JSON.stringify('studio')));
   await page.reload();
   await enterEditorFromHome(page);
@@ -74,6 +76,7 @@ test('duplo clique edita o título no card e a lixeira remove o elemento selecio
   await enterEditorFromHome(page);
   await page.getByRole('button', { name: /abrir templates/i }).click({ force: true });
   await page.locator('.modal-panel').getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+  await page.locator('.modal-panel').getByRole('button', { name: /aplicar só layout/i }).click();
 
   const title = page.locator('main h1[data-vc-inline-editable="true"]').first();
   await title.dispatchEvent('dblclick');

@@ -1,11 +1,32 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getAIGenerationCount, subscribeAIGeneration } from '../utils/generation-control.js';
+
+export function formatGenerationElapsed(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const remainder = String(total % 60).padStart(2, '0');
+  return `${minutes}:${remainder}`;
+}
 
 /** Sempre visível, inclusive sobre modais e depois de trocar de aba. */
 export function GenerationStatus({ progress, onCancel }) {
   const active = useSyncExternalStore(subscribeAIGeneration, getAIGenerationCount, getAIGenerationCount);
   const isImport = progress?.phase === 'import';
+  const running = active > 0 || isImport;
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    if (!running) {
+      setElapsedSeconds(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
   if (!active && !isImport) return null;
 
   const toneAnalysis = progress?.phase === 'tone';
@@ -70,6 +91,9 @@ export function GenerationStatus({ progress, onCancel }) {
           >
             {cancelLabel}
           </button>
+        </div>
+        <div style={{ marginTop: 7, fontSize: 11, color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>
+          Tempo decorrido: {formatGenerationElapsed(elapsedSeconds)}
         </div>
         {showBar ? (
           <div

@@ -9,7 +9,8 @@ vi.mock('../../api/lib/library-sync-postgres.js', () => ({
 
 import {
   createAgentImageJob, expireAgentImageJob, finishAgentImageJob, getAgentVisualJob,
-  isImageJobStale, selectImageSlides, undoAgentVisualBatch,
+  isImageJobStale, listAgentImageJobsForSettlement, markAgentImageJobCreditsSettled,
+  selectImageSlides, undoAgentVisualBatch,
 } from '../../api/lib/agent-visual-batch.js';
 
 const clone = value => structuredClone(value);
@@ -46,6 +47,16 @@ function fakeQuery(sql, params) {
     return row ? [{ project_id: row.id, entry: clone(row.entry), version: row.version, deleted_at: null }] : [];
   }
   if (sql.includes('FROM moont.agent_visual_jobs')) {
+    if (sql.includes("meta->>'creditsSettled'")) {
+      const limit = params[0];
+      return [...jobs.values()].flatMap(ownerJobs => [...ownerJobs.values()])
+        .filter(job => job.meta?.kind === 'image' && job.meta?.creditsSettled !== true
+          && (['applied', 'failed', 'undone'].includes(job.status)
+            || (job.status === 'pending'
+              && Date.now() - new Date(job.created_at).getTime() > 12 * 60_000)))
+        .slice(0, limit)
+        .map(columns);
+    }
     if (sql.includes('undo_request_id = $2')) {
       const job = [...(jobs.get(params[0])?.values() || [])].find(item => item.undo_request_id === params[1]);
       return job ? [{ request_id: job.request_id }] : [];
@@ -82,6 +93,12 @@ function fakeQuery(sql, params) {
       finished_at: 'later',
     });
     return [columns(job)];
+  }
+  if (sql.includes('UPDATE moont.agent_visual_jobs') && sql.includes("'{creditsSettled}'")) {
+    const job = jobs.get(params[0])?.get(params[1]);
+    if (!job || job.meta?.kind !== 'image' || !['applied', 'failed', 'undone'].includes(job.status)) return [];
+    job.meta = { ...job.meta, creditsSettled:true };
+    return [{ request_id:job.request_id }];
   }
   if (sql.includes('UPDATE moont.agent_visual_jobs')) {
     const job = jobs.get(params[0]).get(params[1]);
@@ -226,5 +243,24 @@ describe('agent image jobs store', () => {
       .toEqual([['failed', 'mcp_op_s2'], ['failed', 'mcp_op_s4']]);
     expect(expired.meta).toMatchObject({ kind: 'image', periodStartSec: 100 });
     expect(rows.get(owner).get(id).version).toBe(4);
+  });
+
+  it('mantém job terminal ou desfeito na fila até confirmar a liquidação', async () => {
+    await start();
+    await finishAgentImageJob(owner, 'image-job-01', [
+      { slideId:'s2', assetId:'original_abc' },
+      { slideId:'s4', errorCode:'sjinn_timeout' },
+    ]);
+
+    let pending = await listAgentImageJobsForSettlement();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ ownerId:owner, job:{ requestId:'image-job-01', status:'applied' } });
+
+    await undoAgentVisualBatch(owner, { requestId:'image-job-01', undoRequestId:'image-job-01-undo' });
+    pending = await listAgentImageJobsForSettlement();
+    expect(pending[0].job.status).toBe('undone');
+
+    expect(await markAgentImageJobCreditsSettled(owner, 'image-job-01')).toBe(true);
+    expect(await listAgentImageJobsForSettlement()).toEqual([]);
   });
 });

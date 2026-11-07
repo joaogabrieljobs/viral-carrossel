@@ -183,13 +183,17 @@ export function CriarRapidoHome({
       with_images: scopeImages ? '1' : '0',
       product: isPresentation ? 'apresentacao' : 'carrossel',
     });
-    await onQuickGenerate?.(promptTrim, {
-      withImages: !!(scopeImages && hasOpenAI),
-      narrativeMode: effectiveNarrativeMode,
-      cardCount: quickCardCount,
-      productKind: isPresentation ? 'apresentacao' : 'carrossel',
-      presentationPath: normalizedPresentationPath,
-    });
+    try {
+      await onQuickGenerate?.(promptTrim, {
+        withImages: !!(scopeImages && hasOpenAI),
+        narrativeMode: effectiveNarrativeMode,
+        cardCount: quickCardCount,
+        productKind: isPresentation ? 'apresentacao' : 'carrossel',
+        presentationPath: normalizedPresentationPath,
+      });
+    } catch (error) {
+      toast?.(error?.message || 'Não foi possível iniciar a geração.', 'error', 8000);
+    }
   };
 
   const openImagePicker = () => {
@@ -741,8 +745,13 @@ function ImageBatchPicker({ slides, selectedIds, setSelectedIds, busy, onClose, 
           );
         })}
       </div>
+      <div style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-muted)' }}>
+        Usa 1 crédito por imagem. Ao confirmar, esta ação consumirá até <strong>{selectedIds.length} crédito{selectedIds.length === 1 ? '' : 's'} de imagem</strong>.
+      </div>
       <button type="button" className="vc-btn vc-btn-primary" disabled={busy || !selectedIds.length} onClick={onGenerate} style={{ minHeight: 46 }}>
-        {busy ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Gerando…</> : `Gerar ${selectedIds.length || ''} ${selectedIds.length === 1 ? 'imagem' : 'imagens'}`}
+        {busy
+          ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} /> Gerando…</>
+          : `Confirmar: gerar ${selectedIds.length || ''} ${selectedIds.length === 1 ? 'imagem' : 'imagens'} · ${selectedIds.length || 0} ${selectedIds.length === 1 ? 'crédito' : 'créditos'}`}
       </button>
     </section>
   );

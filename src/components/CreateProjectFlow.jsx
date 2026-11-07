@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Loader2, Sparkles, X } from 'lucide-react
 import BrandLogo from './BrandLogo.jsx';
 import VisualStylePicker from './VisualStylePicker.jsx';
 import { ImgParamsPanel } from './panels/generate-modal-parts.jsx';
-import { CREATIVE_PRESETS, quickTemplateIdFromPreset } from '../utils/generation-prompts.js';
+import { CREATIVE_PRESETS, GENERATION_TOPIC_MAX_CHARS, quickTemplateIdFromPreset } from '../utils/generation-prompts.js';
 import { TITLE_FONTS } from '../utils/design-data.js';
 import { BODY_FONTS } from '../utils/brand-visuals.js';
 import { sanitizeCustomVisualPresetBrand } from '../utils/custom-visual-presets.js';
@@ -14,7 +14,7 @@ import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx'
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
-import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice } from '../utils/create-project-flow.js';
+import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
 import '../styles/create-project-flow.css';
 
 const PATH_LABELS = { auto:'Deixar o Moont organizar', pitch:'Apresentar um negócio — Pitch', aula_workshop:'Ensinar — Aula ou workshop', proposta_comercial:'Vender uma solução — Proposta', relatorio_executivo:'Mostrar resultados — Relatório', estudo_de_caso:'Demonstrar uma transformação — Caso', keynote_manifesto:'Defender uma visão — Palestra' };
@@ -82,6 +82,9 @@ export default function CreateProjectFlow({
   const busyRef = useRef(false);
   const mainRef = useRef(null);
   const isPresentation = productKind === 'apresentacao';
+  const materialLimits = creationMaterialLimits(productKind);
+  const materialOverageMessage = creationMaterialOverageMessage(material, productKind);
+  const hasMaterialOverage = Boolean(materialOverageMessage);
   const item = isPresentation ? 'slides' : 'cards';
   const quantityUnit = !isPresentation && Number(count) === 1 ? 'card' : item;
   const minCount = isPresentation ? 5 : 1;
@@ -98,7 +101,7 @@ export default function CreateProjectFlow({
   const customPresets = presets.filter(p => p.isCustom);
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
-  const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady : step === 4 ? countValid : true;
+  const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady && !hasMaterialOverage : step === 4 ? countValid : true;
   const estimatedMinutes = wantImages
     ? `${Math.max(4, Math.ceil(Number(count || 1) * 0.8))}–${Math.max(8, Math.ceil(Number(count || 1) * 1.8))} min`
     : '2–5 min';
@@ -173,10 +176,29 @@ export default function CreateProjectFlow({
     void runUpload(async current => {
       const text = await readCreationTextFile(file);
       if (!current()) return;
-      if ((material.content.length + text.length) > 200000) throw new Error('O material completo ultrapassa 200 mil caracteres. Divida o conteúdo; o arquivo não foi adicionado.');
-      setMaterial(old => ({ ...old, content:[old.content, text].filter(Boolean).join('\n\n') }));
+      const joined = [material.content, text].filter(Boolean).join('\n\n');
+      if (joined.length > materialLimits.content) {
+        setNotice(`O texto ultrapassou o limite deste ${isPresentation ? 'projeto' : 'carrossel'}. Mantivemos os primeiros ${materialLimits.content.toLocaleString('pt-BR')} caracteres; revise o recorte antes de gerar.`);
+      }
+      setMaterial(old => ({ ...old, content:[old.content, text].filter(Boolean).join('\n\n').slice(0, materialLimits.content) }));
       setImportedNames(old => [...old, file.name]);
     });
+  };
+  const updateMaterial = (field, value) => {
+    const limit = materialLimits[field];
+    const raw = String(value || '');
+    if (raw.length > limit) {
+      const label = field === 'content' ? 'Texto de apoio' : field === 'sources' ? 'Links e fontes' : 'Instruções adicionais';
+      setNotice(`${label}: o limite usado pela geração é ${limit.toLocaleString('pt-BR')} caracteres. O excedente não foi incluído.`);
+    }
+    setMaterial(old => ({ ...old, [field]:raw.slice(0, limit) }));
+  };
+  const updateTopic = value => {
+    const raw = String(value || '');
+    if (raw.length > GENERATION_TOPIC_MAX_CHARS) {
+      setNotice(`Ideia principal: o limite usado pela geração é ${GENERATION_TOPIC_MAX_CHARS.toLocaleString('pt-BR')} caracteres. O excedente não foi incluído.`);
+    }
+    setTopic(raw.slice(0, GENERATION_TOPIC_MAX_CHARS));
   };
   const importLogo = event => {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
@@ -201,6 +223,12 @@ export default function CreateProjectFlow({
   };
   const create = async () => {
     if (busyRef.current || pendingRef.current) return;
+    if (hasMaterialOverage) {
+      setError(materialOverageMessage);
+      setStep(2);
+      setFurthest(v => Math.max(v, 2));
+      return;
+    }
     if (!hasTextAI) { setError('Configure o acesso à IA para gerar este projeto. Suas escolhas continuam aqui.'); return; }
     if (!name.trim() || !sourceReady || !countValid || (brandId === '__new__' && !brand.name?.trim())) { setError('Revise o nome, o conteúdo e a quantidade antes de gerar.'); return; }
     busyRef.current = true; setBusy(true); setError(''); setNotice('');
@@ -208,7 +236,7 @@ export default function CreateProjectFlow({
     const resolvedTopic = topic.trim() || 'Organize o material fornecido conforme o objetivo deste projeto.';
     try {
       const result = await onCreate({
-        name:name.trim(), productKind, formatId, brandId, brand:JSON.parse(JSON.stringify(brand)), styleKit:JSON.parse(JSON.stringify(styleKit)), material:{ ...material },
+        name:name.trim(), productKind, formatId, brandId, brand:JSON.parse(JSON.stringify(brand)), styleKit:JSON.parse(JSON.stringify(styleKit)), material:creationMaterialForSubmission(material, productKind),
         generation:{ topic:resolvedTopic, count:Number(count), niche:brand.niche || '', tone:brand.defaultTone || 'claro e direto', audience:brand.defaultAudience || '', imgMode:'dalle', imgParams:{ ...params }, mode:isPresentation ? 'editorial' : isSpecial ? (quickModes[quickTemplateIdFromPreset(narrative)] || 'editorial') : narrative, creativePreset:isPresentation ? 'apresentacao' : isSpecial ? narrative : 'livre', contentObjective:isPresentation ? 'auto' : objective, presentationPath:isPresentation ? path : undefined, slideTextDensity:density, cardVisualStyle:isPresentation ? 'full' : cardStyle, visualPreset, preserveBrandIdentity:visualPreset === null || identityVisualEdited, brandVisualOverrides:{ ...brandVisualOverrides }, fetchImagesNow:hasOpenAI && wantImages },
       });
       if (result?.cancelled && alive.current) setNotice('Geração interrompida. Suas escolhas foram mantidas. Você pode tentar novamente ou abrir o rascunho disponível.');
@@ -269,11 +297,12 @@ export default function CreateProjectFlow({
         </>}
       </>}
       {step === 2 && <>
-        <Field label="Sobre o que vamos criar?" hint="Diga o tema, a mensagem principal e o resultado que espera."><textarea className="vc-input" rows={4} value={topic} onChange={e => setTopic(e.target.value)} placeholder={isPresentation ? 'Ex.: um pitch para explicar nosso negócio a investidores.' : 'Ex.: apresentar nossa campanha de Halloween e convidar o público a conhecer a oferta.'}/></Field>
-        <Field label="Texto de apoio" hint="Cole o briefing, a pesquisa, as notas ou o texto que já tem. Opcional."><textarea className="vc-input" rows={7} value={material.content} onChange={e => setMaterial(m => ({ ...m, content:e.target.value }))}/></Field>
+        {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
+        <Field label="Sobre o que vamos criar?" hint={`${topic.length.toLocaleString('pt-BR')} de ${GENERATION_TOPIC_MAX_CHARS.toLocaleString('pt-BR')} caracteres. Diga o tema, a mensagem principal e o resultado que espera.`}><textarea className="vc-input" rows={4} value={topic} onChange={e => updateTopic(e.target.value)} placeholder={isPresentation ? 'Ex.: um pitch para explicar nosso negócio a investidores.' : 'Ex.: apresentar nossa campanha de Halloween e convidar o público a conhecer a oferta.'}/></Field>
+        <Field label="Texto de apoio" hint={`${material.content.length.toLocaleString('pt-BR')} de ${materialLimits.content.toLocaleString('pt-BR')} caracteres usados pela geração.`}><textarea className="vc-input" rows={7} value={material.content} onChange={e => updateMaterial('content', e.target.value)}/></Field>
         <label className="vc-create-upload">Adicionar arquivo de texto (.txt ou .md)<input type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" aria-label="Importar texto de apoio" disabled={pending} onChange={importText}/><span className="vc-create-note">O texto é acrescentado ao apoio. Para PDF ou Word, cole o conteúdo no campo acima.</span>{importedNames.length > 0 && <span>{importedNames.join(' · ')}</span>}</label>
-        <Field label="Links e fontes" hint="Cole links e referências que ajudam a sustentar o conteúdo."><textarea className="vc-input" rows={3} value={material.sources} onChange={e => setMaterial(m => ({ ...m, sources:e.target.value }))} placeholder="https://…"/></Field>
-        <Field label="Instruções adicionais" hint="Idioma, palavras a evitar, informações obrigatórias ou o convite final."><textarea className="vc-input" rows={3} value={material.context} onChange={e => setMaterial(m => ({ ...m, context:e.target.value }))}/></Field>
+        <Field label="Links e fontes" hint={`${material.sources.length.toLocaleString('pt-BR')} de ${materialLimits.sources.toLocaleString('pt-BR')} caracteres. Cole referências que sustentam o conteúdo.`}><textarea className="vc-input" rows={3} value={material.sources} onChange={e => updateMaterial('sources', e.target.value)} placeholder="https://…"/></Field>
+        <Field label="Instruções adicionais" hint={`${material.context.length.toLocaleString('pt-BR')} de ${materialLimits.context.toLocaleString('pt-BR')} caracteres. Idioma, palavras a evitar, informações obrigatórias ou convite final.`}><textarea className="vc-input" rows={3} value={material.context} onChange={e => updateMaterial('context', e.target.value)}/></Field>
       </>}
       {step === 3 && <>{isPresentation ? <div className="vc-create-grid" role="radiogroup" aria-label="Objetivo da apresentação">{PRESENTATION_PATHS.map(route => <Option key={route.id} label={PATH_LABELS[route.id] || route.label} desc={route.description} example={PATH_EXAMPLES[route.id]} selected={path === route.id} onClick={() => { setPath(route.id); if (!countEdited) setCount(String(route.defaultSlideCount)); }}/>)}</div> : <>
         <div className="vc-create-grid" role="radiogroup" aria-label="Como contar sua ideia">{NARRATIVE_CHOICES.map(choice => <Option key={choice.id} {...choice} selected={narrative === choice.id} onClick={() => setNarrative(choice.id)}/>)}</div>
@@ -295,6 +324,7 @@ export default function CreateProjectFlow({
         <div className="vc-create-identity-summary"><strong>Logo e referências — opcionais</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais.</span><button type="button" className="vc-btn vc-btn-ghost" onClick={() => { if (identityPath === 'moont') setIdentityPath('custom'); setIdentityAdjustmentsOpen(true); go(1); }}>Ajustar logo e referências</button></div>
       </>}
       {step === 6 && <>
+        {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
         <dl className="vc-create-review">{reviewRow('Projeto', name, 0)}{reviewRow('Identidade', identityLabel, 1)}{reviewRow('Logo e referências', `${identitySummary.logo} · ${identitySummary.references} referências`, 1)}{reviewRow('Tom de voz', identitySummary.tone || 'Sem orientação adicional', 1)}{reviewRow('Tema', topic || 'Usar o material e o briefing fornecidos', 2)}{reviewRow('Material', `${material.content.length.toLocaleString('pt-BR')} caracteres de apoio${material.sources.trim() ? ' · fontes incluídas' : ''}${material.context.trim() ? ' · instruções incluídas' : ''}`, 2)}{reviewRow('Narrativa', selectedNarrative, 3)}{reviewRow('Quantidade', `${count} ${quantityUnit} · ${FORMAT_LABELS[formatId]}`, 4)}{reviewRow('Texto', CREATION_DENSITIES.find(d => d.id === density)?.label, 4)}{reviewRow('Visual', visualPreset ? `${presets.find(p => p.id === visualPreset)?.label || 'Estilo selecionado'}${identityVisualEdited ? ' · ajustado neste projeto' : ''}` : 'Identidade configurada', 5)}{reviewRow('Imagens', wantImages && hasOpenAI ? 'Gerar texto e imagens' : 'Criar o texto primeiro', 5)}</dl>
         {!hasTextAI && <div className="vc-create-details"><p>Configure o acesso à IA para gerar. Suas escolhas ficam mantidas nesta tela.</p>{onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar acesso à IA</button>}</div>}
         <p className="vc-create-generation-cost"><strong>Antes de gerar:</strong> tempo estimado de {estimatedMinutes} · {imageConsumption}.</p>
@@ -311,6 +341,6 @@ export default function CreateProjectFlow({
       {notice && <p role="status" className="vc-create-note" style={{ marginTop:24 }}>{notice}</p>}
       {error && <div role="alert" className="vc-create-error" style={{ marginTop:24 }}>{error}</div>}
     </main>
-    <footer className="vc-create-footer"><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || (busy && !onCancelGeneration)} onClick={busy ? onCancelGeneration : step > 0 ? () => go(step - 1) : onCancel}><ArrowLeft size={15} aria-hidden/>{busy ? 'Cancelar geração' : step > 0 ? 'Voltar' : 'Cancelar'}</button><span className="vc-create-note">{step + 1} de {CREATION_STEPS.length}{step >= 4 && countValid ? ` · ${count} ${quantityUnit}` : ''}</span>{step < 6 ? <button type="button" className="vc-create-primary" disabled={!canContinue || pending || busy} onClick={() => go(step + 1)}>Continuar <ArrowRight size={14} aria-hidden/></button> : <button type="button" className="vc-create-primary" disabled={busy || pending || !countValid || !sourceReady || !hasTextAI} onClick={create}>{busy ? <Loader2 size={15} aria-hidden/> : <Sparkles size={15} aria-hidden/>} {busy ? 'Gerando…' : `Criar e gerar ${count} ${quantityUnit}`}</button>}</footer>
+    <footer className="vc-create-footer"><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || (busy && !onCancelGeneration)} onClick={busy ? onCancelGeneration : step > 0 ? () => go(step - 1) : onCancel}><ArrowLeft size={15} aria-hidden/>{busy ? 'Cancelar geração' : step > 0 ? 'Voltar' : 'Cancelar'}</button><span className="vc-create-note">{step + 1} de {CREATION_STEPS.length}{step >= 4 && countValid ? ` · ${count} ${quantityUnit}` : ''}</span>{step < 6 ? <button type="button" className="vc-create-primary" disabled={!canContinue || pending || busy} onClick={() => go(step + 1)}>Continuar <ArrowRight size={14} aria-hidden/></button> : <button type="button" className="vc-create-primary" disabled={busy || pending || !countValid || !sourceReady || !hasTextAI || hasMaterialOverage} title={hasMaterialOverage ? 'Reduza o material na etapa Conteúdo antes de criar.' : undefined} onClick={create}>{busy ? <Loader2 size={15} aria-hidden/> : <Sparkles size={15} aria-hidden/>} {busy ? 'Gerando…' : `Criar e gerar ${count} ${quantityUnit}`}</button>}</footer>
   </section>;
 }

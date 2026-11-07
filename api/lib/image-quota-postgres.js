@@ -219,7 +219,9 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
       return sql.begin(async (tx) => {
         const row = await locked(tx, owner, start);
         const op = (await run(tx, 'operation', [owner, start, id]))[0];
-        if (!op) throw fail('Reserva de imagem não encontrada.', 'quota_operation_not_found');
+        // Uma reserva com resultado de commit ambíguo precisa poder ser
+        // compensada mesmo quando o INSERT afinal não ocorreu.
+        if (!op) return { used: count(row.used), refunded: false, reason: 'not_found' };
         if (op.status === 'refunded') return { used: count(row.used), refunded: false };
         await run(tx, 'updateOperation', [owner, start, id, 'refunded']);
         const updated = (await run(tx, 'changeUsed', [owner, start, -1]))[0];

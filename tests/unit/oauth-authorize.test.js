@@ -55,6 +55,21 @@ describe('autorização OAuth do MCP', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send.mock.calls[0][0]).toContain('pessoa@empresa.com');
     expect(res.send.mock.calls[0][0]).toContain('Conectar ChatGPT');
+    expect(res.send.mock.calls[0][0]).toContain('chatgpt.com');
+    expect(res.send.mock.calls[0][0]).not.toContain('Aplicativo não verificado');
+  });
+
+  it('mostra o domínio e alerta quando o cliente retorna para um domínio não verificado', async () => {
+    deps.validateOAuthRequest.mockResolvedValue({
+      client:{ client_name:'Assistente' }, scopes:['projects:read','projects:write'],
+      redirectUri:'https://login.exemplo.net/oauth/callback',
+    });
+    const req = request();
+    req.query.redirect_uri = 'https://login.exemplo.net/oauth/callback';
+    const res = response();
+    await authorize(req, res);
+    expect(res.send.mock.calls[0][0]).toContain('login.exemplo.net');
+    expect(res.send.mock.calls[0][0]).toContain('Aplicativo não verificado pela Moont');
   });
 
   it('aceita o callback OAuth do Claude no fluxo MCP sem resource explícito', async () => {

@@ -34,7 +34,7 @@ function perSlideImageActionState(slide = {}, busy = false, itemLabel = 'slide')
 
 function PerSlideImageRefBlock({
   slide, width, onChangeExtra, onRemoveRef, onPickRef,
-  onRenameRef,
+  onRenameRef, onReuploadRef,
   onGenerateImage, generateImageBusy,
   generationState,
   itemLabel = 'slide',
@@ -62,7 +62,10 @@ function PerSlideImageRefBlock({
     // A assinatura representa os campos de referência; objetos são recriados no render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [referenceSignature]);
-  const refError = referenceItems.map(item => previews[item.key]?.error).find(Boolean) || '';
+  const refError = referenceItems.map(item => (
+    previews[item.key]?.error || (item.refImageFailed
+      ? 'A referência deste card está indisponível. Reenvie o arquivo para manter o @nome.' : '')
+  )).find(Boolean) || '';
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
   const disabled = (generationState ? !generationState.canGenerate : false) || Boolean(refError);
   const planWithoutImages = generationState?.reason === 'plan_without_images';
@@ -200,13 +203,14 @@ function PerSlideImageRefBlock({
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 64px)', gap:6 }}>
             {referenceItems.map((item, index) => {
               const preview = previews[item.key];
+              const unavailable = item.refImageFailed || Boolean(preview?.error);
               return <div key={item.key} style={{ position:'relative', width:64, minWidth:0 }}>
                 <div style={{ width:56, height:56, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-card)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', color:'var(--text-muted)' }} title={item.name}>
                   {preview?.url ? <img src={preview.url} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-                    : preview?.error ? <ImageIcon size={18} aria-label="Referência indisponível"/>
+                    : unavailable ? <ImageIcon size={18} aria-label="Referência indisponível"/>
                       : <Loader2 size={18} aria-label="Carregando referência" style={{ animation:'spin 0.8s linear infinite' }}/>}</div>
-                <button type="button" onClick={() => onRemoveRef?.(item.key)} aria-label={`Remover ${item.name}`} title={`Remover ${item.name}`} style={{ position:'absolute', top:-5, right:3, width:22, height:22, padding:0, borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--text-primary)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><X size={12}/></button>
-                <label title={`Nome desta imagem no prompt. Arquivo: ${item.name}`} style={{ marginTop:4, width:64, height:24, border:'1px solid var(--border)', borderRadius:6, display:'flex', alignItems:'center', padding:'0 4px', boxSizing:'border-box', background:'var(--bg-card)', color:'var(--text-muted)', fontSize:10, fontFamily:'var(--font-mono)' }}>
+                <button type="button" onClick={() => onRemoveRef?.(item.key)} aria-label={`Remover ${item.name}`} title={`Remover ${item.name}`} style={{ position:'absolute', top:-7, right:1, width:28, height:28, padding:0, borderRadius:999, border:'1px solid var(--border)', background:'var(--bg-base)', color:'var(--text-primary)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}><X size={14}/></button>
+                <label title={`Nome desta imagem no prompt. Arquivo: ${item.name}`} style={{ marginTop:4, width:64, minHeight:28, border:'1px solid var(--border)', borderRadius:6, display:'flex', alignItems:'center', padding:'0 4px', boxSizing:'border-box', background:'var(--bg-card)', color:'var(--text-muted)', fontSize:12, fontFamily:'var(--font-mono)' }}>
                   <span aria-hidden="true">@</span>
                   <input
                     value={item.mention}
@@ -217,6 +221,13 @@ function PerSlideImageRefBlock({
                     style={{ width:'100%', minWidth:0, padding:0, border:0, outline:0, background:'transparent', color:'var(--text-primary)', font:'inherit' }}
                   />
                 </label>
+                {unavailable && <button
+                  type="button"
+                  onClick={() => onReuploadRef?.(item.key)}
+                  aria-label={`Reenviar ${item.name}`}
+                  title="O arquivo não está disponível. Reenvie sem perder o @nome."
+                  style={{ width:64, minHeight:28, marginTop:4, padding:'3px 5px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-primary)', fontSize:11, fontWeight:600, cursor:'pointer' }}
+                >Reenviar</button>}
               </div>;
             })}
             {referenceItems.length < MAX_SLIDE_IMAGE_REFERENCES && <button

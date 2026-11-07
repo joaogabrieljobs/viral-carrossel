@@ -6,7 +6,7 @@ vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; }
 import { makeReq, makeRes } from '../helpers/http.js';
 import { createAccessToken, COOKIE_NAME } from '../../api/lib/access.js';
 import { resetActiveAccessCacheForTests } from '../../api/lib/require-access.js';
-import { putSharedProject, resetShareMemory } from '../../api/lib/project-share-store.js';
+import { getSharedProject, putSharedProject, resetShareMemory } from '../../api/lib/project-share-store.js';
 import * as librarySyncStore from '../../api/lib/library-sync-store.js';
 import handler from '../../api/project-share.js';
 
@@ -138,10 +138,16 @@ describe('POST /api/project-share', () => {
     await handler(getReq, viewed);
     expect(viewed.statusCode).toBe(200);
     expect(viewed.body.doc.slides[0].title).toBe('Original');
+    expect(viewed.body).toMatchObject({ isOwner: false, isMember: false, memberCount: 1 });
+    expect(viewed.body).not.toHaveProperty('ownerEmail');
+    expect(viewed.body).not.toHaveProperty('members');
 
     const joined = makeRes();
     await handler(post({ action: 'join', code }, 'cus_guest', 'convidada@teste.exemplo'), joined);
     expect(joined.statusCode).toBe(200);
+    expect(joined.body).toMatchObject({ isOwner: false, isMember: true, memberCount: 2 });
+    expect(joined.body).not.toHaveProperty('ownerEmail');
+    expect(joined.body).not.toHaveProperty('members');
     const pushed = makeRes();
     await handler(post({ action: 'push', code, doc: { slides: [{ title: 'Da convidada' }] } },
       'cus_guest', 'convidada@teste.exemplo'), pushed);
@@ -164,11 +170,78 @@ describe('POST /api/project-share', () => {
     const getReq = makeReq({ cookie: cookieFor('cus_owner', 'dona@teste.exemplo') });
     getReq.query = { code };
     await handler(getReq, final);
-    expect(final.body.members).toEqual(expect.arrayContaining([
+    expect(final.body).toMatchObject({ isOwner: true, isMember: true, memberCount: 3 });
+    expect(final.body).not.toHaveProperty('ownerEmail');
+    expect(final.body).not.toHaveProperty('members');
+    expect((await getSharedProject(code)).members).toEqual(expect.arrayContaining([
       'cus_owner', 'cus_a', 'cus_b',
     ]));
     expect(final.body.doc.slides[0].title).toBe('Nova versão');
     expect(final.body.revision).toBe(2);
+  });
+
+  it('dono remove membro, bloqueia nova entrada e o próximo push recebe 403', async () => {
+    const code = await createShare();
+    const joined = makeRes();
+    await handler(post({ action: 'join', code }, 'cus_member', 'membro@teste.exemplo'), joined);
+    expect(joined.statusCode).toBe(200);
+
+    const current = await getSharedProject(code);
+    await putSharedProject({
+      ...current,
+      doc: { slides: [{ title: 'Privado', bgImageAssetId: 'private-photo' }] },
+      keepRevision: true,
+    });
+
+    const removed = makeRes();
+    await handler(post({ action: 'removeMember', code, memberId: 'cus_member' },
+      'cus_owner', 'dona@teste.exemplo'), removed);
+    expect(removed.statusCode).toBe(200);
+    expect(removed.body).toMatchObject({ isOwner: true, memberCount: 1 });
+    expect(removed.body).not.toHaveProperty('members');
+
+    const pushed = makeRes();
+    await handler(post({ action: 'push', code, doc: { slides: [{ title: 'Sem acesso' }] } },
+      'cus_member', 'membro@teste.exemplo'), pushed);
+    expect(pushed.statusCode).toBe(403);
+
+    const rejoined = makeRes();
+    await handler(post({ action: 'join', code }, 'cus_member', 'membro@teste.exemplo'), rejoined);
+    expect(rejoined.statusCode).toBe(403);
+
+    const readReq = makeReq({ cookie: cookieFor('cus_member', 'membro@teste.exemplo') });
+    readReq.query = { code };
+    const read = makeRes();
+    await handler(readReq, read);
+    expect(read.statusCode).toBe(403);
+    expect(read.body).not.toHaveProperty('doc');
+
+    const assetSpy = vi.spyOn(librarySyncStore, 'getLibraryAsset');
+    const assetReq = makeReq({ cookie: cookieFor('cus_member', 'membro@teste.exemplo') });
+    assetReq.query = { code, asset: 'private-photo' };
+    const asset = makeRes();
+    await handler(assetReq, asset);
+    expect(asset.statusCode).toBe(403);
+    expect(assetSpy).not.toHaveBeenCalled();
+    assetSpy.mockRestore();
+  });
+
+  it('somente o dono revoga a partilha e o código antigo passa a devolver 404', async () => {
+    const code = await createShare();
+    const denied = makeRes();
+    await handler(post({ action: 'revoke', code }, 'cus_other', 'outro@teste.exemplo'), denied);
+    expect(denied.statusCode).toBe(403);
+
+    const revoked = makeRes();
+    await handler(post({ action: 'revoke', code }, 'cus_owner', 'dona@teste.exemplo'), revoked);
+    expect(revoked.statusCode).toBe(200);
+    expect(revoked.body).toMatchObject({ ok: true, code, revoked: true });
+
+    const getReq = makeReq({ cookie: cookieFor('cus_owner', 'dona@teste.exemplo') });
+    getReq.query = { code };
+    const missing = makeRes();
+    await handler(getReq, missing);
+    expect(missing.statusCode).toBe(404);
   });
 
   it('bypass de desenvolvimento mantém dono estável, mas não abre escrita em produção', async () => {

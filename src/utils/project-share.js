@@ -666,6 +666,18 @@ export async function pullProjectShare(code) {
   return shareRequest(null, { method: 'GET', code: String(code || '').trim().toUpperCase() });
 }
 
+export async function removeProjectShareMember(code, memberId) {
+  return shareRequest({
+    action: 'removeMember',
+    code: normalizeShareCode(code),
+    memberId: String(memberId || '').trim(),
+  });
+}
+
+export async function revokeProjectShare(code) {
+  return shareRequest({ action: 'revoke', code: normalizeShareCode(code) });
+}
+
 /** sessionStorage: sobrevive ao OAuth Google que devolve sem ?share= */
 export const PENDING_SHARE_KEY = 'vc_pending_share';
 

@@ -199,6 +199,63 @@ export async function getAgentVisualJob(ownerValue, idValue) {
   return safeJob(rows[0]);
 }
 
+/** Estado privado para rotinas de idempotência e liquidação de quota. */
+export async function getAgentVisualJobInternal(ownerValue, idValue) {
+  const owner = ownerId(ownerValue);
+  const id = requestId(idValue);
+  const rows = await getPostgresConnection().unsafe(
+    `SELECT request_hash, ${JOB_COLUMNS}
+     FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`,
+    [owner, id],
+  );
+  if (!rows[0]) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
+  return { ...internalJob(rows[0]), requestHash:rows[0].request_hash };
+}
+
+/**
+ * Jobs de imagem cuja quota ainda precisa ser confirmada ou devolvida.
+ * Inclui pendentes antigos para que o cron consiga expirá-los sem depender de
+ * um novo polling do cliente.
+ */
+export async function listAgentImageJobsForSettlement({ limit = 50 } = {}) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
+    fail(400, 'visual_limit_invalid', 'Limite inválido.');
+  }
+  const rows = await getPostgresConnection().unsafe(
+    `SELECT owner_id, request_hash, ${JOB_COLUMNS}
+     FROM moont.agent_visual_jobs
+     WHERE meta->>'kind' = 'image'
+       AND (meta->>'creditsSettled') IS DISTINCT FROM 'true'
+       AND (
+         status IN ('applied', 'failed', 'undone')
+         OR (status = 'pending' AND created_at < now() - interval '12 minutes')
+       )
+     ORDER BY COALESCE(finished_at, created_at) ASC
+     LIMIT $1`,
+    [limit],
+  );
+  return rows.map(row => ({
+    ownerId:row.owner_id,
+    ...internalJob(row),
+    requestHash:row.request_hash,
+  }));
+}
+
+/** Marca a liquidação somente depois de todas as operações idempotentes concluírem. */
+export async function markAgentImageJobCreditsSettled(ownerValue, idValue) {
+  const owner = ownerId(ownerValue);
+  const id = requestId(idValue);
+  const rows = await getPostgresConnection().unsafe(
+    `UPDATE moont.agent_visual_jobs
+     SET meta = jsonb_set(meta, '{creditsSettled}', 'true'::jsonb, true)
+     WHERE owner_id = $1 AND request_id = $2
+       AND meta->>'kind' = 'image' AND status IN ('applied', 'failed', 'undone')
+     RETURNING request_id`,
+    [owner, id],
+  );
+  return Boolean(rows[0]);
+}
+
 async function lockAccountAndProject(tx, owner, id) {
   const states = await tx.unsafe(
     `SELECT owner_id FROM moont.account_libraries WHERE owner_id = $1 FOR UPDATE`, [owner],
@@ -392,9 +449,9 @@ export function imageJobHash({ projectId: id, baseVersion: base, slideIds }) {
 }
 
 /**
- * Registra o job de imagem como `pending` com CAS na versão do projeto. Os
- * créditos já foram reservados pelo chamador, que devolve tudo se isto falhar.
- * Repetir o mesmo requestId devolve o job existente sem reservar de novo.
+ * Registra um placeholder `pending` com CAS na versão do projeto. O chamador
+ * cria esta linha única antes de reservar créditos; assim só o vencedor de uma
+ * corrida por requestId toca na quota. Repetições devolvem o job existente.
  */
 export async function createAgentImageJob(ownerValue, tokenId, input) {
   const owner = ownerId(ownerValue);
@@ -407,7 +464,7 @@ export async function createAgentImageJob(ownerValue, tokenId, input) {
     fail(400, 'image_slide_ids_invalid', 'Cards do job inválidos.');
   }
   const hash = imageJobHash({ projectId: id, baseVersion: base, slideIds: input?.slideIds });
-  const meta = { kind: 'image', ...(input?.meta || {}) };
+  const meta = { kind: 'image', creditsSettled:false, ...(input?.meta || {}) };
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
     await forgetExpiredVisualJobs(tx, owner);
@@ -447,8 +504,11 @@ function mergeOutcomes(slides, outcomes, fallbackError) {
   return slides.map(slide => {
     if (slide.status !== 'pending') return slide;
     const outcome = byId.get(slide.slideId);
-    if (outcome?.assetId) return { ...slide, status: 'done', assetId: outcome.assetId };
-    return { ...slide, status: 'failed', errorCode: outcome?.errorCode || fallbackError };
+    const creditState = typeof outcome?.creditReserved === 'boolean'
+      ? { creditReserved:outcome.creditReserved }
+      : {};
+    if (outcome?.assetId) return { ...slide, ...creditState, status: 'done', assetId: outcome.assetId };
+    return { ...slide, ...creditState, status: 'failed', errorCode: outcome?.errorCode || fallbackError };
   });
 }
 

@@ -58,6 +58,13 @@ export function slideImageGenerationState(slide = {}, accessState = ready, style
       ...instruction,
     };
   }
+  if (Array.isArray(slide.imageReferences)
+    && slide.imageReferences.some((ref) => ref?.missing === true && !text(ref?.dataUrl))) {
+    return {
+      ...blocked('reference_unavailable', 'Reenvie a referência indisponível deste card. O @nome será mantido.'),
+      ...instruction,
+    };
+  }
   if (!instruction.query) {
     return {
       ...blocked('missing_direction', 'Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.'),

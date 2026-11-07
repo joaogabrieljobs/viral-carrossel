@@ -2,6 +2,11 @@
  * Client helpers — assinatura Stripe / acesso ao studio.
  */
 const PENDING_CHECKOUT_KEY = 'vc_pending_checkout';
+export const ACCESS_SESSION_TIMEOUT_MS = 10_000;
+
+export function isAccessSessionUnavailable(session) {
+  return ['offline', 'error', 'timeout'].includes(String(session?.status || ''));
+}
 
 export function readPendingCheckoutSessionId() {
   try { return sessionStorage.getItem(PENDING_CHECKOUT_KEY) || ''; }
@@ -12,24 +17,65 @@ export function clearPendingCheckoutSessionId() {
   try { sessionStorage.removeItem(PENDING_CHECKOUT_KEY); } catch { /* armazenamento indisponível */ }
 }
 
-export async function fetchAccessSession() {
+export async function fetchAccessSession({
+  timeoutMs = ACCESS_SESSION_TIMEOUT_MS,
+  allowDevFallback = import.meta.env.DEV,
+  signal,
+} = {}) {
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abortFromCaller();
+  else signal?.addEventListener?.('abort', abortFromCaller, { once: true });
+  const timeout = setTimeout(() => controller.abort('access_session_timeout'), timeoutMs);
   try {
     const r = await fetch('/api/auth/session', {
       method: 'GET',
       credentials: 'include',
+      signal: controller.signal,
     });
     if (!r.ok) {
-      if (import.meta.env.DEV) {
+      // Uma sessão realmente ausente continua sendo estado inativo. Apenas
+      // falhas temporárias preservam a conta local e pedem nova tentativa.
+      if (r.status === 401 || r.status === 403) {
+        return { active: false, status: 'inactive' };
+      }
+      if (allowDevFallback) {
         return { active: true, billingDisabled: true, devFallback: true };
       }
-      return { active: false, status: 'error' };
+      return {
+        active: false,
+        status: 'error',
+        verificationUnavailable: true,
+        error: 'Não foi possível verificar sua conta. Tente novamente.',
+      };
     }
-    return await r.json();
+    const data = await r.json().catch(() => null);
+    if (!data || typeof data !== 'object') {
+      if (allowDevFallback) return { active: true, billingDisabled: true, devFallback: true };
+      return {
+        active: false,
+        status: 'error',
+        verificationUnavailable: true,
+        error: 'Não foi possível verificar sua conta. Tente novamente.',
+      };
+    }
+    return data;
   } catch {
-    if (import.meta.env.DEV) {
+    if (allowDevFallback) {
       return { active: true, billingDisabled: true, devFallback: true };
     }
-    return { active: false, status: 'offline' };
+    const timedOut = controller.signal.aborted && !signal?.aborted;
+    return {
+      active: false,
+      status: timedOut ? 'timeout' : 'offline',
+      verificationUnavailable: true,
+      error: timedOut
+        ? 'A verificação da conta demorou mais que o esperado. Tente novamente.'
+        : 'Não foi possível verificar sua conta. Confira a conexão e tente novamente.',
+    };
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener?.('abort', abortFromCaller);
   }
 }
 

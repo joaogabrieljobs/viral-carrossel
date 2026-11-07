@@ -1,29 +1,26 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { X } from 'lucide-react';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 export function ConfirmDialog({ open, title, body, confirmLabel = 'Continuar', cancelLabel = 'Cancelar', onConfirm, onCancel }) {
   const confirmRef = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const t = setTimeout(() => confirmRef.current?.focus(), 30);
-    const onKey = (event) => {
-      if (event.key === 'Escape') onCancel?.();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, onCancel]);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
+    open,
+    onClose: onCancel,
+    initialFocusRef: confirmRef,
+  });
   if (!open) return null;
   return (
-    <div className="modal-overlay" onClick={onCancel} role="presentation">
+    <div ref={overlayRef} className="modal-overlay" onClick={onCancel} role="presentation">
       <div
+        ref={dialogRef}
         className="modal-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="vc-confirm-title"
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
         style={{ maxWidth: 440 }}
       >
         <div style={{ padding: '20px 20px 0' }}>

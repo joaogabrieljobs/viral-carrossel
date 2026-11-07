@@ -91,6 +91,7 @@ test.describe('Painéis de IA', () => {
     const modal = page.locator('.modal-panel');
     await expect(modal).toBeVisible({ timeout: 10_000 });
     await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+    await modal.getByRole('button', { name: /aplicar só layout/i }).click();
 
     // o botão vive na aba Narrativa da sidebar
     await selectEditorMode(page, 'diretor');

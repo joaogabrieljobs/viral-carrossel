@@ -49,7 +49,7 @@ Todos incluem o editor e texto com IA pela plataforma. Imagens inclusas usam o s
 
 O Moont pode ser conectado ao ChatGPT, Claude Code e Codex pelo MCP hospedado em `https://moont.ai/mcp`. A conexão usa OAuth com os escopos `projects:read` e `projects:write`; no Codex também existe o plugin local em [`plugins/moont`](plugins/moont/README.md).
 
-O agente pode listar e ler projetos, revisar texto e composição com prévia, aplicar alterações versionadas, desfazer uma aplicação e gerar as fotos dos cards. `generate_slide_image` usa a `imageQuery` já salva em cada card, aceita até oito cards sem foto por job e consome um crédito de imagem por card. A chamada responde `pending`; o agente acompanha o trabalho até `applied` ou `failed`. Créditos de cards que falham são devolvidos, e repetir o mesmo `requestId` consulta o mesmo job sem gerar ou cobrar novamente.
+O agente pode listar e ler projetos, revisar texto e composição com prévia, aplicar alterações versionadas, desfazer uma aplicação e gerar as fotos dos cards. `generate_slide_image` usa a `imageQuery` já salva em cada card, aceita até oito cards sem foto por job e consome um crédito de imagem por card. A chamada responde `pending`; o agente acompanha o trabalho até `applied` ou `failed`. Créditos de cards que falham são devolvidos, repetir o mesmo `requestId` consulta o mesmo job sem gerar ou cobrar novamente e uma reconciliação periódica conclui settlements interrompidos.
 
 O MCP não recebe os bytes das fotos nem expõe credenciais de banco. A imagem gerada é armazenada na conta e incorporada ao projeto. Logos, referências e uploads permanecem protegidos contra substituição por esse fluxo.
 
@@ -57,7 +57,7 @@ O MCP não recebe os bytes das fotos nem expõe credenciais de banco. A imagem g
 
 - O documento e a biblioteca ficam no `localStorage`; bytes de imagens, referências e logos de projeto/cards ficam no `IndexedDB`.
 - O contexto é isolado por projeto. O perfil global de marca e o material do post são conceitos diferentes.
-- Não há sincronização automática de projetos entre aparelhos. Use exportação/importação JSON para transferir o projeto com seus arquivos.
+- Com uma conta ativa, projetos e assets sincronizam com a nuvem e podem ser reabertos em outro aparelho. O backup JSON continua recomendado como cópia editável independente.
 - Não limpe os dados do navegador sem um backup. PNG/PDF são arquivos para publicação, não substituem o backup editável.
 
 ## Desenvolvimento local

@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   fetchAccessSession,
+  isAccessSessionUnavailable,
   startCheckout,
   confirmCheckoutSession,
   openBillingPortal,
@@ -16,6 +17,7 @@ const jsonResponse = (body, ok = true) => ({
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -34,6 +36,47 @@ describe('fetchAccessSession', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
     const s = await fetchAccessSession();
     expect(s).toEqual({ active: true, billingDisabled: true, devFallback: true });
+  });
+
+  it('distingue sessão inativa de falha temporária fora do fallback de desenvolvimento', async () => {
+    const spy = vi.fn()
+      .mockResolvedValueOnce({ ...jsonResponse({ error: 'Sem sessão' }, false), status: 401 })
+      .mockResolvedValueOnce({ ...jsonResponse({ error: 'Indisponível' }, false), status: 503 });
+    vi.stubGlobal('fetch', spy);
+    await expect(fetchAccessSession({ allowDevFallback: false })).resolves.toEqual({
+      active: false, status: 'inactive',
+    });
+
+    const unavailable = await fetchAccessSession({ allowDevFallback: false });
+    expect(unavailable).toMatchObject({ active: false, status: 'error', verificationUnavailable: true });
+    expect(isAccessSessionUnavailable(unavailable)).toBe(true);
+  });
+
+  it('mantém falha de rede como indisponibilidade, sem convertê-la em plano inativo', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    const session = await fetchAccessSession({ allowDevFallback: false });
+
+    expect(session).toMatchObject({
+      active: false,
+      status: 'offline',
+      verificationUnavailable: true,
+    });
+    expect(isAccessSessionUnavailable(session)).toBe(true);
+  });
+
+  it('encerra a verificação após 10 segundos e devolve estado de nova tentativa', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    })));
+    const pending = fetchAccessSession({ allowDevFallback: false });
+    const result = expect(pending).resolves.toMatchObject({
+      active: false, status: 'timeout', verificationUnavailable: true,
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await result;
+    vi.useRealTimers();
   });
 });
 

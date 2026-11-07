@@ -5,7 +5,7 @@ import AccountUsage from './AccountUsage.jsx';
 import ImagesLibraryPanel from './panels/ImagesLibraryPanel.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import CloudPhotoProgress from './CloudPhotoProgress.jsx';
-import { resolveSlideBrandBg } from '../utils/brand-helpers.js';
+import CardThumbnail, { projectThumbnailView } from './card/CardThumbnail.jsx';
 import { STATUS_DEFS, fmtDate } from '../utils/library-helpers.js';
 import { DEFAULT_AI_SETTINGS } from '../config/ai-providers.js';
 import { moontNarrative, moontProjectFormat } from '../config/moont-brand.js';
@@ -267,8 +267,7 @@ function AccountHomeShell({
           {visibleItems.map(entry => {
             const isActive = entry.id === activeDocId;
             const slides = entry.doc?.slides || [];
-            const firstSlide = slides[0];
-            const bg = resolveSlideBrandBg(entry.doc?.brand || {}, 0, firstSlide || {});
+            const thumbnail = projectThumbnailView(entry.doc);
             const product = projectKindCopy(entry);
             const isPresentation = product.kind === 'apresentacao';
             return (
@@ -294,35 +293,26 @@ function AccountHomeShell({
                   style={{
                     width: isPresentation ? 88 : 56,
                     height: isPresentation ? 50 : 70,
+                    padding: 0,
                     borderRadius: 11,
                     flexShrink: 0,
                     cursor: 'pointer',
                     border: '1px solid var(--hairline)',
-                    background: bg,
-                    backgroundImage: firstSlide?.bgImage ? `url(${firstSlide.bgImage})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
+                    background: 'none',
                     position: 'relative',
                     overflow: 'hidden',
                   }}
                 >
-                  {firstSlide?.bgImage && (
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'rgba(0,0,0,0.28)',
-                    }} />
-                  )}
-                  <span style={{
-                    position: 'absolute',
-                    bottom: 5,
-                    left: 6,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: '#fff',
-                    fontFamily: 'var(--font-mono)',
-                    opacity: 0.85,
-                  }}>{slides.length}</span>
+                  <CardThumbnail
+                    slide={thumbnail.slide}
+                    brand={thumbnail.brand}
+                    index={0}
+                    count={slides.length}
+                    width="100%"
+                    height="100%"
+                    isPresentation={isPresentation}
+                    style={{ borderRadius:10 }}
+                  />
                 </button>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

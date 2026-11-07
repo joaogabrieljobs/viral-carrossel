@@ -40,6 +40,7 @@ test.describe('Smoke da UI inteira (auditoria do refactor)', () => {
     const modal = page.locator('.modal-panel');
     await expect(modal).toBeVisible({ timeout: 10_000 });
     await modal.getByRole('button').filter({ hasText: 'Erro Comum' }).first().click({ force: true });
+    await modal.getByRole('button', { name: /aplicar só layout/i }).click();
     await page.waitForTimeout(1200);
 
     // percorre os 3 modos; cada um expõe um conjunto maior de abas.

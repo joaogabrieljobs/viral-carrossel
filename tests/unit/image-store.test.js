@@ -216,6 +216,20 @@ describe('applySlidePatchIfImageCurrent', () => {
     expect(applySlidePatchIfImageCurrent(changed, patch)).toBe(changed);
     expect(applySlidePatchIfImageCurrent(removed, patch)).toBe(removed);
   });
+
+  it('uma foto importada bloqueia só a geração daquele card', () => {
+    const original = [{ id:'s1', bgImage:null }, { id:'s2', bgImage:null }];
+    const expected = original.map(slideImageIdentity);
+    const afterImport = [{ ...original[0], bgImage:'data:image/png;base64,manual' }, original[1]];
+    const cardOneLate = applySlidePatchIfImageCurrent(afterImport, {
+      id:'s1', expectedImageIdentity:expected[0], patch:{ bgImage:'data:image/png;base64,ai-1' },
+    });
+    const cardTwoLate = applySlidePatchIfImageCurrent(cardOneLate, {
+      id:'s2', expectedImageIdentity:expected[1], patch:{ bgImage:'data:image/png;base64,ai-2' },
+    });
+    expect(cardTwoLate[0].bgImage).toContain('manual');
+    expect(cardTwoLate[1].bgImage).toContain('ai-2');
+  });
 });
 
 it('protege moodboards de todos os projetos da limpeza de órfãs', () => {

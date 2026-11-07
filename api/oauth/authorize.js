@@ -4,9 +4,18 @@ import { resolveLibraryOwnerId } from '../lib/library-sync-store.js';
 import { createAuthorizationCode, oauthResource, validateOAuthRequest } from '../lib/oauth-store.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+const TRUSTED_OAUTH_HOSTS = new Set(['chatgpt.com', 'claude.ai']);
+function redirectDisclosure(uri) {
+  const target = new URL(uri);
+  const host = target.hostname.toLowerCase();
+  const loopback = target.protocol === 'http:' && (host === '127.0.0.1' || host === 'localhost' || host === '::1');
+  const trusted = loopback || Array.from(TRUSTED_OAUTH_HOSTS).some((allowed) =>
+    host === allowed || host.endsWith(`.${allowed}`));
+  return { host: loopback ? `${host} (aplicativo neste aparelho)` : host, trusted };
+}
 function page(res, title, body, status = 200) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
-  return res.status(status).send(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(title)} — Moont</title><style>body{margin:0;background:#090a0f;color:#f7f4ed;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.box{width:min(520px,calc(100% - 40px));padding:28px;border:1px solid #343641;border-radius:18px;background:#15161d}h1{font-size:25px}p{color:#b8b8c1;line-height:1.55}.account{margin:20px 0;padding:14px 16px;border:1px solid #343641;border-radius:12px;color:#b8b8c1}.account strong{display:block;margin-top:4px;color:#f7f4ed;overflow-wrap:anywhere}button,a{display:inline-flex;padding:12px 18px;border-radius:999px;border:0;background:#7668f7;color:white;font-weight:700;text-decoration:none;cursor:pointer}.muted{background:#292b34;margin-left:8px}</style><div class="box">${body}</div></html>`);
+  return res.status(status).send(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(title)} — Moont</title><style>body{margin:0;background:#090a0f;color:#f7f4ed;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.box{width:min(520px,calc(100% - 40px));padding:28px;border:1px solid #343641;border-radius:18px;background:#15161d}h1{font-size:25px}p{color:#b8b8c1;line-height:1.55}.account{margin:20px 0;padding:14px 16px;border:1px solid #343641;border-radius:12px;color:#b8b8c1}.account strong{display:block;margin-top:4px;color:#f7f4ed;overflow-wrap:anywhere}.destination{margin-top:-8px}.warning{display:inline-flex;margin-top:8px;padding:5px 8px;border-radius:999px;background:#4a2f13;color:#ffd29a;font-size:12px;font-weight:700}button,a{display:inline-flex;padding:12px 18px;border-radius:999px;border:0;background:#7668f7;color:white;font-weight:700;text-decoration:none;cursor:pointer}.muted{background:#292b34;margin-left:8px}</style><div class="box">${body}</div></html>`);
 }
 function finishNativeAuthorization(res, target) {
   const destination = target.toString();
@@ -38,7 +47,9 @@ export default async function handler(req, res) {
     }
     if (req.method === 'GET') {
       const hidden = Object.entries(p).map(([k,v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join('');
-      return page(res, 'Autorizar', `<h1>Conectar ${esc(valid.client.client_name)}</h1><p>O assistente poderá ${valid.scopes.includes('projects:write') ? 'ler e editar' : 'ler'} seus projetos Moont. Alterações usam prévia, controle de versão e podem ser desfeitas.</p><div class="account">Conta Moont<strong>${esc(access.email)}</strong></div><form method="post" action="/oauth/authorize">${hidden}<button name="decision" value="allow">Autorizar conexão</button><button class="muted" name="decision" value="deny">Cancelar</button></form>`);
+      const disclosure = redirectDisclosure(valid.redirectUri);
+      const warning = disclosure.trusted ? '' : '<span class="warning">Aplicativo não verificado pela Moont</span>';
+      return page(res, 'Autorizar', `<h1>Conectar ${esc(valid.client.client_name)}</h1><p>O assistente poderá ${valid.scopes.includes('projects:write') ? 'ler e editar' : 'ler'} seus projetos Moont. Alterações usam prévia, controle de versão e podem ser desfeitas.</p><div class="account">Conta Moont<strong>${esc(access.email)}</strong></div><div class="account destination">Retorno da conexão<strong>${esc(disclosure.host)}</strong>${warning}</div><form method="post" action="/oauth/authorize">${hidden}<button name="decision" value="allow">Autorizar conexão</button><button class="muted" name="decision" value="deny">Cancelar</button></form>`);
     }
     const target = new URL(valid.redirectUri); target.searchParams.set('state', p.state);
     if (p.decision !== 'allow') { target.searchParams.set('error','access_denied'); return res.redirect(302, target.toString()); }

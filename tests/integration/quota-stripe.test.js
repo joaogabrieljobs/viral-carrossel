@@ -64,6 +64,28 @@ describe('contador de imagens nos metadados do Stripe', () => {
     expect(await stripeQuotaRefund({ customerId: CUS, periodStartSec: PERIODO })).toBe(0);
   });
 
+  it('reembolso com operationId ausente não altera o contador', async () => {
+    const snap = clienteStateful({ [CHAVE]: '1' });
+    expect(await stripeQuotaRefund({
+      customerId:CUS, periodStartSec:PERIODO, operationId:'generation-missing',
+    })).toBe(1);
+    expect(snap()[CHAVE]).toBe('1');
+  });
+
+  it('reembolso por operationId é idempotente', async () => {
+    const snap = clienteStateful({});
+    await stripeQuotaConsume({
+      customerId:CUS, periodStartSec:PERIODO, cap:50, operationId:'generation-real',
+    });
+    expect(await stripeQuotaRefund({
+      customerId:CUS, periodStartSec:PERIODO, operationId:'generation-real',
+    })).toBe(0);
+    expect(await stripeQuotaRefund({
+      customerId:CUS, periodStartSec:PERIODO, operationId:'generation-real',
+    })).toBe(0);
+    expect(snap()[CHAVE]).toBe('0');
+  });
+
   it('períodos antigos são podados — metadados do Stripe têm 50 chaves', async () => {
     const snap = clienteStateful({
       vc_img_1000: '9',

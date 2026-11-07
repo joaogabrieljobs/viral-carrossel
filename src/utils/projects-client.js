@@ -1,6 +1,7 @@
 /** Cliente da API de projetos individuais. A sessão é determinada pelo cookie. */
 const PROJECTS_API = '/api/projects';
 const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
+export const PROJECT_REQUEST_TIMEOUT_MS = 30_000;
 
 export class ProjectApiError extends Error {
   constructor(message, { status = 0, code = 'project_request_failed', cloudVersion } = {}) {
@@ -39,13 +40,18 @@ async function projectRequest(method, query = {}, body, { signal, expectedOwnerI
   const params = new URLSearchParams(query);
   const queryString = params.toString();
   const url = queryString ? `${PROJECTS_API}?${queryString}` : PROJECTS_API;
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abortFromCaller();
+  else signal?.addEventListener?.('abort', abortFromCaller, { once: true });
+  const timeout = setTimeout(() => controller.abort('project_request_timeout'), PROJECT_REQUEST_TIMEOUT_MS);
   let response;
   try {
     response = await fetch(url, {
       method,
       credentials: 'include',
       cache: 'no-store',
-      signal,
+      signal: controller.signal,
       headers: {
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(expectedOwnerId ? { 'X-Project-Owner': expectedOwnerId } : {}),
@@ -54,9 +60,17 @@ async function projectRequest(method, query = {}, body, { signal, expectedOwnerI
     });
   } catch (cause) {
     if (signal?.aborted) throw cause;
+    if (controller.signal.aborted) {
+      throw new ProjectApiError('A sincronização demorou mais que o esperado. Tente salvar novamente.', {
+        code: 'project_request_timeout',
+      });
+    }
     throw new ProjectApiError('Não foi possível conectar aos seus projetos. Tente novamente.', {
       code: 'project_network_error',
     });
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener?.('abort', abortFromCaller);
   }
   let data;
   try { data = await response.json(); }

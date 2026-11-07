@@ -191,6 +191,18 @@ describe('library-sync client pack', () => {
     expect(JSON.stringify(packed.manifest)).not.toContain('imageId');
   });
 
+  it('pack bloqueia o save quando uma referência local perdeu os bytes antes de receber assetId', async () => {
+    imageMocks.read.mockRejectedValueOnce(new Error('IndexedDB bloqueado'));
+    const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
+    const packed = await packLibraryForCloud({ library:[{ id:'p1', doc:{ slides:[{
+      id:'s1', imageReferences:[
+        { id:'one', imageId:'ref-sem-bytes', name:'Produto', mention:'produto' },
+      ],
+    }] } }], brandRoster:[], libraryFolders:[] });
+    expect(packed.packingFailed).toBe(1);
+    expect(packed.manifest.docs[0].doc.slides[0].imageReferences).toEqual([]);
+  });
+
   it('pack migra referência data URL legada para um asset e preserva anexo remoto ausente', async () => {
     const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
     const reference = 'data:image/jpeg;base64,cmVm';
@@ -314,6 +326,19 @@ describe('library-sync client pack', () => {
     expect(pulled.snapshot.library[0].doc.slides[0].imageReferences[0]).toEqual(
       expect.objectContaining({ assetId:'reference-1', dataUrl:'data:image/jpeg;base64,MQ==' }),
     );
+  });
+
+  it('marca referência múltipla ausente para reenvio sem perder o @nome', async () => {
+    const manifest = cloudLibrary(1);
+    manifest.docs[0].doc.slides[0] = { id:'s1', imageReferences:[{
+      id:'one', name:'Produto', mention:'produto', assetId:'reference-missing',
+    }] };
+    installCloudApi(manifest);
+    const pulled = await pullLibraryFromCloud();
+    expect(pulled.snapshot.library[0].doc.slides[0].imageReferences[0]).toMatchObject({
+      id:'one', name:'Produto', mention:'produto', assetId:'reference-missing', missing:true,
+    });
+    expect(pulled.snapshot.library[0].doc.slides[0].imageReferences[0].error).toContain('Reenvie');
   });
 
   it('404 da referência não derruba a lista nem apaga a referência local correspondente', async () => {
