@@ -997,7 +997,9 @@
 }
 
 @media (max-width: 340px) {
-  .moont-lp-hero { padding-top: 16px; }
+  /* Reserva folga para variações de métrica da fonte no iPhone SE/320 px:
+     o CTA principal deve caber inteiro na primeira dobra de 568 px. */
+  .moont-lp-hero { padding-top: 8px; }
   .moont-lp-kicker { margin-bottom: 8px; }
   .moont-lp-hero h1 { margin-bottom: 12px; font-size: 40px; }
   .moont-lp-hero__lead { margin-bottom: 12px; font-size: 15px; line-height: 1.38; }
