@@ -156,7 +156,7 @@ test('objetivo do Criar rápido aplica e persiste o modo narrativo sugerido', as
   expect(prompts[0]).toContain('MÉTODO PASSO-A-PASSO');
 });
 
-test('roteiro inline Card 01 define quantidade, ordem e regra de fidelidade', async ({ page }) => {
+test('roteiro inline com rótulos equivalentes define quantidade, ordem e fidelidade', async ({ page }) => {
   const prompts = [];
   const scriptedDraft = {
     slides: [
@@ -175,7 +175,7 @@ test('roteiro inline Card 01 define quantidade, ordem e regra de fidelidade', as
   });
   await openPanel(page, /PROMPT PARA GERAR/i);
   await page.getByLabel('Prompt para gerar', { exact: true }).fill(
-    'Card 01; Abra com a mudança. Card 02; Explique a consequência Card 03 Convide para agir.',
+    'Carrosel 01; Abra com a mudança. Página 02; Explique a consequência Post 03 Convide para agir.',
   );
   await generate(page);
 

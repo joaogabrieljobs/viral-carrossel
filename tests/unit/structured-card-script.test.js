@@ -28,6 +28,29 @@ describe('parseExplicitCardScript', () => {
     ]);
   });
 
+  it.each([
+    'Carrossel 01, Abertura. Carrossel 02, Desenvolvimento. Carrossel 03, Fecho.',
+    'Carrosel 01: Abertura. Carrosel 02: Desenvolvimento. Carrosel 03: Fecho.',
+    'Carossel 01; Abertura. Carossel 02; Desenvolvimento. Carossel 03; Fecho.',
+    'Carosel 01; Abertura. Carosel 02; Desenvolvimento. Carosel 03; Fecho.',
+    'Página 01 — Abertura. Pagina 02 — Desenvolvimento. Página 03 — Fecho.',
+    'Ideia 01. Abertura. Ideia 02. Desenvolvimento. Ideia 03. Fecho.',
+    'Post #01: Abertura. Post #02: Desenvolvimento. Post #03: Fecho.',
+    'Postagem 01: Abertura. Postagem 02: Desenvolvimento. Postagem 03: Fecho.',
+    'Bloco 01: Abertura. Bloco 02: Desenvolvimento. Bloco 03: Fecho.',
+    'Tela 01: Abertura. Tela 02: Desenvolvimento. Tela 03: Fecho.',
+  ])('reconhece rótulos equivalentes: %s', (source) => {
+    const parsed = parseExplicitCardScript(source);
+
+    expect(parsed?.count).toBe(3);
+    expect(parsed?.blocks.map((block) => block.number)).toEqual([1, 2, 3]);
+    expect(parsed?.blocks.map((block) => block.text)).toEqual([
+      'Abertura.',
+      'Desenvolvimento.',
+      'Fecho.',
+    ]);
+  });
+
   it('aceita markdown, páginas, slides, Page e um preâmbulo', () => {
     const parsed = parseExplicitCardScript(`Siga este roteiro sem trocar a ordem.
 ### Página 01 — Abertura com contexto
@@ -50,6 +73,7 @@ Page 03: Encerramento`);
     expect(parseExplicitCardScript('Compare o card 1 com o card 2 antes de decidir.')).toBeNull();
     expect(parseExplicitCardScript('Card 1 versus Card 2: qual funciona melhor?')).toBeNull();
     expect(parseExplicitCardScript('Card 1 e Card 2 são apenas exemplos.')).toBeNull();
+    expect(parseExplicitCardScript('Página 1 de Página 2')).toBeNull();
   });
 
   it('rejeita sequência duplicada, fora de ordem, incompleta ou acima do limite', () => {
@@ -57,6 +81,7 @@ Page 03: Encerramento`);
     expect(parseExplicitCardScript('Card 1: A. Card 3: C.')).toBeNull();
     expect(parseExplicitCardScript('Card 2: B. Card 3: C.')).toBeNull();
     expect(parseExplicitCardScript('Card 1: A. Card 2:')).toBeNull();
+    expect(parseExplicitCardScript('Ideia 01: A. Ideia 03: B. Ideia 03: C.')).toBeNull();
     const tooMany = Array.from({ length: 25 }, (_, index) => `Card ${index + 1}: Texto ${index + 1}.`).join(' ');
     expect(parseExplicitCardScript(tooMany)).toBeNull();
   });

@@ -5,7 +5,28 @@ const DEFAULT_MAX_CARDS = 24;
 // pontuação) e a sequência inteira precisa ser 1, 2, 3... Isso permite o caso
 // humano "Card 01; ... card 02; ... card 03 ..." sem ativar por uma menção
 // isolada como "veja o card 2".
-const CARD_MARKER_RE = /\b(?:card|slide|p[aá]gina|page)[ \t]*0*(\d{1,3})\b/giu;
+const CARD_LABEL_RE = [
+  'cards?',
+  'slides?',
+  'p[aá]ginas?',
+  'pages?',
+  'car{1,2}os{1,2}(?:el|[eé]is)',
+  'carousels?',
+  'id[eé]ias?',
+  'ideas?',
+  'posts?',
+  'postage(?:m|ns)',
+  'publica(?:ç|c)(?:[aã]o|[oõ]es)',
+  'blocos?',
+  'blocks?',
+  'telas?',
+  'screens?',
+  'pe[çc]as?',
+].join('|');
+const CARD_MARKER_RE = new RegExp(
+  `\\b(?:${CARD_LABEL_RE})[ \\t]*(?:#[ \\t]*)?0*(\\d{1,3})\\b`,
+  'giu',
+);
 
 function resolveMarkerStart(source, index) {
   const lineStart = source.lastIndexOf('\n', Math.max(0, index - 1)) + 1;
@@ -24,12 +45,12 @@ function firstMarkerHasExplicitBoundary(source, markerStart) {
 
 function resolveContentStart(source, markerEnd) {
   const suffix = source.slice(markerEnd);
-  const separator = suffix.match(/^(?:[ \t]*={2,})?[ \t]*(?:[:;\-—.)][ \t]*)?(?:\n[ \t]*)?/u);
+  const separator = suffix.match(/^(?:[ \t]*={2,})?[ \t]*(?:[:,;\-—.)][ \t]*)?(?:\n[ \t]*)?/u);
   return markerEnd + String(separator?.[0] || '').length;
 }
 
 function isNaturalComparisonConnector(text) {
-  return /^(?:e|ou|vs\.?|versus|contra)$/iu.test(String(text || '').trim());
+  return /^(?:e|ou|vs\.?|versus|contra|de|do|da|para|at[eé])$/iu.test(String(text || '').trim());
 }
 
 function normalizeMaxCards(value) {
