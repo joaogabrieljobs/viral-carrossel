@@ -67,6 +67,15 @@ Legenda final #a #b
     expect(parsed.cards[0].title).toBe('Abertura');
     expect(parsed.cards[0].subtitle).toMatch(/Corpo um/);
   });
+
+  it('preserva conteúdo quando os marcadores Card 01 e Card 02 estão inline', () => {
+    const parsed = parseImportedText('Card 01; Título: Abertura. Subtítulo: Primeiro argumento. Card 02; Título: Conclusão. Subtítulo: Próximo passo.');
+
+    expect(parsed.cards).toHaveLength(2);
+    expect(parsed.cards[0]).toMatchObject({ title: 'Abertura.', subtitle: 'Primeiro argumento.' });
+    expect(parsed.cards[1]).toMatchObject({ title: 'Conclusão.', subtitle: 'Próximo passo.' });
+    expect(parsed.cards.map((card) => `${card.title} ${card.subtitle}`).join(' ')).not.toMatch(/Card 0?[12]/i);
+  });
 });
 
 describe('scrubLabelLeak', () => {

@@ -231,6 +231,7 @@ import {
   buildGenerationTaskBlock,
 } from './src/utils/style-kit.js';
 import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
+import { buildExplicitCardScriptPrompt, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
@@ -3227,6 +3228,11 @@ export default function App() {
   // O drawer mobile e a sidebar desktop desmontam ao mudar a largura da tela.
   // Mantém o pedido no editor para não perdê-lo ao girar o celular/cancelar.
   const [quickPrompt, setQuickPrompt] = useState('');
+  const quickPromptCardScript = useMemo(() => (
+    activeProductKind === 'carrossel'
+      ? (parseExplicitCardScript(quickPrompt) || parseExplicitCardScript(material?.content))
+      : null
+  ), [activeProductKind, material?.content, quickPrompt]);
   const cancelGeneration = useCallback(() => {
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
     if (importAbortRef.current) importAbortRef.current.cancelled = true;
@@ -4962,7 +4968,15 @@ export default function App() {
     announcement = false,
     remix = false,
   }) => {
-    topic = String(topic || '').slice(0, GENERATION_TOPIC_MAX_CHARS);
+    const rawTopic = String(topic || '');
+    const requestedPresetId = presetArg ?? creativePreset ?? 'livre';
+    // Detecte antes do limite do campo de tema. O tema curto continua
+    // protegido em 1.500 caracteres, enquanto o bloco estruturado completo é
+    // enviado uma única vez por buildExplicitCardScriptPrompt.
+    const topicCardScript = !isApresentacaoPreset(requestedPresetId)
+      ? parseExplicitCardScript(rawTopic)
+      : null;
+    topic = rawTopic.slice(0, GENERATION_TOPIC_MAX_CHARS);
     const materialProductKind = isApresentacaoPreset(presetArg ?? creativePreset ?? 'livre')
       ? 'apresentacao'
       : 'carrossel';
@@ -4992,7 +5006,16 @@ export default function App() {
       if (activeProjectRef.current !== generationProjectId || generationRef.current !== job) job.cancel();
       throwIfGenerationCancelled(job.signal);
     };
-    const requestedPresetId = presetArg ?? creativePreset ?? 'livre';
+    const explicitCardScript = !isApresentacaoPreset(requestedPresetId)
+      ? (topicCardScript || parseExplicitCardScript(material?.content))
+      : null;
+    if (explicitCardScript) {
+      const previousCount = Number(count);
+      count = explicitCardScript.count;
+      if (!remix && previousCount !== count) {
+        toast(`Roteiro reconhecido: vou manter os ${count} cards e a ordem indicada.`, 'info', 5000);
+      }
+    }
     const requestedPresentationPath = normalizePresentationPath(
       presentationPathArg ?? presentationPath,
     );
@@ -5151,6 +5174,7 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const generationTaskBlock = isPresentationGeneration
       ? `TAREFA: transforme o tema e as fontes em um deck pronto para apresentar. Cada slide deve avançar o caminho escolhido, sustentar uma única ideia e funcionar em uma tela 16:9. A conclusão deve deixar clara a decisão, aprendizagem ou próxima ação.`
       : buildGenerationTaskBlock(topic, announcement);
+    const explicitCardScriptBlock = buildExplicitCardScriptPrompt(explicitCardScript);
 
     const prompt = `${introLine}
 ${hasPromptMaterial ? `${materialBlock}${materialPriorityBlock}` : ''}${deliveryLine}
@@ -5158,6 +5182,7 @@ ${contextoModoPerso ? `${contextoModoPerso}\n` : ''}${brandBlock}${projectContex
 ${hasPromptMaterial ? '' : `${materialBlock}${materialPriorityBlock}`}${imgParamsBlock}
 
 ${generationTaskBlock}
+${explicitCardScriptBlock}
 ${idiomaRegra}
 
 ${effectiveMode === 'none' || isPresentationGeneration ? '' : buildEditorialStrategyBlock(objective, cp, performanceGuidance.preferredStructureId)}
@@ -5193,6 +5218,7 @@ ${jsonShapeLine}`;
       audience ? `Público: ${audience}` : '',
       `Tom: ${tone}`,
       material?.context ? `Recorte e instruções atuais do usuário: ${String(material.context).slice(0, 3000)}` : '',
+      explicitCardScriptBlock,
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
@@ -5203,6 +5229,7 @@ ${jsonShapeLine}`;
         presetId: cp,
         densityId: td,
         narrativeMode: effectiveMode,
+        explicitCardScript,
         commercialClaimSource: [topic, materialBlock, material?.context, styleKit.contextMd].filter(Boolean).join('\n'),
         presentationPath: presentationPathId,
         presentationTextLimits,
@@ -7476,6 +7503,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     {appMode === 'criador' ? 'Descreva a ideia.' : <>Escolha como sua ideia<br/><span style={{ color:'var(--accent)' }}>vai avançar.</span></>}
                   </div>
                   {appMode === 'criador' ? (
+                    <>
                     <textarea
                       data-vc-center-prompt=""
                       aria-label={activeProductKind === 'apresentacao' ? 'Pedido para gerar a apresentação' : 'Pedido para gerar o carrossel'}
@@ -7502,6 +7530,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
                         textAlign: 'left',
                       }}
                     />
+                    {quickPromptCardScript && (
+                      <div role="status" style={{ margin:'-6px 0 16px', padding:'9px 11px', border:'1px solid var(--accent)', borderRadius:10, background:'var(--accent-surface)', color:'var(--text-secondary)', fontSize:11, lineHeight:1.45, textAlign:'left' }}>
+                        Roteiro reconhecido: {quickPromptCardScript.count} cards. A ordem de cada bloco será mantida.
+                      </div>
+                    )}
+                    </>
                   ) : (
                   <p style={{
                     fontSize:15,
@@ -7520,7 +7554,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                   {appMode === 'criador' && <div style={{ marginBottom:16, textAlign:'left', display:'grid', gap:12 }}>
                     <GenerationScopePicker value={hasOpenAI ? (doc.quickGenerationScope || 'text') : 'text'} onChange={value => history.set(d => ({ ...d, quickGenerationScope:value }))} hasImages={hasOpenAI} disabled={!!genProgress} />
                     <label style={{ display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:12 }}>Quantidade de páginas
-                      <select className="vc-input" aria-label="Quantidade de páginas" value={quickCardCount} onChange={event => setQuickCardCount(event.target.value)} style={{ width:130 }}>
+                      <select className="vc-input" aria-label="Quantidade de páginas" value={quickPromptCardScript?.count ?? quickCardCount} disabled={!!quickPromptCardScript} onChange={event => setQuickCardCount(event.target.value)} style={{ width:130 }}>
                         <option value="auto">Pelo pedido</option>
                         {Array.from({length:24}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
                       </select>
@@ -7532,12 +7566,15 @@ Retorne APENAS JSON: ${refineAllWantsBody
                       onClick={() => {
                         if (appMode === 'criador') {
                           if (activeProductKind === 'apresentacao') setCreativePreset('livre');
-                          const topic = String(quickPrompt || '').trim();
+                          const cardScript = parseExplicitCardScript(quickPrompt)
+                            || parseExplicitCardScript(material?.content);
+                          const topic = String(quickPrompt || '').trim()
+                            || (cardScript ? 'Siga exatamente o roteiro explícito por card do material de apoio.' : '');
                           if (!topic) {
                             document.querySelector('[data-vc-center-prompt]')?.focus?.();
                             return;
                           }
-                          handleQuickGenerateFromNarrativa(topic, { productKind: 'carrossel', cardCount:quickCardCount, narrativeMode:doc.quickNarrativeMode || 'none' });
+                          handleQuickGenerateFromNarrativa(topic, { productKind: 'carrossel', cardCount:cardScript?.count ?? quickCardCount, narrativeMode:doc.quickNarrativeMode || 'none' });
                           return;
                         }
                         generateProjectByKind('carrossel');

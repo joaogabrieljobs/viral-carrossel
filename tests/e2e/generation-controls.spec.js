@@ -156,6 +156,74 @@ test('objetivo do Criar rápido aplica e persiste o modo narrativo sugerido', as
   expect(prompts[0]).toContain('MÉTODO PASSO-A-PASSO');
 });
 
+test('roteiro inline Card 01 define quantidade, ordem e regra de fidelidade', async ({ page }) => {
+  const prompts = [];
+  const scriptedDraft = {
+    slides: [
+      { title: 'Abra com a mudança', subtitle: 'Apresente o novo cenário.', imageQuery: '' },
+      { title: 'Explique a consequência', subtitle: 'Mostre o impacto para o público.', imageQuery: '' },
+      { title: 'Convide para agir', subtitle: 'Encerre com o próximo passo.', imageQuery: '' },
+    ],
+    caption: 'Uma sequência fiel ao roteiro.',
+  };
+  await openEditor(page, {
+    '/api/ai/compatible': route => {
+      const text = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      prompts.push(text);
+      return route.fulfill({ json: completion(text.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : scriptedDraft) });
+    },
+  });
+  await openPanel(page, /PROMPT PARA GERAR/i);
+  await page.getByLabel('Prompt para gerar', { exact: true }).fill(
+    'Card 01; Abra com a mudança. Card 02; Explique a consequência Card 03 Convide para agir.',
+  );
+  await generate(page);
+
+  await expect.poll(async () => (await doc(page))?.slides.length).toBe(3);
+  await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
+  expect(prompts).toHaveLength(2);
+  expect(prompts[0]).toContain('ROTEIRO EXPLÍCITO POR CARD');
+  expect(prompts[0]).toContain('exatamente 3 cards');
+  expect(prompts[1]).toContain('ROTEIRO EXPLÍCITO');
+  expect(prompts[0].indexOf('Abra com a mudança')).toBeLessThan(prompts[0].indexOf('Explique a consequência'));
+  expect(prompts[0].indexOf('Explique a consequência')).toBeLessThan(prompts[0].indexOf('Convide para agir'));
+  expect(prompts[1]).toContain('Não funda, reordene, mova para outro card nem omita um bloco');
+});
+
+test('roteiro por card mantém blocos que ultrapassam o limite do tema curto', async ({ page }) => {
+  const prompts = [];
+  const finalInstruction = 'Feche com a ação que a pessoa deve realizar agora.';
+  await mockApi(page, {
+    session,
+    extra: {
+      '/api/ai/compatible': route => {
+        const text = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+        prompts.push(text);
+        return route.fulfill({ json: completion(text.startsWith('REVISÃO EDITORIAL')
+          ? { edits: [] }
+          : {
+              slides: [
+                { title: 'Contexto', subtitle: 'Primeiro bloco.', imageQuery: '' },
+                { title: 'Ação', subtitle: finalInstruction, imageQuery: '' },
+              ],
+              caption: 'Roteiro completo.',
+            }) });
+      },
+    },
+  });
+  await page.goto('/?app=1');
+  await enterSavedProject(page);
+  const request = `Card 01; ${'contexto '.repeat(190)} Card 02; ${finalInstruction}`;
+  await page.getByLabel('Pedido para gerar carrossel', { exact: true }).fill(request);
+  await expect(page.getByText(/Roteiro reconhecido: 2 cards/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Gerar carrossel', exact: true }).click();
+
+  await expect.poll(async () => (await doc(page))?.slides.length).toBe(2);
+  expect(request.length).toBeGreaterThan(1500);
+  expect(prompts[0]).toContain(finalInstruction);
+  expect(prompts[0]).toContain('ROTEIRO EXPLÍCITO POR CARD');
+});
+
 // Somente APIs mockadas: nenhum crédito real e nenhuma conta de produção.
 test('remix exige escolha, mantém visual e usa contexto/referências atuais nas imagens', async ({ page }) => {
   test.setTimeout(90_000);

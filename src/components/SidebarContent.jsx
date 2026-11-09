@@ -3747,6 +3747,7 @@ function SidebarContent({
                   setBrand={setBrand}
                   styleKit={styleKit}
                   setStyleKit={setStyleKit}
+                  material={material}
                   slides={slides}
                   quickPrompt={quickPrompt}
                   setQuickPrompt={setQuickPrompt}

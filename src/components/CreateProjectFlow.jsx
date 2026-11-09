@@ -14,6 +14,7 @@ import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx'
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
+import { parseExplicitCardScript } from '../utils/structured-card-script.js';
 import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
 import '../styles/create-project-flow.css';
 
@@ -82,6 +83,11 @@ export default function CreateProjectFlow({
   const busyRef = useRef(false);
   const mainRef = useRef(null);
   const isPresentation = productKind === 'apresentacao';
+  const explicitCardScript = useMemo(() => {
+    if (isPresentation) return null;
+    return parseExplicitCardScript(topic) || parseExplicitCardScript(material.content);
+  }, [isPresentation, material.content, topic]);
+  const explicitCardCount = explicitCardScript?.count || 0;
   const materialLimits = creationMaterialLimits(productKind);
   const materialOverageMessage = creationMaterialOverageMessage(material, productKind);
   const hasMaterialOverage = Boolean(materialOverageMessage);
@@ -113,6 +119,10 @@ export default function CreateProjectFlow({
     mainRef.current?.focus({ preventScroll:true });
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [step]);
+  useEffect(() => {
+    if (!explicitCardCount || isPresentation) return;
+    setCount(current => String(current) === String(explicitCardCount) ? current : String(explicitCardCount));
+  }, [explicitCardCount, isPresentation]);
   const go = next => { if (busy || pending) return; setError(''); setNotice(''); setStep(next); setFurthest(v => Math.max(v, next)); };
   const chooseProduct = next => {
     if (next === productKind) return;
@@ -300,6 +310,7 @@ export default function CreateProjectFlow({
         {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
         <Field label="Sobre o que vamos criar?" hint={`${topic.length.toLocaleString('pt-BR')} de ${GENERATION_TOPIC_MAX_CHARS.toLocaleString('pt-BR')} caracteres. Diga o tema, a mensagem principal e o resultado que espera.`}><textarea className="vc-input" rows={4} value={topic} onChange={e => updateTopic(e.target.value)} placeholder={isPresentation ? 'Ex.: um pitch para explicar nosso negócio a investidores.' : 'Ex.: apresentar nossa campanha de Halloween e convidar o público a conhecer a oferta.'}/></Field>
         <Field label="Texto de apoio" hint={`${material.content.length.toLocaleString('pt-BR')} de ${materialLimits.content.toLocaleString('pt-BR')} caracteres usados pela geração.`}><textarea className="vc-input" rows={7} value={material.content} onChange={e => updateMaterial('content', e.target.value)}/></Field>
+        {explicitCardCount > 0 && <p role="status" className="vc-create-note"><strong>Roteiro reconhecido: {explicitCardCount} cards.</strong> A quantidade e a ordem serão mantidas na geração.</p>}
         <label className="vc-create-upload">Adicionar arquivo de texto (.txt ou .md)<input type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" aria-label="Importar texto de apoio" disabled={pending} onChange={importText}/><span className="vc-create-note">O texto é acrescentado ao apoio. Para PDF ou Word, cole o conteúdo no campo acima.</span>{importedNames.length > 0 && <span>{importedNames.join(' · ')}</span>}</label>
         <Field label="Links e fontes" hint={`${material.sources.length.toLocaleString('pt-BR')} de ${materialLimits.sources.toLocaleString('pt-BR')} caracteres. Cole referências que sustentam o conteúdo.`}><textarea className="vc-input" rows={3} value={material.sources} onChange={e => updateMaterial('sources', e.target.value)} placeholder="https://…"/></Field>
         <Field label="Instruções adicionais" hint={`${material.context.length.toLocaleString('pt-BR')} de ${materialLimits.context.toLocaleString('pt-BR')} caracteres. Idioma, palavras a evitar, informações obrigatórias ou convite final.`}><textarea className="vc-input" rows={3} value={material.context} onChange={e => updateMaterial('context', e.target.value)}/></Field>
@@ -310,7 +321,7 @@ export default function CreateProjectFlow({
         <details className="vc-create-details"><summary>Qual ação você quer incentivar? — opcional</summary><Field label="Objetivo do conteúdo"><select className="vc-input" value={objective} onChange={e => setObjective(e.target.value)}>{CONTENT_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></Field><p className="vc-create-note">{CONTENT_OBJECTIVES.find(o => o.id === objective)?.desc}</p></details>
       </>}</>}
       {step === 4 && <>
-        <div><label className="vc-create-field" htmlFor="creation-count">Quantidade de {item}</label><div className="vc-create-count" style={{ marginTop:12 }}><button type="button" aria-label={`Diminuir quantidade de ${item}`} disabled={!countValid || Number(count) <= minCount} onClick={() => changeCount(Number(count) - 1)}>−</button><input id="creation-count" type="number" inputMode="numeric" min={minCount} max={24} step={1} value={count} onChange={e => changeCount(e.target.value)} aria-invalid={!countValid}/><button type="button" aria-label={`Aumentar quantidade de ${item}`} disabled={!countValid || Number(count) >= 24} onClick={() => changeCount(Number(count) + 1)}>+</button></div><div className="vc-create-shortcuts">{(isPresentation ? [8,10,12,16] : [5,6,8,10]).map(n => <button type="button" key={n} aria-pressed={Number(count) === n} onClick={() => changeCount(n)}>{n}</button>)}</div><p className="vc-create-note">Escolha de {minCount} a 24 {item}. A quantidade inclui a abertura e o encerramento.</p>{!countValid && <p role="alert" className="vc-create-note">Digite um número inteiro de {minCount} a 24.</p>}</div>
+        <div><label className="vc-create-field" htmlFor="creation-count">Quantidade de {item}</label><div className="vc-create-count" style={{ marginTop:12 }}><button type="button" aria-label={`Diminuir quantidade de ${item}`} disabled={explicitCardCount > 0 || !countValid || Number(count) <= minCount} onClick={() => changeCount(Number(count) - 1)}>−</button><input id="creation-count" type="number" inputMode="numeric" min={minCount} max={24} step={1} value={count} disabled={explicitCardCount > 0} onChange={e => changeCount(e.target.value)} aria-invalid={!countValid}/><button type="button" aria-label={`Aumentar quantidade de ${item}`} disabled={explicitCardCount > 0 || !countValid || Number(count) >= 24} onClick={() => changeCount(Number(count) + 1)}>+</button></div><div className="vc-create-shortcuts">{(isPresentation ? [8,10,12,16] : [5,6,8,10]).map(n => <button type="button" key={n} aria-pressed={Number(count) === n} disabled={explicitCardCount > 0} onClick={() => changeCount(n)}>{n}</button>)}</div>{explicitCardCount > 0 ? <p role="status" className="vc-create-note"><strong>Roteiro reconhecido: {explicitCardCount} cards.</strong> Para mudar a quantidade, adicione ou remova blocos “Card” no conteúdo.</p> : <p className="vc-create-note">Escolha de {minCount} a 24 {item}. A quantidade inclui a abertura e o encerramento.</p>}{!countValid && <p role="alert" className="vc-create-note">Digite um número inteiro de {minCount} a 24.</p>}</div>
         <fieldset className="vc-create-group"><legend>Formato do projeto</legend>{isPresentation ? <p className="vc-create-note">Apresentação horizontal 16:9 — pronta para tela e PDF.</p> : <div className="vc-create-grid" role="radiogroup" aria-label="Formato do projeto">{['carrossel','quadrado','stories'].map(id => <Option key={id} label={FORMAT_LABELS[id]} desc={id === 'carrossel' ? 'Vertical · 1080 × 1350' : id === 'quadrado' ? 'Quadrado · 1080 × 1080' : 'Vertical · 1080 × 1920'} selected={formatId === id} onClick={() => setFormatId(id)}/>)}</div>}</fieldset>
         <fieldset className="vc-create-group"><legend>Quanto texto por {isPresentation ? 'slide' : 'card'}?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Quantidade de texto">{CREATION_DENSITIES.map(d => <Option key={d.id} {...d} selected={density === d.id} onClick={() => setDensity(d.id)}/>)}</div></fieldset>
       </>}
@@ -325,6 +336,7 @@ export default function CreateProjectFlow({
       </>}
       {step === 6 && <>
         {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
+        {explicitCardCount > 0 && <p role="status" className="vc-create-note"><strong>Roteiro reconhecido: {explicitCardCount} cards.</strong> Cada bloco será usado no card correspondente, na ordem informada.</p>}
         <dl className="vc-create-review">{reviewRow('Projeto', name, 0)}{reviewRow('Identidade', identityLabel, 1)}{reviewRow('Logo e referências', `${identitySummary.logo} · ${identitySummary.references} referências`, 1)}{reviewRow('Tom de voz', identitySummary.tone || 'Sem orientação adicional', 1)}{reviewRow('Tema', topic || 'Usar o material e o briefing fornecidos', 2)}{reviewRow('Material', `${material.content.length.toLocaleString('pt-BR')} caracteres de apoio${material.sources.trim() ? ' · fontes incluídas' : ''}${material.context.trim() ? ' · instruções incluídas' : ''}`, 2)}{reviewRow('Narrativa', selectedNarrative, 3)}{reviewRow('Quantidade', `${count} ${quantityUnit} · ${FORMAT_LABELS[formatId]}`, 4)}{reviewRow('Texto', CREATION_DENSITIES.find(d => d.id === density)?.label, 4)}{reviewRow('Visual', visualPreset ? `${presets.find(p => p.id === visualPreset)?.label || 'Estilo selecionado'}${identityVisualEdited ? ' · ajustado neste projeto' : ''}` : 'Identidade configurada', 5)}{reviewRow('Imagens', wantImages && hasOpenAI ? 'Gerar texto e imagens' : 'Criar o texto primeiro', 5)}</dl>
         {!hasTextAI && <div className="vc-create-details"><p>Configure o acesso à IA para gerar. Suas escolhas ficam mantidas nesta tela.</p>{onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar acesso à IA</button>}</div>}
         <p className="vc-create-generation-cost"><strong>Antes de gerar:</strong> tempo estimado de {estimatedMinutes} · {imageConsumption}.</p>

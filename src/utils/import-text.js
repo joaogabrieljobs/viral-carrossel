@@ -5,6 +5,7 @@
  */
 
 import { mkSlide } from './doc-schema.js';
+import { parseExplicitCardScript } from './structured-card-script.js';
 
 const SEPARATOR_LINE_RE = /^(?:-{3,}|={3,}.*|página\s*\d+\b.*|page\s*\d+\b.*|(?:card|slide)\s*\d+\b.*)$/i;
 
@@ -107,6 +108,17 @@ function splitPages(raw) {
   if (captionTail && captionTail.index != null) {
     trailingCaption = captionTail[1].trim();
     body = text.slice(0, captionTail.index).trim();
+  }
+
+  // O roteiro explícito também pode vir inteiro em uma linha:
+  // `Card 01; texto. Card 02; texto`. O separador legado por linha descartava
+  // o conteúdo nesses casos; o parser compartilhado preserva cada bloco.
+  const explicitScript = parseExplicitCardScript(body);
+  if (explicitScript) {
+    return {
+      pages: explicitScript.blocks.map((block) => block.text),
+      trailingCaption,
+    };
   }
 
   const pages = [];

@@ -272,6 +272,36 @@ test('ir para o editor respeita apresentação e cria um slide vazio', async ({ 
   }] });
 });
 
+test('roteiro explícito sincroniza e bloqueia a quantidade até a revisão', async ({ page }) => {
+  await setup(page, { withProject:false });
+  await page.getByRole('button', { name:'Criar um projeto', exact:true }).click();
+  const wizard = flow(page);
+  await wizard.getByLabel(/^Nome do projeto/).fill('Roteiro pronto');
+  await next(page);
+  await next(page);
+
+  await wizard.getByLabel(/^Sobre o que vamos criar/).fill('Campanha de lançamento do serviço.');
+  await wizard.getByLabel(/^Texto de apoio/).fill(
+    'Card 01; O problema que o cliente reconhece. Card 02; A solução em linguagem simples. Card 03; Convite para conhecer a oferta.',
+  );
+  await expect(wizard.getByText('Roteiro reconhecido: 3 cards.', { exact:true })).toBeVisible();
+
+  await next(page);
+  await next(page);
+  const count = wizard.getByRole('spinbutton', { name:'Quantidade de cards', exact:true });
+  await expect(count).toHaveValue('3');
+  await expect(count).toBeDisabled();
+  await expect(wizard.getByRole('button', { name:'Diminuir quantidade de cards', exact:true })).toBeDisabled();
+  await expect(wizard.getByRole('button', { name:'Aumentar quantidade de cards', exact:true })).toBeDisabled();
+  await expect(wizard.locator('.vc-create-shortcuts').getByRole('button', { name:'5', exact:true })).toBeDisabled();
+  await expect(wizard.getByText('Roteiro reconhecido: 3 cards.', { exact:true })).toBeVisible();
+
+  await next(page);
+  await next(page);
+  await expect(wizard.getByText('Roteiro reconhecido: 3 cards.', { exact:true })).toBeVisible();
+  await expect(wizard.getByRole('button', { name:'Criar e gerar 3 cards', exact:true })).toBeVisible();
+});
+
 test('novo carrossel usa quantidade, narrativa, marca, material e estilo sem sobrescrever o anterior', async ({ page }) => {
   test.setTimeout(60_000);
   const prompts = [];

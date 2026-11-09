@@ -66,6 +66,7 @@ function assembledPrompt(cp, density = '1_1', count = 7, performanceGuidance = {
     slideLayoutRules: prompts.buildGenerationSlideLayoutRules('editorial', cp, density, count),
     langLayer: prompts.buildGenerationLanguageLayer(cp, 'próximo', 'editorial'),
     imageLayer: prompts.buildGenerationImageLayer(cp, 'Reuniões sem pauta', '', ''),
+    explicitCardScriptBlock: '',
     jsonShapeLine: prompts.buildGenerationJsonContract(cp, density, count),
   };
   return new Function(...Object.keys(context), `return ${literal};`)(...Object.values(context));
@@ -165,6 +166,8 @@ describe('montagem final dos prompts de texto', () => {
     expect(bulk).toContain('...presentationAIOptions(creativePreset, presentationPath)');
     expect(caption).toContain('...presentationAIOptions(creativePreset, presentationPath)');
     expect(caption).toContain('buildPresentationSummaryRules(presentationPath)');
-    expect(src).toContain("topic = String(topic || '').slice(0, GENERATION_TOPIC_MAX_CHARS)");
+    expect(src).toContain("const rawTopic = String(topic || '')");
+    expect(src).toContain('topic = rawTopic.slice(0, GENERATION_TOPIC_MAX_CHARS)');
+    expect(src).toContain('parseExplicitCardScript(rawTopic)');
   });
 });

@@ -5,13 +5,14 @@ import { BrandTonePanel } from './BrandTonePanel.jsx';
 import { buildIdentityChecklist, projectHasCarouselContent } from '../../utils/context-status.js';
 import { storeSlideLogo, projectLogoFromStored } from '../../utils/slide-logo.js';
 import { Check, Download, Image as ImageIcon, Loader2, Sparkles, Type, SlidersHorizontal, Upload, X } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PRESENTATION_PATHS,
   getPresentationPath,
   normalizePresentationPath,
 } from '../../utils/presentation.js';
 import { MOONT_NARRATIVES } from '../../config/moont-brand.js';
+import { parseExplicitCardScript } from '../../utils/structured-card-script.js';
 
 const QUICK_PRODUCTS = [
   { ...MOONT_NARRATIVES.carrossel, flow: 'Faça uma ideia circular' },
@@ -41,6 +42,7 @@ export function CriarRapidoHome({
   setBrand,
   styleKit,
   setStyleKit,
+  material = {},
   slides = [],
   quickPrompt = '',
   setQuickPrompt = () => {},
@@ -96,10 +98,19 @@ export function CriarRapidoHome({
   const previousIdentityCompleteRef = useRef(identityComplete);
   const hasResult = projectHasCarouselContent(slides);
   const promptTrim = String(quickPrompt || '').trim();
+  const explicitCardScript = useMemo(
+    () => (isPresentation
+      ? null
+      : (parseExplicitCardScript(promptTrim) || parseExplicitCardScript(material?.content))),
+    [isPresentation, material?.content, promptTrim],
+  );
+  const generationPrompt = promptTrim
+    || (explicitCardScript ? 'Siga exatamente o roteiro explícito por card do material de apoio.' : '');
+  const displayedQuickCardCount = explicitCardScript?.count ?? quickCardCount;
   const shortBio = String(brand?.bio || '').trim();
   const countPresets = isPresentation ? ['auto', 6, 8, 10, 12, 14, 16] : ['auto', 3, 5, 6, 8, 10];
   const maxCustomCount = isPresentation ? 24 : 24;
-  const numericQuickCount = quickCardCount === 'auto' ? null : Number(quickCardCount);
+  const numericQuickCount = displayedQuickCardCount === 'auto' ? null : Number(displayedQuickCardCount);
   const isCustomCount = numericQuickCount != null
     && Number.isInteger(numericQuickCount)
     && !countPresets.includes(numericQuickCount);
@@ -175,7 +186,7 @@ export function CriarRapidoHome({
   };
 
   const handleGenerate = async () => {
-    if (!promptTrim || genBusy) return;
+    if (!generationPrompt || genBusy) return;
     const effectiveNarrativeMode = isPresentation
       ? 'editorial'
       : resolveQuickNarrativeMode(objectiveId, narrativeMode);
@@ -184,10 +195,10 @@ export function CriarRapidoHome({
       product: isPresentation ? 'apresentacao' : 'carrossel',
     });
     try {
-      await onQuickGenerate?.(promptTrim, {
+      await onQuickGenerate?.(generationPrompt, {
         withImages: !!(scopeImages && hasOpenAI),
         narrativeMode: effectiveNarrativeMode,
-        cardCount: quickCardCount,
+        cardCount: explicitCardScript?.count ?? quickCardCount,
         productKind: isPresentation ? 'apresentacao' : 'carrossel',
         presentationPath: normalizedPresentationPath,
       });
@@ -447,6 +458,11 @@ export function CriarRapidoHome({
             : 'Ex.: Explique por que…\nAnuncie o lançamento de…\nConte a história de…\nCrie um passo a passo sobre…'}
           style={{ minHeight: 110, resize: 'vertical', lineHeight: 1.5, fontSize: 14 }}
         />
+        {explicitCardScript && (
+          <div role="status" style={{ padding:'9px 11px', border:'1px solid var(--accent)', borderRadius:9, background:'var(--accent-surface)', color:'var(--text-secondary)', fontSize:11, lineHeight:1.45 }}>
+            Roteiro reconhecido: {explicitCardScript.count} cards. O Moont seguirá cada bloco na ordem indicada.
+          </div>
+        )}
         <div>
           <div className="vc-label-sm" style={{ marginBottom: 7 }}>{isPresentation ? 'Quantidade de slides' : 'Quantidade de cards'}</div>
           <div
@@ -457,8 +473,8 @@ export function CriarRapidoHome({
           >
             {countPresets.map((value) => {
               const active = !showCustomCount && (
-                quickCardCount === value
-                || (value !== 'auto' && Number(quickCardCount) === value)
+                displayedQuickCardCount === value
+                || (value !== 'auto' && Number(displayedQuickCardCount) === value)
               );
               return (
                 <button
@@ -466,7 +482,7 @@ export function CriarRapidoHome({
                   type="button"
                   className={`vc-seg-item${active ? ' active' : ''}`}
                   aria-pressed={active}
-                  disabled={genBusy}
+                  disabled={genBusy || !!explicitCardScript}
                   onClick={() => {
                     setCustomCountOpen(false);
                     setCustomCountDraft('');
@@ -482,7 +498,7 @@ export function CriarRapidoHome({
               type="button"
               className={`vc-seg-item${showCustomCount ? ' active' : ''}`}
               aria-pressed={showCustomCount}
-              disabled={genBusy}
+              disabled={genBusy || !!explicitCardScript}
               onClick={() => {
                 setCustomCountOpen(true);
                 setCustomCountDraft(
@@ -504,8 +520,8 @@ export function CriarRapidoHome({
                 inputMode="numeric"
                 aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
                 placeholder={`1–${maxCustomCount}`}
-                value={customCountDraft}
-                disabled={genBusy}
+                value={explicitCardScript ? String(explicitCardScript.count) : customCountDraft}
+                disabled={genBusy || !!explicitCardScript}
                 onChange={(e) => setCustomCountDraft(e.target.value.replace(/[^\d]/g, ''))}
                 onBlur={() => {
                   const n = Number(customCountDraft);
@@ -536,7 +552,9 @@ export function CriarRapidoHome({
           <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
             {isPresentation
               ? `Auto usa cerca de ${getPresentationPath(normalizedPresentationPath).defaultSlideCount} slides e adapta o arco de ${getPresentationPath(normalizedPresentationPath).shortLabel}.`
-              : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards. Outro deixa escolher qualquer número.'}
+              : explicitCardScript
+                ? `A quantidade vem dos ${explicitCardScript.count} blocos numerados do roteiro.`
+                : 'Auto respeita uma quantidade escrita no pedido; sem quantidade, escolhe 6 cards. Outro deixa escolher qualquer número.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -571,13 +589,13 @@ export function CriarRapidoHome({
         <button
           type="button"
           aria-label={isPresentation ? 'Gerar apresentação' : 'Gerar carrossel'}
-          disabled={genBusy || !promptTrim}
+          disabled={genBusy || !generationPrompt}
           onClick={handleGenerate}
           style={{
             width: '100%', height: 48, borderRadius: 9999, border: 'none',
-            cursor: genBusy || !promptTrim ? 'not-allowed' : 'pointer',
-            background: genBusy || !promptTrim ? 'var(--bg-pearl)' : 'var(--accent)',
-            color: genBusy || !promptTrim ? 'var(--text-muted)' : '#fff',
+            cursor: genBusy || !generationPrompt ? 'not-allowed' : 'pointer',
+            background: genBusy || !generationPrompt ? 'var(--bg-pearl)' : 'var(--accent)',
+            color: genBusy || !generationPrompt ? 'var(--text-muted)' : '#fff',
             fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             ...BTN_CAPS,
           }}

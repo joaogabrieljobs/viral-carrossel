@@ -331,11 +331,14 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
   const claimsRule = unsupportedClaims.length
     ? `\nALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO NO BRIEFING — correção obrigatória: ${unsupportedClaims.map(item => `slideIndex ${item.slideIndex}: ${item.claim}`).join('; ')}. Remova a alegação ou qualifique explicitamente como hipótese; não substitua por outra promessa.`
     : '';
+  const explicitScriptRule = config?.explicitCardScript?.count
+    ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
+    : '';
   return `REVISÃO EDITORIAL — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o carrossel novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
-Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}
+Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${explicitScriptRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"legenda corrigida apenas se necessário"}.

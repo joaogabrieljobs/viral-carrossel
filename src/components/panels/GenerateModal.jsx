@@ -24,6 +24,7 @@ import {
 } from '../../styles/presentation-presets.jsx';
 import { moontNarrative } from '../../config/moont-brand.js';
 import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
+import { parseExplicitCardScript } from '../../utils/structured-card-script.js';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -182,6 +183,13 @@ function GenerateModal({
     setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
     setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
   }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
+  const explicitCardScript = useMemo(() => (
+    isPresentation ? null : (parseExplicitCardScript(topic) || parseExplicitCardScript(material?.content))
+  ), [isPresentation, material?.content, topic]);
+  useEffect(() => {
+    if (!open || !explicitCardScript || count === explicitCardScript.count) return;
+    setCount(explicitCardScript.count);
+  }, [count, explicitCardScript, open]);
   useEffect(() => { if (open) setTextDensity(defaultSlideTextDensity || '1_1'); }, [open, defaultSlideTextDensity]);
   const [cardStyle, setCardStyle] = useState(() => normalizeCardVisualStyle(defaultCardVisualStyle));
   useEffect(() => {
@@ -590,6 +598,11 @@ function GenerateModal({
                   className="vc-input vc-textarea"
                 />
                 <div style={{ marginTop:6, fontSize:11, color:'var(--text-muted)', fontFamily:'var(--font-ui)' }}>{topic.length.toLocaleString('pt-BR')} de {GENERATION_TOPIC_MAX_CHARS.toLocaleString('pt-BR')} caracteres usados pela geração.</div>
+                {explicitCardScript && (
+                  <div role="status" style={{ marginTop:8, padding:'9px 11px', border:'1px solid var(--accent)', borderRadius:9, background:'var(--accent-surface)', color:'var(--text-secondary)', fontSize:11, lineHeight:1.45 }}>
+                    Roteiro reconhecido: {explicitCardScript.count} cards. A ordem e o conteúdo de cada bloco serão mantidos.
+                  </div>
+                )}
                 {/* Ganchos salvos para este nicho; um clique preenche o tema. */}
                 {!isPresentation && (() => {
                   const suggestions = getHooksForNiche(hookLibrary, niche, 3);
@@ -863,7 +876,7 @@ function GenerateModal({
                     ? Array.from({ length: 11 }, (_, index) => index + 6)
                     : [3,4,5,6,7,8,9,10]
                   ).map(n=>(
-                    <button type="button" key={n} aria-pressed={count === n} onClick={()=>setCount(n)} style={{
+                    <button type="button" key={n} aria-pressed={count === n} disabled={!!explicitCardScript} onClick={()=>setCount(n)} style={{
                       width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
                       cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
                       fontVariantNumeric:'tabular-nums',
@@ -890,6 +903,7 @@ function GenerateModal({
                       min={1}
                       max={24}
                       value={count}
+                      disabled={!!explicitCardScript}
                       aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
                       onChange={(e) => {
                         const n = Number(e.target.value);
@@ -906,7 +920,9 @@ function GenerateModal({
                   </label>
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  Use Outro para qualquer quantidade entre 1 e 24.
+                  {explicitCardScript
+                    ? `A quantidade vem dos ${explicitCardScript.count} blocos numerados do roteiro.`
+                    : 'Use Outro para qualquer quantidade entre 1 e 24.'}
                 </p>
               </div>
 
