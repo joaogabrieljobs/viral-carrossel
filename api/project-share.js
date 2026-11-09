@@ -28,6 +28,10 @@ function sameIdentity(a, b) {
   return !!left && left === right;
 }
 
+function normalizedShareCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+}
+
 async function hasVerifiedEmail(access) {
   if (!access?.customerId || !access?.email) return false;
   try {
@@ -269,6 +273,13 @@ export default async function handler(req, res) {
             code: 'share_forbidden',
           });
         }
+        const requestedCode = normalizedShareCode(body.code);
+        const documentCode = normalizedShareCode(body.doc.shareCode);
+        if (!requestedCode || documentCode !== requestedCode) {
+          throw Object.assign(new Error('Este código não pertence ao projeto enviado.'), {
+            code: 'share_project_mismatch',
+          });
+        }
         return {
           ...existing,
           doc: body.doc,
@@ -301,7 +312,9 @@ export default async function handler(req, res) {
     }
     const saved = await putSharedProject({
       code,
-      doc: body.doc,
+      // A própria revisão guardada leva o vínculo. Assim qualquer cliente que
+      // entrar pelo código também recebe a defesa contra publicar outro projeto.
+      doc: { ...body.doc, shareCode: code },
       name: typeof body.name === 'string' && body.name.trim()
         ? body.name.trim().slice(0, 120)
         : 'Projeto partilhado',
@@ -320,6 +333,7 @@ export default async function handler(req, res) {
   } catch (e) {
     const msg = e?.message || 'Falha na partilha.';
     const status = e?.code === 'share_forbidden' ? 403
+      : e?.code === 'share_project_mismatch' ? 409
       : e?.code === 'share_busy' ? 409
         : e?.code === 'share_too_large' ? 413
           : e?.code === 'share_storage_unconfigured' ? 503 : 500;

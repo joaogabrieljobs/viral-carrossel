@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import PasswordField from './PasswordField.jsx';
 import { requestPasswordReset } from '../lib/password-recovery.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import { loginWithPassword, registerWithPassword } from '../lib/billing.js';
 import { dismissOnboardingLanding } from '../utils/landing-gate.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 /**
  * Login / criar conta — e-mail+senha + Google opcional.
@@ -25,6 +26,12 @@ export default function LoginModal({
   const [checkoutReady, setCheckoutReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hint || '');
+  const emailRef = useRef(null);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
+    open,
+    onClose,
+    initialFocusRef: emailRef,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -83,16 +90,20 @@ export default function LoginModal({
 
   return (
     <div
+      ref={overlayRef}
       className="modal-overlay"
       onClick={onClose}
       role="presentation"
       style={{ zIndex: 12000 }}
     >
       <div
+        ref={dialogRef}
         className="modal-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="login-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
         onClick={(event) => event.stopPropagation()}
         style={{
           maxWidth: 420,
@@ -185,6 +196,7 @@ export default function LoginModal({
             <label style={{ display: 'grid', gap: 6 }}>
               <span className="vc-label">E-mail</span>
               <input
+                ref={emailRef}
                 type="email"
                 required
                 disabled={loading}

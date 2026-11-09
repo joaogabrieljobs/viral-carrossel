@@ -43,7 +43,7 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
-import { videoPut, videoGet, videoDelete, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile } from './src/utils/video-store.js';
+import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile } from './src/utils/video-store.js';
 import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
@@ -58,6 +58,7 @@ import {
   idsDeImagemEmUso,
   dataUrlParaBlob,
 } from './src/utils/image-store.js';
+import { projectCacheFingerprint, projectContentSnapshot } from './src/utils/project-content-snapshot.js';
 import {
   MAX_SLIDE_IMAGE_REFERENCES,
   normalizeSlideImageReferences,
@@ -523,68 +524,6 @@ import CloudPhotoProgress from './src/components/CloudPhotoProgress.jsx';
 // A rota por projeto só é ativada depois do banco, importação e API estarem
 // prontos no mesmo deploy. O fluxo anterior permanece intacto sem a flag.
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
-
-/** IDs locais de cache podem mudar enquanto o mesmo asset da conta é baixado. */
-function projectContentSnapshot(library) {
-  return semImagensDeRuntime(library).map((entry) => {
-    if (!entry?.doc) return entry;
-    const doc = entry.doc;
-    const slides = (doc.slides || []).map((slide) => {
-      if (!slide) return slide;
-      const next = { ...slide };
-      for (const [assetKey, idKey, imageKey, failedKey, errorKey] of [
-        ['bgImageAssetId', 'bgImageId', 'bgImage', 'bgImageFailed', 'bgImageError'],
-        ['logoImageAssetId', 'logoImageId', 'logoImage', 'logoImageFailed', 'logoImageError'],
-        ['refImageAssetId', 'refImageId', 'refImage', 'refImageFailed', 'refImageError'],
-      ]) {
-        if (!next[assetKey]) continue;
-        delete next[idKey];
-        delete next[failedKey];
-        delete next[errorKey];
-        if (typeof next[imageKey] === 'string' && /^(blob:|data:image\/)/.test(next[imageKey])) {
-          delete next[imageKey];
-        }
-      }
-      if (Array.isArray(next.imageReferences)) {
-        next.imageReferences = next.imageReferences.map((ref) => {
-          if (!ref?.assetId) return ref;
-          const clean = { ...ref };
-          delete clean.imageId;
-          delete clean.dataUrl;
-          return clean;
-        });
-      }
-      return next;
-    });
-    const brand = doc.brand ? { ...doc.brand } : doc.brand;
-    if (brand?.logoAssetId) {
-      delete brand.logoImageId;
-      if (typeof brand.logo === 'string' && /^(blob:|data:image\/)/.test(brand.logo)) delete brand.logo;
-    }
-    const styleKit = doc.styleKit ? { ...doc.styleKit } : doc.styleKit;
-    if (styleKit?.logo?.assetId) {
-      styleKit.logo = { ...styleKit.logo };
-      delete styleKit.logo.imageId;
-      delete styleKit.logo.dataUrl;
-    }
-    if (Array.isArray(styleKit?.refImages)) {
-      styleKit.refImages = styleKit.refImages.map((ref) => {
-        if (!ref?.assetId) return ref;
-        const clean = { ...ref };
-        delete clean.imageId;
-        delete clean.dataUrl;
-        return clean;
-      });
-    }
-    return { ...entry, doc: { ...doc, slides, brand, styleKit } };
-  });
-}
-
-function projectCacheFingerprint(entry) {
-  if (!entry) return '';
-  const { updatedAt: _updatedAt, ...stable } = projectContentSnapshot([entry])[0] || {};
-  return JSON.stringify(stable);
-}
 
 function accountBrandsContentSnapshot(brands) {
   return semLogosDeRuntimeDasMarcas(brands).map((brand) => {
@@ -2474,10 +2413,15 @@ export default function App() {
     if (!activeDocId || !accountLibraryReady) return;
     const t = setTimeout(() => {
       if (areAccountDataWritesLocked()) return;
-      setLibrary(prev => prev.map(e => e.id === activeDocId
-        ? { ...e, doc, updatedAt: Date.now() }
-        : e
-      ));
+      setLibrary(prev => prev.map((entry) => {
+        if (entry.id !== activeDocId) return entry;
+        // Abrir/hidratar um projeto pode criar um novo objeto React sem mudar
+        // o conteúdo persistente. Não transforme navegação em edição.
+        if (projectCacheFingerprint(entry) === projectCacheFingerprint({ ...entry, doc })) {
+          return entry;
+        }
+        return { ...entry, doc, updatedAt: Date.now() };
+      }));
     }, 400);
     docAutosaveTimerRef.current = t;
     return () => clearTimeout(t);
@@ -3163,9 +3107,13 @@ export default function App() {
 
   // ── VÍDEOS — IndexedDB store + Map reativo de id → blob URL ──────────────────
   // videoId no slide referencia o blob no IndexedDB. Aqui criamos object URLs sob
-  // demanda e revogamos no unmount. Cleanup de orphans roda quando slides mudam.
+  // demanda e revogamos no unmount. Órfãos de sessões anteriores são limpos uma
+  // vez, somente depois de a biblioteca terminar de restaurar.
   const [videoUrls, setVideoUrls] = useState({}); // { [videoId]: blobUrl }
   const videoUrlsRef = useRef({});
+  // IDs desvinculados nesta sessão continuam protegidos para Desfazer. Depois
+  // de recarregar, o histórico já não existe e o GC pode remover o órfão.
+  const videoSessionProtectedIdsRef = useRef(new Set());
   videoUrlsRef.current = videoUrls;
   // Wrapper que mantém o cache de object URLs (video-store) SINCRONIZADO com setVideoUrls.
   // Sem isso, o renderer (que lê o map module-level via getVideoUrl) ficava
@@ -3206,9 +3154,51 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [library, setVideoUrlsSync]);
-  // A biblioteca ainda está vazia durante o restore e o cofre durável pode
-  // referenciar vídeos ausentes da lista ativa. Sem índice de refs do cofre,
-  // um GC automático destruiria a única cópia local desses arquivos.
+  // Limpa apenas depois de a biblioteca da conta estar restaurada. Além de
+  // todos os projetos, protege o documento ativo e qualquer vídeo removido ou
+  // substituído nesta sessão (ainda alcançável por Desfazer).
+  useEffect(() => {
+    if (!accountLibraryReady) return undefined;
+    // A partir daqui o restore terminou: tudo o que estava referenciado neste
+    // instante pertence ao histórico inicial da sessão e precisa sobreviver a
+    // exclusões/gerações que ainda possam ser desfeitas. O GC abaixo remove
+    // somente órfãos que já chegaram órfãos a este boot.
+    for (const entry of libraryPersistRef.current || []) {
+      for (const item of entry?.doc?.slides || []) {
+        if (item?.videoId) videoSessionProtectedIdsRef.current.add(item.videoId);
+      }
+    }
+    for (const item of editorSyncStateRef.current.doc?.slides || []) {
+      if (item?.videoId) videoSessionProtectedIdsRef.current.add(item.videoId);
+    }
+    const run = async () => {
+      try {
+        const keep = new Set(videoSessionProtectedIdsRef.current);
+        for (const entry of libraryPersistRef.current || []) {
+          for (const item of entry?.doc?.slides || []) if (item?.videoId) keep.add(item.videoId);
+        }
+        for (const item of editorSyncStateRef.current.doc?.slides || []) if (item?.videoId) keep.add(item.videoId);
+        const removableUrls = Object.keys(videoUrlsRef.current).filter((id) => !keep.has(id));
+        const removed = await videoCleanupOrphans([...keep]);
+        if (removed > 0 && removableUrls.length) {
+          setVideoUrlsSync((previous) => {
+            const next = { ...previous };
+            for (const id of removableUrls) {
+              const url = next[id];
+              if (url) {
+                try { URL.revokeObjectURL(url); } catch { /* */ }
+              }
+              delete next[id];
+            }
+            return next;
+          });
+        }
+        if (removed > 0) console.log(`[video] limpeza: ${removed} vídeo(s) órfão(s) removido(s)`);
+      } catch { /* IndexedDB indisponível */ }
+    };
+    const initial = setTimeout(run, 8_000);
+    return () => { clearTimeout(initial); };
+  }, [accountLibraryReady, setVideoUrlsSync]);
   // Revogar todas as object URLs quando o componente desmonta (raro mas correto)
   useEffect(() => () => {
     Object.values(videoUrlsRef.current).forEach(url => {
@@ -4029,8 +4019,12 @@ export default function App() {
     const targetSlideId = targetSlide.id;
     const expectedImageIdentity = slideImageIdentity(targetSlide);
     const expectedVideoId = targetSlide.videoId || null;
+    if (expectedVideoId) videoSessionProtectedIdsRef.current.add(expectedVideoId);
     try {
       const id = newVideoId();
+      // Um arquivo criado nesta sessão pode deixar de aparecer no documento por
+      // uma exclusão ainda reversível. Só o próximo boot pode considerá-lo órfão.
+      videoSessionProtectedIdsRef.current.add(id);
       await videoPut(id, file, { mime: videoValidation.mime, name: file.name });
       const liveTarget = activeProjectRef.current === targetProjectId
         ? slidesLiveRef.current?.find((slide) => slide.id === targetSlideId)
@@ -4091,25 +4085,11 @@ export default function App() {
         return;
       }
 
-      const appliedTarget = activeProjectRef.current === targetProjectId
-        ? slidesLiveRef.current?.find((slide) => slide.id === targetSlideId)
-        : null;
-      const oldId = expectedVideoId;
-      // Se o utilizador já saiu do projeto (ou substituiu novamente o vídeo),
-      // mantenha o blob anterior por segurança. A limpeza de órfãos da próxima
-      // sessão o remove sem risco de quebrar um projeto persistido.
-      if (oldId && appliedTarget?.videoId === id) {
-        videoDelete(oldId).catch(() => {});
-        const oldUrl = videoUrlsRef.current[oldId];
-        setVideoUrlsSync((prev) => {
-          const next = { ...prev };
-          delete next[oldId];
-          return next;
-        });
-        if (oldUrl) {
-          try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
-        }
-      }
+      // Um vídeo pode ser partilhado por cards duplicados e o snapshot anterior
+      // continua no histórico de Desfazer. Não apague nem revogue `oldId` aqui:
+      // desvincular o card é reversível, enquanto remover o Blob não é. A limpeza
+      // explícita de órfãos só pode acontecer depois de considerar todos os
+      // projetos e snapshots protegidos.
       const usage = await videoStorageUsage().catch(() => null);
       const usageNote = usage ? ` · uso total ${usage.totalMB.toFixed(1)} MB / ${usage.count} vídeos` : '';
       toast(`Vídeo importado (${(file.size / 1024 / 1024).toFixed(1)} MB)${usageNote}`, 'success', 4000);
@@ -4120,27 +4100,15 @@ export default function App() {
     }
   }, [activeIdx, setSlides, toast]);
 
-  // Remover vídeo do slide ativo (apaga do IndexedDB também)
-  const removeVideoFromActiveSlide = useCallback(async () => {
+  // Remover vídeo do slide ativo desvincula apenas o card. O Blob pode pertencer
+  // a outro card duplicado e também precisa sobreviver ao Desfazer.
+  const removeVideoFromActiveSlide = useCallback(() => {
     const slide = slides[activeIdx];
     const oldId = slide?.videoId;
     if (!oldId) return;
-    try {
-      await videoDelete(oldId);
-      const oldUrl = videoUrlsRef.current[oldId];
-      if (oldUrl) {
-        try { URL.revokeObjectURL(oldUrl); } catch { /* */ }
-        setVideoUrlsSync(prev => {
-          const next = { ...prev };
-          delete next[oldId];
-          return next;
-        });
-      }
-      updateSlide({ videoId: null, videoMime: null, videoName: null });
-      toast('Vídeo removido do card.', 'info');
-    } catch (e) {
-      console.error('[video] erro ao remover:', e);
-    }
+    videoSessionProtectedIdsRef.current.add(oldId);
+    updateSlide({ videoId: null, videoMime: null, videoName: null });
+    toast('Vídeo removido do card. Use Desfazer para recuperar.', 'info');
   }, [activeIdx, slides, updateSlide, toast]);
 
   const handleImportTextApply = useCallback((parsed) => {
@@ -6617,13 +6585,18 @@ Retorne APENAS JSON: ${refineAllWantsBody
     const isEditable = (el) => {
       if (!el) return false;
       const tag = (el.tagName || '').toLowerCase();
-      return tag === 'input' || tag === 'textarea' || el.isContentEditable;
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
     };
     const onKey = (e) => {
       // Permite undo/redo mesmo com modais abertos? Não — bloqueamos se houver modal.
       // Qualquer overlay bloqueia os atalhos. Landing/paywall/login e a intro de
       // modos faltavam: com eles abertos, setas/Delete/F agiam no documento por baixo.
-      const anyModalOpen = resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
+      // Alguns diálogos vivem dentro dos painéis e não têm estado neste
+      // componente (ex.: Importar texto). A semântica do próprio DOM também
+      // deve bloquear atalhos que editariam o documento por trás do modal.
+      const modalInDom = typeof document !== 'undefined'
+        && !!document.querySelector('[role="dialog"][aria-modal="true"]');
+      const anyModalOpen = modalInDom || resultsOpen || setupOpen || researchOpen || seriesOpen || keysOpen || templatesOpen || hookVarsOpen || helpOpen || imgPrompt.open || fullscreenOpen || tourOpen || libraryOpen || brandsOpen || imageCropOpen || photoPositionOpen || modesIntroOpen || landingOpen || paywallOpen || loginOpen;
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key;
       if (creationSession) {

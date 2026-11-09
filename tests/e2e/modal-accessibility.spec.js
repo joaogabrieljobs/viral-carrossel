@@ -35,6 +35,88 @@ test('Configurar IA prende e devolve o foco, fecha com Escape e isola o editor',
   await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') == null)).toBe(true);
 });
 
+test('Templates e Pesquisa prendem o foco, fecham com Escape e devolvem ao gatilho', async ({ page }) => {
+  await mockEditorApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+
+  const cases = [
+    {
+      trigger: page.getByRole('button', { name: /Abrir templates/i }).first(),
+      dialogName: 'Templates prontos',
+    },
+    {
+      trigger: page.getByRole('button', { name: /Pesquisar nicho/i }).first(),
+      dialogName: 'Pesquisa de nicho',
+    },
+  ];
+
+  for (const item of cases) {
+    const triggerHandle = await item.trigger.elementHandle();
+    await triggerHandle.click({ force: true });
+    const dialog = page.getByRole('dialog', { name: item.dialogName, exact: true });
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[role="dialog"]') != null)).toBe(true);
+    await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+
+    const close = dialog.getByRole('button', { name: 'Fechar', exact: true });
+    const focusable = dialog.locator('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])');
+    await focusable.last().focus();
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => triggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
+    await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') == null)).toBe(true);
+  }
+});
+
+test('Importar texto prende o foco e devolve ao botão que abriu o diálogo', async ({ page }) => {
+  await mockEditorApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await selectEditorMode(page, 'diretor');
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
+  await openPanel(page, 'Adicionar conteúdo');
+
+  const trigger = page.getByRole('button', { name: /Importar texto \(1 página = 1 card\)/i });
+  const triggerHandle = await trigger.elementHandle();
+  await triggerHandle.click();
+
+  const dialog = page.getByRole('dialog', { name: '1 página → 1 card', exact: true });
+  await expect(dialog.getByLabel('Texto a importar', { exact: true })).toBeFocused();
+  await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => triggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
+  await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') == null)).toBe(true);
+});
+
+test('Editar perfil prende o foco e Escape fecha primeiro o diálogo e depois o perfil', async ({ page }) => {
+  await mockEditorApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await page.getByRole('button', { name: 'Perfil', exact: true }).click();
+
+  const trigger = page.getByRole('button', { name: 'Editar perfil', exact: true }).last();
+  const triggerHandle = await trigger.elementHandle();
+  await triggerHandle.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Editar perfil', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[role="dialog"]') != null)).toBe(true);
+  await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => triggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Perfil pessoal', exact: true })).toHaveCount(0);
+  await expect(page.locator('#vc-cards-viewport')).toBeVisible();
+});
+
 test('confirmação de substituir cards desativa inclusive os inputs de foto atrás', async ({ page }) => {
   await mockEditorApi(page, { session: SESSAO_ATIVA });
   await page.addInitScript(() => {

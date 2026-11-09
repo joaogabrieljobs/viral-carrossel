@@ -1,9 +1,10 @@
 import { isGenerationCancelled } from '../../utils/generation-control.js';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'lucide-react';
 import { buildResearchUserPrompt, normalizeResearchResult, researchIdeaMaterial } from '../../utils/research-prompts.js';
 import { callAI, callAIwithSearch } from '../../utils/ai-client.js';
+import { useModalDialog } from '../../hooks/useModalDialog.js';
 
 const PRESET_NICHES = [
   'Marketing digital','Empreendedorismo','Finanças pessoais','Saúde mental',
@@ -28,6 +29,12 @@ function ResearchPanel({
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [degraded, setDegraded] = useState(false);
+  const nicheInputRef = useRef(null);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
+    open,
+    onClose,
+    initialFocusRef: nicheInputRef,
+  });
   const isPresentation = productKind === 'apresentacao' || creativePreset === 'apresentacao';
 
   useEffect(() => {
@@ -75,8 +82,17 @@ function ResearchPanel({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel modal-panel-wide" onClick={e=>e.stopPropagation()}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel modal-panel-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="research-modal-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={e=>e.stopPropagation()}
+      >
         {/* Header */}
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -92,7 +108,7 @@ function ResearchPanel({
               <TrendingUp size={14} color="#fff"/>
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>
+              <div id="research-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>
                 {isPresentation ? 'Pesquisa para apresentação' : 'Pesquisa de nicho'}
               </div>
               <div className="vc-eyebrow">
@@ -109,6 +125,7 @@ function ResearchPanel({
           {/* Search bar */}
           <div style={{ display:'flex', gap:8 }}>
             <input
+              ref={nicheInputRef}
               value={niche} onChange={e=>setNiche(e.target.value)}
               placeholder={isPresentation
                 ? 'Tema, setor ou decisão (ex: expansão B2B, treinamento, relatório…)'

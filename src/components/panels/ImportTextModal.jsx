@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { FileText, Loader2, X } from 'lucide-react';
 import {
   IMPORT_TEXT_TEMPLATE,
   parseImportedText,
 } from '../../utils/import-text.js';
+import { useModalDialog } from '../../hooks/useModalDialog.js';
 
 /**
  * Modal: colar ou carregar texto estruturado (1 página = 1 card).
@@ -17,6 +18,13 @@ export function ImportTextModal({
 }) {
   const [raw, setRaw] = useState(IMPORT_TEXT_TEMPLATE);
   const preview = useMemo(() => parseImportedText(raw), [raw]);
+  const textareaRef = useRef(null);
+  const closeDialog = () => { if (!busy) onClose?.(); };
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
+    open,
+    onClose: closeDialog,
+    initialFocusRef: textareaRef,
+  });
 
   if (!open) return null;
 
@@ -33,9 +41,8 @@ export function ImportTextModal({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Importar texto"
+      ref={overlayRef}
+      role="presentation"
       style={{
         position: 'fixed', inset: 0, zIndex: 80,
         background: 'rgba(0,0,0,0.55)',
@@ -44,7 +51,7 @@ export function ImportTextModal({
       }}
       onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose?.(); }}
     >
-      <div style={{
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="import-text-title" tabIndex={-1} onKeyDown={onDialogKeyDown} style={{
         width: 'min(720px, 100%)', maxHeight: '90vh', overflow: 'auto',
         background: 'var(--bg-base)', borderRadius: 16,
         border: '1px solid var(--border)', padding: 18,
@@ -58,7 +65,7 @@ export function ImportTextModal({
             }}>
               Importar texto
             </div>
-            <h2 style={{
+            <h2 id="import-text-title" style={{
               margin: '4px 0 0', fontSize: 18, fontWeight: 600,
               fontFamily: 'var(--font-display)', letterSpacing: '-0.022em',
             }}>
@@ -108,6 +115,7 @@ export function ImportTextModal({
         </div>
 
         <textarea
+          ref={textareaRef}
           className="vc-input vc-textarea"
           aria-label="Texto a importar"
           rows={14}

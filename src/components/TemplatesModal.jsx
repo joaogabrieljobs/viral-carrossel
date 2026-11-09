@@ -16,6 +16,7 @@ import { Layout, X } from 'lucide-react';
 import { PALETTES, TEMPLATES } from '../utils/design-data.js';
 import { FONT_PAIRINGS } from '../utils/slide-design-system.js';
 import { resolvePresetText } from '../utils/preset-tokens.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 const FAMILIAS = [
   { id: 'todos', label: 'Todos' },
@@ -112,7 +113,15 @@ function PreviewTemplate({ tpl }) {
 export default function TemplatesModal({ open, onClose, onApply }) {
   const [familia, setFamilia] = React.useState('todos');
   const [pendingTemplate, setPendingTemplate] = React.useState(null);
+  const pendingPanelRef = React.useRef(null);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
   React.useEffect(() => { if (!open) setPendingTemplate(null); }, [open]);
+  React.useEffect(() => {
+    if (!pendingTemplate) return;
+    window.requestAnimationFrame(() => {
+      pendingPanelRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    });
+  }, [pendingTemplate]);
   if (!open) return null;
   const lista = familia === 'todos' ? TEMPLATES : TEMPLATES.filter((t) => t.categoria === familia);
   const pendingCredits = templateImageCreditCount(pendingTemplate);
@@ -123,8 +132,17 @@ export default function TemplatesModal({ open, onClose, onApply }) {
     onClose();
   };
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel modal-panel-wide" onClick={(e) => e.stopPropagation()}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel modal-panel-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templates-modal-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 20px', borderBottom: '1px solid var(--border)',
@@ -139,7 +157,7 @@ export default function TemplatesModal({ open, onClose, onApply }) {
               <Layout size={14} color="#fff"/>
             </div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.022em' }}>
+              <div id="templates-modal-title" style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.022em' }}>
                 Templates prontos
               </div>
               <div className="vc-eyebrow">{TEMPLATES.length} arcos · texto, paleta e assinatura em 1 clique</div>
@@ -176,7 +194,7 @@ export default function TemplatesModal({ open, onClose, onApply }) {
           })}
         </div>
 
-        {pendingTemplate && <div role="group" aria-label={`Como aplicar ${pendingTemplate.name}`} style={{
+        {pendingTemplate && <div ref={pendingPanelRef} role="group" aria-label={`Como aplicar ${pendingTemplate.name}`} style={{
           margin:'14px 20px 0', padding:14, border:'1px solid var(--accent)', borderRadius:10,
           background:'var(--accent-surface)', display:'grid', gap:10,
         }}>

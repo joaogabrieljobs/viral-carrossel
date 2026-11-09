@@ -4,6 +4,7 @@ import { createImageQuotaPostgres } from '../../api/lib/image-quota-postgres.js'
 function fakeDatabase() {
   const periods = new Map();
   const operations = new Map();
+  let clock = Date.parse('2026-10-13T12:00:00.000Z');
   let mutex = Promise.resolve();
   const copy = (item) => structuredClone(item);
   const periodKey = (owner, start) => `${owner}\0${start}`;
@@ -32,15 +33,34 @@ function fakeDatabase() {
           const row = currentOperations.get(opKey(owner, start, id));
           return row ? [copy(row)] : [];
         }
+        if (operation === 'moont_image_quota_activity') {
+          return [...currentOperations.values()]
+            .filter((row) => row.owner_id === owner && row.period_start_sec === start)
+            .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
+            .slice(0, Number(id))
+            .map(copy);
+        }
         if (operation === 'moont_image_quota_insert_operation') {
           const keyForOperation = opKey(owner, start, id);
           if (currentOperations.has(keyForOperation)) throw new Error('unique violation');
-          currentOperations.set(keyForOperation, { status: 'reserved' });
+          const now = new Date(clock += 1_000).toISOString();
+          currentOperations.set(keyForOperation, {
+            owner_id: owner,
+            period_start_sec: start,
+            operation_id: id,
+            status: 'reserved',
+            created_at: now,
+            updated_at: now,
+          });
           return [];
         }
         if (operation === 'moont_image_quota_update_operation') {
           const current = currentOperations.get(opKey(owner, start, id));
-          currentOperations.set(opKey(owner, start, id), { ...current, status: params[3] });
+          currentOperations.set(opKey(owner, start, id), {
+            ...current,
+            status: params[3],
+            updated_at: new Date(clock += 1_000).toISOString(),
+          });
           return [];
         }
         if (operation === 'moont_image_quota_change_used') {
@@ -135,6 +155,26 @@ describe('quota transacional de imagens', () => {
       .toMatchObject({ allowed: false, replayed: true, reason: 'already_refunded', used: 8 });
     expect((await adapter.getQuotaUsage(args)).used).toBe(8);
     expect(db.snapshot().periods[0][1].legacy_used).toBe(7);
+  });
+
+  it('lista a atividade do ciclo com origem, estado e ordem mais recente', async () => {
+    const db = fakeDatabase();
+    const adapter = quota(db);
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-ready' });
+    await adapter.settleImageCredit({ ...args, operationId: 'editor-ready' });
+    await adapter.consumeImageCredit({ ...args, operationId: 'mcp_generate-7' });
+    await adapter.consumeImageCredit({ ...args, operationId: 'editor-failed' });
+    await adapter.refundImageCredit({ ...args, operationId: 'editor-failed' });
+
+    expect(await adapter.getImageQuotaActivity({
+      customerId: args.customerId,
+      periodStartSec: args.periodStartSec,
+      limit: 10,
+    })).toEqual([
+      expect.objectContaining({ source: 'editor', status: 'refunded', createdAt: expect.any(String), updatedAt: expect.any(String) }),
+      expect.objectContaining({ source: 'mcp', status: 'reserved', createdAt: expect.any(String), updatedAt: expect.any(String) }),
+      expect.objectContaining({ source: 'editor', status: 'consumed', createdAt: expect.any(String), updatedAt: expect.any(String) }),
+    ]);
   });
 
   it('trata reembolso de commit ambíguo sem reserva como no-op', async () => {

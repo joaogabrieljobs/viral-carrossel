@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link2, Loader2, RefreshCw, Users } from 'lucide-react';
 import {
   buildTeamShareInviteUrl,
   createProjectShare,
   joinProjectShare,
+  normalizeShareCode,
   pullProjectShare,
   pushProjectShare,
 } from '../../utils/project-share.js';
@@ -14,6 +15,7 @@ import {
  */
 export function TeamSharePanel({
   doc,
+  projectId = '',
   projectName = 'Projeto',
   shareCode = '',
   shareRevision = 0,
@@ -25,27 +27,54 @@ export function TeamSharePanel({
 }) {
   const [busy, setBusy] = useState(false);
   const [joinCode, setJoinCode] = useState('');
-  const [localCode, setLocalCode] = useState(shareCode || '');
+  const projectKey = String(projectId || '');
+  const mountedProjectRef = useRef(projectKey);
+  mountedProjectRef.current = projectKey;
+  const [localShare, setLocalShare] = useState(() => ({
+    projectId: projectKey,
+    code: normalizeShareCode(shareCode),
+  }));
 
-  const linked = Boolean(localCode || shareCode);
-  const activeCode = localCode || shareCode;
+  // O painel permanece montado ao trocar de projeto. Escopar o código pelo ID
+  // impede até o primeiro render transitório de reutilizar a partilha anterior.
+  const localCode = localShare.projectId === projectKey ? localShare.code : '';
+  const activeCode = normalizeShareCode(shareCode) || localCode;
+  const docShareCode = normalizeShareCode(doc?.shareCode);
+  const linked = Boolean(activeCode);
+  const canPushCurrentDoc = Boolean(activeCode && docShareCode === activeCode);
   const inviteUrl = buildTeamShareInviteUrl(activeCode);
+
+  useEffect(() => {
+    setLocalShare({ projectId: projectKey, code: normalizeShareCode(shareCode) });
+    setJoinCode('');
+    setBusy(false);
+  }, [projectKey, shareCode]);
+
+  useEffect(() => () => {
+    // Respostas atrasadas do projeto anterior não podem vincular o projeto que
+    // passou a ocupar o editor enquanto a rede estava em andamento.
+    mountedProjectRef.current = null;
+  }, []);
 
   const run = async (fn, okMsg) => {
     if (busy) return;
+    const runProjectKey = projectKey;
     setBusy(true);
     try {
       const result = await fn();
+      if (mountedProjectRef.current !== runProjectKey) return result;
       const msg = typeof okMsg === 'function' ? okMsg(result) : okMsg;
       const text = msg && typeof msg === 'object' ? msg.text : msg;
       const tone = msg && typeof msg === 'object' ? (msg.tone || 'success') : 'success';
       if (text) toast?.(text, tone, 4500);
       return result;
     } catch (e) {
-      toast?.(e?.message || 'Não foi possível sincronizar com a equipe.', 'error', 6000);
+      if (mountedProjectRef.current === runProjectKey) {
+        toast?.(e?.message || 'Não foi possível sincronizar com a equipe.', 'error', 6000);
+      }
       return null;
     } finally {
-      setBusy(false);
+      if (mountedProjectRef.current === runProjectKey) setBusy(false);
     }
   };
 
@@ -112,15 +141,17 @@ export function TeamSharePanel({
             <button
               type="button"
               className="vc-btn"
-              disabled={busy}
+              disabled={busy || !canPushCurrentDoc}
+              title={canPushCurrentDoc ? undefined : 'Este código não pertence ao projeto aberto.'}
               onClick={() => run(async () => {
                 const res = await pushProjectShare({ code: activeCode, doc, name: projectName });
+                if (mountedProjectRef.current !== projectKey) return res;
                 onShareLinked({
                   code: res.code,
                   revision: res.revision,
                   updatedAt: res.updatedAt,
                 });
-                setLocalCode(res.code);
+                setLocalShare({ projectId: projectKey, code: normalizeShareCode(res.code) });
                 return res;
               }, (res) => {
                 if (res?.imagesOmitted) {
@@ -145,7 +176,9 @@ export function TeamSharePanel({
               disabled={busy}
               onClick={() => run(async () => {
                 const res = await pullProjectShare(activeCode);
+                if (mountedProjectRef.current !== projectKey) return res;
                 const pulled = await onDocPulled(res);
+                if (mountedProjectRef.current !== projectKey) return res;
                 onShareLinked({
                   code: res.code,
                   revision: res.revision,
@@ -188,7 +221,8 @@ export function TeamSharePanel({
             disabled={busy || !doc}
             onClick={() => run(async () => {
               const res = await createProjectShare({ doc, name: projectName });
-              setLocalCode(res.code);
+              if (mountedProjectRef.current !== projectKey) return res;
+              setLocalShare({ projectId: projectKey, code: normalizeShareCode(res.code) });
               onShareLinked({
                 code: res.code,
                 revision: res.revision,
@@ -236,7 +270,8 @@ export function TeamSharePanel({
           disabled={busy || joinCode.length < 6}
           onClick={() => run(async () => {
             const res = await joinProjectShare(joinCode);
-            setLocalCode(res.code);
+            if (mountedProjectRef.current !== projectKey) return res;
+            setLocalShare({ projectId: projectKey, code: normalizeShareCode(res.code) });
             await applyJoined(res);
             setJoinCode('');
             return res;

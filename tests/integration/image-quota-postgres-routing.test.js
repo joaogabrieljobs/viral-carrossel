@@ -3,6 +3,7 @@ import { stripeMock, resetStripeMock, subAtiva } from '../helpers/stripe-mock.js
 
 const quota = vi.hoisted(() => ({
   getQuotaUsagePostgres: vi.fn(),
+  getImageQuotaActivityPostgres: vi.fn(),
   consumeImageCreditPostgres: vi.fn(),
   settleImageCreditPostgres: vi.fn(),
   refundImageCreditPostgres: vi.fn(),
@@ -52,6 +53,7 @@ beforeEach(() => {
   }] });
   quota.consumeImageCreditPostgres.mockResolvedValue({ allowed: true, used: 1, limit: 50, remaining: 49 });
   quota.getQuotaUsagePostgres.mockResolvedValue({ used: 0, limit: 50, remaining: 50, allowed: true });
+  quota.getImageQuotaActivityPostgres.mockResolvedValue([]);
   quota.settleImageCreditPostgres.mockResolvedValue({ used: 1, status: 'consumed' });
   quota.refundImageCreditPostgres.mockResolvedValue({ used: 0, refunded: true });
   sjinn.createGptImage2Task.mockResolvedValue('task-1');

@@ -23,6 +23,12 @@ const SQL = {
   operation: `/* moont_image_quota_operation */
     SELECT status FROM moont.image_quota_operations
     WHERE owner_id = $1 AND period_start_sec = $2 AND operation_id = $3`,
+  activity: `/* moont_image_quota_activity */
+    SELECT operation_id, status, created_at, updated_at
+    FROM moont.image_quota_operations
+    WHERE owner_id = $1 AND period_start_sec = $2
+    ORDER BY created_at DESC
+    LIMIT $3`,
   insertOperation: `/* moont_image_quota_insert_operation */
     INSERT INTO moont.image_quota_operations
       (owner_id, period_start_sec, operation_id, status)
@@ -96,6 +102,11 @@ function usage(used, cap) {
   };
 }
 
+function activityTimestamp(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 async function run(sql, key, params) {
   return sql.unsafe(SQL[key], params);
 }
@@ -158,6 +169,23 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
       const sql = await connection();
       const row = await ensurePeriod(sql, owner, start, end);
       return usage(count(row.used), cap);
+    });
+  }
+
+  async function getImageQuotaActivity({ customerId, periodStartSec, limit = 50 }) {
+    const owner = ownerId(customerId);
+    const start = period(periodStartSec);
+    const requested = Number(limit);
+    const rowLimit = Number.isSafeInteger(requested) ? Math.min(100, Math.max(1, requested)) : 50;
+    return guardStorage(async () => {
+      const sql = await connection();
+      const rows = await run(sql, 'activity', [owner, start, rowLimit]);
+      return rows.map((row) => ({
+        source: String(row.operation_id || '').startsWith('mcp_') ? 'mcp' : 'editor',
+        status: ['reserved', 'consumed', 'refunded'].includes(row.status) ? row.status : 'reserved',
+        createdAt: activityTimestamp(row.created_at),
+        updatedAt: activityTimestamp(row.updated_at),
+      }));
     });
   }
 
@@ -230,11 +258,12 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
-  return { getQuotaUsage, consumeImageCredit, settleImageCredit, refundImageCredit };
+  return { getQuotaUsage, getImageQuotaActivity, consumeImageCredit, settleImageCredit, refundImageCredit };
 }
 
 const production = createImageQuotaPostgres();
 export const getQuotaUsagePostgres = production.getQuotaUsage;
+export const getImageQuotaActivityPostgres = production.getImageQuotaActivity;
 export const consumeImageCreditPostgres = production.consumeImageCredit;
 export const settleImageCreditPostgres = production.settleImageCredit;
 export const refundImageCreditPostgres = production.refundImageCredit;

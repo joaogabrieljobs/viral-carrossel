@@ -19,6 +19,8 @@ import { migrateDoc } from '../utils/schema-migration.js';
 import { trackEvent } from '../utils/telemetry.js';
 import { downloadBlob } from '../utils/export-helpers.js';
 import { imagemComoDataUrl, guardarImagemDoSlide } from '../utils/image-store.js';
+import { projectContentSnapshot } from '../utils/project-content-snapshot.js';
+import { detachTeamShareMetadata } from '../utils/team-share-metadata.js';
 import { exportProjectReferences, migrateProjectReferences } from '../utils/style-kit-storage.js';
 import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
@@ -49,6 +51,20 @@ import { rememberDeletedProjectIds } from '../utils/project-deletions.js';
 export const INVALID_BACKUP_MESSAGE = 'Arquivo inválido ou corrompido. Verifique se é um backup exportado pela Moont.';
 export function reportInvalidBackup(toast) {
   toast?.(INVALID_BACKUP_MESSAGE, 'error', 6500);
+}
+
+/**
+ * Compara apenas o conteúdo persistente do documento. URLs `blob:` e cópias
+ * inline que já vivem no IndexedDB não representam uma edição do usuário.
+ */
+export function samePersistedDocument(left, right) {
+  if (left === right) return true;
+  const clean = (doc) => projectContentSnapshot([{ doc }])?.[0]?.doc ?? doc;
+  try {
+    return JSON.stringify(clean(left)) === JSON.stringify(clean(right));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -108,9 +124,10 @@ export function useLibrary({
   // Snapshot imediato: trocar/exportar não depende do debounce de autosave.
   const live = useRef(null);
   live.current = { id: activeDocId || library[0]?.id, doc: history.state };
-  const snapshotEntries = useCallback((entries, snapshot = live.current) => entries.map(entry =>
-    entry.id === snapshot.id ? { ...entry, doc: snapshot.doc, updatedAt: Date.now() } : entry
-  ), []);
+  const snapshotEntries = useCallback((entries, snapshot = live.current) => entries.map((entry) => {
+    if (entry.id !== snapshot.id || samePersistedDocument(entry.doc, snapshot.doc)) return entry;
+    return { ...entry, doc: snapshot.doc, updatedAt: Date.now() };
+  }), []);
   const flushCurrent = useCallback(() => {
     const snapshot = live.current;
     setLibrary(entries => snapshotEntries(entries, snapshot));
@@ -189,7 +206,7 @@ export function useLibrary({
       const currentEntries = snapshotEntries(prev, snapshot);
       const src = currentEntries.find(e => e.id === docId);
       if (!src) return prev;
-      const copy = mkLibEntry(JSON.parse(JSON.stringify(src.doc)), `${src.name} (cópia)`, { folderId: src.folderId || '' });
+      const copy = mkLibEntry(detachTeamShareMetadata(src.doc), `${src.name} (cópia)`, { folderId: src.folderId || '' });
       return [copy, ...currentEntries];
     });
   }, []);

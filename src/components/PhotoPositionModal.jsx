@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, RotateCcw, Move, FlipHorizontal2, Scan } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 import { FORMATS } from '../utils/formats.js';
 
 /**
@@ -10,6 +11,7 @@ import { FORMATS } from '../utils/formats.js';
  */
 export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange }) {
   useScrollLock(open);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
   const dragRef = React.useRef(null);
   const previewRef = React.useRef(null);
   const naturalRef = React.useRef({ width: 0, height: 0 });
@@ -57,15 +59,25 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
   const previewW = Math.min(520, typeof window !== 'undefined' ? window.innerWidth - 48 : 520);
   const previewH = Math.round(previewW / aspect);
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Posicionar foto">
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: previewW + 48 }}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="photo-position-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: previewW + 48 }}
+      >
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
           position:'sticky', top:0, background:'var(--bg-sidebar)', zIndex:1,
         }}>
           <div>
-            <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Posicionar foto</div>
+            <div id="photo-position-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Posicionar foto</div>
             <div className="vc-eyebrow">{slide.autoPhotoPending ? 'Ajustando enquadramento…' : 'Arraste a foto para mover · use o zoom abaixo'}</div>
           </div>
           <button onClick={onClose} className="vc-icon-btn" aria-label="Fechar">
@@ -161,9 +173,9 @@ export default function PhotoPositionModal({ open, slide, fmt, onClose, onChange
               onClick={() => onChange({ bgX: 50, bgY: 50, bgZoom: 100, bgMirror: false })}
               className="vc-btn vc-btn-ghost"
               style={{ height: 36, fontSize: 12, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
-              title="Resetar pra valores neutros"
+              title="Restaurar valores neutros"
             >
-              <RotateCcw size={12} aria-hidden/> Reset
+              <RotateCcw size={12} aria-hidden/> Restaurar
             </button>
             <button
               type="button"

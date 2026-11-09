@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 import { FORMATS } from '../utils/formats.js';
 import { canvasToPngBlob } from '../utils/image-storage.js';
 
@@ -66,6 +67,10 @@ export default function ImageCropModal({ open, imageSrc, fmt = 'carrossel', onCl
   const natRef = useRef({ w: 0, h: 0 });
   const dispRef = useRef({ w: 0, h: 0 });
   const lockFormatRef = useRef(true);
+  const closeDialog = useCallback(() => {
+    if (!busy) onClose?.();
+  }, [busy, onClose]);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose: closeDialog });
   lockFormatRef.current = lockFormat;
 
   const maxWp = typeof window !== 'undefined' ? Math.min(520, window.innerWidth - 48) : 520;
@@ -265,8 +270,18 @@ export default function ImageCropModal({ open, imageSrc, fmt = 'carrossel', onCl
   const cantApply = busy || !nat.w || cropN.w < 2 || cropN.h < 2;
 
   return (
-    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
-      <div className="modal-panel vc-modal-scroll" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
+    <div ref={overlayRef} className="modal-overlay" onClick={busy ? undefined : onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel vc-modal-scroll"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-crop-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={(ev) => ev.stopPropagation()}
+        style={{ maxWidth: 560 }}
+      >
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -276,7 +291,7 @@ export default function ImageCropModal({ open, imageSrc, fmt = 'carrossel', onCl
           flexShrink: 0,
           background: 'var(--bg-sidebar)',
         }}>
-          <div style={{ fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>
+          <div id="image-crop-title" style={{ fontSize: 17, fontWeight: 600, fontFamily: 'var(--font-display)', letterSpacing: '-0.022em', color: 'var(--text-primary)' }}>
             Recortar imagem do {cropFormat.subject}
           </div>
           <button type="button" onClick={() => !busy && onClose()} aria-label="Fechar" disabled={busy} className="vc-icon-btn" style={{ cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.4 : 1 }}>

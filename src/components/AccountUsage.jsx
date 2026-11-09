@@ -30,6 +30,19 @@ const formatCount = (value) => (value === null ? '—' : value.toLocaleString('p
 const formatDate = (value) => new Date(value).toLocaleDateString('pt-BR', {
   day: 'numeric', month: 'short', year: 'numeric',
 });
+const formatActivityDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Horário indisponível';
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+};
+
+const activityStatus = {
+  consumed: { label: 'Crédito utilizado', color: 'var(--text-primary)' },
+  refunded: { label: 'Crédito devolvido', color: 'var(--accent)' },
+  reserved: { label: 'Em processamento', color: 'var(--text-secondary)' },
+};
 
 function UsageMetric({ label, value, description, prominent = false, isMobile }) {
   return (
@@ -60,6 +73,7 @@ export default function AccountUsage({
   const [refreshMessage, setRefreshMessage] = useState('');
   const refreshInFlight = useRef(false);
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodStart, currentPeriodEnd });
+  const activity = Array.isArray(imageQuota?.activity) ? imageQuota.activity : [];
   // Ciclos que atravessam a correção podem ter contadores legados incompletos.
   const hasLegacyCycle = usage.limit > 0 && usage.periodStart?.slice(0, 10) <= '2026-10-14';
   const padding = isMobile ? 18 : 26;
@@ -149,6 +163,43 @@ export default function AccountUsage({
           )}
         </div>
       </section>
+
+      {usage.limit > 0 && usage.hasUsage && (
+        <section aria-labelledby="image-activity-title" style={{ ...panelStyle, padding, display: 'grid', gap: 14 }}>
+          <div>
+            <h3 id="image-activity-title" style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Últimas atividades deste ciclo</h3>
+            <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Até 50 reservas mais recentes aparecem aqui, inclusive as concluídas, devolvidas ou ainda em processamento. Imagens substituídas ou removidas continuam registradas.
+            </p>
+          </div>
+          {activity.length ? (
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+              {activity.map((item, index) => {
+                const state = activityStatus[item?.status] || activityStatus.reserved;
+                return (
+                  <li key={`${item?.createdAt || 'atividade'}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', padding: '11px 12px', borderRadius: 11, background: 'var(--bg-pearl)' }}>
+                    <span style={{ minWidth: 0 }}>
+                      <strong style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>
+                        {item?.source === 'mcp' ? 'Integração de IA' : 'Editor Moont'}
+                      </strong>
+                      <time dateTime={item?.createdAt || undefined} style={{ display: 'block', marginTop: 3, fontSize: 11, color: 'var(--text-muted)' }}>
+                        {formatActivityDate(item?.createdAt)}
+                      </time>
+                    </span>
+                    <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: state.color }}>{state.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p style={{ margin: 0, padding: '12px 14px', borderRadius: 11, background: 'var(--bg-pearl)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {usage.used > 0
+                ? 'O total inclui gerações anteriores à ativação do histórico detalhado. As próximas aparecerão individualmente aqui.'
+                : 'Nenhuma geração foi registrada neste ciclo.'}
+            </p>
+          )}
+        </section>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: isMobile ? 16 : 18 }}>
         <section style={{ ...panelStyle, padding, display: 'flex', flexDirection: 'column', gap: 16 }}>

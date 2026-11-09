@@ -1303,6 +1303,7 @@ function SidebarContent({
                 </label>
                 <textarea
                   ref={titleTaRef}
+                  aria-label="Título do card"
                   onFocus={(e) => {
                     lastTextFieldRef.current = 'title';
                     if (e.currentTarget.value.trim() === 'Seu título aqui') e.currentTarget.select();
@@ -1333,6 +1334,7 @@ function SidebarContent({
                 <label className="vc-label-sm">Subtítulo</label>
                 <textarea
                   ref={subtitleTaRef}
+                  aria-label="Subtítulo do card"
                   onFocus={() => { lastTextFieldRef.current = 'subtitle'; }}
                   onSelect={(e) => captureSelection('subtitle', e.currentTarget)}
                   onKeyUp={(e) => captureSelection('subtitle', e.currentTarget)}
@@ -3720,7 +3722,9 @@ function SidebarContent({
               hint="Acesso de edição para sua equipe. Para o cliente revisar, use Aprovação."
             >
               <TeamSharePanel
+                key={activeDocId || activeEntry?.id || 'sem-projeto'}
                 doc={historyDoc}
+                projectId={activeDocId || activeEntry?.id || ''}
                 projectName={activeEntry?.name || 'Projeto'}
                 shareCode={historyDoc?.shareCode || ''}
                 shareRevision={historyDoc?.shareRevision || 0}

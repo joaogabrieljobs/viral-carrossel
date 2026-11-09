@@ -104,4 +104,28 @@ describe('account usage page', () => {
     expect(render({ ...props, currentPeriodStart: '2026-10-01T12:00:00Z' })).toContain('anteriores à correção do contador');
     expect(render({ ...props, currentPeriodStart: '2026-11-01T12:00:00Z' })).not.toContain('anteriores à correção do contador');
   });
+
+  it('shows the current-cycle activity from the editor and integrations', () => {
+    const html = render({ imageQuota: {
+      used: 3,
+      limit: 50,
+      activity: [
+        { source: 'editor', status: 'consumed', createdAt: '2026-11-06T12:00:00.000Z' },
+        { source: 'mcp', status: 'refunded', createdAt: '2026-11-06T11:00:00.000Z' },
+        { source: 'mcp', status: 'reserved', createdAt: '2026-11-06T10:00:00.000Z' },
+      ],
+    } });
+    expect(html).toContain('Últimas atividades deste ciclo');
+    expect(html).toContain('Editor Moont');
+    expect(html).toContain('Integração de IA');
+    expect(html).toContain('Crédito utilizado');
+    expect(html).toContain('Crédito devolvido');
+    expect(html).toContain('Em processamento');
+  });
+
+  it('explains legacy totals when individual activity is still empty', () => {
+    const html = render({ imageQuota: { used: 3, limit: 50, activity: [] } });
+    expect(html).toContain('Últimas atividades deste ciclo');
+    expect(html).toContain('anteriores à ativação do histórico detalhado');
+  });
 });

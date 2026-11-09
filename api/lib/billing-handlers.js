@@ -27,7 +27,7 @@ import {
   imageQuotaForTier,
   periodBoundsFromSubscription,
 } from './plans.js';
-import { getQuotaUsage } from './image-quota.js';
+import { getImageQuotaActivity, getQuotaUsage } from './image-quota.js';
 import {
   accountIdentityBackendEnabled,
   getOrCreateAccountForStripeCustomer,
@@ -74,6 +74,7 @@ export async function handleSession(req, res) {
         used: 0,
         limit: imageQuotaForTier('max'),
         remaining: imageQuotaForTier('max'),
+        activity: [],
         tier: 'max',
       },
     });
@@ -118,6 +119,16 @@ export async function handleSession(req, res) {
           periodStartSec: bounds.periodStartSec,
           limit,
         }) : { used: 0, limit: 0, remaining: 0, allowed: false }),
+        activity: limit > 0
+          ? await getImageQuotaActivity({
+            customerId: access.customerId,
+            periodStartSec: bounds.periodStartSec,
+            limit: 50,
+          }).catch((error) => {
+            console.warn('[auth/session] quota activity', error?.message || error);
+            return [];
+          })
+          : [],
         status: 'available',
         available: true,
         tier,

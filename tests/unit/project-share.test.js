@@ -3,6 +3,7 @@ import {
   sanitizeDocForShare,
   packDocWithImagesForShare,
   hydrateSharedDocImages,
+  pushProjectShare,
   normalizeShareCode,
   buildTeamShareInviteUrl,
   stashPendingShareCode,
@@ -342,5 +343,19 @@ describe('team share invite link', () => {
     stashPendingShareCode('ZZ99YY88');
     expect(consumePendingShareCode('AB12CD34')).toBe('');
     expect(peekPendingShareCode()).toBe('ZZ99YY88');
+  });
+});
+
+describe('pushProjectShare', () => {
+  it('não envia o documento quando o código pertence a outro projeto', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(pushProjectShare({
+      code: 'AB12CD34',
+      doc: { shareCode: 'ZZ99YY88', slides: [{ title: 'Projeto pessoal' }] },
+      name: 'Outro projeto',
+    })).rejects.toMatchObject({ code: 'share_project_mismatch' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

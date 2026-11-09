@@ -10,12 +10,12 @@ export default function HelpModal({ open, onClose, onShowLanding, onStartTour })
     { keys:[Mod,'⇧','Z'],      label:'Refazer' },
     { keys:[Mod,'D'],          label:'Duplicar slide atual' },
     { keys:[Mod,'E'],          label:'Exportar slide atual (PNG)' },
-    { keys:[Mod,'S'],          label:'Exportar todos (PNG)' },
+    { keys:[Mod,'S'],          label:'Salvar projeto' },
     { keys:['←','→'],          label:'Navegar entre slides' },
     { keys:['F'],              label:'Tela cheia (apresentação)' },
     { keys:['Esc'],            label:'Sair da tela cheia' },
     { keys:['N'],              label:'Novo slide' },
-    { keys:['Del'],            label:'Apagar slide atual' },
+    { keys:['Del'],            label:'Apagar elemento selecionado' },
     { keys:['?'],              label:'Abrir esta ajuda' },
   ];
   return (

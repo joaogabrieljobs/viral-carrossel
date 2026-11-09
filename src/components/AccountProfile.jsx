@@ -13,6 +13,7 @@ import {
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS } from '../config/ai-providers.js';
 import { normalizeAccountUsage } from '../utils/account-usage.js';
 import AgentAccessPanel from './AgentAccessPanel.jsx';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 const SOCIAL_FIELDS = [
   { id: 'instagram', prefix: 'instagram.com/', placeholder: 'seuhandle' },
@@ -64,6 +65,7 @@ function Avatar({ profile, name, size = 72 }) {
 function EditProfileModal({ open, draft, onChange, onClose, onSave, email }) {
   const fileRef = useRef(null);
   const [avatarError, setAvatarError] = useState('');
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
 
   const setField = (key, value) => onChange({ ...draft, [key]: value });
   const setSocial = (key, value) => onChange({
@@ -112,12 +114,15 @@ function EditProfileModal({ open, draft, onChange, onClose, onSave, email }) {
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 12000 }}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation" style={{ zIndex: 12000 }}>
       <div
+        ref={dialogRef}
         className="modal-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-profile-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: 520,
@@ -355,11 +360,23 @@ export default function AccountProfile({
   onOpenUsage,
   onProfileSaved,
   cloudProfile,
+  onClose,
 }) {
   const [profile, setProfile] = useState(() => loadUserProfile());
   const [editing, setEditing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_USER_PROFILE);
+
+  useEffect(() => {
+    if (editing || typeof onClose !== 'function') return undefined;
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [editing, onClose]);
 
   useEffect(() => {
     setProfile(cloudProfile === undefined

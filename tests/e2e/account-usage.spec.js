@@ -18,7 +18,13 @@ async function setup(page, { unavailable = false } = {}) {
         currentPeriodEnd: '2026-11-01T12:00:00.000Z',
         imageQuota: state.failed
           ? { status: 'unavailable', available: false, used: null, remaining: null, limit: 50, tier: 'creator' }
-          : { status: 'available', available: true, used: state.used, remaining: 50 - state.used, limit: 50, tier: 'creator' },
+          : {
+            status: 'available', available: true, used: state.used, remaining: 50 - state.used, limit: 50, tier: 'creator',
+            activity: [
+              { source: 'editor', status: 'consumed', createdAt: '2026-10-13T12:00:00.000Z' },
+              { source: 'mcp', status: 'refunded', createdAt: '2026-10-13T11:00:00.000Z' },
+            ],
+          },
       } });
     },
     '/api/library-sync': (route) => {
@@ -55,6 +61,10 @@ test('Uso mostra consumo real do ciclo e atualiza saldo sem sair da conta', asyn
   await expect(progress).toHaveAttribute('aria-valuemax', '50');
   await expect(page.getByText('38', { exact: true })).toBeVisible();
   await expect(page.getByText(/nov.*2026/).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Últimas atividades deste ciclo' })).toBeVisible();
+  await expect(page.getByText('Editor Moont', { exact: true })).toBeVisible();
+  await expect(page.getByText('Integração de IA', { exact: true })).toBeVisible();
+  await expect(page.getByText('Crédito devolvido', { exact: true })).toBeVisible();
 
   state.used = 13;
   await page.getByRole('button', { name: 'Atualizar uso', exact: true }).click();

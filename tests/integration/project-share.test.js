@@ -42,6 +42,10 @@ async function createShare() {
   return created.body.code;
 }
 
+function boundDoc(code, slide) {
+  return { shareCode: code, slides: [slide] };
+}
+
 describe('POST /api/project-share', () => {
   it('recusa push de quem não é dono nem membro', async () => {
     const code = await createShare();
@@ -58,9 +62,27 @@ describe('POST /api/project-share', () => {
     await handler(post({
       action: 'push',
       code,
-      doc: { slides: [{ title: 'Atualizado' }] },
+      doc: boundDoc(code, { title: 'Atualizado' }),
     }, 'cus_owner', 'dona@teste.exemplo'), allowed);
     expect(allowed.statusCode).toBe(200);
+  });
+
+  it('recusa publicar um projeto sem vínculo ou vinculado a outro código', async () => {
+    const code = await createShare();
+
+    for (const doc of [
+      { slides: [{ title: 'Projeto pessoal sem vínculo' }] },
+      boundDoc('OUTRO123', { title: 'Projeto de outra equipe' }),
+    ]) {
+      const denied = makeRes();
+      await handler(post({ action: 'push', code, doc }, 'cus_owner', 'dona@teste.exemplo'), denied);
+      expect(denied.statusCode).toBe(409);
+      expect(denied.body.error).toMatch(/não pertence ao projeto/i);
+    }
+
+    const saved = await getSharedProject(code);
+    expect(saved.doc.slides[0].title).toBe('Original');
+    expect(saved.doc.shareCode).toBe(code);
   });
 
   it('não confunde outro cliente Stripe com o dono pelo mesmo e-mail', async () => {
@@ -98,7 +120,7 @@ describe('POST /api/project-share', () => {
       metadata: { vc_google_sub: 'google-owner-sub' },
     }));
     const verified = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY01', doc: { slides: [{ title: 'Da dona' }] } },
+    await handler(post({ action: 'push', code: 'LEGACY01', doc: boundDoc('LEGACY01', { title: 'Da dona' }) },
       'cus_verified', 'dona@teste.exemplo'), verified);
     expect(verified.statusCode).toBe(200);
   });
@@ -115,7 +137,7 @@ describe('POST /api/project-share', () => {
     expect(unverified.statusCode).toBe(403);
 
     const member = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY02', doc: { slides: [{ title: 'Por ID' }] } },
+    await handler(post({ action: 'push', code: 'LEGACY02', doc: boundDoc('LEGACY02', { title: 'Por ID' }) },
       'cus_member', 'novo@teste.exemplo'), member);
     expect(member.statusCode).toBe(200);
 
@@ -125,7 +147,7 @@ describe('POST /api/project-share', () => {
       metadata: { vc_google_sub: 'google-member-sub' },
     }));
     const verified = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY02', doc: { slides: [{ title: 'Por e-mail verificado' }] } },
+    await handler(post({ action: 'push', code: 'LEGACY02', doc: boundDoc('LEGACY02', { title: 'Por e-mail verificado' }) },
       'cus_verified', 'membro@teste.exemplo'), verified);
     expect(verified.statusCode).toBe(200);
   });
@@ -138,6 +160,7 @@ describe('POST /api/project-share', () => {
     await handler(getReq, viewed);
     expect(viewed.statusCode).toBe(200);
     expect(viewed.body.doc.slides[0].title).toBe('Original');
+    expect(viewed.body.doc.shareCode).toBe(code);
     expect(viewed.body).toMatchObject({ isOwner: false, isMember: false, memberCount: 1 });
     expect(viewed.body).not.toHaveProperty('ownerEmail');
     expect(viewed.body).not.toHaveProperty('members');
@@ -149,7 +172,7 @@ describe('POST /api/project-share', () => {
     expect(joined.body).not.toHaveProperty('ownerEmail');
     expect(joined.body).not.toHaveProperty('members');
     const pushed = makeRes();
-    await handler(post({ action: 'push', code, doc: { slides: [{ title: 'Da convidada' }] } },
+    await handler(post({ action: 'push', code, doc: boundDoc(code, { title: 'Da convidada' }) },
       'cus_guest', 'convidada@teste.exemplo'), pushed);
     expect(pushed.statusCode).toBe(200);
   });
@@ -162,7 +185,7 @@ describe('POST /api/project-share', () => {
     await Promise.all([
       handler(post({ action: 'join', code }, 'cus_a', 'a@teste.exemplo'), a),
       handler(post({ action: 'pull', code }, 'cus_b', 'b@teste.exemplo'), b),
-      handler(post({ action: 'push', code, doc: { slides: [{ title: 'Nova versão' }] } },
+      handler(post({ action: 'push', code, doc: boundDoc(code, { title: 'Nova versão' }) },
         'cus_owner', 'dona@teste.exemplo'), published),
     ]);
     expect([a.statusCode, b.statusCode, published.statusCode]).toEqual([200, 200, 200]);
@@ -255,7 +278,7 @@ describe('POST /api/project-share', () => {
     const code = created.body.code;
     const updated = makeRes();
     await handler(makeReq({ method: 'POST', body: {
-      action: 'push', code, doc: { slides: [{ title: 'Dev atualizado' }] },
+      action: 'push', code, doc: boundDoc(code, { title: 'Dev atualizado' }),
     } }), updated);
     expect(updated.statusCode).toBe(200);
 
@@ -313,7 +336,7 @@ describe('POST /api/project-share', () => {
     await handler(post({
       action: 'push',
       code: 'MEMBER01',
-      doc: { slides: [{ id: 's1', title: 'Foto do membro', bgImageAssetId: 'member-photo' }] },
+      doc: boundDoc('MEMBER01', { id: 's1', title: 'Foto do membro', bgImageAssetId: 'member-photo' }),
     }, 'cus_member', 'membro@teste.exemplo'), published);
     expect(published.statusCode).toBe(200);
 

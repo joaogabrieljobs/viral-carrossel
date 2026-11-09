@@ -111,6 +111,22 @@ test('limpa filtros da Biblioteca antes de abrir Calendário ou Fila', async ({ 
   await expect(search).toHaveValue('');
 });
 
+test('busca da Biblioteca ignora espaços no começo e no fim', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await page.getByRole('button', { name: /abrir biblioteca/i }).first().click({ force: true });
+
+  const dialog = page.getByRole('dialog', { name: /biblioteca de projetos/i });
+  const firstOpen = dialog.getByRole('button', { name: /^Abrir / }).first();
+  const projectName = String(await firstOpen.getAttribute('aria-label')).replace(/^Abrir /, '');
+  const search = dialog.getByRole('searchbox', { name: /buscar projetos/i });
+  await search.fill(projectName);
+  await expect(dialog.getByRole('button', { name: `Abrir ${projectName}`, exact: true })).toBeVisible();
+  await search.fill(`  ${projectName}  `);
+  await expect(dialog.getByRole('button', { name: `Abrir ${projectName}`, exact: true })).toBeVisible();
+});
+
 test('Escape fecha a Biblioteca e devolve o foco ao botão que a abriu', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');

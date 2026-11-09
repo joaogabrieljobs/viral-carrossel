@@ -197,6 +197,7 @@ function AccountHomeShell({
                 onLogout={onLogout} onOpenBrands={onOpenBrands} currentPeriodEnd={currentPeriodEnd}
                 planTier={planTier} imageQuota={imageQuota} onOpenUsage={() => setAccountTab?.('usage')}
                 onProfileSaved={onProfileSaved} cloudProfile={cloudProfile}
+                onClose={closeAccount}
               />
             </>
           )}

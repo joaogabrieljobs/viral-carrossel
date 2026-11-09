@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, selectEditorMode } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 
@@ -53,8 +53,16 @@ test('preserva assunto lateral, compartilha recorte com export e respeita ajuste
     await expect(exported).toHaveCSS('background-position', await photo.evaluate(el => el.style.backgroundPosition));
   }
   await page.getByRole('button', { name: 'Quadrado', exact: true }).click();
-  await page.getByRole('button', { name: 'Editar foto do card 1', exact: true }).click();
+  const positionTrigger = page.getByRole('button', { name: 'Editar foto do card 1', exact: true });
+  const positionTriggerHandle = await positionTrigger.elementHandle();
+  await positionTriggerHandle.click();
   const modal = page.getByRole('dialog', { name: 'Posicionar foto' });
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[role="dialog"]') != null)).toBe(true);
+  await expect.poll(() => positionTriggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(modal).toHaveCount(0);
+  await expect.poll(() => positionTriggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
+  await positionTrigger.click();
   await expect(modal.getByRole('button', { name: 'Priorizar assunto' })).toHaveAttribute('aria-pressed', 'true');
   const autoPosition = await photo.evaluate(el => el.style.backgroundPosition);
   await modal.getByRole('slider').fill('110');
@@ -84,5 +92,17 @@ test('preserva assunto lateral, compartilha recorte com export e respeita ajuste
   await modal.getByRole('button', { name: 'Priorizar assunto' }).click();
   await expect.poll(() => photo.evaluate(el => parseFloat(el.style.backgroundPositionX))).toBeGreaterThan(80);
   await modal.getByRole('button', { name: 'Pronto', exact: true }).click();
+
+  await selectEditorMode(page, 'diretor');
+  await page.getByRole('tab', { name: /^Imagem$/i }).click({ force: true });
+  const cropTrigger = page.getByRole('button', { name: 'Recortar', exact: true }).first();
+  const cropTriggerHandle = await cropTrigger.elementHandle();
+  await cropTriggerHandle.click();
+  const cropDialog = page.getByRole('dialog', { name: 'Recortar imagem do card' });
+  await expect(cropDialog).toBeVisible();
+  await expect.poll(() => cropTriggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(cropDialog).toHaveCount(0);
+  await expect.poll(() => cropTriggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
   await card.screenshot({ path: testInfo.outputPath('assunto-enquadrado.png') });
 });

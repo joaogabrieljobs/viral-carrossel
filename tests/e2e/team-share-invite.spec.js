@@ -1,4 +1,4 @@
-import { enterEditorFromHome } from './helpers/project-entry.js';
+import { enterEditorFromHome, openProjectLibrary } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA, SESSAO_ANONIMA } from './helpers/api-mock.js';
 
@@ -154,4 +154,86 @@ test('convite aguarda login e o stash continua disponível no retorno sem parâm
   await expect(page.locator('main [data-vc-card-surface="team-slide"]')).toBeVisible();
   expect(state.joins).toBe(1);
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('vc_pending_share'))).toBeNull();
+});
+
+test('trocar de projeto limpa imediatamente o código e as ações da equipe anterior', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.addInitScript(({ brand, code }) => {
+    localStorage.setItem('vc_app_mode', JSON.stringify('diretor'));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('team-project-a'));
+    localStorage.setItem('vc_library', JSON.stringify([
+      {
+        id: 'team-project-a', name: 'Projeto da equipe A', updatedAt: Date.now(),
+        doc: {
+          fmt: 'carrossel', brand, shareCode: code, shareRevision: 2,
+          slides: [{ id: 'team-a-slide', num: 1, title: 'Conteúdo compartilhado A' }],
+        },
+      },
+      {
+        id: 'personal-project-b', name: 'Projeto pessoal B', updatedAt: Date.now() - 1,
+        doc: {
+          fmt: 'carrossel', brand,
+          slides: [{ id: 'personal-b-slide', num: 1, title: 'Conteúdo pessoal B' }],
+        },
+      },
+    ]));
+  }, { brand: BRAND, code: CODE });
+
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page, 'Projeto da equipe A');
+  const shareSummary = page.locator('summary').filter({ hasText: 'Convidar para editar' }).first();
+  if (!await shareSummary.locator('xpath=..').evaluate((node) => node.open)) await shareSummary.click();
+  await expect(page.getByText(`Código: ${CODE}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enviar alterações à equipe', exact: true })).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Abrir biblioteca de projetos salvos', exact: true }).click();
+  await page.getByRole('button', { name: 'Abrir Projeto pessoal B', exact: true }).click();
+  await expect(page.locator('[data-vc-card-surface="personal-b-slide"]').first()).toBeVisible();
+  const personalSummary = page.locator('summary').filter({ hasText: 'Convidar para editar' }).first();
+  if (!await personalSummary.locator('xpath=..').evaluate((node) => node.open)) await personalSummary.click();
+
+  await expect(page.getByText(`Código: ${CODE}`, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Enviar alterações à equipe', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Convidar para editar', exact: true })).toBeVisible();
+});
+
+test('duplicar projeto de equipe cria uma cópia pessoal sem o código remoto', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA });
+  await page.addInitScript(({ brand, code }) => {
+    localStorage.setItem('vc_app_mode', JSON.stringify('diretor'));
+    localStorage.setItem('vc_shell_view', JSON.stringify('home'));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('team-project-copy-source'));
+    localStorage.setItem('vc_library', JSON.stringify([{
+      id: 'team-project-copy-source', name: 'Projeto compartilhado', updatedAt: Date.now(),
+      doc: {
+        fmt: 'carrossel', brand, shareCode: code, shareRevision: 4, shareUpdatedAt: Date.now(),
+        shareMeta: { syncedAt: Date.now() },
+        slides: [{ id: 'team-copy-slide', num: 1, title: 'Conteúdo que deve ser preservado' }],
+      },
+    }]));
+  }, { brand: BRAND, code: CODE });
+
+  await page.goto('/?app=1');
+  const library = await openProjectLibrary(page);
+  await library.getByRole('button', { name: 'Duplicar Projeto compartilhado', exact: true }).click();
+  await enterEditorFromHome(page, 'Projeto compartilhado (cópia)');
+  await expect(page.locator('[data-vc-card-surface]').first()).toContainText('Conteúdo que deve ser preservado');
+
+  const shareSummary = page.locator('summary').filter({ hasText: 'Convidar para editar' }).first();
+  if (!await shareSummary.locator('xpath=..').evaluate((node) => node.open)) await shareSummary.click();
+  await expect(page.getByText(`Código: ${CODE}`, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Enviar alterações à equipe', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Convidar para editar', exact: true })).toBeVisible();
+
+  await expect.poll(() => page.evaluate(() => {
+    const copy = JSON.parse(localStorage.getItem('vc_library') || '[]')
+      .find((entry) => entry.name === 'Projeto compartilhado (cópia)');
+    if (!copy) return null;
+    return {
+      shareCode: copy.doc.shareCode ?? null,
+      shareRevision: copy.doc.shareRevision ?? null,
+      shareUpdatedAt: copy.doc.shareUpdatedAt ?? null,
+      shareMeta: copy.doc.shareMeta ?? null,
+    };
+  })).toEqual({ shareCode: '', shareRevision: 0, shareUpdatedAt: 0, shareMeta: null });
 });

@@ -210,6 +210,13 @@ export async function getQuotaUsage({ customerId, periodStartSec, periodEndSec, 
   };
 }
 
+/** Histórico explicável do ciclo. O backend legado só guarda o total. */
+export async function getImageQuotaActivity({ customerId, periodStartSec, limit = 50 }) {
+  if (!usesPostgresQuota()) return [];
+  const { getImageQuotaActivityPostgres } = await import('./image-quota-postgres.js');
+  return getImageQuotaActivityPostgres({ customerId, periodStartSec, limit });
+}
+
 /**
  * Consome 1 crédito. Se ultrapassar o limite, reverte e devolve allowed:false.
  */

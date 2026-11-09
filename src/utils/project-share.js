@@ -644,10 +644,17 @@ export async function createProjectShare({ doc, name }) {
 }
 
 export async function pushProjectShare({ code, doc, name }) {
+  const normalizedCode = normalizeShareCode(code);
+  const docCode = normalizeShareCode(doc?.shareCode);
+  if (!normalizedCode || docCode !== normalizedCode) {
+    const error = new Error('Este código não pertence ao projeto aberto. Reabra o projeto da equipe e tente novamente.');
+    error.code = 'share_project_mismatch';
+    throw error;
+  }
   const { doc: packed, packedImages, imagesOmitted } = await packDocWithImagesForShare(doc);
   const res = await shareRequest({
     action: 'push',
-    code,
+    code: normalizedCode,
     name,
     doc: packed,
   });

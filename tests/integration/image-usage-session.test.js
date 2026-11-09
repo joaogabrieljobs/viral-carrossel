@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetStripeMock, stripeMock } from '../helpers/stripe-mock.js';
 vi.mock('stripe', () => ({ default: class { constructor() { return stripeMock; } } }));
-vi.mock('../../api/lib/image-quota.js', () => ({ getQuotaUsage: vi.fn() }));
-import { getQuotaUsage } from '../../api/lib/image-quota.js';
+vi.mock('../../api/lib/image-quota.js', () => ({
+  getQuotaUsage: vi.fn(),
+  getImageQuotaActivity: vi.fn(),
+}));
+import { getImageQuotaActivity, getQuotaUsage } from '../../api/lib/image-quota.js';
 import { createAccessToken, COOKIE_NAME } from '../../api/lib/access.js';
 import sessionHandler from '../../api/auth/session.js';
 import { makeReq, makeRes } from '../helpers/http.js';
@@ -25,6 +28,10 @@ async function session(sub = subscription()) {
 beforeEach(() => {
   resetStripeMock();
   getQuotaUsage.mockReset().mockResolvedValue({ used: 12, limit: 50, remaining: 38, allowed: true });
+  getImageQuotaActivity.mockReset().mockResolvedValue([
+    { source: 'editor', status: 'consumed', createdAt: '2026-10-13T12:00:00.000Z', updatedAt: '2026-10-13T12:01:00.000Z' },
+    { source: 'mcp', status: 'refunded', createdAt: '2026-10-13T11:00:00.000Z', updatedAt: '2026-10-13T11:01:00.000Z' },
+  ]);
 });
 
 describe('saldo de imagens na sessão', () => {
@@ -34,9 +41,25 @@ describe('saldo de imagens na sessão', () => {
     expect(res.body).toMatchObject({ active: true,
       currentPeriodStart: new Date(start * 1000).toISOString(),
       currentPeriodEnd: new Date(end * 1000).toISOString(),
-      imageQuota: { used: 12, limit: 50, remaining: 38, allowed: true, status: 'available', available: true, tier: 'creator' },
+      imageQuota: {
+        used: 12, limit: 50, remaining: 38, allowed: true, status: 'available', available: true, tier: 'creator',
+        activity: [
+          { source: 'editor', status: 'consumed' },
+          { source: 'mcp', status: 'refunded' },
+        ],
+      },
     });
     expect(getQuotaUsage).toHaveBeenCalledWith({ customerId: 'cus_usage', periodStartSec: start, limit: 50 });
+    expect(getImageQuotaActivity).toHaveBeenCalledWith({ customerId: 'cus_usage', periodStartSec: start, limit: 50 });
+  });
+
+  it('falha do histórico não derruba o saldo confirmado do ciclo', async () => {
+    getImageQuotaActivity.mockRejectedValue(new Error('activity unavailable'));
+    const res = await session();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.imageQuota).toMatchObject({
+      status: 'available', available: true, used: 12, remaining: 38, activity: [],
+    });
   });
 
   it('falha do contador mantém assinatura ativa e informa saldo desconhecido', async () => {
@@ -52,6 +75,7 @@ describe('saldo de imagens na sessão', () => {
     const res = await session({ ...subscription(), items: { data: [{}] } });
     expect(res.body.imageQuota).toMatchObject({ status: 'unavailable', used: null, remaining: null, code: 'quota_period_unavailable' });
     expect(getQuotaUsage).not.toHaveBeenCalled();
+    expect(getImageQuotaActivity).not.toHaveBeenCalled();
   });
 
   it('saldo esgotado é um valor confirmado, diferente de consulta indisponível', async () => {
@@ -64,5 +88,6 @@ describe('saldo de imagens na sessão', () => {
     const res = await session({ ...subscription('essential'), items: { data: [{}] } });
     expect(res.body.imageQuota).toMatchObject({ available: true, used: 0, limit: 0, remaining: 0, allowed: false });
     expect(getQuotaUsage).not.toHaveBeenCalled();
+    expect(getImageQuotaActivity).not.toHaveBeenCalled();
   });
 });

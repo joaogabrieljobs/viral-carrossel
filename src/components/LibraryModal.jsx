@@ -129,14 +129,24 @@ function useModalKeyboard(open, onClose) {
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
   const focusEditorAfterCloseRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return undefined;
     returnFocusRef.current = document.activeElement;
     focusEditorAfterCloseRef.current = false;
     const focusTimer = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    const closeIfFocusHasNotArrived = (event) => {
+      if (event.key !== 'Escape' || dialogRef.current?.contains(event.target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current?.();
+    };
+    window.addEventListener('keydown', closeIfFocusHasNotArrived, true);
     return () => {
       window.cancelAnimationFrame(focusTimer);
+      window.removeEventListener('keydown', closeIfFocusHasNotArrived, true);
       // Abrir um projeto troca o conteúdo atrás do modal. Nesse caso o alvo
       // lógico é a aba ativa do editor; nos demais fechamentos voltamos ao
       // botão que abriu a Biblioteca, se ele ainda existir.
@@ -161,7 +171,7 @@ function useModalKeyboard(open, onClose) {
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      onClose?.();
+      onCloseRef.current?.();
       return;
     }
     if (event.key !== 'Tab' || !dialogRef.current) return;
@@ -754,7 +764,7 @@ export default function LibraryModal({
     .filter((entry) => filter === 'all' || entry.status === filter)
     .filter((entry) => folderFilter === 'all'
       || (folderFilter === UNFILED_FOLDER_ID ? !entry.folderId : entry.folderId === folderFilter))
-    .filter((entry) => !search.trim() || entry.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((entry) => !search.trim() || entry.name.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)), [library, filter, folderFilter, search]);
 
   const counts = useMemo(() => ({

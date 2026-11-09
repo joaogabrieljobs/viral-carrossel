@@ -2,12 +2,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bindAccountDataWriteOwner, SK } from '../../src/utils/storage.js';
 import { originalImageAssetId } from '../../src/utils/cloud-image-assets.js';
 import {
-  acknowledgeProjectOp, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
+  acknowledgeProjectOp, conflictCopyEntry, conflictCopyId, flushProjectOutbox, getPendingProjectOp,
   listPendingProjectOps, queueProjectDelete, queueProjectPut,
 } from '../../src/utils/projects-outbox.js';
 
 const ALICE = 'email:alice@example.test';
 const BOB = 'email:bob@example.test';
+
+it('cópia de conflito não conserva o vínculo de equipe do projeto original', () => {
+  const copy = conflictCopyEntry({
+    projectId: 'equipe-a',
+    createdAt: 123,
+    entry: {
+      id: 'equipe-a',
+      name: 'Equipe A',
+      doc: {
+        shareCode: 'AB12CD34', shareRevision: 5, shareUpdatedAt: 100,
+        shareMeta: { syncedAt: 99 }, slides: [{ id: 's1', title: 'Local preservado' }],
+      },
+    },
+  });
+  expect(copy.id).toBe(conflictCopyId('equipe-a'));
+  expect(copy.doc).not.toHaveProperty('shareCode');
+  expect(copy.doc).not.toHaveProperty('shareRevision');
+  expect(copy.doc).not.toHaveProperty('shareUpdatedAt');
+  expect(copy.doc).not.toHaveProperty('shareMeta');
+  expect(copy.doc.slides[0].title).toBe('Local preservado');
+});
 
 function storage() {
   const values = new Map();

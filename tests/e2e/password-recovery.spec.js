@@ -8,6 +8,26 @@ async function openLogin(page, extra = {}) {
   return page.getByRole('dialog', { name: 'Entrar no studio' });
 }
 
+test('login prende o foco, fecha com Escape e devolve ao botão Entrar', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/?landing=1');
+  const trigger = page.getByRole('button', { name: 'Entrar', exact: true }).first();
+  const triggerHandle = await trigger.elementHandle();
+  await triggerHandle.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Entrar no studio' });
+  await expect(dialog.getByLabel('E-mail')).toBeFocused();
+  await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') != null)).toBe(true);
+  const lastLink = dialog.getByRole('link', { name: /política de privacidade/i });
+  await lastLink.focus();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Fechar', exact: true })).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => triggerHandle.evaluate(element => document.activeElement === element)).toBe(true);
+});
+
 test('mostrar/ocultar senha permanece legível e volta a ocultar após fechar ou mudar de modo', async ({ page }, testInfo) => {
   const dialog = await openLogin(page);
   const password = dialog.getByLabel('Senha', { exact: true });

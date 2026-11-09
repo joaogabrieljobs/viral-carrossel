@@ -6,6 +6,7 @@ import { dataOwnerAliases, readDataOwner } from './account-data-owner.js';
 import { isAccountDataWriteOwnerCurrent } from './storage.js';
 import { CLOUD_IMAGE_MAX_CHARS, imageContentType } from './cloud-image-assets.js';
 import { uploadAssetsBestEffort } from './library-sync.js';
+import { detachTeamShareMetadata } from './team-share-metadata.js';
 import {
   ProjectApiError, deleteProject, getProject, isProjectConflict,
   isProjectDeletedConflict, putProject,
@@ -445,7 +446,7 @@ export function conflictCopyId(projectId) {
   return `conflict-${clean}`.slice(0, 120);
 }
 
-function conflictCopyEntry(op) {
+export function conflictCopyEntry(op) {
   const id = conflictCopyId(op.projectId);
   const rawName = String(op.entry?.name || 'Projeto').trim();
   const name = rawName.endsWith(CONFLICT_COPY_SUFFIX)
@@ -453,6 +454,7 @@ function conflictCopyEntry(op) {
     : `${rawName.slice(0, 120)}${CONFLICT_COPY_SUFFIX}`;
   return {
     ...op.entry,
+    doc: detachTeamShareMetadata(op.entry?.doc),
     id,
     name,
     conflictSourceId: op.projectId,
