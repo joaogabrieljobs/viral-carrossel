@@ -112,6 +112,17 @@ Legenda final #a #b
     expect(parseImportedText('Card 1: Abertura. Card 2: Fecho.').scriptConfirmation).toBeNull();
   });
 
+  it('exige confirmação quando um marcador forte aparece colado ao texto anterior', () => {
+    const parsed = parseImportedText('Card 01: Abertura. Card 02: Meio card 03: Fecho.');
+
+    expect(parsed.cards).toHaveLength(3);
+    expect(parsed.scriptConfirmation).toEqual({
+      required: true,
+      reason: 'inline-marker',
+      labels: [],
+    });
+  });
+
   it.each(['CTA', 'Chamada', 'Legenda', 'Fecho.', 'CTA:'])('não perde bloco cujo conteúdo é apenas %s', (content) => {
     const parsed = parseImportedText(`Card 1: Abertura. Card 2: Meio. Card 3: ${content}`);
 

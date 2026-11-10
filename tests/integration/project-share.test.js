@@ -45,10 +45,11 @@ async function createShare() {
   return created.body.code;
 }
 
-function boundDoc(code, slide) {
+function boundDoc(code, slide, shareRevision = 1) {
   return {
     shareCode: code,
     shareProjectId: bindingByCode.get(code) || `legacy_${code}`,
+    shareRevision,
     slides: [slide],
   };
 }
@@ -79,6 +80,7 @@ describe('POST /api/project-share', () => {
 
     for (const doc of [
       { slides: [{ title: 'Projeto pessoal sem vínculo' }] },
+      { shareCode: code, slides: [{ title: 'Código sem identidade canônica' }] },
       boundDoc('OUTRO123', { title: 'Projeto de outra equipe' }),
     ]) {
       const denied = makeRes();
@@ -91,6 +93,32 @@ describe('POST /api/project-share', () => {
     expect(saved.doc.slides[0].title).toBe('Original');
     expect(saved.doc.shareCode).toBe(code);
     expect(saved.doc.shareProjectId).toBe(bindingByCode.get(code));
+  });
+
+  it('recusa revisão antiga também depois que o vínculo já foi migrado', async () => {
+    const code = await createShare();
+    const first = makeRes();
+    await handler(post({
+      action: 'push',
+      code,
+      doc: boundDoc(code, { title: 'Versão mais nova' }, 1),
+    }, 'cus_owner', 'dona@teste.exemplo'), first);
+    expect(first.statusCode).toBe(200);
+    expect(first.body.revision).toBe(2);
+
+    const stale = makeRes();
+    await handler(post({
+      action: 'push',
+      code,
+      doc: boundDoc(code, { title: 'Versão antiga atrasada' }, 1),
+    }, 'cus_owner', 'dona@teste.exemplo'), stale);
+
+    expect(stale.statusCode).toBe(409);
+    expect(stale.body.error).toMatch(/versão da equipe mudou/i);
+    expect(await getSharedProject(code)).toMatchObject({
+      revision: 2,
+      doc: { slides: [{ title: 'Versão mais nova' }] },
+    });
   });
 
   it('recusa outro projeto que copiou o código mas não a identidade canônica', async () => {
@@ -144,7 +172,10 @@ describe('POST /api/project-share', () => {
       metadata: { vc_google_sub: 'google-owner-sub' },
     }));
     const verified = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY01', doc: boundDoc('LEGACY01', { title: 'Da dona' }) },
+    await handler(post({
+      action: 'push', code: 'LEGACY01',
+      doc: { ...boundDoc('LEGACY01', { title: 'Da dona' }), shareRevision: 1 },
+    },
       'cus_verified', 'dona@teste.exemplo'), verified);
     expect(verified.statusCode).toBe(200);
   });
@@ -177,6 +208,133 @@ describe('POST /api/project-share', () => {
     });
   });
 
+  it('migra a partilha legada no primeiro push sem apagar a edição local', async () => {
+    await putSharedProject({
+      code: 'LEGACY04', ownerId: 'cus_owner', ownerEmail: 'dona@teste.exemplo',
+      members: ['cus_owner', 'cus_member'],
+      doc: { shareCode: 'LEGACY04', slides: [{ title: 'Versão remota antiga' }] },
+      revision: 3, keepRevision: true,
+    });
+
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY04',
+      doc: {
+        shareCode: 'LEGACY04', shareRevision: 3,
+        slides: [{ title: 'Edição local preservada' }],
+      },
+    }, 'cus_member', 'membro@teste.exemplo'), pushed);
+
+    expect(pushed.statusCode).toBe(200);
+    expect(pushed.body.projectId).toBe('legacy_LEGACY04');
+    expect(await getSharedProject('LEGACY04')).toMatchObject({
+      shareProjectId: 'legacy_LEGACY04',
+      doc: {
+        shareCode: 'LEGACY04',
+        shareProjectId: 'legacy_LEGACY04',
+        slides: [{ title: 'Edição local preservada' }],
+      },
+    });
+  });
+
+  it('recusa migração legada com revisão local desatualizada', async () => {
+    await putSharedProject({
+      code: 'LEGACY06', ownerId: 'cus_owner', members: ['cus_owner'],
+      doc: { shareCode: 'LEGACY06', slides: [{ title: 'Remoto atual' }] },
+      revision: 3, keepRevision: true,
+    });
+    const stale = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY06',
+      doc: {
+        shareCode: 'LEGACY06', shareRevision: 2,
+        slides: [{ title: 'Edição local antiga' }],
+      },
+    }, 'cus_owner', 'dona@teste.exemplo'), stale);
+
+    expect(stale.statusCode).toBe(409);
+    expect(stale.body.error).toMatch(/versão da equipe mudou/i);
+    expect(await getSharedProject('LEGACY06')).toMatchObject({
+      revision: 3,
+      doc: { slides: [{ title: 'Remoto atual' }] },
+    });
+  });
+
+  it('recusa revisão desatualizada mesmo quando o GET legado já entregou o ID derivado', async () => {
+    await putSharedProject({
+      code: 'LEGACY09', ownerId: 'cus_owner', members: ['cus_owner'],
+      doc: { shareCode: 'LEGACY09', slides: [{ title: 'Remoto atual' }] },
+      revision: 3, keepRevision: true,
+    });
+    const stale = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY09',
+      doc: {
+        shareCode: 'LEGACY09', shareProjectId: 'legacy_LEGACY09', shareRevision: 2,
+        slides: [{ title: 'Edição local antiga' }],
+      },
+    }, 'cus_owner', 'dona@teste.exemplo'), stale);
+
+    expect(stale.statusCode).toBe(409);
+    expect(stale.body.error).toMatch(/versão da equipe mudou/i);
+    expect(await getSharedProject('LEGACY09')).toMatchObject({
+      revision: 3,
+      doc: { slides: [{ title: 'Remoto atual' }] },
+    });
+  });
+
+  it('aceita ausência de revisão somente em partilha legada na revisão zero', async () => {
+    await putSharedProject({
+      code: 'LEGACY07', ownerId: 'cus_owner', members: ['cus_owner'],
+      doc: { shareCode: 'LEGACY07', slides: [{ title: 'Inicial' }] }, revision: -1,
+    });
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY07',
+      doc: { shareCode: 'LEGACY07', slides: [{ title: 'Primeira edição' }] },
+    }, 'cus_owner', 'dona@teste.exemplo'), pushed);
+
+    expect(pushed.statusCode).toBe(200);
+    expect(pushed.body.projectId).toBe('legacy_LEGACY07');
+  });
+
+  it('não confia no shareProjectId histórico guardado apenas dentro do documento', async () => {
+    await putSharedProject({
+      code: 'LEGACY08', ownerId: 'cus_owner', members: ['cus_owner'],
+      doc: {
+        shareCode: 'LEGACY08', shareProjectId: 'sp_NAOCANONICO1234',
+        slides: [{ title: 'Legado' }],
+      },
+      revision: 0,
+    });
+    const getReq = makeReq({ cookie: cookieFor('cus_owner', 'dona@teste.exemplo') });
+    getReq.query = { code: 'LEGACY08' };
+    const viewed = makeRes();
+    await handler(getReq, viewed);
+
+    expect(viewed.statusCode).toBe(200);
+    expect(viewed.body.projectId).toBe('legacy_LEGACY08');
+    expect(viewed.body.doc.shareProjectId).toBe('legacy_LEGACY08');
+  });
+
+  it('não trata identidade inválida como ausência durante a migração legada', async () => {
+    await putSharedProject({
+      code: 'LEGACY05', ownerId: 'cus_owner', members: ['cus_owner'],
+      doc: { shareCode: 'LEGACY05', slides: [{ title: 'Original' }] }, revision: 1,
+    });
+    const denied = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY05',
+      doc: {
+        shareCode: 'LEGACY05', shareProjectId: 'inválido!',
+        slides: [{ title: 'Não deve entrar' }],
+      },
+    }, 'cus_owner', 'dona@teste.exemplo'), denied);
+
+    expect(denied.statusCode).toBe(409);
+    expect((await getSharedProject('LEGACY05')).doc.slides[0].title).toBe('Original');
+  });
+
   it('membro legado por e-mail precisa de verificação; membro por ID pode publicar', async () => {
     await putSharedProject({
       code: 'LEGACY02', ownerId: 'cus_owner', ownerEmail: 'dona@teste.exemplo',
@@ -189,7 +347,10 @@ describe('POST /api/project-share', () => {
     expect(unverified.statusCode).toBe(403);
 
     const member = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY02', doc: boundDoc('LEGACY02', { title: 'Por ID' }) },
+    await handler(post({
+      action: 'push', code: 'LEGACY02',
+      doc: { ...boundDoc('LEGACY02', { title: 'Por ID' }), shareRevision: 1 },
+    },
       'cus_member', 'novo@teste.exemplo'), member);
     expect(member.statusCode).toBe(200);
 
@@ -199,7 +360,10 @@ describe('POST /api/project-share', () => {
       metadata: { vc_google_sub: 'google-member-sub' },
     }));
     const verified = makeRes();
-    await handler(post({ action: 'push', code: 'LEGACY02', doc: boundDoc('LEGACY02', { title: 'Por e-mail verificado' }) },
+    await handler(post({
+      action: 'push', code: 'LEGACY02',
+      doc: boundDoc('LEGACY02', { title: 'Por e-mail verificado' }, 2),
+    },
       'cus_verified', 'membro@teste.exemplo'), verified);
     expect(verified.statusCode).toBe(200);
   });
@@ -391,7 +555,10 @@ describe('POST /api/project-share', () => {
     await handler(post({
       action: 'push',
       code: 'MEMBER01',
-      doc: boundDoc('MEMBER01', { id: 's1', title: 'Foto do membro', bgImageAssetId: 'member-photo' }),
+      doc: {
+        ...boundDoc('MEMBER01', { id: 's1', title: 'Foto do membro', bgImageAssetId: 'member-photo' }),
+        shareRevision: 1,
+      },
     }, 'cus_member', 'membro@teste.exemplo'), published);
     expect(published.statusCode).toBe(200);
 

@@ -16,10 +16,12 @@ export function detachTeamShareMetadata(doc) {
 
 function looksLikeLegacyCopy(entry) {
   const id = String(entry?.id || '');
-  const name = String(entry?.name || '');
+  // O nome é conteúdo do usuário e não prova que houve duplicação. Projetos
+  // legítimos podem se chamar "Campanha (cópia)" e ainda pertencer à equipe.
+  // Só sinais estruturais gravados pelo fluxo de conflito autorizam remover o
+  // vínculo remoto durante a migração.
   return !!entry?.conflictSourceId
-    || /^conflict-/i.test(id)
-    || /\((?:c[oó]pia|copy)(?:\s+de\s+conflito)?\)/iu.test(name);
+    || /^conflict-/i.test(id);
 }
 
 /** Neutraliza cópias antigas criadas antes da remoção dos metadados. */

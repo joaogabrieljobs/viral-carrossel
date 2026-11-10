@@ -73,4 +73,39 @@ describe('detachTeamShareMetadata', () => {
     expect(migrated[1].doc).not.toHaveProperty('shareCode');
     expect(legacyCopy.doc.shareCode).toBe('AB12CD34');
   });
+
+  it.each([
+    'Campanha Natal (cópia)',
+    'Campaign launch (copy)',
+    'Campanha Natal (cópia de conflito)',
+  ])('preserva o vínculo de projeto legítimo cujo nome contém cópia: %s', (name) => {
+    const legitimate = {
+      id: 'campanha-natal',
+      name,
+      doc: { shareCode: 'AB12CD34', shareRevision: 4, slides: [] },
+    };
+    const entries = [legitimate];
+
+    const migrated = detachLegacyTeamShareCopies(entries);
+
+    expect(migrated).toBe(entries);
+    expect(migrated[0]).toBe(legitimate);
+    expect(migrated[0].doc.shareCode).toBe('AB12CD34');
+  });
+
+  it.each([
+    [{ id: 'projeto-antigo', conflictSourceId: 'projeto-origem' }],
+    [{ id: 'conflict-projeto-antigo' }],
+  ])('continua neutralizando conflito identificado por metadado estrutural: %o', (identity) => {
+    const legacyCopy = {
+      ...identity,
+      name: 'Nome livre escolhido pelo usuário',
+      doc: { shareCode: 'AB12CD34', shareRevision: 4, slides: [] },
+    };
+
+    const [migrated] = detachLegacyTeamShareCopies([legacyCopy]);
+
+    expect(migrated.doc).not.toHaveProperty('shareCode');
+    expect(legacyCopy.doc.shareCode).toBe('AB12CD34');
+  });
 });

@@ -132,6 +132,34 @@ test('Importar texto pede confirmação para Post antes de aplicar os blocos', a
   await expect(page.locator('main [data-vc-card-surface]')).toHaveCount(3);
 });
 
+test('Importar texto explica marcador inline antes de dividir os cards', async ({ page }) => {
+  await mockEditorApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await selectEditorMode(page, 'diretor');
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
+  await openPanel(page, 'Adicionar conteúdo');
+  await page.getByRole('button', { name: /Importar texto \(1 página = 1 card\)/i }).click();
+
+  const dialog = page.getByRole('dialog', { name: '1 página → 1 card', exact: true });
+  await dialog.getByLabel('Texto a importar', { exact: true }).fill(
+    'Card 01: Abertura. Card 02: Meio card 03: Fecho.',
+  );
+
+  const alert = dialog.getByRole('alert');
+  await expect(alert).toContainText('marcador numerado aparece colado ao texto anterior');
+  await expect(alert).not.toContainText('Os rótulos  também');
+  const apply = dialog.getByRole('button', { name: 'Aplicar aos cards', exact: true });
+  await expect(apply).toBeDisabled();
+  await dialog.getByRole('checkbox', {
+    name: 'Confirmo que cada bloco deve virar um card.',
+    exact: true,
+  }).check();
+  await apply.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('main [data-vc-card-surface]')).toHaveCount(3);
+});
+
 test('Editar perfil prende o foco e Escape fecha primeiro o diálogo e depois o perfil', async ({ page }) => {
   await mockEditorApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');

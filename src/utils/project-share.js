@@ -11,6 +11,7 @@ import { guardarImagemDoSlide, imagemComoDataUrl } from './image-store.js';
 import { ensurePngDataUrl, exportBrandLogo, exportSlideLogo, importBrandLogo, importSlideLogo } from './slide-logo.js';
 import { exportSlideReference, importSlideReference } from './slide-reference.js';
 import { exportProjectReferences, migrateProjectReferences } from './style-kit-storage.js';
+import { projectContentSnapshot } from './project-content-snapshot.js';
 
 const TEAM_SHARE_API = '/api/project-share';
 /**
@@ -643,16 +644,85 @@ export async function createProjectShare({ doc, name }) {
   return { ...res, packedImages, imagesOmitted };
 }
 
+const TEAM_SHARE_SYNC_FIELDS = Object.freeze([
+  'shareCode',
+  'shareProjectId',
+  'shareRevision',
+  'shareUpdatedAt',
+  'shareMeta',
+]);
+
+function hasUnbackedRuntimeMedia(doc) {
+  const runtime = (value) => typeof value === 'string' && /^(?:blob:|data:image\/)/.test(value);
+  for (const slide of doc?.slides || []) {
+    if (runtime(slide?.bgImage) && !slide?.bgImageAssetId && !slide?.bgImageId) return true;
+    if (runtime(slide?.logoImage) && !slide?.logoImageAssetId && !slide?.logoImageId) return true;
+    if (runtime(slide?.refImage) && !slide?.refImageAssetId && !slide?.refImageId) return true;
+    for (const ref of slide?.imageReferences || []) {
+      if (runtime(ref?.dataUrl) && !ref?.assetId && !ref?.imageId) return true;
+    }
+  }
+  if (runtime(doc?.brand?.logo) && !doc?.brand?.logoAssetId && !doc?.brand?.logoImageId) return true;
+  for (const kit of [doc?.styleKit, doc?.brand?.styleKit]) {
+    if (runtime(kit?.logo?.dataUrl) && !kit?.logo?.assetId && !kit?.logo?.imageId) return true;
+    for (const ref of kit?.refImages || []) {
+      if (runtime(ref?.dataUrl) && !ref?.assetId && !ref?.imageId) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Compara somente o conteúdo editável. Metadados de revisão e URLs de runtime
+ * mudam ao puxar a equipe, mas não representam uma decisão da pessoa.
+ */
+export function teamShareDocumentsDiffer(localDoc, remoteDoc) {
+  // Um blob/data URL sem ID é a única cópia conhecida dos bytes. A limpeza de
+  // runtime o removeria do snapshot; portanto o pull deve sempre pedir
+  // confirmação antes de correr o risco de perdê-lo.
+  if (hasUnbackedRuntimeMedia(localDoc)) return true;
+  const comparable = (doc) => {
+    const snapshot = projectContentSnapshot([{ doc: doc && typeof doc === 'object' ? doc : {} }])?.[0]?.doc || {};
+    const clean = { ...snapshot };
+    for (const key of TEAM_SHARE_SYNC_FIELDS) delete clean[key];
+    // Com assetId, o binário vive fora do documento. Durante a hidratação o
+    // mesmo asset pode aparecer como `blob:` local, `null` remoto ou campo
+    // ausente; essas formas são equivalentes e não justificam apagar trabalho.
+    clean.slides = Array.isArray(snapshot.slides)
+      ? snapshot.slides.map((slide) => {
+          if (!slide || typeof slide !== 'object') return slide;
+          const next = { ...slide };
+          for (const [assetKey, imageKey] of [
+            ['bgImageAssetId', 'bgImage'],
+            ['logoImageAssetId', 'logoImage'],
+            ['refImageAssetId', 'refImage'],
+          ]) {
+            if (next[assetKey]) delete next[imageKey];
+          }
+          return next;
+        })
+      : snapshot.slides;
+    if (snapshot.brand && typeof snapshot.brand === 'object') {
+      clean.brand = { ...snapshot.brand };
+      if (clean.brand.logoAssetId) delete clean.brand.logo;
+    }
+    return clean;
+  };
+  try {
+    return JSON.stringify(comparable(localDoc)) !== JSON.stringify(comparable(remoteDoc));
+  } catch {
+    // Se não for possível provar igualdade, proteja a edição local.
+    return true;
+  }
+}
+
 export async function pushProjectShare({ code, doc, name }) {
   const normalizedCode = normalizeShareCode(code);
   const docCode = normalizeShareCode(doc?.shareCode);
+  const rawProjectId = String(doc?.shareProjectId || '').trim();
   const projectId = normalizeShareProjectId(doc?.shareProjectId);
-  if (!normalizedCode || docCode !== normalizedCode || !projectId) {
-    const error = new Error(
-      projectId
-        ? 'Este código não pertence ao projeto aberto. Reabra o projeto da equipe e tente novamente.'
-        : 'Este projeto precisa receber as alterações da equipe uma vez antes de publicar.',
-    );
+  if (!normalizedCode || docCode !== normalizedCode || (rawProjectId && !projectId)) {
+    const error = new Error('Este código não pertence ao projeto aberto. Reabra o projeto da equipe e tente novamente.');
     error.code = 'share_project_mismatch';
     throw error;
   }
@@ -661,6 +731,7 @@ export async function pushProjectShare({ code, doc, name }) {
     action: 'push',
     code: normalizedCode,
     name,
+    baseRevision: doc?.shareRevision,
     doc: packed,
   });
   return { ...res, packedImages, imagesOmitted };

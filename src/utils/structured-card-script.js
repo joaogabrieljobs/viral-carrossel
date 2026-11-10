@@ -146,6 +146,25 @@ function normalizeMaxCards(value) {
   return Number.isInteger(parsed) && parsed >= 2 ? parsed : DEFAULT_MAX_CARDS;
 }
 
+function wordNumberHasContentSeparator(source, match) {
+  const rawNumber = String(match?.[2] || '');
+  if (/^0*\d{1,3}$/u.test(rawNumber)) return true;
+  const markerEnd = (match?.index || 0) + String(match?.[0] || '').length;
+  const suffix = source.slice(markerEnd);
+  return /^(?:[ \t]*(?:\*{1,3}|_{1,3}|={2,}))?[ \t]*(?:[:,;.)]|[-–—]{1,3}|[>»→⇒➜➡▶►•]|\p{Extended_Pictographic}|\n|$)/u.test(suffix);
+}
+
+function markerHasStrongInlineStructure(candidate) {
+  const rawNumber = String(candidate?.match?.[2] || '');
+  if (/^0\d+$/u.test(rawNumber)) return true;
+
+  const rawMarker = String(candidate?.match?.[0] || '');
+  const rawLabel = String(candidate?.match?.[1] || '');
+  const numberAt = rawMarker.indexOf(rawNumber, rawLabel.length);
+  const between = numberAt >= 0 ? rawMarker.slice(rawLabel.length, numberAt) : '';
+  return /#|[-–—]|n(?:[º°o]|ro)?\.?|n[uú]mero|number|num\.?/iu.test(between);
+}
+
 function findOrderedMarkers(source, ceiling) {
   const matcher = new RegExp(CARD_MARKER_RE.source, CARD_MARKER_RE.flags);
   const candidates = [...source.matchAll(matcher)].map((match) => ({
@@ -155,26 +174,41 @@ function findOrderedMarkers(source, ceiling) {
     label: normalizeLabel(match[1]),
     markerStart: resolveMarkerStart(source, match.index || 0),
     contentStart: resolveContentStart(source, (match.index || 0) + match[0].length),
-  }));
+  })).filter((candidate) => wordNumberHasContentSeparator(source, candidate.match));
 
   const first = candidates.find((candidate) => (
     candidate.number === 1 && markerHasExplicitBoundary(source, candidate.markerStart)
   ));
   if (!first) return [];
 
+  // Card 00 é conteúdo estruturado fora da sequência, não um preâmbulo. Se
+  // aparecer antes do Card 01, não esconda a capa nem altere a quantidade.
+  if (candidates.some((candidate) => (
+    candidate.number === 0
+    && (candidate.match.index || 0) < (first.match.index || 0)
+  ))) return [];
+
   const ordered = [first];
   let expected = 2;
   for (const candidate of candidates) {
     if ((candidate.match.index || 0) <= (first.match.index || 0)) continue;
     // Depois do primeiro rótulo, uma referência no meio da frase não abre um
-    // novo bloco, mesmo que por acaso tenha o próximo número da sequência.
-    if (!markerHasExplicitBoundary(source, candidate.markerStart)) continue;
+    // novo bloco. Exceção: marcadores fortes como `Card 03`, `Card-3`, `#3`
+    // ou `nº 3`, que preservam roteiros compactos sem reabrir referências
+    // naturais como "compare o card 2 com o card 3".
+    const hasBoundary = markerHasExplicitBoundary(source, candidate.markerStart);
+    if (!hasBoundary) {
+      if (!markerHasStrongInlineStructure(candidate)) continue;
+      // Um marcador forte é intenção estrutural, portanto fora de ordem ou
+      // duplicado invalida o roteiro em vez de desaparecer silenciosamente.
+      if (candidate.number !== expected) return [];
+    }
     if (candidate.number !== expected) {
       // Uma numeração fora da sequência em posição de cabeçalho é lacuna ou
       // duplicação real.
       return [];
     }
-    ordered.push(candidate);
+    ordered.push(hasBoundary ? candidate : { ...candidate, inlineMarker: true });
     expected += 1;
     if (ordered.length > ceiling) return [];
   }
@@ -214,7 +248,8 @@ export function parseExplicitCardScript(text, { maxCards = DEFAULT_MAX_CARDS } =
   const ambiguousLabels = [...new Set(positions
     .filter((position) => position.label.ambiguous)
     .map((position) => position.label.kind))];
-  const requiresConfirmation = ambiguousLabels.length > 0;
+  const hasInlineMarker = positions.some((position) => position.inlineMarker === true);
+  const requiresConfirmation = ambiguousLabels.length > 0 || hasInlineMarker;
 
   return {
     count: blocks.length,
@@ -223,7 +258,7 @@ export function parseExplicitCardScript(text, { maxCards = DEFAULT_MAX_CARDS } =
     labelKinds,
     requiresConfirmation,
     ambiguity: requiresConfirmation
-      ? { reason: 'ambiguous-label', labels: ambiguousLabels }
+      ? { reason: hasInlineMarker ? 'inline-marker' : 'ambiguous-label', labels: ambiguousLabels }
       : null,
   };
 }

@@ -197,6 +197,56 @@ test('trocar de projeto limpa imediatamente o código e as ações da equipe ant
   await expect(page.getByRole('button', { name: 'Convidar para editar', exact: true })).toBeVisible();
 });
 
+test('receber versão diferente pede confirmação e cancelar preserva a edição local', async ({ page }) => {
+  await mockApi(page, { session: SESSAO_ATIVA, extra: {
+    '/api/project-share': route => route.fulfill({ json: {
+      ok: true,
+      code: CODE,
+      projectId: 'sp_TEAMPROJECTA123456',
+      revision: 4,
+      updatedAt: Date.now(),
+      doc: {
+        fmt: 'carrossel', brand: BRAND, shareCode: CODE,
+        shareProjectId: 'sp_TEAMPROJECTA123456', shareRevision: 4,
+        slides: [{ id: 'team-local-slide', num: 1, title: 'Versão remota' }],
+      },
+    } }),
+  } });
+  await page.addInitScript(({ brand, code }) => {
+    localStorage.setItem('vc_app_mode', JSON.stringify('diretor'));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('team-local'));
+    localStorage.setItem('vc_library', JSON.stringify([{
+      id: 'team-local', name: 'Projeto legado editado', updatedAt: Date.now(),
+      doc: {
+        fmt: 'carrossel', brand, shareCode: code,
+        shareProjectId: 'sp_TEAMPROJECTA123456', shareRevision: 3,
+        slides: [{ id: 'team-local-slide', num: 1, title: 'Minha edição local' }],
+      },
+    }]));
+  }, { brand: BRAND, code: CODE });
+
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page, 'Projeto legado editado');
+  const shareSummary = page.locator('summary').filter({ hasText: 'Convidar para editar' }).first();
+  if (!await shareSummary.locator('xpath=..').evaluate((node) => node.open)) await shareSummary.click();
+
+  const dialogMessage = new Promise(resolve => {
+    page.once('dialog', async dialog => {
+      resolve(dialog.message());
+      await dialog.dismiss();
+    });
+  });
+  await page.getByRole('button', { name: 'Receber alterações da equipe', exact: true }).click();
+  await expect(dialogMessage).resolves.toMatch(/substituirá suas alterações locais/i);
+  await expect(page.locator('[data-vc-card-surface="team-local-slide"]').first())
+    .toContainText('Minha edição local');
+  await expect.poll(() => page.evaluate(() => {
+    const project = JSON.parse(localStorage.getItem('vc_library') || '[]')
+      .find(entry => entry.id === 'team-local');
+    return project?.doc?.slides?.[0]?.title;
+  })).toBe('Minha edição local');
+});
+
 test('duplicar projeto de equipe cria uma cópia pessoal sem o código remoto', async ({ page }) => {
   await mockApi(page, { session: SESSAO_ATIVA });
   await page.addInitScript(({ brand, code }) => {

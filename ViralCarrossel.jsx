@@ -4238,7 +4238,15 @@ export default function App() {
 
   const handleTeamDocPulled = useCallback(async (payload) => {
     if (!payload?.doc || typeof payload.doc !== 'object') return;
-    const { hydrateSharedDocImages } = await import('./src/utils/project-share.js');
+    const { hydrateSharedDocImages, teamShareDocumentsDiffer } = await import('./src/utils/project-share.js');
+    const localDoc = editorSyncStateRef.current?.doc || history.state;
+    if (teamShareDocumentsDiffer(localDoc, payload.doc)
+      && typeof window !== 'undefined'
+      && !window.confirm(
+        'A versão da equipe está diferente deste projeto. Receber agora substituirá suas alterações locais e limpará o histórico de Desfazer. Deseja continuar?',
+      )) {
+      return { cancelled: true };
+    }
     const hydrated = await hydrateSharedDocImages(payload.doc, { code: payload.code });
     const shaped = ensureDocShape({
       ...hydrated,
@@ -5070,9 +5078,13 @@ export default function App() {
       : null;
     let explicitCardScript = explicitCardScriptCandidate;
     if (explicitCardScriptCandidate?.requiresConfirmation) {
+      const confirmationReason = explicitCardScriptCandidate.ambiguity?.reason || '';
       const label = explicitCardScriptCandidate.ambiguity?.labels?.join(', ') || 'Página/Post/Ideia';
+      const foundMessage = confirmationReason === 'inline-marker'
+        ? `Encontrei ${explicitCardScriptCandidate.count} blocos numerados, mas um marcador aparece colado ao texto anterior.`
+        : `Encontrei ${explicitCardScriptCandidate.count} blocos numerados com o rótulo ${label}.`;
       const confirmed = window.confirm(
-        `Encontrei ${explicitCardScriptCandidate.count} blocos numerados com o rótulo ${label}.\n\nUsar esses blocos como roteiro de ${explicitCardScriptCandidate.count} cards?\n\nCancelar mantém a quantidade escolhida e trata o texto apenas como referência.`,
+        `${foundMessage}\n\nConfira a divisão e use esses blocos como roteiro de ${explicitCardScriptCandidate.count} cards?\n\nCancelar mantém a quantidade escolhida e trata o texto apenas como referência.`,
       );
       if (!confirmed) explicitCardScript = null;
     }

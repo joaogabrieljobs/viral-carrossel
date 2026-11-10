@@ -4,6 +4,7 @@ import {
   packDocWithImagesForShare,
   hydrateSharedDocImages,
   pushProjectShare,
+  teamShareDocumentsDiffer,
   normalizeShareCode,
   buildTeamShareInviteUrl,
   stashPendingShareCode,
@@ -23,6 +24,7 @@ vi.mock('../../src/utils/image-store.js', () => ({
   newImageId: vi.fn(() => 'new-reference-id'),
   dataUrlParaBlob: (src) => new Blob([Buffer.from(src.split(',')[1], 'base64')], { type: 'image/png' }),
   blobParaDataUrl: async (blob) => `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`,
+  semImagensDeRuntime: vi.fn((value) => value),
 }));
 
 vi.mock('../../src/utils/slide-logo.js', () => ({
@@ -363,15 +365,87 @@ describe('pushProjectShare', () => {
     vi.unstubAllGlobals();
   });
 
-  it('não envia um vínculo legado sem identidade canônica antes de receber alterações', async () => {
-    const fetchMock = vi.fn();
+  it('envia vínculo legado para o servidor migrar sem descartar a edição local', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        ok: true,
+        code: 'AB12CD34',
+        projectId: 'legacy_AB12CD34',
+        revision: 4,
+      }),
+    }));
     vi.stubGlobal('fetch', fetchMock);
-    await expect(pushProjectShare({
+    const result = await pushProjectShare({
       code: 'AB12CD34',
-      doc: { shareCode: 'AB12CD34', slides: [{ title: 'Cópia antiga' }] },
-      name: 'Cópia antiga',
-    })).rejects.toMatchObject({ code: 'share_project_mismatch' });
-    expect(fetchMock).not.toHaveBeenCalled();
+      doc: {
+        shareCode: 'AB12CD34',
+        shareRevision: 3,
+        slides: [{ title: 'Edição local preservada' }],
+      },
+      name: 'Projeto antigo',
+    });
+    expect(result.projectId).toBe('legacy_AB12CD34');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.doc.slides[0].title).toBe('Edição local preservada');
+    expect(sent.doc.shareProjectId).toBeUndefined();
+    expect(sent.baseRevision).toBe(3);
     vi.unstubAllGlobals();
+  });
+});
+
+describe('teamShareDocumentsDiffer', () => {
+  it('ignora metadados de sincronização e protege diferenças de conteúdo', () => {
+    const local = {
+      shareCode: 'AB12CD34', shareRevision: 2, shareUpdatedAt: 10,
+      slides: [{ id: 's1', title: 'Minha edição' }],
+    };
+    expect(teamShareDocumentsDiffer(local, {
+      ...local,
+      shareProjectId: 'legacy_AB12CD34',
+      shareRevision: 3,
+      shareUpdatedAt: 20,
+      shareMeta: { syncedAt: 20 },
+    })).toBe(false);
+    expect(teamShareDocumentsDiffer(local, {
+      ...local,
+      slides: [{ id: 's1', title: 'Versão da equipe' }],
+    })).toBe(true);
+  });
+
+  it('considera blob, null e ausência equivalentes quando apontam para o mesmo asset', () => {
+    const local = {
+      brand: { logoAssetId: 'brand-logo-1', logo: 'blob:brand-local' },
+      slides: [{
+        id: 's1', title: 'Mesmo conteúdo',
+        bgImageAssetId: 'photo-1', bgImage: 'blob:photo-local',
+        logoImageAssetId: 'slide-logo-1', logoImage: 'blob:logo-local',
+        refImageAssetId: 'ref-1', refImage: 'blob:ref-local',
+      }],
+    };
+    const remote = {
+      brand: { logoAssetId: 'brand-logo-1', logo: null },
+      slides: [{
+        id: 's1', title: 'Mesmo conteúdo',
+        bgImageAssetId: 'photo-1', bgImage: null,
+        logoImageAssetId: 'slide-logo-1', logoImage: null,
+        refImageAssetId: 'ref-1',
+      }],
+    };
+
+    expect(teamShareDocumentsDiffer(local, remote)).toBe(false);
+  });
+
+  it('protege mídia runtime local que ainda não tem ID persistido', () => {
+    const remote = { slides: [{ id: 's1', title: 'Mesmo texto' }] };
+    expect(teamShareDocumentsDiffer({
+      slides: [{ id: 's1', title: 'Mesmo texto', bgImage: 'blob:unica-copia-local' }],
+    }, remote)).toBe(true);
+    expect(teamShareDocumentsDiffer({
+      brand: { logo: 'data:image/png;base64,AAAA' },
+      slides: [{ id: 's1', title: 'Mesmo texto' }],
+    }, remote)).toBe(true);
   });
 });

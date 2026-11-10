@@ -178,7 +178,7 @@ test('roteiro inline com rótulos equivalentes define quantidade, ordem e fideli
     'Carrossel 01; Abra com a mudança. Página 02; Explique a consequência. Post 03; Convide para agir.',
   );
   page.once('dialog', async dialog => {
-    expect(dialog.message()).toContain('Usar esses blocos');
+    expect(dialog.message()).toMatch(/use esses blocos/i);
     await dialog.accept();
   });
   await generate(page);

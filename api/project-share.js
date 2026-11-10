@@ -44,10 +44,28 @@ function normalizedShareProjectId(value) {
  * cima do projeto da equipe só porque ainda carregavam um `shareCode` antigo.
  */
 function shareProjectIdForRecord(share) {
+  // Somente o vínculo do registro remoto é autoridade. Documentos históricos
+  // podiam carregar qualquer shareProjectId e não podem promover esse valor.
   const persisted = normalizedShareProjectId(share?.shareProjectId);
   if (persisted) return persisted;
   const code = normalizedShareCode(share?.code);
   return code ? `legacy_${code}` : '';
+}
+
+function isLegacyShareWithoutProjectId(share) {
+  return !normalizedShareProjectId(share?.shareProjectId);
+}
+
+function shareRevisionMatches(existing, body) {
+  const remoteRevision = Number.isInteger(Number(existing?.revision))
+    && Number(existing.revision) >= 0
+    ? Number(existing.revision)
+    : 0;
+  const raw = body?.baseRevision ?? body?.doc?.shareRevision;
+  const provided = raw !== undefined && raw !== null && String(raw).trim() !== '';
+  if (!provided) return remoteRevision === 0;
+  const submitted = Number(raw);
+  return Number.isInteger(submitted) && submitted >= 0 && submitted === remoteRevision;
 }
 
 function shareDocBoundToRecord(share) {
@@ -56,6 +74,8 @@ function shareDocBoundToRecord(share) {
     ...(share?.doc && typeof share.doc === 'object' ? share.doc : {}),
     shareCode: normalizedShareCode(share?.code),
     ...(projectId ? { shareProjectId: projectId } : {}),
+    shareRevision: Number.isInteger(Number(share?.revision)) ? Number(share.revision) : 0,
+    shareUpdatedAt: Number(share?.updatedAt) || 0,
   };
 }
 
@@ -305,12 +325,31 @@ export default async function handler(req, res) {
         const requestedCode = normalizedShareCode(body.code);
         const documentCode = normalizedShareCode(body.doc.shareCode);
         const projectId = shareProjectIdForRecord(existing);
+        const rawDocumentProjectId = String(body.doc.shareProjectId || '').trim();
         const documentProjectId = normalizedShareProjectId(body.doc.shareProjectId);
+        // Partilhas criadas antes da identidade canônica só carregavam o código.
+        // O primeiro dono/membro autorizado pode publicar a edição local e, no
+        // mesmo passo, vincular definitivamente o registro. Projetos novos ou já
+        // migrados continuam exigindo a identidade — uma cópia com só o código
+        // não consegue sobrescrever a equipe.
+        const legacyRecord = isLegacyShareWithoutProjectId(existing);
+        const legacyDocumentBindingMatches = !rawDocumentProjectId || documentProjectId === projectId;
+        const bindingMatches = legacyRecord
+          ? legacyDocumentBindingMatches
+          : documentProjectId === projectId;
         if (!requestedCode || documentCode !== requestedCode
-          || !projectId || documentProjectId !== projectId) {
+          || !projectId || !bindingMatches) {
           throw Object.assign(new Error('Este código não pertence ao projeto enviado.'), {
             code: 'share_project_mismatch',
           });
+        }
+        // A identidade prova qual projeto está sendo alterado; a revisão prova
+        // que a edição partiu da versão vigente. A checagem vale também depois
+        // da migração, quando dois membros podem publicar quase ao mesmo tempo.
+        if (!shareRevisionMatches(existing, body)) {
+          throw Object.assign(new Error(
+            'A versão da equipe mudou. Receba as alterações antes de enviar novamente.',
+          ), { code: 'share_revision_conflict' });
         }
         return {
           ...existing,
@@ -332,6 +371,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         code: saved.code,
+        projectId: shareProjectIdForRecord(saved),
         revision: saved.revision,
         updatedAt: saved.updatedAt,
       });
@@ -374,6 +414,7 @@ export default async function handler(req, res) {
     const msg = e?.message || 'Falha na partilha.';
     const status = e?.code === 'share_forbidden' ? 403
       : e?.code === 'share_project_mismatch' ? 409
+      : e?.code === 'share_revision_conflict' ? 409
       : e?.code === 'share_busy' ? 409
         : e?.code === 'share_too_large' ? 413
           : e?.code === 'share_storage_unconfigured' ? 503 : 500;

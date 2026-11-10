@@ -20,6 +20,8 @@ export function ImportTextModal({
   const [confirmedAmbiguousRaw, setConfirmedAmbiguousRaw] = useState('');
   const preview = useMemo(() => parseImportedText(raw), [raw]);
   const needsScriptConfirmation = preview.scriptConfirmation?.required === true;
+  const scriptConfirmationReason = preview.scriptConfirmation?.reason || '';
+  const hasInlineMarker = scriptConfirmationReason === 'inline-marker';
   const ambiguousScriptConfirmed = needsScriptConfirmation && confirmedAmbiguousRaw === raw;
   const textareaRef = useRef(null);
   const closeDialog = () => { if (!busy) onClose?.(); };
@@ -169,7 +171,9 @@ export function ImportTextModal({
           >
             <div>
               <strong>Confirme a divisão antes de importar.</strong>{' '}
-              Os rótulos {ambiguousLabels.join(', ')} também podem indicar uma lista, um calendário ou páginas de um documento.
+              {hasInlineMarker
+                ? 'Um marcador numerado aparece colado ao texto anterior. Confira se ele realmente inicia um novo bloco.'
+                : `Os rótulos ${ambiguousLabels.join(', ')} também podem indicar uma lista, um calendário ou páginas de um documento.`}
             </div>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: busy ? 'default' : 'pointer' }}>
               <input

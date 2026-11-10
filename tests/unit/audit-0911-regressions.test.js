@@ -103,10 +103,22 @@ describe('regressões da auditoria de 09/11', () => {
     expect(panel).toContain('normalizeShareProjectId');
     expect(panel.match(/projectId: res\.projectId/g)?.length).toBeGreaterThanOrEqual(4);
     expect(panel).toContain('docShareProjectId');
-    expect(panel).toContain('docShareCode === activeCode && docShareProjectId');
+    expect(panel).toContain('docShareCode === activeCode');
+    expect(panel).toContain('legacyBindingPending');
 
     expect(app).toContain("const shareProjectId = meta?.projectId || ''");
     expect(app).toContain("shareProjectId: shareProjectId || d.shareProjectId || ''");
     expect(app).toContain("shareProjectId: payload.projectId || hydrated.shareProjectId || ''");
+  });
+
+  it('libera o lock forte antes de validar o metadata da quota', () => {
+    const migration = source('db/migrations/011_image_quota_metadata.sql');
+    const addConstraintAt = migration.indexOf('ADD CONSTRAINT image_quota_operations_metadata_object');
+    const firstCommitAfterConstraint = migration.indexOf('COMMIT;', addConstraintAt);
+    const validateAt = migration.indexOf('VALIDATE CONSTRAINT image_quota_operations_metadata_object');
+
+    expect(addConstraintAt).toBeGreaterThanOrEqual(0);
+    expect(firstCommitAfterConstraint).toBeGreaterThan(addConstraintAt);
+    expect(validateAt).toBeGreaterThan(firstCommitAfterConstraint);
   });
 });

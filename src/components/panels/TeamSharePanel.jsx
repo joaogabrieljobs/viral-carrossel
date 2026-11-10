@@ -43,12 +43,11 @@ export function TeamSharePanel({
   const docShareCode = normalizeShareCode(doc?.shareCode);
   const docShareProjectId = normalizeShareProjectId(doc?.shareProjectId);
   const linked = Boolean(activeCode);
-  const canPushCurrentDoc = Boolean(activeCode && docShareCode === activeCode && docShareProjectId);
+  const canPushCurrentDoc = Boolean(activeCode && docShareCode === activeCode);
+  const legacyBindingPending = Boolean(canPushCurrentDoc && !docShareProjectId);
   const pushBlockedMessage = canPushCurrentDoc
     ? ''
-    : (!docShareProjectId
-        ? 'Receba as alterações da equipe uma vez antes de enviar.'
-        : 'Este código não pertence ao projeto aberto.');
+    : 'Este código não pertence ao projeto aberto.';
   const inviteUrl = buildTeamShareInviteUrl(activeCode);
 
   useEffect(() => {
@@ -187,6 +186,7 @@ export function TeamSharePanel({
                 const res = await pullProjectShare(activeCode);
                 if (mountedProjectRef.current !== projectKey) return res;
                 const pulled = await onDocPulled(res);
+                if (pulled?.cancelled) return pulled;
                 if (mountedProjectRef.current !== projectKey) return res;
                 onShareLinked({
                   code: res.code,
@@ -196,6 +196,7 @@ export function TeamSharePanel({
                 });
                 return pulled || res;
               }, (res) => {
+                if (res?.cancelled) return '';
                 const failed = Number(res?.failed) || 0;
                 if (res?.queued === false) {
                   return { text: 'Projeto aberto neste editor. A fila da conta não confirmou. Salve para enviar.', tone: 'warning' };
@@ -229,6 +230,11 @@ export function TeamSharePanel({
               style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}
             >
               {pushBlockedMessage}
+            </p>
+          ) : null}
+          {legacyBindingPending ? (
+            <p role="status" style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              Vínculo antigo: o primeiro envio atualizará a conexão sem apagar sua edição local.
             </p>
           ) : null}
         </div>
