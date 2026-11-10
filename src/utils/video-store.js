@@ -10,12 +10,19 @@
  *   - Value: { blob: Blob, mime: string, name: string, size: number, savedAt: number }
  */
 import { SK, isAccountDataWriteOwnerCurrent } from './storage.js';
+import { getAccountVaultVideoIds } from './account-vault.js';
+import { collectLiveVideoProtectedIds } from './video-tab-coordination.js';
+
+export { registerVideoGcProtection } from './video-tab-coordination.js';
 
 const DB_NAME = 'viral-carrossel';
 const STORE_NAME = 'videos';
 const DB_VERSION = 1;
 const SUPPORTED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
 const SUPPORTED_VIDEO_EXTENSION = /\.(mp4|mov|webm)$/i;
+// Protege uploads/autosaves ainda não confirmados, inclusive quando outra aba
+// ficou suspensa e não conseguiu responder ao BroadcastChannel.
+export const VIDEO_ORPHAN_GRACE_MS = 24 * 60 * 60_000;
 
 /**
  * `accept="video/*"` só orienta o seletor; automações, drag/drop e alguns
@@ -101,11 +108,11 @@ function tx(db, mode) {
 /** Salva um Blob de vídeo com um id único. Substitui se id já existir. */
 export async function videoPut(id, blob, meta = {}) {
   if (!id || !blob) throw new Error('videoPut: id e blob obrigatórios.');
-  if (!isAccountDataWriteOwnerCurrent()) throw new Error('A conta mudou antes de guardar o vídeo.');
+  if (!isAccountDataWriteOwnerCurrent()) throw new Error('A conta mudou antes de salvar o vídeo.');
   const owner = activeMediaOwner();
   const db = await openDB();
   if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
-    throw new Error('A conta mudou antes de guardar o vídeo.');
+    throw new Error('A conta mudou antes de salvar o vídeo.');
   }
   return new Promise((resolve, reject) => {
     const store = tx(db, 'readwrite');
@@ -116,7 +123,7 @@ export async function videoPut(id, blob, meta = {}) {
         return;
       }
       if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
-        reject(new Error('A conta mudou antes de guardar o vídeo.'));
+        reject(new Error('A conta mudou antes de salvar o vídeo.'));
         return;
       }
       const req = store.put({
@@ -199,14 +206,44 @@ export async function videoListIds() {
   });
 }
 
-/** Apaga vídeos cujos ids não estão na lista de "ainda em uso".
- *  Roda periodicamente pra limpar lixo de slides deletados. */
-export async function videoCleanupOrphans(keepIds) {
-  const keep = new Set(keepIds);
+/**
+ * Apaga somente vídeos comprovadamente órfãos.
+ *
+ * A lista do chamador é unida a:
+ * - todos os projetos preservados no cofre durável;
+ * - IDs alcançáveis pelo editor/Desfazer de outras abas vivas;
+ * - uma carência para abas suspensas ou autosaves ainda não concluídos.
+ *
+ * Se o cofre não puder ser lido, o GC é abortado: manter bytes extras é
+ * preferível a apagar a única cópia local de um vídeo.
+ */
+export async function videoCleanupOrphans(keepIds, {
+  graceMs = VIDEO_ORPHAN_GRACE_MS,
+  peerWaitMs,
+  now = Date.now(),
+  onRemovedIds,
+} = {}) {
+  const keep = new Set((keepIds || []).filter(Boolean));
+  let vaultIds;
+  try { vaultIds = await getAccountVaultVideoIds(); }
+  catch { return 0; }
+  for (const id of vaultIds) keep.add(id);
+  try {
+    const liveIds = await collectLiveVideoProtectedIds(keep, { waitMs: peerWaitMs });
+    for (const id of liveIds) keep.add(id);
+  } catch {
+    // Sem coordenação entre abas, a carência ainda impede exclusão recente.
+  }
   const all = await videoListIds();
   const entries = await Promise.all(all.filter((id) => !keep.has(id)).map(videoGet));
-  const orphans = entries.filter(Boolean).map((entry) => entry.id);
+  const parsedGrace = Number(graceMs);
+  const grace = Math.max(0, Number.isFinite(parsedGrace) ? parsedGrace : VIDEO_ORPHAN_GRACE_MS);
+  const cutoff = Number(now) - grace;
+  const orphans = entries
+    .filter((entry) => entry && Number(entry.savedAt || 0) < cutoff)
+    .map((entry) => entry.id);
   await Promise.all(orphans.map((id) => videoDelete(id)));
+  if (typeof onRemovedIds === 'function' && orphans.length) onRemovedIds([...orphans]);
   return orphans.length;
 }
 

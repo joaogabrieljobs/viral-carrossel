@@ -3,6 +3,7 @@ import {
   ACCOUNT_VAULT_KEY,
   accountVaultHasProjects,
   getAccountVaultImageIds,
+  getAccountVaultVideoIds,
   restoreAccountVault,
   snapshotAccountVault,
   snapshotAccountVaultForOwners,
@@ -253,5 +254,21 @@ describe('account-vault', () => {
     ].sort());
     expect(await restoreAccountVault('broken')).toBe(false);
     expect(await accountVaultHasProjects('cycle-a')).toBe(false);
+  });
+
+  it('protege vídeos de projetos preservados em todas as contas e aliases', async () => {
+    local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify({
+      'email:a@x.com': { keys: { [SK.library]: JSON.stringify([
+        { id: 'p1', doc: { slides: [{ videoId: 'video-a' }, { videoId: 'video-b' }] } },
+      ]) } },
+      'id:cus_1': { aliasOf: 'email:a@x.com' },
+      'email:b@x.com': { keys: { [SK.library]: JSON.stringify([
+        { id: 'p2', doc: { slides: [{ videoId: 'video-outra-conta' }] } },
+      ]) } },
+    }));
+
+    expect([...await getAccountVaultVideoIds()].sort()).toEqual([
+      'video-a', 'video-b', 'video-outra-conta',
+    ]);
   });
 });

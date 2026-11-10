@@ -17,11 +17,11 @@ export const LEGAL_PAGES = {
       },
       {
         heading: 'Dados da conta',
-        body: 'Para entrar, guardamos o e-mail e, se você criar senha, uma forma protegida dessa senha. O login com Google usa a identificação que o Google confirma. A sessão fica num cookie HttpOnly chamado vc_access. O pagamento é processado pela Stripe: o Moont guarda o identificador do cliente e o estado da assinatura, não o número completo do cartão.',
+        body: 'Para entrar, guardamos o e-mail e, se você criar senha, uma forma protegida dessa senha. O login com Google usa a identificação que o Google confirma. A sessão fica em um cookie HttpOnly chamado vc_access. O pagamento é processado pela Stripe: o Moont guarda o identificador do cliente e o estado da assinatura, não o número completo do cartão.',
       },
       {
         heading: 'O que você cria',
-        body: 'Projetos, textos, briefing, marcas e logos ficam associados à sua conta. As fotos ficam num armazenamento privado dessa conta. Um código de equipe permite que outra conta com assinatura leia aquele projeto e as fotos referenciadas nele. A outra conta não passa a ver o resto da sua biblioteca.',
+        body: 'Projetos, textos, briefing, marcas e logos ficam associados à sua conta. As fotos ficam em um armazenamento privado dessa conta. Um código de equipe permite que outra conta com assinatura leia aquele projeto e as fotos referenciadas nele. A outra conta não passa a ver o resto da sua biblioteca.',
       },
       {
         heading: 'Integrações com assistentes de IA',
@@ -29,7 +29,7 @@ export const LEGAL_PAGES = {
       },
       {
         heading: 'Para que usamos',
-        body: 'Usamos esses dados para autenticar, cobrar o plano, sincronizar a biblioteca entre os seus navegadores, gerar e guardar as peças que você pede, e impedir que uma conta acesse o conteúdo de outra. Não vendemos a biblioteca.',
+        body: 'Usamos esses dados para autenticar, cobrar o plano, sincronizar a biblioteca entre seus navegadores, gerar e salvar as peças que você pede e impedir que uma conta acesse o conteúdo de outra. Não vendemos a biblioteca.',
       },
       {
         heading: 'Operadores e serviços contratados',
@@ -40,7 +40,7 @@ export const LEGAL_PAGES = {
         body: 'Mantemos os dados enquanto a conta estiver ativa e pelo período necessário para prestar o serviço, cumprir obrigações legais, prevenir fraude, exercer direitos e resolver disputas. Quando a exclusão for cabível, removemos ou anonimizamos os dados dos sistemas ativos e os eliminamos dos ciclos de backup conforme os prazos técnicos e legais aplicáveis. Dados fiscais, financeiros e registros necessários à defesa de direitos podem ser conservados pelo prazo legal correspondente.',
       },
       {
-        heading: 'Os seus pedidos',
+        heading: 'Seus pedidos',
         body: 'Você pode pedir confirmação do tratamento, acesso, correção, portabilidade quando aplicável, informação sobre compartilhamento, revisão de decisões automatizadas, oposição, anonimização, bloqueio ou exclusão nos casos previstos em lei. A resposta simplificada a confirmação ou acesso será dada imediatamente quando possível; a declaração completa será fornecida em até 15 dias, conforme a LGPD. Outros pedidos serão respondidos em prazo razoável, considerando a complexidade e a legislação aplicável. Apagar a conta não apaga automaticamente uma cópia que outra pessoa já tenha puxado por um código de equipe.',
       },
     ],
@@ -55,7 +55,7 @@ export const LEGAL_PAGES = {
         body: 'O Moont é um studio para criar narrativas visuais, carrosséis e apresentações. O plano define o que está incluído, como geração de texto e, nos planos que o preveem, geração de imagem. Os limites vigentes são os mostrados na página de planos no momento da assinatura.',
       },
       {
-        heading: 'A sua conta',
+        heading: 'Sua conta',
         body: 'A conta é pessoal ou da organização que a contratou. Você é responsável pelo e-mail, pela senha e pelos tokens que criar. Não compartilhe a senha. Um código de equipe entrega o projeto ligado a esse código a quem o usar com uma assinatura ativa.',
       },
       {

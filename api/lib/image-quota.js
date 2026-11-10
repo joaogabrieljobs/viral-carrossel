@@ -220,10 +220,10 @@ export async function getImageQuotaActivity({ customerId, periodStartSec, limit 
 /**
  * Consome 1 crédito. Se ultrapassar o limite, reverte e devolve allowed:false.
  */
-export async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId }) {
+export async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId, metadata }) {
   if (usesPostgresQuota()) {
     const { consumeImageCreditPostgres } = await import('./image-quota-postgres.js');
-    return consumeImageCreditPostgres({ customerId, periodStartSec, periodEndSec, limit, operationId });
+    return consumeImageCreditPostgres({ customerId, periodStartSec, periodEndSec, limit, operationId, metadata });
   }
   const cap = Math.max(0, Number(limit) || 0);
   if (cap <= 0) {
@@ -303,10 +303,10 @@ export async function consumeImageCredit({ customerId, periodStartSec, periodEnd
 }
 
 /** Reembolsa 1 crédito (falha SJinn após consumo). */
-export async function refundImageCredit({ customerId, periodStartSec, operationId }) {
+export async function refundImageCredit({ customerId, periodStartSec, operationId, metadata }) {
   if (usesPostgresQuota()) {
     const { refundImageCreditPostgres } = await import('./image-quota-postgres.js');
-    return refundImageCreditPostgres({ customerId, periodStartSec, operationId });
+    return refundImageCreditPostgres({ customerId, periodStartSec, operationId, metadata });
   }
   const key = quotaKey(customerId, periodStartSec);
   const opKey = imageOperationKey(customerId, periodStartSec, operationId);
@@ -344,10 +344,10 @@ export async function refundImageCredit({ customerId, periodStartSec, operationI
 }
 
 /** Regista o sucesso; o backend legado já considera a reserva consumida. */
-export async function settleImageCredit({ customerId, periodStartSec, operationId }) {
+export async function settleImageCredit({ customerId, periodStartSec, operationId, metadata }) {
   if (!usesPostgresQuota()) return { status: 'consumed' };
   const { settleImageCreditPostgres } = await import('./image-quota-postgres.js');
-  return settleImageCreditPostgres({ customerId, periodStartSec, operationId });
+  return settleImageCreditPostgres({ customerId, periodStartSec, operationId, metadata });
 }
 
 /** Só testes. */

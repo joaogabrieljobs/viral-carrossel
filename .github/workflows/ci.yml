@@ -6,9 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+# Só o commit mais recente de cada PR/branch pode chegar ao portão. Um push
+# novo cancela a validação anterior, evitando que um SHA obsoleto seja usado
+# como sinal verde para produção.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,9 +28,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Acessibilidade estática
+        run: npm run check:a11y
       - name: Unit + integração (Vitest)
         run: npm test -- --reporter=default --reporter=junit --outputFile=test-results/unit-junit.xml
-      - run: npm run build
+      - name: Build de produção
+        run: npm run build
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -27,7 +42,10 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
+    name: e2e
+    needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,3 +64,21 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  deployment-gate:
+    name: deployment-gate
+    if: ${{ always() }}
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Aprovar somente o commit validado
+        env:
+          QUALITY_RESULT: ${{ needs.test.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          if [ "$QUALITY_RESULT" != "success" ] || [ "$E2E_RESULT" != "success" ]; then
+            echo "Portão fechado: quality=$QUALITY_RESULT, e2e=$E2E_RESULT"
+            exit 1
+          fi
+          echo "Portão aprovado para $GITHUB_SHA"

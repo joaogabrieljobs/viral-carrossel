@@ -106,7 +106,7 @@ test('analisar meu tom usa somente IA de texto e não inicia carrossel', async (
   await expect(page.getByRole('region', { name: 'Geração em andamento' })).toHaveCount(0);
   expect((await doc(page)).slides).toEqual(before.slides);
   releaseAnalysis();
-  await expect(page.getByText('Confirme o tom antes de guardar', { exact: true })).toBeVisible();
+  await expect(page.getByText('Confirme o tom antes de salvar', { exact: true })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: '1 fonte lida' })).toBeVisible();
   expect(prompts).toHaveLength(1);
   expect(prompts[0]).toContain('estrategista de voz de marca');
@@ -114,7 +114,7 @@ test('analisar meu tom usa somente IA de texto e não inicia carrossel', async (
   expect(prompts[0]).toContain('Clareza antes de volume');
   expect(prompts[0]).not.toContain('Crie um carrossel de');
   expect((await doc(page)).slides).toEqual(before.slides);
-  await page.getByRole('button', { name: 'Guardar tom da marca', exact: true }).click();
+  await page.getByRole('button', { name: 'Salvar tom da marca', exact: true }).click();
   await expect.poll(async () => page.evaluate(() => {
     const brands = JSON.parse(localStorage.getItem('vc_brands') || '[]');
     const activeId = JSON.parse(localStorage.getItem('vc_active_brand_id') || '"default"');
@@ -175,8 +175,12 @@ test('roteiro inline com rótulos equivalentes define quantidade, ordem e fideli
   });
   await openPanel(page, /PROMPT PARA GERAR/i);
   await page.getByLabel('Prompt para gerar', { exact: true }).fill(
-    'Carrosel 01; Abra com a mudança. Página 02; Explique a consequência Post 03 Convide para agir.',
+    'Carrossel 01; Abra com a mudança. Página 02; Explique a consequência. Post 03; Convide para agir.',
   );
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('Usar esses blocos');
+    await dialog.accept();
+  });
   await generate(page);
 
   await expect.poll(async () => (await doc(page))?.slides.length).toBe(3);
@@ -213,7 +217,7 @@ test('roteiro por card mantém blocos que ultrapassam o limite do tema curto', a
   });
   await page.goto('/?app=1');
   await enterSavedProject(page);
-  const request = `Card 01; ${'contexto '.repeat(190)} Card 02; ${finalInstruction}`;
+  const request = `Card 01; ${'contexto '.repeat(190)}\nCard 02; ${finalInstruction}`;
   await page.getByLabel('Pedido para gerar carrossel', { exact: true }).fill(request);
   await expect(page.getByText(/Roteiro reconhecido: 2 cards/).first()).toBeVisible();
   await page.getByRole('button', { name: 'Gerar carrossel', exact: true }).click();

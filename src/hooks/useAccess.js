@@ -648,7 +648,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         setPaywallOpen(true);
         setLoginOpen(false);
       } else if (loginStatus === 'denied') {
-        setLoginHint('Login Google cancelado. Tente de novo.');
+        setLoginHint('Login com Google cancelado. Tente novamente.');
         setLoginOpen(true);
       } else if (loginStatus === 'google_unconfigured') {
         setLoginHint('Login Google ainda não configurado neste ambiente.');
@@ -658,7 +658,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         setLoginOpen(true);
         setPaywallOpen(false);
       } else if (loginStatus === 'invalid_state' || loginStatus === 'error') {
-        setLoginHint('Não foi possível entrar com Google. Tente de novo.');
+        setLoginHint('Não foi possível entrar com Google. Tente novamente.');
         setLoginOpen(true);
       }
     })().catch((error) => {

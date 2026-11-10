@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     return res.status(timedOut ? 504 : 502).json({
       error: {
         message: timedOut
-          ? 'A IA demorou demasiado a responder. Tente de novo, com menos cards ou menos material colado em Fontes.'
+          ? 'A IA demorou muito para responder. Tente novamente com menos cards ou menos material colado em Fontes.'
           : (e?.message || 'Erro no proxy Anthropic'),
         code: timedOut ? 'upstream_timeout' : 'upstream_error',
       },

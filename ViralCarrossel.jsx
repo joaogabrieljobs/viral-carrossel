@@ -9,7 +9,7 @@ import { cloudSyncFailureMessage, isModuleLoadError } from './src/utils/cloud-sy
 import { CanvasNavigator, MobileScrollRail, useCanvasZoom } from './src/components/CanvasNavigator.jsx';
 import { ProjectContextBanner } from './src/components/ProjectContextBanner.jsx';
 import { startAIJob, runAIJob, cancelAllAIGeneration, getAIGenerationCount, throwIfGenerationCancelled, isGenerationCancelled } from './src/utils/generation-control.js';
-import { buildRemixBlock, mergeRemixedSlides } from './src/utils/carousel-remix.js';
+import { buildRemixBlock, mergeRemixedSlides, validateRemixCardCount } from './src/utils/carousel-remix.js';
 import { GenerationStatus } from './src/components/GenerationStatus.jsx';
 import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
 import {
@@ -43,7 +43,7 @@ import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
 import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
-import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile } from './src/utils/video-store.js';
+import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile, registerVideoGcProtection } from './src/utils/video-store.js';
 import {
   guardarImagemDoSlide,
   applyPersistedImagePatches,
@@ -180,6 +180,7 @@ import {
   buildGenerationIntroLine,
   buildGenerationLanguageLayer,
   buildContentLanguageRule,
+  resolveRequestedContentLanguage,
   buildGenerationSlideLayoutRules,
   buildGenerationImageLayer,
   buildNarrativeModeReminder,
@@ -231,7 +232,7 @@ import {
   buildGenerationTaskBlock,
 } from './src/utils/style-kit.js';
 import { buildProjectDesignInstructions, explicitBrandColorsFromKit, projectDesignBrandPatch, PROJECT_DESIGN_SCHEMA } from './src/utils/style-kit-design.js';
-import { buildExplicitCardScriptPrompt, parseExplicitCardScript } from './src/utils/structured-card-script.js';
+import { buildExplicitCardScriptPrompt, canAutoApplyExplicitCardScript, parseExplicitCardScript } from './src/utils/structured-card-script.js';
 import { resolveImageReferences, migrateProjectReferences } from './src/utils/style-kit-storage.js';
 import { imageGenerationAccess, slideImageGenerationState } from './src/utils/image-generation-readiness.js';
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
@@ -1111,6 +1112,7 @@ export default function App() {
   const [cloudReceipts, setCloudReceipts] = useState({});
   const [autoSaveBusy, setAutoSaveBusy] = useState(false);
   const [remoteProjectNotice, setRemoteProjectNotice] = useState(null);
+  const legacySyncWarningShownRef = useRef(false);
   const firstSaveRef = useRef(true);
   useEffect(() => {
     if (!accountLibraryReady) return undefined;
@@ -2664,14 +2666,28 @@ export default function App() {
           setAutoSaveBusy(true);
           try {
             const result = await task.promise;
-            if (!controller.signal.aborted && result?.ok && !result.assetsFailed && !result.assetsMissing) acknowledgeCloudSave(pending.snapshot);
-            else if (!controller.signal.aborted) setCloudUnsaved(true);
+            if (!controller.signal.aborted && result?.ok && !result.assetsFailed && !result.assetsMissing) {
+              acknowledgeCloudSave(pending.snapshot);
+            } else if (!controller.signal.aborted) {
+              setCloudUnsaved(true);
+              if (!legacySyncWarningShownRef.current) {
+                legacySyncWarningShownRef.current = true;
+                toast('A conta não confirmou esta edição. O projeto está salvo neste aparelho; use Salvar para tentar novamente.', 'error', 0);
+              }
+            }
           } finally {
             setAutoSaveBusy(false);
             if (cloudAutoPushRef.current === task) cloudAutoPushRef.current = null;
           }
         })
-        .catch(() => { if (!controller.signal.aborted) setCloudUnsaved(true); });
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setCloudUnsaved(true);
+          if (!legacySyncWarningShownRef.current) {
+            legacySyncWarningShownRef.current = true;
+            toast('A sincronização falhou. O projeto está salvo neste aparelho; use Salvar para tentar novamente.', 'error', 0);
+          }
+        });
     }, 4_000);
     return () => {
       controller.abort();
@@ -2679,7 +2695,7 @@ export default function App() {
     };
   }, [library, libraryFolders, brandRoster, activeDocId, activeBrandId, profileRevision, doc,
     access?.active, accountLibraryReady, PROJECTS_V2 ? null : cloudSyncBusy,
-    stopCloudAutoPush, cloudAutoPushSnapshot, scheduleCloudAutoPush]);
+    stopCloudAutoPush, cloudAutoPushSnapshot, scheduleCloudAutoPush, toast]);
   useEffect(() => {
     if (!PROJECTS_V2) return undefined;
     const retryWhenOnline = () => cloudAutoPushScheduleRef.current?.();
@@ -3115,6 +3131,16 @@ export default function App() {
   // IDs desvinculados nesta sessão continuam protegidos para Desfazer. Depois
   // de recarregar, o histórico já não existe e o GC pode remover o órfão.
   const videoSessionProtectedIdsRef = useRef(new Set());
+  useEffect(() => registerVideoGcProtection(() => {
+    const ids = new Set(videoSessionProtectedIdsRef.current);
+    for (const entry of libraryPersistRef.current || []) {
+      for (const slide of entry?.doc?.slides || []) if (slide?.videoId) ids.add(slide.videoId);
+    }
+    for (const slide of editorSyncStateRef.current?.doc?.slides || []) {
+      if (slide?.videoId) ids.add(slide.videoId);
+    }
+    return ids;
+  }), []);
   videoUrlsRef.current = videoUrls;
   // Wrapper que mantém o cache de object URLs (video-store) SINCRONIZADO com setVideoUrls.
   // Sem isso, o renderer (que lê o map module-level via getVideoUrl) ficava
@@ -3179,12 +3205,14 @@ export default function App() {
           for (const item of entry?.doc?.slides || []) if (item?.videoId) keep.add(item.videoId);
         }
         for (const item of editorSyncStateRef.current.doc?.slides || []) if (item?.videoId) keep.add(item.videoId);
-        const removableUrls = Object.keys(videoUrlsRef.current).filter((id) => !keep.has(id));
-        const removed = await videoCleanupOrphans([...keep]);
-        if (removed > 0 && removableUrls.length) {
+        let removedIds = [];
+        const removed = await videoCleanupOrphans([...keep], {
+          onRemovedIds: (ids) => { removedIds = ids; },
+        });
+        if (removed > 0 && removedIds.length) {
           setVideoUrlsSync((previous) => {
             const next = { ...previous };
-            for (const id of removableUrls) {
+            for (const id of removedIds) {
               const url = next[id];
               if (url) {
                 try { URL.revokeObjectURL(url); } catch { /* */ }
@@ -3222,6 +3250,8 @@ export default function App() {
   const [slideImgGenBusy, setSlideImgGenBusy] = useState({});
   // Progresso da geração (texto + imagens) — exibido como barra fixa enquanto roda
   const [genProgress, setGenProgress] = useState(null); // null | { phase, current, total, label }
+  // Importação manual é independente da IA: cancelar uma não pode abortar a outra.
+  const [importProgress, setImportProgress] = useState(null);
   const [creationPreviewSlides, setCreationPreviewSlides] = useState([]);
   /** Cancela import de fotos em curso (lote / foto única). */
   const importAbortRef = useRef(null);
@@ -3230,12 +3260,14 @@ export default function App() {
   const [quickPrompt, setQuickPrompt] = useState('');
   const quickPromptCardScript = useMemo(() => (
     activeProductKind === 'carrossel'
-      ? (parseExplicitCardScript(quickPrompt) || parseExplicitCardScript(material?.content))
+      ? (() => {
+          const candidate = parseExplicitCardScript(quickPrompt) || parseExplicitCardScript(material?.content);
+          return canAutoApplyExplicitCardScript(candidate) ? candidate : null;
+        })()
       : null
   ), [activeProductKind, material?.content, quickPrompt]);
   const cancelGeneration = useCallback(() => {
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
-    if (importAbortRef.current) importAbortRef.current.cancelled = true;
     generationRef.current?.cancel();
     cancelAllAIGeneration();
     generationRef.current = null;
@@ -3247,6 +3279,12 @@ export default function App() {
     setRefining(false);
     setGenCaption(false);
     toast('Operação cancelada. O que já foi concluído foi mantido.', 'info');
+  }, [toast]);
+  const cancelImport = useCallback(() => {
+    if (importAbortRef.current) importAbortRef.current.cancelled = true;
+    importAbortRef.current = null;
+    setImportProgress(null);
+    toast('Importação cancelada. As fotos já aplicadas foram mantidas.', 'info');
   }, [toast]);
   useEffect(() => {
     setQuickPrompt(
@@ -3260,8 +3298,11 @@ export default function App() {
       generationRef.current?.cancel();
       generationRef.current = null;
       if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+      if (importAbortRef.current) importAbortRef.current.cancelled = true;
+      importAbortRef.current = null;
       cancelAllAIGeneration();
       setGenProgress(null);
+      setImportProgress(null);
     };
   }, [activeEntry?.id]);
   useEffect(() => {
@@ -3911,7 +3952,7 @@ export default function App() {
     // que tente voltar para este card depois da importação.
     const job = { cancelled: false };
     importAbortRef.current = job;
-    setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Importando a foto… 0/1' });
+    setImportProgress({ phase: 'import', current: 0, total: 1, label: 'Importando a foto… 0/1' });
     void (async () => {
       try {
         if (job.cancelled) return;
@@ -3920,7 +3961,7 @@ export default function App() {
           toast(validation.message, 'error', 6000);
           return;
         }
-        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Lendo a foto… 0/1' });
+        setImportProgress({ phase: 'import', current: 0, total: 1, label: 'Lendo a foto… 0/1' });
         const url = await vcImageFileToStorageDataUrl(file);
         if (job.cancelled) return;
         if (typeof url !== 'string' || url.length < 32) {
@@ -3931,7 +3972,7 @@ export default function App() {
           toast('Formato não reconhecido após a leitura. Tente outro arquivo PNG, JPEG ou WebP.', 'error', 4500);
           return;
         }
-        setGenProgress({ phase: 'import', current: 0, total: 1, label: 'Salvando a foto… 0/1' });
+        setImportProgress({ phase: 'import', current: 0, total: 1, label: 'Salvando a foto… 0/1' });
         let patch;
         try {
           patch = await guardarImagemDoSlide(url);
@@ -3941,7 +3982,7 @@ export default function App() {
         }
         if (job.cancelled) return;
         if (!patch?.bgImage && !patch?.bgImageId) {
-          toast('Não foi possível guardar a imagem.', 'error', 4500);
+          toast('Não foi possível salvar a imagem.', 'error', 4500);
           return;
         }
         if (patch.bgImageId && patch.bgImage) {
@@ -3953,15 +3994,17 @@ export default function App() {
           bgImageFailed: false,
           bgImageError: null,
         });
-        setGenProgress({ phase: 'import', current: 1, total: 1, label: 'Foto importada · 1/1' });
+        setImportProgress({ phase: 'import', current: 1, total: 1, label: 'Foto importada · 1/1' });
         toast('Foto importada.', 'success', 2500);
       } catch (err) {
         if (job.cancelled) return;
         console.error('[foto]', err);
         toast(err?.message || 'Falha ao importar a foto.', 'error', 5000);
       } finally {
-        if (importAbortRef.current === job) importAbortRef.current = null;
-        setGenProgress((prev) => (prev?.phase === 'import' ? null : prev));
+        if (importAbortRef.current === job) {
+          importAbortRef.current = null;
+          setImportProgress(null);
+        }
       }
     })();
   }, [updateSlideAt, toast]);
@@ -4119,13 +4162,17 @@ export default function App() {
 
   const handleImportTextApply = useCallback((parsed) => {
     const isPresentation = activeProductKind === 'apresentacao';
-    const { slides: next, created, updated } = applyImportedTextToSlides(
+    const { slides: next, created, updated, confirmationRequired } = applyImportedTextToSlides(
       slidesLiveRef.current,
       parsed,
       mkSlide,
       brand,
       { isPresentation },
     );
+    if (confirmationRequired) {
+      toast('Confirme no importador que cada bloco deve virar um card.', 'warning', 6000);
+      return false;
+    }
     setSlides(next);
     // LEGENDA global do documento → caption do post; legendas por página ficam em slide.caption
     if (parsed?.caption) setCaption(parsed.caption);
@@ -4140,15 +4187,18 @@ export default function App() {
       cards: String(parsed?.cards?.length || 0),
       created: String(created),
     });
+    return true;
   }, [activeProductKind, brand, setCaption, setSlides, toast]);
 
   const handleTeamShareLinked = useCallback((meta) => {
     const shareCode = meta?.code || '';
+    const shareProjectId = meta?.projectId || '';
     const shareRevision = meta?.revision ?? 0;
     const shareUpdatedAt = meta?.updatedAt ?? Date.now();
     history.set((d) => ({
       ...d,
       shareCode: shareCode || d.shareCode || '',
+      shareProjectId: shareProjectId || d.shareProjectId || '',
       shareRevision: shareRevision || d.shareRevision || 0,
       shareUpdatedAt,
     }));
@@ -4157,6 +4207,7 @@ export default function App() {
     const nextDoc = {
       ...current.doc,
       shareCode: shareCode || current.doc.shareCode || '',
+      shareProjectId: shareProjectId || current.doc.shareProjectId || '',
       shareRevision: shareRevision || current.doc.shareRevision || 0,
       shareUpdatedAt,
     };
@@ -4192,6 +4243,7 @@ export default function App() {
     const shaped = ensureDocShape({
       ...hydrated,
       shareCode: payload.code || hydrated.shareCode || '',
+      shareProjectId: payload.projectId || hydrated.shareProjectId || '',
       shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
@@ -4232,6 +4284,7 @@ export default function App() {
     const shaped = ensureDocShape({
       ...hydrated,
       shareCode: code || hydrated.shareCode || '',
+      shareProjectId: payload.projectId || hydrated.shareProjectId || '',
       shareRevision: payload.revision ?? hydrated.shareRevision ?? 0,
       shareUpdatedAt: payload.updatedAt ?? Date.now(),
     });
@@ -4275,7 +4328,7 @@ export default function App() {
       toast(
         created
           ? `Projeto da equipe adicionado à biblioteca${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`
-          : `Projeto da equipe actualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`,
+          : `Projeto da equipe atualizado${withPhoto ? ` · ${withPhoto} imagem${withPhoto === 1 ? '' : 'ns'}` : ''}${failed ? `. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}.` : '.'}`,
         failed ? 'warning' : 'success',
         5000,
       );
@@ -4350,7 +4403,7 @@ export default function App() {
     const job = { cancelled: false };
     importAbortRef.current = job;
     const total = files.length;
-    setGenProgress({
+    setImportProgress({
       phase: 'import',
       current: 0,
       total,
@@ -4377,7 +4430,7 @@ export default function App() {
         for (let i = 0; i < files.length; i += 1) {
           if (job.cancelled) break;
           const file = files[i];
-          setGenProgress({
+          setImportProgress({
             phase: 'import',
             current: i,
             total,
@@ -4398,7 +4451,7 @@ export default function App() {
             // Mantém a relação 1 arquivo = 1 card. Se o primeiro arquivo for
             // recusado, o segundo continua pertencendo ao card 2.
             urls.push(null);
-            setGenProgress({
+            setImportProgress({
               phase: 'import',
               current: i + 1,
               total,
@@ -4420,7 +4473,7 @@ export default function App() {
             console.warn('[batch-photos] guardar falhou', err);
             urls.push({ bgImage: dataUrl, bgImageId: null, bgImageFailed: false, bgImageError: null });
           }
-          setGenProgress({
+          setImportProgress({
             phase: 'import',
             current: i + 1,
             total,
@@ -4474,8 +4527,10 @@ export default function App() {
         console.error('[batch-photos]', err);
         toast(err?.message || 'Falha ao importar imagens. Use JPEG ou PNG e recarregue (Cmd+Shift+R).', 'error', 7000);
       } finally {
-        if (importAbortRef.current === job) importAbortRef.current = null;
-        setGenProgress((prev) => (prev?.phase === 'import' ? null : prev));
+        if (importAbortRef.current === job) {
+          importAbortRef.current = null;
+          setImportProgress(null);
+        }
       }
     })();
   }, [activeProductKind, brand, setSlides, toast]);
@@ -4631,11 +4686,15 @@ export default function App() {
     if (!snap) return { ok: false, reason: 'slide_missing' };
     const slideId = snap.id;
     const expectedImageIdentity = slideImageIdentity(snap);
+    const queryOverride = String(target?.queryOverride || '').trim();
+    const generationSnap = queryOverride
+      ? { ...snap, imageQuery:queryOverride, imgMode:'dalle' }
+      : snap;
     if (slideImgGenIdsRef.current.has(slideId)) return { ok: false, reason: 'already_generating', slideId };
 
     const itemLabel = fmt === 'apresentacao' ? 'slide' : 'card';
 
-    const imageState = slideImageGenerationState(snap, imageGenerationAvailability, styleKit);
+    const imageState = slideImageGenerationState(generationSnap, imageGenerationAvailability, styleKit);
     if (!imageState.canGenerate) {
       toast(imageState.message, 'error');
       return { ok: false, reason: imageState.reason, slideId };
@@ -4647,9 +4706,15 @@ export default function App() {
     try {
       const url = await generateDALLEWithRetry(imageState.query, openaiKey, imgParams, {
         signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, snap.refImage, snap.refImageId || snap.refImageAssetId, snap.imageReferences), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(snap, imageState.extraPrompt)),
+        refImages: await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal),
+        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, imageState.extraPrompt)),
         aspectRatio: imageAspectRatioForFormat(fmt),
+        usageContext: {
+          projectId: generationProjectId,
+          projectName: activeEntry?.name || '',
+          cardId: slideId,
+          cardNumber: idx + 1,
+        },
       });
       // Bytes para o IndexedDB; no documento fica só o id (ver image-store.js).
       const patchImg = await guardarImagemDoSlide(url);
@@ -4666,6 +4731,7 @@ export default function App() {
         expectedImageIdentity,
         patch: {
           ...patchImg,
+          imageQuery: imageState.query,
           imgMode: 'dalle',
           bgFit: 'cover',
           bgX: 50,
@@ -4701,7 +4767,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast, activeEntry?.name]);
 
   useEffect(() => {
     const onQuota = (ev) => {
@@ -4999,6 +5065,22 @@ export default function App() {
       });
       if (!ok) return { cancelled: true };
     }
+    const explicitCardScriptCandidate = !isApresentacaoPreset(requestedPresetId)
+      ? (topicCardScript || parseExplicitCardScript(material?.content))
+      : null;
+    let explicitCardScript = explicitCardScriptCandidate;
+    if (explicitCardScriptCandidate?.requiresConfirmation) {
+      const label = explicitCardScriptCandidate.ambiguity?.labels?.join(', ') || 'Página/Post/Ideia';
+      const confirmed = window.confirm(
+        `Encontrei ${explicitCardScriptCandidate.count} blocos numerados com o rótulo ${label}.\n\nUsar esses blocos como roteiro de ${explicitCardScriptCandidate.count} cards?\n\nCancelar mantém a quantidade escolhida e trata o texto apenas como referência.`,
+      );
+      if (!confirmed) explicitCardScript = null;
+    }
+    if (remix) {
+      const validation = validateRemixCardCount(slides, explicitCardScript);
+      if (!validation.ok) throw new Error(validation.message);
+      count = slides.length;
+    }
     const generationProjectId = activeProjectRef.current;
     const job = startAIJob();
     generationRef.current = job;
@@ -5006,10 +5088,7 @@ export default function App() {
       if (activeProjectRef.current !== generationProjectId || generationRef.current !== job) job.cancel();
       throwIfGenerationCancelled(job.signal);
     };
-    const explicitCardScript = !isApresentacaoPreset(requestedPresetId)
-      ? (topicCardScript || parseExplicitCardScript(material?.content))
-      : null;
-    if (explicitCardScript) {
+    if (explicitCardScript && !remix) {
       const previousCount = Number(count);
       count = explicitCardScript.count;
       if (!remix && previousCount !== count) {
@@ -5130,6 +5209,11 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
     const remixBlock = remix ? buildRemixBlock(sourceSlides, fetchImagesNow) : '';
     const jsonShapeLine = buildGenerationJsonContract(cp, td, count, projectDesignInstructions ? PROJECT_DESIGN_SCHEMA : null, presentationPathId);
 
+    const requestedContentLanguage = resolveRequestedContentLanguage({
+      instructions: material?.context,
+      topic,
+      content: material?.content,
+    });
     const idiomaRegra = buildContentLanguageRule({
       instructions: material?.context,
       topic,
@@ -5254,6 +5338,7 @@ ${jsonShapeLine}`;
       aiOptions: {
         maxTokens: genMaxTokens,
         openaiKey,
+        contentLanguage: requestedContentLanguage.code,
         signal: job.signal,
         onRetry: ({ attempt, total, reason }) => {
           checkActive();
@@ -5632,6 +5717,12 @@ ${jsonShapeLine}`;
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
               ].filter(Boolean).join('\n'))),
               aspectRatio: generationPlan ? presentationPhotoAspectRatio(newSlides[i]) : isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
+              usageContext: {
+                projectId: generationProjectId,
+                projectName: activeEntry?.name || '',
+                cardId: slideId,
+                cardNumber: i + 1,
+              },
             });
             checkActive();
             const patchImg = await guardarImagemDoSlide(url);
@@ -5790,7 +5881,7 @@ ${jsonShapeLine}`;
           // A imagem acabou de entrar por `setSlides`; esperar o próximo tick
           // evita gravar o snapshot anterior sem os blobs/IDs recém-gerados.
           window.setTimeout(() => flushPersistRef.current?.(), 0);
-          toast('Projeto na sua conta e neste navegador. «Salvar» ou Sync na nuvem actualizam a cópia remota.', 'info', 7500);
+          toast('Projeto na sua conta e neste navegador. “Salvar” ou sincronizar atualizam a cópia remota.', 'info', 7500);
         }
       } catch { /* */ }
       return { cancelled: false };
@@ -6548,6 +6639,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
               aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
+              usageContext: {
+                projectId,
+                projectName: activeEntry?.name || '',
+                cardId: slideId,
+                cardNumber: i + 1,
+              },
             });
             const patchImg = await guardarImagemDoSlide(url);
             const liveTarget = activeProjectRef.current === projectId
@@ -6593,7 +6690,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           ? '1 imagem do template não carregou. Toque no card para tentar de novo.'
           : `${failCount} imagens do template não carregaram. Toque no card para tentar de novo.`, 'warning', 5000);
     })();
-  }, [activeProductKind, fmt, history, toast, setSlides, hasOpenAI, openaiKey, imgParams, styleKit]);
+  }, [activeProductKind, fmt, history, toast, setSlides, hasOpenAI, openaiKey, imgParams, styleKit, activeEntry?.name]);
 
   // Reordena slides (drag-and-drop)
   const reorderSlides = useCallback((from, to) => {
@@ -7957,7 +8054,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
                     <button
                       type="button"
                       onClick={() => setThumbQaMode((v) => !v)}
-                      title={thumbQaMode ? 'Sair do preview telemóvel (distância)' : 'QA: preview à distância do polegar'}
+                      title={thumbQaMode ? 'Sair da prévia no celular (distância)' : 'QA: prévia à distância do polegar'}
                       aria-label="Preview qualidade tipográfica"
                       aria-pressed={thumbQaMode}
                       style={{
@@ -8339,6 +8436,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
           ? { phase: 'tone', label: 'Analisando publicações e tom da marca…' }
           : genProgress}
         onCancel={cancelGeneration}
+        bottom={importProgress ? 190 : 16}
+      />}
+      {!creationSession && importProgress && <GenerationStatus
+        progress={importProgress}
+        onCancel={cancelImport}
       />}
 
       {/* Modals */}

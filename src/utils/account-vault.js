@@ -459,15 +459,19 @@ export async function accountVaultHasProjects(ownerId, aliases = []) {
   return slots.some((slot) => libraryCountFromBag(applyDeletedProjects(slot.keys, ...deletionBags)[SK.library]) > 0);
 }
 
-/** Imagens do cofre também estão em uso, mesmo com outra conta aberta. */
-export async function getAccountVaultImageIds() {
+/**
+ * IDs de mídia referenciados no cofre continuam em uso mesmo quando outra aba
+ * ou conta está aberta. O GC nunca deve inferir que um blob é órfão olhando
+ * apenas para a biblioteca carregada na aba atual.
+ */
+async function getAccountVaultMediaIds(fields) {
   const ids = new Set();
   if (typeof localStorage === 'undefined') return ids;
   // Se o cofre durável não puder ser lido, abortar o GC é mais seguro do que
-  // tratar imagens de outra conta como órfãs. Sem IDB, só existe o legado.
+  // tratar mídia de outra conta como órfã. Sem IDB, só existe o legado.
   const map = await accessVault(undefined, { allowFallback: typeof indexedDB === 'undefined' });
   const visited = new Set();
-  const imageKeys = new Set(['bgImageId', 'logoImageId', 'refImageId', 'imageId', 'refImageAssetId', 'assetId']);
+  const mediaKeys = new Set(fields);
   for (const ownerId of Object.keys(map)) {
     const resolved = resolveSlot(map, ownerId);
     if (!resolved || visited.has(resolved.ownerId)) continue;
@@ -480,13 +484,25 @@ export async function getAccountVaultImageIds() {
         const current = pending.pop();
         if (!current || typeof current !== 'object') continue;
         for (const [field, child] of Object.entries(current)) {
-          if (imageKeys.has(field) && typeof child === 'string' && child) ids.add(child);
+          if (mediaKeys.has(field) && typeof child === 'string' && child) ids.add(child);
           else if (child && typeof child === 'object') pending.push(child);
         }
       }
     }
   }
   return ids;
+}
+
+/** Imagens do cofre também estão em uso, mesmo com outra conta aberta. */
+export async function getAccountVaultImageIds() {
+  return getAccountVaultMediaIds([
+    'bgImageId', 'logoImageId', 'refImageId', 'imageId', 'refImageAssetId', 'assetId',
+  ]);
+}
+
+/** Vídeos do cofre também estão em uso, inclusive em projetos de outras abas. */
+export async function getAccountVaultVideoIds() {
+  return getAccountVaultMediaIds(['videoId']);
 }
 
 export { SNAPSHOT_KEYS };

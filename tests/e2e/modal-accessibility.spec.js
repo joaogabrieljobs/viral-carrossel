@@ -94,6 +94,44 @@ test('Importar texto prende o foco e devolve ao botão que abriu o diálogo', as
   await expect.poll(() => triggerHandle.evaluate(element => element.closest('[inert]') == null)).toBe(true);
 });
 
+test('Importar texto pede confirmação para Post antes de aplicar os blocos', async ({ page }) => {
+  await mockEditorApi(page, { session: SESSAO_ATIVA });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await selectEditorMode(page, 'diretor');
+  await page.getByRole('tab', { name: /^Narrativa$/i }).first().click();
+  await openPanel(page, 'Adicionar conteúdo');
+  await page.getByRole('button', { name: /Importar texto \(1 página = 1 card\)/i }).click();
+
+  const dialog = page.getByRole('dialog', { name: '1 página → 1 card', exact: true });
+  await dialog.getByLabel('Texto a importar', { exact: true }).fill(
+    'Post 1: 300 curtidas. Post 2: 120 curtidas. Post 3: 80 curtidas.',
+  );
+
+  await expect(dialog.getByRole('alert')).toContainText('Confirme a divisão antes de importar');
+  const apply = dialog.getByRole('button', { name: 'Aplicar aos cards', exact: true });
+  await expect(apply).toBeDisabled();
+
+  const confirmation = dialog.getByRole('checkbox', {
+    name: 'Confirmo que cada bloco deve virar um card.',
+    exact: true,
+  });
+  await confirmation.check();
+  await expect(apply).toBeEnabled();
+
+  // Uma confirmação antiga não vale para um texto novo.
+  await dialog.getByLabel('Texto a importar', { exact: true }).fill(
+    'Post 1: abertura. Post 2: desenvolvimento. Post 3: conclusão.',
+  );
+  await expect(confirmation).not.toBeChecked();
+  await expect(apply).toBeDisabled();
+
+  await confirmation.check();
+  await apply.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('main [data-vc-card-surface]')).toHaveCount(3);
+});
+
 test('Editar perfil prende o foco e Escape fecha primeiro o diálogo e depois o perfil', async ({ page }) => {
   await mockEditorApi(page, { session: SESSAO_ATIVA });
   await page.goto('/?app=1');

@@ -51,7 +51,7 @@ const STEPS = [
   {
     n: '02',
     title: 'Escolha a direção',
-    body: 'Escolha só texto ou texto e imagens. Selecione um modo narrativo ou Nenhum, para seguir o seu pedido sem uma estrutura predefinida.',
+    body: 'Escolha só texto ou texto e imagens. Selecione um modo narrativo ou Nenhum para seguir seu pedido sem uma estrutura predefinida.',
     image: IMG.steps[1],
   },
   {
@@ -194,7 +194,7 @@ const FAQ = [
   },
   {
     q: 'Os projetos ficam salvos na nuvem?',
-    a: 'Com login activo, os projetos sincronizam na nuvem desta conta (botão «Sync na nuvem» ou ao sair). Noutro browser, entre com o mesmo e-mail para restaurar. O backup JSON continua disponível como cópia extra.',
+    a: 'Com o login ativo, os projetos sincronizam na nuvem desta conta (botão «Sync na nuvem» ou ao sair). Em outro navegador, entre com o mesmo e-mail para restaurar. O backup JSON continua disponível como cópia extra.',
   },
   {
     q: 'Existe limite de carrosséis?',
@@ -202,7 +202,7 @@ const FAQ = [
   },
   {
     q: 'Preciso ser designer ou copywriter?',
-    a: 'Não. Comece em Criar rápido e refine o resultado. Controle profissional e Studio abrem mais controlos. Os modos narrativos são outra escolha: definem a estrutura do conteúdo; o tom de voz da marca acompanha qualquer modo. «Seguir meu pedido» gera sem fórmula predefinida.',
+    a: 'Não. Comece em Criar rápido e refine o resultado. Controle profissional e Studio abrem mais controles. Os modos narrativos são outra escolha: definem a estrutura do conteúdo; o tom de voz da marca acompanha qualquer modo. «Seguir meu pedido» gera sem fórmula predefinida.',
   },
   {
     q: 'Funciona no celular?',

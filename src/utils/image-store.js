@@ -148,11 +148,11 @@ export function newImageId() {
 
 export async function imagePut(id, blob, meta = {}) {
   if (!id || !blob) throw new Error('imagePut: id e blob obrigatórios.');
-  if (!isAccountDataWriteOwnerCurrent()) throw new Error('A conta mudou antes de guardar a imagem.');
+  if (!isAccountDataWriteOwnerCurrent()) throw new Error('A conta mudou antes de salvar a imagem.');
   const owner = activeMediaOwner();
   const db = await openDB();
   if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
-    throw new Error('A conta mudou antes de guardar a imagem.');
+    throw new Error('A conta mudou antes de salvar a imagem.');
   }
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
@@ -184,7 +184,7 @@ export async function imagePut(id, blob, meta = {}) {
         return;
       }
       if (!isAccountDataWriteOwnerCurrent() || activeMediaOwner() !== owner) {
-        finish(new Error('A conta mudou antes de guardar a imagem.'));
+        finish(new Error('A conta mudou antes de salvar a imagem.'));
         return;
       }
       try {

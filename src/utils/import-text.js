@@ -13,8 +13,12 @@ const SEPARATOR_LINE_RE = /^(?:-{3,}|={3,}.*|página\s*\d+\b.*|page\s*\d+\b.*|(?
  * Rótulos de campo. Ambíguos (gancho/corpo/abertura/texto) SÓ com `:` —
  * senão "Gancho forte" / "Abertura\nCorpo" viram campos por engano.
  */
+// Rótulos claros continuam aceitando o formato inline sem `:` ("Headline Foo"),
+// mas só quando há conteúdo depois de um espaço. Assim uma frase/card cujo
+// conteúdo inteiro é "Fecho.", "CTA" ou "Legenda" não vira um campo vazio e
+// não desaparece silenciosamente.
 const FIELD_TOKEN_RE =
-  /\b(?:(call[\s-]?to[\s-]?action|subt[ií]tulo|subtitle|t[ií]tulo|headline|title|cta|chamada|fecho|convite|legenda|caption)\b\s*:?\s*|(gancho|hook|abertura|corpo|texto)\s*:\s*)/gi;
+  /\b(?:(call[\s-]?to[\s-]?action|subt[ií]tulo|subtitle|t[ií]tulo|headline|title|cta|chamada|fecho|convite|legenda|caption)\b(?:\s*:\s*|[ \t]+(?=\S))|(gancho|hook|abertura|corpo|texto)\s*:\s*)/gi;
 
 const TOKEN_TO_FIELD = Object.freeze({
   titulo: 'titulo',
@@ -98,7 +102,7 @@ export function scrubLabelLeak(text) {
 
 function splitPages(raw) {
   const text = String(raw || '').replace(/\r\n/g, '\n').trim();
-  if (!text) return { pages: [], trailingCaption: '' };
+  if (!text) return { pages: [], trailingCaption: '', scriptConfirmation: null };
 
   let body = text;
   let trailingCaption = '';
@@ -115,9 +119,22 @@ function splitPages(raw) {
   // o conteúdo nesses casos; o parser compartilhado preserva cada bloco.
   const explicitScript = parseExplicitCardScript(body);
   if (explicitScript) {
+    const pages = explicitScript.blocks.map((block) => block.text);
+    if (explicitScript.preamble) {
+      pages[0] = `${explicitScript.preamble}\n${pages[0]}`.trim();
+    }
     return {
-      pages: explicitScript.blocks.map((block) => block.text),
+      pages,
       trailingCaption,
+      scriptConfirmation: explicitScript.requiresConfirmation
+        ? {
+            required: true,
+            reason: explicitScript.ambiguity?.reason || 'ambiguous-label',
+            labels: Array.isArray(explicitScript.ambiguity?.labels)
+              ? [...explicitScript.ambiguity.labels]
+              : [],
+          }
+        : null,
     };
   }
 
@@ -140,7 +157,11 @@ function splitPages(raw) {
     flush();
   }
 
-  return { pages: pages.length ? pages : (body ? [body] : []), trailingCaption };
+  return {
+    pages: pages.length ? pages : (body ? [body] : []),
+    trailingCaption,
+    scriptConfirmation: null,
+  };
 }
 
 function parseLabeledBlock(pageText) {
@@ -174,6 +195,13 @@ function parseLabeledBlock(pageText) {
     const value = source.slice(start, end).trim();
     if (!value) continue;
     fields[field] = fields[field] ? `${fields[field]}\n${value}`.trim() : value;
+  }
+
+  if (!unlabeled.length && !Object.values(fields).some((value) => String(value || '').trim())) {
+    return {
+      fields,
+      unlabeled: source.split('\n').map((line) => line.trim()).filter(Boolean),
+    };
   }
 
   return { fields, unlabeled };
@@ -211,17 +239,21 @@ function mapFieldsToSlide(fields, unlabeled) {
     if (peeled.theme && !titulo) titulo = peeled.theme;
   }
 
+  const hasLabeledTitle = Boolean(headline || titulo);
+  const unlabeledSupport = hasLabeledTitle
+    ? unlabeledClean.join('\n')
+    : unlabeledClean.slice(1).join('\n');
   let title = headline || titulo || unlabeledClean[0] || '';
   title = scrubLabelLeak(title);
 
   let subtitle = '';
   if (headline && titulo && headline !== titulo) {
     // Tema curto + subtítulo descritivo — tipografia limpa, sem amontoar labels
-    subtitle = [titulo, subtitulo].filter(Boolean).join('\n');
+    subtitle = [unlabeledSupport, titulo, subtitulo].filter(Boolean).join('\n');
   } else if (subtitulo) {
-    subtitle = subtitulo;
+    subtitle = [unlabeledSupport, subtitulo].filter(Boolean).join('\n');
   } else {
-    subtitle = unlabeledClean.slice(1).join('\n');
+    subtitle = unlabeledSupport;
   }
   subtitle = scrubLabelLeak(subtitle);
 
@@ -234,10 +266,10 @@ function mapFieldsToSlide(fields, unlabeled) {
 }
 
 /**
- * @returns {{ cards: Array<{title,subtitle,bodyAfterImage,caption}>, caption: string, pageCount: number }}
+ * @returns {{ cards: Array<{title,subtitle,bodyAfterImage,caption}>, caption: string, pageCount: number, scriptConfirmation: null|{required:boolean,reason:string,labels:string[]} }}
  */
 export function parseImportedText(raw) {
-  const { pages, trailingCaption } = splitPages(raw);
+  const { pages, trailingCaption, scriptConfirmation } = splitPages(raw);
   const cards = [];
   // Só a LEGENDA global do documento vai para a caption do post.
   const docCaption = scrubLabelLeak(trailingCaption);
@@ -258,6 +290,7 @@ export function parseImportedText(raw) {
     cards,
     caption: docCaption,
     pageCount: pages.length,
+    scriptConfirmation,
   };
 }
 
@@ -275,6 +308,14 @@ export function joinSlideCaptions(slides) {
 export function applyImportedTextToSlides(slides, parsed, mkSlideFn = mkSlide, brand = null, opts = {}) {
   const list = Array.isArray(slides) ? slides : [];
   const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
+  if (parsed?.scriptConfirmation?.required && parsed?.ambiguousScriptConfirmed !== true) {
+    return {
+      slides: list,
+      created: 0,
+      updated: 0,
+      confirmationRequired: true,
+    };
+  }
   if (!cards.length) return { slides: list, created: 0, updated: 0 };
 
   const isPresentation = !!opts.isPresentation;

@@ -31,13 +31,13 @@ const customerId = 'cus_pg_img';
 const periodStartSec = 1_790_000_000;
 const periodEndSec = periodStartSec + 30 * 86400;
 
-async function generate(operationId = 'stable-generation-1') {
+async function generate(operationId = 'stable-generation-1', usageContext) {
   const response = makeRes();
   await handler(makeReq({
     method: 'POST',
     headers: { origin: 'https://viralcarrossel.com.br' },
     cookie: `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email: 'x@teste.exemplo' }))}`,
-    body: { prompt: 'Imagem editorial para um card da clínica', operationId },
+    body: { prompt: 'Imagem editorial para um card da clínica', operationId, usageContext },
   }), response);
   return response;
 }
@@ -65,14 +65,19 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe('geração com quota Postgres', () => {
   it('reserva e confirma uma vez usando o ID do cliente', async () => {
-    const result = await generate();
+    const usageContext = {
+      projectId: 'clinica-01', projectName: 'Clínica Janine', cardId: 'card-2', cardNumber: 2,
+    };
+    const result = await generate('stable-generation-1', usageContext);
     expect(result.statusCode).toBe(200);
     expect(result.body.operationId).toBe('stable-generation-1');
     expect(quota.consumeImageCreditPostgres).toHaveBeenCalledWith(expect.objectContaining({
       customerId, periodStartSec, periodEndSec, operationId: 'stable-generation-1', limit: 50,
+      metadata: usageContext,
     }));
     expect(quota.settleImageCreditPostgres).toHaveBeenCalledWith({
       customerId, periodStartSec, operationId: 'stable-generation-1',
+      metadata: { ...usageContext, imageId: 'task-1' },
     });
     expect(quota.refundImageCreditPostgres).not.toHaveBeenCalled();
   });
@@ -96,6 +101,7 @@ describe('geração com quota Postgres', () => {
     expect(result.statusCode).toBe(502);
     expect(quota.refundImageCreditPostgres).toHaveBeenCalledWith({
       customerId, periodStartSec, operationId: 'failed-generation-1',
+      metadata: undefined,
     });
     expect(quota.settleImageCreditPostgres).not.toHaveBeenCalled();
   });

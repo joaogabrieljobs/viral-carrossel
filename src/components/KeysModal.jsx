@@ -439,7 +439,7 @@ export default function KeysModal({
                       <div className="vc-label" style={{ marginBottom: 8 }}>Imagens do plano</div>
                       <p style={{ margin: '0 0 12px', fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted)' }}>
                         Nos planos Criador, Pro e Max as imagens já estão inclusas — gera direto no editor.
-                        No Essencial (R$ 19,90), active abaixo a sua própria chave para gerar imagens.
+                        No Essencial (R$ 19,90), ative abaixo sua própria chave para gerar imagens.
                       </p>
                       <label style={{
                         display: 'flex',
@@ -458,7 +458,7 @@ export default function KeysModal({
                         <span>
                           Usar minha chave de imagem
                           <span style={{ display: 'block', marginTop: 4, fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>
-                            Ideal no plano Essencial · consome a tua conta do provedor, não a quota do plano
+                            Ideal no plano Essencial · o uso é cobrado na sua conta do provedor, não no saldo do plano
                           </span>
                         </span>
                       </label>
@@ -466,7 +466,7 @@ export default function KeysModal({
 
                     {!draft.useOwnImageKey ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Nada a configurar aqui se o teu plano inclui imagens. Texto já vem incluso (Moont AI) — sem chave.
+                        Nada a configurar aqui se seu plano inclui imagens. O texto já vem incluso (Moont AI) — sem chave.
                       </p>
                     ) : (
                       <>

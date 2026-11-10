@@ -287,6 +287,8 @@ const DEFAULT_DOC = {
   autoAdjustOnGenerate: true,
   /** Código de partilha com a equipe (sync servidor). */
   shareCode: '',
+  /** Identidade canônica do projeto remoto; não atravessa cópias/importações. */
+  shareProjectId: '',
   shareRevision: 0,
   shareUpdatedAt: 0,
 };
@@ -412,6 +414,9 @@ function ensureDocShape(d) {
   if (typeof out.caption !== 'string') out.caption = '';
   if (typeof out.shareCode !== 'string') out.shareCode = '';
   else out.shareCode = out.shareCode.trim().toUpperCase().slice(0, 12);
+  if (typeof out.shareProjectId !== 'string'
+    || !/^[A-Za-z0-9_-]{8,80}$/.test(out.shareProjectId.trim())) out.shareProjectId = '';
+  else out.shareProjectId = out.shareProjectId.trim();
   out.shareRevision = Number.isFinite(Number(out.shareRevision)) ? Number(out.shareRevision) : 0;
   out.shareUpdatedAt = Number.isFinite(Number(out.shareUpdatedAt)) ? Number(out.shareUpdatedAt) : 0;
   return out;

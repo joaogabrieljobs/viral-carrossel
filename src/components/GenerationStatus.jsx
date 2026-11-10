@@ -10,7 +10,7 @@ export function formatGenerationElapsed(seconds) {
 }
 
 /** Sempre visível, inclusive sobre modais e depois de trocar de aba. */
-export function GenerationStatus({ progress, onCancel }) {
+export function GenerationStatus({ progress, onCancel, bottom = 16 }) {
   const active = useSyncExternalStore(subscribeAIGeneration, getAIGenerationCount, getAIGenerationCount);
   const isImport = progress?.phase === 'import';
   const running = active > 0 || isImport;
@@ -57,7 +57,7 @@ export function GenerationStatus({ progress, onCancel }) {
     <div
       role="region"
       aria-label={regionLabel}
-      style={{ position: 'fixed', bottom: 16, left: 12, right: 12, zIndex: 9999, pointerEvents: 'none' }}
+      style={{ position: 'fixed', bottom, left: 12, right: 12, zIndex: 9999, pointerEvents: 'none' }}
     >
       <div style={{
         maxWidth: 560,

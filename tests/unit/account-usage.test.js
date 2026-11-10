@@ -110,7 +110,11 @@ describe('account usage page', () => {
       used: 3,
       limit: 50,
       activity: [
-        { source: 'editor', status: 'consumed', createdAt: '2026-11-06T12:00:00.000Z' },
+        {
+          source: 'editor', status: 'consumed', createdAt: '2026-11-06T12:00:00.000Z',
+          projectName: 'Campanha Éter', projectId: 'eter-01', cardNumber: 3,
+          cardId: 'slide-3', assetId: 'original_abcdefghijklmnopqrstuvwxyz_0123456789',
+        },
         { source: 'mcp', status: 'refunded', createdAt: '2026-11-06T11:00:00.000Z' },
         { source: 'mcp', status: 'reserved', createdAt: '2026-11-06T10:00:00.000Z' },
       ],
@@ -121,6 +125,10 @@ describe('account usage page', () => {
     expect(html).toContain('Crédito utilizado');
     expect(html).toContain('Crédito devolvido');
     expect(html).toContain('Em processamento');
+    expect(html).toContain('Projeto: Campanha Éter');
+    expect(html).toContain('Card 3');
+    expect(html).toContain('Imagem: original_abcdefg…23456789');
+    expect(html).toContain('title="original_abcdefghijklmnopqrstuvwxyz_0123456789"');
   });
 
   it('explains legacy totals when individual activity is still empty', () => {

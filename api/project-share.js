@@ -32,6 +32,33 @@ function normalizedShareCode(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
 }
 
+function normalizedShareProjectId(value) {
+  const id = String(value || '').trim();
+  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : '';
+}
+
+/**
+ * Identidade canônica do projeto remoto. Diferente do código de convite, ela
+ * vincula uma revisão ao projeto que entrou pela partilha. Backups importados
+ * e cópias removem este campo, portanto não conseguem publicar por engano por
+ * cima do projeto da equipe só porque ainda carregavam um `shareCode` antigo.
+ */
+function shareProjectIdForRecord(share) {
+  const persisted = normalizedShareProjectId(share?.shareProjectId);
+  if (persisted) return persisted;
+  const code = normalizedShareCode(share?.code);
+  return code ? `legacy_${code}` : '';
+}
+
+function shareDocBoundToRecord(share) {
+  const projectId = shareProjectIdForRecord(share);
+  return {
+    ...(share?.doc && typeof share.doc === 'object' ? share.doc : {}),
+    shareCode: normalizedShareCode(share?.code),
+    ...(projectId ? { shareProjectId: projectId } : {}),
+  };
+}
+
 async function hasVerifiedEmail(access) {
   if (!access?.customerId || !access?.email) return false;
   try {
@@ -83,6 +110,7 @@ function memberCount(share) {
 }
 
 async function publicShareResponse(share, actor, { includeDoc = true } = {}) {
+  const projectId = shareProjectIdForRecord(share);
   return {
     ok: true,
     code: share.code,
@@ -93,7 +121,8 @@ async function publicShareResponse(share, actor, { includeDoc = true } = {}) {
     isOwner: callerIsOwner(share, actor),
     isMember: await callerCanWrite(share, actor),
     memberCount: memberCount(share),
-    ...(includeDoc ? { doc: share.doc } : {}),
+    ...(projectId ? { projectId } : {}),
+    ...(includeDoc ? { doc: shareDocBoundToRecord(share) } : {}),
   };
 }
 
@@ -275,14 +304,22 @@ export default async function handler(req, res) {
         }
         const requestedCode = normalizedShareCode(body.code);
         const documentCode = normalizedShareCode(body.doc.shareCode);
-        if (!requestedCode || documentCode !== requestedCode) {
+        const projectId = shareProjectIdForRecord(existing);
+        const documentProjectId = normalizedShareProjectId(body.doc.shareProjectId);
+        if (!requestedCode || documentCode !== requestedCode
+          || !projectId || documentProjectId !== projectId) {
           throw Object.assign(new Error('Este código não pertence ao projeto enviado.'), {
             code: 'share_project_mismatch',
           });
         }
         return {
           ...existing,
-          doc: body.doc,
+          shareProjectId: projectId,
+          doc: {
+            ...body.doc,
+            shareCode: requestedCode,
+            shareProjectId: projectId,
+          },
           assetOwners: assetOwnersForRevision(body.doc, actor, existing.ownerId),
           name: typeof body.name === 'string' && body.name.trim()
             ? body.name.trim().slice(0, 120)
@@ -310,11 +347,13 @@ export default async function handler(req, res) {
       if (!(await getSharedProject(code))) break;
       code = makeCode();
     }
+    const shareProjectId = `sp_${makeCode()}${makeCode()}`;
     const saved = await putSharedProject({
       code,
       // A própria revisão guardada leva o vínculo. Assim qualquer cliente que
       // entrar pelo código também recebe a defesa contra publicar outro projeto.
-      doc: { ...body.doc, shareCode: code },
+      shareProjectId,
+      doc: { ...body.doc, shareCode: code, shareProjectId },
       name: typeof body.name === 'string' && body.name.trim()
         ? body.name.trim().slice(0, 120)
         : 'Projeto partilhado',
@@ -327,6 +366,7 @@ export default async function handler(req, res) {
     return res.status(201).json({
       ok: true,
       code: saved.code,
+      projectId: saved.shareProjectId,
       revision: saved.revision,
       updatedAt: saved.updatedAt,
     });

@@ -65,7 +65,7 @@ export function PublicationResultsModal({ doc, library, projectId, settings, onS
         <div style={{ padding: 20, display: 'grid', gap: 24 }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>Informe os números que você mediu no Instagram. Os dados ficam neste navegador e nos backups da biblioteca. Excluir o projeto também exclui seus registros locais.</p>
           <section aria-label="Comparação de resultados" style={{ display: 'grid', gap: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 16 }}>O que o seu histórico mostra</h3>
+            <h3 style={{ margin: 0, fontSize: 16 }}>O que seu histórico mostra</h3>
             <div style={gridStyle}>
               <label style={fieldStyle}>Conta para comparar e orientar a geração
                 <input className="vc-input" value={settings.account || ''} placeholder="@sua.conta" onChange={e => onSettingsChange({ account: e.target.value })}/>
@@ -101,7 +101,7 @@ export function PublicationResultsModal({ doc, library, projectId, settings, onS
 
           <form onSubmit={save} style={{ display: 'grid', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>{editing ? 'Atualizar números' : 'Registrar uma publicação'}</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{editing ? 'O texto original permanece guardado.' : 'Registre o projeto que corresponde ao post publicado. A cópia do texto atual será guardada junto dos números.'} Campos de métricas vazios significam “não medido”.</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>{editing ? 'O texto original permanece salvo.' : 'Registre o projeto que corresponde ao post publicado. A cópia do texto atual será salva junto dos números.'} Campos de métricas vazios significam “não medido”.</p>
             <div style={gridStyle}>
               <label style={fieldStyle}>Conta da publicação
                 <input className="vc-input" required disabled={!!editing} value={form.account} onChange={e => change('account', e.target.value)} placeholder="@sua.conta"/>

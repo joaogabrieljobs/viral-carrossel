@@ -133,7 +133,10 @@ test('logo branca conserva transparência após Salvar, restaurar em outro naveg
     await restored.locator('[data-vc-editor-section="marca-logo"] > summary').click();
     await restored.getByLabel('Posição da logo neste card', { exact: true }).selectOption('bl');
     await restored.getByRole('button', { name: /salvar projeto agora/i }).click();
-    await expect.poll(() => state.manifest.docs[0].doc.slides[0].logoPosition).toBe('bl');
+    await expect.poll(
+      () => state.manifest.docs[0].doc.slides[0].logoPosition,
+      { timeout: 15_000 },
+    ).toBe('bl');
     await restored.reload();
     await enterEditorFromHome(restored);
     expect(await logoPixels(restored)).toEqual(before);

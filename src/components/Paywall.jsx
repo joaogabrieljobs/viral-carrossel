@@ -39,7 +39,7 @@ export default function Paywall({
     try {
       const data = await startCheckout(email, { tier });
       if (data.requireLogin || data.alreadyActive) {
-        setError(data.message || 'Este e-mail já tem assinatura. Entre com Google para aceder.');
+        setError(data.message || 'Este e-mail já tem assinatura. Entre com Google para acessar.');
         return;
       }
       if (data.url) {

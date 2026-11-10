@@ -1135,7 +1135,8 @@ export const GLOBAL_STYLE = `
     font-size: 14px; font-family: var(--font-ui); font-weight: 400;
     letter-spacing: -0.016em;
     animation: fadeUp 0.18s var(--ease-smooth);
-    pointer-events: auto;
+    /* O aviso pode permanecer visível sem bloquear o editor abaixo dele. */
+    pointer-events: none;
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border: 1px solid transparent;
@@ -1152,6 +1153,7 @@ export const GLOBAL_STYLE = `
     min-width: 44px; min-height: 44px;
     display: inline-flex; align-items: center; justify-content: center;
     border-radius: 8px;
+    pointer-events: auto;
   }
   .toast-item.toast-info button { background: rgba(23,19,30,0.08); }
   .toast-item button:hover { background: rgba(255,255,255,0.24); }

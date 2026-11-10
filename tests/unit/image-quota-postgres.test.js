@@ -49,6 +49,7 @@ function fakeDatabase() {
             period_start_sec: start,
             operation_id: id,
             status: 'reserved',
+            metadata: JSON.parse(params[3] || '{}'),
             created_at: now,
             updated_at: now,
           });
@@ -59,6 +60,16 @@ function fakeDatabase() {
           currentOperations.set(opKey(owner, start, id), {
             ...current,
             status: params[3],
+            metadata: { ...(current?.metadata || {}), ...JSON.parse(params[4] || '{}') },
+            updated_at: new Date(clock += 1_000).toISOString(),
+          });
+          return [];
+        }
+        if (operation === 'moont_image_quota_merge_operation_metadata') {
+          const current = currentOperations.get(opKey(owner, start, id));
+          currentOperations.set(opKey(owner, start, id), {
+            ...current,
+            metadata: { ...(current?.metadata || {}), ...JSON.parse(params[3] || '{}') },
             updated_at: new Date(clock += 1_000).toISOString(),
           });
           return [];
@@ -160,8 +171,19 @@ describe('quota transacional de imagens', () => {
   it('lista a atividade do ciclo com origem, estado e ordem mais recente', async () => {
     const db = fakeDatabase();
     const adapter = quota(db);
-    await adapter.consumeImageCredit({ ...args, operationId: 'editor-ready' });
-    await adapter.settleImageCredit({ ...args, operationId: 'editor-ready' });
+    await adapter.consumeImageCredit({
+      ...args,
+      operationId: 'editor-ready',
+      metadata: {
+        projectId: 'project-eter', projectName: 'Éter\u0000 Pitch',
+        cardId: 'slide-3', cardNumber: 3, ignored: 'não persistir',
+      },
+    });
+    await adapter.settleImageCredit({
+      ...args,
+      operationId: 'editor-ready',
+      metadata: { assetId: 'original_abc', imageId: 'task-123' },
+    });
     await adapter.consumeImageCredit({ ...args, operationId: 'mcp_generate-7' });
     await adapter.consumeImageCredit({ ...args, operationId: 'editor-failed' });
     await adapter.refundImageCredit({ ...args, operationId: 'editor-failed' });
@@ -173,8 +195,14 @@ describe('quota transacional de imagens', () => {
     })).toEqual([
       expect.objectContaining({ source: 'editor', status: 'refunded', createdAt: expect.any(String), updatedAt: expect.any(String) }),
       expect.objectContaining({ source: 'mcp', status: 'reserved', createdAt: expect.any(String), updatedAt: expect.any(String) }),
-      expect.objectContaining({ source: 'editor', status: 'consumed', createdAt: expect.any(String), updatedAt: expect.any(String) }),
+      expect.objectContaining({
+        source: 'editor', status: 'consumed', createdAt: expect.any(String), updatedAt: expect.any(String),
+        projectId: 'project-eter', projectName: 'Éter Pitch', cardId: 'slide-3', cardNumber: 3,
+        assetId: 'original_abc', imageId: 'task-123',
+      }),
     ]);
+    expect(db.snapshot().operations.find(([, row]) => row.operation_id === 'editor-ready')?.[1]?.metadata)
+      .not.toHaveProperty('ignored');
   });
 
   it('trata reembolso de commit ambíguo sem reserva como no-op', async () => {

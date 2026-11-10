@@ -1,7 +1,6 @@
 import { ApprovalPanel } from './panels/ApprovalPanel.jsx';
 import { SlideLogoPanel } from './panels/SlideLogoPanel.jsx';
 import { LOGO_SIZE_MIN, LOGO_SIZE_MAX, LOGO_SIZE_DEFAULT } from '../utils/slide-logo.js';
-import { isGenerationCancelled, startAIJob, runAIJob, throwIfGenerationCancelled } from '../utils/generation-control.js';
 import { RemixPanel } from './panels/RemixPanel.jsx';
 // Extraído de ViralCarrossel.jsx pelo extrator AST (scripts/extract-module.mjs).
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
@@ -49,12 +48,8 @@ import { brandMatchesPalette, BODY_FONTS } from '../utils/brand-visuals.js';
 import { slideAutoAdjustPatch, slideHasPendingPhotoIntent } from '../utils/canvas-zones.js';
 import { normalizeDestaqueSpansForLen, remapDestaqueSpansOnEdit } from '../utils/text-spans.js';
 import { DEFAULT_SLIDE_TEXT_INSET } from '../utils/canvas-layout.js';
-import { generateDALLE } from '../utils/ai-client.js';
 import { guardarImagemDoSlide } from '../utils/image-store.js';
 import { styleKitHasContent } from '../utils/style-kit.js';
-import { composeImgExtraPrompt } from '../utils/style-kit.js';
-import { resolveImageReferences } from '../utils/style-kit-storage.js';
-import { composeSlideReferencePrompt } from '../utils/slide-reference.js';
 import { slideImageGenerationState } from '../utils/image-generation-readiness.js';
 import { creationMaterialLimits, creationMaterialOverages } from '../utils/create-project-flow.js';
 
@@ -472,7 +467,7 @@ function SidebarContent({
             value={valor}
             onChange={(e) => setBrand({ ...brand, [campo]: Number(e.target.value) })}
             style={{ flex:1 }}
-            aria-label={`${rotulo} em percentagem`}
+            aria-label={`${rotulo} em porcentagem`}
           />
           <button
             type="button"
@@ -495,29 +490,13 @@ function SidebarContent({
   const applyDalleQuery = async (q) => {
     if (!hasOpenAI) { toast?.('Para gerar imagens, confirme o seu plano ou a sua chave em Configurar IA.', 'error'); return; }
     const target = imageTargetRef.current;
-    updateSlide({ imageQuery: q, imgMode: 'dalle' });
     setDalleLoading(true);
-    const job = startAIJob();
     try {
-      const url = await generateDALLE(q, openaiKey, imgParams, {
-        signal: job.signal,
-        refImages: await runAIJob(() => resolveImageReferences(styleKit, slide.refImage, slide.refImageId || slide.refImageAssetId, slide.imageReferences), job.signal),
-        imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(slide, slide.imgExtraPrompt)),
-        aspectRatio: isPresentationProject ? '16:9' : (fmt === 'quadrado' ? '1:1' : fmt === 'stories' ? '9:16' : '4:5'),
+      await generateSlideImageAt(activeIdx, null, {
+        ...target,
+        queryOverride: String(q || '').trim(),
       });
-      // Bytes no IndexedDB; o documento fica com o id (ver image-store.js).
-      const patch = await guardarImagemDoSlide(url);
-      throwIfGenerationCancelled(job.signal);
-      if (!imageTargetMatches(imageTargetRef.current, target)) return;
-      updateSlide({ ...patch, bgImageFailed: false, bgImageError: null, bgImageSource: 'ai' });
-    } catch(e) {
-      if (!isGenerationCancelled(e) && imageTargetMatches(imageTargetRef.current, target)) {
-        updateSlide({ bgImageFailed: true, bgImageError: e?.code || e?.message || 'generation_failed' });
-        toast?.('GPT Image 2: '+e.message, 'error');
-      }
-    }
-    finally {
-      job.finish();
+    } finally {
       setDalleLoading(false);
     }
   };
@@ -873,7 +852,7 @@ function SidebarContent({
         )}
 
         {tab === 'narrativa' && narrativaPanel !== 'card' && appMode === 'criador' && projectHasCarouselContent(slides) && (
-          <S title="Depois de gerar" hint={`Revise, baixe ou abra mais controlos — sem recriar ${isPresentationProject ? 'a apresentação' : 'o carrossel'}.`}>
+          <S title="Depois de gerar" hint={`Revise, baixe ou abra mais controles — sem recriar ${isPresentationProject ? 'a apresentação' : 'o carrossel'}.`}>
             <PostGenerateActions
               onAdjustText={() => setNarrativaPanel('card')}
               onGenerateImages={generateMissingImages}
@@ -2306,7 +2285,7 @@ function SidebarContent({
                 </div>
               ) : null}
             </S>
-            <S sectionId="visual-elementos" title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do seleccionado.">
+            <S sectionId="visual-elementos" title="Elementos" hint="CTAs e traços premium — clique para inserir; edite texto e cores do item selecionado.">
               <ElementsPanel
                 brand={brand}
                 slide={slide}
@@ -2382,7 +2361,7 @@ function SidebarContent({
                     className="vc-btn vc-btn-ghost"
                     onClick={() => {
                       onSaveBrandContext(activeBrandId, styleKit);
-                      toast?.('Contexto deste projeto guardado na marca. Novos projetos herdam.', 'success', 4000);
+                      toast?.('Contexto deste projeto salvo na marca. Novos projetos herdam.', 'success', 4000);
                     }}
                     style={{ width: '100%', minHeight: 36, fontSize: 12, marginTop: 8 }}
                   >
@@ -2408,7 +2387,7 @@ function SidebarContent({
                     className="vc-btn vc-btn-ghost"
                     onClick={() => {
                       onSaveBrandContext(activeBrandId, styleKit);
-                      toast?.('Contexto deste projeto guardado na marca. Novos projetos herdam.', 'success', 4000);
+                      toast?.('Contexto deste projeto salvo na marca. Novos projetos herdam.', 'success', 4000);
                     }}
                     style={{ width: '100%', minHeight: 36, fontSize: 12 }}
                   >
@@ -3136,7 +3115,7 @@ function SidebarContent({
             </>)}
 
             {tab==='texto' && (<>
-            <S title="Fontes próprias (ficheiro)" hint="WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o ficheiro não tiver todos os pesos.">
+            <S title="Fontes próprias (arquivo)" hint="WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o arquivo não tiver todos os pesos.">
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div>
                   <label className="vc-label-sm">Ficheiro — títulos da marca</label>
@@ -3208,7 +3187,7 @@ function SidebarContent({
                           if (!file) return;
                           const max = 5 * 1024 * 1024;
                           if (file.size > max) {
-                            toast?.('Ficheiro demasiado grande. Máximo 5MB.', 'error');
+                            toast?.('Arquivo muito grande. Máximo de 5 MB.', 'error');
                             e.target.value = '';
                             return;
                           }
@@ -3298,7 +3277,7 @@ function SidebarContent({
                           if (!file) return;
                           const max = 5 * 1024 * 1024;
                           if (file.size > max) {
-                            toast?.('Ficheiro demasiado grande. Máximo 5MB.', 'error');
+                            toast?.('Arquivo muito grande. Máximo de 5 MB.', 'error');
                             e.target.value = '';
                             return;
                           }
@@ -4241,8 +4220,8 @@ function SidebarContent({
           if (!onImportTextApply) return;
           setImportTextBusy(true);
           try {
-            await onImportTextApply(parsed);
-            setImportTextOpen(false);
+            const applied = await onImportTextApply(parsed);
+            if (applied !== false) setImportTextOpen(false);
           } finally {
             setImportTextBusy(false);
           }

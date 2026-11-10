@@ -12,7 +12,7 @@ import {
   normalizePresentationPath,
 } from '../../utils/presentation.js';
 import { MOONT_NARRATIVES } from '../../config/moont-brand.js';
-import { parseExplicitCardScript } from '../../utils/structured-card-script.js';
+import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../../utils/structured-card-script.js';
 
 const QUICK_PRODUCTS = [
   { ...MOONT_NARRATIVES.carrossel, flow: 'Faça uma ideia circular' },
@@ -98,12 +98,11 @@ export function CriarRapidoHome({
   const previousIdentityCompleteRef = useRef(identityComplete);
   const hasResult = projectHasCarouselContent(slides);
   const promptTrim = String(quickPrompt || '').trim();
-  const explicitCardScript = useMemo(
-    () => (isPresentation
-      ? null
-      : (parseExplicitCardScript(promptTrim) || parseExplicitCardScript(material?.content))),
-    [isPresentation, material?.content, promptTrim],
-  );
+  const explicitCardScript = useMemo(() => {
+    if (isPresentation) return null;
+    const candidate = parseExplicitCardScript(promptTrim) || parseExplicitCardScript(material?.content);
+    return canAutoApplyExplicitCardScript(candidate) ? candidate : null;
+  }, [isPresentation, material?.content, promptTrim]);
   const generationPrompt = promptTrim
     || (explicitCardScript ? 'Siga exatamente o roteiro explícito por card do material de apoio.' : '');
   const displayedQuickCardCount = explicitCardScript?.count ?? quickCardCount;
@@ -170,7 +169,7 @@ export function CriarRapidoHome({
       }));
       toast?.(
         stored.logoLowRes
-          ? 'Logo salva, mas o PNG é pequeno (<600px). Para nitidez, use um ficheiro maior com fundo transparente.'
+          ? 'Logo salva, mas o PNG é pequeno (<600px). Para nitidez, use um arquivo maior com fundo transparente.'
           : `Logo salva. Novos ${isPresentation ? 'slides' : 'cards'} deste projeto já saem com ela.`,
         stored.logoLowRes ? 'info' : 'success',
         stored.logoLowRes ? 7000 : 4000,

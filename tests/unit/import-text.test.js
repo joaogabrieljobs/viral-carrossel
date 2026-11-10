@@ -76,6 +76,64 @@ Legenda final #a #b
     expect(parsed.cards[1]).toMatchObject({ title: 'Conclusão.', subtitle: 'Próximo passo.' });
     expect(parsed.cards.map((card) => `${card.title} ${card.subtitle}`).join(' ')).not.toMatch(/Card 0?[12]/i);
   });
+
+  it('preserva o preâmbulo no primeiro card em vez de descartá-lo', () => {
+    const parsed = parseImportedText('Contexto obrigatório da campanha. Card 1: Abertura. Card 2: Fecho.');
+
+    expect(parsed.cards).toHaveLength(2);
+    expect(`${parsed.cards[0].title} ${parsed.cards[0].subtitle}`).toContain('Contexto obrigatório');
+    expect(`${parsed.cards[0].title} ${parsed.cards[0].subtitle}`).toContain('Abertura');
+  });
+
+  it('preserva o preâmbulo quando o primeiro card também usa Título rotulado', () => {
+    const parsed = parseImportedText('Contexto obrigatório. Card 1: Título: Abertura. Card 2: Título: Fecho.');
+
+    expect(parsed.cards).toHaveLength(2);
+    expect(parsed.cards[0].title).toBe('Abertura.');
+    expect(parsed.cards[0].subtitle).toContain('Contexto obrigatório.');
+  });
+
+  it.each([
+    ['Post 1: 300 curtidas. Post 2: 120 curtidas.', ['post']],
+    ['Ideia 1: bastidor. Ideia 2: oferta.', ['idea']],
+    ['Página 1: abertura. Página 2: dados.', ['page']],
+  ])('marca roteiro ambíguo para confirmação: %s', (raw, labels) => {
+    const parsed = parseImportedText(raw);
+
+    expect(parsed.cards).toHaveLength(2);
+    expect(parsed.scriptConfirmation).toEqual({
+      required: true,
+      reason: 'ambiguous-label',
+      labels,
+    });
+  });
+
+  it('não exige confirmação para Card explícito', () => {
+    expect(parseImportedText('Card 1: Abertura. Card 2: Fecho.').scriptConfirmation).toBeNull();
+  });
+
+  it.each(['CTA', 'Chamada', 'Legenda', 'Fecho.', 'CTA:'])('não perde bloco cujo conteúdo é apenas %s', (content) => {
+    const parsed = parseImportedText(`Card 1: Abertura. Card 2: Meio. Card 3: ${content}`);
+
+    expect(parsed.pageCount).toBe(3);
+    expect(parsed.cards).toHaveLength(3);
+    expect(Object.values(parsed.cards[2]).join(' ')).toContain(content.replace(':', ''));
+  });
+
+  it('preserva o Fecho do exemplo misto Card/Carrosel usado na sonda 10/11', () => {
+    const parsed = parseImportedText('Card 1: Abertura. Card 2: Meio. Carrosel 03: Fecho.');
+
+    expect(parsed.pageCount).toBe(3);
+    expect(parsed.cards).toHaveLength(3);
+    expect(Object.values(parsed.cards[2]).join(' ')).toContain('Fecho.');
+  });
+
+  it('limpa total, markdown, emoji e separador sem vazar para os cards', () => {
+    const parsed = parseImportedText('**Card 1 de 2** 👉 Abertura.--- **Card 2/2** — Fecho.---');
+
+    expect(parsed.cards).toHaveLength(2);
+    expect(parsed.cards.map((card) => Object.values(card).join(' ')).join(' ')).not.toMatch(/de 2|\/2|\*\*|👉|---/);
+  });
 });
 
 describe('scrubLabelLeak', () => {
@@ -114,5 +172,28 @@ Legenda: Nota C #tag
     expect(slides[2].showSwipeCue).toBe(false);
     expect(joinSlideCaptions(slides)).toMatch(/Nota do card A/);
     expect(joinSlideCaptions(slides)).toMatch(/Nota C/);
+  });
+
+  it('recusa roteiro ambíguo sem confirmação explícita e aplica depois dela', () => {
+    const parsed = parseImportedText('Post 1: Abertura. Post 2: Fecho.');
+    const original = [mkSlide(1)];
+
+    const blocked = applyImportedTextToSlides(original, parsed, mkSlide);
+    expect(blocked).toMatchObject({
+      slides: original,
+      created: 0,
+      updated: 0,
+      confirmationRequired: true,
+    });
+
+    const confirmed = applyImportedTextToSlides(
+      original,
+      { ...parsed, ambiguousScriptConfirmed: true },
+      mkSlide,
+    );
+    expect(confirmed.confirmationRequired).toBeUndefined();
+    expect(confirmed.slides).toHaveLength(2);
+    expect(confirmed.updated).toBe(1);
+    expect(confirmed.created).toBe(1);
   });
 });

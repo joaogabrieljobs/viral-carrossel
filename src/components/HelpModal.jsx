@@ -1,7 +1,9 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 
 export default function HelpModal({ open, onClose, onShowLanding, onStartTour }) {
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
   if (!open) return null;
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const Mod = isMac ? '⌘' : 'Ctrl';
@@ -19,13 +21,23 @@ export default function HelpModal({ open, onClose, onShowLanding, onStartTour })
     { keys:['?'],              label:'Abrir esta ajuda' },
   ];
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={e=>e.stopPropagation()} style={{ maxWidth:440 }}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={e=>e.stopPropagation()}
+        style={{ maxWidth:440 }}
+      >
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
         }}>
-          <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Atalhos de teclado</div>
+          <div id="help-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', fontFamily:'var(--font-display)', letterSpacing:'-0.022em' }}>Atalhos de teclado</div>
           <button onClick={onClose} aria-label="Fechar" className="vc-icon-btn">
             <X size={16}/>
           </button>

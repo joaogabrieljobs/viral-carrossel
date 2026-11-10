@@ -98,7 +98,7 @@ async function refundAll(ownerId, periodStartSec, operationIds) {
   return results.filter(Boolean);
 }
 
-async function reserveCredits(ownerId, quota, slides) {
+async function reserveCredits(ownerId, quota, slides, projectContext = {}) {
   const reserved = [];
   const ownedReservations = [];
   let last = null;
@@ -108,6 +108,12 @@ async function reserveCredits(ownerId, quota, slides) {
       consumed = await consumeImageCredit({
         customerId: ownerId, periodStartSec: quota.periodStartSec, periodEndSec: quota.periodEndSec,
         limit: quota.limit, operationId: slide.operationId,
+        metadata: {
+          projectId: projectContext.projectId,
+          projectName: projectContext.projectName,
+          cardId: slide.slideId,
+          cardNumber: slide.cardNumber,
+        },
       });
     } catch (error) {
       // A conexão pode cair depois de o backend confirmar a reserva. Inclua a
@@ -186,7 +192,12 @@ async function settleCredits(ownerId, periodStartSec, slides) {
   const results = await Promise.all(slides.map(async slide => {
     if (!slide.operationId || slide.creditReserved === false) return true;
     try {
-      if (slide.status === 'done') await settleImageCredit({ customerId: ownerId, periodStartSec, operationId: slide.operationId });
+      if (slide.status === 'done') await settleImageCredit({
+        customerId: ownerId,
+        periodStartSec,
+        operationId: slide.operationId,
+        metadata: { assetId: slide.assetId },
+      });
       else if (slide.status === 'failed') await refundImageCredit({ customerId: ownerId, periodStartSec, operationId: slide.operationId });
       return true;
     } catch (error) {
@@ -291,7 +302,17 @@ export async function startAgentImageJob(ownerId, tokenId, input, { schedule = d
     fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: project.version });
   }
   const selected = selectImageSlides(project.entry, input?.slideIds);
-  const slides = selected.map(slide => ({ ...slide, operationId: imageOperationId(requestId, slide.slideId) }));
+  const cardNumberById = new Map((project.entry?.doc?.slides || [])
+    .map((slide, index) => [slide?.id, index + 1]));
+  const slides = selected.map(slide => ({
+    ...slide,
+    cardNumber: cardNumberById.get(slide.slideId),
+    operationId: imageOperationId(requestId, slide.slideId),
+  }));
+  const projectContext = {
+    projectId: project.id,
+    projectName: project.entry?.name || project.entry?.doc?.name || '',
+  };
 
   const quota = await quotaContext(ownerId);
   const usage = await getQuotaUsage({ customerId: ownerId, periodStartSec: quota.periodStartSec,
@@ -317,7 +338,7 @@ export async function startAgentImageJob(ownerId, tokenId, input, { schedule = d
 
   let reservation;
   try {
-    reservation = await reserveCredits(ownerId, quota, slides);
+    reservation = await reserveCredits(ownerId, quota, slides, projectContext);
   } catch (error) {
     // Fecha o placeholder imediatamente. Assim o mesmo requestId não fica
     // pendente por 12 minutos quando a reserva falha.

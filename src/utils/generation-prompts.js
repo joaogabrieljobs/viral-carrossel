@@ -73,7 +73,7 @@ Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EV
     id: 'viral',
     Icon: TrendingUp,
     label: 'Viral Trends',
-    desc: 'Parada de scroll, loop de tensão, prova e frase para guardar ou mandar',
+    desc: 'Parada de scroll, loop de tensão, prova e frase para salvar ou enviar',
     method: `MÉTODO VIRAL TRENDS — retenção e clareza algorítmica (escala ao N de slides):
 Cada slide deve entregar informação e criar motivo para continuar; feche no miolo a pergunta aberta na capa.
 - Slide 1 · PARADA DE SCROLL (≤0,5s): UMA técnica abaixo. PROIBIDO abrir com "Hoje vou te ensinar", "Você sabia que", "5 dicas infalíveis".
@@ -104,7 +104,7 @@ Conte uma história sobre o tema; não explique em modo manual. Cenas com tempo,
   CONSEQUÊNCIA (como fica o mundo depois),
   e se couber GENERALIZAÇÃO leve (o que isso significa além deste caso) — antes do fecho.
 Se poucos slides: contexto → virada → consequência.
-- Último slide: convite a partilhar experiência. Ex.: "Já te aconteceu algo assim?" / "Qual foi teu '23h' com [tema]?"
+- Último slide: convite para compartilhar uma experiência. Ex.: "Já aconteceu algo assim com você?" / "Qual foi seu '23h' com [tema]?"
 Use verbos no passado/presente; EVITE "muitas pessoas", "em geral", gerúndio em excesso.`,
   },
   {
@@ -808,7 +808,7 @@ PACOTE ATIVO — ARQUÉTIPO "${t.name}" (mesmo molde que «Templates prontos» n
 ${t.desc}
 
 Regras:
-- Adapte títulos, subtítulos e imageQuery ao TEMA do utilizador; NÃO copie texto literal dos exemplos — preserve só a FUNÇÃO de cada posição no arco.
+- Adapte títulos, subtítulos e imageQuery ao TEMA do usuário; NÃO copie texto literal dos exemplos — preserve só a FUNÇÃO de cada posição no arco.
 - Cada imageQuery: inglês, 8–15 palavras, alinhada ao argumento do slide (pode inspirar-se na família visual dos exemplos).
 
 MATERIAL E EXEMPLOS:

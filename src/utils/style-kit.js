@@ -5,7 +5,7 @@
  * - refImages: moodboard (IDs no IndexedDB; data URLs apenas no legado/backup)
  */
 
-import { parseExplicitCardScript } from './structured-card-script.js';
+import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from './structured-card-script.js';
 
 const STYLE_PROMPT_MAX = 4000;
 const CONTEXT_MD_MAX = 48000;
@@ -121,7 +121,9 @@ function resolveQuickGenerationRequest(text, fallbackCount = 6, maxCount = 12) {
   const match = plain.match(/\b(\d+|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|catorze|quatorze|quinze|dezesseis)\s+(?:cards?|slides?|telas?|pecas?)\b/);
   const ceiling = Number.isInteger(maxCount) && maxCount >= 1 ? maxCount : 12;
   const scripted = parseExplicitCardScript(text, { maxCards: ceiling });
-  const count = scripted?.count ?? (match ? (words[match[1]] || Number(match[1])) : fallbackCount);
+  const count = canAutoApplyExplicitCardScript(scripted)
+    ? scripted.count
+    : (match ? (words[match[1]] || Number(match[1])) : fallbackCount);
   if (!Number.isInteger(count) || count < 1 || count > ceiling) throw new Error(`Peça entre 1 e ${ceiling} cards ou slides por geração.`);
   const announcement = /\b(anunciando|anuncie|anunciar|divulgue|divulgando|promova|anuncios?)\b/.test(plain);
   return { count, announcement };

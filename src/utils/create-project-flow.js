@@ -5,7 +5,7 @@ import { PRESENTATION_INSTRUCTIONS_MAX_CHARS } from './presentation-material.js'
 
 export const CREATION_STEPS = ['Projeto', 'Marca', 'Conteúdo', 'Narrativa', 'Quantidade', 'Visual', 'Revisão'];
 export const NARRATIVE_CHOICES = [
-  { id: 'none', label: 'Seguir meu pedido', desc: 'Organiza o conteúdo conforme o seu briefing.', example: 'Apresente meus serviços, benefícios e como contratar.' },
+  { id: 'none', label: 'Seguir meu pedido', desc: 'Organiza o conteúdo conforme seu briefing.', example: 'Apresente meus serviços, benefícios e como contratar.' },
   { id: 'editorial', label: 'Explicar com autoridade', desc: 'Defende uma ideia com contexto, argumentos e consequências.', example: 'Por que uma proposta clara ajuda o cliente a decidir.' },
   { id: 'how_to', label: 'Ensinar passo a passo', desc: 'Mostra uma sequência prática que a pessoa pode seguir.', example: 'Como preparar uma proposta comercial em cinco etapas.' },
   { id: 'storytelling', label: 'Contar uma história', desc: 'Conecta uma situação, uma mudança e o que aconteceu depois.', example: 'O que mudou quando uma pequena loja ganhou um site.' },

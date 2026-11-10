@@ -112,7 +112,7 @@ export async function storeSlideImageReference(file) {
   try {
     await imagePut(imageId, file);
   } catch {
-    throw new Error('Não foi possível guardar a referência neste navegador. Tente novamente; as imagens anteriores foram preservadas.');
+    throw new Error('Não foi possível salvar a referência neste navegador. Tente novamente; as imagens anteriores foram preservadas.');
   }
   return { id:imageId, imageId, name:String(file.name || 'Referência').slice(0, 80) };
 }
@@ -124,7 +124,7 @@ export async function storeSlideReference(file) {
     return { refImageId:stored.imageId, refImage:null, refImageAssetId:null };
   } catch (error) {
     if (error?.message?.includes('as imagens anteriores foram preservadas')) {
-      throw new Error('Não foi possível guardar a referência neste navegador. Tente novamente; a imagem anterior foi preservada.');
+      throw new Error('Não foi possível salvar a referência neste navegador. Tente novamente; a imagem anterior foi preservada.');
     }
     throw error;
   }

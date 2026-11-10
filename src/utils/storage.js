@@ -352,7 +352,7 @@ const lsSet = (key, value) => {
       if (!VC_QUOTA_HARD_ALREADY_NOTIFIED) {
         VC_QUOTA_HARD_ALREADY_NOTIFIED = true;
         if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vc:quota-exceeded', {
-          detail: 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para tentar guardar as alterações na sua conta.',
+          detail: 'Não foi possível salvar a cópia local porque o armazenamento deste navegador está cheio. Mantenha esta aba aberta e clique em Salvar para tentar salvar as alterações na sua conta.',
         }));
       }
     }

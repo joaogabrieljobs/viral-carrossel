@@ -68,7 +68,7 @@ export async function waitForSjinnTask(
 ) {
   const startedAt = Date.now();
   const timeout = () => {
-    const err = new Error('A geração de imagem demorou demasiado. Tente de novo.');
+    const err = new Error('A geração de imagem demorou muito. Tente novamente.');
     err.code = 'sjinn_timeout';
     return err;
   };
@@ -85,7 +85,7 @@ export async function waitForSjinnTask(
       throw err;
     }
   }
-  const err = new Error('A geração de imagem demorou demasiado. Tente de novo.');
+  const err = new Error('A geração de imagem demorou muito. Tente novamente.');
   err.code = 'sjinn_timeout';
   throw err;
 }

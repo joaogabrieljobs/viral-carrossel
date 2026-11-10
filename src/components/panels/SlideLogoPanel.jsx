@@ -166,7 +166,7 @@ export function SlideLogoPanel({
       updateSlide({ ...clearSlideLogoLayout(), logoHidden: false });
       toast?.(
         stored.logoLowRes
-          ? `Logo aplicada, mas o PNG é pequeno (<600px). Use um ficheiro maior para ficar nítida.`
+          ? `Logo aplicada, mas o PNG é pequeno (<600px). Use um arquivo maior para ficar nítida.`
           : `Logo da marca aplicada · tamanho ${LOGO_SIZE_IMPORT}px (ajuste no slider até ${LOGO_SIZE_MAX}).`,
         stored.logoLowRes ? 'info' : 'success',
         stored.logoLowRes ? 7000 : 4000,
@@ -203,7 +203,7 @@ export function SlideLogoPanel({
       });
       toast?.(
         patch.logoLowRes
-          ? `Logo no card ${cardN}, mas o PNG é pequeno (<600px). Prefira um ficheiro maior.`
+          ? `Logo no card ${cardN}, mas o PNG é pequeno (<600px). Prefira um arquivo maior.`
           : `Logo só no card ${cardN} · tamanho ${LOGO_SIZE_IMPORT}px.`,
         patch.logoLowRes ? 'info' : 'success',
         5500,

@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, Check, Image, Layers, Palette, Square, Wand2 } fr
 
 const FEATURES = [
   { icon: BookOpen, title: 'Um contexto para cada projeto', body: 'Guarde o brief, o estilo visual e até quatro referências. O aviso Contexto ON mostra qual direção está em uso.' },
-  { icon: Layers, title: 'Você escolhe o que gerar', body: 'Só texto ou texto e imagens. Escolha um dos oito modos narrativos ou Nenhum, para seguir o seu pedido sem fórmula predefinida.' },
+  { icon: Layers, title: 'Você escolhe o que gerar', body: 'Só texto ou texto e imagens. Escolha um dos oito modos narrativos ou Nenhum para seguir seu pedido sem fórmula predefinida.' },
   { icon: Wand2, title: 'Outro tom, a mesma identidade', body: 'Refaça em oito tons. No remix só de texto, imagens, fontes, cores e composição continuam como estão.' },
   { icon: Palette, title: 'Sua logo, no card que você escolher', body: 'Importe um PNG transparente uma vez. Reutilize a logo salva no projeto e ajuste tamanho e posição em cada card.' },
   { icon: Square, title: 'Pode parar quando precisar', body: 'O botão Cancelar geração continua disponível ao trocar de aba. O que já ficou pronto é mantido.' },

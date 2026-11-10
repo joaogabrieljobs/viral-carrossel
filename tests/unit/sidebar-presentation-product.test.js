@@ -87,6 +87,13 @@ describe('estado da ação de imagem por slide', () => {
     expect(imageTargetMatches({ projectId: 'p1', slideId: 's2' }, target)).toBe(false);
   });
 
+  it('encaminha busca e regeneração para o gerador canônico por projeto e card', () => {
+    const code = source('src/components/SidebarContent.jsx');
+    expect(code).not.toContain("import { generateDALLE }");
+    expect(code).toContain('await generateSlideImageAt(activeIdx, null, {');
+    expect(code).toContain('queryOverride: String(q || \'\').trim()');
+  });
+
   it('renderiza rótulo, estado ocupado e cópia conforme o produto', () => {
     const common = {
       width: 320,

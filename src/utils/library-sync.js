@@ -328,7 +328,7 @@ async function syncRequest(payload, { method = 'POST', query = '', signal, rateL
   const url = query ? `${SYNC_API}?${query}` : SYNC_API;
   const body = method === 'GET' ? undefined : JSON.stringify(payload);
   if (body && body.length > MAX_BODY_CHARS) {
-    throw new Error('Pedido de sync demasiado grande. Tente de novo (imagens serão enviadas à parte).');
+    throw new Error('Pedido de sincronização grande demais. Tente novamente (as imagens serão enviadas à parte).');
   }
   let res;
   try {
@@ -343,7 +343,7 @@ async function syncRequest(payload, { method = 'POST', query = '', signal, rateL
   } catch (e) {
     const raw = String(e?.message || e || '');
     if (/failed to fetch|networkerror|load failed/i.test(raw)) {
-      throw new Error('Não foi possível sincronizar (rede). Verifique a ligação e tente de novo.');
+      throw new Error('Não foi possível sincronizar (rede). Verifique a conexão e tente novamente.');
     }
     throw e instanceof Error ? e : new Error(raw);
   }
@@ -370,7 +370,7 @@ async function syncRequest(payload, { method = 'POST', query = '', signal, rateL
     }
     if (res.status === 413) throw new Error(data.error || 'Biblioteca grande demais para a nuvem.');
     if (res.status === 401 || res.status === 402) {
-      throw new Error(data.error || 'Faça login com assinatura activa para sincronizar.');
+      throw new Error(data.error || 'Faça login com uma assinatura ativa para sincronizar.');
     }
     if (res.status === 503) {
       throw new Error(data.error || 'Sync indisponível no servidor (configure Blob no Vercel).');

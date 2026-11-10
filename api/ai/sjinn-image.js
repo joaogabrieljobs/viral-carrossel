@@ -80,6 +80,12 @@ export default async function handler(req, res) {
   // Browsers antigos continuam utilizáveis, mas novos clientes enviam o mesmo
   // ID em cada tentativa de rede para não descontar duas vezes.
   const operationId = suppliedOperationId || randomUUID();
+  // Contexto opcional para explicar a cobrança na conta. A persistência
+  // sanitiza e limita os campos; clientes antigos podem continuar omitindo-o.
+  const usageContext = body.usageContext && typeof body.usageContext === 'object'
+    && !Array.isArray(body.usageContext)
+    ? body.usageContext
+    : undefined;
 
   let references;
   try {
@@ -152,6 +158,7 @@ export default async function handler(req, res) {
       periodEndSec,
       limit,
       operationId,
+      metadata: usageContext,
     });
   } catch (e) {
     console.error('[sjinn-image] quota', e?.message || e);
@@ -205,7 +212,12 @@ export default async function handler(req, res) {
     // A reserva já descontou o crédito. Se apenas esta anotação falhar, a
     // imagem e o débito permanecem válidos; não refazer a geração nem devolver.
     try {
-      await settleImageCredit({ customerId, periodStartSec, operationId });
+      await settleImageCredit({
+        customerId,
+        periodStartSec,
+        operationId,
+        metadata: { ...usageContext, imageId: taskId },
+      });
     } catch (settleError) {
       console.error('[sjinn-image] settle', settleError?.message || settleError);
     }
@@ -230,7 +242,7 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('[sjinn-image]', e?.message || e);
     try {
-      await refundImageCredit({ customerId, periodStartSec, operationId });
+      await refundImageCredit({ customerId, periodStartSec, operationId, metadata: usageContext });
     } catch (refundErr) {
       console.error('[sjinn-image] refund', refundErr?.message || refundErr);
     }

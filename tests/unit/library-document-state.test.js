@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { samePersistedDocument } from '../../src/hooks/useLibrary.js';
-import { detachTeamShareMetadata } from '../../src/utils/team-share-metadata.js';
+import {
+  detachLegacyTeamShareCopies,
+  detachTeamShareMetadata,
+} from '../../src/utils/team-share-metadata.js';
 
 describe('samePersistedDocument', () => {
   it('não trata a abertura do mesmo conteúdo como edição', () => {
@@ -38,6 +41,7 @@ describe('detachTeamShareMetadata', () => {
   it('transforma a duplicação em projeto independente sem perder o conteúdo', () => {
     const original = {
       shareCode: 'AB12CD34',
+      shareProjectId: 'sp_PROJETO12345678',
       shareRevision: 7,
       shareUpdatedAt: 123,
       shareMeta: { syncedAt: 100, includesImages: true },
@@ -47,11 +51,26 @@ describe('detachTeamShareMetadata', () => {
     const copy = detachTeamShareMetadata(original);
 
     expect(copy).not.toHaveProperty('shareCode');
+    expect(copy).not.toHaveProperty('shareProjectId');
     expect(copy).not.toHaveProperty('shareRevision');
     expect(copy).not.toHaveProperty('shareUpdatedAt');
     expect(copy).not.toHaveProperty('shareMeta');
     expect(copy.slides).toEqual(original.slides);
     expect(copy.slides).not.toBe(original.slides);
     expect(original.shareCode).toBe('AB12CD34');
+  });
+
+  it('neutraliza somente cópias legadas que ainda carregavam o código da equipe', () => {
+    const original = { id: 'projeto', name: 'Equipe', doc: { shareCode: 'AB12CD34', slides: [] } };
+    const legacyCopy = {
+      id: 'conflict-projeto',
+      conflictSourceId: 'projeto',
+      name: 'Equipe (cópia de conflito)',
+      doc: { shareCode: 'AB12CD34', shareRevision: 4, slides: [] },
+    };
+    const migrated = detachLegacyTeamShareCopies([original, legacyCopy]);
+    expect(migrated[0]).toBe(original);
+    expect(migrated[1].doc).not.toHaveProperty('shareCode');
+    expect(legacyCopy.doc.shareCode).toBe('AB12CD34');
   });
 });

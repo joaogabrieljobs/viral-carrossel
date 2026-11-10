@@ -33,5 +33,18 @@ describe('contrato de acessibilidade dos diálogos do editor', () => {
     expect(dialogs).toContain('onKeyDown={onDialogKeyDown}');
     expect(app).toContain('title="Substituir os cards?"');
   });
+
+  it.each([
+    'src/components/HelpModal.jsx',
+    'src/components/BrandsModal.jsx',
+  ])('aplica o contrato ao diálogo %s', (path) => {
+    const modal = source(path);
+    expect(modal).toContain("import { useModalDialog } from '../hooks/useModalDialog.js'");
+    expect(modal).toContain('ref={overlayRef}');
+    expect(modal).toContain('ref={dialogRef}');
+    expect(modal).toContain('onKeyDown={onDialogKeyDown}');
+    expect(modal).toContain('role="dialog"');
+    expect(modal).toContain('aria-modal="true"');
+  });
 });
 

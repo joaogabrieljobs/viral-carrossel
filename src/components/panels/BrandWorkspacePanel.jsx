@@ -42,7 +42,7 @@ export function BrandWorkspacePanel({
       stylePrompt: draftStyle,
     });
     setDirty(false);
-    toast?.('Contexto da marca guardado. Projetos novos herdam isto.', 'success', 3500);
+    toast?.('Contexto da marca salvo. Projetos novos herdam essas informações.', 'success', 3500);
   };
 
   const editors = (
@@ -111,7 +111,7 @@ export function BrandWorkspacePanel({
           }}
         >
           <Check size={13} />
-          Guardar contexto da marca
+          Salvar contexto da marca
         </button>
       ) : null}
     </div>

@@ -8,7 +8,7 @@ test.setTimeout(60_000);
 const CODE = 'AB12CD34';
 const BRAND = { id: 'invite-brand', name: 'Marca da equipe', titleFont: 'Arial', subtitleFont: 'Arial' };
 const shared = {
-  ok: true, code: CODE, name: 'Campanha da equipe', revision: 3, updatedAt: 1_790_000_000_000,
+  ok: true, code: CODE, projectId: 'sp_TEAMPROJECTA123456', name: 'Campanha da equipe', revision: 3, updatedAt: 1_790_000_000_000,
   doc: { brand: BRAND, fmt: 'carrossel', slides: [{
     id: 'team-slide', num: 1, title: 'Texto recebido da equipe', subtitle: 'Conteúdo íntegro do convite.',
   }] },
@@ -165,7 +165,7 @@ test('trocar de projeto limpa imediatamente o código e as ações da equipe ant
       {
         id: 'team-project-a', name: 'Projeto da equipe A', updatedAt: Date.now(),
         doc: {
-          fmt: 'carrossel', brand, shareCode: code, shareRevision: 2,
+          fmt: 'carrossel', brand, shareCode: code, shareProjectId: 'sp_TEAMPROJECTA123456', shareRevision: 2,
           slides: [{ id: 'team-a-slide', num: 1, title: 'Conteúdo compartilhado A' }],
         },
       },

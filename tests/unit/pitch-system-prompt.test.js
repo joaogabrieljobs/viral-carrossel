@@ -46,6 +46,33 @@ describe('papel do Pitch no transporte real de texto', () => {
     expect(envelope.provider).toBe('zai');
     expect(systemOf(envelope.payload)).toContain(PITCH_SYSTEM_PT);
   });
+
+  it('envia ao provedor um papel social coerente com o idioma resolvido', async () => {
+    setAIRuntimeSettings({ textProvider: 'zai' });
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(response({ ok: true })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callAI('brief', { json: true, contentLanguage: 'en' });
+    const system = systemOf(requestBody(fetchMock));
+    expect(system).toContain('natural English');
+    expect(system).toContain('Do not switch to Portuguese');
+    expect(system).not.toContain('Use português brasileiro em todo texto visível');
+  });
+
+  it.each([
+    ['pitch', 'pitch'],
+    ['presentation', 'keynote_manifesto'],
+  ])('mantém o papel especializado de %s sem forçar português', async (contentMode, presentationPath) => {
+    setAIRuntimeSettings({ textProvider: 'zai' });
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(response({ ok: true })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callAI('English brief', { json: true, contentMode, presentationPath, contentLanguage: 'en' });
+    const system = systemOf(requestBody(fetchMock));
+    expect(system).toContain('natural English');
+    expect(system).toContain('Do not switch to Portuguese');
+    expect(system).not.toContain('em português brasileiro');
+  });
 });
 
 describe('geração e segunda leitura do Pitch', () => {

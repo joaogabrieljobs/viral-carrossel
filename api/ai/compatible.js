@@ -68,7 +68,7 @@ export default async function handler(req, res) {
   const { provider, operation = 'chat', apiKey, payload } = readBody(req);
   const target = PROVIDERS[provider]?.[operation];
   if (!target || !['chat', 'images'].includes(operation)) {
-    return res.status(400).json({ error: { message: 'Pedido de IA inválido. Recarregue a página e tente de novo.' } });
+    return res.status(400).json({ error: { message: 'Pedido de IA inválido. Recarregue a página e tente novamente.' } });
   }
   const envKey = provider === 'zai'
     ? String(process.env.ZAI_API_KEY || '').trim()
@@ -87,13 +87,13 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: {
         message: operation === 'chat'
-          ? 'A IA incluída no plano não está configurada neste momento. Tente de novo mais tarde, ou use a sua própria chave em Configurar IA.'
+          ? 'A IA incluída no plano não está configurada neste momento. Tente novamente mais tarde ou use sua própria chave em Configurar IA.'
           : 'Falta a chave deste provedor de imagem. Adicione-a em Configurar IA.',
       },
     });
   }
   if (!payload || typeof payload !== 'object') {
-    return res.status(400).json({ error: { message: 'Pedido de IA incompleto. Recarregue a página e tente de novo.' } });
+    return res.status(400).json({ error: { message: 'Pedido de IA incompleto. Recarregue a página e tente novamente.' } });
   }
   // Chave da plataforma: allowlist de modelo, sem stream/tools, tectos de tokens e prompt (auditoria H4).
   if (!userKey) {
@@ -109,7 +109,7 @@ export default async function handler(req, res) {
     }
     payload.n = 1;
     if (messagesChars(payload) > PLATFORM_MAX_PROMPT_CHARS) {
-      return res.status(413).json({ error: { message: 'O material colado em Fontes é demasiado longo. Reduza o texto e tente de novo.' } });
+      return res.status(413).json({ error: { message: 'O material colado em Fontes é muito longo. Reduza o texto e tente novamente.' } });
     }
     const requested = Number(payload.max_tokens);
     payload.max_tokens = Number.isFinite(requested) && requested > 0
@@ -177,7 +177,7 @@ export default async function handler(req, res) {
     return res.status(timedOut ? 504 : 502).json({
       error: {
         message: timedOut
-          ? 'A IA demorou demasiado a responder. Tente de novo, com menos cards ou menos material colado em Fontes.'
+          ? 'A IA demorou muito para responder. Tente novamente com menos cards ou menos material colado em Fontes.'
           : 'Falha ao conectar ao provedor de IA.',
         code: timedOut ? 'upstream_timeout' : 'upstream_error',
       },

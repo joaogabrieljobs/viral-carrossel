@@ -29,7 +29,11 @@ beforeEach(() => {
   resetStripeMock();
   getQuotaUsage.mockReset().mockResolvedValue({ used: 12, limit: 50, remaining: 38, allowed: true });
   getImageQuotaActivity.mockReset().mockResolvedValue([
-    { source: 'editor', status: 'consumed', createdAt: '2026-10-13T12:00:00.000Z', updatedAt: '2026-10-13T12:01:00.000Z' },
+    {
+      source: 'editor', status: 'consumed', createdAt: '2026-10-13T12:00:00.000Z', updatedAt: '2026-10-13T12:01:00.000Z',
+      projectId: 'project-01', projectName: 'Projeto de uso', cardId: 'card-2', cardNumber: 2,
+      assetId: 'original_abc', imageId: 'task-123',
+    },
     { source: 'mcp', status: 'refunded', createdAt: '2026-10-13T11:00:00.000Z', updatedAt: '2026-10-13T11:01:00.000Z' },
   ]);
 });
@@ -44,7 +48,10 @@ describe('saldo de imagens na sessão', () => {
       imageQuota: {
         used: 12, limit: 50, remaining: 38, allowed: true, status: 'available', available: true, tier: 'creator',
         activity: [
-          { source: 'editor', status: 'consumed' },
+          {
+            source: 'editor', status: 'consumed', projectId: 'project-01', projectName: 'Projeto de uso',
+            cardId: 'card-2', cardNumber: 2, assetId: 'original_abc', imageId: 'task-123',
+          },
           { source: 'mcp', status: 'refunded' },
         ],
       },

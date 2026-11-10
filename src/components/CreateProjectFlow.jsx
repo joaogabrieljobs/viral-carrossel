@@ -14,7 +14,7 @@ import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx'
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
-import { parseExplicitCardScript } from '../utils/structured-card-script.js';
+import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../utils/structured-card-script.js';
 import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
 import '../styles/create-project-flow.css';
 
@@ -85,7 +85,8 @@ export default function CreateProjectFlow({
   const isPresentation = productKind === 'apresentacao';
   const explicitCardScript = useMemo(() => {
     if (isPresentation) return null;
-    return parseExplicitCardScript(topic) || parseExplicitCardScript(material.content);
+    const candidate = parseExplicitCardScript(topic) || parseExplicitCardScript(material.content);
+    return canAutoApplyExplicitCardScript(candidate) ? candidate : null;
   }, [isPresentation, material.content, topic]);
   const explicitCardCount = explicitCardScript?.count || 0;
   const materialLimits = creationMaterialLimits(productKind);
@@ -271,7 +272,7 @@ export default function CreateProjectFlow({
   };
   const reviewRow = (label, value, target) => <div key={label}><dt>{label}</dt><dd>{value}</dd><button type="button" disabled={busy || pending} onClick={() => go(target)} aria-label={`Alterar ${label.toLowerCase()}`}>Alterar</button></div>;
   const identityEditor = <div className="vc-create-stack">
-    <Field label={brandId === '__new__' ? 'Nome da nova marca' : 'Nome da marca no projeto'} hint={brandId === '__new__' ? 'Dê um nome para guardar esta marca. Se não quiser salvar, escolha Somente neste projeto.' : 'Opcional. Pode ficar vazio.'}><input className="vc-input" value={brand.name || ''} onChange={e => setBrand(b => ({ ...b, name:e.target.value }))} maxLength={80} placeholder="Ex.: Clínica Janine Araújo"/></Field>
+    <Field label={brandId === '__new__' ? 'Nome da nova marca' : 'Nome da marca no projeto'} hint={brandId === '__new__' ? 'Dê um nome para salvar esta marca. Se não quiser salvar, escolha Somente neste projeto.' : 'Opcional. Pode ficar vazio.'}><input className="vc-input" value={brand.name || ''} onChange={e => setBrand(b => ({ ...b, name:e.target.value }))} maxLength={80} placeholder="Ex.: Clínica Janine Araújo"/></Field>
     <div className="vc-create-grid"><Field label="Para quem é o conteúdo?" hint="Opcional."><input className="vc-input" value={brand.defaultAudience || ''} onChange={e => setBrand(b => ({ ...b, defaultAudience:e.target.value }))} placeholder="Ex.: profissionais de saúde"/></Field><Field label="Como a marca deve falar?" hint="Opcional. O tom salvo é reutilizado quando disponível."><input className="vc-input" value={brand.defaultTone || ''} onChange={e => setBrand(b => ({ ...b, defaultTone:e.target.value, brandTone:null }))} placeholder="Ex.: acolhedora, clara e profissional"/></Field></div>
     <Field label="O que o Moont precisa saber sobre a marca?" hint="Opcional. Produto, diferencial, público e cuidados com a comunicação."><textarea className="vc-input" rows={4} value={styleKit.contextMd} maxLength={CONTEXT_MD_MAX} onChange={e => setStyleKit(k => ({ ...k, contextMd:e.target.value }))}/></Field>
     <details className="vc-create-details"><summary>Cores e fontes — opcional</summary>{visualPreset && <p className="vc-create-note">Estes ajustes personalizam o preset neste projeto. Ao voltar para a identidade configurada ou trocar o tipo de projeto, as cores e fontes da identidade serão restauradas.</p>}<div className="vc-create-stack"><div className="vc-create-colors">{[{ key:'bg',label:'Cor de fundo' },{ key:'titleColor',label:'Cor dos títulos' },{ key:'textColor',label:'Cor do texto' },{ key:'accent',label:'Cor de destaque' }].map(field => <Field key={field.key} label={field.label}><input type="color" aria-label={field.label} value={/^#[0-9a-f]{6}$/i.test(brand[field.key] || '') ? brand[field.key] : '#000000'} onChange={e => editIdentityVisual(field.key === 'textColor' ? { textColor:e.target.value, subtitleColor:e.target.value } : { [field.key]:e.target.value })}/></Field>)}</div><div className="vc-create-grid"><Field label="Fonte dos títulos"><select className="vc-input" value={brand.titleFont || TITLE_FONTS[0].val} onChange={e => editIdentityVisual({ titleFont:e.target.value, customTitleFont:null })}>{!TITLE_FONTS.some(f => f.val === brand.titleFont) && brand.titleFont && <option value={brand.titleFont}>Fonte da identidade salva</option>}{TITLE_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field><Field label="Fonte do texto"><select className="vc-input" value={brand.bodyFont || BODY_FONTS[0].val} onChange={e => editIdentityVisual({ bodyFont:e.target.value, customBodyFont:null })}>{!BODY_FONTS.some(f => f.val === brand.bodyFont) && brand.bodyFont && <option value={brand.bodyFont}>Fonte da identidade salva</option>}{BODY_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field></div></div></details>

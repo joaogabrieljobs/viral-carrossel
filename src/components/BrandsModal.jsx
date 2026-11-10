@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
 import { Palette, X, Trash2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock.js';
+import { useModalDialog } from '../hooks/useModalDialog.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../utils/brand-helpers.js';
 
 export default function BrandsModal({ open, onClose, brands, activeBrandId, currentBrand, onApply, onSave, onDelete }) {
   useScrollLock(open);
+  const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({ open, onClose });
   const [newName, setNewName] = useState('');
   const [confirmDeleteBrandId, setConfirmDeleteBrandId] = useState(null);
   if (!open) return null;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ maxWidth:520 }}>
+    <div ref={overlayRef} className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        ref={dialogRef}
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="brands-modal-title"
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth:520 }}
+      >
         <div style={{
           display:'flex', alignItems:'center', justifyContent:'space-between',
           padding:'16px 20px', borderBottom:'1px solid var(--border)',
@@ -21,7 +33,7 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
               <Palette size={14} color="var(--text-secondary)"/>
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Marcas</div>
+              <div id="brands-modal-title" style={{ fontSize:17, fontWeight:600, color:'var(--text-primary)', letterSpacing:'-0.022em' }}>Marcas</div>
               <div style={{ fontSize:11, color:'var(--text-muted)' }}>{brands.length} {brands.length === 1 ? 'marca' : 'marcas'} · contexto herdado por projetos novos</div>
             </div>
           </div>
@@ -37,7 +49,7 @@ export default function BrandsModal({ open, onClose, brands, activeBrandId, curr
             borderRadius:10, padding:12, display:'flex', flexDirection:'column', gap:8,
           }}>
             <div style={{ fontSize:11, color:'var(--text-secondary)', fontFamily:'var(--font-ui)', lineHeight:1.45 }}>
-              Guardar a marca <b>atual</b> ({currentBrand?.handle || '@perfil'}) com identidade e contexto do projeto (brief/estilo) para herdar em projetos novos:
+              Salvar a marca <b>atual</b> ({currentBrand?.handle || '@perfil'}) com identidade e contexto do projeto (brief/estilo) para herdar em projetos novos:
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <input

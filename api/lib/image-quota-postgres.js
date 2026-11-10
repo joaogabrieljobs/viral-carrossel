@@ -21,21 +21,25 @@ const SQL = {
     FROM moont.image_quota_periods
     WHERE owner_id = $1 AND period_start_sec = $2 FOR UPDATE`,
   operation: `/* moont_image_quota_operation */
-    SELECT status FROM moont.image_quota_operations
+    SELECT status, metadata FROM moont.image_quota_operations
     WHERE owner_id = $1 AND period_start_sec = $2 AND operation_id = $3`,
   activity: `/* moont_image_quota_activity */
-    SELECT operation_id, status, created_at, updated_at
+    SELECT operation_id, status, metadata, created_at, updated_at
     FROM moont.image_quota_operations
     WHERE owner_id = $1 AND period_start_sec = $2
     ORDER BY created_at DESC
     LIMIT $3`,
   insertOperation: `/* moont_image_quota_insert_operation */
     INSERT INTO moont.image_quota_operations
-      (owner_id, period_start_sec, operation_id, status)
-    VALUES ($1, $2, $3, 'reserved')`,
+      (owner_id, period_start_sec, operation_id, status, metadata)
+    VALUES ($1, $2, $3, 'reserved', $4::jsonb)`,
   updateOperation: `/* moont_image_quota_update_operation */
     UPDATE moont.image_quota_operations
-    SET status = $4, updated_at = now()
+    SET status = $4, metadata = metadata || $5::jsonb, updated_at = now()
+    WHERE owner_id = $1 AND period_start_sec = $2 AND operation_id = $3`,
+  mergeOperationMetadata: `/* moont_image_quota_merge_operation_metadata */
+    UPDATE moont.image_quota_operations
+    SET metadata = metadata || $4::jsonb, updated_at = now()
     WHERE owner_id = $1 AND period_start_sec = $2 AND operation_id = $3`,
   changeUsed: `/* moont_image_quota_change_used */
     UPDATE moont.image_quota_periods
@@ -105,6 +109,41 @@ function usage(used, cap) {
 function activityTimestamp(value) {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+const METADATA_TEXT_LIMITS = Object.freeze({
+  projectId: 255,
+  projectName: 200,
+  cardId: 255,
+  assetId: 500,
+  imageId: 255,
+});
+
+function metadataText(value, limit) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
+}
+
+/**
+ * Apenas contexto explicativo, nunca necessário para cobrar a geração. Campos
+ * ausentes ou inválidos são ignorados para manter clientes antigos funcionais.
+ */
+export function normalizeImageOperationMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const normalized = {};
+  for (const [field, limit] of Object.entries(METADATA_TEXT_LIMITS)) {
+    const clean = metadataText(value[field], limit);
+    if (clean) normalized[field] = clean;
+  }
+  const cardNumber = Number(value.cardNumber);
+  if (Number.isSafeInteger(cardNumber) && cardNumber > 0 && cardNumber <= 100_000) {
+    normalized.cardNumber = cardNumber;
+  }
+  return normalized;
+}
+
+function serializedMetadata(value) {
+  return JSON.stringify(normalizeImageOperationMetadata(value));
 }
 
 async function run(sql, key, params) {
@@ -180,16 +219,20 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     return guardStorage(async () => {
       const sql = await connection();
       const rows = await run(sql, 'activity', [owner, start, rowLimit]);
-      return rows.map((row) => ({
-        source: String(row.operation_id || '').startsWith('mcp_') ? 'mcp' : 'editor',
-        status: ['reserved', 'consumed', 'refunded'].includes(row.status) ? row.status : 'reserved',
-        createdAt: activityTimestamp(row.created_at),
-        updatedAt: activityTimestamp(row.updated_at),
-      }));
+      return rows.map((row) => {
+        const metadata = normalizeImageOperationMetadata(row.metadata);
+        return {
+          source: String(row.operation_id || '').startsWith('mcp_') ? 'mcp' : 'editor',
+          status: ['reserved', 'consumed', 'refunded'].includes(row.status) ? row.status : 'reserved',
+          createdAt: activityTimestamp(row.created_at),
+          updatedAt: activityTimestamp(row.updated_at),
+          ...metadata,
+        };
+      });
     });
   }
 
-  async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId: rawId }) {
+  async function consumeImageCredit({ customerId, periodStartSec, periodEndSec, limit, operationId: rawId, metadata }) {
     const cap = capValue(limit);
     if (cap <= 0) {
       return { ...usage(0, 0), reason: 'no_quota' };
@@ -206,13 +249,17 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
         const used = count(row.used);
         const existing = (await run(tx, 'operation', [owner, start, id]))[0];
         if (existing) {
+          const nextMetadata = normalizeImageOperationMetadata(metadata);
+          if (Object.keys(nextMetadata).length) {
+            await run(tx, 'mergeOperationMetadata', [owner, start, id, JSON.stringify(nextMetadata)]);
+          }
           return { ...usage(used, cap), allowed: false,
             reason: `already_${existing.status}`, replayed: true };
         }
         if (used >= cap) {
           return { ...usage(used, cap), allowed: false, reason: 'exhausted' };
         }
-        await run(tx, 'insertOperation', [owner, start, id]);
+        await run(tx, 'insertOperation', [owner, start, id, serializedMetadata(metadata)]);
         const updated = (await run(tx, 'changeUsed', [owner, start, 1]))[0];
         return { ...usage(count(updated.used), cap), allowed: true,
           reason: null, operationId: id, status: 'reserved' };
@@ -220,7 +267,7 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
     });
   }
 
-  async function settleImageCredit({ customerId, periodStartSec, operationId: rawId }) {
+  async function settleImageCredit({ customerId, periodStartSec, operationId: rawId, metadata }) {
     const owner = ownerId(customerId);
     const start = period(periodStartSec);
     const id = operationId(rawId);
@@ -231,14 +278,19 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
         const op = (await run(tx, 'operation', [owner, start, id]))[0];
         if (!op) throw fail('Reserva de imagem não encontrada.', 'quota_operation_not_found');
         if (op.status === 'reserved') {
-          await run(tx, 'updateOperation', [owner, start, id, 'consumed']);
+          await run(tx, 'updateOperation', [owner, start, id, 'consumed', serializedMetadata(metadata)]);
+        } else {
+          const nextMetadata = normalizeImageOperationMetadata(metadata);
+          if (Object.keys(nextMetadata).length) {
+            await run(tx, 'mergeOperationMetadata', [owner, start, id, JSON.stringify(nextMetadata)]);
+          }
         }
         return { used: count(row.used), status: op.status === 'reserved' ? 'consumed' : op.status };
       });
     });
   }
 
-  async function refundImageCredit({ customerId, periodStartSec, operationId: rawId }) {
+  async function refundImageCredit({ customerId, periodStartSec, operationId: rawId, metadata }) {
     const owner = ownerId(customerId);
     const start = period(periodStartSec);
     const id = operationId(rawId);
@@ -251,7 +303,7 @@ export function createImageQuotaPostgres({ sql: injectedSql, readLegacyUsage = d
         // compensada mesmo quando o INSERT afinal não ocorreu.
         if (!op) return { used: count(row.used), refunded: false, reason: 'not_found' };
         if (op.status === 'refunded') return { used: count(row.used), refunded: false };
-        await run(tx, 'updateOperation', [owner, start, id, 'refunded']);
+        await run(tx, 'updateOperation', [owner, start, id, 'refunded', serializedMetadata(metadata)]);
         const updated = (await run(tx, 'changeUsed', [owner, start, -1]))[0];
         return { used: count(updated.used), refunded: true };
       });

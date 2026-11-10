@@ -152,7 +152,7 @@ export function SeriesPanel({
       });
       if (job.signal.aborted) return;
       const list = normalizeSeriesIdeas(raw, { max: request.ideaCount });
-      if (!list.length) throw new Error('A IA não devolveu ideias utilizáveis. Tente de novo.');
+      if (!list.length) throw new Error('A IA não devolveu ideias utilizáveis. Tente novamente.');
       setIdeas(list);
       setIdeasObjectiveId(request.objectiveId);
       setSelected(new Set(list.map((i) => i.id)));

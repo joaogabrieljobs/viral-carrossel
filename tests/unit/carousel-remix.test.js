@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRemixBlock, mergeRemixedSlides, REMIX_TONES } from '../../src/utils/carousel-remix.js';
+import { buildRemixBlock, mergeRemixedSlides, REMIX_TONES, validateRemixCardCount } from '../../src/utils/carousel-remix.js';
 import { projectContextLabel, normalizeStyleKit, styleKitHasContent } from '../../src/utils/style-kit.js';
 import { ensureDocShape } from '../../src/utils/doc-schema.js';
 import { buildGenerationLanguageLayer, buildCaptionOutlineInstructions, GEN_MODE_BY_ID } from '../../src/utils/generation-prompts.js';
@@ -25,6 +25,15 @@ describe('remix preserva a identidade', () => {
     expect(prompt).toContain('O tom verbal não autoriza trocar o estilo da imagem');
     expect(buildRemixBlock([slide], false)).toContain('As imagens existentes serão mantidas');
     expect(new Set(REMIX_TONES.map(t => t.id)).size).toBe(8);
+  });
+  it('valida incompatibilidade com o roteiro antes de chamar a IA', () => {
+    expect(validateRemixCardCount([slide], { count: 2 })).toMatchObject({
+      ok: false,
+      currentCount: 1,
+      scriptCount: 2,
+    });
+    expect(validateRemixCardCount([slide], { count: 1 })).toMatchObject({ ok: true });
+    expect(validateRemixCardCount([slide], null)).toMatchObject({ ok: true });
   });
 });
 

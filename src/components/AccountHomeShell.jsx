@@ -361,7 +361,7 @@ function AccountHomeShell({
                           label: 'Nome',
                           defaultValue: entry.name || '',
                           placeholder: 'Ex: Lançamento de produto',
-                          cta: 'Guardar',
+                          cta: 'Salvar',
                         });
                         if (next?.trim()) renameDoc(entry.id, next.trim());
                       }}

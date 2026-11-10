@@ -21,8 +21,29 @@ ${JSON.stringify(slides.map(({ title, subtitle, bodyAfterImage, imageQuery }) =>
 </carrossel_atual>`;
 }
 
+/**
+ * Validação que pode ser executada antes de chamar a IA. O merge mantém a
+ * mesma defesa, mas o editor deve usar este retorno para não gastar uma
+ * geração de texto quando um roteiro do material pede outra quantidade.
+ */
+export function validateRemixCardCount(current, explicitCardScript = null) {
+  const currentCount = Array.isArray(current) ? current.length : 0;
+  const scriptCount = Number(explicitCardScript?.count || 0);
+  const compatible = !scriptCount || scriptCount === currentCount;
+  return {
+    ok: compatible,
+    currentCount,
+    scriptCount: scriptCount || null,
+    message: compatible
+      ? ''
+      : `O roteiro tem ${scriptCount} cards, mas o projeto atual tem ${currentCount}. Ajuste o roteiro antes de refazer.`,
+  };
+}
+
 export function mergeRemixedSlides(current, generated, withImages) {
-  if (current.length !== generated.length) throw new Error('O remix precisa manter a quantidade de cards.');
+  if (!Array.isArray(generated) || current.length !== generated.length) {
+    throw new Error('O remix precisa manter a quantidade de cards.');
+  }
   return current.map((slide, i) => {
     const next = generated[i];
     const patch = {};

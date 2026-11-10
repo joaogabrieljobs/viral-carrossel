@@ -176,6 +176,22 @@ describe('mídia local por conta', () => {
     expect((await again.videoGet('video-a'))?.blob.size).toBe(1);
   });
 
+  it('cleanup de vídeo respeita carência antes da exclusão física', async () => {
+    const { SK } = await import('../../src/utils/storage.js');
+    local.setItem(SK.dataOwner, owner('a'));
+    local.setItem(SK.library, JSON.stringify([{ id: 'a', doc: { slides: [] } }]));
+    const videos = await import('../../src/utils/video-store.js');
+    await videos.videoPut('video-recente', new Blob(['a'], { type: 'video/mp4' }));
+
+    expect(await videos.videoCleanupOrphans([], { graceMs: 60_000 })).toBe(0);
+    expect(await videos.videoGet('video-recente')).toBeTruthy();
+
+    const rows = idb.databases.get('viral-carrossel').stores.get('videos');
+    rows.get('video-recente').savedAt = 1;
+    expect(await videos.videoCleanupOrphans([], { graceMs: 60_000, now: 120_001 })).toBe(1);
+    expect(await videos.videoGet('video-recente')).toBeNull();
+  });
+
   it('mantém acesso à foto quando o mesmo dono migra de Stripe id para email', async () => {
     const { SK } = await import('../../src/utils/storage.js');
     local.setItem(SK.dataOwner, JSON.stringify('id:cus_1'));

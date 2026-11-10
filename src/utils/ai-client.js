@@ -8,7 +8,7 @@ import { runAIJob, throwIfGenerationCancelled, isGenerationCancelled, abortableD
 import { DEFAULT_AI_SETTINGS, normalizeAISettings } from '../config/ai-providers.js';
 import { getServerStatus } from './server-status.js';
 import { extractJSON } from './parsers.js';
-import { buildImgParamsTagsEN } from './generation-prompts.js';
+import { buildImgParamsTagsEN, resolveRequestedContentLanguage } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 import { PITCH_SYSTEM_PT } from './pitch-content.js';
@@ -62,7 +62,7 @@ function enhanceNetworkError(err, label) {
   if (isGenerationCancelled(err)) return err;
   const m = (err && err.message) ? err.message : String(err);
   if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
-    const t = new Error(`${label}: a resposta demorou demasiado. Tente de novo.`);
+    const t = new Error(`${label}: a resposta demorou muito. Tente novamente.`);
     t.isNetwork = true;
     return t;
   }
@@ -76,10 +76,10 @@ function enhanceNetworkError(err, label) {
   if (!hosted) {
     // Dev local: provavelmente o proxy /api não está respondendo
     // Só alcançável em localhost — mensagem para quem desenvolve.
-    hint = 'Ambiente local: confirme que o servidor de desenvolvimento está a correr e que há internet.';
+    hint = 'Ambiente local: confirme que o servidor de desenvolvimento está em execução e que há internet.';
   } else if (isClaude) {
     hint =
-      'Não foi possível falar com o Claude. Confirme a sua chave em Configurar IA, ou escolha outro modelo de texto.';
+      'Não foi possível falar com o Claude. Confirme sua chave em Configurar IA ou escolha outro modelo de texto.';
   } else if (isOpenAI) {
     hint =
       'Sua chave OpenAI pode estar inválida, expirada ou sem saldo. ' +
@@ -87,7 +87,7 @@ function enhanceNetworkError(err, label) {
       'Se ainda não configurou, adicione a chave em Configurar IA.';
   } else {
     hint =
-      'Não foi possível falar com a IA. Verifique a sua ligação à internet e tente de novo.';
+      'Não foi possível falar com a IA. Verifique sua conexão com a internet e tente novamente.';
   }
   const out = new Error(`${label}: falha de rede. ${hint}`);
   out.isNetwork = true; // lido por generateDALLEWithRetry — a mensagem traduzida não casa com o regex antigo (auditoria M7)
@@ -107,7 +107,20 @@ function sessionGateError(status, data) {
   return e;
 }
 
-const AI_SYSTEM_PT = 'Você é especialista em conteúdo estratégico para Instagram no Brasil. Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos, legendas), salvo quando o pedido do usuário exigir explicitamente outro idioma apenas num campo isolado — por exemplo palavras-chave de busca de imagem em inglês. Escreva com naturalidade brasileira, verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
+const AI_SYSTEM_CORE = 'Você é especialista em conteúdo estratégico para redes sociais. Escreva com verbos concretos e vocabulário adequado ao público; evite jargão corporativo vazio e tom de guru. Não invente dados, pesquisas, citações, prazos ou casos reais; identifique exemplos hipotéticos. Não use Slide N/Card N como rótulo no texto visível; Passo N é permitido em tutoriais. Preserve o schema solicitado, sem acrescentar campos.';
+
+const CONTENT_LANGUAGE_SYSTEM_RULES = Object.freeze({
+  en: 'Write every reader-visible field (titles, subtitles, paragraphs and captions) in natural English. Do not switch to Portuguese. Image-search keywords may remain in English.',
+  es: 'Escribe todos los campos visibles para el lector (títulos, subtítulos, párrafos y leyendas) en español natural. No cambies al portugués. Las palabras clave de búsqueda de imágenes pueden permanecer en inglés.',
+  'pt-BR': 'Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos e legendas). Palavras-chave de busca de imagem podem permanecer em inglês. Escreva com naturalidade brasileira.',
+});
+
+function buildContentSystemPrompt(language = 'pt-BR') {
+  const code = Object.hasOwn(CONTENT_LANGUAGE_SYSTEM_RULES, language) ? language : 'pt-BR';
+  return `${AI_SYSTEM_CORE} ${CONTENT_LANGUAGE_SYSTEM_RULES[code]}`;
+}
+
+const AI_SYSTEM_PT = buildContentSystemPrompt('pt-BR');
 
 // Configuração selecionada no modal. Mantida em módulo para as funções de geração,
 // que vivem fora do componente React, lerem a preferência atual sem prop drilling.
@@ -250,13 +263,13 @@ function translateProviderError(provider, status, data, raw) {
   const msg = String(data?.error?.message || data?.message || '').trim();
   const code = String(data?.error?.code || data?.code || '');
   if (code === '1305' || /overloaded|try again later/i.test(msg)) {
-    return 'A Moont AI está sobrecarregada neste momento. Tenta de novo em alguns segundos.';
+    return 'A Moont AI está sobrecarregada neste momento. Tente novamente em alguns segundos.';
   }
   if (status === 401 || /token expired|incorrect|unauthorized/i.test(msg)) {
-    return 'A IA incluída no plano está indisponível neste momento. Tente de novo em instantes — se persistir, fale com o suporte.';
+    return 'A IA incluída no plano está indisponível neste momento. Tente novamente em instantes — se persistir, fale com o suporte.';
   }
   if (status === 429) {
-    return 'Muitos pedidos à Moont AI. Espera um momento e tenta de novo.';
+    return 'Muitos pedidos à Moont AI. Aguarde um momento e tente novamente.';
   }
   return msg || `${provider === 'zai' ? 'Moont AI' : 'Kimi'} HTTP ${status}`;
 }
@@ -314,7 +327,7 @@ const callCompatibleChat = async (
     // só multiplicava pedidos contra o mesmo limite (auditoria H3).
     const retryAfter = res.headers?.get?.('retry-after');
     if (!useDirect && res.status === 429 && retryAfter) {
-      const e = new Error(`Muitos pedidos seguidos. Aguarde ${retryAfter}s e tente de novo.`);
+      const e = new Error(`Muitos pedidos seguidos. Aguarde ${retryAfter}s e tente novamente.`);
       e.status = 429;
       e.code = 'rate_limited';
       throw e;
@@ -358,14 +371,25 @@ const callCompatibleChat = async (
     return parseStructuredText(text, json, jsonParser);
   }
 
-  throw lastError || new Error('Moont AI indisponível. Tenta de novo.');
+  throw lastError || new Error('Moont AI indisponível. Tente novamente.');
 };
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, temperature, onRetry, signal: parentSignal } = {}) => runAIJob(async (signal) => {
-  const systemPrompt = contentMode === 'pitch' ? PITCH_SYSTEM_PT
-    : contentMode === 'presentation' ? buildPresentationSystemPrompt(presentationPath) : AI_SYSTEM_PT;
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, contentLanguage = '', systemPrompt: explicitSystemPrompt = '', temperature, onRetry, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+  const resolvedContentLanguage = contentLanguage || resolveRequestedContentLanguage({
+    instructions: userMsg,
+    content: userMsg,
+  }).code;
+  const baseSystemPrompt = contentMode === 'pitch'
+    ? PITCH_SYSTEM_PT
+    : contentMode === 'presentation'
+      ? buildPresentationSystemPrompt(presentationPath)
+      : AI_SYSTEM_CORE;
+  const languageSystemRule = CONTENT_LANGUAGE_SYSTEM_RULES[resolvedContentLanguage]
+    || CONTENT_LANGUAGE_SYSTEM_RULES['pt-BR'];
+  const systemPrompt = String(explicitSystemPrompt || '').trim()
+    || `${baseSystemPrompt} ${languageSystemRule}`;
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';
@@ -702,6 +726,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
         aspectRatio,
         resolution: '1K',
         imageList: refs,
+        ...(options.usageContext ? { usageContext: options.usageContext } : {}),
       }),
     });
   } catch (e) {
@@ -877,6 +902,7 @@ export {
   COMPATIBLE_AI_URL,
   enhanceNetworkError,
   AI_SYSTEM_PT,
+  buildContentSystemPrompt,
   setAIRuntimeSettings,
   getTextModel,
   getProviderKey,

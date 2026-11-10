@@ -69,6 +69,26 @@ async function videoExists(page, id) {
   }), id);
 }
 
+async function ageVideoForCleanup(page, id) {
+  return page.evaluate((videoId) => new Promise((resolve, reject) => {
+    const request = indexedDB.open('viral-carrossel', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('videos', 'readwrite');
+      const store = transaction.objectStore('videos');
+      const get = store.get(videoId);
+      get.onerror = () => reject(get.error);
+      get.onsuccess = () => {
+        if (!get.result) { resolve(); return; }
+        store.put({ ...get.result, savedAt: Date.now() - (25 * 60 * 60_000) });
+      };
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }), id);
+}
+
 async function duplicateActiveSlide(page) {
   await page.getByRole('tab', { name: 'Layout', exact: true }).click();
   await page.getByRole('button', { name: 'Duplicar', exact: true }).click();
@@ -156,6 +176,10 @@ test('vídeo removido fica disponível para Desfazer na sessão e vira órfão l
   await page.getByRole('button', { name: /^Remover vídeo do card/ }).click();
   await expect.poll(async () => (await storedDoc(page)).slides[0].videoId || null).toBeNull();
   expect(await videoExists(page, removedId)).toBe(true);
+
+  // A produção conserva órfãos recentes por 24 h para proteger abas
+  // suspensas. Envelheça somente o fixture para provar o GC no próximo boot.
+  await ageVideoForCleanup(page, removedId);
 
   // O reload encerra o histórico de Desfazer. Depois de restaurar a biblioteca,
   // o GC pode remover com segurança o Blob que nenhum projeto referencia.

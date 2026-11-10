@@ -132,8 +132,8 @@ export default function ImagesLibraryPanel({
       }}>
         {useOwnImageKey ? (
           <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
-            Está a usar a sua própria chave de imagem, por isso o plano não conta consumo.
-            As imagens continuam guardadas abaixo.
+            Você está usando sua própria chave de imagem, por isso o plano não conta consumo.
+            As imagens continuam salvas abaixo.
           </div>
         ) : temQuota ? (
           <>
@@ -164,7 +164,7 @@ export default function ImagesLibraryPanel({
         ) : (
           <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
             {usage.noIncludedImages
-              ? 'O seu plano não inclui geração de imagens. Você pode importar imagens ou usar sua própria chave em Configurar IA.'
+              ? 'Seu plano não inclui geração de imagens. Você pode importar imagens ou usar sua própria chave em Configurar IA.'
               : 'Não foi possível confirmar o consumo. Abra Uso para atualizar o saldo.'}
           </div>
         )}
@@ -178,7 +178,7 @@ export default function ImagesLibraryPanel({
             margin: 0, fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-ui)',
             letterSpacing: '-0.011em', color: 'var(--text-primary)',
           }}>
-            {imagens.length === 1 ? '1 imagem guardada' : `${imagens.length} imagens guardadas`}
+            {imagens.length === 1 ? '1 imagem salva' : `${imagens.length} imagens salvas`}
           </h3>
           {imagens.length > 0 && (
             <button
@@ -194,7 +194,7 @@ export default function ImagesLibraryPanel({
               }}
             >
               {baixandoTudo ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }}/> : <Package size={13}/>}
-              {baixandoTudo ? 'A preparar…' : 'Baixar todas (.zip)'}
+              {baixandoTudo ? 'Preparando…' : 'Baixar todas (.zip)'}
             </button>
           )}
         </div>
@@ -206,7 +206,7 @@ export default function ImagesLibraryPanel({
             color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontSize: 13,
           }}>
             <ImageOff size={20} aria-hidden/>
-            Ainda não há imagens geradas. Crie um carrossel com «Texto + imagem», ou use «Gerar imagem» num card.
+            Ainda não há imagens geradas. Crie um carrossel com «Texto + imagem» ou use «Gerar imagem» em um card.
           </div>
         ) : (
           <ul style={{

@@ -24,7 +24,7 @@ import {
 } from '../../styles/presentation-presets.jsx';
 import { moontNarrative } from '../../config/moont-brand.js';
 import { genModeUiLabel } from '../../utils/ui-depth-labels.js';
-import { parseExplicitCardScript } from '../../utils/structured-card-script.js';
+import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../../utils/structured-card-script.js';
 
 function normalizeCardVisualStyle(v) {
   const r = typeof v === 'string' ? v : 'full';
@@ -183,9 +183,11 @@ function GenerateModal({
     setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
     setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
   }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
-  const explicitCardScript = useMemo(() => (
-    isPresentation ? null : (parseExplicitCardScript(topic) || parseExplicitCardScript(material?.content))
-  ), [isPresentation, material?.content, topic]);
+  const explicitCardScript = useMemo(() => {
+    if (isPresentation) return null;
+    const candidate = parseExplicitCardScript(topic) || parseExplicitCardScript(material?.content);
+    return canAutoApplyExplicitCardScript(candidate) ? candidate : null;
+  }, [isPresentation, material?.content, topic]);
   useEffect(() => {
     if (!open || !explicitCardScript || count === explicitCardScript.count) return;
     setCount(explicitCardScript.count);
@@ -1190,6 +1192,14 @@ function GenerateModal({
                   <span style={{ color:'var(--text-primary)' }}>Incluída — confere clareza, repetição e coerência antes de abrir o editor.</span>
                   <span style={{ color:'var(--text-muted)' }}>{isPresentation ? 'Slides' : 'Cards'}</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500, fontVariantNumeric:'tabular-nums' }}>{count}</span>
+                  {explicitCardScript && (
+                    <>
+                      <span style={{ color:'var(--text-muted)' }}>Origem da quantidade</span>
+                      <span style={{ color:'var(--text-primary)', fontWeight:500 }}>
+                        Roteiro reconhecido · {explicitCardScript.count} blocos numerados
+                      </span>
+                    </>
+                  )}
 
                   <span style={{ color:'var(--text-muted)' }}>Densidade</span>
                   <span style={{ color:'var(--text-primary)', fontWeight:500 }}>{DENSITY_FRIENDLY[textDensity] || textDensity}</span>

@@ -36,7 +36,7 @@ export function ElementsPanel({
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Clique para inserir. No card: arraste, Delete remove. Abaixo edita texto e cores do seleccionado.
+        Clique para inserir. No card: arraste, Delete remove. Abaixo, edite o texto e as cores do item selecionado.
       </p>
 
       {groups.map(([group, items]) => (

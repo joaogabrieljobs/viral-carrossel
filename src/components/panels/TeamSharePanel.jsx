@@ -5,6 +5,7 @@ import {
   createProjectShare,
   joinProjectShare,
   normalizeShareCode,
+  normalizeShareProjectId,
   pullProjectShare,
   pushProjectShare,
 } from '../../utils/project-share.js';
@@ -40,8 +41,14 @@ export function TeamSharePanel({
   const localCode = localShare.projectId === projectKey ? localShare.code : '';
   const activeCode = normalizeShareCode(shareCode) || localCode;
   const docShareCode = normalizeShareCode(doc?.shareCode);
+  const docShareProjectId = normalizeShareProjectId(doc?.shareProjectId);
   const linked = Boolean(activeCode);
-  const canPushCurrentDoc = Boolean(activeCode && docShareCode === activeCode);
+  const canPushCurrentDoc = Boolean(activeCode && docShareCode === activeCode && docShareProjectId);
+  const pushBlockedMessage = canPushCurrentDoc
+    ? ''
+    : (!docShareProjectId
+        ? 'Receba as alterações da equipe uma vez antes de enviar.'
+        : 'Este código não pertence ao projeto aberto.');
   const inviteUrl = buildTeamShareInviteUrl(activeCode);
 
   useEffect(() => {
@@ -99,6 +106,7 @@ export function TeamSharePanel({
     }
     onShareLinked({
       code: res.code,
+      projectId: res.projectId,
       revision: res.revision,
       updatedAt: res.updatedAt,
     });
@@ -142,12 +150,13 @@ export function TeamSharePanel({
               type="button"
               className="vc-btn"
               disabled={busy || !canPushCurrentDoc}
-              title={canPushCurrentDoc ? undefined : 'Este código não pertence ao projeto aberto.'}
+              aria-describedby={pushBlockedMessage ? 'vc-team-share-send-help' : undefined}
               onClick={() => run(async () => {
                 const res = await pushProjectShare({ code: activeCode, doc, name: projectName });
                 if (mountedProjectRef.current !== projectKey) return res;
                 onShareLinked({
                   code: res.code,
+                  projectId: res.projectId,
                   revision: res.revision,
                   updatedAt: res.updatedAt,
                 });
@@ -181,6 +190,7 @@ export function TeamSharePanel({
                 if (mountedProjectRef.current !== projectKey) return res;
                 onShareLinked({
                   code: res.code,
+                  projectId: res.projectId,
                   revision: res.revision,
                   updatedAt: res.updatedAt,
                 });
@@ -192,11 +202,11 @@ export function TeamSharePanel({
                 }
                 if (failed) {
                   return {
-                    text: `Projeto actualizado. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}. Puxe de novo.`,
+                    text: `Projeto atualizado. ${failed} foto${failed === 1 ? '' : 's'} não chegou${failed === 1 ? '' : 'ram'}. Tente receber novamente.`,
                     tone: 'warning',
                   };
                 }
-                return 'Projeto e imagens actualizados a partir da equipe.';
+                return 'Projeto e imagens atualizados a partir da equipe.';
               })}
               style={{ minHeight: 40, fontSize: 12 }}
             >
@@ -212,6 +222,15 @@ export function TeamSharePanel({
               <Link2 size={14} /> Copiar link
             </button>
           </div>
+          {pushBlockedMessage ? (
+            <p
+              id="vc-team-share-send-help"
+              role="status"
+              style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}
+            >
+              {pushBlockedMessage}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -225,6 +244,7 @@ export function TeamSharePanel({
               setLocalShare({ projectId: projectKey, code: normalizeShareCode(res.code) });
               onShareLinked({
                 code: res.code,
+                projectId: res.projectId,
                 revision: res.revision,
                 updatedAt: res.updatedAt,
               });

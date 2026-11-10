@@ -568,7 +568,7 @@ async function shareRequest(payload, { method = 'POST', code, asset, part } = {}
   const body = method === 'GET' ? undefined : JSON.stringify(payload);
   if (body && body.length > MAX_SHARE_BODY_CHARS) {
     throw new Error(
-      'Projeto grande demais para partilhar de uma vez. Remova algumas fotos dos cards e tente de novo.',
+      'Projeto grande demais para compartilhar de uma vez. Remova algumas fotos dos cards e tente novamente.',
     );
   }
   let res;
@@ -583,10 +583,10 @@ async function shareRequest(payload, { method = 'POST', code, asset, part } = {}
     const raw = String(e?.message || e || '');
     if (/failed to fetch|fetch failed|networkerror|load failed/i.test(raw)) {
       throw new Error(
-        'Não foi possível partilhar (rede ou projeto demasiado grande com fotos). Tente de novo; se falhar, remova fotos pesadas dos cards.',
+        'Não foi possível compartilhar (rede ou projeto grande demais com fotos). Tente novamente; se falhar, remova fotos pesadas dos cards.',
       );
     }
-    throw e instanceof Error ? e : new Error(raw || 'Falha na partilha.');
+    throw e instanceof Error ? e : new Error(raw || 'Falha no compartilhamento.');
   }
   const rawText = await res.text().catch(() => '');
   let data = {};
@@ -594,17 +594,17 @@ async function shareRequest(payload, { method = 'POST', code, asset, part } = {}
   if (!res.ok) {
     if (res.status === 413 || /PAYLOAD_TOO_LARGE|Entity Too Large/i.test(rawText)) {
       throw new Error(
-        'Projeto grande demais para o servidor (fotos). Remova ou regenere imagens mais leves e tente de novo.',
+        'Projeto grande demais para o servidor (fotos). Remova ou gere novamente imagens mais leves e tente novamente.',
       );
     }
     if (res.status === 401) {
-      throw new Error(typeof data?.error === 'string' ? data.error : 'Faça login pela assinatura para partilhar.');
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Faça login pela assinatura para compartilhar.');
     }
     if (res.status === 503) {
       throw new Error(
         typeof data?.error === 'string'
           ? data.error
-          : 'Partilha indisponível no servidor (Blob/Redis). Peça ao admin para configurar o armazenamento.',
+          : 'Compartilhamento indisponível no servidor (Blob/Redis). Peça ao administrador para configurar o armazenamento.',
       );
     }
     if (res.status === 404) {
@@ -616,7 +616,7 @@ async function shareRequest(payload, { method = 'POST', code, asset, part } = {}
     }
     const errMsg = typeof data?.error === 'string'
       ? data.error
-      : (data?.error?.message || (rawText && rawText.length < 180 ? rawText.trim() : null) || `Falha na partilha (${res.status})`);
+      : (data?.error?.message || (rawText && rawText.length < 180 ? rawText.trim() : null) || `Falha no compartilhamento (${res.status})`);
     throw new Error(errMsg);
   }
   return data;
@@ -646,8 +646,13 @@ export async function createProjectShare({ doc, name }) {
 export async function pushProjectShare({ code, doc, name }) {
   const normalizedCode = normalizeShareCode(code);
   const docCode = normalizeShareCode(doc?.shareCode);
-  if (!normalizedCode || docCode !== normalizedCode) {
-    const error = new Error('Este código não pertence ao projeto aberto. Reabra o projeto da equipe e tente novamente.');
+  const projectId = normalizeShareProjectId(doc?.shareProjectId);
+  if (!normalizedCode || docCode !== normalizedCode || !projectId) {
+    const error = new Error(
+      projectId
+        ? 'Este código não pertence ao projeto aberto. Reabra o projeto da equipe e tente novamente.'
+        : 'Este projeto precisa receber as alterações da equipe uma vez antes de publicar.',
+    );
     error.code = 'share_project_mismatch';
     throw error;
   }
@@ -691,6 +696,11 @@ export const PENDING_SHARE_KEY = 'vc_pending_share';
 export function normalizeShareCode(raw) {
   const code = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   return code.length >= 6 && code.length <= 12 ? code : '';
+}
+
+export function normalizeShareProjectId(raw) {
+  const id = String(raw || '').trim();
+  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : '';
 }
 
 /** Link de convite sempre no domínio da sessão: https://moont.ai/?share=AB12CD34&app=1 */

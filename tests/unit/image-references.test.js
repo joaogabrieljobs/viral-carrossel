@@ -38,6 +38,16 @@ it('reusa o identificador fornecido para a mesma tentativa de geração', async 
   expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).operationId))
     .toEqual(['retry-safe-123', 'retry-safe-123']);
 });
+it('envia o contexto de uso para relacionar o crédito ao projeto e ao card', async () => {
+  setAIRuntimeSettings({ useOwnImageKey: false });
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ b64_json: 'result' }) });
+  vi.stubGlobal('fetch', fetchMock);
+  const usageContext = {
+    projectId: 'project-123', projectName: 'Campanha', cardId: 'slide-7', cardNumber: 7,
+  };
+  await generateDALLE('world', '', null, { usageContext });
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).usageContext).toEqual(usageContext);
+});
 it('plano rejeita referências não suportadas antes da requisição', async () => {
   setAIRuntimeSettings({ useOwnImageKey: false });
   const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);

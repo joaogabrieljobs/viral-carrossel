@@ -476,7 +476,7 @@ export const TEMPLATES = [
     slides: [
       { title:'Seu produto não está caro. Está comum.', subtitle:'Percepção vem antes da conversão.', q:'product packaging flash diagonal', composition:'hook_fullbleed' },
       { title:'O que você ajusta primeiro.', subtitle:'Preço, frete, cupom. Sempre a margem.', q:'discount tags cluttered shelf', composition:'list_beat' },
-      { title:'O que o cliente compara.', subtitle:'A sua página com outras seis abertas ao lado.', body:'Na comparação lado a lado, quem não tem motivo visível para custar mais vira o mais barato da lista — ou some.', q:'multiple browser tabs product blur', composition:'sandwich_editorial' },
+      { title:'O que o cliente compara.', subtitle:'Sua página com outras seis abertas ao lado.', body:'Na comparação lado a lado, quem não tem motivo visível para custar mais vira o mais barato da lista — ou some.', q:'multiple browser tabs product blur', composition:'sandwich_editorial' },
       { title:'Onde a decisão trava.', subtitle:'Na foto que não mostra escala, uso nem acabamento.', q:'product photo detail texture macro', composition:'reveal_bridge' },
       { title:'3 fotos', subtitle:'Uma de escala, uma de uso, uma de detalhe. Antes de mexer no preço.', composition:'stat_proof' },
       { title:'Desconto compra o pedido. Percepção compra o próximo.', subtitle:'Um custa margem, o outro constrói marca.', q:'pink accent product minimal dark', composition:'quote_pull' },
@@ -501,7 +501,7 @@ export const TEMPLATES = [
       { title:'O que muita gente tenta.', subtitle:'Título maior, foto melhor, número de seguidores.', q:'business portrait staged formal', composition:'list_beat' },
       { title:'O que constrói de verdade.', subtitle:'Ser o nome que vem à cabeça em um assunto específico.', body:'Autoridade não é ser conhecido por muitos. É ser lembrado por poucos no momento exato em que eles precisam.', q:'single name spotlight minimal', composition:'sandwich_editorial' },
       { title:'O erro que dilui.', subtitle:'Falar de tudo para não perder ninguém.', q:'scattered light diffuse abstract', composition:'reveal_bridge' },
-      { title:'1 assunto', subtitle:'Se você não consegue nomear o seu, o público também não consegue.', composition:'stat_proof' },
+      { title:'1 assunto', subtitle:'Se você não consegue nomear seu assunto, o público também não consegue.', composition:'stat_proof' },
       { title:'Ser lembrado vale mais que ser visto.', subtitle:'Visibilidade passa. Associação fica.', q:'green accent stone minimal', composition:'quote_pull' },
       { title:'O teste do seu posicionamento.', subtitle:'Pergunte a três pessoas do que você fala. Se vierem três respostas, achamos o problema.', q:'portrait natural light editorial', composition:'list_beat' },
       { title:'Do que você quer ser lembrado?', subtitle:'Uma palavra. Comenta aí.', q:'stone texture warm minimal', composition:'cta_close' },

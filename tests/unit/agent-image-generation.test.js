@@ -51,7 +51,7 @@ const notFound = () => Object.assign(new Error('missing'), { code: 'visual_job_n
 const op = slideId => imageOperationId(requestId, slideId);
 
 function project() {
-  return { id: 'p', version: 3, deleted: false, entry: { id: 'p', doc: { formatId: 'stories', slides: [
+  return { id: 'p', version: 3, deleted: false, entry: { id: 'p', name: 'Projeto Teste', doc: { formatId: 'stories', slides: [
     { id: 's1', imageQuery: 'retrato editorial em luz natural' },
     { id: 's2', imageQuery: 'consultório moderno com plantas' },
     { id: 's3', imageQuery: 'já tem foto', bgImageAssetId: 'photo-3' },
@@ -105,6 +105,9 @@ describe('startAgentImageJob', () => {
     expect(mocked.consume).toHaveBeenCalledTimes(2);
     expect(mocked.consume.mock.calls.map(call => call[0].operationId)).toEqual([op('s1'), op('s2')]);
     expect(mocked.consume.mock.calls[0][0].operationId).toMatch(/^mcp_[a-f0-9]{56}$/);
+    expect(mocked.consume.mock.calls[0][0].metadata).toEqual({
+      projectId: 'p', projectName: 'Projeto Teste', cardId: 's1', cardNumber: 1,
+    });
     expect(mocked.createJob).toHaveBeenCalledWith(owner, 'token', expect.objectContaining({
       projectId: 'p', baseVersion: 3, requestId, slideIds: undefined,
       slides: [expect.objectContaining({ slideId: 's1', operationId: op('s1') }), expect.objectContaining({ slideId: 's2' })],
@@ -274,6 +277,9 @@ describe('runAgentImageJob', () => {
     expect(outcomes.map(outcome => outcome.slideId)).toEqual(['s1', 's2']);
     expect(outcomes.every(outcome => /^original_/.test(outcome.assetId))).toBe(true);
     expect(mocked.settle).toHaveBeenCalledTimes(2);
+    expect(mocked.settle.mock.calls[0][0]).toMatchObject({
+      metadata: { assetId: expect.stringMatching(/^original_/) },
+    });
     expect(mocked.refund).not.toHaveBeenCalled();
     expect(job).toMatchObject({ status: 'applied', afterVersion: 4 });
   });

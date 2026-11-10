@@ -352,8 +352,24 @@ describe('pushProjectShare', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(pushProjectShare({
       code: 'AB12CD34',
-      doc: { shareCode: 'ZZ99YY88', slides: [{ title: 'Projeto pessoal' }] },
+      doc: {
+        shareCode: 'ZZ99YY88',
+        shareProjectId: 'sp_PROJETO12345678',
+        slides: [{ title: 'Projeto pessoal' }],
+      },
       name: 'Outro projeto',
+    })).rejects.toMatchObject({ code: 'share_project_mismatch' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('não envia um vínculo legado sem identidade canônica antes de receber alterações', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(pushProjectShare({
+      code: 'AB12CD34',
+      doc: { shareCode: 'AB12CD34', slides: [{ title: 'Cópia antiga' }] },
+      name: 'Cópia antiga',
     })).rejects.toMatchObject({ code: 'share_project_mismatch' });
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();

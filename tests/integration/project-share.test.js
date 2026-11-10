@@ -12,6 +12,7 @@ import handler from '../../api/project-share.js';
 
 const cookieFor = (customerId, email) =>
   `${COOKIE_NAME}=${encodeURIComponent(createAccessToken({ customerId, email }))}`;
+const bindingByCode = new Map();
 
 function post(body, customerId, email) {
   return makeReq({
@@ -25,6 +26,7 @@ beforeEach(() => {
   resetStripeMock();
   resetShareMemory();
   resetActiveAccessCacheForTests();
+  bindingByCode.clear();
   stripeMock.subscriptions.list.mockImplementation(async ({ customer }) => ({
     data: [subAtiva(customer)],
   }));
@@ -39,11 +41,16 @@ async function createShare() {
     doc: { slides: [{ title: 'Original' }] },
   }, 'cus_owner', 'dona@teste.exemplo'), created);
   expect(created.statusCode).toBe(201);
+  bindingByCode.set(created.body.code, created.body.projectId);
   return created.body.code;
 }
 
 function boundDoc(code, slide) {
-  return { shareCode: code, slides: [slide] };
+  return {
+    shareCode: code,
+    shareProjectId: bindingByCode.get(code) || `legacy_${code}`,
+    slides: [slide],
+  };
 }
 
 describe('POST /api/project-share', () => {
@@ -83,6 +90,23 @@ describe('POST /api/project-share', () => {
     const saved = await getSharedProject(code);
     expect(saved.doc.slides[0].title).toBe('Original');
     expect(saved.doc.shareCode).toBe(code);
+    expect(saved.doc.shareProjectId).toBe(bindingByCode.get(code));
+  });
+
+  it('recusa outro projeto que copiou o código mas não a identidade canônica', async () => {
+    const code = await createShare();
+    const denied = makeRes();
+    await handler(post({
+      action: 'push',
+      code,
+      doc: {
+        shareCode: code,
+        shareProjectId: 'sp_OUTROPROJETO1234',
+        slides: [{ title: 'Projeto importado' }],
+      },
+    }, 'cus_owner', 'dona@teste.exemplo'), denied);
+    expect(denied.statusCode).toBe(409);
+    expect((await getSharedProject(code)).doc.slides[0].title).toBe('Original');
   });
 
   it('não confunde outro cliente Stripe com o dono pelo mesmo e-mail', async () => {
@@ -125,6 +149,34 @@ describe('POST /api/project-share', () => {
     expect(verified.statusCode).toBe(200);
   });
 
+  it('migra partilha legada com segurança depois de receber a revisão canônica', async () => {
+    await putSharedProject({
+      code: 'LEGACY03', ownerId: 'cus_owner', ownerEmail: 'dona@teste.exemplo',
+      members: ['cus_owner'], doc: { shareCode: 'LEGACY03', slides: [{ title: 'Legado' }] }, revision: 0,
+    });
+    const getReq = makeReq({ cookie: cookieFor('cus_owner', 'dona@teste.exemplo') });
+    getReq.query = { code: 'LEGACY03' };
+    const pulled = makeRes();
+    await handler(getReq, pulled);
+    expect(pulled.statusCode).toBe(200);
+    expect(pulled.body.projectId).toBe('legacy_LEGACY03');
+    expect(pulled.body.doc).toMatchObject({
+      shareCode: 'LEGACY03',
+      shareProjectId: 'legacy_LEGACY03',
+    });
+
+    const pushed = makeRes();
+    await handler(post({
+      action: 'push', code: 'LEGACY03',
+      doc: { ...pulled.body.doc, slides: [{ title: 'Migrado' }] },
+    }, 'cus_owner', 'dona@teste.exemplo'), pushed);
+    expect(pushed.statusCode).toBe(200);
+    expect((await getSharedProject('LEGACY03'))).toMatchObject({
+      shareProjectId: 'legacy_LEGACY03',
+      doc: { shareProjectId: 'legacy_LEGACY03', slides: [{ title: 'Migrado' }] },
+    });
+  });
+
   it('membro legado por e-mail precisa de verificação; membro por ID pode publicar', async () => {
     await putSharedProject({
       code: 'LEGACY02', ownerId: 'cus_owner', ownerEmail: 'dona@teste.exemplo',
@@ -161,6 +213,8 @@ describe('POST /api/project-share', () => {
     expect(viewed.statusCode).toBe(200);
     expect(viewed.body.doc.slides[0].title).toBe('Original');
     expect(viewed.body.doc.shareCode).toBe(code);
+    expect(viewed.body.doc.shareProjectId).toBe(bindingByCode.get(code));
+    expect(viewed.body.projectId).toBe(bindingByCode.get(code));
     expect(viewed.body).toMatchObject({ isOwner: false, isMember: false, memberCount: 1 });
     expect(viewed.body).not.toHaveProperty('ownerEmail');
     expect(viewed.body).not.toHaveProperty('members');
@@ -276,6 +330,7 @@ describe('POST /api/project-share', () => {
     } }), created);
     expect(created.statusCode).toBe(201);
     const code = created.body.code;
+    bindingByCode.set(code, created.body.projectId);
     const updated = makeRes();
     await handler(makeReq({ method: 'POST', body: {
       action: 'push', code, doc: boundDoc(code, { title: 'Dev atualizado' }),

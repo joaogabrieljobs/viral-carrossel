@@ -20,7 +20,7 @@ import { trackEvent } from '../utils/telemetry.js';
 import { downloadBlob } from '../utils/export-helpers.js';
 import { imagemComoDataUrl, guardarImagemDoSlide } from '../utils/image-store.js';
 import { projectContentSnapshot } from '../utils/project-content-snapshot.js';
-import { detachTeamShareMetadata } from '../utils/team-share-metadata.js';
+import { detachLegacyTeamShareCopies, detachTeamShareMetadata } from '../utils/team-share-metadata.js';
 import { exportProjectReferences, migrateProjectReferences } from '../utils/style-kit-storage.js';
 import { uid } from '../utils/doc-schema.js';
 import { readInitialShellView } from '../utils/storage.js';
@@ -116,6 +116,13 @@ export function useLibrary({
   setLibraryOpen, toast, setError,
   visualPresets = PRESENTATION_VISUAL_PRESETS,
 }) {
+  useEffect(() => {
+    const migrated = detachLegacyTeamShareCopies(library);
+    if (migrated === library) return;
+    setLibrary(migrated);
+    const active = migrated.find((entry) => entry.id === activeDocId);
+    if (active?.doc) history.reset(active.doc);
+  }, [activeDocId, history, library, setLibrary]);
   // Algumas ações encadeiam "criar pasta" e "aplicar ao projeto" no mesmo
   // clique. O ref é atualizado antes do próximo render para a segunda ação não
   // validar contra a lista antiga capturada pelo callback.
@@ -417,7 +424,7 @@ export function useLibrary({
     const fname = `${(entry.name || 'carrossel').replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'carrossel'}.json`;
     await downloadBlob(blob, fname);
     if (missingBg > 0) {
-      toast(`Backup "${fname}" salvo — ${missingBg} slide(s) sem imagem de fundo no ficheiro.`, 'warning', 5500);
+      toast(`Backup "${fname}" salvo — ${missingBg} slide(s) sem imagem de fundo no arquivo.`, 'warning', 5500);
     } else {
       toast(`Backup "${fname}" salvo. Importe depois pra restaurar.`, 'success', 4500);
     }
@@ -500,7 +507,9 @@ export function useLibrary({
           name: e.name || 'Importado',
           folderId: folderRemap.get(e.folderId) || '',
           importedAt: Date.now(),
-          doc: ensureDocShape(e.doc || {}),
+          // Um backup é uma nova biblioteca local. Nunca herda o vínculo de
+          // publicação da equipe do projeto de origem.
+          doc: ensureDocShape(detachTeamShareMetadata(e.doc || {})),
         }, importedFolders));
         // As imagens vêm embutidas em data URL no backup. Passam para o
         // IndexedDB agora, senão voltariam a pesar no localStorage e seriam

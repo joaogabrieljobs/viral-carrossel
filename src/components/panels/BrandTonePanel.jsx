@@ -203,7 +203,7 @@ export function BrandTonePanel({
       return;
     }
     if (typeof onAnalyze !== 'function') {
-      toast?.('A análise de tom não está disponível nesta tela. Reabra o projeto e tente de novo.', 'error', 5200);
+      toast?.('A análise de tom não está disponível nesta tela. Reabra o projeto e tente novamente.', 'error', 5200);
       return;
     }
     if (ready && !window.confirm('Isto substitui o tom atual nas próximas gerações. Continuar?')) return;
@@ -273,7 +273,7 @@ export function BrandTonePanel({
       useBrandVoice: true,
     }));
     setDraft(null);
-    toast?.('Tom da marca guardado. A voz acompanha qualquer modo narrativo.', 'success', 5500);
+    toast?.('Tom da marca salvo. A voz acompanha qualquer modo narrativo.', 'success', 5500);
   };
 
   const discardDraft = () => setDraft(null);
@@ -429,7 +429,7 @@ export function BrandTonePanel({
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
           <div style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--accent)' }}>
-            Confirme o tom antes de guardar
+            Confirme o tom antes de salvar
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
             {draft.summary}
@@ -459,7 +459,7 @@ export function BrandTonePanel({
             <button type="button" className="vc-btn" onClick={confirmDraft} style={{
               flex: 1, minHeight: 44, borderRadius: 9999, background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 600,
             }}>
-              Guardar tom da marca
+              Salvar tom da marca
             </button>
             <button type="button" className="vc-btn vc-btn-ghost" onClick={discardDraft} style={{ minHeight: 44 }}>
               Descartar

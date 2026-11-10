@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Loader2, X } from 'lucide-react';
 import {
   IMPORT_TEXT_TEMPLATE,
@@ -17,7 +17,10 @@ export function ImportTextModal({
   itemLabel = 'card',
 }) {
   const [raw, setRaw] = useState(IMPORT_TEXT_TEMPLATE);
+  const [confirmedAmbiguousRaw, setConfirmedAmbiguousRaw] = useState('');
   const preview = useMemo(() => parseImportedText(raw), [raw]);
+  const needsScriptConfirmation = preview.scriptConfirmation?.required === true;
+  const ambiguousScriptConfirmed = needsScriptConfirmation && confirmedAmbiguousRaw === raw;
   const textareaRef = useRef(null);
   const closeDialog = () => { if (!busy) onClose?.(); };
   const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
@@ -26,12 +29,25 @@ export function ImportTextModal({
     initialFocusRef: textareaRef,
   });
 
+  useEffect(() => {
+    setConfirmedAmbiguousRaw('');
+  }, [open]);
+
   if (!open) return null;
 
   const apply = () => {
-    if (!preview.cards.length) return;
-    onApply?.(preview);
+    if (!preview.cards.length || (needsScriptConfirmation && !ambiguousScriptConfirmed)) return;
+    onApply?.({
+      ...preview,
+      ambiguousScriptConfirmed: needsScriptConfirmation ? true : undefined,
+    });
   };
+
+  const ambiguousLabels = (preview.scriptConfirmation?.labels || []).map((label) => ({
+    post: 'Post',
+    idea: 'Ideia',
+    page: 'Página',
+  }[label] || label));
 
   const loadFile = async (file) => {
     if (!file) return;
@@ -141,6 +157,33 @@ export function ImportTextModal({
           ) : null}
         </div>
 
+        {needsScriptConfirmation ? (
+          <div
+            role="alert"
+            style={{
+              padding: 12, borderRadius: 10,
+              border: '1px solid color-mix(in srgb, var(--warning, #b76b00) 55%, var(--hairline))',
+              background: 'color-mix(in srgb, var(--warning, #b76b00) 10%, var(--bg-pearl))',
+              display: 'grid', gap: 10, fontSize: 12, lineHeight: 1.45,
+            }}
+          >
+            <div>
+              <strong>Confirme a divisão antes de importar.</strong>{' '}
+              Os rótulos {ambiguousLabels.join(', ')} também podem indicar uma lista, um calendário ou páginas de um documento.
+            </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: busy ? 'default' : 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={ambiguousScriptConfirmed}
+                disabled={busy}
+                onChange={(event) => setConfirmedAmbiguousRaw(event.target.checked ? raw : '')}
+                style={{ marginTop: 2 }}
+              />
+              <span>Confirmo que cada bloco deve virar um {itemLabel}.</span>
+            </label>
+          </div>
+        ) : null}
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button type="button" className="vc-btn vc-btn-ghost" disabled={busy} onClick={onClose} style={{ minHeight: 44 }}>
             Cancelar
@@ -148,12 +191,12 @@ export function ImportTextModal({
           <button
             type="button"
             className="vc-btn"
-            disabled={busy || !preview.cards.length}
+            disabled={busy || !preview.cards.length || (needsScriptConfirmation && !ambiguousScriptConfirmed)}
             onClick={apply}
             style={{
               minHeight: 44, padding: '0 18px', borderRadius: 9999, border: 'none',
-              background: busy || !preview.cards.length ? 'var(--bg-pearl)' : 'var(--accent)',
-              color: busy || !preview.cards.length ? 'var(--text-muted)' : '#fff',
+              background: busy || !preview.cards.length || (needsScriptConfirmation && !ambiguousScriptConfirmed) ? 'var(--bg-pearl)' : 'var(--accent)',
+              color: busy || !preview.cards.length || (needsScriptConfirmation && !ambiguousScriptConfirmed) ? 'var(--text-muted)' : '#fff',
               fontWeight: 600,
             }}
           >

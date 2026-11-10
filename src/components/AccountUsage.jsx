@@ -44,6 +44,28 @@ const activityStatus = {
   reserved: { label: 'Em processamento', color: 'var(--text-secondary)' },
 };
 
+const compactIdentifier = (value) => {
+  const id = String(value || '').trim();
+  if (id.length <= 28) return id;
+  return `${id.slice(0, 16)}…${id.slice(-8)}`;
+};
+
+function activityContext(item) {
+  const project = String(item?.projectName || item?.projectId || '').trim();
+  const card = Number.isSafeInteger(item?.cardNumber) && item.cardNumber > 0
+    ? `Card ${item.cardNumber}`
+    : String(item?.cardId || '').trim()
+      ? `Card ${compactIdentifier(item.cardId)}`
+      : '';
+  const imageId = String(item?.assetId || item?.imageId || '').trim();
+  return {
+    project: project ? `Projeto: ${compactIdentifier(project)}` : '',
+    card,
+    image: imageId ? `Imagem: ${compactIdentifier(imageId)}` : '',
+    imageId,
+  };
+}
+
 function UsageMetric({ label, value, description, prominent = false, isMobile }) {
   return (
     <div style={{ minWidth: 0, padding: isMobile ? '14px 16px' : '20px 22px', background: prominent ? 'var(--accent-surface)' : 'var(--bg-pearl)', borderRadius: 12 }}>
@@ -176,12 +198,23 @@ export default function AccountUsage({
             <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
               {activity.map((item, index) => {
                 const state = activityStatus[item?.status] || activityStatus.reserved;
+                const context = activityContext(item);
                 return (
                   <li key={`${item?.createdAt || 'atividade'}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', padding: '11px 12px', borderRadius: 11, background: 'var(--bg-pearl)' }}>
                     <span style={{ minWidth: 0 }}>
                       <strong style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>
                         {item?.source === 'mcp' ? 'Integração de IA' : 'Editor Moont'}
                       </strong>
+                      {(context.project || context.card || context.image) && (
+                        <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                          {[context.project, context.card, context.image].filter(Boolean).map((part, partIndex) => (
+                            <React.Fragment key={part}>
+                              {partIndex > 0 ? ' · ' : ''}
+                              <span title={part === context.image ? context.imageId : undefined}>{part}</span>
+                            </React.Fragment>
+                          ))}
+                        </span>
+                      )}
                       <time dateTime={item?.createdAt || undefined} style={{ display: 'block', marginTop: 3, fontSize: 11, color: 'var(--text-muted)' }}>
                         {formatActivityDate(item?.createdAt)}
                       </time>
