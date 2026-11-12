@@ -136,14 +136,42 @@ function mimeFromPath(pathname) {
   return 'image/jpeg';
 }
 
+const ALLOWED_IMAGE_MIMES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+]);
+
+function sniffImageMime(bytes) {
+  if (!bytes || bytes.length < 6) return null;
+  if (bytes.length >= 8
+    && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 12
+    && bytes.toString('ascii', 0, 4) === 'RIFF'
+    && bytes.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  const gif = bytes.toString('ascii', 0, 6);
+  if (gif === 'GIF87a' || gif === 'GIF89a') return 'image/gif';
+  if (bytes.length >= 12
+    && bytes.toString('ascii', 4, 8) === 'ftyp'
+    && ['avif', 'avis'].includes(bytes.toString('ascii', 8, 12))) return 'image/avif';
+  return null;
+}
+
 function parseDataUrl(dataUrl) {
   const src = String(dataUrl || '');
-  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(src);
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/.exec(src);
   if (!m) return null;
   try {
+    const declaredMime = m[1].toLowerCase();
+    if (!ALLOWED_IMAGE_MIMES.has(declaredMime) || m[2].length % 4 !== 0) return null;
     const bytes = Buffer.from(m[2], 'base64');
     if (!bytes.length) return null;
-    return { mime: m[1], bytes };
+    const detectedMime = sniffImageMime(bytes);
+    if (!detectedMime || detectedMime !== declaredMime) return null;
+    return { mime: detectedMime, bytes };
   } catch {
     return null;
   }

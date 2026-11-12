@@ -84,7 +84,7 @@ describe('checkout e logout com identidade no Postgres', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({
         vc_identity_epoch: owner.identityEpoch,
-      }) }),
+      }) }), expect.any(Object),
     );
   });
 

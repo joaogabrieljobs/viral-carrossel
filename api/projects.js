@@ -66,6 +66,12 @@ function mapStoreError(cause) {
       return error(400, 'Dados do projeto inválidos.', cause.code);
     case 'project_too_large':
       return error(413, 'Este projeto excede o tamanho permitido.', cause.code);
+    case 'project_account_limit':
+    case 'project_account_too_large':
+      return error(413, cause.message, cause.code, {
+        ...(cause.limit ? { limit: cause.limit } : {}),
+        ...(cause.limitBytes ? { limitBytes: cause.limitBytes } : {}),
+      });
     case 'library_storage_unconfigured':
     case 'library_storage_unavailable':
       return error(503, 'O armazenamento de projetos está indisponível. Tente novamente.', cause.code);

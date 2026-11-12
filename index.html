@@ -19,20 +19,8 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
     <!-- Tailwind CDN removido: CSP bloqueia cdn.tailwindcss.com; a UI usa GLOBAL_STYLE. -->
-    <!-- Analytics: Plausible (privacy-first, sem cookies, sem PII, sem consent banner) -->
-    <script>
-      // A página de recuperação não carrega analytics com o token na URL.
-      if (window.location.pathname !== '/redefinir-senha') {
-        var analytics = document.createElement('script');
-        analytics.defer = true;
-        // Identificador do painel Plausible existente; acompanha ambos os hosts
-        // até a alteração da propriedade no painel de analytics.
-        analytics.dataset.domain = 'viralcarrossel.com.br';
-        analytics.src = 'https://plausible.io/js/script.tagged-events.js';
-        document.head.appendChild(analytics);
-      }
-    </script>
-    <script>window.plausible = window.plausible || function(){(window.plausible.q=window.plausible.q||[]).push(arguments)}</script>
+    <!-- Convites/recuperação não carregam analytics; lógica externa para CSP sem inline. -->
+    <script defer src="/analytics-loader.js"></script>
     <style>
       html, body, #root { height: 100%; margin: 0; padding: 0; background: #090a0f; color: #f3f0e7; }
       body {

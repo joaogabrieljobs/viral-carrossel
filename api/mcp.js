@@ -85,8 +85,12 @@ async function call(name, args, agent) {
   switch (name) {
     case 'get_connection_profile': return { connected: true, service: 'Moont', scopes: agent.scopes };
     case 'list_projects': return listAgentProjects(agent.ownerId, args);
-    case 'get_project_content': return getAgentProject(agent.ownerId, args.projectId, { includeText: true });
-    case 'get_project_design': return getAgentProject(agent.ownerId, args.projectId, { includeText: args.includeText === true });
+    case 'get_project_content': return getAgentProject(agent.ownerId, args.projectId, {
+      includeText: true, includeShare: agent.scopes.includes('projects:write'),
+    });
+    case 'get_project_design': return getAgentProject(agent.ownerId, args.projectId, {
+      includeText: args.includeText === true, includeShare: agent.scopes.includes('projects:write'),
+    });
     case 'get_content_schema': return { schema: CONTENT_PATCH_SCHEMA };
     case 'get_visual_schema': return { schema: VISUAL_PATCH_SCHEMA };
     case 'preview_text_edit': return previewAgentTextEdit(agent.ownerId, args);

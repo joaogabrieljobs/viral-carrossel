@@ -359,10 +359,10 @@ export function applyVisualPatchToEntry(entry, rawPatch, slideIds, { brandScope 
   };
 }
 
-export function projectDesignView(project, { includeText = false } = {}) {
+export function projectDesignView(project, { includeText = false, includeShare = false } = {}) {
   const entry = project?.entry || {};
   const doc = entry.doc || {};
-  const shareCode = typeof doc.shareCode === 'string'
+  const shareCode = includeShare && typeof doc.shareCode === 'string'
     && /^[A-Z2-9]{8,12}$/.test(doc.shareCode.trim().toUpperCase())
     ? doc.shareCode.trim().toUpperCase()
     : '';

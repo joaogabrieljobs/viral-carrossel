@@ -6,6 +6,7 @@
  */
 import { SK } from './storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
+import { CUSTOM_VISUAL_PRESETS_KEY } from './custom-visual-presets.js';
 import { updateDurableVault } from './account-vault-store.js';
 import { imageGet, imagePut, newImageId, origemParaBlob, blobParaDataUrl } from './image-store.js';
 
@@ -23,6 +24,9 @@ const SNAPSHOT_KEYS = [
   /** Tour / intro — só na 1.ª vez da conta, não a cada geração de cards. */
   SK.onboarding,
   SK.modesIntro,
+  /** Preferências criativas também pertencem à conta, não ao navegador. */
+  SK.hookLibrary,
+  CUSTOM_VISUAL_PRESETS_KEY,
 ];
 
 function readLegacyVaultMap() {

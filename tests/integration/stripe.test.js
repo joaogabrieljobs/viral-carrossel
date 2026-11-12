@@ -34,12 +34,14 @@ describe('POST /api/stripe/checkout (RF-07)', () => {
     // e-mail normalizado (trim + lowercase)
     expect(stripeMock.customers.create).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'user5@teste.exemplo' }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-checkout-customer-/) }),
     );
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'subscription',
         success_url: 'https://moont.ai/?billing=success',
       }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-checkout-session-/) }),
     );
     const signed = cookieValue(res, checkoutCookieName('cs_test_fake'));
     expect(signed).toMatch(/^v1\.[^.]+\.[^.]+$/);
@@ -55,7 +57,7 @@ describe('POST /api/stripe/checkout (RF-07)', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
       success_url: 'https://viralcarrossel.com.br/?billing=success',
       cancel_url: 'https://viralcarrossel.com.br/?billing=cancel',
-    }));
+    }), expect.any(Object));
   });
 
   it('e-mail preexistente ativo ou inativo exige login e nunca reutiliza o customer sem prova', async () => {
@@ -103,7 +105,7 @@ describe('POST /api/stripe/checkout (RF-07)', () => {
     expect(stripeMock.customers.create).not.toHaveBeenCalled();
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
       customer: 'cus_vitima', expires_at: expect.any(Number),
-    }));
+    }), expect.any(Object));
     expect(cookieValue(res, CHECKOUT_IDENTITY_COOKIE)).toBe('');
 
     const forged = makeRes();

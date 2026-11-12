@@ -159,6 +159,24 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(assign).toHaveBeenCalledWith('/');
   });
 
+  it('só apaga este aparelho depois de a nuvem confirmar o salvamento completo', async () => {
+    mocks.vault.mockReturnValue(true);
+    mocks.push.mockResolvedValue({ ...cloudReceipt, assetsFailed: 1 });
+    expect(await run({ wipeDevice: true })).toBe(false);
+    expect(mocks.logout).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('confirme primeiro o salvamento completo'), 'warning', 6500);
+  });
+
+  it('logout destrutivo usa wipeMedia somente após recibo completo da conta', async () => {
+    mocks.vault.mockReturnValue(true);
+    mocks.push.mockResolvedValue(cloudReceipt);
+    expect(await run({ wipeDevice: true })).toBe(true);
+    expect(mocks.push.mock.invocationCallOrder[0]).toBeLessThan(mocks.logout.mock.invocationCallOrder[0]);
+    expect(mocks.logout.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
+    expect(mocks.clear).toHaveBeenCalledWith({ timeoutMs: 1_200, wipeMedia: true });
+  });
+
   it('falha de rede no logout não afirma saída e libera o editor para tentar novamente', async () => {
     mocks.vault.mockReturnValue(true);
     mocks.logout.mockRejectedValue(new Error('rede indisponível'));
@@ -189,8 +207,23 @@ describe('logout protege a edição atual antes de limpar a conta', () => {
     expect(await run()).toBe(true);
     expect(mocks.logout.mock.invocationCallOrder[0]).toBeLessThan(mocks.clear.mock.invocationCallOrder[0]);
     expect(assign).toHaveBeenCalledWith('/?landing=1');
-    expect(sessionValues.get('vc_logout_cleanup_pending')).toBe('1');
+    expect(sessionValues.get('vc_logout_cleanup_pending')).toBe('normal');
     expect(mocks.state.locked).toBe(true);
+  });
+
+  it('falha do wipe destrutivo grava marcador que preserva o pedido no próximo boot', async () => {
+    mocks.vault.mockReturnValue(true);
+    mocks.push.mockResolvedValue(cloudReceipt);
+    mocks.clear.mockRejectedValue(new Error('outra aba aberta'));
+    const sessionValues = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key) => sessionValues.get(key) || null,
+      setItem: (key, value) => sessionValues.set(key, value),
+      removeItem: (key) => sessionValues.delete(key),
+    });
+    expect(await run({ wipeDevice: true })).toBe(true);
+    expect(sessionValues.get('vc_logout_cleanup_pending')).toBe('device-wipe');
+    expect(assign).toHaveBeenCalledWith('/?landing=1');
   });
 
   it('não considera limpeza completa se só o perfil pessoal ficou no navegador', async () => {

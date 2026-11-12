@@ -24,6 +24,7 @@ afterEach(() => {
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
   delete process.env.RATE_LIMIT_TEST_UPSTASH;
+  delete process.env.VERCEL_ENV;
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -69,6 +70,18 @@ describe('rate limit partilhado no Postgres', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('em produção, falha do Postgres não cai no contador da instância', async () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.RATE_LIMIT_BACKEND = 'postgres';
+    database.unsafe.mockRejectedValueOnce(new Error('offline'));
+    const request = { headers: { 'x-real-ip': '203.0.113.9' } };
+    const options = { limit: 1, windowMs: 60_000, keyPrefix: 'login', failClosed: true };
+
+    expect(await consumeRateLimit(request, options)).toEqual({ unavailable: true, retryAfterSec: 0 });
+    expect(await consumeRateLimit(request, options)).toEqual({ unavailable: true, retryAfterSec: 0 });
+    expect(database.unsafe).toHaveBeenCalledTimes(1);
   });
 
   it('ignora credenciais Upstash antigas quando a fonte está desativada', async () => {

@@ -15,8 +15,9 @@ export default function middleware(request) {
   if (!host.endsWith('.vercel.app') && !ALTERNATE_HOSTS.has(host)) return;
 
   const incoming = new URL(request.url);
-  // O cron da Vercel não segue redirects; a própria rota exige CRON_SECRET.
-  if (incoming.pathname === '/api/cron/cleanup-image-references') return;
+  // O cron da Vercel não segue redirects; cada rota de cron exige CRON_SECRET.
+  // Liberar o prefixo inteiro evita que um cron novo do vercel.json fique de fora.
+  if (incoming.pathname.startsWith('/api/cron/')) return;
   const dest = new URL(incoming.pathname + incoming.search, CANONICAL_ORIGIN);
   return Response.redirect(dest, 308);
 }

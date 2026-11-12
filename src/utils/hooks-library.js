@@ -4,6 +4,24 @@
 
 export const HOOK_LIBRARY_MAX = 50;
 
+/** Limita e normaliza conteúdo restaurado do cofre/nuvem antes de expor à UI. */
+export function normalizeHookLibrary(value) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set();
+  return value
+    .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+    .map((item, index) => ({
+      id: String(item.id || `hook_${index}`).slice(0, 80),
+      hook: String(item.hook || '').trim().slice(0, 500),
+      niche: String(item.niche || '').trim().slice(0, 160),
+      tone: String(item.tone || '').trim().slice(0, 160),
+      savedAt: Number.isFinite(Number(item.savedAt)) ? Number(item.savedAt) : 0,
+      usageCount: Math.max(1, Math.min(10_000, Number(item.usageCount) || 1)),
+    }))
+    .filter((item) => item.hook && item.id && !ids.has(item.id) && ids.add(item.id))
+    .slice(0, HOOK_LIBRARY_MAX);
+}
+
 /** Adiciona um hook à biblioteca, com dedup por (hook, niche).
  *  Duplicata: incrementa usageCount + atualiza savedAt no mesmo slot.
  *  Não-duplicata: prepend, com truncamento FIFO a HOOK_LIBRARY_MAX. */

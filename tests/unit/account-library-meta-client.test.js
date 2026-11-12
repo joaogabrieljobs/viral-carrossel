@@ -4,6 +4,7 @@ const owner = vi.hoisted(() => ({ current: 'email:janine@example.test', locked: 
 const cloud = vi.hoisted(() => ({ pack: vi.fn(), hydrate: vi.fn(), upload: vi.fn() }));
 vi.mock('../../src/utils/account-data-owner.js', () => ({ readDataOwner: () => owner.current }));
 vi.mock('../../src/utils/storage.js', () => ({
+  SK: { hookLibrary: 'vc_hook_library' },
   areAccountDataWritesLocked: () => owner.locked,
   isAccountDataWriteOwnerCurrent: () => owner.tabCurrent,
 }));
@@ -81,6 +82,8 @@ describe('metadados globais por conta no cliente', () => {
     const saved = await saveAccountLibraryMetadata({
       brandRoster: [{ id: 'janine' }], libraryFolders: [{ id: 'clientes' }],
       activeBrandId: 'janine', activeDocId: 'clinica', userProfile: { name: 'João' },
+      hookLibrary: [{ id: 'hook_1', hook: 'Gancho aprovado' }],
+      customVisualPresets: [{ id: 'custom_1', label: 'Editorial', isCustom: true }],
     }, { ...opts, baseRevision: 3 });
     expect(saved.revision).toBe(4);
     expect(saved.assetsUploaded).toBe(1);
@@ -93,26 +96,62 @@ describe('metadados globais por conta no cliente', () => {
     const body = JSON.parse(fetch.mock.calls[0][1].body);
     expect(body).toMatchObject({ baseRevision: 3, metadata: {
       brands: [{ id: 'janine' }], folders: [{ id: 'clientes' }], userProfile: { name: 'João' },
+      hookLibrary: [{ id: 'hook_1', hook: 'Gancho aprovado' }],
+      customVisualPresets: [{ id: 'custom_1', label: 'Editorial', isCustom: true }],
     } });
     expect(body.metadata).not.toHaveProperty('docs');
     expect(body.metadata).not.toHaveProperty('deletedIds');
     expect(fetch.mock.calls[0][1].headers['X-Account-Owner']).toBe('cus_janine');
   });
 
-  it('na saída, regrava uma vez com a revisão que a nuvem acabou de confirmar', async () => {
+  it('na saída, relê e mescla hooks/presets concorrentes antes de regravar', async () => {
+    const common = {
+      brands: [{ id: 'janine', logoAssetId: 'logo-1' }], folders: [{ id: 'clientes' }],
+      activeBrandId: 'janine', activeDocId: 'clinica', userProfile: { name: 'João' },
+      onboardingDone: '1', modesIntroDone: null, assetIds: ['logo-1'],
+    };
     fetch.mockResolvedValueOnce(response(409, {
       error: 'Esses dados mudaram em outro dispositivo. Atualize antes de salvar.',
       code: 'account_meta_conflict', cloudRevision: 8,
     })).mockResolvedValueOnce(response(200, {
-      ok: true, revision: 9, updatedAt: 130, metadata: { brands: [{ id: 'janine' }] },
+      ok: true, revision: 8, updatedAt: 125,
+      metadata: {
+        ...common,
+        hookLibrary: [{ id: 'hook_remote', hook: 'Gancho remoto', savedAt: 20 }],
+        customVisualPresets: [{ id: 'custom_remote', label: 'Remoto', isCustom: true, savedAt: 20 }],
+      },
+    })).mockResolvedValueOnce(response(200, {
+      ok: true, revision: 9, updatedAt: 130, metadata: common,
     }));
     const saved = await saveAccountLibraryMetadata({
-      brandRoster: [{ id: 'janine' }],
+      brandRoster: common.brands, libraryFolders: common.folders,
+      activeBrandId: common.activeBrandId, activeDocId: common.activeDocId,
+      userProfile: common.userProfile, onboardingDone: common.onboardingDone,
+      modesIntroDone: common.modesIntroDone,
+      hookLibrary: [{ id: 'hook_local', hook: 'Gancho local', savedAt: 30 }],
+      customVisualPresets: [{ id: 'custom_local', label: 'Local', isCustom: true, savedAt: 30 }],
     }, { ...opts, baseRevision: 3, resolveRevisionConflict: true });
     expect(saved.revision).toBe(9);
     expect(JSON.parse(fetch.mock.calls[0][1].body).baseRevision).toBe(3);
-    expect(JSON.parse(fetch.mock.calls[1][1].body).baseRevision).toBe(8);
+    expect(fetch.mock.calls[1][1].method).toBe('GET');
+    const retry = JSON.parse(fetch.mock.calls[2][1].body);
+    expect(retry.baseRevision).toBe(8);
+    expect(retry.metadata.hookLibrary.map((item) => item.id)).toEqual(['hook_remote', 'hook_local']);
+    expect(retry.metadata.customVisualPresets.map((item) => item.id))
+      .toEqual(['custom_remote', 'custom_local']);
     expect(cloud.upload).toHaveBeenCalledTimes(1);
+  });
+
+  it('não tenta resolver conflito quando outros metadados também mudaram', async () => {
+    fetch.mockResolvedValueOnce(response(409, {
+      error: 'Dados mais recentes na nuvem.', code: 'account_meta_conflict', cloudRevision: 8,
+    })).mockResolvedValueOnce(response(200, {
+      ok: true, revision: 8, metadata: { brands: [{ id: 'outra' }], folders: [] },
+    }));
+    await expect(saveAccountLibraryMetadata({ brandRoster: [{ id: 'janine' }] }, {
+      ...opts, baseRevision: 3, resolveRevisionConflict: true,
+    })).rejects.toMatchObject({ status: 409, code: 'account_meta_conflict' });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('não sobrescreve a nuvem quando recebe 409; reporta a revisão atual', async () => {

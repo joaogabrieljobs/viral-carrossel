@@ -3,13 +3,30 @@
  *
  * RATE_LIMIT_BACKEND=postgres usa uma janela fixa partilhada entre lambdas.
  * Sem a flag, preserva Upstash Redis quando configurado e disponível.
- * Falha do backend partilhado usa temporariamente um Map por instância.
+ * Em produção, falha/ausência do backend partilhado fecha a rota com 503.
+ * O Map por instância existe apenas para desenvolvimento e testes.
  */
 
 const buckets = new Map();
 const UPSTASH_RETRY_MS = 30_000;
 let upstashUnavailableUntil = 0;
 let postgresUnavailableUntil = 0;
+let loggedBackend = '';
+
+function productionRateLimitRequired() {
+  return process.env.VERCEL_ENV === 'production'
+    || (process.env.NODE_ENV === 'production' && process.env.VITEST !== 'true');
+}
+
+function unavailable() {
+  return { unavailable: true, retryAfterSec: 0 };
+}
+
+function logBackendOnce(name) {
+  if (loggedBackend === name) return;
+  loggedBackend = name;
+  console.info('[rate-limit]', JSON.stringify({ event: 'backend_selected', backend: name }));
+}
 
 function headerValue(headers, name) {
   const value = headers?.[name] || headers?.[name.toLowerCase()];
@@ -114,9 +131,12 @@ function rateIdentity(req, subject) {
   return clientIp(req);
 }
 
-export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, keyPrefix = 'api', subject } = {}) {
+export async function consumeRateLimit(req, {
+  limit = 30, windowMs = 60_000, keyPrefix = 'api', subject, failClosed = false,
+} = {}) {
   const identity = rateIdentity(req, subject);
   if (process.env.RATE_LIMIT_BACKEND === 'postgres') {
+    logBackendOnce('postgres');
     if (Date.now() >= postgresUnavailableUntil) {
       try {
         // Carregar apenas quando o backend partilhado estiver ativado. O import
@@ -129,10 +149,17 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
         return result;
       } catch (error) {
         postgresUnavailableUntil = Date.now() + UPSTASH_RETRY_MS;
-        console.warn('[rate-limit] Postgres falhou; usando limite local temporário:', error?.message || error);
+        console.warn('[rate-limit] Postgres falhou:', error?.message || error);
       }
     }
+    if (failClosed && productionRateLimitRequired()) {
+      logBackendOnce('unavailable');
+      return unavailable();
+    }
     return consumeMemory(req, { limit, windowMs, keyPrefix, identity });
+  }
+  if (hasUpstash()) {
+    logBackendOnce('upstash');
   }
   if (hasUpstash() && Date.now() >= upstashUnavailableUntil) {
     try {
@@ -141,13 +168,25 @@ export async function consumeRateLimit(req, { limit = 30, windowMs = 60_000, key
       return result;
     } catch (e) {
       upstashUnavailableUntil = Date.now() + UPSTASH_RETRY_MS;
-      console.warn('[rate-limit] Upstash falhou; usando limite local temporário:', e?.message || e);
+      console.warn('[rate-limit] Upstash falhou:', e?.message || e);
     }
   }
+  if (failClosed && productionRateLimitRequired()) {
+    logBackendOnce('unavailable');
+    return unavailable();
+  }
+  logBackendOnce('memory-development');
   return consumeMemory(req, { limit, windowMs, keyPrefix, identity });
 }
 
 export function rateLimitResponse(res, retryAfterSec, nested = false) {
+  if (!Number.isFinite(Number(retryAfterSec)) || Number(retryAfterSec) <= 0) {
+    const message = 'Proteção contra excesso de pedidos temporariamente indisponível. Tente novamente em instantes.';
+    return res.status(503).json(
+      nested ? { error: { message, code: 'rate_limit_unavailable' } }
+        : { error: message, code: 'rate_limit_unavailable' },
+    );
+  }
   res.setHeader('Retry-After', String(retryAfterSec));
   const message = 'Demasiados pedidos. Aguarde um momento e tente de novo.';
   return res.status(429).json(
@@ -160,4 +199,5 @@ export function resetRateLimits() {
   buckets.clear();
   upstashUnavailableUntil = 0;
   postgresUnavailableUntil = 0;
+  loggedBackend = '';
 }

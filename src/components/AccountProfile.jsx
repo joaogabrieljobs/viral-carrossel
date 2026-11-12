@@ -574,32 +574,63 @@ export default function AccountProfile({
             </p>
           )}
           {onLogout && (
-            <button
-              type="button"
-              disabled={loggingOut}
-              aria-busy={loggingOut}
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (loggingOut) return;
-                setLoggingOut(true);
-                try { await onLogout(); }
-                catch (err) { console.warn('[logout]', err); }
-                finally { setLoggingOut(false); }
-              }}
-              style={{
-                height: 38,
-                borderRadius: 9999,
-                border: '1px solid var(--border)',
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              {loggingOut ? 'Salvando e saindo…' : 'Sair da conta'}
-            </button>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <button
+                type="button"
+                disabled={loggingOut}
+                aria-busy={loggingOut}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (loggingOut) return;
+                  setLoggingOut(true);
+                  try { await onLogout(); }
+                  catch (err) { console.warn('[logout]', err); }
+                  finally { setLoggingOut(false); }
+                }}
+                style={{
+                  height: 38,
+                  borderRadius: 9999,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: loggingOut ? 'wait' : 'pointer',
+                }}
+              >
+                {loggingOut ? 'Salvando e saindo…' : 'Sair da conta'}
+              </button>
+              <button
+                type="button"
+                disabled={loggingOut}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (loggingOut) return;
+                  const confirmed = window.confirm(
+                    'O Moont confirmará o salvamento na sua conta e apagará projetos, imagens e preferências deste aparelho. Deseja continuar?',
+                  );
+                  if (!confirmed) return;
+                  setLoggingOut(true);
+                  try { await onLogout({ wipeDevice: true }); }
+                  catch (err) { console.warn('[logout/wipe-device]', err); }
+                  finally { setLoggingOut(false); }
+                }}
+                style={{
+                  minHeight: 38,
+                  borderRadius: 9999,
+                  border: '1px solid var(--danger, #d95c5c)',
+                  background: 'transparent',
+                  color: 'var(--danger, #d95c5c)',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: loggingOut ? 'wait' : 'pointer',
+                }}
+              >
+                Sair e apagar deste aparelho
+              </button>
+            </div>
           )}
         </div>
 

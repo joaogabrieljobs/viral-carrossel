@@ -98,7 +98,9 @@ export default function AgentAccessPanel() {
     finally { setBusy(''); }
   }
 
-  const visibleTokens = credentials.filter((item) => !item.revokedAt && !item.invalidated);
+  const visibleTokens = credentials.filter((item) => (
+    !item.revokedAt && !item.invalidated && Date.parse(item.expiresAt) > Date.now()
+  ));
 
   function expiryNote(iso) {
     const ms = Date.parse(iso) - Date.now();

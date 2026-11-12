@@ -124,10 +124,11 @@ async function reserveCredits(ownerId, quota, slides, projectContext = {}) {
       fail(503, 'quota_store_error', 'Não foi possível reservar o crédito de imagem. Nenhum crédito foi usado.',
         { cause: error?.code, ownedReservations:uncertainReservations });
     }
-    // Só uma reserva ainda aberta pode pertencer a uma chamada concorrente do
-    // mesmo requestId. Operações já liquidadas ou reembolsadas estão fechadas:
-    // reutilizá-las criaria uma imagem sem nova cobrança.
-    if (consumed.replayed && consumed.reason !== 'already_reserved') {
+    // O placeholder único é criado antes da quota: uma chamada concorrente do
+    // mesmo requestId retorna em `created.existing` sem chegar aqui. Portanto,
+    // qualquer operação já existente — inclusive `already_reserved` — veio de
+    // outro fluxo ou de um job encerrado e nunca pode financiar outra imagem.
+    if (consumed.replayed) {
       await refundAll(ownerId, quota.periodStartSec, ownedReservations);
       fail(409, 'image_request_closed',
         'Este requestId já foi encerrado. Gere um novo requestId para tentar novamente.',
@@ -140,10 +141,6 @@ async function reserveCredits(ownerId, quota, slides, projectContext = {}) {
           ownedReservations:[...ownedReservations] });
     }
     reserved.push(slide.operationId);
-    // `already_reserved` significa que outra chamada abriu a mesma reserva.
-    // Ela pode ser reutilizada pelo requestId, mas nunca pertence a esta
-    // chamada para fins de reembolso: numa corrida, devolver esse crédito
-    // cancelaria a cobrança do job vencedor.
     if (consumed.allowed === true && consumed.replayed !== true) {
       ownedReservations.push(slide.operationId);
     }

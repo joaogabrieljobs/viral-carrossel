@@ -11,7 +11,10 @@ const images = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
 vi.mock('../../src/utils/image-store.js', async (original) => ({
   ...(await original()), imagemComoDataUrl: images.read, guardarImagemDoSlide: images.write,
 }));
-const photo = `data:image/jpeg;base64,${Buffer.alloc(3_300_000, 173).toString('base64')}`;
+const photo = `data:image/jpeg;base64,${Buffer.concat([
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+  Buffer.alloc(3_299_994, 173),
+]).toString('base64')}`;
 const snapshot = (source = photo) => ({ library: [{ id: 'p1', updatedAt: 1, doc: {
   slides: [{ id: 's1', title: 'Detalhe preservado', bgImage: source, bgImageId: 'local-original' }],
 } }], brandRoster: [], libraryFolders: [], activeDocId: 'p1' });

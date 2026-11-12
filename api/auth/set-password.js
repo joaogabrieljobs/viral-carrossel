@@ -42,7 +42,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const limited = await consumeRateLimit(req, { limit: 5, windowMs: 15 * 60_000, keyPrefix: 'set-password' });
+  const limited = await consumeRateLimit(req, {
+    limit: 5, windowMs: 15 * 60_000, keyPrefix: 'set-password', failClosed: true,
+  });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   const secret = String(process.env.BOOTSTRAP_SECRET || '').trim();

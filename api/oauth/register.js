@@ -1,5 +1,6 @@
 import { registerOAuthClient } from '../lib/oauth-store.js';
-import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
+import { consumeRateLimit } from '../lib/rate-limit.js';
+import { oauthRateLimitResponse } from '../lib/oauth-rate-limit.js';
 
 function registrationBody(req) {
   let value = req.body;
@@ -19,8 +20,10 @@ function registrationBody(req) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'invalid_request' });
-  const limited = await consumeRateLimit(req, { limit: 15, windowMs: 60_000, keyPrefix: 'oauth-register' });
-  if (limited) return rateLimitResponse(res, limited.retryAfterSec);
+  const limited = await consumeRateLimit(req, {
+    limit: 15, windowMs: 60_000, keyPrefix: 'oauth-register', failClosed: true,
+  });
+  if (limited) return oauthRateLimitResponse(res, limited);
   const input = registrationBody(req);
   try { return res.status(201).json(await registerOAuthClient(input)); }
   catch (cause) {

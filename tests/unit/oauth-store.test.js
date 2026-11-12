@@ -97,6 +97,22 @@ describe('refresh OAuth vinculado à segurança da conta', () => {
       .toBeLessThan(deps.begin.mock.invocationCallOrder[0]);
   });
 
+  it('não consome o refresh anterior quando a emissão atômica falha', async () => {
+    deps.query.mockImplementation(async statement => {
+      if (statement.includes('SELECT owner_id')) return [{ owner_id:ownerId }];
+      if (statement.includes('SELECT r.*')) return [storedRefresh()];
+      return [];
+    });
+
+    await expect(rotateRefreshToken({
+      token:'refresh-old', clientId, resource,
+      issue:async () => { throw Object.assign(new Error('banco indisponível'), { code:'db_down' }); },
+    })).rejects.toMatchObject({ code:'db_down' });
+
+    expect(deps.query.mock.calls.some(([statement]) =>
+      statement.includes('SET revoked_at = now() WHERE token_hash'))).toBe(false);
+  });
+
   it('mantém a integração depois de logout comum quando agent_epoch não mudou', async () => {
     deps.identity.mockResolvedValue({
       agentEpoch: 'security-1', accountId: '22222222-2222-4222-8222-222222222222',

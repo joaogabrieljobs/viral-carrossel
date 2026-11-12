@@ -72,3 +72,28 @@ export async function updateDurableVault(change) {
     };
   });
 }
+
+/**
+ * Apaga todos os slots do cofre deste aparelho. Só deve ser usado pela ação
+ * destrutiva e explícita de logout; o logout normal preserva o banco.
+ */
+export async function wipeDurableVaultDatabase() {
+  if (typeof indexedDB === 'undefined') return;
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const timer = setTimeout(() => finish(new Error('A limpeza do cofre local não foi confirmada.')), TIMEOUT_MS);
+    try {
+      const request = indexedDB.deleteDatabase(ACCOUNT_VAULT_DB);
+      request.onsuccess = () => finish();
+      request.onerror = () => finish(request.error || new Error('Não foi possível apagar o cofre local.'));
+      request.onblocked = () => finish(new Error('Feche outras abas do Moont para apagar os dados deste aparelho.'));
+    } catch (error) { finish(error); }
+  });
+}

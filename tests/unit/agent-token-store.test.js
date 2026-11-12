@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 
 const deps = vi.hoisted(() => ({
-  query: vi.fn(), activeSubscription: vi.fn(), billingDisabled: vi.fn(),
+  query: vi.fn(), begin:vi.fn(), activeSubscription: vi.fn(), billingDisabled: vi.fn(),
   customer: vi.fn(), identityBackend: vi.fn(), account: vi.fn(),
 }));
 vi.mock('../../api/lib/postgres-connection.js', () => ({
-  getPostgresConnection: () => ({ unsafe: deps.query }),
+  getPostgresConnection: () => ({ unsafe: deps.query, begin:deps.begin }),
 }));
 vi.mock('../../api/lib/stripe.js', () => ({
   findActiveSubscription: deps.activeSubscription,
@@ -20,9 +20,11 @@ vi.mock('../../api/lib/account-identity-postgres.js', () => ({
 
 import {
   authenticateAgentRequest,
+  cleanupExpiredAgentTokens,
   clearAgentSubscriptionCache,
   createAgentToken,
   listAgentTokens,
+  revokeSupersededOAuthTokens,
   revokeAgentToken,
 } from '../../api/lib/agent-token-store.js';
 
@@ -46,6 +48,7 @@ beforeEach(() => {
   deps.identityBackend.mockReturnValue(false);
   deps.customer.mockResolvedValue({ id: 'cus_alice', metadata: { vc_agent_epoch: 'security-1' } });
   deps.activeSubscription.mockResolvedValue({ status: 'active' });
+  deps.begin.mockImplementation(async callback => callback({ unsafe:deps.query }));
 });
 
 describe('credenciais pessoais do agente', () => {
@@ -64,6 +67,7 @@ describe('credenciais pessoais do agente', () => {
       'Meu Codex',
       ['projects:read', 'projects:write'],
       90 * 86400,
+      null,
     ]);
     expect(JSON.stringify(params)).not.toContain(created.token);
 
@@ -72,6 +76,53 @@ describe('credenciais pessoais do agente', () => {
     expect(listed).toEqual([created.credential]);
     expect(JSON.stringify(listed)).not.toContain(created.token);
     expect(deps.query.mock.calls[1][1]).toEqual(['cus_alice']);
+    expect(deps.query.mock.calls[1][0]).toContain('LIMIT 100');
+    expect(deps.query.mock.calls[1][0]).toContain("expires_at > now() - interval '7 days'");
+    expect(deps.query.mock.calls[1][0]).toContain('PARTITION BY oauth_client_id');
+    expect(deps.query.mock.calls[1][0]).toContain('oauth_rank = 1');
+  });
+
+  it('renovação OAuth revoga os tokens anteriores da mesma conexão', async () => {
+    const clientId = '11111111-1111-4111-8111-111111111111';
+    deps.query.mockResolvedValueOnce([{ id: '22222222-2222-4222-8222-222222222222' }]);
+    expect(await revokeSupersededOAuthTokens(
+      'cus_alice', clientId, tokenId,
+    )).toBe(1);
+    const [statement, params] = deps.query.mock.calls[0];
+    expect(statement).toContain('oauth_client_id = $2::uuid');
+    expect(statement).toContain('id <> $3::uuid');
+    expect(params).toEqual(['cus_alice', clientId, tokenId]);
+  });
+
+  it('separa conexões OAuth de mesmo nome pelo client_id e revoga só a família escolhida', async () => {
+    const clientId = '11111111-1111-4111-8111-111111111111';
+    deps.query.mockResolvedValueOnce([{
+      ...row, oauth_client_id: clientId, revoked_at: new Date(),
+    }]).mockResolvedValueOnce([{ token_hash:'refresh-hash' }]);
+
+    await expect(revokeAgentToken('cus_alice', tokenId)).resolves.toMatchObject({ id:tokenId });
+    expect(deps.query.mock.calls[1][0]).toContain('client_id = $2::uuid');
+    expect(deps.query.mock.calls[1][1]).toEqual(['cus_alice', clientId]);
+  });
+
+  it('revoga acesso e refresh da conexão na mesma transação', async () => {
+    const clientId = '11111111-1111-4111-8111-111111111111';
+    deps.query.mockResolvedValueOnce([{
+      ...row, oauth_client_id:clientId, revoked_at:new Date(),
+    }]).mockRejectedValueOnce(Object.assign(new Error('storage down'), { code:'db_down' }));
+
+    await expect(revokeAgentToken('cus_alice', tokenId)).rejects.toMatchObject({ code:'db_down' });
+    expect(deps.begin).toHaveBeenCalledTimes(1);
+    expect(deps.query.mock.calls[1][0]).toContain('client_id = $2::uuid');
+  });
+
+  it('cron apaga credenciais vencidas ou revogadas depois da retenção', async () => {
+    deps.query.mockResolvedValueOnce([{ id: tokenId }, { id: '22222222-2222-4222-8222-222222222222' }]);
+    expect(await cleanupExpiredAgentTokens()).toEqual({ deleted: 2 });
+    const [statement, params] = deps.query.mock.calls[0];
+    expect(statement).toContain('DELETE FROM moont.agent_tokens');
+    expect(statement).toContain('expires_at <');
+    expect(params).toEqual([7]);
   });
 
   it('revoga somente uma credencial da conta autenticada', async () => {

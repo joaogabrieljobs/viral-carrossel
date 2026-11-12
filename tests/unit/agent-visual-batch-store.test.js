@@ -43,6 +43,11 @@ function fakeQuery(sql, params) {
     const row = rows.get(params[0])?.get(params[1]);
     return row ? [{ project_id: row.id, entry: clone(row.entry), version: row.version, deleted_at: row.deleted ? 1 : null }] : [];
   }
+  if (sql.includes('SELECT count(*)::integer AS pending_count')) {
+    const pendingCount = [...(jobs.get(params[0])?.values() || [])]
+      .filter(job => job.status === 'pending').length;
+    return [{ pending_count:pendingCount }];
+  }
   if (sql.includes('FROM moont.agent_visual_jobs')) {
     if (sql.includes('undo_request_id = $2')) {
       const job = [...(jobs.get(params[0])?.values() || [])]
@@ -129,6 +134,23 @@ describe('agent visual batch store', () => {
     expect(restored.updatedAt).toBeGreaterThan(before.updatedAt);
   });
 
+  it('desfazer texto preserva mídia data: omitida do snapshot privado', async () => {
+    const embeddedLogo = 'data:image/png;base64,aGVsbG8=';
+    rows.get(owner).get(id).entry.doc.brand.logo = embeddedLogo;
+    await applyAgentTextEdit(owner, tokenId, {
+      projectId: id,
+      baseVersion: 4,
+      requestId: 'janine-data-logo-01',
+      patch: { slideEdits: [{ slideId: 's1', title: 'Título temporário' }] },
+    });
+    expect(jobs.get(owner).get('janine-data-logo-01').before_entry.doc.brand.logo).toBeNull();
+    await undoAgentVisualBatch(owner, {
+      requestId: 'janine-data-logo-01', undoRequestId: 'janine-data-logo-undo-01',
+    });
+    expect(rows.get(owner).get(id).entry.doc.brand.logo).toBe(embeddedLogo);
+    expect(rows.get(owner).get(id).entry.doc.slides[0].title).toBe('Texto final');
+  });
+
   it('aplica todos os cards sem regravar texto, fotos, logo ou legenda; replay é idempotente', async () => {
     const before = clone(rows.get(owner).get(id).entry);
     const first = await applyAgentVisualBatch(owner, tokenId, applyInput());
@@ -153,6 +175,23 @@ describe('agent visual batch store', () => {
     expect(job).toMatchObject({ beforeVersion: 4, afterVersion: 4, changedSlideCount: 0 });
     expect(rows.get(owner).get(id).version).toBe(4);
     expect(await getAgentVisualJob(owner, 'janine-noop-01')).toEqual(job);
+  });
+
+  it('poda o histórico do agente antes de inserir para manter o teto por conta', async () => {
+    await applyAgentVisualBatch(owner, tokenId, applyInput('janine-limit-01'));
+    const prune = db.unsafe.mock.calls.find(([sql]) => (
+      sql.includes('DELETE FROM moont.agent_visual_jobs') && sql.includes('OFFSET $2')
+    ));
+    expect(prune?.[1]).toEqual([owner, 499]);
+    const accountLockIndex = db.unsafe.mock.calls.findIndex(([sql]) => (
+      sql.includes('FROM moont.account_libraries') && sql.includes('FOR UPDATE')
+    ));
+    const pruneIndex = db.unsafe.mock.calls.findIndex(([sql]) => (
+      sql.includes('DELETE FROM moont.agent_visual_jobs') && sql.includes('OFFSET $2')
+    ));
+    expect(accountLockIndex).toBeGreaterThanOrEqual(0);
+    expect(pruneIndex).toBeGreaterThan(accountLockIndex);
+    expect(prune[0]).toContain("status <> 'pending'");
   });
 
   it('recusa versão desatualizada e desfazer após edição de outra pessoa', async () => {

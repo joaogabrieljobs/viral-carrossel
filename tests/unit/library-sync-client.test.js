@@ -4,6 +4,7 @@ import { readDeletedProjectIds, rememberDeletedProjectIds } from '../../src/util
 import {
   SK, lsSet, lockAccountDataWrites, unlockAccountDataWrites, areAccountDataWritesLocked,
 } from '../../src/utils/storage.js';
+import { CUSTOM_VISUAL_PRESETS_KEY } from '../../src/utils/custom-visual-presets.js';
 import {
   applyCloudManifest, pullLibraryFromCloud, pushLibraryToCloud,
   pushLibraryToCloudBestEffort, reconcileLibraryCloud,
@@ -114,6 +115,9 @@ describe('library-sync client pack', () => {
     local.setItem(SK.brands, JSON.stringify([{ id: 'default', name: 'Marca' }]));
     local.setItem(SK.activeBrandId, JSON.stringify('default'));
     local.setItem(SK.activeDocId, JSON.stringify('p1'));
+    local.setItem(SK.hookLibrary, JSON.stringify([{ id: 'hook_1', hook: 'Gancho aprovado' }]));
+    local.setItem(CUSTOM_VISUAL_PRESETS_KEY,
+      JSON.stringify([{ id: 'custom_1', label: 'Editorial', isCustom: true }]));
 
     const { packLibraryForCloud } = await import('../../src/utils/library-sync.js');
     const { manifest, projectCount, assets } = await packLibraryForCloud();
@@ -121,6 +125,8 @@ describe('library-sync client pack', () => {
     expect(manifest.docs[0].name).toBe('Carrossel');
     expect(manifest.docs[0].doc.slides[0].title).toBe('Oi');
     expect(manifest.vcVersion).toBe(3);
+    expect(manifest.hookLibrary[0].hook).toBe('Gancho aprovado');
+    expect(manifest.customVisualPresets[0]).toMatchObject({ id: 'custom_1', label: 'Editorial' });
     expect(assets.size).toBe(0);
   });
 
@@ -1235,7 +1241,11 @@ describe('library-sync client pack', () => {
   });
 
   it('pull reúne exclusões locais e remotas antes de restaurar a lista', async () => {
-    const manifest = { ...cloudLibrary(3), deletedIds: ['p2'], activeDocId: 'p2' };
+    const manifest = {
+      ...cloudLibrary(3), deletedIds: ['p2'], activeDocId: 'p2',
+      hookLibrary: [{ id: 'hook_1', hook: 'Gancho da nuvem' }],
+      customVisualPresets: [{ id: 'custom_1', label: 'Editorial', isCustom: true }],
+    };
     installCloudApi(manifest);
     rememberDeletedProjectIds(['p3']);
     const result = await applyCloudManifest(manifest);
@@ -1244,6 +1254,9 @@ describe('library-sync client pack', () => {
     expect(result.snapshot.activeDocId).toBe('p1');
     expect(result.snapshot.deletedIds).toEqual(['p2', 'p3']);
     expect(readDeletedProjectIds()).toEqual(['p2', 'p3']);
+    expect(JSON.parse(local.getItem(SK.hookLibrary))[0].hook).toBe('Gancho da nuvem');
+    expect(JSON.parse(local.getItem(CUSTOM_VISUAL_PRESETS_KEY))[0])
+      .toMatchObject({ id: 'custom_1', label: 'Editorial' });
   });
 
   it('exclusão com quota e tombstone recuperado do cofre entram no push', async () => {

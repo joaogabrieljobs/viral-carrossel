@@ -46,6 +46,29 @@ function fakeQuery(sql, params) {
     const row = rows.get(params[0])?.get(params[1]);
     return row ? [{ project_id: row.id, entry: clone(row.entry), version: row.version, deleted_at: null }] : [];
   }
+  if (sql.includes('SELECT count(*)::integer AS pending_count')) {
+    const pendingCount = [...(jobs.get(params[0])?.values() || [])]
+      .filter(job => job.status === 'pending').length;
+    return [{ pending_count:pendingCount }];
+  }
+  if (sql.includes('DELETE FROM moont.agent_visual_jobs') && sql.includes("created_at < now() - interval '30 days'")) {
+    const ownerJobs = jobs.get(params[0]);
+    if (!ownerJobs) return [];
+    const cutoff = Date.now() - 30 * 86400_000;
+    for (const [requestId, job] of ownerJobs) {
+      if (job.status !== 'pending' && new Date(job.created_at).getTime() < cutoff) ownerJobs.delete(requestId);
+    }
+    return [];
+  }
+  if (sql.includes('DELETE FROM moont.agent_visual_jobs') && sql.includes('OFFSET $2')) {
+    const ownerJobs = jobs.get(params[0]);
+    const terminal = [...(ownerJobs?.values() || [])]
+      .filter(job => job.status !== 'pending')
+      .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at))
+        || right.request_id.localeCompare(left.request_id));
+    terminal.slice(params[1]).forEach(job => ownerJobs.delete(job.request_id));
+    return [];
+  }
   if (sql.includes('FROM moont.agent_visual_jobs')) {
     if (sql.includes("meta->>'creditsSettled'")) {
       const limit = params[0];
@@ -84,7 +107,6 @@ function fakeQuery(sql, params) {
     jobs.get(params[0]).set(params[1], row);
     return [columns(row)];
   }
-  if (sql.includes('DELETE FROM moont.agent_visual_jobs')) return [];
   if (sql.includes('UPDATE moont.agent_visual_jobs') && sql.includes('finished_at = now()')) {
     const job = jobs.get(params[0]).get(params[1]);
     Object.assign(job, {
@@ -210,15 +232,82 @@ describe('agent image jobs store', () => {
     expect(rows.get(owner).get(id).entry.doc.slides.map(slide => slide.bgImageAssetId)).toEqual(['photo-1', undefined, undefined, undefined]);
   });
 
-  it('falha tudo com project_conflict se o projeto mudou durante a geração', async () => {
+  it('aplica na versão atual quando outro card mudou e desfaz só a imagem gerada', async () => {
     await start();
     rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[0].title = 'Título editado durante a geração';
     const finished = await finishAgentImageJob(owner, 'image-job-01', [{ slideId: 's2', assetId: 'original_abc' }]);
-    expect(finished.job).toMatchObject({ status: 'failed', errorCode: 'project_conflict', afterVersion: 4, changedSlideCount: 0 });
-    expect(finished.slides.every(slide => slide.status === 'failed' && slide.errorCode === 'project_conflict')).toBe(true);
+    expect(finished.job).toMatchObject({ status: 'applied', afterVersion: 6, changedSlideCount: 1 });
+    expect(finished.slides[0]).toMatchObject({ slideId: 's2', status: 'done', assetId: 'original_abc' });
+    expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBe('original_abc');
+    await undoAgentVisualBatch(owner, { requestId: 'image-job-01', undoRequestId: 'image-job-01-undo' });
+    expect(rows.get(owner).get(id).entry.doc.slides[0].title).toBe('Título editado durante a geração');
     expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBeUndefined();
-    await expect(undoAgentVisualBatch(owner, { requestId: 'image-job-01', undoRequestId: 'image-job-01-undo' }))
-      .rejects.toMatchObject({ code: 'visual_undo_not_applicable' });
+  });
+
+  it('recusa a imagem pronta quando prompt ou referências do card mudaram', async () => {
+    rows.get(owner).get(id).entry.doc.slides[1].imageReferences = [
+      { id:'ref-1', assetId:'original_ref', name:'Produto', mention:'produto' },
+    ];
+    await start();
+    rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[1].imageQuery = 'novo prompt editorial para o mesmo card';
+    const promptChanged = await finishAgentImageJob(owner, 'image-job-01', [
+      { slideId:'s2', assetId:'original_old_prompt' },
+    ]);
+    expect(promptChanged.job).toMatchObject({ status:'failed', afterVersion:5, changedSlideCount:0 });
+    expect(promptChanged.slides[0]).toMatchObject({
+      slideId:'s2', status:'failed', errorCode:'image_input_changed',
+    });
+    expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBeUndefined();
+
+    jobs.get(owner).clear();
+    rows.get(owner).get(id).version = 4;
+    rows.get(owner).get(id).entry.doc.slides[1].imageQuery = 'consultório moderno com plantas';
+    await start('image-job-refs');
+    rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[1].imageReferences[0].assetId = 'original_ref_new';
+    const refsChanged = await finishAgentImageJob(owner, 'image-job-refs', [
+      { slideId:'s2', assetId:'original_old_reference' },
+    ]);
+    expect(refsChanged.slides[0]).toMatchObject({ status:'failed', errorCode:'image_input_changed' });
+  });
+
+  it('preserva pending antigo na poda e bloqueia a conta com 500 jobs ativos', async () => {
+    const oldPending = {
+      owner_id:owner, request_id:'pending-very-old', project_id:id, token_id:tokenId,
+      request_hash:'a'.repeat(64), before_version:4, after_version:4,
+      changed_slide_count:0, changed_brand_fields:[], before_entry:fixture().entry,
+      status:'pending', slides:[], meta:{ kind:'image' },
+      created_at:new Date(Date.now() - 45 * 86400_000).toISOString(),
+      undone_at:null, undo_request_id:null, undo_version:null,
+    };
+    jobs.get(owner).set(oldPending.request_id, oldPending);
+    await start('image-job-after-old');
+    expect(jobs.get(owner).has('pending-very-old')).toBe(true);
+    expect(db.unsafe.mock.calls.find(([sql]) => sql.includes("status <> 'pending'")
+      && sql.includes("interval '30 days'"))).toBeTruthy();
+
+    jobs.get(owner).clear();
+    for (let index = 0; index < 500; index += 1) {
+      jobs.get(owner).set(`pending-${index}`, {
+        ...clone(oldPending), request_id:`pending-${index}`, created_at:new Date().toISOString(),
+      });
+    }
+    await expect(start('image-job-over-limit')).rejects.toMatchObject({
+      status:429, code:'visual_job_limit',
+    });
+    expect(jobs.get(owner).size).toBe(500);
+  });
+
+  it('não sobrescreve card que ganhou foto enquanto o job gerava', async () => {
+    await start();
+    rows.get(owner).get(id).version = 5;
+    rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId = 'photo-user';
+    const finished = await finishAgentImageJob(owner, 'image-job-01', [{ slideId: 's2', assetId: 'original_abc' }]);
+    expect(finished.job).toMatchObject({ status: 'failed', afterVersion: 5, changedSlideCount: 0 });
+    expect(finished.slides[0]).toMatchObject({ slideId: 's2', status: 'failed', errorCode: 'image_already_present' });
+    expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBe('photo-user');
   });
 
   it('marca como failed sem gerar nada e recusa desfazer enquanto pendente', async () => {

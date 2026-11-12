@@ -7,12 +7,14 @@ import { getPostgresConnection } from './postgres-connection.js';
 import { preserveDroppedMediaReferences } from './media-reference-guard.js';
 
 const MAX_ASSETS = 800;
-const MAX_PROJECT_ID = 500;
 const MAX_PAGE_SIZE = 100;
 const MAX_ACCOUNT_META_BYTES = 512 * 1024;
+const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
+const DEFAULT_MAX_PROJECTS_PER_ACCOUNT = 250;
+const DEFAULT_MAX_ACCOUNT_PROJECT_BYTES = 100 * 1024 * 1024;
 const ACCOUNT_META_FIELDS = new Set([
   'brands', 'folders', 'userProfile', 'onboardingDone', 'modesIntroDone',
-  'activeBrandId', 'activeDocId', 'assetIds',
+  'activeBrandId', 'activeDocId', 'assetIds', 'hookLibrary', 'customVisualPresets',
 ]);
 
 const SQL = {
@@ -71,6 +73,13 @@ const SQL = {
       sort_order = EXCLUDED.sort_order`,
   deleteAgentVisualJobs: `/* moont_delete_agent_visual_jobs */
     DELETE FROM moont.agent_visual_jobs WHERE owner_id = $1 AND project_id = $2`,
+  accountProjectUsage: `/* moont_account_project_usage */
+    SELECT count(*) FILTER (WHERE deleted_at IS NULL)::bigint AS project_count,
+      COALESCE(sum(octet_length(entry::text)) FILTER (WHERE deleted_at IS NULL), 0)::bigint AS total_bytes,
+      COALESCE(max(octet_length(entry::text)) FILTER (
+        WHERE deleted_at IS NULL AND project_id = $2
+      ), 0)::bigint AS target_bytes
+    FROM moont.account_projects WHERE owner_id = $1`,
 };
 
 function fail(message, code, extra = {}) {
@@ -87,10 +96,30 @@ function ownerId(value) {
 
 function projectId(value) {
   const id = String(value || '');
-  if (!id.trim() || id.length > MAX_PROJECT_ID || id.includes('\0')) {
+  if (!PROJECT_ID.test(id)) {
     throw fail('Identificador de projeto inválido.', 'project_bad_id');
   }
   return id;
+}
+
+function positiveLimit(value, fallback) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function serializedBytes(value) {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function assertAccountCapacity({ count, bytes, maxProjects, maxBytes }) {
+  if (count > maxProjects) {
+    throw fail(`Sua conta atingiu o limite de ${maxProjects} projetos. Exclua um projeto antes de criar outro.`,
+      'project_account_limit', { limit: maxProjects });
+  }
+  if (bytes > maxBytes) {
+    throw fail('Sua conta atingiu o limite de armazenamento de projetos. Exclua projetos ou mídias antes de salvar.',
+      'project_account_too_large', { limitBytes: maxBytes });
+  }
 }
 
 function object(value) {
@@ -229,6 +258,8 @@ function accountMetadata(headerValue) {
     activeBrandId: typeof header.activeBrandId === 'string' ? header.activeBrandId : '',
     activeDocId: typeof header.activeDocId === 'string' ? header.activeDocId : '',
     assetIds: cleanAssetIds(header.assetIds),
+    ...(Array.isArray(header.hookLibrary) ? { hookLibrary: header.hookLibrary } : {}),
+    ...(Array.isArray(header.customVisualPresets) ? { customVisualPresets: header.customVisualPresets } : {}),
   };
 }
 
@@ -258,6 +289,10 @@ function validAccountMetadataPatch(data) {
     if ((key === 'brands' || key === 'folders')
       && (!Array.isArray(value) || !value.every((item) => item && typeof item === 'object' && !Array.isArray(item)))) {
       throw fail('Marcas ou pastas inválidas.', 'account_meta_bad_data');
+    }
+    if ((key === 'hookLibrary' || key === 'customVisualPresets')
+      && (!Array.isArray(value) || !value.every((item) => item && typeof item === 'object' && !Array.isArray(item)))) {
+      throw fail('Preferências criativas inválidas.', 'account_meta_bad_data');
     }
     if (key === 'userProfile' && value !== null
       && (!value || typeof value !== 'object' || Array.isArray(value))) {
@@ -339,7 +374,13 @@ function deletedConflict(row, state) {
 }
 
 /** Factory injetável para testes; a instância de produção usa DATABASE_URL/POSTGRES_URL. */
-export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifest = defaultLegacyReader, now = Date.now } = {}) {
+export function createLibraryPostgresStore({
+  sql: injectedSql,
+  readLegacyManifest = defaultLegacyReader,
+  now = Date.now,
+  maxProjects = positiveLimit(process.env.PROJECTS_MAX_PER_ACCOUNT, DEFAULT_MAX_PROJECTS_PER_ACCOUNT),
+  maxAccountBytes = positiveLimit(process.env.PROJECT_BYTES_MAX_PER_ACCOUNT, DEFAULT_MAX_ACCOUNT_PROJECT_BYTES),
+} = {}) {
   async function connection() { return injectedSql || defaultSql(); }
 
   async function ensureMigrated(sql, owner) {
@@ -478,6 +519,12 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
             ...(Array.isArray(manifest.assetIds) ? manifest.assetIds : [])]);
         const ordered = [...rows.values()].sort((a, b) => a.sort_order - b.sort_order);
         const projectCount = ordered.filter((row) => row.deleted_at == null).length;
+        const projectBytes = ordered.reduce((total, row) => (
+          row.deleted_at == null && row.entry ? total + serializedBytes(row.entry) : total
+        ), 0);
+        assertAccountCapacity({
+          count: projectCount, bytes: projectBytes, maxProjects, maxBytes: maxAccountBytes,
+        });
         const revision = integer(state.revision) + 1;
         if (changed.size) await run(tx, 'upsertProjects', [owner, JSON.stringify([...changed.values()])]);
         await run(tx, 'updateState', [
@@ -560,6 +607,16 @@ export function createLibraryPostgresStore({ sql: injectedSql, readLegacyManifes
           console.warn('[account-projects] media_reference_preserved', id, guarded.restored.length);
         }
         const stored = { ...guarded.entry, updatedAt: timestamp };
+        const usage = (await run(tx, 'accountProjectUsage', [owner, id]))[0] || {};
+        const currentCount = integer(usage.project_count, integer(state.project_count));
+        const totalBytes = integer(usage.total_bytes);
+        const targetBytes = integer(usage.target_bytes);
+        assertAccountCapacity({
+          count: currentCount + (previous ? 0 : 1),
+          bytes: Math.max(0, totalBytes - targetBytes) + serializedBytes(stored),
+          maxProjects,
+          maxBytes: maxAccountBytes,
+        });
         const nextOrder = previous ? integer(state.next_order) : integer(state.next_order) + 1;
         const row = {
           project_id: id, entry: stored, version: base + 1,

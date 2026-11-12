@@ -70,6 +70,9 @@ function pendingJob(slides = ['s1', 's2']) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Limpa também filas `mockResolvedValueOnce` deixadas por cenários em que o
+  // placeholder vence antes de a quota ser chamada.
+  mocked.consume.mockReset();
   mocked.subscription.mockResolvedValue({ id: 'sub' });
   mocked.usage.mockResolvedValue({ used: 1, limit: 50, remaining: 49, allowed: true });
   mocked.consume.mockImplementation(async ({ operationId }) => ({ allowed: true, used: 2, limit: 50, remaining: 48, operationId }));
@@ -211,6 +214,26 @@ describe('startAgentImageJob', () => {
     expect(mocked.finishJob).toHaveBeenCalledTimes(1);
     expect(schedule).not.toHaveBeenCalled();
     expect(mocked.refund).not.toHaveBeenCalled();
+  });
+
+  it('não reutiliza reserva mcp_ aberta fora do placeholder deste job', async () => {
+    const schedule = vi.fn();
+    mocked.consume.mockResolvedValue({
+      allowed: false,
+      replayed: true,
+      reason: 'already_reserved',
+      used: 1,
+      limit: 50,
+      remaining: 49,
+    });
+
+    await expect(startAgentImageJob(owner, 'token', input, { schedule }))
+      .rejects.toMatchObject({ code: 'image_request_closed', status: 409 });
+
+    expect(mocked.createJob).toHaveBeenCalledTimes(1);
+    expect(mocked.finishJob).toHaveBeenCalledTimes(1);
+    expect(mocked.refund).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
   });
 
   it('uma chamada concorrente acompanha o placeholder sem tocar na quota', async () => {

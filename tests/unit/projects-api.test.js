@@ -126,6 +126,19 @@ describe('/api/projects', () => {
     });
   });
 
+  it('devolve 413 e o teto quando a conta não comporta outro projeto', async () => {
+    pg.put.mockRejectedValue(Object.assign(new Error('Sua conta atingiu o limite de 3 projetos.'), {
+      code: 'project_account_limit', limit: 3,
+    }));
+    const result = await request('PUT', {
+      body: { entry: { id: 'quarto', doc: { slides: [] } }, baseVersion: 0 },
+    });
+    expect(result).toMatchObject({
+      status: 413,
+      body: { code: 'project_account_limit', limit: 3 },
+    });
+  });
+
   it('bloqueia escrita pendente de outra conta pelo header X-Project-Owner', async () => {
     const entry = { id: 'project-1', doc: { slides: [] } };
     const oldOwner = await request('PUT', {

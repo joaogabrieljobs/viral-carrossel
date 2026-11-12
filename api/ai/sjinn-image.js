@@ -77,6 +77,15 @@ export default async function handler(req, res) {
       || !/^[A-Za-z0-9._:-]+$/.test(suppliedOperationId))) {
     return res.status(400).json({ error: 'Identificador da geração inválido.', code: 'invalid_operation_id' });
   }
+  // `mcp_` é um namespace interno derivado de requestId + slideId. Permitir
+  // que o editor reserve esses IDs deixa duas gerações reutilizarem o mesmo
+  // débito. O cliente escolhe IDs próprios, mas nunca os reservados do agente.
+  if (typeof suppliedOperationId === 'string' && /^mcp_/i.test(suppliedOperationId)) {
+    return res.status(400).json({
+      error: 'Identificador reservado para integrações. Inicie uma nova geração.',
+      code: 'reserved_operation_id',
+    });
+  }
   // Browsers antigos continuam utilizáveis, mas novos clientes enviam o mesmo
   // ID em cada tentativa de rede para não descontar duas vezes.
   const operationId = suppliedOperationId || randomUUID();

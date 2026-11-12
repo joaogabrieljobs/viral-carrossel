@@ -56,6 +56,14 @@ describe('padrões visuais personalizados', () => {
     expect(normalizeCustomVisualPresets([preset, preset])).toHaveLength(1);
   });
 
+  it('normaliza preset legado sem savedAt de forma determinística', () => {
+    const legacy = [{ id: 'custom_legacy', label: 'Legado', isCustom: true }];
+    const first = normalizeCustomVisualPresets(legacy);
+    const second = normalizeCustomVisualPresets(legacy);
+    expect(first).toEqual(second);
+    expect(first[0].savedAt).toBe(0);
+  });
+
   it('salva corpo, glass e mapas tipográficos por perfil com cópia segura', () => {
     const glass = {
       enabled: true,

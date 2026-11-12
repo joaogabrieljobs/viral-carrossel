@@ -13,7 +13,7 @@ import { makeReq, makeRes } from '../helpers/http.js';
 const start = 1791846000;
 const end = 1794524400;
 const subscription = (tier = 'creator') => ({
-  id: 'sub_usage', status: 'active', metadata: { tier },
+  id: 'sub_usage', status: 'active', metadata: { product:'viral-carrossel', tier },
   items: { data: [{ current_period_start: start, current_period_end: end }] },
 });
 

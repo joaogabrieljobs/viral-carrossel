@@ -217,7 +217,10 @@ export function normalizeCustomVisualPresets(value) {
       aspectRatio: item.productKind === 'apresentacao' || item.creativePreset === 'apresentacao'
         ? '16:9'
         : '4:5',
-      savedAt: Number(item.savedAt) || Date.now(),
+      // Normalização precisa ser pura. Um valor dependente do relógio mudava o
+      // fingerprint a cada leitura de presets legados e mantinha o autosave
+      // permanentemente sujo. Criações novas já recebem Date.now() uma vez.
+      savedAt: Number.isFinite(Number(item.savedAt)) ? Number(item.savedAt) : 0,
     }))
     .filter((item) => item.id && !ids.has(item.id) && ids.add(item.id))
     .slice(-MAX_CUSTOM_VISUAL_PRESETS);

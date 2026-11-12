@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { extractDominantColor } from './src/utils/color-extraction.js';
 import { extractJSON } from './src/utils/parsers.js';
-import { saveHookToLibrary, getHooksForNiche } from './src/utils/hooks-library.js';
+import { saveHookToLibrary, getHooksForNiche, normalizeHookLibrary } from './src/utils/hooks-library.js';
 import { SCHEMA_VERSION, migrateDoc } from './src/utils/schema-migration.js';
 import { videoPut, videoGet, videoDelete, videoCleanupOrphans, videoStorageUsage, newVideoId, getVideoUrl, setVideoUrlMap, validateVideoFile, registerVideoGcProtection } from './src/utils/video-store.js';
 import {
@@ -99,6 +99,8 @@ import {
 import {
   createCustomVisualPreset,
   sanitizeCustomVisualPresetBrand,
+  CUSTOM_VISUAL_PRESETS_KEY,
+  normalizeCustomVisualPresets,
   readCustomVisualPresets,
   writeCustomVisualPresets,
 } from './src/utils/custom-visual-presets.js';
@@ -548,9 +550,15 @@ function accountMetaFingerprint(snapshot) {
   } catch { userProfile = null; }
   let onboardingDone = snapshot.onboardingDone;
   let modesIntroDone = snapshot.modesIntroDone;
+  let hookLibrary = snapshot.hookLibrary;
+  let customVisualPresets = snapshot.customVisualPresets;
   try {
     if (onboardingDone === undefined) onboardingDone = localStorage.getItem(SK.onboarding) || null;
     if (modesIntroDone === undefined) modesIntroDone = localStorage.getItem(SK.modesIntro) || null;
+    if (hookLibrary === undefined) hookLibrary = JSON.parse(localStorage.getItem(SK.hookLibrary) || '[]');
+    if (customVisualPresets === undefined) {
+      customVisualPresets = JSON.parse(localStorage.getItem(CUSTOM_VISUAL_PRESETS_KEY) || '[]');
+    }
   } catch { /* cache bloqueada: a revisão remota continua protegida */ }
   return accountMetadataContentKey({
     brands: accountBrandsContentSnapshot(snapshot.brandRoster || []),
@@ -560,6 +568,8 @@ function accountMetaFingerprint(snapshot) {
     userProfile: userProfile || null,
     onboardingDone: onboardingDone || null,
     modesIntroDone: modesIntroDone || null,
+    hookLibrary: normalizeHookLibrary(hookLibrary),
+    customVisualPresets: normalizeCustomVisualPresets(customVisualPresets),
   });
 }
 
@@ -1331,6 +1341,7 @@ export default function App() {
   );
   useEffect(() => {
     writeCustomVisualPresets(customVisualPresets);
+    if (PROJECTS_V2) queueMicrotask(() => cloudAutoPushScheduleRef.current?.());
   }, [customVisualPresets]);
   const setVisualPreset = useCallback(next => history.set(d => ({
     ...d,
@@ -1779,6 +1790,16 @@ export default function App() {
     if (!Array.isArray(snapshot?.library) || snapshot.library.length !== Number(result?.projectCount)) {
       throw new Error('A lista recebida não corresponde à biblioteca da nuvem. Tente sincronizar novamente.');
     }
+    if (Array.isArray(snapshot.hookLibrary)) {
+      const nextHooks = normalizeHookLibrary(snapshot.hookLibrary);
+      lsSet(SK.hookLibrary, nextHooks);
+      setHookLibrary(nextHooks);
+    }
+    if (Array.isArray(snapshot.customVisualPresets)) {
+      const nextPresets = normalizeCustomVisualPresets(snapshot.customVisualPresets);
+      writeCustomVisualPresets(nextPresets);
+      setCustomVisualPresets(nextPresets);
+    }
     if (!PROJECTS_V2) rememberDeletedProjectIds(snapshot.deletedIds || []);
     const folders = normalizeLibraryFolders(snapshot.libraryFolders || []);
     const restored = snapshot.library.map((entry) => normalizeLibraryEntry({
@@ -1953,6 +1974,16 @@ export default function App() {
     v2MetaRevisionRef.current = Number.isSafeInteger(metadata?.revision) ? metadata.revision : null;
     if (snapshot) {
       v2UserProfileRef.current = metadata.metadata.userProfile || null;
+      if (Array.isArray(metadata.metadata.hookLibrary)) {
+        const nextHooks = normalizeHookLibrary(metadata.metadata.hookLibrary);
+        lsSet(SK.hookLibrary, nextHooks);
+        setHookLibrary(nextHooks);
+      }
+      if (Array.isArray(metadata.metadata.customVisualPresets)) {
+        const nextPresets = normalizeCustomVisualPresets(metadata.metadata.customVisualPresets);
+        writeCustomVisualPresets(nextPresets);
+        setCustomVisualPresets(nextPresets);
+      }
       setProfileRevision((value) => value + 1);
     }
     v2MetaBaselineRef.current = snapshot ? accountMetaFingerprint({
@@ -1963,6 +1994,8 @@ export default function App() {
       userProfile: metadata.metadata.userProfile,
       onboardingDone: metadata.metadata.onboardingDone,
       modesIntroDone: metadata.metadata.modesIntroDone,
+      hookLibrary: metadata.metadata.hookLibrary || [],
+      customVisualPresets: metadata.metadata.customVisualPresets || [],
     }) : null;
   }, []);
 
@@ -2821,7 +2854,10 @@ export default function App() {
     setModesIntroOpen(false);
     try { localStorage.setItem(SK.modesIntro, '1'); } catch { /* */ }
   }, []);
-  useEffect(() => { lsSet(SK.hookLibrary, hookLibrary); }, [hookLibrary]);
+  useEffect(() => {
+    lsSet(SK.hookLibrary, hookLibrary);
+    if (PROJECTS_V2) queueMicrotask(() => cloudAutoPushScheduleRef.current?.());
+  }, [hookLibrary]);
   // ── IMAGENS — bytes em IndexedDB, object URL em runtime ─────────────────────
   // O documento guarda `bgImageId`; `bgImage` é recriado a cada load. Também
   // migramos aqui as data URLs de projetos antigos: ficavam no localStorage e

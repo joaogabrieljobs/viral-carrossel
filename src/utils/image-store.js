@@ -256,7 +256,7 @@ export async function imageDelete(id) {
 }
 
 /** Apaga a base inteira apenas em limpeza explícita, nunca na troca de conta. */
-export async function imageWipeDatabase() {
+export async function imageWipeDatabase({ strict = false } = {}) {
   try {
     if (_dbPromise) {
       const db = await Promise.race([
@@ -270,6 +270,29 @@ export async function imageWipeDatabase() {
   _dbRetryAfter = 0;
   _dbRetryError = null;
   if (typeof indexedDB === 'undefined') return;
+  if (strict) {
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      let timer;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve();
+      };
+      timer = setTimeout(() => finish(new Error('A limpeza das imagens deste aparelho não foi confirmada.')),
+        IDB_WIPE_TIMEOUT_MS);
+      try {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => finish();
+        req.onerror = () => finish(req.error || new Error('Não foi possível apagar as imagens deste aparelho.'));
+        req.onblocked = () => finish(new Error('Feche outras abas do Moont para apagar as imagens deste aparelho.'));
+      } catch (error) { finish(error); }
+    });
+    _dbPromise = null;
+    return;
+  }
   await Promise.race([
     new Promise((resolve) => {
       const req = indexedDB.deleteDatabase(DB_NAME);

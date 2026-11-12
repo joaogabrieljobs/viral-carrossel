@@ -9,6 +9,7 @@ import {
   snapshotAccountVaultForOwners,
 } from '../../src/utils/account-vault.js';
 import { SK } from '../../src/utils/storage.js';
+import { CUSTOM_VISUAL_PRESETS_KEY } from '../../src/utils/custom-visual-presets.js';
 
 function makeMemoryStorage() {
   const map = new Map();
@@ -47,6 +48,22 @@ describe('account-vault', () => {
     expect(await restoreAccountVault('email:a@x.com')).toBe(true);
     expect(JSON.parse(local.getItem(SK.library))).toEqual([{ id: 'p1', name: 'Meu' }]);
     expect(JSON.parse(local.getItem(SK.brands))).toEqual([{ id: 'b1' }]);
+  });
+
+  it('restaura padrões visuais e biblioteca de ganchos da mesma conta', async () => {
+    const hooks = [{ id: 'hook_1', hook: 'Uma capa aprovada', niche: 'saúde' }];
+    const presets = [{ id: 'custom_1', label: 'Meu padrão', isCustom: true }];
+    local.setItem(SK.library, JSON.stringify([{ id: 'p1' }]));
+    local.setItem(SK.hookLibrary, JSON.stringify(hooks));
+    local.setItem(CUSTOM_VISUAL_PRESETS_KEY, JSON.stringify(presets));
+    expect(await snapshotAccountVault('email:a@x.com')).toBe(true);
+
+    local.removeItem(SK.library);
+    local.removeItem(SK.hookLibrary);
+    local.removeItem(CUSTOM_VISUAL_PRESETS_KEY);
+    expect(await restoreAccountVault('email:a@x.com')).toBe(true);
+    expect(JSON.parse(local.getItem(SK.hookLibrary))).toEqual(hooks);
+    expect(JSON.parse(local.getItem(CUSTOM_VISUAL_PRESETS_KEY))).toEqual(presets);
   });
 
   it('isola slots entre contas', async () => {

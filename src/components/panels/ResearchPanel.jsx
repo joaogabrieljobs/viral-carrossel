@@ -5,6 +5,9 @@ import { Search, Copy, Loader2, TrendingUp, X, Zap, Flame, Lightbulb } from 'luc
 import { buildResearchUserPrompt, normalizeResearchResult, researchIdeaMaterial } from '../../utils/research-prompts.js';
 import { callAI, callAIwithSearch } from '../../utils/ai-client.js';
 import { useModalDialog } from '../../hooks/useModalDialog.js';
+import { createSingleFlight } from '../../utils/single-flight.js';
+
+const RESEARCH_NICHE_MAX_LENGTH = 200;
 
 const PRESET_NICHES = [
   'Marketing digital','Empreendedorismo','Finanças pessoais','Saúde mental',
@@ -30,6 +33,8 @@ function ResearchPanel({
   const [err, setErr] = useState('');
   const [degraded, setDegraded] = useState(false);
   const nicheInputRef = useRef(null);
+  // Trava de envio: Enter repetido não abre chamadas em paralelo, e fechar cancela.
+  const [flight] = useState(createSingleFlight);
   const { overlayRef, dialogRef, onDialogKeyDown } = useModalDialog({
     open,
     onClose,
@@ -42,6 +47,14 @@ function ResearchPanel({
     setErr('');
     setDegraded(false);
   }, [isPresentation, presentationPath]);
+
+  useEffect(() => {
+    if (open) return undefined;
+    flight.cancel();
+    setBusy(false);
+    return undefined;
+  }, [open, flight]);
+  useEffect(() => () => flight.cancel(), [flight]);
 
   if (!open) return null;
 
@@ -56,29 +69,36 @@ function ResearchPanel({
     hasWeb,
   });
 
-  const run = async () => {
-    if (!niche.trim()) { setErr('Informe o nicho'); return; }
-    setBusy(true); setErr(''); setData(null); setDegraded(false);
-    try {
-      const r = await callAIwithSearch(researchPrompt(true), { json: true });
-      setData(normalizeResearchResult(r, true, researchOptions));
-      onSetNiche?.(niche);
-    } catch (e1) {
-      if (isGenerationCancelled(e1)) return;
-      setDegraded(true);
+  const run = () => {
+    if (!niche.trim()) { setErr('Informe o nicho'); return undefined; }
+    return flight.run(async (signal) => {
+      setBusy(true); setErr(''); setData(null); setDegraded(false);
       try {
-        const r = await callAI(
-          researchPrompt(false),
-          { json: true, openaiKey },
-        );
-        setData(normalizeResearchResult(r, false, researchOptions));
-        setDegraded(true);
+        const r = await callAIwithSearch(researchPrompt(true), { json: true, signal });
+        if (signal.aborted) return;
+        setData(normalizeResearchResult(r, true, researchOptions));
         onSetNiche?.(niche);
-      } catch (e2) {
-        if (isGenerationCancelled(e2)) return;
-        setErr(e2.message || e1.message || String(e2));
+      } catch (e1) {
+        if (signal.aborted || isGenerationCancelled(e1)) return;
+        setDegraded(true);
+        try {
+          const r = await callAI(
+            researchPrompt(false),
+            { json: true, openaiKey, signal },
+          );
+          if (signal.aborted) return;
+          setData(normalizeResearchResult(r, false, researchOptions));
+          setDegraded(true);
+          onSetNiche?.(niche);
+        } catch (e2) {
+          if (signal.aborted || isGenerationCancelled(e2)) return;
+          setErr(e2.message || e1.message || String(e2));
+        }
+      } finally {
+        // Cancelada: quem cancelou já repôs o estado, e pode haver pesquisa nova rodando.
+        if (!signal.aborted) setBusy(false);
       }
-    } finally { setBusy(false); }
+    });
   };
 
   return (
@@ -131,6 +151,7 @@ function ResearchPanel({
                 ? 'Tema, setor ou decisão (ex: expansão B2B, treinamento, relatório…)'
                 : 'Nicho ou tema (ex: nutrição, vendas B2B, saúde mental…)'}
               className="vc-input" style={{ flex:1 }}
+              maxLength={RESEARCH_NICHE_MAX_LENGTH}
               onKeyDown={e=>{if(e.key==='Enter')run();}}
             />
             <button onClick={run} disabled={busy||!niche.trim()} className="vc-btn vc-btn-primary" aria-label="Pesquisar"

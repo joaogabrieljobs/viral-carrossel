@@ -24,10 +24,15 @@ import {
 import { ACCOUNT_VAULT_KEY, snapshotAccountVaultForOwners } from '../utils/account-vault.js';
 import { PENDING_SHARE_KEY, captureShareInviteFromLocation } from '../utils/project-share.js';
 import { USER_PROFILE_KEY } from '../utils/user-profile.js';
-import { CUSTOM_VISUAL_PRESETS_KEY } from '../utils/custom-visual-presets.js';
+import {
+  CUSTOM_VISUAL_PRESETS_KEY, normalizeCustomVisualPresets,
+} from '../utils/custom-visual-presets.js';
+import { normalizeHookLibrary } from '../utils/hooks-library.js';
 import { isProjectOutboxUnavailable, selectRestoredProjectId } from '../utils/project-sync-control.js';
 
 const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
+const LOGOUT_CLEANUP_NORMAL = 'normal';
+const LOGOUT_CLEANUP_DEVICE_WIPE = 'device-wipe';
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais neste navegador. Vamos terminar a limpeza antes de abrir outra conta.';
 const OUTBOX_BOOT_WARNING = 'A biblioteca abriu, mas não foi possível verificar as alterações pendentes neste navegador. Edições ainda não enviadas podem não aparecer; mantenha este navegador e tente salvar novamente antes de sair.';
@@ -68,7 +73,7 @@ export function accessStateFromSession(session = {}, current = {}) {
   };
 }
 
-function hasAccountDataResidue() {
+function hasAccountDataResidue({ wipeDevice = false } = {}) {
   try {
     const stores = [
       typeof localStorage !== 'undefined' ? localStorage : null,
@@ -77,22 +82,58 @@ function hasAccountDataResidue() {
     const knownKeys = [...Object.values(SK), USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
     return stores.some((store) => {
       if (!store) return false;
-      if (knownKeys.some((key) => key && !LOGOUT_PRESERVED_KEYS.has(key) && store.getItem(key) != null)) return true;
+      if (knownKeys.some((key) => key && (!LOGOUT_PRESERVED_KEYS.has(key)
+        || (wipeDevice && key === ACCOUNT_VAULT_KEY)) && store.getItem(key) != null)) return true;
       if (typeof store.length !== 'number' || typeof store.key !== 'function') return false;
       for (let i = 0; i < store.length; i += 1) {
         const key = store.key(i);
-        if (key?.startsWith('vc_') && !LOGOUT_PRESERVED_KEYS.has(key)) return true;
+        if (key?.startsWith('vc_') && (!LOGOUT_PRESERVED_KEYS.has(key)
+          || (wipeDevice && key === ACCOUNT_VAULT_KEY))) return true;
       }
       return false;
     });
   } catch { return true; }
 }
 
-function rememberLogoutWarning(message, cleanupPending = false) {
+function rememberLogoutWarning(message, cleanupMode = null) {
   try {
     sessionStorage.setItem('vc_logout_warning', message);
-    if (cleanupPending) sessionStorage.setItem(LOGOUT_CLEANUP_PENDING_KEY, '1');
+    if (cleanupMode) sessionStorage.setItem(LOGOUT_CLEANUP_PENDING_KEY, cleanupMode);
   } catch { /* isolamento por owner continua no boot */ }
+}
+
+/**
+ * Retoma a limpeza que não pôde terminar depois de o servidor confirmar o
+ * logout. O valor legado `1` equivale à limpeza normal; uma solicitação
+ * explícita de apagar o aparelho nunca pode ser rebaixada no boot seguinte.
+ *
+ * `clearAccountLocalData({ wipeMedia: true })` só resolve depois de os três
+ * `deleteDatabase` estritos confirmarem sucesso. Se qualquer um bloquear ou
+ * falhar, o marcador é restaurado antes de propagar o erro.
+ */
+export async function resumePendingLogoutCleanup({
+  store = typeof sessionStorage !== 'undefined' ? sessionStorage : null,
+  clear = clearAccountLocalData,
+  hasResidue = hasAccountDataResidue,
+  unlock = unlockAccountDataWrites,
+} = {}) {
+  const pending = store?.getItem(LOGOUT_CLEANUP_PENDING_KEY);
+  if (!pending) return { pending: false, completed: false, wipeDevice: false };
+  const wipeDevice = pending === LOGOUT_CLEANUP_DEVICE_WIPE;
+  const mode = wipeDevice ? LOGOUT_CLEANUP_DEVICE_WIPE : LOGOUT_CLEANUP_NORMAL;
+  try {
+    await clear({ timeoutMs: 1_200, wipeMedia: wipeDevice });
+    if (hasResidue({ wipeDevice })) {
+      store?.setItem(LOGOUT_CLEANUP_PENDING_KEY, mode);
+      return { pending: true, completed: false, wipeDevice };
+    }
+    store?.removeItem(LOGOUT_CLEANUP_PENDING_KEY);
+    unlock();
+    return { pending: false, completed: true, wipeDevice };
+  } catch (cause) {
+    try { store?.setItem(LOGOUT_CLEANUP_PENDING_KEY, mode); } catch { /* mantém o lock */ }
+    throw cause;
+  }
 }
 
 function readLoginHintEmail() {
@@ -124,6 +165,7 @@ export async function flushProjectOutboxForBoot(owner, flush) {
 /** Só descarta a edição ativa depois de uma cópia confirmada desta mesma edição. */
 export async function logoutWithProtectedLibrary({
   access = {}, onBeforeLogout, isSameAccount = () => true, inFlightRef, toast,
+  wipeDevice = false,
 } = {}) {
   if (!inFlightRef || inFlightRef.current) return false;
   inFlightRef.current = true;
@@ -186,6 +228,9 @@ export async function logoutWithProtectedLibrary({
       throw new Error('O projeto mudou durante a sincronização. Você continua na conta; salve as novas alterações antes de sair.');
     }
     const cloudSaved = cloudResult?.ok === true && cloudResult.cloudSaved === true && cloudResult.assetsFailed === 0;
+    if (wipeDevice && !cloudSaved) {
+      throw new Error('Para apagar os dados deste aparelho, confirme primeiro o salvamento completo na sua conta. Tente sincronizar novamente.');
+    }
     if (!vaultSaved && !cloudSaved) {
       throw new Error('As últimas alterações ainda não estão protegidas. Você continua na conta; salve ou sincronize antes de sair.');
     }
@@ -211,13 +256,14 @@ export async function logoutWithProtectedLibrary({
     // Só remove o cache ativo depois de o servidor confirmar a saída. Se a
     // limpeza local falhar, mantém o lock e recarrega no gate antes de outra conta.
     let cleanupFailed = false;
-    try { await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false }); }
+    try { await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: wipeDevice }); }
     catch (error) {
       console.error('[auth/logout] local cleanup', error);
       cleanupFailed = true;
     }
-    if (hasAccountDataResidue()) cleanupFailed = true;
-    if (cleanupFailed) rememberLogoutWarning(LOGOUT_CLEANUP_WARNING, true);
+    if (hasAccountDataResidue({ wipeDevice })) cleanupFailed = true;
+    if (cleanupFailed) rememberLogoutWarning(LOGOUT_CLEANUP_WARNING,
+      wipeDevice ? LOGOUT_CLEANUP_DEVICE_WIPE : LOGOUT_CLEANUP_NORMAL);
     else if (revocationWarning) rememberLogoutWarning('Você saiu deste navegador, mas não foi possível confirmar o encerramento das outras sessões.');
     try { trackEvent('logout'); } catch { /* */ }
     window.location.assign(cleanupFailed ? '/?landing=1' : '/');
@@ -326,15 +372,12 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         }
       } catch { /* */ }
       try {
-        if (sessionStorage.getItem(LOGOUT_CLEANUP_PENDING_KEY) === '1') {
-          await clearAccountLocalData({ timeoutMs: 1_200, wipeMedia: false });
-          if (hasAccountDataResidue()) {
-            sessionStorage.setItem(LOGOUT_CLEANUP_PENDING_KEY, '1');
+        if (sessionStorage.getItem(LOGOUT_CLEANUP_PENDING_KEY)) {
+          const resumed = await resumePendingLogoutCleanup();
+          if (resumed.pending) {
             libraryCallbacksRef.current.onLibraryBlocked?.(LOGOUT_CLEANUP_WARNING);
             return;
           }
-          sessionStorage.removeItem(LOGOUT_CLEANUP_PENDING_KEY);
-          unlockAccountDataWrites();
         }
       } catch {
         libraryCallbacksRef.current.onLibraryBlocked?.(LOGOUT_CLEANUP_WARNING);
@@ -513,6 +556,13 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
                 }
                 if (metadata.metadata.onboardingDone) localStorage.setItem(SK.onboarding, '1');
                 if (metadata.metadata.modesIntroDone) localStorage.setItem(SK.modesIntro, '1');
+                if (Array.isArray(metadata.metadata.hookLibrary)) {
+                  localStorage.setItem(SK.hookLibrary, JSON.stringify(normalizeHookLibrary(metadata.metadata.hookLibrary)));
+                }
+                if (Array.isArray(metadata.metadata.customVisualPresets)) {
+                  localStorage.setItem(CUSTOM_VISUAL_PRESETS_KEY,
+                    JSON.stringify(normalizeCustomVisualPresets(metadata.metadata.customVisualPresets)));
+                }
               } catch { /* perfil continua na nuvem se o navegador estiver cheio */ }
               libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot);
               libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, snapshot);
@@ -706,10 +756,11 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       else console.error(msg);
     }
   }, [toast]);
-  const handleLogout = useCallback(async () => {
+  const handleLogout = useCallback(async ({ wipeDevice = false } = {}) => {
     const owner = latestAccessRef.current;
     return logoutWithProtectedLibrary({
       access: owner, onBeforeLogout, toast, inFlightRef: logoutInFlightRef,
+      wipeDevice,
       isSameAccount: () => latestAccessRef.current.email === owner.email
         && latestAccessRef.current.customerId === owner.customerId,
     });

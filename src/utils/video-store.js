@@ -172,7 +172,7 @@ export async function videoDelete(id) {
 }
 
 /** Apaga a base inteira apenas em limpeza explícita, nunca na troca de conta. */
-export async function videoWipeDatabase() {
+export async function videoWipeDatabase({ strict = false } = {}) {
   try {
     if (_dbPromise) {
       const db = await Promise.race([
@@ -183,7 +183,29 @@ export async function videoWipeDatabase() {
       _dbPromise = null;
     }
   } catch { /* */ }
+  _dbPromise = null;
   if (typeof indexedDB === 'undefined') return;
+  if (strict) {
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      let timer;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve();
+      };
+      timer = setTimeout(() => finish(new Error('A limpeza dos vídeos deste aparelho não foi confirmada.')), 2_500);
+      try {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => finish();
+        req.onerror = () => finish(req.error || new Error('Não foi possível apagar os vídeos deste aparelho.'));
+        req.onblocked = () => finish(new Error('Feche outras abas do Moont para apagar os vídeos deste aparelho.'));
+      } catch (error) { finish(error); }
+    });
+    return;
+  }
   await Promise.race([
     new Promise((resolve) => {
       const req = indexedDB.deleteDatabase(DB_NAME);

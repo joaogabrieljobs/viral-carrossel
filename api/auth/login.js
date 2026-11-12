@@ -26,7 +26,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const limited = await consumeRateLimit(req, { limit: 20, windowMs: 60_000, keyPrefix: 'login' });
+  const limited = await consumeRateLimit(req, {
+    limit: 20, windowMs: 60_000, keyPrefix: 'login', failClosed: true,
+  });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   if (!passwordAuthConfigured()) {

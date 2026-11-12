@@ -48,6 +48,19 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it('login falha fechado em produção quando não há limitador partilhado', async () => {
+  vi.stubEnv('VERCEL_ENV', 'production');
+  vi.stubEnv('RATE_LIMIT_BACKEND', '');
+  vi.stubEnv('UPSTASH_DISABLED', '1');
+  const res = makeRes();
+  await loginHandler(makeReq({ method: 'POST', body: {
+    email: 'pessoa@teste.exemplo', password: 'SenhaSegura123',
+  } }), res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toMatchObject({ code: 'rate_limit_unavailable' });
+  expect(stripeMock.customers.list).not.toHaveBeenCalled();
+});
+
 it('gate em produção verifica a epoch a cada chamada, sem reutilizar cache após revogação', async () => {
   vi.stubEnv('VERCEL_ENV', 'production');
   const customer = { id: 'cus_gate', email: 'dona@teste.exemplo', metadata: {
@@ -643,9 +656,17 @@ describe('identidade para renovar assinatura por senha', () => {
     await registerHandler(makeReq({ method: 'POST', body: { email: 'nova@teste.exemplo', password: 'MinhaSenha123!' } }), res);
     expect(res.statusCode).toBe(200);
     expect(res.body.needCheckout).toBe(true);
-    expect(stripeMock.customers.create).toHaveBeenCalledWith(expect.objectContaining({
-      email: 'nova@teste.exemplo', metadata: expect.objectContaining({ vc_pw_hash: expect.any(String) }),
-    }));
+    expect(stripeMock.customers.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'nova@teste.exemplo', metadata: { product: 'viral-carrossel' },
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-register-customer-/) }),
+    );
+    expect(stripeMock.customers.update).toHaveBeenCalledWith(
+      'cus_novo_nova',
+      expect.objectContaining({ metadata: expect.objectContaining({ vc_pw_hash: expect.any(String) }) }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-register-credential-/) }),
+    );
     expect(checkoutIdentityFrom(res)).toEqual({
       email: 'nova@teste.exemplo', customerId: 'cus_novo_nova', source: 'new_registration',
     });
@@ -661,7 +682,35 @@ describe('identidade para renovar assinatura por senha', () => {
     expect(checkout.statusCode).toBe(200);
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
       customer: 'cus_novo_nova',
-    }));
+    }), expect.any(Object));
     expect(stripeMock.customers.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('dois cadastros simultâneos convergem no mesmo customer e o segundo recebe 409', async () => {
+    stripeMock.customers.list.mockResolvedValue({ data: [], has_more: false });
+    stripeMock.customers.create.mockResolvedValue({
+      id: 'cus_concorrente', email: 'concorrente@teste.exemplo', metadata: { product: 'viral-carrossel' },
+    });
+    stripeMock.customers.update
+      .mockResolvedValueOnce({ id: 'cus_concorrente' })
+      .mockRejectedValueOnce(Object.assign(new Error('same key, different params'), {
+        type: 'StripeIdempotencyError',
+      }));
+    const first = makeRes();
+    const second = makeRes();
+
+    await Promise.all([
+      registerHandler(makeReq({ method: 'POST', body: {
+        email: 'concorrente@teste.exemplo', password: 'SenhaConcorrente123!',
+      } }), first),
+      registerHandler(makeReq({ method: 'POST', body: {
+        email: 'concorrente@teste.exemplo', password: 'OutraSenhaConcorrente456!',
+      } }), second),
+    ]);
+
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    expect(stripeMock.customers.create).toHaveBeenCalledTimes(2);
+    expect(new Set(stripeMock.customers.create.mock.calls.map((call) => call[1].idempotencyKey)).size).toBe(1);
+    expect(stripeMock.customers.update).toHaveBeenCalledTimes(2);
   });
 });

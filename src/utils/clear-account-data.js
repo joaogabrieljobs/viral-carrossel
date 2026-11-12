@@ -10,6 +10,7 @@ import { imageWipeDatabase } from './image-store.js';
 import { videoWipeDatabase, setVideoUrlMap } from './video-store.js';
 import { PENDING_SHARE_KEY } from './project-share.js';
 import { ACCOUNT_VAULT_KEY } from './account-vault.js';
+import { wipeDurableVaultDatabase } from './account-vault-store.js';
 
 const EXTRA_KEYS = [USER_PROFILE_KEY, CUSTOM_VISUAL_PRESETS_KEY];
 /**
@@ -45,10 +46,12 @@ function removeKnownKeys(store) {
 }
 
 /**
- * Best-effort: nunca lança. Chamar antes de redirecionar no logout.
+ * A limpeza normal é best-effort. A opção destrutiva lança se algum banco não
+ * confirmar a exclusão, para a interface nunca afirmar que o aparelho foi limpo.
  * @param {{ timeoutMs?: number, wipeMedia?: boolean }} [opts]
  *   wipeMedia: limpeza explícita de TODAS as contas deste browser. No logout e
  *   na troca de conta fica false: o cofre usa IDs que apontam para estes blobs.
+ *   Quando true, apaga também o cofre de todas as contas deste aparelho.
  *   A leitura e a limpeza de órfãos são isoladas por owner nos stores.
  */
 export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = false } = {}) {
@@ -58,17 +61,33 @@ export async function clearAccountLocalData({ timeoutMs = 3_000, wipeMedia = fal
   try { removeKnownKeys(typeof sessionStorage !== 'undefined' ? sessionStorage : null); } catch { /* */ }
   try { setVideoUrlMap({}); } catch { /* */ }
 
+  let wipeError = null;
   if (wipeMedia) {
+    // O cofre legado é preservado na limpeza normal, mas a opção destrutiva
+    // precisa remover tanto a cópia pequena quanto a transação durável.
+    try { localStorage.removeItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
     const wipe = Promise.all([
-      imageWipeDatabase().catch(() => {}),
-      videoWipeDatabase().catch(() => {}),
+      imageWipeDatabase({ strict: true }),
+      videoWipeDatabase({ strict: true }),
+      wipeDurableVaultDatabase(),
     ]);
-    await Promise.race([
-      wipe,
-      new Promise((r) => setTimeout(r, Math.max(500, Number(timeoutMs) || 3_000))),
-    ]);
+    try {
+      await Promise.race([
+        wipe,
+        new Promise((_, reject) => setTimeout(
+          () => reject(new Error('A limpeza dos dados deste aparelho não foi confirmada. Feche outras abas do Moont e tente novamente.')),
+          Math.max(500, Number(timeoutMs) || 3_000),
+        )),
+      ]);
+    } catch (error) {
+      wipeError = error instanceof Error ? error : new Error('Não foi possível apagar os dados deste aparelho.');
+    }
   }
 
   // Segunda passagem: se algum flush correu em paralelo antes do lock.
   try { removeKnownKeys(typeof localStorage !== 'undefined' ? localStorage : null); } catch { /* */ }
+  if (wipeMedia) {
+    try { localStorage.removeItem(ACCOUNT_VAULT_KEY); } catch { /* */ }
+  }
+  if (wipeError) throw wipeError;
 }

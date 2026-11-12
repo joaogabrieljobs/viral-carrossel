@@ -65,7 +65,8 @@ function mapStoreError(e) {
       },
     };
   }
-  if (code === 'library_too_large' || code === 'library_asset_too_large') {
+  if (code === 'library_too_large' || code === 'library_asset_too_large'
+    || code === 'project_account_limit' || code === 'project_account_too_large') {
     return { status: 413, body: { error: e.message, code } };
   }
   if (code === 'library_storage_unconfigured' || code === 'library_storage_unavailable') {

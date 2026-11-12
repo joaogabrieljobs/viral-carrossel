@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { buildPriceIdToTierMap } from './plans.js';
 
 let _stripe;
 
@@ -72,10 +73,26 @@ export function getPriceId() {
   return id;
 }
 
+/** Só assinaturas do próprio Moont podem liberar ou bloquear o studio. */
+export function isMoontSubscription(sub) {
+  if (!sub || typeof sub !== 'object') return false;
+  const product = String(sub.metadata?.product || '').trim();
+  if (product) return product === 'viral-carrossel';
+  // Assinaturas sem `metadata.product` só são legadas do Moont quando o preço
+  // está na allowlist configurada. `metadata.tier` é genérico e também existe
+  // em outros produtos da empresa; aceitá-lo isoladamente cruza assinaturas.
+  const knownPrices = buildPriceIdToTierMap();
+  return (sub.items?.data || []).some((item) => {
+    const priceId = typeof item?.price === 'string' ? item.price : item?.price?.id;
+    return priceId && knownPrices.has(cleanEnv(priceId));
+  });
+}
+
 /** Assinatura considerada válida para acesso ao studio. */
 export function isSubscriptionActive(sub) {
   if (!sub) return false;
-  return sub.status === 'active' || sub.status === 'trialing';
+  return isMoontSubscription(sub)
+    && (sub.status === 'active' || sub.status === 'trialing');
 }
 
 export async function findActiveSubscription(customerId) {
@@ -86,4 +103,24 @@ export async function findActiveSubscription(customerId) {
     limit: 10,
   });
   return list.data.find(isSubscriptionActive) || null;
+}
+
+/** Assinatura aberta que ainda pode cobrar ou ser regularizada. Não dá acesso ao
+ *  studio (isso continua em `isSubscriptionActive`), mas criar outra assinatura
+ *  ao lado dela pode cobrar o mesmo cartão duas vezes. */
+const RECOVERABLE_SUBSCRIPTION_STATUSES = new Set(['past_due', 'unpaid', 'incomplete']);
+
+export function isSubscriptionRecoverable(sub) {
+  return isMoontSubscription(sub) && RECOVERABLE_SUBSCRIPTION_STATUSES.has(sub?.status);
+}
+
+export async function findRecoverableSubscription(customerId) {
+  const stripe = getStripe();
+  const list = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 10,
+    expand: ['data.latest_invoice'],
+  });
+  return list.data.find(isSubscriptionRecoverable) || null;
 }

@@ -61,6 +61,18 @@ function fakeDatabase() {
             .sort((a, b) => a.sort_order - b.sort_order || a.project_id.localeCompare(b.project_id));
         }
         if (operation === 'moont_delete_agent_visual_jobs') return [];
+        if (operation === 'moont_account_project_usage') {
+          const targetId = params[1];
+          const live = [...currentProjects.entries()]
+            .filter(([key, row]) => key.startsWith(`${owner}\0`) && row.deleted_at == null);
+          const bytes = row => Buffer.byteLength(JSON.stringify(row.entry), 'utf8');
+          return [{
+            project_count: live.length,
+            total_bytes: live.reduce((total, [, row]) => total + bytes(row), 0),
+            target_bytes: live.find(([key]) => key === keyFor(owner, targetId))
+              ? bytes(live.find(([key]) => key === keyFor(owner, targetId))[1]) : 0,
+          }];
+        }
         if (operation === 'moont_one_project') {
           const row = currentProjects.get(keyFor(owner, params[1]));
           return row ? [copy(row)] : [];
@@ -104,14 +116,51 @@ function fakeDatabase() {
   };
 }
 
-function store(db, legacy = vi.fn(async () => null)) {
+function store(db, legacy = vi.fn(async () => null), options = {}) {
   let timestamp = 1_000;
   return createLibraryPostgresStore({
-    sql: db.sql, readLegacyManifest: legacy, now: () => ++timestamp,
+    sql: db.sql, readLegacyManifest: legacy, now: () => ++timestamp, ...options,
   });
 }
 
 describe('biblioteca Postgres por conta', () => {
+  it('recusa o quarto projeto dentro da transação quando o teto da conta é três', async () => {
+    const adapter = store(fakeDatabase(), vi.fn(async () => null), {
+      maxProjects: 3, maxAccountBytes: 1024 * 1024,
+    });
+    for (const id of ['um', 'dois', 'tres']) {
+      await adapter.putAccountProject('cus_limit', { id, name: id, doc: { slides: [] } }, { baseVersion: 0 });
+    }
+    await expect(adapter.putAccountProject('cus_limit', {
+      id: 'quatro', name: 'Quatro', doc: { slides: [] },
+    }, { baseVersion: 0 })).rejects.toMatchObject({ code: 'project_account_limit', limit: 3 });
+    expect((await adapter.listAccountProjects('cus_limit', { limit: 10 })).total).toBe(3);
+    expect(await adapter.getAccountProject('cus_limit', 'quatro')).toBeNull();
+  });
+
+  it('usa a mesma regex de ID no push legado e na rota por projeto', async () => {
+    const adapter = store(fakeDatabase());
+    await expect(adapter.putLibraryManifest('cus_bad_id', {
+      docs: [{ id: 'fora/da-regex', name: 'Inválido', doc: {} }],
+    })).rejects.toMatchObject({ code: 'project_bad_id' });
+    expect((await adapter.listAccountProjects('cus_bad_id', { limit: 10 })).total).toBe(0);
+  });
+
+  it('recusa a escrita que ultrapassa o teto agregado de bytes da conta', async () => {
+    const adapter = store(fakeDatabase(), vi.fn(async () => null), {
+      maxProjects: 10, maxAccountBytes: 300,
+    });
+    await adapter.putAccountProject('cus_bytes', {
+      id: 'um', doc: { text: 'x'.repeat(120) },
+    }, { baseVersion: 0 });
+    await expect(adapter.putAccountProject('cus_bytes', {
+      id: 'dois', doc: { text: 'y'.repeat(120) },
+    }, { baseVersion: 0 })).rejects.toMatchObject({
+      code: 'project_account_too_large', limitBytes: 300,
+    });
+    expect((await adapter.listAccountProjects('cus_bytes', { limit: 10 })).total).toBe(1);
+  });
+
   it('importa o manifesto Blob uma vez e preserva documentos, metadados e exclusões', async () => {
     const db = fakeDatabase();
     const legacy = vi.fn(async (owner) => owner === 'cus_janine' ? {
@@ -308,6 +357,8 @@ describe('biblioteca Postgres por conta', () => {
     const updated = await adapter.putAccountLibraryMeta('cus_janine', {
       userProfile: { name: 'João Gabriel' },
       folders: [{ id: 'clientes', name: 'Clientes premium' }],
+      hookLibrary: [{ id: 'hook_1', hook: 'Gancho aprovado' }],
+      customVisualPresets: [{ id: 'custom_1', isCustom: true, label: 'Editorial' }],
       assetIds: ['image_new'],
     }, { baseRevision: before.revision });
     expect(updated.revision).toBe(1);
@@ -315,6 +366,8 @@ describe('biblioteca Postgres por conta', () => {
       brands: [{ id: 'janine' }],
       folders: [{ id: 'clientes', name: 'Clientes premium' }],
       userProfile: { name: 'João Gabriel' },
+      hookLibrary: [{ id: 'hook_1', hook: 'Gancho aprovado' }],
+      customVisualPresets: [{ id: 'custom_1', isCustom: true, label: 'Editorial' }],
       assetIds: ['image_old', 'image_new'],
     });
     expect((await adapter.getLibraryManifest('cus_janine')).docs[0].doc.slides).toHaveLength(23);

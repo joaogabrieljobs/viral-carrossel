@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.resetAllMocks(); resetStripeMock(); resetMemoryQuotas();
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_test_fake');
   vi.stubEnv('BLOB_STORE_ID', ''); vi.stubEnv('VERCEL_OIDC_TOKEN', '');
-  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { tier: 'creator' } }] });
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { product:'viral-carrossel', tier: 'creator' } }] });
   put.mockImplementation(async pathname => ({ pathname }));
   del.mockResolvedValue();
   issueSignedToken.mockResolvedValue({ delegationToken: 'fake', clientSigningToken: 'fake-secret' });
@@ -85,14 +85,14 @@ it('falha na geração limpa os anexos e reembolsa; falha na limpeza não perde 
 
 it('sem autenticação ou plano sem imagens não faz upload', async () => {
   expect((await generate([PNG], { signedIn: false })).statusCode).toBe(401);
-  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { tier: 'essential' } }] });
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { product:'viral-carrossel', tier: 'essential' } }] });
   expect((await generate([PNG])).body.code).toBe('plan_no_images');
   expect(put).not.toHaveBeenCalled();
 });
 
 it('quota esgotada não inicia upload nem tarefa paga', async () => {
   const periodStartSec = 1000;
-  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), current_period_start: periodStartSec, metadata: { tier: 'creator' } }] });
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), current_period_start: periodStartSec, metadata: { product:'viral-carrossel', tier: 'creator' } }] });
   for (let i = 0; i < 50; i++) await consumeImageCredit({ customerId: 'cus_ref', periodStartSec, limit: 50 });
   const res = await generate([PNG]);
   expect(res.body.code).toBe('quota_exhausted');
@@ -103,7 +103,7 @@ it('geração usa o período do item Stripe e acumula no mesmo contador da sess�
   const periodStartSec = 1791846000;
   const periodEndSec = 1794524400;
   stripeMock.subscriptions.list.mockResolvedValue({ data: [{
-    id: 'sub_ref', status: 'active', metadata: { tier: 'creator' },
+    id: 'sub_ref', status: 'active', metadata: { product:'viral-carrossel', tier: 'creator' },
     items: { data: [{ current_period_start: periodStartSec, current_period_end: periodEndSec }] },
   }] });
   expect((await generate([])).body.quota).toMatchObject({ used: 1, available: true });
@@ -114,7 +114,7 @@ it('geração usa o período do item Stripe e acumula no mesmo contador da sess�
 
 it('sem período confirmado não cobra, não faz upload e não inicia a geração', async () => {
   stripeMock.subscriptions.list.mockResolvedValue({ data: [{
-    id: 'sub_ref', status: 'active', metadata: { tier: 'creator' }, items: { data: [{}] },
+    id: 'sub_ref', status: 'active', metadata: { product:'viral-carrossel', tier: 'creator' }, items: { data: [{}] },
   }] });
   const res = await generate([PNG]);
   expect(res.statusCode).toBe(503);

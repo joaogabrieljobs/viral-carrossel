@@ -60,6 +60,25 @@ describe('remote MCP endpoint', () => {
     expect(mocked.auth.mock.calls.map(call => call[1].scope)).toEqual(['projects:read', 'projects:write']);
   });
 
+  it('só pede o código de compartilhamento quando a credencial também pode escrever', async () => {
+    mocked.project.mockResolvedValue({ id: 'p1', version: 1 });
+    mocked.auth.mockResolvedValueOnce({ ownerId: 'cus_test', tokenId: 'read-only', scopes: ['projects:read'] });
+    await send({ jsonrpc: '2.0', id: 31, method: 'tools/call', params: {
+      name: 'get_project_content', arguments: { projectId: 'p1' },
+    } });
+    expect(mocked.project).toHaveBeenLastCalledWith('cus_test', 'p1', {
+      includeText: true, includeShare: false,
+    });
+
+    mocked.auth.mockResolvedValueOnce({ ownerId: 'cus_test', tokenId: 'writer', scopes: ['projects:read', 'projects:write'] });
+    await send({ jsonrpc: '2.0', id: 32, method: 'tools/call', params: {
+      name: 'get_project_content', arguments: { projectId: 'p1' },
+    } });
+    expect(mocked.project).toHaveBeenLastCalledWith('cus_test', 'p1', {
+      includeText: true, includeShare: true,
+    });
+  });
+
   it('inicia o job de imagem com escopo de escrita e expõe o acompanhamento', async () => {
     mocked.image.mockResolvedValue({ requestId: 'image-request-01', status: 'pending', slides: [{ slideId: 's1', status: 'pending' }] });
     const result = await send({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: {

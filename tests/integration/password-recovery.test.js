@@ -215,7 +215,7 @@ describe('redefinição da senha', () => {
     const session = {
       id: 'cs_pre_reset', mode: 'subscription', payment_status: 'paid',
       customer: customer.id, customer_details: { email: customer.email },
-      subscription: { id: 'sub_reset', status: 'active' }, metadata: {},
+      subscription: { id: 'sub_reset', status: 'active', metadata: { product: 'viral-carrossel' } }, metadata: {},
     };
     stripeMock.checkout.sessions.retrieve.mockImplementation(async () => structuredClone(session));
     stripeMock.checkout.sessions.update.mockImplementation(async (_, data) => {

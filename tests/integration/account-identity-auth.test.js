@@ -22,8 +22,13 @@ vi.mock('../../api/lib/account-identity-postgres.js', () => ({
     .filter((account) => account.email === email),
   getPasswordRecordByStripeCustomerId: async (id) => identityState.accounts.get(id) || null,
   setAccountPassword: async (id, { salt, hash, expectedHash, expectedEpoch } = {}) => {
-    const account = identityState.accounts.get(id);
-    if ((expectedHash !== undefined && expectedHash !== account.hash)
+    const account = identityState.accounts.get(id) || {
+      id: '00000000-0000-4000-8000-000000000003',
+      stripeCustomerId: id,
+      email: identityState.newCustomers.get(id),
+      salt: null, hash: null, identityEpoch: '', sessionRevokedBefore: 0,
+    };
+    if ((expectedHash !== undefined && String(expectedHash) !== String(account.hash || ''))
       || (expectedEpoch !== undefined && expectedEpoch !== account.identityEpoch)) {
       throw Object.assign(new Error('conflito'), { code: 'identity_credential_conflict' });
     }
@@ -156,6 +161,9 @@ describe('autenticação com ACCOUNT_IDENTITY_BACKEND=postgres', () => {
     } }), response);
     expect(response.statusCode).toBe(200);
     expect(response.body.needCheckout).toBe(true);
+    expect(stripeMock.customers.create.mock.calls[0][1]).toMatchObject({
+      idempotencyKey: expect.stringMatching(/^moont-register-customer-/),
+    });
     expect(identityState.accounts.get('cus_new').hash).toBeTruthy();
     expect(setCookies(response).some((cookie) => cookie.startsWith('vc_identity_checkout='))).toBe(true);
   });

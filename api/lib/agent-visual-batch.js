@@ -5,9 +5,10 @@ import { getAccountProject, listAccountProjects } from './library-sync-postgres.
 import { applyVisualPatchToEntry, projectDesignView } from './visual-patch.js';
 import { applyContentPatchToEntry } from './content-patch.js';
 
-const PROJECT_ID = /^[^\u0000]{1,500}$/;
+const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const OWNER_ID = /^[A-Za-z0-9_.-]{1,80}$/;
+const MAX_AGENT_VISUAL_JOBS_PER_OWNER = 500;
 
 function fail(status, code, message, extra = {}) {
   throw Object.assign(new Error(message), { status, code, ...extra });
@@ -120,10 +121,10 @@ export async function listAgentProjects(ownerValue, { cursor, limit = 25 } = {})
   };
 }
 
-export async function getAgentProject(ownerValue, idValue, { includeText = false } = {}) {
+export async function getAgentProject(ownerValue, idValue, { includeText = false, includeShare = false } = {}) {
   const project = await getAccountProject(ownerId(ownerValue), projectId(idValue));
   if (!project || project.deleted) fail(404, 'visual_project_not_found', 'Projeto não encontrado.');
-  return projectDesignView(project, { includeText });
+  return projectDesignView(project, { includeText, includeShare });
 }
 
 function snapshotForUndo(entry) {
@@ -143,11 +144,55 @@ function snapshotForUndo(entry) {
   return clone;
 }
 
+function restoreRuntimeMedia(before, current, { preserveRuntimeMedia = true } = {}) {
+  if (!preserveRuntimeMedia) return before;
+  if (before === null && typeof current === 'string'
+    && (current.startsWith('data:') || current.startsWith('blob:'))) return current;
+  if (Array.isArray(before)) {
+    return before.map((value, index) => restoreRuntimeMedia(value, current?.[index], { preserveRuntimeMedia }));
+  }
+  if (!before || typeof before !== 'object') return before;
+  const currentObject = current && typeof current === 'object' ? current : {};
+  return Object.fromEntries(Object.entries(before).map(([key, value]) => [
+    key, restoreRuntimeMedia(value, currentObject[key], { preserveRuntimeMedia }),
+  ]));
+}
+
 async function forgetExpiredVisualJobs(tx, owner) {
   await tx.unsafe(
     `DELETE FROM moont.agent_visual_jobs
-     WHERE owner_id = $1 AND created_at < now() - interval '30 days'`,
+     WHERE owner_id = $1 AND status <> 'pending'
+       AND created_at < now() - interval '30 days'`,
     [owner],
+  );
+}
+
+async function prepareAgentVisualJobInsert(tx, owner) {
+  await forgetExpiredVisualJobs(tx, owner);
+  const counts = await tx.unsafe(
+    `SELECT count(*)::integer AS pending_count
+     FROM moont.agent_visual_jobs
+     WHERE owner_id = $1 AND status = 'pending'`,
+    [owner],
+  );
+  const pendingCount = Number(counts[0]?.pending_count || 0);
+  if (pendingCount >= MAX_AGENT_VISUAL_JOBS_PER_OWNER) {
+    fail(429, 'visual_job_limit',
+      'Há muitas gerações em andamento nesta conta. Aguarde a conclusão antes de criar outra.');
+  }
+  // Retenha no máximo 499 linhas antes do próximo INSERT. Jobs pending nunca
+  // são podados: eles ainda possuem geração/crédito em andamento e precisam
+  // chegar a um estado terminal pelo worker ou pelo reconciliador.
+  const terminalToKeep = MAX_AGENT_VISUAL_JOBS_PER_OWNER - 1 - pendingCount;
+  await tx.unsafe(
+    `DELETE FROM moont.agent_visual_jobs
+     WHERE owner_id = $1 AND request_id IN (
+       SELECT request_id FROM moont.agent_visual_jobs
+       WHERE owner_id = $1 AND status <> 'pending'
+       ORDER BY created_at DESC, request_id DESC
+       OFFSET $2
+     )`,
+    [owner, terminalToKeep],
   );
 }
 
@@ -306,7 +351,6 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
   // Ensure legacy libraries are migrated before taking our own transaction.
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
-    await forgetExpiredVisualJobs(tx, owner);
     const row = await lockAccountAndProject(tx, owner, id);
     const existing = await tx.unsafe(
       `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
@@ -317,6 +361,9 @@ export async function applyAgentVisualBatch(ownerValue, tokenId, input) {
       }
       return safeJob(existing[0]);
     }
+    // lockAccountAndProject trava primeiro a linha da conta. Assim a contagem,
+    // a poda e o INSERT ficam serializados para todas as ferramentas do dono.
+    await prepareAgentVisualJobInsert(tx, owner);
     const currentVersion = Number(row.version);
     if (currentVersion !== base) {
       fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
@@ -346,7 +393,6 @@ export async function applyAgentTextEdit(ownerValue, tokenId, input) {
   const hash = requestHash({ kind: 'content', projectId: id, baseVersion: base, patch: input.patch });
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
-    await forgetExpiredVisualJobs(tx, owner);
     const row = await lockAccountAndProject(tx, owner, id);
     const existing = await tx.unsafe(
       `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
@@ -357,6 +403,7 @@ export async function applyAgentTextEdit(ownerValue, tokenId, input) {
       }
       return safeJob(existing[0]);
     }
+    await prepareAgentVisualJobInsert(tx, owner);
     const currentVersion = Number(row.version);
     if (currentVersion !== base) {
       fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
@@ -399,6 +446,36 @@ function withGeneratedImage(slide, assetId) {
   delete next.bgImage;
   delete next.bgImageId;
   return next;
+}
+
+const GENERATED_IMAGE_FIELDS = [
+  'bgImageAssetId', 'bgImageSource', 'bgImageFailed', 'bgImageError',
+  'imgMode', 'bgFit', 'bgX', 'bgY', 'bgZoom', 'bgImage', 'bgImageId',
+];
+
+/**
+ * Desfaz apenas as fotos que este job aplicou. Um job pode terminar depois de
+ * outra edição legítima no projeto; restaurar o snapshot inteiro apagaria essa
+ * edição concorrente.
+ */
+function undoGeneratedImages(currentEntry, beforeEntry, jobSlides) {
+  const beforeById = new Map((beforeEntry?.doc?.slides || [])
+    .filter(slide => slide?.id).map(slide => [slide.id, slide]));
+  const generated = new Map((jobSlides || [])
+    .filter(slide => slide?.status === 'done' && slide?.assetId)
+    .map(slide => [slide.slideId, slide.assetId]));
+  const slides = (currentEntry?.doc?.slides || []).map((slide) => {
+    const assetId = generated.get(slide?.id);
+    if (!assetId || slide.bgImageAssetId !== assetId) return slide;
+    const restored = { ...slide };
+    const before = beforeById.get(slide.id) || {};
+    for (const field of GENERATED_IMAGE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(before, field)) restored[field] = before[field];
+      else delete restored[field];
+    }
+    return restored;
+  });
+  return { ...currentEntry, doc: { ...currentEntry.doc, slides } };
 }
 
 function imageSlideIds(value) {
@@ -449,6 +526,24 @@ export function imageJobHash({ projectId: id, baseVersion: base, slideIds }) {
 }
 
 /**
+ * Identidade dos dados que orientam a imagem. O job pode ser rebaseado quando
+ * outro card muda, mas nunca quando o prompt ou as referências do próprio
+ * card foram editados durante a geração.
+ */
+function imageInputFingerprint(slide) {
+  return requestHash({
+    imageQuery:String(slide?.imageQuery || '').trim().slice(0, 4000),
+    refImage:slide?.refImage ?? null,
+    refImageId:slide?.refImageId ?? null,
+    refImageAssetId:slide?.refImageAssetId ?? null,
+    refImageMention:slide?.refImageMention ?? null,
+    refImageName:slide?.refImageName ?? null,
+    refImageFailed:slide?.refImageFailed === true,
+    imageReferences:Array.isArray(slide?.imageReferences) ? slide.imageReferences : [],
+  });
+}
+
+/**
  * Registra um placeholder `pending` com CAS na versão do projeto. O chamador
  * cria esta linha única antes de reservar créditos; assim só o vencedor de uma
  * corrida por requestId toca na quota. Repetições devolvem o job existente.
@@ -467,7 +562,6 @@ export async function createAgentImageJob(ownerValue, tokenId, input) {
   const meta = { kind: 'image', creditsSettled:false, ...(input?.meta || {}) };
   await getAccountProject(owner, id);
   return getPostgresConnection().begin(async tx => {
-    await forgetExpiredVisualJobs(tx, owner);
     const row = await lockAccountAndProject(tx, owner, id);
     const existing = await tx.unsafe(
       `SELECT * FROM moont.agent_visual_jobs WHERE owner_id = $1 AND request_id = $2`, [owner, rid],
@@ -478,6 +572,7 @@ export async function createAgentImageJob(ownerValue, tokenId, input) {
       }
       return { ...internalJob(existing[0]), existing: true };
     }
+    await prepareAgentVisualJobInsert(tx, owner);
     const currentVersion = Number(row.version);
     if (currentVersion !== base) fail(409, 'project_conflict', 'O projeto mudou na nuvem.', { cloudVersion: currentVersion });
     const current = new Map((row.entry?.doc?.slides || []).filter(slide => slide?.id).map(slide => [slide.id, slide]));
@@ -485,7 +580,12 @@ export async function createAgentImageJob(ownerValue, tokenId, input) {
     if (missing.length) fail(404, 'image_slide_missing', 'Card não encontrado neste projeto.', { slideIds: missing });
     const withPhoto = slides.filter(slide => slideHasPhoto(current.get(slide.slideId))).map(slide => slide.slideId);
     if (withPhoto.length) fail(409, 'image_already_present', 'Estes cards já possuem imagem.', { slideIds: withPhoto });
-    const state = slides.map(slide => ({ slideId: slide.slideId, status: 'pending', operationId: slide.operationId }));
+    const state = slides.map(slide => ({
+      slideId:slide.slideId,
+      status:'pending',
+      operationId:slide.operationId,
+      inputFingerprint:imageInputFingerprint(current.get(slide.slideId)),
+    }));
     const jobs = await tx.unsafe(
       `INSERT INTO moont.agent_visual_jobs
        (owner_id, request_id, project_id, token_id, request_hash, before_version,
@@ -527,10 +627,10 @@ async function settleImageJob(tx, owner, rid, { status, afterVersion, slides, er
 }
 
 /**
- * Fecha o job com os resultados por card. Grava as imagens prontas numa única
- * versão nova se o projeto ainda estiver na versão base; caso contrário tudo
- * falha com `project_conflict`. Devolve o estado interno para o chamador
- * confirmar ou devolver cada crédito.
+ * Fecha o job com os resultados por card. Se o projeto mudou durante a
+ * geração, reaplica na versão atual apenas os cards que ainda existem, seguem
+ * sem foto e mantêm o mesmo prompt/referências. Assim uma edição em outro card
+ * não perde assets, mas uma direção antiga nunca vence a edição do próprio alvo.
  */
 export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) {
   const owner = ownerId(ownerValue);
@@ -546,16 +646,26 @@ export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) 
     if (!job) fail(404, 'visual_job_not_found', 'Alteração não encontrada.');
     if (job.status !== 'pending') return { ...internalJob(job), finished: false };
     const currentVersion = Number(row.version);
-    const base = Number(job.before_version);
     const slides = Array.isArray(job.slides) ? job.slides : [];
-    if (currentVersion !== base) {
-      const failed = slides.map(slide => (slide.status === 'pending'
-        ? { ...slide, status: 'failed', errorCode: 'project_conflict' } : slide));
-      return { ...await settleImageJob(tx, owner, rid, { status: 'failed', afterVersion: base, slides: failed,
-        errorCode: 'project_conflict' }), finished: true };
-    }
     const merged = mergeOutcomes(slides, outcomes, 'image_generation_failed');
-    const assets = new Map(merged.filter(slide => slide.status === 'done').map(slide => [slide.slideId, slide.assetId]));
+    const currentSlides = new Map((row.entry?.doc?.slides || [])
+      .filter(slide => slide?.id).map(slide => [slide.id, slide]));
+    const beforeSlides = new Map((job.before_entry?.doc?.slides || [])
+      .filter(slide => slide?.id).map(slide => [slide.id, slide]));
+    const applicable = merged.map((slide) => {
+      if (slide.status !== 'done') return slide;
+      const current = currentSlides.get(slide.slideId);
+      if (!current) return { ...slide, status: 'failed', errorCode: 'image_slide_missing' };
+      if (slideHasPhoto(current)) return { ...slide, status: 'failed', errorCode: 'image_already_present' };
+      const expectedFingerprint = slide.inputFingerprint
+        || (beforeSlides.has(slide.slideId) ? imageInputFingerprint(beforeSlides.get(slide.slideId)) : null);
+      if (!expectedFingerprint || expectedFingerprint !== imageInputFingerprint(current)) {
+        return { ...slide, status: 'failed', errorCode: 'image_input_changed' };
+      }
+      return slide;
+    });
+    const assets = new Map(applicable.filter(slide => slide.status === 'done')
+      .map(slide => [slide.slideId, slide.assetId]));
     let afterVersion = currentVersion;
     if (assets.size) {
       const nextSlides = (row.entry?.doc?.slides || []).map(slide => (assets.has(slide?.id)
@@ -564,7 +674,7 @@ export async function finishAgentImageJob(ownerValue, requestIdValue, outcomes) 
       afterVersion = await updateProject(tx, owner, found.projectId, nextEntry, currentVersion, Date.now());
     }
     return { ...await settleImageJob(tx, owner, rid, {
-      status: assets.size ? 'applied' : 'failed', afterVersion, slides: merged,
+      status: assets.size ? 'applied' : 'failed', afterVersion, slides: applicable,
       errorCode: assets.size ? null : 'image_generation_failed',
     }), finished: true };
   });
@@ -628,8 +738,11 @@ export async function undoAgentVisualBatch(ownerValue, input) {
         { cloudVersion: currentVersion });
     }
     const changed = Number(job.after_version) !== Number(job.before_version);
+    const beforeEntry = job.meta?.kind === 'image'
+      ? undoGeneratedImages(row.entry, job.before_entry, job.slides)
+      : restoreRuntimeMedia(job.before_entry, row.entry, { preserveRuntimeMedia: true });
     const undoVersion = changed
-      ? await updateProject(tx, owner, found.projectId, job.before_entry, currentVersion, Date.now())
+      ? await updateProject(tx, owner, found.projectId, beforeEntry, currentVersion, Date.now())
       : currentVersion;
     const updated = await tx.unsafe(
       `UPDATE moont.agent_visual_jobs SET status = 'undone', undone_at = now(),

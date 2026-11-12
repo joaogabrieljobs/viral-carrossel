@@ -138,7 +138,7 @@ describe('C3 — SJinn não ultrapassa o maxDuration da função', () => {
 
   it('handler força resolution 1K mesmo que o cliente peça 4K', async () => {
     process.env.SJINN_API_KEY = 'sjinn-fake-key-123';
-    stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_img'), metadata: { tier: 'creator' } }] });
+    stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_img'), metadata: { product:'viral-carrossel', tier: 'creator' } }] });
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(okJson({ success: true, data: { task_id: 't1' } }))
       .mockResolvedValueOnce(okJson({ success: true, data: { status: 1, output_urls: ['https://cdn.exemplo/img.png'] } }))
@@ -192,7 +192,7 @@ describe('Orçamento de tempo do proxy (timeout de geração longa)', () => {
 
 it('referência sem bytes de imagem é recusada antes de consumir crédito ou chamar SJinn', async () => {
   process.env.SJINN_API_KEY = 'sjinn-fake-key-123';
-  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { tier: 'creator' } }] });
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [{ ...subAtiva('cus_ref'), metadata: { product:'viral-carrossel', tier: 'creator' } }] });
   const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
   const res = makeRes();
   await sjinnHandler(makeReq({ method: 'POST', headers: { origin: APP }, cookie: cookieFor('cus_ref'), body: { prompt: 'imagem com referência', imageList: ['data:image/png;base64,YQ=='] } }), res);

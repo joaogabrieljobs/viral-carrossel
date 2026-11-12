@@ -14,7 +14,18 @@ import handler from '../../api/library-sync.js';
 
 const owner = 'cus_original';
 const digest = (value) => createHash('sha256').update(value, 'utf8').digest('hex');
-const original = `data:image/png;base64,${Buffer.alloc(1_600_000, 0xa7).toString('base64')}`;
+const signatures = {
+  png: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  jpeg: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+  webp: Buffer.from('RIFF0000WEBP', 'ascii'),
+  gif: Buffer.from('GIF89a', 'ascii'),
+  avif: Buffer.from([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]),
+};
+const imageDataUrl = (type, size = 32) => {
+  const signature = signatures[type];
+  return `data:image/${type};base64,${Buffer.concat([signature, Buffer.alloc(Math.max(0, size - signature.length), 0xa7)]).toString('base64')}`;
+};
+const original = imageDataUrl('png', 1_600_000);
 const assetId = `original_chunks_${digest(original)}`;
 function chunks(dataUrl = original) {
   const total = Math.ceil(dataUrl.length / ASSET_CHUNK_CHARS);
@@ -50,7 +61,7 @@ for (const mode of ['memory', 'private Blob']) {
     });
 
     it.each(['png', 'jpeg', 'webp', 'gif', 'avif'])('preserva bytes e MIME de %s, isolados por conta', async (type) => {
-      const dataUrl = `data:image/${type};base64,AQIDBA==`;
+      const dataUrl = imageDataUrl(type);
       const id = `original_${digest(dataUrl)}`;
       await putLibraryAsset(owner, id, { dataUrl, contentType: 'image/jpeg' });
       expect(await getLibraryAsset(owner, id)).toMatchObject({ dataUrl, contentType: `image/${type}` });

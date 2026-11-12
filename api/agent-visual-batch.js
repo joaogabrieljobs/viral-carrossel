@@ -90,7 +90,9 @@ export default async function handler(req, res) {
       }
       if (op === 'project') {
         const includeText = req.query?.includeText === '1' || req.query?.includeText === 'true';
-        const project = await getAgentProject(agent.ownerId, req.query?.id, { includeText });
+        const project = await getAgentProject(agent.ownerId, req.query?.id, {
+          includeText, includeShare: agent.scopes.includes('projects:write'),
+        });
         return res.status(200).json({ ok: true, project });
       }
       if (op === 'job') {

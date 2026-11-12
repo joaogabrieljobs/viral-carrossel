@@ -7,7 +7,9 @@ import { assertPublicHttpUrl } from '../../urlSourceFetch.js';
 
 const BASE = 'https://sjinn.ai/api/un-api';
 const POLL_MS = 5_000;
-const MAX_ATTEMPTS = 30;
+/** Erros de consulta seguidos tolerados antes de desistir. A tarefa continua
+ * no SJinn quando uma consulta isolada falha por rede ou timeout. */
+const MAX_QUERY_ERRORS = 3;
 /** Deadline absoluta do polling, abaixo do `maxDuration` de api/ai/sjinn-image.js
  *  com folga para download + refund. O spike mediu ~82 s por imagem GPT Image 2
  *  (qa-session/sjinn-spike/report.json), logo 95 s deixava 2 de 3 imagens a morrer
@@ -64,19 +66,40 @@ export async function createGptImage2Task({ prompt, aspectRatio = '2:3', resolut
 
 export async function waitForSjinnTask(
   taskId,
-  { pollMs = POLL_MS, maxAttempts = MAX_ATTEMPTS, deadlineMs = SJINN_DEADLINE_MS } = {},
+  {
+    pollMs = POLL_MS,
+    maxAttempts = Infinity,
+    deadlineMs = SJINN_DEADLINE_MS,
+    maxQueryErrors = MAX_QUERY_ERRORS,
+  } = {},
 ) {
+  if (!apiKey()) throw new Error('SJINN_API_KEY não configurada no servidor.');
   const startedAt = Date.now();
   const timeout = () => {
     const err = new Error('A geração de imagem demorou muito. Tente novamente.');
     err.code = 'sjinn_timeout';
     return err;
   };
+  let queryErrors = 0;
   for (let i = 0; i < maxAttempts; i++) {
     // Primeiro poll imediato — evita 5s mortos no início.
     if (i > 0) await new Promise((r) => setTimeout(r, pollMs));
-    if (Date.now() - startedAt > deadlineMs) throw timeout();
-    const { json } = await sjinnFetch('/query_tool_task_status', { task_id: taskId });
+    if (Date.now() - startedAt >= deadlineMs) throw timeout();
+    let json;
+    try {
+      ({ json } = await sjinnFetch('/query_tool_task_status', { task_id: taskId }));
+      queryErrors = 0;
+    } catch (error) {
+      queryErrors += 1;
+      if (queryErrors >= maxQueryErrors) throw error;
+      console.warn(
+        '[sjinn] consulta falhou, nova tentativa',
+        queryErrors,
+        error?.name || '',
+        error?.message || error,
+      );
+      continue;
+    }
     const status = json?.data?.status;
     if (status === 1) return json.data;
     if (status === -1) {
@@ -85,9 +108,7 @@ export async function waitForSjinnTask(
       throw err;
     }
   }
-  const err = new Error('A geração de imagem demorou muito. Tente novamente.');
-  err.code = 'sjinn_timeout';
-  throw err;
+  throw timeout();
 }
 
 /** Extrai URL de imagem da resposta SJinn (campos variam entre tools). */

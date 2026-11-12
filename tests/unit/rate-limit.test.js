@@ -49,7 +49,7 @@ describe('consumeRateLimit', () => {
     }, opts)).toMatchObject({ retryAfterSec: expect.any(Number) });
   });
 
-  it('em produção, falha do Upstash usa limite local e tenta recuperar após 30 segundos', async () => {
+  it('em produção, falha do Upstash fecha a rota e tenta recuperar após 30 segundos', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-15T00:00:00Z'));
     process.env.RATE_LIMIT_TEST_UPSTASH = '1';
@@ -58,15 +58,25 @@ describe('consumeRateLimit', () => {
     process.env.VERCEL_ENV = 'production';
     const fetchMock = vi.fn().mockRejectedValue(new Error('down'));
     vi.stubGlobal('fetch', fetchMock);
-    const options = { limit: 2, windowMs: 60_000, keyPrefix: 'prod' };
-    expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
-    expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
-    expect(await consumeRateLimit(req('7.7.7.7'), options)).toMatchObject({ retryAfterSec: expect.any(Number) });
+    const options = { limit: 2, windowMs: 60_000, keyPrefix: 'prod', failClosed: true };
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toEqual({ unavailable: true, retryAfterSec: 0 });
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toEqual({ unavailable: true, retryAfterSec: 0 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(30_001);
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ result: 1 }) });
     expect(await consumeRateLimit(req('7.7.7.7'), options)).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(3); // INCR + EXPIRE após o cooldown
+  });
+
+  it('em produção sem backend partilhado nunca usa o contador local', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const options = { limit: 1, windowMs: 60_000, keyPrefix: 'prod-sem-backend', failClosed: true };
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toEqual({
+      unavailable: true, retryAfterSec: 0,
+    });
+    expect(await consumeRateLimit(req('7.7.7.7'), options)).toEqual({
+      unavailable: true, retryAfterSec: 0,
+    });
   });
 });

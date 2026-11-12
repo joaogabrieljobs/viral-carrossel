@@ -131,21 +131,30 @@ function publicRow(row, identity = null) {
 }
 
 /** Cria um segredo aleatório de 256 bits; devolve-o uma única vez. */
-export async function createAgentToken(ownerId, { label = 'Codex', scopes = ['projects:read', 'projects:write'], expiresInSec = 90 * 86400 } = {}) {
+export async function createAgentToken(ownerId, {
+  label = 'Codex', scopes = ['projects:read', 'projects:write'],
+  expiresInSec = 90 * 86400, oauthClientId = null,
+} = {}, { connection = null, identity: knownIdentity = null } = {}) {
   const owner = validateOwner(ownerId);
   const cleanLabel = normalizeLabel(label);
   const cleanScopes = normalizeScopes(scopes);
-  const identity = await getCurrentAgentSecurityContext(owner);
+  if (oauthClientId != null && !UUID_PATTERN.test(String(oauthClientId))) {
+    fail(400, 'agent_oauth_client_invalid', 'Cliente OAuth inválido.');
+  }
+  const identity = knownIdentity || await getCurrentAgentSecurityContext(owner);
   const token = `${TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`;
   if (!Number.isSafeInteger(expiresInSec) || expiresInSec < 300 || expiresInSec > 90 * 86400) {
     fail(400, 'agent_expiry_invalid', 'Validade inválida para a integração.');
   }
-  const rows = await getPostgresConnection().unsafe(
+  const sql = connection || getPostgresConnection();
+  const rows = await sql.unsafe(
     `INSERT INTO moont.agent_tokens
-       (owner_id, agent_epoch, account_id, token_hash, label, scopes, expires_at)
-     VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], now() + ($7 * interval '1 second'))
-     RETURNING id, label, scopes, agent_epoch, account_id, created_at, expires_at, revoked_at`,
-    [owner, identity.agentEpoch, identity.accountId, hashToken(token), cleanLabel, cleanScopes, expiresInSec],
+       (owner_id, agent_epoch, account_id, token_hash, label, scopes, expires_at, oauth_client_id)
+     VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], now() + ($7 * interval '1 second'), $8::uuid)
+     RETURNING id, label, scopes, agent_epoch, account_id, oauth_client_id,
+       created_at, expires_at, revoked_at`,
+    [owner, identity.agentEpoch, identity.accountId, hashToken(token), cleanLabel,
+      cleanScopes, expiresInSec, oauthClientId],
   );
   return { token, credential: publicRow(rows[0], identity) };
 }
@@ -154,11 +163,63 @@ export async function listAgentTokens(ownerId) {
   const owner = validateOwner(ownerId);
   const identity = await getCurrentAgentSecurityContext(owner);
   const rows = await getPostgresConnection().unsafe(
-    `SELECT id, label, scopes, agent_epoch, account_id, created_at, expires_at, revoked_at
-     FROM moont.agent_tokens WHERE owner_id = $1 ORDER BY created_at DESC`,
+    `WITH ranked AS (
+       SELECT id, label, scopes, agent_epoch, account_id, oauth_client_id,
+         created_at, expires_at, revoked_at,
+         CASE WHEN oauth_client_id IS NOT NULL
+           THEN row_number() OVER (
+             PARTITION BY oauth_client_id
+             ORDER BY (revoked_at IS NULL AND expires_at > now()) DESC, created_at DESC
+           )
+           ELSE 1
+         END AS oauth_rank
+       FROM moont.agent_tokens
+       WHERE owner_id = $1
+         AND expires_at > now() - interval '7 days'
+         AND (revoked_at IS NULL OR revoked_at > now() - interval '7 days')
+     )
+     SELECT id, label, scopes, agent_epoch, account_id, oauth_client_id,
+       created_at, expires_at, revoked_at
+     FROM ranked
+     WHERE oauth_rank = 1
+     ORDER BY (revoked_at IS NULL AND expires_at > now()) DESC, created_at DESC
+     LIMIT 100`,
     [owner],
   );
   return rows.map((row) => publicRow(row, identity));
+}
+
+/** Mantém só a credencial OAuth recém-emitida para a mesma conexão. */
+export async function revokeSupersededOAuthTokens(ownerId, oauthClientId, exceptTokenId, { connection = null } = {}) {
+  const owner = validateOwner(ownerId);
+  if (!UUID_PATTERN.test(String(oauthClientId || ''))) fail(400, 'agent_oauth_client_invalid', 'Cliente OAuth inválido.');
+  if (typeof exceptTokenId !== 'string' || !UUID_PATTERN.test(exceptTokenId)) {
+    fail(400, 'agent_token_id_invalid', 'Identificador de integração inválido.');
+  }
+  const sql = connection || getPostgresConnection();
+  const rows = await sql.unsafe(
+    `UPDATE moont.agent_tokens SET revoked_at = now()
+     WHERE owner_id = $1 AND oauth_client_id = $2::uuid AND id <> $3::uuid
+       AND revoked_at IS NULL
+     RETURNING id`,
+    [owner, oauthClientId, exceptTokenId],
+  );
+  return rows.length;
+}
+
+/** Executada pelo cron diário: remove apenas credenciais sem validade há 7 dias. */
+export async function cleanupExpiredAgentTokens({ retentionDays = 7 } = {}) {
+  if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 90) {
+    throw new TypeError('Retenção de tokens inválida.');
+  }
+  const rows = await getPostgresConnection().unsafe(
+    `DELETE FROM moont.agent_tokens
+     WHERE expires_at < now() - ($1 * interval '1 day')
+       OR (revoked_at IS NOT NULL AND revoked_at < now() - ($1 * interval '1 day'))
+     RETURNING id`,
+    [retentionDays],
+  );
+  return { deleted: rows.length };
 }
 
 export async function revokeAgentToken(ownerId, tokenId) {
@@ -166,20 +227,23 @@ export async function revokeAgentToken(ownerId, tokenId) {
   if (typeof tokenId !== 'string' || !UUID_PATTERN.test(tokenId)) {
     fail(400, 'agent_token_id_invalid', 'Identificador de integração inválido.');
   }
-  const rows = await getPostgresConnection().unsafe(
-    `UPDATE moont.agent_tokens SET revoked_at = now()
-     WHERE owner_id = $1 AND id = $2::uuid AND revoked_at IS NULL
-     RETURNING id, label, scopes, created_at, expires_at, revoked_at`,
-    [owner, tokenId],
-  );
-  if (!rows[0]) fail(404, 'agent_token_not_found', 'Integração não encontrada nesta conta.');
-  if (/MCP OAuth|ChatGPT/i.test(String(rows[0].label || ''))) {
-    await getPostgresConnection().unsafe(
-      `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
-       WHERE owner_id = $1 AND revoked_at IS NULL`, [owner],
+  return getPostgresConnection().begin(async tx => {
+    const rows = await tx.unsafe(
+      `UPDATE moont.agent_tokens SET revoked_at = now()
+       WHERE owner_id = $1 AND id = $2::uuid AND revoked_at IS NULL
+       RETURNING id, label, scopes, oauth_client_id, created_at, expires_at, revoked_at`,
+      [owner, tokenId],
     );
-  }
-  return publicRow(rows[0]);
+    if (!rows[0]) fail(404, 'agent_token_not_found', 'Integração não encontrada nesta conta.');
+    if (rows[0].oauth_client_id) {
+      await tx.unsafe(
+        `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
+         WHERE owner_id = $1 AND client_id = $2::uuid AND revoked_at IS NULL`,
+        [owner, rows[0].oauth_client_id],
+      );
+    }
+    return publicRow(rows[0]);
+  });
 }
 
 /**

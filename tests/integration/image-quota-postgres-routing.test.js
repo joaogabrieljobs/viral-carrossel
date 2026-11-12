@@ -48,7 +48,7 @@ beforeEach(() => {
   vi.stubEnv('IMAGE_QUOTA_BACKEND', 'postgres');
   stripeMock.subscriptions.list.mockResolvedValue({ data: [{
     ...subAtiva(customerId),
-    metadata: { tier: 'creator' },
+    metadata: { product:'viral-carrossel', tier: 'creator' },
     items: { data: [{ current_period_start: periodStartSec, current_period_end: periodEndSec }] },
   }] });
   quota.consumeImageCreditPostgres.mockResolvedValue({ allowed: true, used: 1, limit: 50, remaining: 49 });
@@ -64,6 +64,14 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('geração com quota Postgres', () => {
+  it('recusa o namespace mcp_ antes de reservar ou iniciar tarefa', async () => {
+    const result = await generate(`mcp_${'a'.repeat(56)}`);
+    expect(result.statusCode).toBe(400);
+    expect(result.body.code).toBe('reserved_operation_id');
+    expect(quota.consumeImageCreditPostgres).not.toHaveBeenCalled();
+    expect(sjinn.createGptImage2Task).not.toHaveBeenCalled();
+  });
+
   it('reserva e confirma uma vez usando o ID do cliente', async () => {
     const usageContext = {
       projectId: 'clinica-01', projectName: 'Clínica Janine', cardId: 'card-2', cardNumber: 2,

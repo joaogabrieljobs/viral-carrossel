@@ -115,10 +115,12 @@ export async function consumeAuthorizationCode({ code, clientId, redirectUri, re
   });
 }
 
-export async function createRefreshToken({ clientId, ownerId, scopes }) {
+export async function createRefreshToken({ clientId, ownerId, scopes }, {
+  connection = null, identity: knownIdentity = null,
+} = {}) {
   const token = secret('moont_refresh_');
-  const identity = await getCurrentAgentSecurityContext(ownerId);
-  const sql = getPostgresConnection();
+  const identity = knownIdentity || await getCurrentAgentSecurityContext(ownerId);
+  const sql = connection || getPostgresConnection();
   try {
     await sql.unsafe(
       `INSERT INTO moont.oauth_refresh_tokens
@@ -129,7 +131,9 @@ export async function createRefreshToken({ clientId, ownerId, scopes }) {
   } catch (error) {
     // Compatibilidade durante a implantação: mesmo antes da migração, o
     // `created_at` é comparado com `session_revoked_before` na renovação.
-    if (error?.code !== '42703') throw error;
+    // Dentro de uma transação Postgres, a primeira falha já aborta o bloco;
+    // nesse caso deixe tudo fazer rollback (inclusive o refresh antigo).
+    if (error?.code !== '42703' || connection) throw error;
     await sql.unsafe(
       `INSERT INTO moont.oauth_refresh_tokens
         (token_hash, client_id, owner_id, resource, scopes, expires_at)
@@ -141,13 +145,16 @@ export async function createRefreshToken({ clientId, ownerId, scopes }) {
 }
 
 /** Revoga a credencial recém-emitida ou, apó mudança de segurança, toda a família. */
-export async function revokeRefreshToken({ token, ownerId, revokeFamily = false }) {
+export async function revokeRefreshToken({ token, ownerId, revokeFamily = false, clientId = null }) {
   if (typeof ownerId !== 'string' || !ownerId || ownerId.length > 255) return false;
   const sql = getPostgresConnection();
+  if (clientId != null && !UUID.test(String(clientId))) return false;
   const rows = revokeFamily
     ? await sql.unsafe(
       `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
-       WHERE owner_id = $1 AND revoked_at IS NULL RETURNING token_hash`, [ownerId],
+       WHERE owner_id = $1
+         AND ($2::uuid IS NULL OR client_id = $2::uuid)
+         AND revoked_at IS NULL RETURNING token_hash`, [ownerId, clientId],
     )
     : await sql.unsafe(
       `UPDATE moont.oauth_refresh_tokens SET revoked_at = now()
@@ -157,7 +164,7 @@ export async function revokeRefreshToken({ token, ownerId, revokeFamily = false 
   return rows.length > 0;
 }
 
-export async function rotateRefreshToken({ token, clientId, resource }) {
+export async function rotateRefreshToken({ token, clientId, resource, issue = null }) {
   normalizeOAuthResource(resource);
   if (!UUID.test(String(clientId || ''))) fail('invalid_grant', 'Renovação inválida.');
   const sql = getPostgresConnection();
@@ -202,13 +209,18 @@ export async function rotateRefreshToken({ token, clientId, resource }) {
       );
       return { invalidatedBySecurityChange: true };
     }
-    await tx.unsafe(`UPDATE moont.oauth_refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, [hash(token)]);
-    return {
+    const grant = {
       ownerId: row.owner_id,
       scopes: row.scopes,
       clientName: row.client_name,
       securitySnapshot: identity,
     };
+    // Quando a rota passa `issue`, todas as novas credenciais e a revogação
+    // do refresh antigo vivem na mesma transação. Qualquer falha deixa a
+    // credencial anterior utilizável, em vez de desconectar o cliente.
+    const issued = typeof issue === 'function' ? await issue({ grant, tx, identity }) : null;
+    await tx.unsafe(`UPDATE moont.oauth_refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, [hash(token)]);
+    return issued ? { ...grant, issued } : grant;
   });
   if (result?.invalidatedBySecurityChange) {
     fail('invalid_grant', 'Renovação encerrada após uma alteração de segurança.');

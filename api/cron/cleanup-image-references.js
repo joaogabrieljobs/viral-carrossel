@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { cleanupStaleImageReferences } from '../lib/image-references.js';
+import { cleanupExpiredAgentTokens } from '../lib/agent-token-store.js';
 
 export const config = { maxDuration: 120 };
 
@@ -12,9 +13,21 @@ export default async function handler(req, res) {
   if (!secret || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  try { return res.status(200).json(await cleanupStaleImageReferences()); }
-  catch {
+  const tokenCleanup = process.env.LIBRARY_SYNC_BACKEND === 'postgres'
+    ? cleanupExpiredAgentTokens()
+    : Promise.resolve({ deleted: 0, skipped: true });
+  const [imagesResult, tokensResult] = await Promise.allSettled([
+    cleanupStaleImageReferences(), tokenCleanup,
+  ]);
+  if (imagesResult.status === 'rejected') {
     console.error('[image-references] scheduled_cleanup_failed');
     return res.status(503).json({ error: 'Falha na limpeza das referências temporárias.' });
   }
+  let agentTokens = tokensResult.value;
+  if (tokensResult.status === 'rejected') {
+    const error = tokensResult.reason;
+    console.error('[agent-tokens] scheduled_cleanup_failed', error?.code || error?.message || error);
+    agentTokens = { deleted: 0, failed: true };
+  }
+  return res.status(200).json({ ...imagesResult.value, agentTokens });
 }

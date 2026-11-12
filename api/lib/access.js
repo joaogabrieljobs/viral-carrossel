@@ -177,6 +177,7 @@ const CHECKOUT_COOKIE_PREFIX = `${CHECKOUT_COOKIE}_`;
 export const LOGIN_HINT_COOKIE = 'vc_login_hint';
 export const CHECKOUT_IDENTITY_COOKIE = 'vc_identity_checkout';
 const CHECKOUT_IDENTITY_MAX_AGE_SEC = 60 * 10;
+const CHECKOUT_PROVISIONAL_IDENTITY_MAX_AGE_SEC = CHECKOUT_MAX_AGE_SEC;
 
 function browserCookie(name, value, { maxAge, httpOnly }) {
   const secure = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
@@ -250,7 +251,7 @@ export function readCheckoutCookie(req) {
 
 /** Liga temporariamente o checkout a um customer após login verificado ou cadastro novo. */
 export function setCheckoutIdentityCookie(res, { email, customerId, source, identityEpoch = '' }) {
-  if (!['verified_login', 'new_registration'].includes(source)
+  if (!['verified_login', 'new_registration', 'checkout_provisional'].includes(source)
     || !/^cus_[A-Za-z0-9_]+$/.test(String(customerId || ''))) {
     throw new Error('Identidade do checkout inválida');
   }
@@ -264,7 +265,9 @@ export function setCheckoutIdentityCookie(res, { email, customerId, source, iden
   });
   const signature = sign(`checkout-identity:${body}`);
   appendSetCookie(res, browserCookie(CHECKOUT_IDENTITY_COOKIE, `v1.${body}.${signature}`, {
-    maxAge: CHECKOUT_IDENTITY_MAX_AGE_SEC,
+    maxAge: source === 'checkout_provisional'
+      ? CHECKOUT_PROVISIONAL_IDENTITY_MAX_AGE_SEC
+      : CHECKOUT_IDENTITY_MAX_AGE_SEC,
     httpOnly: true,
   }));
 }
@@ -280,14 +283,17 @@ export function readCheckoutIdentityCookie(req) {
   try {
     const data = JSON.parse(fromB64url(body));
     const now = Math.floor(Date.now() / 1000);
+    const maxAge = data.source === 'checkout_provisional'
+      ? CHECKOUT_PROVISIONAL_IDENTITY_MAX_AGE_SEC
+      : CHECKOUT_IDENTITY_MAX_AGE_SEC;
     if (data.v !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)
       || data.email !== data.email.trim().toLowerCase()
       || !/^cus_[A-Za-z0-9_]+$/.test(data.customerId)
-      || !['verified_login', 'new_registration'].includes(data.source)
+      || !['verified_login', 'new_registration', 'checkout_provisional'].includes(data.source)
       || (data.identityEpoch != null && !/^[a-f0-9]{0,64}$/.test(data.identityEpoch))
       || !Number.isSafeInteger(data.iat)
       || data.iat > now + 60
-      || now - data.iat > CHECKOUT_IDENTITY_MAX_AGE_SEC) return null;
+      || now - data.iat > maxAge) return null;
     return { email: data.email, customerId: data.customerId, source: data.source,
       ...(data.identityEpoch ? { identityEpoch: data.identityEpoch } : {}) };
   } catch { return null; }

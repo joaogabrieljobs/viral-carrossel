@@ -19,9 +19,8 @@ function page(res, title, body, status = 200) {
 }
 function finishNativeAuthorization(res, target) {
   const destination = target.toString();
-  const scriptDestination = JSON.stringify(destination).replace(/</g, '\\u003c');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  return page(res, 'Conexão autorizada', `<h1>Conexão autorizada</h1><p>Retornando ao Claude Code…</p><a href="${esc(destination)}">Voltar ao Claude Code</a><script>window.location.replace(${scriptDestination})</script>`);
+  return page(res, 'Conexão autorizada', `<h1>Conexão autorizada</h1><p>Retornando ao Claude Code…</p><a id="oauth-native-return" href="${esc(destination)}">Voltar ao Claude Code</a><script src="/oauth-return.js" defer></script>`);
 }
 function params(req) {
   if (req.method !== 'POST') return req.query || {};
@@ -35,13 +34,13 @@ export default async function handler(req, res) {
     if (p.response_type !== 'code' || p.code_challenge_method !== 'S256' || !p.state) throw Object.assign(new Error('Solicitação OAuth incompleta.'), { code:'invalid_request' });
     const valid = await validateOAuthRequest({ clientId:p.client_id, redirectUri:p.redirect_uri, resource:p.resource || oauthResource, scope:p.scope });
     const access = await readCurrentAccessCookie(req);
-    if (!access) return page(res, 'Entre no Moont', '<h1>Entre primeiro no Moont</h1><p>Abra o Moont, entre na sua conta e volte para esta janela para continuar a conexão.</p><a href="https://moont.ai" target="_blank" rel="noopener">Abrir Moont</a><a class="muted" href="javascript:location.reload()">Tentar novamente</a>', 401);
+    if (!access) return page(res, 'Entre no Moont', '<h1>Entre primeiro no Moont</h1><p>Abra o Moont, entre na sua conta e volte para esta janela para continuar a conexão.</p><a href="https://moont.ai" target="_blank" rel="noopener">Abrir Moont</a><a class="muted" href="">Tentar novamente</a>', 401);
     if (!billingDisabled()) {
       let subscription;
       try { subscription = await findActiveSubscription(access.customerId); }
       catch (error) {
         if (error?.code === 'resource_missing') subscription = null;
-        else return page(res, 'Verificação temporariamente indisponível', `<h1>Não foi possível verificar sua assinatura</h1><div class="account">Conta Moont<strong>${esc(access.email)}</strong></div><p>Tente novamente em alguns instantes. Sua conta e seus projetos não foram alterados.</p><a href="javascript:location.reload()">Tentar novamente</a>`, 503);
+        else return page(res, 'Verificação temporariamente indisponível', `<h1>Não foi possível verificar sua assinatura</h1><div class="account">Conta Moont<strong>${esc(access.email)}</strong></div><p>Tente novamente em alguns instantes. Sua conta e seus projetos não foram alterados.</p><a href="">Tentar novamente</a>`, 503);
       }
       if (!subscription) return page(res, 'Assinatura necessária', `<h1>Assinatura inativa</h1><div class="account">Conta Moont<strong>${esc(access.email)}</strong></div><p>Esta conta precisa de um plano ativo para conectar o ChatGPT ou outro assistente.</p><a href="https://moont.ai/#planos">Ver planos</a>`, 402);
     }

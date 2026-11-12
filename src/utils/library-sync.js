@@ -17,6 +17,10 @@ import { hasConfirmedOriginalUpload, rememberConfirmedOriginalUpload } from './c
 import { readDeletedProjectIds, rememberDeletedProjectIds, mergeDeletedProjectIds } from './project-deletions.js';
 import { readDataOwner } from './account-data-owner.js';
 import { selectRestoredProjectId } from './project-sync-control.js';
+import {
+  CUSTOM_VISUAL_PRESETS_KEY, normalizeCustomVisualPresets,
+} from './custom-visual-presets.js';
+import { normalizeHookLibrary } from './hooks-library.js';
 export { rememberDeletedProjectIds } from './project-deletions.js';
 
 export const LIBRARY_CLOUD_META_KEY = SK.libraryCloudMeta;
@@ -247,6 +251,10 @@ export async function packLibraryForCloud(snapshot) {
   const brandsRaw = readSnapshot('brandRoster', SK.brands, []) || [];
   const activeBrandId = readSnapshot('activeBrandId', SK.activeBrandId, '') || '';
   const activeDocId = readSnapshot('activeDocId', SK.activeDocId, '') || '';
+  const hookLibrary = normalizeHookLibrary(readSnapshot('hookLibrary', SK.hookLibrary, []) || []);
+  const customVisualPresets = normalizeCustomVisualPresets(
+    readSnapshot('customVisualPresets', CUSTOM_VISUAL_PRESETS_KEY, []) || [],
+  );
   if (!Array.isArray(docsRaw) || !Array.isArray(brandsRaw) || !Array.isArray(folders)) {
     throw new Error('A biblioteca em edição não está pronta para sincronizar. Tente novamente.');
   }
@@ -308,6 +316,8 @@ export async function packLibraryForCloud(snapshot) {
     userProfile: userProfile && typeof userProfile === 'object' ? stripRuntime(userProfile) : null,
     onboardingDone: onboardingDone || null,
     modesIntroDone: modesIntroDone || null,
+    hookLibrary,
+    customVisualPresets,
   };
 
   return { manifest, assets, projectCount: docs.length, packingFailed: assets.packingFailed || 0 };
@@ -1145,6 +1155,10 @@ export async function pullAccountLibraryAuthoritative({
     userProfile: manifest.userProfile || null,
     onboardingDone: manifest.onboardingDone || null,
     modesIntroDone: manifest.modesIntroDone || null,
+    ...(Array.isArray(manifest.hookLibrary)
+      ? { hookLibrary: normalizeHookLibrary(manifest.hookLibrary) } : {}),
+    ...(Array.isArray(manifest.customVisualPresets)
+      ? { customVisualPresets: normalizeCustomVisualPresets(manifest.customVisualPresets) } : {}),
   };
   onBeforeApply?.(snapshot);
   guard();
@@ -1246,6 +1260,10 @@ export async function applyCloudManifest(manifest, {
     activeDocId: docs.some((entry) => entry?.id === manifest.activeDocId)
       ? manifest.activeDocId : docs[0]?.id || '',
     activeBrandId: manifest.activeBrandId ?? brands[0]?.id ?? '',
+    ...(Array.isArray(manifest.hookLibrary)
+      ? { hookLibrary: normalizeHookLibrary(manifest.hookLibrary) } : {}),
+    ...(Array.isArray(manifest.customVisualPresets)
+      ? { customVisualPresets: normalizeCustomVisualPresets(manifest.customVisualPresets) } : {}),
   };
   const writes = [
     [SK.libraryFolders, snapshot.libraryFolders],
@@ -1253,6 +1271,9 @@ export async function applyCloudManifest(manifest, {
     [SK.activeBrandId, snapshot.activeBrandId],
     [SK.activeDocId, snapshot.activeDocId],
     [SK.library, semImagensDeRuntime(snapshot.library)],
+    ...(Array.isArray(snapshot.hookLibrary) ? [[SK.hookLibrary, snapshot.hookLibrary]] : []),
+    ...(Array.isArray(snapshot.customVisualPresets)
+      ? [[CUSTOM_VISUAL_PRESETS_KEY, snapshot.customVisualPresets]] : []),
   ];
   const previous = writes.map(([key]) => [key, localStorage.getItem(key)]);
   let cacheError = '';

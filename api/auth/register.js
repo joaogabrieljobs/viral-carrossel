@@ -11,6 +11,19 @@ import {
 import { getStripe } from '../lib/stripe.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { accountIdentityBackendEnabled, setAccountPassword } from '../lib/account-identity-postgres.js';
+import { createHash } from 'node:crypto';
+
+function registrationIdempotencyKey(email, phase) {
+  const digest = createHash('sha256').update(String(email), 'utf8').digest('hex');
+  return `moont-register-${phase}-${digest}`;
+}
+
+function registrationConflict(error) {
+  return error?.code === 'identity_credential_conflict'
+    || error?.code === 'identity_provider_conflict'
+    || error?.code === 'idempotency_key_in_use'
+    || error?.type === 'StripeIdempotencyError';
+}
 
 function readBody(req) {
   if (!req.body) return {};
@@ -30,7 +43,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const limited = await consumeRateLimit(req, { limit: 10, windowMs: 60_000, keyPrefix: 'register' });
+  const limited = await consumeRateLimit(req, {
+    limit: 10, windowMs: 60_000, keyPrefix: 'register', failClosed: true,
+  });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   if (!passwordAuthConfigured()) {
@@ -57,15 +72,26 @@ export default async function handler(req, res) {
 
     const { salt, hash } = hashPassword(password);
     const dbIdentity = accountIdentityBackendEnabled();
-    const customer = await getStripe().customers.create({
+    const stripe = getStripe();
+    // A chave por email faz chamadas simultâneas convergirem no mesmo customer.
+    // A senha é ligada no passo seguinte com CAS/idempotência própria.
+    const customer = await stripe.customers.create({
       email: cleanEmail,
-      metadata: dbIdentity
-        ? { product: 'viral-carrossel' }
-        : { product: 'viral-carrossel', vc_pw_salt: salt, vc_pw_hash: hash },
-    });
+      metadata: { product: 'viral-carrossel' },
+    }, { idempotencyKey: registrationIdempotencyKey(cleanEmail, 'customer') });
     const identity = dbIdentity
-      ? await setAccountPassword(customer.id, { salt, hash })
+      ? await setAccountPassword(customer.id, { salt, hash, expectedHash: '' })
       : null;
+    if (!dbIdentity) {
+      await stripe.customers.update(customer.id, {
+        metadata: {
+          ...(customer.metadata || {}),
+          product: 'viral-carrossel',
+          vc_pw_salt: salt,
+          vc_pw_hash: hash,
+        },
+      }, { idempotencyKey: registrationIdempotencyKey(cleanEmail, 'credential') });
+    }
     setCheckoutIdentityCookie(res, {
       email: cleanEmail,
       customerId: customer.id,
@@ -81,7 +107,13 @@ export default async function handler(req, res) {
       message: 'Conta criada. Escolha um plano para entrar no studio.',
     });
   } catch (e) {
+    if (registrationConflict(e)) {
+      return res.status(409).json({
+        error: 'Este e-mail acabou de ser cadastrado. Entre com sua senha para continuar.',
+        requireLogin: true,
+      });
+    }
     console.error('[auth/register]', e?.message || e);
-    return res.status(500).json({ error: e.message || 'register_error' });
+    return res.status(500).json({ error: 'Não foi possível criar a conta agora.' });
   }
 }

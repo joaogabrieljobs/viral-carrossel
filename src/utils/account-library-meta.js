@@ -5,7 +5,11 @@
  */
 import { readDataOwner } from './account-data-owner.js';
 import { packLibraryForCloud, hydrateCloudBrandRoster, uploadAssetsBestEffort } from './library-sync.js';
-import { areAccountDataWritesLocked, isAccountDataWriteOwnerCurrent } from './storage.js';
+import { SK, areAccountDataWritesLocked, isAccountDataWriteOwnerCurrent } from './storage.js';
+import {
+  CUSTOM_VISUAL_PRESETS_KEY, normalizeCustomVisualPresets,
+} from './custom-visual-presets.js';
+import { normalizeHookLibrary } from './hooks-library.js';
 
 const META_API = '/api/account-library-meta';
 const MAX_METADATA_BYTES = 512 * 1024;
@@ -39,6 +43,60 @@ function assertOwner({ localOwnerId, signal, isCurrent, forWrite = false } = {})
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readLocalJson(key, fallback) {
+  try { return JSON.parse(globalThis.localStorage?.getItem(key) || 'null') ?? fallback; }
+  catch { return fallback; }
+}
+
+function withoutMergeableCollections(metadata = {}) {
+  const { hookLibrary: _hooks, customVisualPresets: _presets, ...rest } = metadata;
+  return rest;
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+}
+
+function sameMetadataOutsideCollections(left, right) {
+  try {
+    return JSON.stringify(canonicalize(withoutMergeableCollections(left)))
+      === JSON.stringify(canonicalize(withoutMergeableCollections(right)));
+  } catch { return false; }
+}
+
+function mergeById(remote, local, normalize) {
+  const merged = new Map();
+  for (const item of normalize(remote)) merged.set(item.id, item);
+  for (const item of normalize(local)) {
+    const current = merged.get(item.id);
+    if (!current) {
+      merged.set(item.id, item);
+      continue;
+    }
+    const currentTime = Number(current.savedAt) || 0;
+    const itemTime = Number(item.savedAt) || 0;
+    // Empate determinístico: o mesmo par produz o mesmo vencedor em qualquer
+    // aba, sem depender da ordem em que a resposta chegou.
+    if (itemTime > currentTime
+      || (itemTime === currentTime && JSON.stringify(item) > JSON.stringify(current))) {
+      merged.set(item.id, item);
+    }
+  }
+  return normalize([...merged.values()]);
+}
+
+function mergeConcurrentCollections(remote, local) {
+  return {
+    ...local,
+    hookLibrary: mergeById(remote?.hookLibrary, local?.hookLibrary, normalizeHookLibrary),
+    customVisualPresets: mergeById(
+      remote?.customVisualPresets, local?.customVisualPresets, normalizeCustomVisualPresets,
+    ),
+  };
 }
 
 function validateResponse(data) {
@@ -124,6 +182,10 @@ export async function prepareAccountLibraryMetadata(snapshot = {}, {
     userProfile: Object.hasOwn(snapshot, 'userProfile') ? snapshot.userProfile : manifest.userProfile,
     onboardingDone: Object.hasOwn(snapshot, 'onboardingDone') ? snapshot.onboardingDone : manifest.onboardingDone,
     modesIntroDone: Object.hasOwn(snapshot, 'modesIntroDone') ? snapshot.modesIntroDone : manifest.modesIntroDone,
+    hookLibrary: normalizeHookLibrary(Object.hasOwn(snapshot, 'hookLibrary')
+      ? snapshot.hookLibrary : readLocalJson(SK.hookLibrary, [])),
+    customVisualPresets: normalizeCustomVisualPresets(Object.hasOwn(snapshot, 'customVisualPresets')
+      ? snapshot.customVisualPresets : readLocalJson(CUSTOM_VISUAL_PRESETS_KEY, [])),
     assetIds: manifest.assetIds,
   };
   let bytes;
@@ -156,21 +218,29 @@ export async function saveAccountLibraryMetadata(snapshot, {
   if (uploaded.failed) {
     throw error(`Não foi possível enviar ${uploaded.failed} logo(s). Tente novamente.`, 'account_meta_asset_upload_failed');
   }
-  const put = (revision) => request('PUT', {
-    metadata: prepared.metadata, baseRevision: revision,
+  const put = (revision, metadata = prepared.metadata) => request('PUT', {
+    metadata, baseRevision: revision,
   }, { expectedOwnerId, localOwnerId, signal, isCurrent });
   let saved;
   let attempted = baseRevision;
   try {
     saved = await put(attempted);
   } catch (cause) {
-    // Um projeto salvo neste mesmo navegador avança a revisão da conta.
-    // Sem esta segunda tentativa, Sync e Sair ficam presos no 409.
+    // Um projeto salvo neste mesmo navegador pode avançar a revisão da conta.
+    // Antes de tentar outra vez, releia a nuvem. Só hooks e presets têm merge
+    // por identidade/data; qualquer diferença nas demais coleções é conflito
+    // real e nunca deve ser sobrescrita silenciosamente.
     const nextRevision = cause?.cloudRevision;
     if (!resolveRevisionConflict || cause?.status !== 409 || cause?.code !== 'account_meta_conflict'
       || !Number.isSafeInteger(nextRevision) || nextRevision === baseRevision) throw cause;
+    const remote = await request('GET', undefined, {
+      expectedOwnerId, localOwnerId, signal, isCurrent,
+    });
+    guard();
+    if (remote.revision !== nextRevision
+      || !sameMetadataOutsideCollections(remote.metadata, prepared.metadata)) throw cause;
     attempted = nextRevision;
-    saved = await put(attempted);
+    saved = await put(attempted, mergeConcurrentCollections(remote.metadata, prepared.metadata));
   }
   guard();
   if (saved.revision <= attempted) {
@@ -207,6 +277,7 @@ function hasRemoteAccountMetadata(remote) {
   const value = remote.metadata;
   return !!(
     value.brands?.length || value.folders?.length || value.assetIds?.length
+    || value.hookLibrary?.length || value.customVisualPresets?.length
     || value.activeBrandId || value.activeDocId || value.onboardingDone || value.modesIntroDone
     || (isRecord(value.userProfile) && Object.keys(value.userProfile).length)
   );

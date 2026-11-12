@@ -223,12 +223,16 @@ describe('visual-only agent patch', () => {
     expect(withText.slides[0].overlays[0].text).toBe('Agende sua avaliação');
   });
 
-  it('expõe o link oficial de compartilhamento quando o projeto possui shareCode', () => {
+  it('não entrega o convite da equipe na visão de leitura, mas preserva o fluxo com permissão de escrita', () => {
     const entry = sampleEntry();
     entry.doc.shareCode = 'f5m3cgpb';
-    expect(projectDesignView({ id: 'gisr5t9', version: 23, entry }, { includeText: true }))
+    const view = projectDesignView({ id: 'gisr5t9', version: 23, entry }, { includeText: true });
+    expect(view.id).toBe('gisr5t9');
+    expect(JSON.stringify(view)).not.toContain('F5M3CGPB');
+    expect(view.shareCode).toBeUndefined();
+    expect(view.shareUrl).toBeUndefined();
+    expect(projectDesignView({ id: 'gisr5t9', version: 23, entry }, { includeShare: true }))
       .toMatchObject({
-        id: 'gisr5t9',
         shareCode: 'F5M3CGPB',
         shareUrl: 'https://moont.ai/?share=F5M3CGPB&app=1',
       });

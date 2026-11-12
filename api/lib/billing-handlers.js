@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import {
   getStripe,
   getBillingReturnUrl,
-  getPriceId,
   findActiveSubscription,
+  findRecoverableSubscription,
   isSubscriptionActive,
 } from '../lib/stripe.js';
 import {
@@ -16,6 +16,7 @@ import {
   clearCheckoutCookie,
   CHECKOUT_MAX_AGE_SEC,
   readCheckoutIdentityCookie,
+  setCheckoutIdentityCookie,
   clearCheckoutIdentityCookie,
   billingDisabled,
 } from '../lib/access.js';
@@ -48,6 +49,11 @@ function readJson(req) {
     try { return JSON.parse(req.body || '{}'); } catch { return {}; }
   }
   return req.body;
+}
+
+function checkoutIdempotencyKey(kind, value) {
+  const digest = crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+  return `moont-checkout-${kind}-${digest}`;
 }
 
 /** GET /api/auth/session — estado da assinatura do cookie atual */
@@ -165,7 +171,9 @@ export async function handleCheckout(req, res) {
     return res.status(400).json({ error: 'Billing desativado neste ambiente' });
   }
 
-  const limited = await consumeRateLimit(req, { limit: 8, windowMs: 60_000, keyPrefix: 'checkout' });
+  const limited = await consumeRateLimit(req, {
+    limit: 8, windowMs: 60_000, keyPrefix: 'checkout', failClosed: true,
+  });
   if (limited) return rateLimitResponse(res, limited.retryAfterSec);
 
   try {
@@ -177,9 +185,12 @@ export async function handleCheckout(req, res) {
 
     const tier = PLAN_ORDER.includes(rawTier) ? rawTier : 'creator';
     const stripe = getStripe();
-    const priceId = getStripePriceIdForTier(tier) || getPriceId();
+    const priceId = getStripePriceIdForTier(tier);
     if (!priceId) {
-      return res.status(500).json({ error: `Price Stripe não configurado para o plano ${tier}` });
+      return res.status(503).json({
+        error: `O plano ${tier} está temporariamente indisponível para assinatura.`,
+        code: 'plan_price_not_configured',
+      });
     }
     const appUrl = getBillingReturnUrl(req);
 
@@ -195,6 +206,8 @@ export async function handleCheckout(req, res) {
     const boundCustomerId = proofMatches ? identity.customerId
       : accessMatches ? access.customerId : null;
     let customer;
+    let provisionalCheckoutIdentity = proofMatches
+      && identity?.source === 'checkout_provisional';
     if (boundCustomerId) {
       customer = await stripe.customers.retrieve(boundCustomerId);
       if (!customer || customer.deleted || String(customer.email || '').trim().toLowerCase() !== cleanEmail) {
@@ -223,6 +236,20 @@ export async function handleCheckout(req, res) {
       customer = await stripe.customers.create({
         email: cleanEmail,
         metadata: { product: 'viral-carrossel' },
+      }, {
+        // Duas lambdas podem observar a mesma lista vazia. O Stripe resolve a
+        // corrida com a mesma chave e devolve um único customer às duas.
+        idempotencyKey: checkoutIdempotencyKey('customer', `viral-carrossel:${cleanEmail}`),
+      });
+      provisionalCheckoutIdentity = true;
+      // Grave a prova antes de qualquer chamada posterior. Se consulta de
+      // assinatura ou criação da sessão falhar, a resposta 5xx ainda permite
+      // repetir o checkout neste navegador sem exigir uma senha inexistente.
+      setCheckoutIdentityCookie(res, {
+        email: cleanEmail,
+        customerId: customer.id,
+        source: 'checkout_provisional',
+        identityEpoch: String(customer.metadata?.vc_identity_epoch || ''),
       });
     }
 
@@ -247,32 +274,86 @@ export async function handleCheckout(req, res) {
       return res.status(403).json({ error: 'Sua sessão de assinatura mudou. Entre novamente antes de assinar.' });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+    // Assinatura em atraso ou com a primeira fatura pendente: regularizar a que
+    // existe. Uma sessão nova criaria a segunda assinatura no mesmo cliente.
+    const pending = await findRecoverableSubscription(customer.id);
+    if (pending) {
+      const invoice = pending.latest_invoice;
+      const invoiceUrl = pending.status === 'incomplete' && invoice?.status === 'open'
+        && /^https:\/\//.test(String(invoice.hosted_invoice_url || ''))
+        ? invoice.hosted_invoice_url : null;
+      const url = invoiceUrl || (await stripe.billingPortal.sessions.create({
+        customer: customer.id,
+        return_url: `${appUrl}/?app=1`,
+      })).url;
+      return res.status(200).json({
+        url,
+        billingIssue: true,
+        subscriptionStatus: pending.status,
+        message: 'Sua assinatura tem um pagamento pendente. Regularize a cobrança para voltar ao studio.',
+      });
+    }
+
+    // Reutilize uma sessão aberta, inclusive quando a resposta anterior se
+    // perdeu. A chave determinística também fecha a corrida entre duas
+    // lambdas que listaram antes de qualquer sessão ficar visível.
+    const openSessions = await stripe.checkout.sessions.list({
       customer: customer.id,
-      client_reference_id: customer.id,
-      expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_MAX_AGE_SEC - 60,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/?billing=success`,
-      cancel_url: `${appUrl}/?billing=cancel`,
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      subscription_data: {
+      status: 'open',
+      limit: 100,
+    });
+    let session = (openSessions.data || []).find((entry) => (
+      entry?.mode === 'subscription'
+      && entry?.metadata?.product === 'viral-carrossel'
+      && entry?.metadata?.tier === tier
+      && typeof entry?.url === 'string'
+      && entry.url.startsWith('https://')
+    ));
+    if (!session) {
+      const checkoutWindow = Math.floor(Date.now() / (30 * 60_000));
+      const expiresAt = checkoutWindow * 30 * 60 + CHECKOUT_MAX_AGE_SEC - 60;
+      session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customer.id,
+        client_reference_id: customer.id,
+        expires_at: expiresAt,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}/?billing=success`,
+        cancel_url: `${appUrl}/?billing=cancel`,
+        allow_promotion_codes: true,
+        billing_address_collection: 'auto',
+        subscription_data: {
+          metadata: {
+            product: 'viral-carrossel',
+            tier,
+            image_quota: String(imageQuotaForTier(tier)),
+          },
+        },
         metadata: {
           product: 'viral-carrossel',
+          email: cleanEmail,
           tier,
-          image_quota: String(imageQuotaForTier(tier)),
+          ...(identityEpoch ? { vc_identity_epoch: identityEpoch } : {}),
         },
-      },
-      metadata: {
-        product: 'viral-carrossel',
-        email: cleanEmail,
-        tier,
-        ...(identityEpoch ? { vc_identity_epoch: identityEpoch } : {}),
-      },
-    });
+      }, {
+        idempotencyKey: checkoutIdempotencyKey(
+          'session', `viral-carrossel:${customer.id}:${priceId}:${tier}:${checkoutWindow}`,
+        ),
+      });
+    }
 
-    clearCheckoutIdentityCookie(res);
+    if (provisionalCheckoutIdentity) {
+      // Permite repetir um checkout cancelado no mesmo navegador sem transformar
+      // o e-mail em prova de identidade para outro browser.
+      setCheckoutIdentityCookie(res, {
+        email: cleanEmail,
+        customerId: customer.id,
+        source: 'checkout_provisional',
+        identityEpoch,
+      });
+    } else {
+      clearCheckoutIdentityCookie(res);
+    }
     setCheckoutCookie(res, session.id);
     return res.status(200).json({ url: session.url, sessionId: session.id, tier });
   } catch (e) {

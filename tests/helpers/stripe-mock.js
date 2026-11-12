@@ -11,7 +11,7 @@ import { vi } from 'vitest';
 export const stripeMock = {
   customers: { list: vi.fn(), create: vi.fn(), retrieve: vi.fn(), update: vi.fn() },
   subscriptions: { list: vi.fn() },
-  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn(), update: vi.fn() } },
+  checkout: { sessions: { list: vi.fn(), create: vi.fn(), retrieve: vi.fn(), update: vi.fn() } },
   billingPortal: { sessions: { create: vi.fn() } },
   webhooks: { constructEvent: vi.fn() },
 };
@@ -20,6 +20,7 @@ export const subAtiva = (customerId) => ({
   id: `sub_${customerId}`,
   status: 'active',
   customer: customerId,
+  metadata: { product: 'viral-carrossel' },
   current_period_start: Math.floor(Date.now() / 1000),
   current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
 });
@@ -33,6 +34,7 @@ export function resetStripeMock() {
     email,
   }));
   stripeMock.subscriptions.list.mockReset().mockResolvedValue({ data: [] });
+  stripeMock.checkout.sessions.list.mockReset().mockResolvedValue({ data: [] });
   stripeMock.checkout.sessions.create.mockReset().mockResolvedValue({
     id: 'cs_test_fake',
     url: 'https://checkout.stripe.com/c/pay/cs_test_fake',

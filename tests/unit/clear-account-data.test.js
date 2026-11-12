@@ -86,6 +86,48 @@ describe('clearAccountLocalData (FE-001/002/003)', () => {
     expect(local.getItem(ACCOUNT_VAULT_KEY)).toContain('email:a@x.com');
   });
 
+  it('apaga também o cofre quando a pessoa escolhe limpar este aparelho', async () => {
+    const deletedDatabases = [];
+    vi.stubGlobal('indexedDB', {
+      deleteDatabase: (name) => {
+        deletedDatabases.push(name);
+        const request = {};
+        queueMicrotask(() => request.onsuccess?.());
+        return request;
+      },
+    });
+    local.setItem(ACCOUNT_VAULT_KEY, JSON.stringify({
+      'email:a@x.com': { savedAt: 1, keys: { [SK.library]: '[{"id":"p1"}]' } },
+    }));
+    await clearAccountLocalData({ wipeMedia: true, timeoutMs: 10 });
+    expect(local.getItem(SK.library)).toBeNull();
+    expect(local.getItem(ACCOUNT_VAULT_KEY)).toBeNull();
+    expect(new Set(deletedDatabases)).toEqual(new Set([
+      'viral-carrossel-img',
+      'viral-carrossel',
+      'viral-carrossel-account-vault',
+    ]));
+  });
+
+  it('não confirma a limpeza destrutiva se algum IndexedDB estiver bloqueado', async () => {
+    vi.stubGlobal('indexedDB', {
+      deleteDatabase: (name) => {
+        const request = {};
+        queueMicrotask(() => {
+          if (name === 'viral-carrossel') request.onblocked?.();
+          else request.onsuccess?.();
+        });
+        return request;
+      },
+    });
+    local.setItem(ACCOUNT_VAULT_KEY, '{"email:a@x.com":{}}');
+    await expect(clearAccountLocalData({ wipeMedia: true, timeoutMs: 10 }))
+      .rejects.toThrow('Feche outras abas do Moont');
+    // O cache síncrono já foi removido, mas a UI recebe a falha e não anuncia
+    // que todos os bancos deste aparelho foram apagados.
+    expect(local.getItem(ACCOUNT_VAULT_KEY)).toBeNull();
+  });
+
   it('não deixa meta de sync órfã sem biblioteca (vai no cofre)', async () => {
     local.setItem(SK.libraryCloudMeta, JSON.stringify({ revision: 3, updatedAt: 99 }));
     await clearAccountLocalData();
