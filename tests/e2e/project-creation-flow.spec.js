@@ -270,6 +270,12 @@ test('ir para o editor respeita apresentação e cria um slide vazio', async ({ 
   expect(created.doc).toMatchObject({ productKind:'apresentacao', fmt:'apresentacao', quickCardCount:1, slides:[{
     title:'', subtitle:'', photoRegion:'full', showSwipeCue:false,
   }] });
+  // Cross both persistence debounces: a transition from the carousel editor
+  // must not rename the presentation using the previous document's format.
+  await page.waitForTimeout(650);
+  const settled = (await library(page)).find(project => project.id === created.id);
+  expect(settled.name).toBe('Nova apresentação');
+  expect(settled.doc).toMatchObject({ productKind:'apresentacao', fmt:'apresentacao' });
 });
 
 test('roteiro explícito sincroniza e bloqueia a quantidade até a revisão', async ({ page }) => {
@@ -432,6 +438,12 @@ test('prévia mostra todos os textos durante a revisão sem salvar o rascunho in
   await expect.poll(async () => (await library(page)).find(project => project.id === destination.id)?.doc?.slides?.[0]?.title).toBe('Organize o conteúdo do site');
   const saved = (await library(page)).find(project => project.id === destination.id);
   expect(saved.doc.slides).toHaveLength(5);
+  // A stale 100ms library write must not undo the synchronous final save.
+  // Cross the 400ms document debounce and the following 100ms library debounce.
+  await page.waitForTimeout(650);
+  const settled = (await library(page)).find(project => project.id === destination.id);
+  expect(settled.doc.slides).toHaveLength(5);
+  expect(settled.doc.slides[0].title).toBe('Organize o conteúdo do site');
 });
 
 test('cancelar a revisão mantém a prévia identificada e ignora a resposta tardia', async ({ page }) => {

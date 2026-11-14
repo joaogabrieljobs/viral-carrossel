@@ -1076,6 +1076,7 @@ export default function App() {
     await pending.promise?.catch(() => {});
   }, []);
   const docAutosaveTimerRef = useRef(null);
+  const libraryPersistTimerRef = useRef(null);
 
   // Após sync/pull: o reload pode disparar pagehide que regrava a biblioteca
   // React (stale) por cima da nuvem. O lock impede isso; aqui libertamos no boot.
@@ -1131,10 +1132,14 @@ export default function App() {
   useEffect(() => {
     if (!accountLibraryReady) return undefined;
     const t = setTimeout(() => {
-      if (!lsSet(SK.library, semImagensDeRuntime(library))) return;
+      if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) return;
+      // A synchronous save may have already advanced this snapshot. Never
+      // replay the library captured before generation or project creation.
+      if (!lsSet(SK.library, semImagensDeRuntime(libraryPersistRef.current))) return;
       if (firstSaveRef.current) { firstSaveRef.current = false; return; }
       setLastSavedAt(Date.now());
     }, 100);
+    libraryPersistTimerRef.current = t;
     return () => clearTimeout(t);
   }, [library, accountLibraryReady]);
   useEffect(() => { if (accountLibraryReady) lsSet(SK.libraryFolders, libraryFolders); }, [libraryFolders, accountLibraryReady]);
@@ -1619,12 +1624,16 @@ export default function App() {
   useEffect(() => {
     if (!activeEntry?.id) return;
     const currentName = String(activeEntry.name || '').trim();
-    if (activeProductKind === 'apresentacao' && ['Novo carrossel', 'Nova comunicação'].includes(currentName)) {
+    // On a project switch the entry changes before history is reset. Rename
+    // from this entry's own document, never from the previous editor's format.
+    const entryIsPresentation = isApresentacaoPreset(activeEntry.doc?.creativePreset)
+      || activeEntry.doc?.fmt === 'apresentacao';
+    if (entryIsPresentation && ['Novo carrossel', 'Nova comunicação'].includes(currentName)) {
       renameDoc(activeEntry.id, 'Nova apresentação');
-    } else if (activeProductKind === 'carrossel' && currentName === 'Nova apresentação') {
+    } else if (!entryIsPresentation && currentName === 'Nova apresentação') {
       renameDoc(activeEntry.id, 'Nova comunicação');
     }
-  }, [activeEntry?.id, activeEntry?.name, activeProductKind, renameDoc]);
+  }, [activeEntry?.id, activeEntry?.name, activeEntry?.doc, renameDoc]);
 
   // ── PERFIS DE MARCA: handlers ───────────────────────────────────────────────
   const applyBrand = useCallback((brandId) => {
@@ -1736,6 +1745,7 @@ export default function App() {
     // A edição pendente já entra neste flush. Seu debounce antigo não pode
     // reaplicar o mesmo doc com outro updatedAt durante o pull.
     clearTimeout(docAutosaveTimerRef.current);
+    clearTimeout(libraryPersistTimerRef.current);
     const agora = Date.now();
     const liveDoc = editorSyncStateRef.current?.activeDocId === activeDocId
       ? editorSyncStateRef.current.doc
