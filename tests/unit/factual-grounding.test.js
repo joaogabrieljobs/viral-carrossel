@@ -82,6 +82,25 @@ describe('fidelidade ao briefing — regressões dos nove modos', () => {
     ]);
   });
 
+  it.each(['Não inclui software ou automação.', 'Does not include software or automation.', "Doesn't include software or automation."])(
+    'não classifica exclusão explícita como promessa de item incluso: %s', text => {
+      const first = draft(); first.slides[1].subtitle = text;
+      expect(auditDraftFactuality(first, { ...config, factualSource: 'Não inclui software próprio nem automação.' })).toEqual([]);
+    },
+  );
+
+  it('a exclusão da fonte não autoriza prometer o item como incluso', () => {
+    const first = draft(); first.slides[1].subtitle = 'Inclui software e automação.';
+    expect(auditDraftFactuality(first, { ...config, factualSource: 'Não inclui software e automação.' }))
+      .toContainEqual(expect.objectContaining({ field: 'subtitle', category: 'item incluso' }));
+  });
+
+  it('não estende a negação por uma conjunção até uma inclusão positiva', () => {
+    const first = draft(); first.slides[1].subtitle = 'Não promete mas inclui software e automação.';
+    expect(auditDraftFactuality(first, { ...config, factualSource: 'Não inclui software e automação.' }))
+      .toContainEqual(expect.objectContaining({ field: 'subtitle', category: 'item incluso' }));
+  });
+
   it('não une campos para fabricar uma alegação e mantém valores factuais fornecidos', () => {
     const first = draft();
     first.slides[2].title = 'Duas';

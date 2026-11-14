@@ -34,10 +34,19 @@ A publicação usa apenas esse checkout isolado. Commit e push fast-forward para
 | Build da seleção final | `npm run build` passou novamente no checkout isolado após o ajuste de cancelamento; 1.914 módulos transformados. Permanecem avisos de tamanho de bundle e imports dinâmicos já presentes na base; não houve erro de build. |
 | Acessibilidade estática e diff | `npm run check:a11y` passou: nenhum botão apenas com ícone sem rótulo. `git diff --check` passou na seleção isolada. |
 | E2E da seleção final | Cinco testes de prévia e cancelamento passaram contra o build isolado em servidor próprio. Cobrem roteiro antes dos slides, prévia durante revisão, cancelamento com 3/6 slides, abertura do rascunho, resposta tardia e recarga com notas/blocos/legenda preservados. As APIs são simuladas; não comprovam a resposta real do provedor. |
-| CI, push e deploy desta rodada | Acompanhar após o commit desta seleção. O reteste real depende da confirmação do mesmo SHA em produção. |
+| Primeira publicação e CI | `dd5ef7a5e1892615c378c3aee7e55b007904656b` enviado por fast-forward para `main`. [CI 43644310901](https://github.com/joaogabrieljobs/viral-carrossel/actions/runs/43644310901) passou: 2.172 testes + quatro falhas esperadas; 231 E2E passaram, 13 foram pulados, sem flaky reportado. Portão aprovado para esse SHA. |
+| Produção da primeira publicação | Vercel `dpl_9PBSZpX8CSzNJRQrKwsPEraiE4gD` READY, target production, SHA `dd5ef7a`. Alias `moont.ai` aplicado; domínio respondeu HTTP 200 e serviu `/assets/index-JkNadsm1.js`. |
 | Geração real por API local | As tentativas receberam HTTP 401; não produziram uma apresentação nem validaram os prompts. |
 | Credenciais para reteste | Uma tentativa de obter o ambiente completo foi recusada pela revisão automática de aprovação. Não foi repetida e não integra o procedimento de verificação. |
-| Reteste real pela aplicação | Planejado após testes automatizados e publicação. Usará a sessão normal da aplicação em produção, sem exportar segredos. Ainda não há resultado real atribuível a estas correções. |
+| Reteste real pela aplicação | O responsável informou que Auto entregou e salvou 12 slides em `dd5ef7a`. Essa entrega não equivale à aprovação editorial dos sete caminhos. O reteste identificou alertas factuais indevidos para fatos presentes nas fontes e extrapolações nas notas; o ajuste complementar abaixo trata esses achados. As outras avaliações reais seguem documentadas separadamente. |
+
+## Ajuste após o primeiro reteste real
+
+A auditoria factual agora considera o texto original das fontes junto das instruções fornecidas. O plano e os argumentos gerados continuam excluídos como evidência. Uma exclusão explícita, como “não inclui software”, deixa de ser classificada como promessa positiva; a mesma exclusão no briefing não autoriza a geração de uma inclusão afirmativa. Números inventados continuam sinalizados.
+
+Os prompts de redação e revisão exigem preservar decisões pendentes, não deduzir encerramento de contrato a partir de um aceite e conferir todos os campos, inclusive notas, blocos e legenda. Base, período e exclusões essenciais de indicadores ou escopo devem aparecer no slide correspondente. Diagnóstico não fornecido deve ser apresentado como hipótese, sem criar causalidade.
+
+Este ajuste complementar altera sete arquivos de código/teste e este relatório. Ele não modifica layout, cancelamento ou o enquadramento de imagens. Verificação final no checkout isolado: `npm test` passou em 202 arquivos, com 2.187 testes aprovados e quatro falhas esperadas; build, checks de identificadores/props, acessibilidade estática e `git diff --check` passaram. O efeito real nas próximas respostas da IA exige reteste; a CI acompanhará o SHA do ajuste complementar.
 
 ## Critérios para encerrar a rodada
 

@@ -297,6 +297,7 @@ O briefing abaixo é referência, não um pedido para gerar o deck novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
 Verifique: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
+Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
@@ -636,6 +637,22 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const textOptions = { ...aiOptions, ...presentationAIOptions('apresentacao', config.presentationPath), json: true, jsonParser: parsePresentationPlanResponse, temperature: 0.2, thinking: 'disabled', maxTokens: 8192 };
   const planning = config.planningContext || {};
   const sources = Array.isArray(planning.sources) ? planning.sources : [];
+  // The planning sources are the original supplied material. The caller's
+  // factualSource may contain only the short topic when uploads were extracted
+  // separately. Never use the generated plan/claims as evidence for themselves.
+  const factualConfig = {
+    ...config,
+    factualSource: [
+      config.factualSource ?? config.commercialClaimSource,
+      ...sources.flatMap(source => {
+        if (!isObject(source)) return [];
+        const excerpts = Array.isArray(source.chunks) && source.chunks.length
+          ? source.chunks.map(chunk => chunk?.text)
+          : [source.text];
+        return excerpts.filter(text => typeof text === 'string');
+      }),
+    ].filter(text => typeof text === 'string').join('\n'),
+  };
   const { plan, diagnostics: planningDiagnostics } = await generatePresentationPlan({
     brief: planning.brief || '', sources, count: config.count, presentationPath: config.presentationPath,
     aiOptions: textOptions, onStage, onPlan,
@@ -648,7 +665,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       ? value.map(collectText).join('\n') : isObject(value) ? Object.values(value).map(collectText).join('\n') : '';
     const facts = auditDraftFactuality({ ...result, slides: result.slides.map(slide => ({ ...slide,
       bodyAfterImage: [slide.bodyAfterImage, slide.speakerNotes, collectText(slide.presentationBlocks)].filter(Boolean).join('\n'),
-    })) }, config).map(issue => ({ ...issue, kind: 'factual' }));
+    })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
     return { result, plan, planningDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
   };

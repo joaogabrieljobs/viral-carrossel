@@ -48,6 +48,10 @@ const ABSOLUTES = /\b(?:a maioria (?:das pessoas|dos (?:clientes|acessos|consumi
 const CHANNELS = /\b(?:whatsapp|DM|direct|coment[aá]rios|agendamento|agende (?:uma )?consulta|patients?|pacientes?)\b/giu;
 const CONDITIONAL = /\b(?:pode|podem|poderia|talvez|se (?:voce|sua|seu|ja)|por exemplo|uma opcao|may|might|could|if (?:you|your)|for example|an option)\b/;
 const negatedGuarantee = (text, index) => /\b(?:nao|nem|no|not|never|without)\b(?:\s+[\p{L}]+){0,4}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
+// An explicit exclusion is not a positive promise of an included service.
+// The evidence filter still removes negated clauses, so that an exclusion in
+// the brief cannot substantiate a newly invented positive inclusion.
+const negatedInclusion = (text, index) => /\b(?:nao|nem|not|never|without|don['’]t|doesn['’]t)\b(?:\s+(?:esta|estao|estara|estarao|sera|serao|foi|foram|is|are|be|being|been|tambem|also|even)){0,2}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
 
 function textFields(draft) {
   const result = (Array.isArray(draft?.slides) ? draft.slides : []).flatMap((slide, slideIndex) =>
@@ -65,6 +69,7 @@ export function auditUnsupportedCommercialClaims(slides, source) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
+        if (rule.category === 'item incluso' && negatedInclusion(text, match.index)) continue;
         if (!sourceText.includes(normalize(claim))) violations.push({ slideIndex, category: rule.category, claim });
       }
     }
@@ -94,6 +99,7 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
+        if (rule.category === 'item incluso' && negatedInclusion(text, match.index)) continue;
         if (!sourceText.includes(normalize(claim))) add(rule.category, claim);
       }
     }

@@ -265,4 +265,35 @@ describe('apresentação planejada e revisada', () => {
     expect(output.result.slides[1].presentationBlocks[0].items[0].value).toBe('90%');
     expect(output.result.slides[2].speakerNotes).toBe('A oferta alcançou 40 clientes.');
   });
+
+  it.each(['text', 'chunks'])('confere o material original do reteste de 14/11 vindo de %s, sem usar o plano como prova', async sourceFormat => {
+    // Trechos literais do material fictício em apresentacoes-producao-2026-11-14.md.
+    const originalMaterial = 'Não inclui software próprio nem automação.\n'
+      + 'O piloto gratuito ocorreu em quatro equipes de uma organização fictícia, com oito pessoas por equipe. A duração média registrada passou de 45 para 33 minutos.\n'
+      + 'A oferta proposta é um programa de seis semanas por R$ 6.000, com pagamento de 50% no início e 50% na entrega.\n'
+      + 'Ainda não existem contratos pagos nem dados sobre disposição a pagar.';
+    const suppliedSource = { id: 'material', text: originalMaterial,
+      ...(sourceFormat === 'chunks' ? { text: 'Material extraído separadamente.', chunks: [{ text: originalMaterial }] } : {}) };
+    const raw = batch(0);
+    raw.slides[0].subtitle = 'Caso fictício: piloto gratuito. Duração média observada: 33 minutos.';
+    raw.slides[1].subtitle = 'Oferta proposta: seis semanas por R$ 6.000; 50% no início e 50% na entrega.';
+    raw.slides[2].subtitle = 'Não inclui software ou automação.';
+    const actualConfig = config({ factualSource: 'Apresente o método de reuniões.',
+      userInstructions: 'O prazo para decidir é 2 dias.',
+      planningContext: { brief: 'Apresente o método de reuniões.', sources: [...sources, suppliedSource] },
+    });
+    raw.slides[2].speakerNotes = 'O prazo para decidir é 2 dias.';
+    const clean = await generateReviewedCarousel({ prompt: '', config: actualConfig }, vi.fn()
+      .mockResolvedValueOnce(plan()).mockResolvedValueOnce(raw).mockResolvedValueOnce({ edits: [] }));
+    expect(clean.reviewStatus).toBe('unchanged');
+    expect(clean.violations).toBeUndefined();
+
+    // Even a syntactically valid plan cannot make its own invented metric true.
+    const inventedPlan = plan(); inventedPlan.evidence[0].claim = 'A retenção alcançou 90%.';
+    raw.slides[0].title = 'A retenção alcançou 90%';
+    const flagged = await generateReviewedCarousel({ prompt: 'Exemplo de estilo: retenção de 90%.', config: actualConfig }, vi.fn()
+      .mockResolvedValueOnce(inventedPlan).mockResolvedValueOnce(raw).mockResolvedValueOnce({ edits: [] }));
+    expect(flagged.reviewStatus).toBe('needs_attention');
+    expect(flagged.violations).toContainEqual(expect.objectContaining({ field: 'title', claim: '90%', kind: 'factual' }));
+  });
 });

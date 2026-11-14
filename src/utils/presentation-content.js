@@ -5,6 +5,15 @@
  */
 export const PRESENTATION_PROVENANCE_RULE = `ENTREGA FINAL AUTÔNOMA: fale diretamente ao público. Não mencione o arquivo enviado, upload, manual de referência, processo de extração, "matéria-prima" ou "segundo o material". Manuais orientam o método; seus exemplos não são fatos do projeto. Preserve instituição, estudo e ano fornecidos quando necessários para contextualizar uma evidência; isso é diferente de citar o documento de entrada. Não invente fontes e não esconda limitações.`;
 
+export const PRESENTATION_FIELD_GROUNDING_RULES = `FIDELIDADE EM TODOS OS CAMPOS:
+- O mesmo rigor vale para title, subtitle, bodyAfterImage, presentationBlocks, speakerNotes e caption. Notas e resumo não podem acrescentar fatos, cláusulas ou decisões ausentes, nem contradizer a página.
+- Uma decisão em discussão continua pendente. Um pedido de aprovação não comprova aprovação, contratação ou autorização para iniciar. Formule o fecho como pedido ou pergunta; próximos passos dependentes devem dizer "se aprovado", quando essa condição ainda estiver aberta. Confira também notas e caption.
+- Aprovação da proposta e aceite das entregas são decisões distintas; não troque suas condições. Critério de aceite não determina encerramento do contrato, renovação, garantia ou novas obrigações. Preserve apenas as condições fornecidas, sem inferir consequências contratuais. Ao resumir critérios cumulativos, mantenha todos ou remeta ao critério completo, sem apresentar uma lista parcial como suficiente.
+- Lacunas não viram novos objetivos ou metodologia aprovados. Preserve o propósito e o desenho informados do próximo ciclo; não acrescente validação comercial, dimensionamento de mercado ou grupo de controle que não foram informados. Manter as mesmas definições não transforma uma observação em teste controlado. Uma recomendação adicional deve estar identificada como sugestão, fora do escopo já proposto.
+- No próprio slide de indicadores, mantenha junto dos números a unidade, período, base/denominador e condições de comparação disponíveis; em antes/depois, preserve quem foi observado e as limitações relevantes. Use os detalhes do bloco ou apoio visível. Não esconda esse contexto apenas nas notas para caber.
+- Escopo comercial visível mantém quantidades, entregáveis, exclusões, responsabilidades e condições que mudam a decisão. Não substitua uma exclusão por outra parecida: licenças de software não equivalem a software próprio. Resuma sem ampliar ou reduzir o compromisso. Compare categorias equivalentes em tabelas.
+- speakerNotes aprofunda a fala com informações sustentadas; não contém instruções para o gerador nem corrige silenciosamente uma omissão essencial do slide.`;
+
 export const PRESENTATION_EVIDENCE_RULES = `FIDELIDADE E RACIOCÍNIO DA APRESENTAÇÃO:
 - Distinga fato observado, capacidade disponível, plano, hipótese e decisão pendente. Um título não pode afirmar mais do que seu desenvolvimento e as evidências sustentam.
 - Não invente métricas, resultados, clientes, preços, prazos, credenciais, depoimentos, citações ou fontes. Se faltar informação essencial, explicite a decisão pendente em linguagem do público; não use [preencher] nem finja precisão.
@@ -14,7 +23,8 @@ export const PRESENTATION_EVIDENCE_RULES = `FIDELIDADE E RACIOCÍNIO DA APRESENT
 - Separe o que aconteceu, sua interpretação e a ação proposta. Relacione cada recomendação ao achado, mecanismo ou objetivo que a justifica; identifique dependências e limites.
 - Quando houver versões conflitantes, use a explicitamente vigente; se a divergência persistir, qualifique ou omita a afirmação. Não escolha automaticamente a versão mais favorável.
 - Não atribua fatos, falas ou compromissos a pessoas sem base. Cenários didáticos podem ser propostos quando pertinentes, claramente identificados como exemplos hipotéticos e nunca como casos ou resultados reais.
-- Persuasão e clareza vêm de exemplos, mecanismos e consequências concretas. Evite absolutos, falsa urgência, ataques ao público e falsas dicotomias. Não invente canais de contato, gratuidades ou garantias no fechamento.`;
+- Persuasão e clareza vêm de exemplos, mecanismos e consequências concretas. Evite absolutos, falsa urgência, ataques ao público e falsas dicotomias. Não invente canais de contato, gratuidades ou garantias no fechamento.
+${PRESENTATION_FIELD_GROUNDING_RULES}`;
 
 const PROFILES = Object.freeze({
   auto: {
@@ -130,6 +140,7 @@ export function presentationReviewForRoute(route) {
   return `REVISÃO DE PROFUNDIDADE — ${route.label.toUpperCase()}:
 ${profileFor(route).review}
 Compare os slides entre si e com o briefing. Recupere explicações, critérios e condições omitidos, somente com apoio disponível e dentro dos limites. Elimine repetição entre páginas e entre título, apoio e bloco de dados. Um slide curto e completo não precisa ser ampliado; altere apenas defeitos concretos.
+Audite o JSON inteiro, inclusive presentationBlocks, speakerNotes e caption quando presentes. Procure especialmente decisão pendente tratada como tomada, condição contratual deduzida e contexto de indicador ou exclusão que só apareceu nas notas. Corrija o campo que contém o problema, respeitando os campos editáveis do contrato.
 subtitle e bodyAfterImage são editáveis; amplie ou condense onde necessário sem alterar fatos, quantidade, ordem ou imagem. Não acrescente fatos para atingir um mínimo.
 ${PRESENTATION_EVIDENCE_RULES}
 ${presentationFieldsForRoute(route)}

@@ -9,7 +9,7 @@ import {
   buildGenerationLanguageLayer, buildGenerationSlideLayoutRules, buildGenerationImageLayer,
   buildGenerationJsonContract, buildRefineSingleSlideRules, resolveMaterialPromptParts,
 } from '../../src/utils/generation-prompts.js';
-import { generateReviewedCarousel, buildEditorialReviewPrompt } from '../../src/utils/editorial-review.js';
+import { generateReviewedCarousel, buildEditorialReviewPrompt, applyEditorialReview } from '../../src/utils/editorial-review.js';
 import { PITCH_SYSTEM_PT } from '../../src/utils/pitch-content.js';
 import { buildPresentationDesignSystemPromptBlock } from '../../src/styles/presentation-presets.jsx';
 
@@ -159,6 +159,22 @@ it('preserva aula e keynote ao vivo, e a leitura autônoma dos documentos de dec
 });
 
 describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatorio_executivo', 'estudo_de_caso', 'keynote_manifesto'])('clareza e fidelidade em %s', path => {
+  it('mantém decisões pendentes e condições exatas em geração, revisão, refinamento e resumo', () => {
+    for (const prompt of [buildApresentacaoPackBlock(12, path), buildPresentationReviewRules(path),
+      buildApresentacaoRefineHint(path), buildPresentationSummaryRules(path)]) {
+      expect(prompt).toContain('FIDELIDADE EM TODOS OS CAMPOS');
+      expect(prompt).toContain('presentationBlocks, speakerNotes e caption');
+      expect(prompt).toContain('Um pedido de aprovação não comprova aprovação');
+      expect(prompt).toContain('Critério de aceite não determina encerramento do contrato');
+      expect(prompt).toContain('Aprovação da proposta e aceite das entregas são decisões distintas');
+      expect(prompt).toContain('Lacunas não viram novos objetivos ou metodologia aprovados');
+      expect(prompt).toContain('No próprio slide de indicadores');
+      expect(prompt).toContain('base/denominador');
+      expect(prompt).toContain('licenças de software não equivalem a software próprio');
+      expect(prompt).not.toContain('Mesa Clara');
+      expect(prompt).not.toContain('R$ 6.000');
+    }
+  });
   it('usa limites como tetos e mantém condições essenciais visíveis, sem exigir preenchimento', () => {
     const fields = buildPresentationFieldRules(path);
     expect(fields).toContain('Os limites obrigatórios por slide prevalecem');
@@ -185,4 +201,25 @@ describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatori
       expect(prompt).not.toContain('R$ 6.000');
     }
   });
+});
+
+it('revisão recebe e pode corrigir notas e resumo sem substituir o slide ou perder blocos', () => {
+  const presentationPlan = { slides:[{ index:1 }], evidence:[] };
+  const config = { presetId:'apresentacao', presentationPath:'auto', count:1, presentationPlan };
+  const blocks = [{ type:'metrics', items:[{ label:'Duração média', value:'45 → 33 min', detail:'Mesmas equipes; dois períodos observados.' }] }];
+  const draft = { presentationPlan, slides:[{ title:'Decisão em discussão', subtitle:'Avaliar o próximo ciclo.', bodyAfterImage:'', imageQuery:'',
+    presentationBlocks:blocks, speakerNotes:'A decisão final é aprovar. O contrato se encerra na entrega.', logoImageId:'logo-preservada' }],
+    caption:'Iniciar o ciclo.' };
+  const prompt = buildEditorialReviewPrompt('A aprovação está em discussão. O aceite depende da entrega. Não foi definido encerramento contratual.', draft, config);
+  expect(prompt).toContain('Leia todos os campos do rascunho');
+  expect(prompt).toContain('inclusive blocos nativos, speakerNotes e caption');
+  const transmitted = JSON.parse(prompt.match(/<rascunho>\n([\s\S]*?)\n<\/rascunho>/)[1]);
+  expect(transmitted.slides[0].speakerNotes).toBe(draft.slides[0].speakerNotes);
+  expect(transmitted.slides[0].presentationBlocks).toEqual(blocks);
+  expect(transmitted.caption).toBe(draft.caption);
+  const corrected = applyEditorialReview(draft, { edits:[{ slideIndex:0, reason:'Preservar a decisão pendente e somente o aceite informado.',
+    speakerNotes:'A aprovação está em discussão. O aceite depende da entrega.' }], caption:'Avaliar o próximo ciclo; se aprovado, definir o início.' }, config);
+  expect(corrected.slides[0]).toMatchObject({ title:draft.slides[0].title, presentationBlocks:blocks, logoImageId:'logo-preservada',
+    speakerNotes:'A aprovação está em discussão. O aceite depende da entrega.' });
+  expect(corrected.caption).toBe('Avaliar o próximo ciclo; se aprovado, definir o início.');
 });

@@ -1,4 +1,5 @@
 import { contentAwarePresentationOverrides } from './presentation-composition.js';
+import { PRESENTATION_FIELD_GROUNDING_RULES } from './presentation-content.js';
 
 /** Contrato compartilhado entre redação, revisão e composição do Pitch. */
 export const isPitchPath = (pathId) => ['pitch', 'pitch_deck', 'investor_pitch'].includes(pathId);
@@ -23,7 +24,8 @@ export function buildPitchEvidenceRules() {
 - Separe evidência externa de resultado da empresa. Pesquisa de categoria não comprova demanda pelo produto; estudo de uma intervenção não comprova eficácia da solução apresentada. Concorrentes devem ser descritos apenas por diferenças sustentadas, sem reduzir todos a uma caricatura.
 - Em negócios com serviço humano, explique quem executa, quem decide, escopo, capacidade e custo quando conhecidos. Em saúde, preserve o papel do profissional e a diferença entre organizar informação e decidir a conduta; não prometa prevenção, economia ou desfecho clínico comprovado sem evidência própria adequada.
 - Quando versões ou trechos divergem, use a atualização explicitamente identificada como vigente. Se a divergência continuar, qualifique ou omita a afirmação conflitante; não escolha a versão mais favorável.
-- Persuasão vem da ligação entre problema, mecanismo, evidência e decisão. Não crie falsas dicotomias, absolutos como "garantido"/"inviolável", ataques ao cliente, contatos ou benefícios comerciais não informados.`;
+- Persuasão vem da ligação entre problema, mecanismo, evidência e decisão. Não crie falsas dicotomias, absolutos como "garantido"/"inviolável", ataques ao cliente, contatos ou benefícios comerciais não informados.
+${PRESENTATION_FIELD_GROUNDING_RULES}`;
 }
 
 export function pitchTextLimits(kind = 'content') {
@@ -66,7 +68,7 @@ ${buildPitchEvidenceRules()}
 
 PROFUNDIDADE OBRIGATÓRIA, QUANDO O MATERIAL PERMITIR:
 - Abertura: explique o que a empresa faz e para quem. Não esconda o produto até a metade do deck.
-- Problema: descreva uma situação de uso, a alternativa atual e o custo ou consequência da dor. Mostre por que resolvê-la importa, além de um slogan.
+- Problema: descreva uma situação de uso, a alternativa atual e o custo ou consequência da dor. Mostre por que resolvê-la importa, além de um slogan. Diagnóstico e alternativa atual só são fatos quando fornecidos; se ausentes, formule um risco ou hipótese explícita, sem inventar como o cliente trabalha hoje.
 - Por que agora: conecte uma mudança concreta à oportunidade. Não invente tendência, urgência ou estatística de mercado.
 - Solução/produto: descreva entrada, ação e resultado de um uso real, como o mecanismo resolve a causa e quem recebe o valor. Separe software, serviço humano e complementos. Mostre o fluxo e o papel de cada participante; preserve disponibilidade e dependências. Demonstração pode ser textual; não dependa de uma foto futura.
 - Mercado: delimite segmento inicial, geografia, comprador e acesso. Use TAM/SAM/SOM somente com números sustentados; sem dados, explique o recorte e a hipótese a validar, sem fabricar tamanho de mercado.
@@ -87,6 +89,7 @@ ${PITCH_PROVENANCE_RULE}`;
 
 export function buildPitchReviewRules() {
   return `REVISÃO DE PROFUNDIDADE DO PITCH:
+Audite o JSON inteiro, inclusive presentationBlocks, speakerNotes e caption quando presentes. As notas não podem inventar cláusulas e o resumo não pode transformar pedido de aprovação em decisão tomada. Corrija o campo que contém o problema, respeitando os campos editáveis do contrato.
 Um slide de conteúdo com apenas título e slogan está incompleto. Desenvolva o argumento com os fatos já disponíveis no briefing: situação/mecanismo e consequência, mais evidência ou detalhe útil. Não trate "edits":[] como resposta aceitável para esse problema.
 Confira se a abertura explica o negócio, a sequência sustenta a decisão e cada seção responde às perguntas de negócio. Corte redundância entre páginas e entre texto e bloco de dados. Um slide curto e completo não precisa ser ampliado; não acrescente fatos novos para atingir um mínimo.
 subtitle e bodyAfterImage podem ser reescritos e ampliados dentro dos limites: ambos são conteúdo principal editável. Não remeta a uma imagem ausente para explicar a tese.
