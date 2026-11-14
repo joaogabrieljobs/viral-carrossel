@@ -8,7 +8,7 @@ import { runAIJob, throwIfGenerationCancelled, isGenerationCancelled, abortableD
 import { DEFAULT_AI_SETTINGS, normalizeAISettings } from '../config/ai-providers.js';
 import { getServerStatus } from './server-status.js';
 import { extractJSON } from './parsers.js';
-import { buildImgParamsTagsEN, resolveRequestedContentLanguage } from './generation-prompts.js';
+import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 import { PITCH_SYSTEM_PT } from './pitch-content.js';
@@ -115,12 +115,18 @@ const CONTENT_LANGUAGE_SYSTEM_RULES = Object.freeze({
   'pt-BR': 'Use português brasileiro em todo texto visível ao leitor (títulos, subtítulos, parágrafos e legendas). Palavras-chave de busca de imagem podem permanecer em inglês. Escreva com naturalidade brasileira.',
 });
 
-function buildContentSystemPrompt(language = 'pt-BR') {
-  const code = Object.hasOwn(CONTENT_LANGUAGE_SYSTEM_RULES, language) ? language : 'pt-BR';
-  return `${AI_SYSTEM_CORE} ${CONTENT_LANGUAGE_SYSTEM_RULES[code]}`;
+const CONTENT_LANGUAGE_POLICY = `IDIOMA DO CONTEÚDO — ordem de prioridade:
+1. Siga o idioma explicitamente pedido pelo usuário, inclusive nas Instruções adicionais, em TODO o texto visível (title, subtitle, bodyAfterImage e caption).
+2. Sem pedido explícito de idioma, siga a língua predominante do briefing e do conteúdo fornecidos pelo usuário. Em revisão ou refinamento, preserve a língua do conteúdo atual, salvo pedido de tradução.
+3. Use português brasileiro apenas quando o pedido e o material não permitirem identificar um idioma.
+Instruções técnicas, rótulos da interface, exemplos internos, voz de referência e palavras-chave de imagem não definem o idioma. Uma regra automática do app que peça português não deve substituir a escolha explícita do usuário ou a língua do briefing. imageQuery permanece no idioma solicitado para busca de imagem, sem mudar o idioma dos demais campos.`;
+
+function buildContentSystemPrompt(language = '') {
+  const languageRule = CONTENT_LANGUAGE_SYSTEM_RULES[language] || '';
+  return `${AI_SYSTEM_CORE} ${CONTENT_LANGUAGE_POLICY}${languageRule ? `\n${languageRule}` : ''}`;
 }
 
-const AI_SYSTEM_PT = buildContentSystemPrompt('pt-BR');
+const AI_SYSTEM_PT = buildContentSystemPrompt();
 
 // Configuração selecionada no modal. Mantida em módulo para as funções de geração,
 // que vivem fora do componente React, lerem a preferência atual sem prop drilling.
@@ -377,19 +383,16 @@ const callCompatibleChat = async (
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
 const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, contentLanguage = '', systemPrompt: explicitSystemPrompt = '', temperature, onRetry, signal: parentSignal } = {}) => runAIJob(async (signal) => {
-  const resolvedContentLanguage = contentLanguage || resolveRequestedContentLanguage({
-    instructions: userMsg,
-    content: userMsg,
-  }).code;
   const baseSystemPrompt = contentMode === 'pitch'
     ? PITCH_SYSTEM_PT
     : contentMode === 'presentation'
       ? buildPresentationSystemPrompt(presentationPath)
       : AI_SYSTEM_CORE;
-  const languageSystemRule = CONTENT_LANGUAGE_SYSTEM_RULES[resolvedContentLanguage]
-    || CONTENT_LANGUAGE_SYSTEM_RULES['pt-BR'];
+  // Only a caller that resolved the raw user material may fix the language.
+  // Inferring it from the expanded technical prompt biases short briefs to PT.
+  const languageSystemRule = CONTENT_LANGUAGE_SYSTEM_RULES[contentLanguage] || '';
   const systemPrompt = String(explicitSystemPrompt || '').trim()
-    || `${baseSystemPrompt} ${languageSystemRule}`;
+    || `${baseSystemPrompt} ${CONTENT_LANGUAGE_POLICY}${languageSystemRule ? `\n${languageSystemRule}` : ''}`;
   let provider = _aiRuntimeSettings.textProvider;
   if (provider === 'openai' && !(getProviderKey('openai') || openaiKey)) provider = 'zai';
   if (provider === 'anthropic' && !getProviderKey('anthropic')) provider = 'zai';

@@ -7,6 +7,40 @@ async function useProfessionalControls(page) {
   await page.getByRole('menuitem', { name: /Controle profissional/i }).click();
 }
 
+test('modal exibe cards durante a revisão sem ficar preso no resumo', async ({ page }) => {
+  test.setTimeout(60_000);
+  let releaseReview;
+  const reviewing = new Promise(resolve => { releaseReview = resolve; });
+  let reviewRequested = false;
+  const payload = value => ({ choices: [{ message: { content: JSON.stringify(value) } }] });
+  await mockApi(page, { session: { ...SESSAO_ATIVA, tier:'creator', imageQuota:{limit:50,remaining:50,used:0} }, extra: {
+    '/api/ai/compatible': async route => {
+      const prompt = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      if (prompt.startsWith('REVISÃO EDITORIAL')) {
+        reviewRequested = true;
+        await reviewing;
+        return route.fulfill({ json: payload({ edits:[] }) });
+      }
+      return route.fulfill({ json: payload({ slides:Array.from({ length:6 }, () => ({ title:'Organize o briefing', subtitle:'Comece definindo o objetivo do conteúdo.', bodyAfterImage:'', imageQuery:'' })), caption:'Organize as informações antes de criar.' }) });
+    },
+  } });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  await useProfessionalControls(page);
+  await page.getByRole('button', { name:'Gerar carrossel com IA', exact:true }).first().click();
+  const modal = page.locator('.modal-panel');
+  await modal.getByLabel('Sobre o que é o conteúdo?', { exact:true }).fill('Como organizar um briefing antes de criar conteúdo');
+  for (let step = 0; step < 2; step++) await modal.getByRole('button', { name:/Continuar/i }).click();
+  await modal.getByRole('radio', { name:'Só texto', exact:true }).check();
+  await modal.getByRole('button', { name:/Continuar/i }).click();
+  await modal.getByRole('button', { name:'Gerar só texto', exact:true }).click();
+  await expect.poll(() => reviewRequested).toBe(true);
+  await expect(modal.getByRole('heading', { name:'Rascunho — em revisão', exact:true })).toBeInViewport();
+  await expect(modal.getByLabel('Prévia dos cards', { exact:true }).getByRole('article')).toHaveCount(6);
+  releaseReview();
+  await expect(modal).toHaveCount(0, { timeout:30_000 });
+});
+
 test('modal mobile prioriza o pedido e usa um único escopo até o CTA final', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page, {

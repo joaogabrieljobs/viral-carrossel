@@ -52,6 +52,160 @@ async function cardLogo(page) {
   await openFold(page, 'Logo nos cards');
 }
 
+test('editor mostra a prévia enquanto a revisão espera e só aplica o texto final', async ({ page }) => {
+  test.setTimeout(60_000);
+  let releaseReview;
+  const reviewing = new Promise(resolve => { releaseReview = resolve; });
+  let requestedReview = false;
+  await openEditor(page, {
+    '/api/ai/compatible': async route => {
+      const promptText = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+      if (promptText.startsWith('REVISÃO EDITORIAL')) {
+        requestedReview = true;
+        await reviewing;
+        return route.fulfill({ json: completion({ edits: [{ slideIndex: 0, reason: 'Clareza', title: 'Crie com o MUSA' }] }) });
+      }
+      return route.fulfill({ json: completion(draft('Prévia MUSA')) });
+    },
+  });
+  await prompt(page);
+  const before = await doc(page);
+  await generate(page);
+  await expect.poll(() => requestedReview).toBe(true);
+  const preview = page.locator('#vc-cards-viewport').getByLabel('Prévia dos cards', { exact: true });
+  await expect(preview.getByRole('article')).toHaveCount(3);
+  await expect(preview.getByRole('article', { name: 'Card 1', exact: true })).toContainText('Prévia MUSA 1');
+  expect((await doc(page)).slides).toEqual(before.slides);
+  releaseReview();
+  await expect.poll(async () => (await doc(page))?.slides[0]?.title).toBe('Crie com o MUSA');
+  await expect(preview).toHaveCount(0);
+});
+
+test('rascunho com informação não confirmada mostra aviso persistente e adia imagens', async ({ page }) => {
+  test.setTimeout(60_000);
+  const images = [];
+  const unverified = draft('Crie com o MUSA');
+  unverified.slides[1].subtitle = 'Sem taxas escondidas.';
+  await openEditor(page, {
+    '/api/ai/compatible': route => {
+      const promptText = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      return route.fulfill({ json:completion(promptText.startsWith('REVISÃO EDITORIAL') ? { edits:[] } : unverified) });
+    },
+    '/api/ai/sjinn-image': route => {
+      images.push(route.request().postDataJSON());
+      return route.fulfill({ json:{b64_json:PNG,mime:'image/png'} });
+    },
+  });
+  await prompt(page);
+  await page.getByRole('complementary').getByRole('radio', { name:'Texto e imagens', exact:true }).check();
+  await generate(page);
+  const notice = page.getByRole('region', { name:'Revisão pendente do conteúdo', exact:true });
+  await expect(notice).toContainText('Cards: 2');
+  await expect(page.getByRole('region', { name:'Geração em andamento', exact:true })).toHaveCount(0);
+  expect(images).toHaveLength(0);
+  await expect.poll(async () => (await doc(page))?.editorialReviewStatus).toBe('needs_attention');
+  expect((await doc(page)).slides).toHaveLength(3);
+  await page.reload();
+  await enterSavedProject(page);
+  await expect(notice).toContainText('Cards: 2');
+  await notice.getByText('O que conferir', { exact:true }).click();
+  await expect(notice).toContainText('Sem taxas escondidas');
+  expect(await page.locator('[data-vc-export-tree]').textContent()).not.toContain('Rascunho preservado');
+  await notice.getByRole('button', { name:'Conferi o conteúdo', exact:true }).click();
+  await expect(notice).toHaveCount(0);
+});
+
+test('prévia e aviso preservam rascunho recuperado sem tratar falha de estrutura como excesso de texto', async ({ page }) => {
+  test.setTimeout(60_000);
+  let releaseReview;
+  const reviewing = new Promise(resolve => { releaseReview = resolve; });
+  let requestedReview = false;
+  const incomplete = draft('Conteúdo recuperável');
+  incomplete.slides = incomplete.slides.slice(0, 2);
+  incomplete.slides[1].title = '';
+  incomplete.slides[1].subtitle = 'Organize as referências e a direção visual do trabalho em um único lugar para desenvolver suas ideias com clareza e manter cada escolha disponível enquanto prepara o próximo conteúdo';
+  await openEditor(page, {
+    '/api/ai/compatible': async route => {
+      const text = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      if (text.startsWith('REVISÃO EDITORIAL')) {
+        requestedReview = true;
+        await reviewing;
+        return route.fulfill({ json:completion({ edits:[] }) });
+      }
+      return route.fulfill({ json:completion(incomplete) });
+    },
+  });
+  await prompt(page);
+  const before = await doc(page);
+  await generate(page);
+  await expect.poll(() => requestedReview).toBe(true);
+  const preview = page.locator('#vc-cards-viewport').getByLabel('Prévia dos cards', { exact:true });
+  await expect(preview.getByRole('article')).toHaveCount(3);
+  await expect(preview.getByRole('article', { name:'Card 2', exact:true })).toContainText(incomplete.slides[1].subtitle);
+  expect((await doc(page)).slides).toEqual(before.slides);
+  releaseReview();
+  await expect.poll(async () => (await doc(page))?.editorialReviewStatus).toBe('needs_attention');
+  const saved = await doc(page);
+  expect(saved.slides).toHaveLength(3);
+  expect([saved.slides[1].title, saved.slides[1].subtitle].join(' ')).toBe(incomplete.slides[1].subtitle);
+  expect(saved.editorialReviewIssues).toEqual(expect.arrayContaining([
+    expect.objectContaining({ slideIndex:null, code:'missing_slides_padded' }),
+    expect.objectContaining({ slideIndex:1, kind:'recovered_title', code:'social_title_recovered' }),
+  ]));
+  const notice = page.getByRole('region', { name:'Revisão pendente do conteúdo', exact:true });
+  await notice.getByText('O que conferir', { exact:true }).click();
+  await expect(notice).toContainText('Estrutura do rascunho: a IA devolveu menos cards');
+  await expect(notice).toContainText('Card 2: título recuperado automaticamente');
+  await expect(notice).toContainText('Card 3: falta um título');
+});
+
+test('tema original continua sendo fonte factual no refinamento individual, em lote e na legenda', async ({ page }) => {
+  test.setTimeout(60_000);
+  const topic = 'Crie 3 cards sobre a clínica: 22 anos de experiência. Avaliação por R$ 399.';
+  const refined = { title:'Experiência no cuidado', subtitle:'22 anos de experiência. Avaliação por R$ 399.' };
+  const finalCaption = 'Conheça a clínica com 22 anos de experiência. Avaliação por R$ 399.';
+  const refinementPrompts = [];
+  await openEditor(page, {
+    '/api/ai/compatible': route => {
+      const text = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      if (text.startsWith('REVISÃO EDITORIAL')) return route.fulfill({ json:completion({ edits:[] }) });
+      if (text.includes('Instrução de refinamento:')) {
+        refinementPrompts.push(text);
+        return route.fulfill({ json:completion(refined) });
+      }
+      if (text.includes('Reescreva TODOS os slides do carrossel')) {
+        refinementPrompts.push(text);
+        return route.fulfill({ json:completion({ slides:[1,2,3].map(index => ({ ...refined, title:`Conheça o cuidado ${index}` })) }) });
+      }
+      if (text.startsWith('Atue como estrategista de conteúdo para Instagram. Crie a legenda')) {
+        refinementPrompts.push(text);
+        return route.fulfill({ json:{ choices:[{ message:{ content:finalCaption } }] } });
+      }
+      return route.fulfill({ json:completion({ slides:[1,2,3].map(index => ({ title:`Conheça a clínica ${index}`, subtitle:'Um cuidado pensado para você.', imageQuery:'' })), caption:'Conheça nossa proposta.' }) });
+    },
+  });
+  await prompt(page);
+  await page.getByLabel('Prompt para gerar', { exact:true }).fill(topic);
+  await generate(page);
+  await expect.poll(async () => (await doc(page))?.editorialContext?.topic).toBe(topic);
+  await expect(page.getByRole('region', { name:'Geração em andamento', exact:true })).toHaveCount(0);
+  expect((await doc(page)).material?.content || '').toBe('');
+
+  await page.getByRole('tab', { name:/^Narrativa$/i }).first().click();
+  await openPanel(page, /EDITAR CARD/i);
+  await page.getByRole('button', { name:'Refinar com IA', exact:true }).first().click();
+  await page.getByRole('button', { name:'Mais direto', exact:true }).click();
+  await expect.poll(async () => (await doc(page))?.slides[0]?.subtitle).toBe(refined.subtitle);
+
+  await page.getByRole('button', { name:'Refinar com IA', exact:true }).last().click();
+  await page.getByRole('button', { name:'Mais direto', exact:true }).click();
+  await expect.poll(async () => (await doc(page))?.slides[2]?.title).toBe('Conheça o cuidado 3');
+  await page.getByRole('button', { name:'Regerar', exact:true }).click();
+  await expect.poll(async () => (await doc(page))?.caption).toBe(finalCaption);
+  expect(refinementPrompts).toHaveLength(3);
+  for (const text of refinementPrompts) expect(text).toContain(`<material_factual_do_usuario>\n${topic}`);
+});
+
 test('analisar meu tom usa somente IA de texto e não inicia carrossel', async ({ page }) => {
   const textOnlySession = {
     ...SESSAO_ATIVA,

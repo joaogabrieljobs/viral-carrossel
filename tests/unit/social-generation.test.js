@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildGenerationSlideLayoutRules, buildRefineSingleSlideRules, buildGenerationJsonContract } from '../../src/utils/generation-prompts.js';
 import { validateCarouselDraft, generateReviewedCarousel } from '../../src/utils/editorial-review.js';
-import { recoverSocialTitle, recoverSocialTitleForEditing, requiresSocialTitles } from '../../src/utils/social-generation.js';
+import { auditSocialTextDensity, longSocialSupportIndexes, recoverSocialTitle, recoverSocialTitleForEditing, requiresSocialTitles } from '../../src/utils/social-generation.js';
 import { cultureAccentRenderablePieces } from '../../src/utils/text-spans.js';
 
 const config = { count: 5, presetId: 'livre', densityId: '1_1', narrativeMode: 'viral' };
@@ -26,10 +26,10 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     expect(prompt).not.toContain('title" se fizer sentido');
     expect(prompt).not.toContain('prosa de várias frases');
     expect(prompt).toContain('Pode deixar o payoff vazio');
-    const expected = density === '1_1' ? ['52–128', '38–92'] : ['38–92', '27–66'];
-    for (const band of expected) {
-      expect(prompt).toContain(band);
-      expect(refine).toContain(band);
+    const expected = density === '1_1' ? ['até 160 caracteres', 'juntos: até 300 caracteres'] : ['até 140 caracteres', 'até 100 caracteres', 'juntos: até 220 caracteres'];
+    for (const ceiling of expected) {
+      expect(prompt).toContain(ceiling);
+      expect(refine).toContain(ceiling);
     }
   });
 
@@ -135,11 +135,13 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     if (review instanceof Error) ai.mockRejectedValueOnce(review); else ai.mockResolvedValueOnce(review);
     const onDraft = vi.fn();
     const output = await generateReviewedCarousel({ prompt: 'brief', config, onDraft }, ai);
-    expect(ai).toHaveBeenCalledTimes(2);
-    expect(onDraft).toHaveBeenCalledWith(expect.objectContaining({ slides:expect.any(Array) }));
+    expect(ai).toHaveBeenCalledTimes(review instanceof Error ? 2 : 3);
+    expect(onDraft).toHaveBeenCalledWith(expect.objectContaining({ slides:expect.any(Array) }), { phase:'reviewing' });
     expect(output.reviewStatus).toBe('needs_attention');
     expect(output.result.slides).toHaveLength(5);
     expect(output.result.slides[2].title).toBeTruthy();
+    expect(output.issues).toContainEqual({ slideIndex:2, code:'social_title_recovered' });
+    expect(output.violations).toContainEqual(expect.objectContaining({ kind:'density', slideIndex:2 }));
     expect(`${output.result.slides[2].title} ${output.result.slides[2].subtitle}`.trim()).toBe(first.slides[2].subtitle);
     expect(output.result.slides[2].bodyAfterImage).toBe(first.slides[2].bodyAfterImage);
   });
@@ -151,15 +153,17 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     expect(`${recovered.title} ${recovered.subtitle}`.trim()).toBe(slide.subtitle);
   });
 
-  it('não abre automaticamente um rascunho com promessa comercial sem apoio', async () => {
+  it('preserva o rascunho com promessa sem apoio como revisão pendente explícita', async () => {
     const first = draft();
     first.slides[2] = { ...first.slides[2], title:'', subtitle:`Grátis para sempre. ${'Texto longo sem pontuação '.repeat(8)}` };
     const ai = vi.fn().mockResolvedValueOnce(first).mockRejectedValueOnce(new Error('offline'));
-    const error = await generateReviewedCarousel({
+    const output = await generateReviewedCarousel({
       prompt:'brief',
       config:{ ...config, commercialClaimSource:'Brief sem preço ou gratuidade.' },
-    }, ai).catch(value => value);
-    expect(error.code).toBe('unsupported_commercial_claim');
+    }, ai);
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.violations).toContainEqual(expect.objectContaining({ kind:'factual', category:'preço', slideIndex:2 }));
+    expect(output.result.slides).toHaveLength(5);
   });
 
   it('o contrato de markup corresponde ao suporte real sem remover underscores de URLs', () => {
@@ -167,5 +171,39 @@ describe('Prender atenção: títulos completos e preservação do texto', () =>
     expect(prompt).toContain('_underscores_');
     expect(prompt).not.toContain('o card mostraria o símbolo');
     expect(visible('Uma *porta de entrada de verdade* em get_webexpresso.com.')).toBe('Uma porta de entrada de verdade em get_webexpresso.com.');
+  });
+});
+
+describe('densidade considera o card inteiro, sem cortar conteúdo', () => {
+  const balanced = { presetId: 'livre', densityId: '1_2' };
+
+  it.each(['none', 'editorial', 'how_to', 'storytelling', 'viral', 'pain', 'deep', 'jornalistico', 'sensacionalista'])('barra o corpo longo que escapava em %s', narrativeMode => {
+    const slides = [{ title: 'O telefone antigo', subtitle: 'Um contato desatualizado dificulta a conversa.', bodyAfterImage: 'Confira o número e revise as informações antes de publicar. '.repeat(5) }];
+    const before = structuredClone(slides);
+    const violations = auditSocialTextDensity(slides, { ...balanced, narrativeMode });
+    expect(violations.map(item => item.field)).toEqual(['bodyAfterImage', 'support']);
+    expect(longSocialSupportIndexes(slides, { ...balanced, narrativeMode })).toEqual([0]);
+    expect(slides).toEqual(before);
+  });
+
+  it('rejeita dois blocos individualmente válidos cuja soma excede o orçamento', () => {
+    const violations = auditSocialTextDensity([{ title: 'Uma só ideia', subtitle: 'a'.repeat(130), bodyAfterImage: 'b'.repeat(95) }], balanced);
+    expect(violations).toEqual([{ slideIndex: 0, field: 'support', chars: 226, maxChars: 220 }]);
+  });
+
+  it('mede texto visível, permite corpo vazio e preserva uma ressalva completa', () => {
+    const slides = [{ title: '**O próximo passo**', subtitle: 'Solicite uma análise do site. Os resultados dependem do diagnóstico.', bodyAfterImage: '' }];
+    expect(auditSocialTextDensity(slides, balanced)).toEqual([]);
+    expect(slides[0].subtitle).toContain('dependem do diagnóstico');
+    expect(auditSocialTextDensity([{ title: '_Curto_', subtitle: `**${'a'.repeat(140)}**`, bodyAfterImage: '' }], balanced)).toEqual([]);
+  });
+
+  it('detecta texto escondido em título, quebras demais e densidade Essencial', () => {
+    expect(auditSocialTextDensity([{ title: 'Uma frase longa '.repeat(8), subtitle: 'a\nb\nc\nd' }], balanced).map(item => item.field)).toEqual(['title', 'subtitle']);
+    expect(auditSocialTextDensity([{ title: 'Uma só ideia', subtitle: 'a'.repeat(71) }], { ...balanced, densityId: '1_5' }).map(item => item.field)).toEqual(['subtitle']);
+  });
+
+  it('não aplica o limite social a apresentações', () => {
+    expect(auditSocialTextDensity([{ title: 'a'.repeat(100), bodyAfterImage: 'b'.repeat(500) }], { presetId: 'apresentacao', densityId: '1_2' })).toEqual([]);
   });
 });

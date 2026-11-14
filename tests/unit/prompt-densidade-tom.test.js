@@ -26,11 +26,11 @@ describe('C1 — densidade de texto escala de verdade', () => {
     expect(scaledCeiling(80, '1_5')).toBeLessThan(80);
   });
 
-  it('override de densidade cita números menores que a faixa base do modo', () => {
+  it('override de densidade limita ambos os campos sem exigir um mínimo', () => {
     const txt = buildSlideTextDensityOverrides('1_3', 'viral');
-    const m = /entre ~(\d+) e ~(\d+)/.exec(txt);
-    expect(m).not.toBeNull();
-    expect(Number(m[2])).toBeLessThan(220);
+    expect(txt).toContain('subtitle: até 110 caracteres');
+    expect(txt).toContain('juntos: até 150 caracteres');
+    expect(txt).toContain('São TETOS, nunca metas mínimas');
   });
 
   it('faixas do sanduíche T/C encolhem monotonicamente com a densidade', () => {
@@ -39,7 +39,8 @@ describe('C1 — densidade de texto escala de verdade', () => {
     const b15 = tendenciaStyleSandwichCharBands('1_5');
     expect(b13.subHi).toBeLessThan(b11.subHi);
     expect(b15.subHi).toBeLessThan(b13.subHi);
-    expect(b15.subLo).toBeLessThan(b13.subLo);
+    expect(b15.subLo).toBe(0);
+    expect(b13.subLo).toBe(0);
   });
 });
 
@@ -47,7 +48,7 @@ describe('H2 — T/C com densidade ≠ 1/1 dá uma única faixa de subtítulo', 
   it('não anexa o override genérico "SUBSTITUI" ao bloco sanduíche', () => {
     const rules = buildGenerationSlideLayoutRules('editorial', 'tendencia_cultura', '1_3');
     expect(rules).not.toMatch(/SUBSTITUI proporcionalmente/);
-    const faixas = [...rules.matchAll(/subtitle ~(\d+)–(\d+)/g)];
+    const faixas = [...rules.matchAll(/Tetos neste projeto: subtitle até (\d+) caracteres/g)];
     expect(faixas.length).toBe(1);
   });
 });

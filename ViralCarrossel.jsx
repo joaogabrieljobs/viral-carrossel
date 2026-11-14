@@ -14,10 +14,12 @@ import { GenerationStatus } from './src/components/GenerationStatus.jsx';
 import { buildEditorialStrategyBlock, buildContentObjectiveReminder, normalizeContentObjective, normalizeInstagramCaption } from './src/utils/editorial-strategy.js';
 import {
   assertPresentationTextLimits,
+  assertSocialRefinement,
   buildPresentationLimitsBlock,
   generateReviewedCarousel,
   presentationTextLimitsFromSlides,
 } from './src/utils/editorial-review.js';
+import { buildFactualGroundingPrompt, auditDraftFactuality } from './src/utils/factual-grounding.js';
 import { normalizePresentationBlocks, repairPresentationLayouts, auditRenderedPresentationLayout } from './src/utils/presentation-quality.js';
 import { repairRenderedPresentation } from './src/utils/presentation-render-review.js';
 import { presentationPhotoAspectRatio } from './src/utils/presentation-composition.js';
@@ -311,6 +313,8 @@ import {
   AccountHomeShell,
 } from './src/components/AccountHomeShell.jsx';
 import CreateProjectFlow from './src/components/CreateProjectFlow.jsx';
+import GenerationPreview from './src/components/GenerationPreview.jsx';
+import EditorialReviewNotice from './src/components/EditorialReviewNotice.jsx';
 import {
   normalizeCardVisualStyle,
   CARD_VISUAL_STYLE_OPTIONS,
@@ -1575,6 +1579,8 @@ export default function App() {
       return false;
     }
     creationTargetRef.current = null;
+    setCreationPreviewSlides([]);
+    setCreationPreviewPhase('draft');
     setLibraryOpen(false);
     setSetupOpen(false);
     setDrawerOpen(false);
@@ -3289,6 +3295,8 @@ export default function App() {
   // Importação manual é independente da IA: cancelar uma não pode abortar a outra.
   const [importProgress, setImportProgress] = useState(null);
   const [creationPreviewSlides, setCreationPreviewSlides] = useState([]);
+  const [creationPreviewPhase, setCreationPreviewPhase] = useState('draft');
+  const [generationPreviewContext, setGenerationPreviewContext] = useState(null);
   /** Cancela import de fotos em curso (lote / foto única). */
   const importAbortRef = useRef(null);
   // O drawer mobile e a sidebar desktop desmontam ao mudar a largura da tela.
@@ -3308,7 +3316,8 @@ export default function App() {
     cancelAllAIGeneration();
     generationRef.current = null;
     setGenProgress(null);
-    setCreationPreviewSlides([]);
+    // Keep the read-only preview available after cancellation. It is still
+    // marked unreviewed and has never replaced the saved document.
     slideImgGenIdsRef.current.clear();
     setSlideImgGenBusy({});
     setAnalyzingBrandTone(false);
@@ -5153,7 +5162,9 @@ export default function App() {
       );
     }
     const sourceSlides = slides;
-    if (creationSession) setCreationPreviewSlides([]);
+    setCreationPreviewSlides([]);
+    setCreationPreviewPhase('draft');
+    setGenerationPreviewContext({ projectId: generationProjectId, startedAt: Date.now(), isPresentation: isApresentacaoPreset(requestedPresetId) });
     setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Preparando contexto do projeto…' });
     trackEvent('carousel_generate_start', {
       product: isApresentacaoPreset(requestedPresetId) ? 'apresentacao' : 'carrossel',
@@ -5211,7 +5222,7 @@ export default function App() {
     // selection as uploaded material; do not append the entire brief again.
     const projectContextBlock = isPresentationGeneration ? '' : buildProjectContextBlock(styleKit);
     const styleKitTextHint = buildStyleKitTextHint(styleKit);
-    const { materialBlock, materialPriorityBlock, presentationSources = [] } = await runAIJob(() => resolveMaterialPromptParts(material, toast, {
+    const { materialBlock, materialPriorityBlock, presentationSources = [], factualSource: materialFactualSource = '' } = await runAIJob(() => resolveMaterialPromptParts(material, toast, {
       presentationPath: isPresentationGeneration ? presentationPathId : null,
       topic,
       additionalSources: isPresentationGeneration && styleKit.contextMd.trim()
@@ -5354,7 +5365,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan } = await generateReviewedCarousel({
+    const { result, reviewStatus, plan: generationPlan, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -5363,6 +5374,12 @@ ${jsonShapeLine}`;
         narrativeMode: effectiveMode,
         explicitCardScript,
         commercialClaimSource: [topic, materialBlock, material?.context, styleKit.contextMd].filter(Boolean).join('\n'),
+        factualSource: [
+          topic, materialFactualSource, styleKit.contextMd, brand.bio,
+          explicitCardScript?.preamble,
+          ...(explicitCardScript?.blocks || []).map(block => block.text),
+        ].filter(Boolean).join('\n'),
+        userInstructions: material?.context || '',
         presentationPath: presentationPathId,
         presentationTextLimits,
         presentationPlanning: isPresentationGeneration && !remix,
@@ -5398,34 +5415,51 @@ ${jsonShapeLine}`;
           }));
         },
       },
+      onDraft: draft => {
+        checkActive();
+        // A read-only preview is separate from history and autosave, including
+        // a remix. Only the final result below can replace existing cards.
+        setCreationPreviewSlides(draft.slides.map((slide, index) => ({
+          id: `draft-${generationProjectId}-${index}`,
+          title: slide.title,
+          subtitle: slide.subtitle,
+          bodyAfterImage: slide.bodyAfterImage,
+        })));
+        setCreationPreviewPhase('draft');
+        if (!creationSession && !setupOpen) {
+          boardScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+          if (isMobile) setDrawerOpen(false);
+        }
+      },
       onStage: stage => {
         checkActive();
-        const stages = {
+        const plannedPresentation = isPresentationGeneration && !remix;
+        const stages = plannedPresentation ? {
           planning: [1, 'Organizando o roteiro e as evidências'],
           writing: [2, 'Desenvolvendo os argumentos de cada slide'],
           reviewing: [3, 'Conferindo clareza, profundidade e fidelidade'],
           repairing: [3, 'Ajustando os textos que precisam de revisão'],
+        } : {
+          writing: [1, 'Escrevendo o texto'],
+          reviewing: [2, 'Conferindo fatos, clareza e tamanho do texto'],
+          repairing: [2, 'Corrigindo os textos que precisam de ajuste'],
         };
         const [current, label] = stages[stage] || stages.writing;
-        setGenProgress({ phase: 'text', current, total: 5, label: `Etapa ${current} de 5 · ${label}` });
+        const total = plannedPresentation ? 5 : 3;
+        setGenProgress({ phase: 'text', current, total, label: `Etapa ${current} de ${total} · ${label}` });
       },
-      onDraft: draft => {
-        checkActive();
-        if (creationSession && !remix) {
-          setCreationPreviewSlides((draft?.slides || []).map((item, index) => ({
-            ...item,
-            id:item.id || `draft-${index + 1}`,
-            bg:item.bg || brand.bg,
-            titleColor:item.titleColor || brand.titleColor,
-          })));
-        }
-      },
-      onReview: () => { checkActive(); if (!isPresentationGeneration || remix) setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Revisando clareza e coerência' }); },
+      onReview: () => { checkActive(); if (!isPresentationGeneration || remix) setGenProgress({ phase: 'text', current: 2, total: 3, label: 'Etapa 2 de 3 · Conferindo fatos, clareza e tamanho do texto' }); },
     }, callAI);
     checkActive();
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
-    if (reviewStatus === 'needs_attention') toast('Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.', 'warning', 8000);
+    if (reviewStatus === 'needs_attention') {
+      toast(isPresentationGeneration
+        ? 'Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.'
+        : 'Rascunho preservado. Confira as informações e o tamanho dos textos antes de exportar. As imagens não foram iniciadas para você revisar primeiro.', 'warning', 10000);
+      // Do not spend image credits on copy known to need a factual/text fix.
+      if (!isPresentationGeneration) fetchImagesNow = false;
+    }
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: isPresentationGeneration ? 4 : 3, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 4 de 5 · Compondo a apresentação' : 'Etapa 3 de 3 · Montando os cards' });
 
@@ -5681,6 +5715,16 @@ ${jsonShapeLine}`;
         ? (effectiveVisualPresetDef?.sourceVersion || null)
         : undefined,
       slideTextDensity: td, contentObjective: objective, editorialReviewStatus: reviewStatus,
+      editorialReviewIssues: reviewStatus === 'needs_attention'
+        ? (editorialViolations.length ? editorialViolations : editorialIssues).map(issue => ({
+            slideIndex: issue.slideIndex ?? null,
+            field: issue.field || null,
+            kind: issue.kind || null,
+            category: issue.category || null,
+            ...(typeof issue.code === 'string' ? { code: issue.code } : {}),
+            ...(typeof issue.claim === 'string' ? { claim: issue.claim.slice(0, 240) } : {}),
+          }))
+        : [],
       ...(generationPlan ? {
         presentationPlan: generationPlan,
         presentationQuality: {
@@ -5700,7 +5744,8 @@ ${jsonShapeLine}`;
           : performanceGuidance.preferredStructureId,
       },
     }));
-    if (creationSession && !remix) setCreationPreviewSlides(newSlides);
+    setCreationPreviewSlides(newSlides);
+    setCreationPreviewPhase(['needs_attention', 'unavailable'].includes(reviewStatus) ? reviewStatus : 'reviewed');
     setActiveIdx(0); setShellView('project');
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
     // versões antigas podiam deixar `subtitleVisible: false` gravado no projeto e
@@ -5842,7 +5887,7 @@ ${jsonShapeLine}`;
           6000,
         );
       }
-    } else if (!remix && result.slides.some(s => (s.imageQuery || '').trim())) {
+    } else if (reviewStatus !== 'needs_attention' && !remix && result.slides.some(s => (s.imageQuery || '').trim())) {
       toast(
         isPresentationGeneration
           ? 'Imagens não foram geradas agora. Os slides já têm áreas prontas para importar ou gerar uma imagem.'
@@ -6148,6 +6193,7 @@ ${jsonShapeLine}`;
 
   const refineSlide = async (instruction) => {
     const projectId = activeProjectRef.current;
+    const targetSlideId = slide.id;
     setRefining(true); setError('');
     const job = startAIJob();
     try {
@@ -6156,7 +6202,10 @@ ${jsonShapeLine}`;
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationRefine ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock, factualSource = '' } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationRefine ? presentationPath : null }), job.signal);
+      const factualConfig = { presetId: creativePreset, densityId: slideTextDensity,
+        factualSource: [doc.editorialContext?.topic, factualSource, styleKit.contextMd, brand.bio].filter(Boolean).join('\n'),
+        userInstructions: [material.context, instruction].filter(Boolean).join('\n') };
       const voiceRefine = buildRefineVoiceRules(creativePreset, mode);
       const nSl = slides.length;
       const presentationRefineTextLimits = isPresentationRefine
@@ -6195,6 +6244,7 @@ Instrução de refinamento: ${instruction}
 
 REGRAS:
 ${voiceRefine}
+${isPresentationRefine ? '' : buildFactualGroundingPrompt(factualConfig)}
 ${isPresentationRefine ? buildApresentacaoRefineHint(presentationPath) : ''}
 ${presentationRefineLimitsBlock}
 ${isPresentationRefine ? '- Desenvolva subtitle e bodyAfterImage quando necessário à instrução e à função do slide, dentro dos limites. Preserve fatos, números, unidades, períodos e ressalvas reais.\n' : ''}
@@ -6228,7 +6278,8 @@ Retorne exatamente: ${singleJson}`,
           'Refinamento',
         );
       }
-      if (activeProjectRef.current === projectId) updateSlide(patch);
+      if (!isPresentationRefine) assertSocialRefinement({ slides: [slide] }, { slides: [{ ...slide, ...patch }] }, factualConfig);
+      if (activeProjectRef.current === projectId) setSlides(current => current.map(item => item.id === targetSlideId ? { ...item, ...patch } : item));
     } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
     finally { job.finish(); setRefining(false); }
   };
@@ -6248,7 +6299,8 @@ Retorne exatamente: ${singleJson}`,
         topic:doc.editorialContext?.topic || '',
         content:[material?.content, ctx].filter(Boolean).join('\n'),
       });
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock, factualSource = '' } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: isPresentationSummary ? presentationPath : null }), job.signal);
+      const factualConfig = { factualSource: [doc.editorialContext?.topic, factualSource, styleKit.contextMd, brand.bio].filter(Boolean).join('\n'), userInstructions: material.context };
       const r = await callAI(
         `${isPresentationSummary
           ? 'Atue como editor de apresentações. Crie um resumo executivo e notas breves para acompanhar este deck.'
@@ -6266,6 +6318,7 @@ ${buildCaptionOutlineInstructions(mode, creativePreset)}
 
 REGRAS:
 ${capRules}
+${isPresentationSummary ? '' : buildFactualGroundingPrompt(factualConfig)}
 ${isPresentationSummary ? buildPresentationSummaryRules(presentationPath) : ''}
 ${isPresentationSummary
   ? '- Sintetize a tese, os principais pontos e a decisão ou próximo passo. Não use hashtags, gatilhos sociais ou pedidos para compartilhar.'
@@ -6278,6 +6331,9 @@ ${isPresentationSummary
       const finalCaption = isPresentationSummary
         ? (isPitchPath(presentationPath) ? cleanPitchText(r?.summary ?? r?.caption ?? r) : String(r?.summary ?? r?.caption ?? r ?? '').trim())
         : normalizeInstagramCaption(r);
+      if (!isPresentationSummary && auditDraftFactuality({ slides: [], caption: finalCaption }, factualConfig).length) {
+        throw new Error('A legenda acrescentou informações sem apoio no briefing. Mantive a legenda anterior; confira o material antes de tentar novamente.');
+      }
 
       if (activeProjectRef.current === projectId) {
         setCaption(finalCaption);
@@ -6489,7 +6545,10 @@ ${isPresentationSummary
       const brandBlock = buildBrandBlock(brand);
       const projectContextBlock = buildProjectContextBlock(styleKit);
       const styleKitTextHint = buildStyleKitTextHint(styleKit);
-      const { materialBlock, materialPriorityBlock } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: refiningPresentation ? presentationPath : null }), job.signal);
+      const { materialBlock, materialPriorityBlock, factualSource = '' } = await runAIJob(() => resolveMaterialPromptParts(material, toast, { presentationPath: refiningPresentation ? presentationPath : null }), job.signal);
+      const factualConfig = { presetId: creativePreset, densityId: slideTextDensity,
+        factualSource: [doc.editorialContext?.topic, factualSource, styleKit.contextMd, brand.bio].filter(Boolean).join('\n'),
+        userInstructions: [material.context, instruction].filter(Boolean).join('\n') };
       const voiceBulk = buildRefineVoiceRules(creativePreset, mode);
       const layoutBulk = buildGenerationSlideLayoutRules(mode, creativePreset, slideTextDensity, slides.length, presentationPath);
       const refinePrompt = refiningPresentation
@@ -6526,6 +6585,7 @@ Instrução: ${instruction}
 
 REGRAS DE VOZ:
 ${voiceBulk}
+${buildFactualGroundingPrompt(factualConfig)}
 ${buildTendenciaCulturaRefineSlideHint(creativePreset, slideTextDensity)}
 ${isApresentacaoPreset(creativePreset) ? buildApresentacaoRefineHint() : ''}
 ${refineAllHybrid ? '- Layout Personalizado (1/1 ou 1/2): do 3.º slide em diante o card é sanduíche — reescreva também "bodyAfterImage" (payoff abaixo da foto) mantendo o campo vazio nos slides 1–2.\n' : ''}- Mantenha exatamente ${slides.length} slides na mesma ordem (slide 1 = abertura do arco do modo; último = fecho/CTA conforme o modo).
@@ -6541,7 +6601,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         { json:true, openaiKey, signal: job.signal, ...presentationAIOptions(creativePreset, presentationPath), maxTokens: refiningPresentation ? Math.min(8192, 3072 + slides.length * 512) : 4096 }
       );
       throwIfGenerationCancelled(job.signal);
-      if (!r?.slides?.length) throw new Error('IA não retornou slides');
+      if (!Array.isArray(r?.slides) || r.slides.length !== slides.length) throw new Error('O refinamento mudou a quantidade de cards. Mantive o conteúdo anterior.');
       if (activeProjectRef.current !== projectId) return;
       const applyRefinedSlides = source => source.map((s, i) => {
         const total = source.length;
@@ -6567,12 +6627,12 @@ Retorne APENAS JSON: ${refineAllWantsBody
           presentationRefineTextLimits,
           'Refinamento',
         );
-      }
+      } else assertSocialRefinement({ slides }, { slides: refinedSlides }, factualConfig);
       setSlides(prev => applyRefinedSlides(prev));
       toast('Todos os slides refinados', 'success');
     } catch(e) { if (!isGenerationCancelled(e)) setError(e.message); }
     finally { job.finish(); setRefining(false); }
-  }, [slides, setSlides, setError, toast, openaiKey, brand, material, styleKit, creativePreset, mode, slideTextDensity, contentObjective, presentationPath]);
+  }, [slides, setSlides, setError, toast, openaiKey, brand, material, styleKit, creativePreset, mode, slideTextDensity, contentObjective, presentationPath, doc.editorialContext?.topic]);
 
   // Aplica um template pronto (preenche slides + brand + composições)
   const applyTemplate = useCallback((tpl, { generateImages = false } = {}) => {
@@ -7223,6 +7283,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           hasDraft={!!creationTargetRef.current && projectHasCarouselContent(slides)}
           progress={genProgress}
           previewSlides={creationPreviewSlides}
+          previewPhase={creationPreviewPhase}
         />
       ) : shellView === 'home' ? (
         <AccountHomeShell
@@ -7606,6 +7667,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
           }} index={activeIdx} count={slides.length} isPresentation={isPresentationProject} onNavigate={index => { setActiveIdx(index); setBoardJump(n => n + 1); }} />}
           <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
           <div id="vc-cards-viewport" className="vc-cards-viewport" ref={boardScrollRef} style={{ flex:1, minWidth:0, overflow:'auto', overscrollBehavior:'contain', touchAction:'pan-x pan-y' }}>
+            {!setupOpen && generationPreviewContext?.projectId === activeDocId && ((generationRef.current && genProgress) || (creationPreviewPhase === 'draft' && creationPreviewSlides.length > 0)) && <div className="vc-editor-generation-preview">
+              <GenerationPreview active={!!generationRef.current && !!genProgress} startedAt={generationPreviewContext.startedAt} progress={genProgress} slides={creationPreviewSlides} phase={creationPreviewPhase} isPresentation={generationPreviewContext.isPresentation}/>
+              {!genProgress && <button type="button" className="vc-btn vc-btn-ghost" onClick={() => { setCreationPreviewSlides([]); setGenerationPreviewContext(null); }}>Fechar prévia da geração</button>}
+            </div>}
+            <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}/>
             {empty ? (
               // Empty state
               <div className="empty-grid" style={{
@@ -8505,6 +8571,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
         onClose={()=>{setSetupOpen(false);setPrefilledTopic('');}}
         onGenerate={handleGenerate}
         onCancelGeneration={cancelGeneration}
+        generationProgress={genProgress}
+        previewSlides={generationPreviewContext?.projectId === activeDocId ? creationPreviewSlides : []}
+        previewPhase={creationPreviewPhase}
+        generationStartedAt={generationPreviewContext?.startedAt}
         defaultNiche={niche}
         defaultTopic={prefilledTopic}
         defaultTone={brand.defaultTone || ''}

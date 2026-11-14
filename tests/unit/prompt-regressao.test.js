@@ -86,8 +86,9 @@ describe('montagem final dos prompts de texto', () => {
   it('livre/editorial/1_1 não mistura faixas genéricas com o híbrido', () => {
     const final = assembledPrompt('livre');
     expect(final).toContain('MÉTODO EDITORIAL');
-    expect(final).toContain('260–403');
-    expect(final).toContain('248–384');
+    expect(final).toContain('subtitle: até 160 caracteres');
+    expect(final).toContain('juntos: até 300 caracteres');
+    expect(final).not.toMatch(/260–403|248–384/);
     expect(final).not.toMatch(/ENTRE 200 E 320|máx 140|50–85/);
     expect(final.match(/LAYOUT VISUAL HÍBRIDO/g)).toHaveLength(1);
     expect(final).toContain('exatamente 7 itens');
@@ -101,8 +102,8 @@ describe('montagem final dos prompts de texto', () => {
     for (const density of ['1_1', '1_3', '1_5']) {
       const final = assembledPrompt('tendencia_cultura', density, 9);
       const b = prompts.tendenciaStyleSandwichCharBands(density);
-      expect(final).toContain(`subtitle ~${b.subLo}–${b.subHi}`);
-      expect(final.split(`${b.subLo}–${b.subHi}`)).toHaveLength(2);
+      expect(final).toContain(`subtitle até ${b.subHi} caracteres`);
+      expect(final).toContain(`subtitle: até ${b.subHi} caracteres`);
       expect(final).toContain('ÚLTIMO SLIDE (posição 9)');
       expect(final).toContain('ESTRUTURA DA LEGENDA CULTURA');
       expect(final).toContain('sem emojis');
@@ -148,7 +149,8 @@ describe('montagem final dos prompts de texto', () => {
     expect(single).toContain('presentationTextLimitsFromSlides(slides)');
     expect(single).toContain('buildPresentationLimitsBlock(');
     expect(single).toContain('assertPresentationTextLimits(');
-    expect(single.indexOf('assertPresentationTextLimits(')).toBeLessThan(single.indexOf('updateSlide(patch)'));
+    expect(single.indexOf('assertPresentationTextLimits(')).toBeLessThan(single.indexOf('setSlides(current =>'));
+    expect(single).toContain('item.id === targetSlideId');
     expect(bulk).toContain('presentationTextLimitsFromSlides(slides)');
     expect(bulk).toContain('buildPresentationLimitsBlock(');
     expect(bulk).toContain('assertPresentationTextLimits(');

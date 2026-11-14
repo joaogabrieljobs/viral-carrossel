@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sparkles, Loader2, Bookmark, X, ChevronRight, ChevronLeft, Check, Settings } from 'lucide-react';
 import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
+import GenerationPreview from '../GenerationPreview.jsx';
 import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
 import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset, resolveRequestedContentLanguage } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
@@ -121,6 +122,7 @@ export function saveGenerationScopePreference(productKind = 'carrossel', withIma
 
 function GenerateModal({
   open, onClose, onGenerate, onCancelGeneration,
+  generationProgress, previewSlides = [], previewPhase = 'draft', generationStartedAt,
   defaultNiche='', defaultTopic='', defaultTone='', defaultAudience='',
   hasOpenAI=false, hasAnthropic=false, onOpenKeys,
   defaultWithImages = false,
@@ -300,6 +302,13 @@ function GenerateModal({
     });
     return () => window.cancelAnimationFrame(focusTimer);
   }, [open, step]);
+
+  useEffect(() => {
+    if (open && busy) {
+      stepPanelRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      stepPanelRef.current?.focus({ preventScroll: true });
+    }
+  }, [open, busy]);
 
   const onDialogKeyDown = (event) => {
     if (event.key === 'Escape') {
@@ -530,6 +539,7 @@ function GenerateModal({
             paddingBottom: 24,
           }}
         >
+          {busy && <GenerationPreview active startedAt={generationStartedAt} progress={generationProgress} slides={previewSlides} phase={previewPhase} isPresentation={isPresentation}/>}
           {/* ═══════════ ETAPA 1 — IDEIA ═══════════
               Tema, pacote criativo e ganchos salvos. Personalizado expõe modo
               narrativo, nicho, público. Outros pacotes mostram aviso explicando
@@ -1135,7 +1145,7 @@ function GenerateModal({
 
           {/* ═══════════ ETAPA 4 — REVISÃO ═══════════
               Resumo das escolhas, contexto aplicado e eventuais erros. */}
-          {step === 4 && (
+          {step === 4 && !busy && (
             <>
               {/* Resumo das escolhas antes da ação final. */}
               <div style={{

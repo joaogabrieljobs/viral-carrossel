@@ -15,11 +15,21 @@ import { normalizeBrandTone } from './brand-tone.js';
 import { genModeUiLabel } from './ui-depth-labels.js';
 import { isPitchPath, buildPitchFieldRules } from './pitch-content.js';
 import { buildPresentationMaterial } from './presentation-material.js';
+import { buildSocialTextLimitsPrompt, socialTextLimits } from './social-generation.js';
 import {
   buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules,
 } from './presentation.js';
 
 export const GENERATION_TOPIC_MAX_CHARS = 1500;
+
+const SOCIAL_FACTUAL_GROUNDING_RULES = `FIDELIDADE AO MATERIAL — vale também para título, legenda e CTA:
+- Use o pedido, brief e material fornecidos como fonte dos fatos. O modo narrativo muda a organização e o ritmo, nunca os fatos, a oferta, o público ou a ação final.
+- Não complete lacunas com números, tempo decorrido, frequência, depoimentos, falas, eventos, diagnósticos, canais de contato, itens inclusos, preço, prazo ou garantias. Um benefício esperado não é um resultado comprovado.
+- Não transforme possibilidade em certeza, associação em causa, nem um caso em regra para a maioria ou para todos. Afirmações de perda, ganho ou conversão exigem apoio no material; caso contrário descreva a dificuldade observável sem prometer seu efeito.
+- Se uma cena foi fornecida, preserve apenas seus acontecimentos. Não acrescente uma história anterior, um concorrente, uma reação ou um desfecho para tornar o arco mais dramático. Só crie ficção se o usuário pedir, deixando claro que é exemplo hipotético.
+- Instruções de estilo, exemplos de fórmula e hipóteses do método não comprovam fatos. Não copie seus detalhes para o conteúdo final.
+- Preserve o vocabulário do público e a intenção do CTA do pedido. Não substitua clientes por pacientes nem acrescente WhatsApp, DM, comentários ou outro canal não solicitado. Na ausência de CTA, prefira uma conclusão útil sem inventar oferta.
+- Cada card acrescenta uma ideia; não repita o mesmo número, problema ou argumento para preencher a sequência. Revise naturalidade e precisão no idioma solicitado.`;
 
 // Cada modo substitui a seção MÉTODO no prompt. Todos devem escalar ao número
 // de slides pedido (hook → meio(s) → fecho), sem assumir sempre 5 slides no miolo.
@@ -33,7 +43,7 @@ const GEN_MODES = [
 Objetivo: defender uma leitura específica do tema com observação, mecanismo e consequência concreta.
 - Slide 1 · HOOK/Tese: uma observação específica que desperta curiosidade e que o miolo sustenta. Pode ser direta, uma cena ou um contraste; não force tese contraintuitiva nem a fórmula "Não é sobre X. É sobre Y.".
 - Slides do meio (2 até penúltimo): cada um = UMA camada nova — sem repetir o mesmo tipo de argumento. Ordens possíveis (combine conforme N): contexto de mercado → onde a leitura óbvia quebra → mecanismo ou estrutura por trás → impacto na categoria ou no consumidor → erro recorrente → contraste com o que "todo mundo faz". Vocabulário útil quando couber: categoria, distribuição, posicionamento, percepção, comportamento, recorrência, narrativa (da categoria), repertório, diferenciação, sinal, confiança.
-- Último slide · Fecho: conclua a tese com uma consequência específica do tema. Depois, uma pergunta real OU um convite para salvar com utilidade clara; evite máximas sobre quem vence ou fica para trás.
+- Último slide · Fecho: conclua a tese com uma consequência sustentada e o próximo passo pedido; evite máximas sobre quem vence ou fica para trás.
 EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos em vários slides.`,
   },
   {
@@ -43,11 +53,11 @@ EVITE: tom de guru, frase vazia de inspiração, repetir "insights" genéricos e
     desc: 'Autopsia do tema — variáveis, padrão escondido, o que muda na prática',
     method: `MÉTODO PROFUNDO — anatomia do fenômeno (modo "patologista"; escala ao N de slides):
 Disseque o tema: variáveis, padrões, hipóteses testáveis. Zero "seja autêntico", zero conselho genérico.
-- Slide 1 · HOOK: tese contraintuitiva que expõe um padrão escondido. Ex.: "Não existe X. Existe Y." / "Todo mundo mede X. O que importa é Y." / "X não é o problema. É sintoma."
+- Slide 1 · HOOK: uma pergunta ou observação específica que o material permite investigar. Não force uma tese contraintuitiva, um segredo ou uma afirmação absoluta.
 - Slides do meio — distribua estas ETAPAS ao longo dos slides 2…penúltimo (se N for pequeno, una etapas adjacentes; se N for grande, detalhe mais dentro da mesma etapa):
   (A) AUTÓPSIA — o que acontece por dentro do fenômeno (mecanismo, não aparência): gatilho, fricção, atrito, sinal, ciclo, dependência.
   (B) PADRÃO OCULTO — princípio que conecta casos visíveis; nomeie o que se repete.
-  (C) DEMONSTRAÇÃO — um caso onde o padrão aparece em ação.
+  (C) DEMONSTRAÇÃO — um caso fornecido, ou a sequência de ações explicitamente descrita no material; não invente um caso para preencher esta etapa.
   (D) IMPLICAÇÃO — o que muda na decisão ou na leitura quando você enxerga isso.
 - Último slide · Fecho: mostre qual decisão muda ao reconhecer o mecanismo; uma pergunta específica pode encerrar, sem hierarquia entre quem entendeu e quem não entendeu.
 Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento, recorrência, fricção, antecipação, hipótese, variável, sistema. EVITE: hack, segredo, fórmula mágica.`,
@@ -61,12 +71,12 @@ Vocabulário preferido: mecanismo, gatilho, sinal, distribuição, comportamento
 Escreva para quem sofre com o tema agora. Nomear, validar, expor o ciclo, apontar direção pequena e real — não promessa. Tom sóbrio e perto; ZERO "você consegue", ZERO performance coaching.
 - Slide 1 · IDENTIFICAÇÃO: o sentimento que o leitor mal consegue nomear — preciso o suficiente para ele pensar "sou eu". Ex.: "Você fez tudo certo. E ainda assim travou." / "Você não está cansado. Está exausto de fingir que está bem."
 - Slides do meio — distribua ao longo de 2…penúltimo:
-  VALIDAÇÃO (detalhes sensoriais e situações concretas da dor),
-  FALSO REMÉDIO (o que tentaram e por que não segurou — sem julgar),
+  VALIDAÇÃO (a dificuldade observável descrita no material),
+  FALSO REMÉDIO (somente se o material informar uma tentativa anterior; caso contrário explique o obstáculo atual, sem inventar histórico),
   RAIZ (mecanismo; sintoma vs causa — o que muda a autoimagem),
   SAÍDA (ângulo honesto e possível hoje — não milagre).
 Se poucos slides: priorize validação → raiz → saída.
-- Último slide: convite gentil. Ex.: "Salve pra reler quando o ciclo voltar." / pergunta nos comentários qual frase doeu primeiro.
+- Último slide: saída honesta e convite gentil coerente com o CTA solicitado.
 Vocabulário: ciclo, raiz, sintoma, exaustão, repetição, pausa, presença. EVITE: jornada, mindset, foco, você nasceu pra isso.`,
   },
   {
@@ -87,7 +97,7 @@ Cada slide deve entregar informação e criar motivo para continuar; feche no mi
   DESENVOLVIMENTO (prova parcial, autoridade rápida sem paper acadêmico),
   SHARE-TRIGGER (uma frase quotável memorável),
   PAYOFF (fecha o loop — o "ahá").
-- Último slide: pergunta real nos comentários OU save com motivo concreto. EVITE: "segue pra mais", "marca o amigo", "compartilha se gostou".
+- Último slide: entregue o payoff e o próximo passo solicitado. EVITE: "segue pra mais", "marca o amigo", "compartilha se gostou".
 Tom: curto, rápido, confiante; urgência sem sensacionalismo.`,
   },
   {
@@ -96,15 +106,15 @@ Tom: curto, rápido, confiante; urgência sem sensacionalismo.`,
     label: 'Storytelling',
     desc: 'História com arco — cena, tempo e virada (não headline de pitch)',
     method: `MÉTODO STORYTELLING — narrativa em cena (escala ao N de slides):
-Conte uma história sobre o tema; não explique em modo manual. Cenas com tempo, lugar, gesto, detalhe verificável. Evite título conceitual genérico ("X: uma reflexão") no lugar de imagem viva.
-- Slide 1 · IN MEDIAS RES: entre no meio da ação. Ex.: "Era 23h e ela releu o e-mail pela quinta vez." / "O cliente desligou antes da segunda frase."
+Conte a situação fornecida como uma sequência compreensível; não explique em modo manual. Use somente ações e detalhes presentes no material. Sem caso fornecido, acompanhe o processo descrito, sem fabricar cliente, cenário ou depoimento.
+- Slide 1 · IN MEDIAS RES: entre na ação que consta no material, sem adicionar horário, contagem, fala ou acontecimento.
 - Slides do meio — distribua ao longo de 2…penúltimo:
-  CONTEXTO (o que estava em jogo; sensorial),
-  VIRADA (um evento concreto que muda tudo — número, fala, objeto),
-  CONSEQUÊNCIA (como fica o mundo depois),
+  CONTEXTO (o que estava em jogo, segundo o material),
+  VIRADA (a descoberta ou mudança que foi informada; não exija um evento extraordinário),
+  CONSEQUÊNCIA (o próximo passo possível, sem apresentar sucesso esperado como já ocorrido),
   e se couber GENERALIZAÇÃO leve (o que isso significa além deste caso) — antes do fecho.
 Se poucos slides: contexto → virada → consequência.
-- Último slide: convite para compartilhar uma experiência. Ex.: "Já aconteceu algo assim com você?" / "Qual foi seu '23h' com [tema]?"
+- Último slide: conclusão da situação e CTA solicitado, sem inventar um final feliz.
 Use verbos no passado/presente; EVITE "muitas pessoas", "em geral", gerúndio em excesso.`,
   },
   {
@@ -117,10 +127,10 @@ Sem palestra motivacional. O leitor deve sair sabendo o que fazer na ordem certa
 - Slide 1 · PROMESSA: deixe explícito resultado + número de passos (alinhado ao total de slides intermediários). Ex.: "Como [resultado] em [K] passos."
 - Slides do meio (2 até penúltimo): UM PASSO POR SLIDE, numerados em sequência real (Passo 1… Passo K). Em cada um:
   • TÍTULO: "Passo N · [verbo + objeto]" (nome curto e ativo).
-  • SUBTÍTULO: (1) imperativo do que fazer; (2) como fazer com precisão; (3) erro comum OU mini-exemplo.
+  • SUBTÍTULO: a ação concreta e, se couber no limite, como executá-la. Um erro ou exemplo é opcional e deve vir do material; não force três explicações em cada card.
   Linguagem imperativa: "Identifique…", "Anote…", "Compare…" — evite "é importante que você…".
 - Penúltimo slide: entregue o último passo; inclua nele um erro específico a evitar, sem substituir o passo prometido.
-- Último slide: save com utilidade + pergunta sobre qual passo testar primeiro.
+- Último slide: síntese do procedimento e CTA solicitado.
 Se houver checklist ou variação, conte apenas os passos reais na promessa da capa; não invente passos para preencher espaço.`,
   },
   {
@@ -132,9 +142,9 @@ Se houver checklist ou variação, conte apenas os passos reais na promessa da c
 Soar como postagem de veículo sério ou newsletter de analítico — não viral barulhento nem pitch de marca.
 - Slide 1 · CAPA: hierarquia de três camadas quando couber ao formato do JSON (use título e subtítulo de forma criativa para isso):
   (A) SELO/CATEGORIA — uma linha curta em tom de editoria em CAIXA ALTA OU caixa alta suave (ex.: "ANÁLISE", "MERCADO", "[NICHO]").
-  (B) MANCHETE — frase forte, pode ser maior e mais objetiva que um hook meme; até ~12 palavras se precisar densidade.
+  (B) MANCHETE — frase objetiva, dentro do limite de título da densidade escolhida.
   (C) LEAD/NUT — 1 linha ou 2 máximas: o "por que importa agora", factual e direto — sem perguntinha vazia.
-- Slides do meio (2…penúltimo): cada um como BLOCO DE MATÉRIA — parágrafos curtos (estilo pirâmide invertida: fato/implicação → contexto → detalhe). Um slide = uma peça da história ou um ângulo novo (who/what/when/why/so what). Vocabulário: fonte implícita, consequência, precedente, cenário — sem jargão de guru.
+- Slides do meio (2…penúltimo): informação principal primeiro, seguida de contexto apenas se couber no limite. Um slide = um fato ou ângulo sustentado. Não simule reportagem, pesquisa, fonte ou tendência de mercado ausentes.
 - Último slide · FECHO: linha-editorial ou o que falta saber próximo — convite sóbrio (pergunta precisa ou "salve para acompanhar").
 EVITE: "X mudou tudo" sem nuance; clickbait que o miolo não sustenta; tom de relatório institucional de marca.`,
   },
@@ -147,11 +157,11 @@ EVITE: "X mudou tudo" sem nuance; clickbait que o miolo não sustenta; tom de re
 Máximo drama na forma, honestidade no conteúdo: pode exagerar RITMO e TENSÃO lexical, não fatos nem promessas.
 - Slide 1 · BERRANTE CONTROLADO — UMA destas âncoras (troque conforme tema):
   • REVELAÇÃO com custo ("O que ninguém te contou sobre [X]").
-  • NÚMERO ou prazo espremido ("3 dias de [cenário] e já dá pra ver…").
+  • CONTRASTE concreto entre o problema descrito e a ação proposta; número ou prazo somente se o material os confirmar.
   • PERGUNTA que arranha ("Por que [grupo] ainda acredita em [Y]?").
   PROIBIDO: "chocante!", "você não vai acreditar" vazio, ou prometer prova que o carrossel não entrega.
 - Slides do meio — distribua tensão máxima: cada slide abre novo micro-gancho OU fecha um aberto antes; uso de cortes curtos, frases de efeito, contraste visceral ("parecia X / era Y"). Um slide deve ter a frase "compartilhável" de choque sóbrio quando houver espaço — não vulgaridade gratuita.
-- Último slide: payoff real (o que ficou provado neste carrossel) + pergunta inflamável NOS FATOS OU save — sem arme-se sem fechar o arco.
+- Último slide: síntese sustentada e CTA solicitado. Tensão não autoriza catastrofismo, generalizações ou promessa de conversão.
 Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo.`,
   },
   {
@@ -159,7 +169,7 @@ Tom: urgência, segunda pessoa só quando intensificar impacto — sem moralismo
     desc: 'Segue o pedido e o brief, sem fórmula narrativa predefinida.',
     method: 'SEM MODO NARRATIVO: siga a entrega e a organização pedidas pelo usuário e pelo brief. Não imponha tese editorial, tutorial, história ou fórmula de retenção. Garanta clareza, coerência e ausência de repetição.',
   },
-];
+].map(mode => ({ ...mode, method: `${mode.method}\nO modo organiza o arco. Fatos, restrições, idioma e CTA do pedido têm prioridade sobre estas sugestões. Não crie detalhes ausentes para completar a estrutura.` }));
 const GEN_MODE_BY_ID = Object.fromEntries(GEN_MODES.map(m => [m.id, m]));
 
 /** IDs legados que deixaram de ser modos narrativos. */
@@ -227,34 +237,23 @@ function isPersoHybridDensity(presetId, densityId) {
   return presetId === 'livre' && (densityId === '1_1' || densityId === '1_2');
 }
 
-function persoHybridCharBands(textDensityId = '1_1', narrativeModeId = 'editorial') {
-  if (narrativeModeId !== 'viral') return tendenciaStyleSandwichCharBands(textDensityId);
-  // Retention copy is not the dense Cultura essay. Split the selected mode's
-  // single-copy budget between the two existing visual regions instead of
-  // imposing two long paragraphs independently of the chosen mode.
-  const band = scaledCharBand(...midSubtitleBandFor(narrativeModeId), textDensityId);
-  return {
-    subLo: Math.max(24, Math.round(band.lo * 0.58)),
-    subHi: Math.max(32, Math.round(band.hi * 0.58)),
-    bodyLo: Math.max(20, Math.round(band.lo * 0.42)),
-    bodyHi: Math.max(24, Math.round(band.hi * 0.42)),
-  };
+function persoHybridCharBands(textDensityId = '1_1') {
+  return tendenciaStyleSandwichCharBands(textDensityId);
 }
 
-function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1', narrativeModeId = 'editorial') {
+function buildPersoHybridLayoutBlock(slideCount, textDensityId = '1_1') {
   const n = Math.min(12, Math.max(2, slideCount | 0));
-  const { subLo, subHi, bodyLo, bodyHi } = persoHybridCharBands(textDensityId || '1_1', narrativeModeId);
-  const attention = narrativeModeId === 'viral';
+  const { subHi, bodyHi } = persoHybridCharBands(textDensityId || '1_1');
   return `
 LAYOUT VISUAL HÍBRIDO (Personalizado · densidade ${SLIDE_TEXT_DENSITY_BY_ID[textDensityId]?.label || textDensityId} — prioridade quando ativo):
 
 - Slide 1 e Slide 2: subtítulo até ${scaledCeiling(80, textDensityId)} caracteres; formato de tela inteira (“full-bleed”) — só "title", "subtitle" e "imageQuery". O campo "bodyAfterImage" DEVE ser exatamente "" (vazio).
 
 - A segunda tela já desenvolve o argumento; não repita a abertura. O último slide conclui o arco, mesmo usando dois blocos.
-- Slide 3 a Slide ${n} (todos quando N≥3): miolo formato sanduíche: bloco inicial em "subtitle" e "title" OBRIGATÓRIO, curto e específico ACIMA da fotografia embutida, e payoff em "bodyAfterImage" ABAIXO da foto. Com ou sem foto, ${attention ? 'subtitle tem alvo de' : 'preencha **subtitle** com'} **${subLo}–${subHi}** caracteres ${attention ? '(uma frase curta com informação)' : '(desenvolvimento conciso, sem parede de texto)'} e **bodyAfterImage** ${attention ? 'pode acrescentar um payoff de' : 'com'} **${bodyLo}–${bodyHi}** caracteres.${attention ? ' Pode deixar o payoff vazio se a ideia já estiver completa; não repita a legenda para preencher a zona.' : ''} As faixas incluem espaços e são alvos: não acrescente redundância ou fatos para atingir o piso. Preserve o ritmo do modo com frases curtas dentro de cada bloco. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
-- TODOS os cards, em qualquer modo narrativo, exigem title não vazio. Nunca use "Seu título aqui" nem coloque o texto inteiro no subtitle. O título entrega a ideia principal; subtitle desenvolve em no máximo 3 linhas curtas e 160 caracteres; bodyAfterImage só complementa.
+- Slide 3 a Slide ${n} (todos quando N≥3): "title" OBRIGATÓRIO, curto e específico. "subtitle" acima da fotografia: até ${subHi} caracteres. "bodyAfterImage" abaixo: até ${bodyHi} caracteres, apenas se acrescentar uma informação útil. Pode deixar o payoff vazio se a ideia já estiver completa; não repita a legenda para preencher a zona. Os dois campos dividem o orçamento de apoio do card, conforme o CONTRATO DE TEXTO. Destaque lexical: no máximo UM trecho entre **asteriscos duplos**.
+- TODOS os cards, em qualquer modo narrativo, exigem title não vazio. Nunca use "Seu título aqui" nem coloque o texto inteiro no subtitle.
 - Opcionalmente "cultureTone": "", "light", "dark" ou "accent" (mesmo significado visual do Pacote Cultura).
-- Slide só texto SEM foto neste formato: imageQuery ""; use "subtitle" + "bodyAfterImage" em dupla coluna tipográfica (sem sanduíche de foto).
+- Slide só texto SEM foto neste formato: imageQuery ""; bodyAfterImage permanece opcional. Não crie texto para preencher a composição.
 `;
 }
 
@@ -490,6 +489,11 @@ async function fetchMaterialUrlSnippets(material) {
 
 /** Monta os blocos de material para o prompt da IA e, se houver URL(s), obtém texto no servidor antes. `toastCb` opcional — (msg, kind, ttl?). */
 async function resolveMaterialPromptParts(material, toastCb, options = {}) {
+  const { c, s, x } = normalizedMaterialPieces(material);
+  const sourceParts = urlSnippets => ({
+    factualSource: [c, s, ...urlSnippets.map(item => String(item?.text || '').trim())].filter(Boolean).join('\n\n'),
+    instructions: x,
+  });
   const urls = extractHttpUrlsFromMaterial(material);
   if (!urls.length) {
     if (options.presentationPath != null) {
@@ -500,6 +504,7 @@ async function resolveMaterialPromptParts(material, toastCb, options = {}) {
     return {
       materialBlock: buildMaterialBlock(material, [], options),
       materialPriorityBlock: buildMaterialPriorityBlock(material, []),
+      ...sourceParts([]),
     };
   }
   toastCb?.('Lendo o texto dos links…', 'info', 2600);
@@ -524,6 +529,7 @@ async function resolveMaterialPromptParts(material, toastCb, options = {}) {
   return {
     materialBlock: buildMaterialBlock(material, urlSnippets, options),
     materialPriorityBlock: buildMaterialPriorityBlock(material, urlSnippets),
+    ...sourceParts(urlSnippets),
   };
 }
 
@@ -640,8 +646,8 @@ const CREATIVE_PRESET_BY_ID = Object.fromEntries(CREATIVE_PRESETS.map((p) => [p.
 
 /** Fração de volume de texto nos cards (persistido): 1/1 ≈ método padrão; menores → mais enxuto. */
 const SLIDE_TEXT_DENSITY_OPTIONS = [
-  { id: '1_1', label: '1/1', desc: 'Padrão do método — sanduíche com duas zonas de prosa densa (acima e abaixo da foto).' },
-  { id: '1_2', label: '1/2', desc: '~Metade da densidade típica; frases proporcionalmente curtas.' },
+  { id: '1_1', label: '1/1', desc: 'Mais contexto, com até 300 caracteres de apoio por card.' },
+  { id: '1_2', label: '1/2', desc: 'Balanceado — uma ideia e até 220 caracteres de apoio, com espaço para o visual.' },
   { id: '1_3', label: '1/3', desc: '~Um terço da densidade; telegráfico com substância.' },
   { id: '1_4', label: '1/4', desc: 'Mínimo corrido — batidas curtas.' },
   { id: '1_5', label: '1/5', desc: 'Mais esparso — quase só o essencial por card.' },
@@ -667,21 +673,12 @@ function scaledCharBand(lo, hi, densityId) {
 }
 
 /**
- * Faixas de caracteres para miolo sanduíche T/C & híbrido personalizado (subtitle acima da foto + bodyAfterImage abaixo).
- * As faixas calculadas abaixo são o único alvo de volume por zona, incluindo espaços.
+ * Legacy band-shaped interface for T/C and hybrid layouts. Zero is deliberate:
+ * no region has a minimum; the shared contract also limits combined support.
  */
 function tendenciaStyleSandwichCharBands(textDensityId = '1_1') {
-  const densityId = textDensityId || '1_1';
-  const mid = scaledCharBand(400, 620, densityId);
-  // Piso editorial de 200 chars vale só para 1/1; nas outras densidades o piso
-  // escala junto, senão 1/3, 1/4 e 1/5 ficavam idênticos (auditoria H2).
-  const floor = scaledCeiling(200, densityId);
-  const gap = Math.max(24, scaledCeiling(60, densityId));
-  const subLo = Math.max(floor, Math.round(mid.lo * 0.65));
-  const subHi = Math.max(subLo + gap, Math.round(mid.hi * 0.65));
-  const bodyLo = Math.max(floor, Math.round(mid.lo * 0.62));
-  const bodyHi = Math.max(bodyLo + gap, Math.round(mid.hi * 0.62));
-  return { subLo, subHi, bodyLo, bodyHi };
+  const limits = socialTextLimits({ densityId: textDensityId });
+  return { subLo: 0, subHi: limits.subtitle, bodyLo: 0, bodyHi: limits.bodyAfterImage };
 }
 
 function scaledCeiling(ceiling, densityId) {
@@ -707,20 +704,7 @@ const midSubtitleBandFor = (modeId) => MID_SUBTITLE_CHAR_BANDS[modeId] || [200, 
 /** Instrução explícita de volume — só quando ≠ 1/1. */
 function buildSlideTextDensityOverrides(densityId, narrativeModeId) {
   if (!densityId || densityId === '1_1') return '';
-  const label = SLIDE_TEXT_DENSITY_BY_ID[densityId]?.label || densityId;
-  const baseMid = midSubtitleBandFor(narrativeModeId);
-
-  const mid = scaledCharBand(baseMid[0], baseMid[1], densityId);
-  const hookMax = scaledCeiling(80, densityId);
-  const finMax = scaledCeiling(140, densityId);
-
-  return `
-▶ DENSIDADE DE TEXTO (${label}) — SUBSTITUI proporcionalmente as faixas “típicas” do método / blocos acima:
-- Slides intermediários: subtítulo com algo entre ~${mid.lo} e ~${mid.hi} caracteres (não estique além).
-- Slide 1: subtítulo no máximo ~${hookMax} caracteres (além do título curto já pedido).
-- Último slide: subtítulo no máximo ~${finMax} caracteres.
-- Quanto menor a fração (1/4, 1/5), menos frases paralelas e menos exemplo redundante — sem esvaziar o significado obrigatório do slide.
-`;
+  return buildSocialTextLimitsPrompt({ densityId, narrativeMode: narrativeModeId });
 }
 
 function buildSlideTextDensityRefineHint(densityId) {
@@ -780,7 +764,7 @@ Reforço contínuo: “você já percebia isso; aqui está o porquê.” Três g
 LAYOUT VISUAL ↔ CAMPOS DO JSON (leitura do app — siga estritamente):
 - Slide 1 (CAPA com foto full-bleed): use "title" + "subtitle" + "imageQuery". O campo "bodyAfterImage" DEVE ser "" (string vazia). Nunca sanduíche na capa.
 - Slide final (fecho): também full-bleed — "bodyAfterImage" vazio; apenas "title", "subtitle", "imageQuery" (e cultureTone se precisar).
-- Apenas slides intermediários COM foto (sanduíche texto · foto inline · texto): quando "imageQuery" estiver preenchido, obrigatório "subtitle" ACIMA da foto na faixa definida nas REGRAS DE TAMANHO (primeira frase abre o argumento) e "bodyAfterImage" ABAIXO da imagem na faixa definida nas REGRAS DE TAMANHO — continuação do mesmo argumento, com consequência ou exemplo sem repetir o bloco superior, **não** uma headline + frase única nem bullets telegráficos salvo densidade 1/4–1/5. Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva **um trecho** com asteriscos duplos.
+- Slides intermediários COM foto (texto · foto inline · texto): "subtitle" ACIMA da foto desenvolve uma ideia. "bodyAfterImage" ABAIXO é opcional, somente para uma consequência ou exemplo sustentado que não repita o bloco superior. Ambos dividem o teto de apoio definido no CONTRATO DE TEXTO; uma frase pode ser suficiente. Destaque lexical: dentro de subtitle ou bodyAfterImage, envolva no máximo **um trecho** com asteriscos duplos.
 - Slide só texto (“stat”) SEM foto e sem destaque lexical: deixe "imageQuery" vazio; use "subtitle" no bloco superior e "bodyAfterImage" como segundo bloco inferior (tipografia editorial em fundo sólido).
 - "cultureTone" (opcional): omita ou use "" para alternância automática claro/escuro; só use "light", "dark" ou "accent" quando o contraste exigir.
 
@@ -822,12 +806,8 @@ ${refs}
 
 function buildTendenciaCulturaRefineSlideHint(creativePresetId, textDensityId = '1_1') {
   if (!isTendenciaCulturaPreset(creativePresetId)) return '';
-  const { subLo, subHi, bodyLo, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
-  const dense =
-    textDensityId === '1_1' || !textDensityId
-      ? ' As faixas são alvos: só expanda se o pedido exigir e houver conteúdo pertinente, sem fatos novos fora do material.'
-      : '';
-  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior (abaixo da foto no sanduíche, ou segunda coluna tipográfica sem imagem). Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards. No miolo, mantenha title curto e específico; subtitle desenvolve a leitura cultural. Alvo miolo sanduíche: subtitle ~${subLo}–${Math.min(subHi, 160)} car.; bodyAfterImage ~${bodyLo}–${bodyHi} car.${dense}`;
+  const { subHi, bodyHi } = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
+  return `- Pacote Tendência/Cultura: "subtitle" = texto acima da mídia (ou bloco superior no slide só texto). "bodyAfterImage" = bloco inferior opcional. Preserve **trechos** marcados para destaque accent. Capa e último slide (foto full-bleed no app) mantêm bodyAfterImage vazio — não devolva texto nesse campo ao refinar só esses cards. No miolo, mantenha title curto e específico; subtitle desenvolve a leitura cultural. Tetos: subtitle até ${subHi} caracteres; bodyAfterImage até ${bodyHi}, respeitando também a soma do apoio. Não expanda para preencher espaço.`;
 }
 
 function coerceCultureTone(v) {
@@ -905,7 +885,7 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
   if (storyLike) {
     return `REGRAS DE TEXTO (modo narrativo "${narrativeMode}" — prioridade sobre tom genérico):
 - Vocabulário de história, não de slide de pitch. Evite fórmulas de marca (“não é sobre X, é sobre Y”) salvo um fecho pontual.
-- Tom "${tone}" aplicado em cenas e falas, não em manuais de estratégia.
+- Tom "${tone}" aplicado às ações e cenas fornecidas; não acrescente falas, horário ou acontecimentos.
 - Deixe identidade da marca colorir a voz, mas não substitua arco narrativo por mensagem institucional.`;
   }
   if (viralMode && narrativeMode === 'sensacionalista') {
@@ -928,7 +908,7 @@ function buildGenerationLanguageLayer(presetId, tone, narrativeMode = 'editorial
 - Imperativo e verificável em cada subtítulo; sem narrativa pessoal nem tese de marca entre um passo e outro.
 - Marca só afina escolha de palavras — não slogan por slide.`;
   }
-  return `REGRAS DE TEXTO (prioridade: MODO NARRATIVO acima → tom "${tone}" → identidade da marca e material. Não replique um único formato nem uma “voz de página” fixa):
+  return `REGRAS DE TEXTO (prioridade: pedido e material factual → limites de texto → modo narrativo → tom "${tone}". Não replique um único formato nem uma “voz de página” fixa):
 - Deixe o modo narrativo guiar a estrutura; adapte vocabulário ao tema e ao público (sem forçar jargão de mercado se o tom ou o modo pedirem outra coisa).
 - Cada slide = 1 ideia principal; evite repetir a mesma fórmula em todos os slides.
 - Prefira substância a frases vazias; evite motivacional genérico e guru.
@@ -994,16 +974,13 @@ function buildGenerationSlideLayoutRulesBody(narrativeModeId, creativePresetId, 
   if (isPersoHybridDensity(creativePresetId, textDensityId)) {
     return buildPersoHybridLayoutBlock(slideCount, textDensityId, narrativeModeId);
   }
-  const base = midSubtitleBandFor(narrativeModeId);
-  const { lo: midLo, hi: midHi } = scaledCharBand(...base, textDensityId);
-  const supportHi = Math.min(midHi, 160);
-  const supportLo = Math.min(midLo, Math.max(40, Math.round(supportHi * 0.65)));
+  const supportHi = socialTextLimits({ densityId: textDensityId }).subtitle;
   if (isTendenciaCulturaPreset(creativePresetId)) {
     const bands = tendenciaStyleSandwichCharBands(textDensityId || '1_1');
     const sandwichVol = `
 ▶ VOLUME NO MIOLO SANDUÍCHE (texto · foto · texto) — prevalece sobre faixas genéricas de “subtítulo único”:
-- **subtitle** (acima da foto) e **bodyAfterImage** (abaixo) são blocos separados; desenvolvem uma ideia sem se repetir. Em 1/4–1/5, aceite frases únicas ou bullets curtos com substância.
-- Faixas-alvo neste projeto: subtitle ~${bands.subLo}–${bands.subHi} caracteres; bodyAfterImage ~${bands.bodyLo}–${bands.bodyHi} caracteres (incluindo espaços). São alvos: não invente fatos nem repita ideias para alcançar o piso.
+- **subtitle** (acima da foto) e **bodyAfterImage** (abaixo) dividem o orçamento de apoio do mesmo card. Desenvolva uma ideia sem repetição; o bloco inferior é opcional em qualquer densidade.
+- Tetos neste projeto: subtitle até ${bands.subHi} caracteres; bodyAfterImage até ${bands.bodyHi} caracteres (incluindo espaços). Respeite também a soma definida no CONTRATO DE TEXTO. Não há tamanho mínimo.
 - Capa: subtitle até ${scaledCeiling(80, textDensityId)} caracteres; fecho: até ${scaledCeiling(140, textDensityId)}. bodyAfterImage vazio em ambos.
 
 `;
@@ -1030,7 +1007,7 @@ O MÉTODO deste modo (seção acima) é a lei. Estas instruções substituem o f
 - PROIBIDO repetir o molde “headline de marca + subtítulo raciocínio binário” em vários slides (ex.: título “Peptídeos: uma revolução na estética” + subtítulo “não é A, é B”; ou “Inovação e ciência” + “quem incorpora ciência constrói credibilidade…”).
 - PROIBIDO títulos formulaicos “[Tema]: uma reflexão”, “[Tema]: uma revolução”, “[Dois conceitos] e [conceito]: …” como capa de deck.
 - Slide 1 (hook): entrada em cena (in medias res ou imagem forte). Título = momento ou fragmento narrativo. Subtítulo = continua a cena ou a tensão — não posicionamento institucional.
-- Slides intermediários: cada um AVANÇA a história (tempo, gesto, virada, consequência). Subtítulo em prosa narrativa: tipicamente ENTRE ${supportLo} E ${supportHi} caracteres; É PERMITIDO bem menos quando for batida seca, fala ou linha única.
+- Slides intermediários: cada um AVANÇA a situação fornecida, sem inventar eventos. Subtítulo em prosa narrativa: até ${supportHi} caracteres; uma batida curta pode bastar.
 - Último slide: desfecho, pergunta ao leitor ou convite honesto — não obrigatoriamente “lição de estratégia”.
 
 🪝 SLIDE 1 — HOOK NARRATIVO:
@@ -1050,7 +1027,7 @@ ${hookMag}
 REGRAS DE ESTRUTURA POR SLIDE (modo "viral" — retenção e ritmo, NÃO parágrafo de ensaio):
 O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras substituem o formato de subtítulo analítico denso.
 
-- Slides intermediários: subtítulo tipicamente ENTRE ${supportLo} E ${supportHi} caracteres; pode ser MENOR quando for punch, cliffhanger ou frase quotável. Priorize loop, número concreto e virada — não explicação acadêmica longa.
+- Slides intermediários: subtítulo até ${supportHi} caracteres; pode ser MENOR quando for frase curta. Entregue informação sustentada, sem criar número ou suspense artificial.
 - Título: curto, cortante, pode incluir número ou pergunta — não headline de relatório.
 - Um slide do meio deve carregar a frase “guardável” (share-trigger) quando o arco tiver slides suficientes.
 
@@ -1068,7 +1045,7 @@ O MÉTODO VIRAL acima define as funções (hook, tensão, payoff). Estas regras 
 REGRAS DE ESTRUTURA POR SLIDE (modo "passo-a-passo" — manual, não narrativa nem pitch):
 O MÉTODO acima manda: um passo por slide com "Passo N · …".
 
-- Slides intermediários: subtítulo tipicamente ENTRE ${supportLo} E ${supportHi} caracteres — imperativo + como fazer + erro ou exemplo; comprima o exemplo se precisar de checklist curto.
+- Slides intermediários: subtítulo até ${supportHi} caracteres — ação concreta e como executá-la quando houver espaço; erro ou exemplo são opcionais, sem acrescentar passos à oferta.
 - Título DEVE refletir sequência de passos (Passo 1, 2…) até o penúltimo ou até o bloco de “erro comum”, conforme o método.
 - PROIBIDO diluir em storytelling ou em tese de marca; mantenha linguagem de procedimento.
 
@@ -1086,7 +1063,7 @@ O MÉTODO acima manda: um passo por slide com "Passo N · …".
 REGRAS DE ESTRUTURA POR SLIDE (modo "sensacionalista" — tensão alta, payoff honesto — NÃO parágrafo de ensaio):
 O método sensacionalista acima manda cortes rápidos e micro-ganchos.
 
-- Slides intermediários: subtítulo tipicamente ENTRE ${supportLo} E ${supportHi} caracteres — pode ser MENOR quando for tacada única ou cliffhanger. Priorize vigas de tensão e contraste visceral sobre explicação longa.
+- Slides intermediários: subtítulo até ${supportHi} caracteres — pode ser MENOR quando uma frase bastar. O contraste deve estar nos fatos, sem dramatizar uma hipótese como resultado certo.
 - Título: curto até médio — pode soar "capa" ou pergunta incômoda; evite headline de relatório corporativo.
 
 🪝 SLIDE 1 — gancho forte (ver método).
@@ -1109,7 +1086,7 @@ O método jornalístico prevalece. Slides devem ler como sequência de fio ou ca
 
 📖 MEIO — blocos de matéria pirâmide invertida:
    - Título: ângulo, fato-âncora ou antetítulo curto da peça DAQUELE slide.
-   - Subtítulo: até 3 linhas curtas, tipicamente ENTRE ${supportLo} E ${supportHi} caracteres; informação primeiro, ornamentação zero.
+   - Subtítulo: até 3 linhas curtas e ${supportHi} caracteres; informação primeiro, ornamentação zero.
 
 🔚 FINAL — editorial curto ou o que falta saber próximo — sem CTA influencer vazio.
 - Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
@@ -1124,17 +1101,17 @@ O método jornalístico prevalece. Slides devem ler como sequência de fio ou ca
 REGRAS DE TAMANHO POR POSIÇÃO (CRÍTICO — siga estritamente, NÃO trate todos os slides com mesmo peso):
 
 🪝 SLIDE 1 (HOOK) — texto MÍNIMO, máximo impacto:
-   - Título: 5-9 palavras. Frase-tese curta e cortante. Usa o espaço visual.
+   - Título: frase específica, curta e compreensível. Não preencha o espaço com palavras extras.
    - Subtítulo: UMA frase curta apenas, máx ${scaledCeiling(80, textDensityId)} caracteres. Pode ser inclusive vazio se a tese se sustenta sozinha.
 ${hookVisualHint}
 
 📖 SLIDES INTERMEDIÁRIOS (2 ao penúltimo) — conteúdo claro, sem parede de texto:
-   - Título: 5-12 palavras, ideia única em frase clara.
-   - Subtítulo: até 3 linhas curtas e 160 caracteres; use a faixa ${supportLo}–${supportHi} como alvo, sem forçar o piso. Explique um mecanismo, exemplo, contraste, dado ou leitura por card.
+   - Título: ideia única em frase clara, dentro do teto da densidade.
+   - Subtítulo: até 3 linhas curtas e ${supportHi} caracteres. Explique um mecanismo, exemplo, contraste, dado ou leitura por card.
    - O leitor deve aprender algo concreto sem encontrar um parágrafo comprimido. Distribua o restante pelos próximos cards.
 
 🔚 SLIDE FINAL (CTA) — concisão elegante:
-   - Título: 5-9 palavras. Conclusão ou convite.
+   - Título: conclusão ou convite curto.
    - Subtítulo: 1-2 frases curtas, máx ${scaledCeiling(140, textDensityId)} caracteres. Fechamento limpo, sem repetir o título.
 - Faixas já ajustadas à densidade: corte redundâncias, sem preencher o piso artificialmente.
 `;
@@ -1143,7 +1120,7 @@ ${hookVisualHint}
 function buildGenerationSlideLayoutRules(narrativeModeId, creativePresetId, textDensityId = '1_1', slideCount = 9, presentationPath = 'auto') {
   const rules = buildGenerationSlideLayoutRulesBody(narrativeModeId, creativePresetId, textDensityId, slideCount, presentationPath);
   if (creativePresetId === 'apresentacao') return rules;
-  return `${rules}\n\nREGRA DE LEGIBILIDADE PARA TODOS OS MODOS SOCIAIS:\n- Cada card deve ter title curto, específico e não vazio. Nunca use “Seu título aqui”.\n- subtitle desenvolve a ideia em no máximo 3 linhas curtas e 160 caracteres; distribua conteúdo adicional em outro card ou bodyAfterImage quando o layout permitir.`;
+  return `${rules}\n\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
 function buildGenerationImageLayer(presetId, topic, n, audience, projectDirection = false, presentationPath = 'auto') {
@@ -1210,8 +1187,8 @@ function buildRefineSingleSlideRulesBody(narrativeModeId, textDensityId = '1_1',
   const sandwich = positioned && ((culture && slideIndex > 0 && slideIndex < slideCount - 1) || (hybrid && slideIndex >= 2));
   let denHint = buildSlideTextDensityRefineHint(textDensityId);
   if (sandwich) {
-    const b = hybrid ? persoHybridCharBands(textDensityId, narrativeModeId) : tendenciaStyleSandwichCharBands(textDensityId);
-    denHint = `- Alvos deste slide: subtitle ${b.subLo}–${b.subHi} caracteres; bodyAfterImage ${b.bodyLo}–${b.bodyHi}. Desenvolva a mesma ideia em dois blocos sem repetição, sem forçar o piso.\n`;
+    const b = hybrid ? persoHybridCharBands(textDensityId) : tendenciaStyleSandwichCharBands(textDensityId);
+    denHint = `- Tetos deste slide: subtitle até ${b.subHi} caracteres; bodyAfterImage até ${b.bodyHi}. Use o segundo bloco só se necessário; ambos dividem o orçamento de apoio.\n`;
     if (culture) denHint += '- No miolo Cultura, title nomeia o fenômeno; subtitle desenvolve a leitura cultural.\n';
   } else if (positioned) {
     const fullBleed = slideIndex === 0 || slideIndex === slideCount - 1 || (hybrid && slideIndex === 1);
@@ -1219,8 +1196,8 @@ function buildRefineSingleSlideRulesBody(narrativeModeId, textDensityId = '1_1',
       const ceiling = scaledCeiling(slideIndex === slideCount - 1 && !hybrid ? 140 : 80, textDensityId);
       denHint = `- Subtitle até ${ceiling} caracteres; bodyAfterImage vazio. Preserve a função desta posição no arco.\n`;
     } else {
-      const b = scaledCharBand(...midSubtitleBandFor(narrativeModeId), textDensityId);
-      denHint = `- Subtitle entre ${b.lo} e ${b.hi} caracteres, sem preencher o piso artificialmente.\n`;
+      const limits = socialTextLimits({ densityId: textDensityId });
+      denHint = `- Subtitle até ${limits.subtitle} caracteres, sem preencher espaço artificialmente.\n`;
     }
   }
   if (culture) return denHint + '- Preserve leitura cultural, título curto que nomeia o fenômeno e consequência concreta.';
@@ -1246,11 +1223,11 @@ function buildRefineSingleSlideRulesBody(narrativeModeId, textDensityId = '1_1',
 function buildRefineSingleSlideRules(narrativeModeId, textDensityId = '1_1', options = {}) {
   const rules = buildRefineSingleSlideRulesBody(narrativeModeId, textDensityId, options);
   if (options.presetId === 'apresentacao') return rules;
-  return `${rules}\n- Mantenha title curto e não vazio. subtitle deve caber em no máximo 3 linhas curtas e 160 caracteres.`;
+  return `${rules}\n${buildSocialTextLimitsPrompt({ densityId: textDensityId })}\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
 /** Estrutura sugerida da legenda conforme modo narrativo. */
-function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
+function buildCaptionOutlineInstructionsBody(narrativeModeId, presetId = 'livre') {
   if (presetId === 'apresentacao') {
     return `NOTAS DA APRESENTAÇÃO (campo "caption"):
 Escreva um resumo executivo curto do deck, com a ideia central e o próximo passo. Sem hashtags, emojis, pedido de curtida, salvamento, compartilhamento ou comentário.`;
@@ -1312,6 +1289,11 @@ Escreva um resumo executivo curto do deck, com a ideia central e o próximo pass
 4. Consequência prática ou insight aplicável.
 5. Pergunta nos comentários OU CTA de salvamento elegante.`;
   }
+}
+
+function buildCaptionOutlineInstructions(narrativeModeId, presetId = 'livre') {
+  const outline = buildCaptionOutlineInstructionsBody(narrativeModeId, presetId);
+  return presetId === 'apresentacao' ? outline : `${outline}\nAs sugestões de CTA acima só valem se o pedido não especificou outra ação. O CTA do pedido tem prioridade.\n${SOCIAL_FACTUAL_GROUNDING_RULES}`;
 }
 
 /** Regras para o modal de variações de gancho — alinhadas ao modo + pacote. */

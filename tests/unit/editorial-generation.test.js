@@ -70,6 +70,15 @@ describe('geração com uma revisão editorial', () => {
     expect(prompt).toContain('metáforas ambíguas ou sem sentido');
   });
 
+  it('preserva o roteiro explícito na revisão mesmo com novos guardrails', () => {
+    const prompt = buildEditorialReviewPrompt('Card 1: a oferta. Card 2: como funciona.', draft(), {
+      ...config, explicitCardScript:{ count:3 },
+    });
+    expect(prompt).toContain('ROTEIRO EXPLÍCITO DO USUÁRIO');
+    expect(prompt).toContain('Não funda, reordene, mova para outro card nem omita um bloco');
+    expect(prompt).toContain('CONTRATO DE TEXTO');
+  });
+
   it('marca e remove promessa comercial que não existe no briefing', async () => {
     const first = draft();
     first.slides[1].subtitle = 'Publique hoje, sem taxas escondidas.';
@@ -133,6 +142,8 @@ describe('geração com uma revisão editorial', () => {
     expect(output.result.slides).toHaveLength(3);
     expect(output.result.slides[2]).toMatchObject({ title:'', subtitle:'', imageQuery:'' });
     expect(output.issues).toContainEqual({ slideIndex:null, code:'missing_slides_padded' });
+    expect(output.violations).toContainEqual({ kind:'normalization', slideIndex:null, code:'missing_slides_padded' });
+    expect(output.violations).toContainEqual({ kind:'missing_title', slideIndex:2, field:'title' });
   });
 
   it('não transforma uma resposta sem nenhum card em rascunho vazio', async () => {
@@ -179,7 +190,25 @@ describe('geração com uma revisão editorial', () => {
     expect(output.reviewStatus).toBe('needs_attention');
     expect(output.result.slides).toHaveLength(3);
     expect(output.issues).toContainEqual({ slideIndex:null, code:'extra_slides_trimmed' });
+    expect(output.violations).toContainEqual({ kind:'normalization', slideIndex:null, code:'extra_slides_trimmed' });
   });
+  it('aceita reparo embrulhado sem perder a advertência de contagem', async () => {
+    const first = draft();
+    first.slides[1].subtitle = 'Um texto muito longo sem necessidade de repetições. '.repeat(5);
+    first.slides.push({ title:'Extra', subtitle:'Informação excedente', imageQuery:'', bodyAfterImage:'' });
+    const ai = vi.fn().mockResolvedValueOnce({ data:first }).mockResolvedValueOnce({ result:{ edits:[] } }).mockResolvedValueOnce({
+      review:{ edits:[{ slideIndex:1, reason:'Condensar o apoio', subtitle:'Um argumento concreto.' }] },
+    });
+    const onDraft = vi.fn();
+    const output = await generateReviewedCarousel({ prompt:'', config, onDraft }, ai);
+    expect(ai).toHaveBeenCalledTimes(3);
+    expect(onDraft).toHaveBeenCalledTimes(1);
+    expect(onDraft).toHaveBeenCalledWith(expect.objectContaining({ slides:expect.any(Array) }), { phase:'reviewing' });
+    expect(output.result.slides[1].subtitle).toBe('Um argumento concreto.');
+    expect(output.reviewStatus).toBe('needs_attention');
+    expect(output.violations).toEqual([{ kind:'normalization', slideIndex:null, code:'extra_slides_trimmed' }]);
+  });
+
   it('respeita as diferentes posições de bodyAfterImage no híbrido', () => {
     const hybrid = { ...config, presetId: 'livre' };
     const first = validateCarouselDraft(draft(), hybrid);
@@ -204,6 +233,12 @@ describe('geração com uma revisão editorial', () => {
     expect(reviewPrompt).toContain('subtitle e bodyAfterImage são editáveis');
     expect(reviewPrompt).toContain('Não mencione o arquivo enviado');
     expect(reviewPrompt).not.toContain('CTA coerente com o objetivo');
+  });
+
+  it('apresentação mantém a fonte comercial do deck sem depender da extração social', () => {
+    const cfg = { count: 1, presetId: 'apresentacao', factualSource: '', commercialClaimSource: 'Plano custa R$ 399. Estudo acompanhou 20 clientes por dois anos.' };
+    const first = { slides: [{ title: '20 clientes por dois anos', subtitle: 'Plano: R$ 399.', bodyAfterImage: '', imageQuery: '' }], caption: 'Resumo' };
+    expect(applyEditorialReview(first, { edits: [] }, cfg).slides[0].subtitle).toBe('Plano: R$ 399.');
   });
 
   it('permite condensar bodyAfterImage em apresentação sem alterar imagem ou demais dados', () => {

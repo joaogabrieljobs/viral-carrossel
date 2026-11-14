@@ -5,7 +5,9 @@ import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js
 import { presentationAIOptions, buildPresentationReviewRules } from './presentation.js';
 import { buildPresentationPlanPrompt, validatePresentationPlan, buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
-import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, longSocialSupportIndexes, SOCIAL_SUPPORT_MAX_CHARS, SOCIAL_SUPPORT_MAX_LINES } from './social-generation.js';
+import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt } from './factual-grounding.js';
+export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
@@ -167,33 +169,6 @@ function bodyAllowed(index, count, presetId, densityId) {
     : isPersoHybridDensity(presetId, densityId) && index >= 2;
 }
 
-const COMMERCIAL_CLAIM_PATTERNS = [
-  { category: 'garantia', regex: /\b(?:garanti(?:a|do|mos)|resultado garantido|sem risco)\b[^.!?\n]{0,90}/giu },
-  { category: 'prazo', regex: /\b(?:pronto|entregue|resultado|receba|comece)\s+(?:em|dentro de)\s+\d+\s*(?:hora|dia|semana|m[eê]s)(?:s|es)?\b[^.!?\n]{0,70}/giu },
-  { category: 'preço', regex: /(?:R\$|US\$|\$|€)\s*\d[\d.,]*|\b(?:gr[aá]tis|gratuito|sem taxas?(?: escondidas?)?|sem custo)\b/giu },
-  { category: 'item incluso', regex: /\b(?:inclui|inclus[oa]s?|vem com|acompanha)\b[^.!?\n]{1,100}/giu },
-];
-
-const normalizeClaim = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-
-/** Marca promessas objetivas que aparecem no rascunho, mas não no material fornecido. */
-export function auditUnsupportedCommercialClaims(slides, source) {
-  if (typeof source !== 'string' || !source.trim()) return [];
-  const sourceText = normalizeClaim(source);
-  const violations = [];
-  (Array.isArray(slides) ? slides : []).forEach((slide, slideIndex) => {
-    const text = [slide?.title, slide?.subtitle, slide?.bodyAfterImage].filter(Boolean).join(' ');
-    for (const rule of COMMERCIAL_CLAIM_PATTERNS) {
-      for (const match of text.matchAll(rule.regex)) {
-        const claim = String(match[0] || '').trim();
-        if (!claim || sourceText.includes(normalizeClaim(claim))) continue;
-        violations.push({ slideIndex, category: rule.category, claim });
-      }
-    }
-  });
-  return violations;
-}
-
 export function normalizeCarouselDraftInput(rawDraft, { count, presetId, densityId } = {}) {
   let draft = rawDraft;
   if (isObject(draft) && !Array.isArray(draft.slides)) {
@@ -258,7 +233,7 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
         (wantsBody && typeof s.bodyAfterImage !== 'string')) {
       throw new Error('A IA retornou um campo de texto inválido. Tente gerar novamente.');
     }
-    const titleConfig = { presetId, narrativeMode };
+    const titleConfig = { presetId, narrativeMode, densityId };
     const slide = pitch ? cleanPitchSlide(s)
       : requiresSocialTitles(titleConfig) ? recoverSocialTitle({ ...s }) : { ...s };
     if (presetId === 'apresentacao' && draft.presentationPlan) {
@@ -287,16 +262,17 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     if (!allowIncompleteDraft && !allowMissingSocialTitles && missingSocialTitleIndexes([slide], titleConfig).length) {
       throw Object.assign(new Error(`O card ${index + 1} ficou sem título. Seu projeto foi preservado.`), { code: 'social_title_missing' });
     }
-    if (!allowLongSocialSupport && longSocialSupportIndexes([slide], titleConfig).length) {
-      throw Object.assign(new Error(`O apoio do card ${index + 1} ficou longo demais. Seu projeto foi preservado.`), { code: 'social_support_too_long' });
+    if (!allowLongSocialSupport && auditSocialTextDensity([slide], titleConfig).length) {
+      throw Object.assign(new Error(`O texto do card ${index + 1} ficou longo demais. Seu projeto foi preservado.`), { code: 'social_support_too_long' });
     }
     return slide;
   });
   const isPresentation = presetId === 'apresentacao';
+  const normalizationIssues = [...new Set([...(Array.isArray(draft.normalizationIssues) ? draft.normalizationIssues : []), ...normalized.issues])];
   return {
     ...draft,
     slides,
-    ...(normalized.issues.length ? { normalizationIssues:normalized.issues } : {}),
+    ...(normalizationIssues.length ? { normalizationIssues } : {}),
     caption: isPresentation
       ? (pitch ? cleanPitchText(draft.caption) : String(draft.caption || '').trim()).slice(0, 2400)
       : normalizeInstagramCaption(draft.caption),
@@ -323,13 +299,13 @@ Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema con
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
   }
   const missingTitles = missingSocialTitleIndexes(draft?.slides, config);
-  const longSupport = longSocialSupportIndexes(draft?.slides, config);
-  const unsupportedClaims = auditUnsupportedCommercialClaims(draft?.slides, config?.commercialClaimSource);
+  const longSupport = [...new Set(auditSocialTextDensity(draft?.slides, config).map(item => item.slideIndex))];
+  const unsupportedClaims = auditDraftFactuality(draft, config);
   const titleRule = requiresSocialTitles(config)
-    ? `\nTODOS os cards, em qualquer modo narrativo, exigem title curto e específico, nunca vazio nem "Seu título aqui". Separe a ideia principal de subtitle sem apagar o desenvolvimento. Subtitle deve ocupar no máximo ${SOCIAL_SUPPORT_MAX_LINES} linhas curtas e ${SOCIAL_SUPPORT_MAX_CHARS} caracteres.${missingTitles.length ? ` Correção obrigatória: preencha title nos slideIndex ${missingTitles.join(', ')} usando apenas o argumento já escrito.` : ''}${longSupport.length ? ` Correção obrigatória: condense subtitle nos slideIndex ${longSupport.join(', ')} sem perder fatos.` : ''}`
+    ? `\nTODOS os cards, em qualquer modo narrativo, exigem title curto e específico, nunca vazio nem "Seu título aqui". Separe a ideia principal de subtitle sem apagar o desenvolvimento. ${buildSocialTextLimitsPrompt(config)}${missingTitles.length ? ` Correção obrigatória: preencha title nos slideIndex ${missingTitles.join(', ')} usando apenas o argumento já escrito.` : ''}${longSupport.length ? ` Correção obrigatória: condense o texto nos slideIndex ${longSupport.join(', ')} sem perder fatos ou condições. Não transfira excesso de subtitle para bodyAfterImage: a soma também tem limite.` : ''}`
     : '';
   const claimsRule = unsupportedClaims.length
-    ? `\nALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO NO BRIEFING — correção obrigatória: ${unsupportedClaims.map(item => `slideIndex ${item.slideIndex}: ${item.claim}`).join('; ')}. Remova a alegação ou qualifique explicitamente como hipótese; não substitua por outra promessa.`
+    ? `\nALEGAÇÕES COMERCIAIS SUGERIDAS SEM APOIO E OUTROS DADOS NÃO SUSTENTADOS — correção obrigatória: ${unsupportedClaims.map(item => `${item.slideIndex == null ? 'caption' : `slideIndex ${item.slideIndex}, ${item.field}`}: ${item.claim}`).join('; ')}. Remova o detalhe sem apoio; não substitua por outra promessa. Qualificar um número inventado como possibilidade não o transforma em fato.`
     : '';
   const explicitScriptRule = config?.explicitCardScript?.count
     ? `\nROTEIRO EXPLÍCITO DO USUÁRIO — preserve a correspondência entre cada bloco e o slideIndex equivalente. Não funda, reordene, mova para outro card nem omita um bloco. A revisão pode melhorar clareza e encaixe dentro do próprio card, sem trocar sua função, fatos ou intenção.`
@@ -338,6 +314,7 @@ Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${e
 O briefing abaixo é referência, não um pedido para gerar o carrossel novamente.
 <briefing>\n${prompt}\n</briefing>
 <rascunho>\n${JSON.stringify(draft)}\n</rascunho>
+${buildFactualGroundingPrompt(config)}
 Verifique: promessa da capa entregue pelo miolo; slide 2 útil; progressão sem repetição; exemplos concretos; afirmações sustentadas pelo material; voz e densidade; legenda complementar; um CTA coerente com o objetivo; linguagem idiomática e natural. Corrija traduções literais, provérbios inventados, ditados combinados e metáforas ambíguas ou sem sentido.${titleRule}${claimsRule}${explicitScriptRule}
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery, cultureTone, layout nem qualquer configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. Nunca preencha bodyAfterImage onde o layout exige vazio.
@@ -345,13 +322,18 @@ Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema con
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: title, subtitle, bodyAfterImage. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem notas, notas numéricas, previsão de viralização ou campos extras.`;
 }
 
-export function applyEditorialReview(draft, review, config) {
+function unwrapEditorialReview(review) {
   if (isObject(review) && !Array.isArray(review.edits)) {
     const wrapper = ['review', 'editorialReview', 'result', 'data']
       .map(key => review[key])
       .find(value => isObject(value) && Array.isArray(value.edits));
-    if (wrapper) review = wrapper;
+    if (wrapper) return wrapper;
   }
+  return review;
+}
+
+export function applyEditorialReview(draft, review, config, { deferQualityChecks = false } = {}) {
+  review = unwrapEditorialReview(review);
   if (!isObject(review) || !Array.isArray(review.edits)) {
     throw new Error('Revisão inválida');
   }
@@ -380,15 +362,19 @@ export function applyEditorialReview(draft, review, config) {
     }
   }
   if (hasOwn(review, 'caption') && typeof review.caption !== 'string') throw new Error('Legenda de revisão inválida');
-  const result = validateCarouselDraft({ ...draft, slides, caption: review.caption ?? draft.caption }, config);
-  const unsupportedClaims = auditUnsupportedCommercialClaims(result.slides, config?.commercialClaimSource);
-  if (unsupportedClaims.length) {
+  const result = validateCarouselDraft({ ...draft, slides, caption: review.caption ?? draft.caption }, deferQualityChecks
+    ? { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true, allowIncompleteDraft: true }
+    : config);
+  const unsupportedClaims = isPresentation
+    ? auditUnsupportedCommercialClaims(result.slides, config?.commercialClaimSource)
+    : auditDraftFactuality(result, config);
+  if (!deferQualityChecks && unsupportedClaims.length) {
     const error = new Error(`A revisão manteve uma promessa comercial sem apoio no briefing: ${unsupportedClaims[0].claim}.`);
     error.code = 'unsupported_commercial_claim';
     error.violations = unsupportedClaims;
     throw error;
   }
-  if (isPresentation) {
+  if (isPresentation && !deferQualityChecks) {
     const limits = planned && typeof config.presentationLimitsForPlan === 'function'
       ? config.presentationLimitsForPlan(config.presentationPlan, result.slides)
       : config?.presentationTextLimits;
@@ -397,10 +383,30 @@ export function applyEditorialReview(draft, review, config) {
   return result;
 }
 
-/**
- * No máximo duas chamadas: geração + revisão. Falha da revisão preserva apenas
- * um rascunho que já tenha passado pelos limites editoriais da apresentação.
- */
+export function auditSocialDraft(draft, config) {
+  return [
+    ...missingSocialTitleIndexes(draft.slides, config).map(slideIndex => ({ kind: 'missing_title', slideIndex, field: 'title' })),
+    ...auditSocialTextDensity(draft.slides, config).map(item => ({ kind: 'density', ...item })),
+    ...auditDraftFactuality(draft, config).map(item => ({ kind: 'factual', ...item })),
+  ];
+}
+
+/** Refinements are a single paid call. Reject a bad replacement and keep the
+ * user's current cards; existing claims are not new evidence for new claims. */
+export function assertSocialRefinement(previous, candidate, config) {
+  if (candidate.slides.length !== previous.slides.length) throw new Error('O refinamento mudou a quantidade de cards. Mantive o conteúdo anterior.');
+  const key = issue => JSON.stringify([issue.slideIndex, issue.field, issue.category, issue.claim]);
+  const priorFacts = new Set(auditDraftFactuality(previous, config).map(key));
+  const issues = auditSocialDraft(candidate, config).filter(issue => issue.kind !== 'factual' || !priorFacts.has(key(issue)));
+  if (issues.length) {
+    throw Object.assign(new Error(issues.some(issue => issue.kind === 'factual')
+      ? 'O refinamento acrescentou informações sem apoio no briefing. Mantive o texto anterior; inclua os dados corretos no material e tente novamente.'
+      : 'O refinamento não respeitou os títulos ou o limite de texto escolhido. Mantive o texto anterior; peça uma versão mais concisa.'), { code: 'social_refinement_needs_attention', violations: issues });
+  }
+}
+
+/** Two normal calls: draft + review. At most one targeted repair when the
+ * response still violates a measurable contract. Never silently truncate copy. */
 export async function generateReviewedCarousel({ prompt, config, aiOptions, onReview, onStage, onDraft }, callAI) {
   if (config?.presetId === 'apresentacao' && config.presentationPlanning) {
     return generatePlannedPresentation({ prompt, config, aiOptions, onStage, onReview, onDraft }, callAI);
@@ -416,20 +422,26 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
   // não deve ser a primeira vez que a IA descobre quanto texto realmente cabe.
   const generationPrompt = isPresentation
     ? `${prompt}${buildPresentationLimitsBlock(config, config?.count || 0)}`
-    : prompt;
-  // Missing titles get the same existing editorial round, not another paid
-  // retry. Complete first sentences can already be moved without losing copy.
-  const draft = validateCarouselDraft(await callAI(generationPrompt, textOptions), {
-    ...config, allowMissingSocialTitles:true, allowLongSocialSupport:true, allowIncompleteDraft:true,
-  });
+    : `${prompt}\n${buildSocialTextLimitsPrompt(config)}\n${buildFactualGroundingPrompt(config)}`;
+  // Recover complete opening sentences without losing copy, then send missing
+  // titles and excessive text through the same editorial review.
+  throwIfGenerationCancelled(aiOptions?.signal);
+  const rawDraft = await callAI(generationPrompt, textOptions);
+  throwIfGenerationCancelled(aiOptions?.signal);
+  const draft = validateCarouselDraft(rawDraft, { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true, allowIncompleteDraft: true });
   const draftLimitViolations = isPresentation
     ? auditPresentationTextLimits(draft.slides, config?.presentationTextLimits)
     : [];
   throwIfGenerationCancelled(aiOptions?.signal);
-  onDraft?.(draft);
+  onDraft?.(draft, { phase: 'reviewing' });
+  throwIfGenerationCancelled(aiOptions?.signal);
   onReview?.();
+  if (!isPresentation) {
+    return reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI);
+  }
   try {
     const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
+    throwIfGenerationCancelled(aiOptions?.signal);
     const result = applyEditorialReview(draft, review, config);
     const normalizationIssues = Array.isArray(draft.normalizationIssues) ? draft.normalizationIssues : [];
     if (normalizationIssues.length) {
@@ -437,39 +449,24 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
         result,
         reviewStatus:'needs_attention',
         issues:normalizationIssues.map(code => ({ slideIndex:null, code })),
+        violations:normalizationIssues.map(code => ({ kind:'normalization', slideIndex:null, code })),
       };
     }
     return { result, reviewStatus: JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised' };
   } catch (error) {
     if (isGenerationCancelled(error) || aiOptions?.signal?.aborted) throw error;
-    const missingTitles = missingSocialTitleIndexes(draft.slides, config);
-    const longSupport = longSocialSupportIndexes(draft.slides, config);
-    // Guardrails factuais continuam fatais: preservar o rascunho nunca pode
-    // publicar preço, prazo ou garantia que não existiam no briefing.
     if (auditUnsupportedCommercialClaims(draft.slides, config?.commercialClaimSource).length) {
       throw Object.assign(new Error('A revisão não conseguiu remover promessas comerciais sem apoio no briefing. Seu projeto foi preservado.'), {
         code: 'unsupported_commercial_claim', generatedDraft: draft,
       });
     }
     const normalizationIssues = Array.isArray(draft.normalizationIssues) ? draft.normalizationIssues : [];
-    if (missingTitles.length || longSupport.length || normalizationIssues.length) {
-      // A resposta principal é conteúdo útil e editável. Uma revisão inválida
-      // não pode apagar esse trabalho depois de vários minutos. Recuperamos os
-      // títulos apenas movendo texto existente e mantemos apoios longos por
-      // inteiro, sinalizados para conferência no editor.
-      const recoveredSlides = draft.slides.map(recoverSocialTitleForEditing);
-      const result = validateCarouselDraft(
-        { ...draft, slides:recoveredSlides },
-        { ...config, allowMissingSocialTitles:true, allowLongSocialSupport:true, allowIncompleteDraft:true },
-      );
+    if (normalizationIssues.length) {
       return {
-        result,
+        result:draft,
         reviewStatus:'needs_attention',
-        issues:[
-          ...missingTitles.map(slideIndex => ({ slideIndex, code:'social_title_recovered' })),
-          ...longSupport.map(slideIndex => ({ slideIndex, code:'social_support_too_long' })),
-          ...normalizationIssues.map(code => ({ slideIndex:null, code })),
-        ],
+        issues:normalizationIssues.map(code => ({ slideIndex:null, code })),
+        violations:normalizationIssues.map(code => ({ kind:'normalization', slideIndex:null, code })),
       };
     }
     // A revisão é a única oportunidade automática de corrigir um primeiro
@@ -482,6 +479,102 @@ export async function generateReviewedCarousel({ prompt, config, aiOptions, onRe
     }
     return { result: draft, reviewStatus: 'unavailable' };
   }
+}
+
+async function reviewSocialDraft({ prompt, draft, config, textOptions, onStage }, callAI) {
+  let candidate = draft;
+  let reviewResponded = false;
+  let reviewApplied = false;
+  try {
+    const review = await callAI(buildEditorialReviewPrompt(prompt, draft, config), textOptions);
+    throwIfGenerationCancelled(textOptions.signal);
+    reviewResponded = true;
+    const proposed = applyEditorialReview(draft, review, config, { deferQualityChecks: true });
+    const accepted = retainGroundedFields(proposed, draft, config);
+    candidate = accepted.result;
+    reviewApplied = !accepted.rejected || JSON.stringify(candidate) !== JSON.stringify(draft);
+  } catch (error) {
+    if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+  }
+  let violations = auditSocialDraft(candidate, config);
+  if (!violations.length) {
+    return finishSocialReview(candidate, reviewApplied
+      ? JSON.stringify(candidate) === JSON.stringify(draft) ? 'unchanged' : 'revised'
+      : 'unavailable');
+  }
+  // A service outage is not a reason to make another equally expensive call.
+  // If a response arrived, give the specific remaining problems one repair.
+  const repairable = violations.filter(item => item.kind !== 'missing_title' ||
+    ['title', 'subtitle', 'bodyAfterImage'].some(field => String(candidate.slides[item.slideIndex]?.[field] || '').trim()));
+  if (reviewResponded && repairable.length) {
+    const indexes = [...new Set(repairable.filter(item => item.slideIndex != null).map(item => item.slideIndex))];
+    const repairCaption = repairable.some(item => item.field === 'caption');
+    onStage?.('repairing');
+    throwIfGenerationCancelled(textOptions.signal);
+    try {
+      const repair = unwrapEditorialReview(await callAI(`${buildEditorialReviewPrompt(prompt, candidate, config)}
+REPARO DIRECIONADO — última passagem, sem gerar outro carrossel.
+Edite somente slideIndex ${indexes.join(', ') || '(nenhum)'}.${repairCaption ? ' Corrija também caption.' : ' Preserve caption.'}
+Problemas restantes: ${JSON.stringify(repairable)}.
+Reescreva frases completas para respeitar o limite. Preserve números, condições e fatos com fonte. Remova dados sem apoio. Não corte finais de frase, não troque por promessas novas, não acrescente novos cards.`, textOptions));
+      throwIfGenerationCancelled(textOptions.signal);
+      if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex)) || (!repairCaption && hasOwn(repair, 'caption'))) {
+        throw new Error('Reparo fora do escopo');
+      }
+      const proposed = applyEditorialReview(candidate, repair, config, { deferQualityChecks: true });
+      const repaired = retainGroundedFields(proposed, candidate, config).result;
+      const remaining = auditSocialDraft(repaired, config);
+      // Keep corrections only when they reduce the known problems, never
+      // replace a useful draft with a worse final repair.
+      if (remaining.length < violations.length) {
+        candidate = repaired;
+        violations = remaining;
+      }
+      if (!violations.length) return finishSocialReview(candidate, 'repaired');
+    } catch (error) {
+      if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
+    }
+  }
+  throwIfGenerationCancelled(textOptions.signal);
+  const missingTitles = missingSocialTitleIndexes(candidate.slides, config);
+  if (missingTitles.length) {
+    const recovered = candidate.slides.map(recoverSocialTitleForEditing);
+    const recoveredIndexes = missingTitles.filter(index => String(recovered[index].title || '').trim());
+    candidate = { ...candidate, slides:recovered };
+    violations = [
+      ...auditSocialDraft(candidate, config),
+      ...recoveredIndexes.map(slideIndex => ({ kind:'recovered_title', slideIndex, field:'title', code:'social_title_recovered' })),
+    ];
+  }
+  return finishSocialReview(candidate, 'needs_attention', violations);
+}
+
+// Normalization is reversible editorial recovery, never silent proof that the
+// provider followed the requested shape. Retain the legacy issue codes while
+// exposing the same notices to the progressive-review UI.
+function finishSocialReview(result, reviewStatus, violations = []) {
+  const normalization = (Array.isArray(result.normalizationIssues) ? result.normalizationIssues : []).map(code => ({ kind:'normalization', slideIndex:null, code }));
+  const all = [...violations, ...normalization];
+  return {
+    result,
+    reviewStatus:all.length ? 'needs_attention' : reviewStatus,
+    ...(all.length ? { violations:all, issues:all.filter(item => item.code).map(({slideIndex, code}) => ({slideIndex, code})) } : {}),
+  };
+}
+
+// A review is not entitled to introduce a new unsupported fact. Keep useful
+// changes in other fields and restore the previous wording in that field.
+function retainGroundedFields(proposed, previous, config) {
+  const key = issue => JSON.stringify([issue.slideIndex, issue.field, issue.category, issue.claim]);
+  const before = new Set(auditDraftFactuality(previous, config).map(key));
+  const added = auditDraftFactuality(proposed, config).filter(issue => !before.has(key(issue)));
+  if (!added.length) return { result: proposed, rejected: false };
+  const result = { ...proposed, slides: proposed.slides.map(slide => ({ ...slide })) };
+  for (const issue of added) {
+    if (issue.field === 'caption') result.caption = previous.caption;
+    else result.slides[issue.slideIndex][issue.field] = previous.slides[issue.slideIndex][issue.field];
+  }
+  return { result, rejected: true };
 }
 
 /** A bounded pipeline: outline → draft → review, with one targeted text repair.
@@ -530,8 +623,10 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       speakerNotes: [slide.speakerNotes, slide.bodyAfterImage].filter(Boolean).join('\n\n'),
     };
   }) }, plannedConfig);
-  onDraft?.(draft);
   const violations = auditPresentationTextLimits(draft.slides, plannedConfig.presentationTextLimits);
+  throwIfGenerationCancelled(aiOptions?.signal);
+  onDraft?.(draft, { phase: 'reviewing', plan });
+  throwIfGenerationCancelled(aiOptions?.signal);
   onStage?.('reviewing');
   onReview?.();
   try {

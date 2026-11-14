@@ -1,7 +1,7 @@
 // Backlog#8 parte 2 — módulo extraído do monólito. Garante que os builders
 // continuam funcionando fora do arquivo original e que a fonte única de
 // faixas (MID_SUBTITLE_CHAR_BANDS) alimenta a prosa do prompt.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildGenerationImageLayer,
   buildGenerationLanguageLayer,
@@ -33,7 +33,10 @@ import {
   buildContentLanguageRule,
   resolveRequestedContentLanguage,
   GENERATION_TOPIC_MAX_CHARS,
+  resolveMaterialPromptParts,
+  clearMaterialUrlCache,
 } from '../../src/utils/generation-prompts.js';
+import { socialTextLimits } from '../../src/utils/social-generation.js';
 import { AI_SYSTEM_PT } from '../../src/utils/ai-client.js';
 
 describe('módulo generation-prompts (extração do monólito)', () => {
@@ -74,11 +77,11 @@ describe('módulo generation-prompts (extração do monólito)', () => {
     expect(GEN_MODE_BY_ID.brand_tone).toBeUndefined();
   });
 
-  it('prosa das regras de layout preserva a fonte única sem ultrapassar 160 caracteres', () => {
+  it('prosa das regras de layout não pede parágrafos além do teto individual', () => {
     for (const modeId of ['storytelling', 'pain', 'viral', 'how_to', 'sensacionalista', 'jornalistico', 'editorial']) {
       const rules = buildGenerationSlideLayoutRules(modeId, 'quick_erro_comum', '1_1');
       expect(rules, `modo ${modeId} deve impor o teto visual`).toContain('160 caracteres');
-      expect(rules).not.toMatch(/(?:1[6-9][1-9]|[2-9]\d\d) caracteres/);
+      expect(rules).not.toMatch(/(?:subtitle|Subtítulo):[^\n]*(?:[2-9]\d\d) caracteres/);
     }
   });
 
@@ -110,28 +113,30 @@ describe('módulo generation-prompts (extração do monólito)', () => {
 
 
 describe('contratos editoriais de texto', () => {
-  it('cada densidade escala o subtítulo uma vez e usa a mesma fonte no refine', () => {
+  it('todos os modos usam o mesmo teto por densidade, inclusive no refinamento', () => {
     for (const { id: mode } of GEN_MODES) {
       for (const { id: density } of SLIDE_TEXT_DENSITY_OPTIONS) {
-        const b = scaledCharBand(...midSubtitleBandFor(mode), density);
+        const limits = socialTextLimits({ densityId: density });
         const layout = buildGenerationSlideLayoutRules(mode, 'quick_erro_comum', density);
-        expect(layout).toContain('160 caracteres');
+        expect(layout).toContain(`subtitle: até ${limits.subtitle} caracteres`);
+        expect(layout).toContain(`juntos: até ${limits.support} caracteres`);
         expect(layout).not.toContain('SUBSTITUI');
         const refine = buildRefineSingleSlideRules(mode, density, { presetId: 'quick_erro_comum', slideIndex: 2, slideCount: 7 });
-        expect(refine).toContain('160 caracteres');
+        expect(refine).toContain(`subtitle: até ${limits.subtitle} caracteres`);
+        expect(refine).toContain(`juntos: até ${limits.support} caracteres`);
       }
     }
   });
 
-  it('híbrido e Cultura compartilham faixas com refine, mas têm fechamentos distintos', () => {
+  it('híbrido e Cultura compartilham tetos com refine, mas têm fechamentos distintos', () => {
     for (const preset of ['livre', 'tendencia_cultura']) {
       for (const density of ['1_1', '1_2']) {
         const b = tendenciaStyleSandwichCharBands(density);
         const layout = buildGenerationSlideLayoutRules('editorial', preset, density, 7);
         const refine = buildRefineSingleSlideRules('editorial', density, { presetId: preset, slideIndex: 2, slideCount: 7 });
         for (const output of [layout, refine]) {
-          expect(output).toContain(`${b.subLo}–${b.subHi}`);
-          expect(output).toContain(`${b.bodyLo}–${b.bodyHi}`);
+          expect(output).toMatch(new RegExp(`subtitle[\": ]+até ${b.subHi} caracteres`));
+          expect(output).toContain(`até ${b.bodyHi} caracteres`);
           expect(output).not.toMatch(/50–85|200 E 320|SUBSTITUI/);
         }
         const end = buildRefineSingleSlideRules('editorial', density, { presetId: preset, slideIndex: 6, slideCount: 7 });
@@ -232,4 +237,54 @@ it('brief visual substitui direção fotográfica genérica', () => {
   expect(layer).toContain('DIREÇÃO DO PROJETO');
   expect(layer).toContain('3D');
   expect(layer).not.toContain('fotografia editorial realista');
+});
+
+describe('brief factual separado dos exemplos e instruções', () => {
+  it('todos os modos preservam o CTA e proíbem completar lacunas narrativas', () => {
+    for (const mode of GEN_MODES) {
+      const prompt = buildGenerationSlideLayoutRules(mode.id, 'livre', '1_2', 7);
+      expect(prompt).toContain('fonte dos fatos');
+      expect(prompt).toContain('Não complete lacunas');
+      expect(prompt).toContain('Não transforme possibilidade em certeza');
+      expect(prompt).toContain('Preserve o vocabulário do público e a intenção do CTA');
+      expect(prompt).toContain('subtitle: até 140 caracteres');
+      expect(prompt).toContain('juntos: até 220 caracteres');
+      expect(prompt).not.toMatch(/260–403|248–384|400.*620|preencha \*\*subtitle\*\*/);
+      expect(mode.method).toContain('CTA do pedido têm prioridade');
+    }
+  });
+
+  it('não usa números e eventos fictícios para ensinar o modo narrativo', () => {
+    expect(GEN_MODE_BY_ID.storytelling.method).not.toMatch(/23h|quinta vez|cliente desligou/i);
+    expect(GEN_MODE_BY_ID.storytelling.method).toContain('sem inventar um final feliz');
+    expect(GEN_MODE_BY_ID.deep.method).not.toContain('Todo mundo mede');
+    expect(GEN_MODE_BY_ID.sensacionalista.method).not.toContain('3 dias');
+  });
+
+  it('expõe conteúdo cru à checagem sem tratar instruções ou voz como evidência', async () => {
+    const result = await resolveMaterialPromptParts({
+      content: 'O negócio atende clientes locais.',
+      sources: 'A oferta inclui uma análise do site.',
+      context: 'Não invente dez anos de experiência. Write in English.',
+      refProfileId: 'editorial',
+    });
+    expect(result.factualSource).toBe('O negócio atende clientes locais.\n\nA oferta inclui uma análise do site.');
+    expect(result.instructions).toContain('Write in English');
+    expect(result.factualSource).not.toContain('dez anos');
+  });
+
+  it('inclui o texto realmente extraído das fontes na checagem factual', async () => {
+    clearMaterialUrlCache();
+    const extracted = 'O processo começa pelo diagnóstico e termina com a orientação da equipe, conforme o escopo aprovado.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ text: extracted }), { headers: { 'Content-Type': 'application/json' } })));
+    try {
+      const result = await resolveMaterialPromptParts({ content: 'Um site claro.', sources: 'https://example.com/escopo', context: 'Não invente prazo.' });
+      expect(result.factualSource).toContain(extracted);
+      expect(result.factualSource).toContain('Um site claro.');
+      expect(result.factualSource).not.toContain('Não invente prazo');
+    } finally {
+      vi.unstubAllGlobals();
+      clearMaterialUrlCache();
+    }
+  });
 });

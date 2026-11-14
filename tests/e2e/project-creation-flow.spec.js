@@ -393,6 +393,78 @@ test('falha mantém escolhas e repetir usa o mesmo destino sem duplicação', as
   }
 });
 
+test('prévia mostra todos os textos durante a revisão sem salvar o rascunho incompleto', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  let releaseReview;
+  const reviewing = new Promise(resolve => { releaseReview = resolve; });
+  let reviewRequested = false;
+  const draft = generated(5, 'Prepare o site');
+  await setup(page, { ai: async route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    if (prompt.startsWith('REVISÃO EDITORIAL')) {
+      reviewRequested = true;
+      await reviewing;
+      return route.fulfill({ json: completion({ edits: [{ slideIndex: 0, reason: 'Título mais claro', title: 'Organize o conteúdo do site' }] }) });
+    }
+    return route.fulfill({ json: completion(draft) });
+  } });
+  const wizard = await configure(page, { name: 'Prévia antes da revisão' });
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect.poll(() => reviewRequested).toBe(true);
+  await expect(wizard.getByRole('heading', { name: 'Rascunho — em revisão', exact: true })).toBeInViewport();
+  const preview = wizard.getByLabel('Prévia dos cards', { exact: true });
+  await expect(preview.getByRole('article')).toHaveCount(5);
+  await expect(preview.getByRole('article', { name: 'Card 1', exact: true })).toContainText(draft.slides[0].title);
+  await expect(preview.getByRole('article', { name: 'Card 3', exact: true })).toContainText(draft.slides[2].bodyAfterImage);
+  await expect(wizard.getByText(/Tempo decorrido: 0:0[1-9]/)).toBeVisible();
+  // Long input/review tables must not push live content off-screen on mobile.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  const beforeReview = await library(page);
+  const destination = beforeReview.find(project => project.name === 'Prévia antes da revisão');
+  expect(destination.doc.slides).toHaveLength(1);
+  expect(destination.doc.slides.some(slide => slide.title === draft.slides[0].title)).toBe(false);
+  expect(beforeReview.find(project => project.id === originalProject.id).doc.slides[0].title).toBe(originalProject.doc.slides[0].title);
+  await page.screenshot({ path:testInfo.outputPath('generation-preview-mobile.png') });
+
+  releaseReview();
+  await expect(wizard).toHaveCount(0, { timeout: 30_000 });
+  await expect.poll(async () => (await library(page)).find(project => project.id === destination.id)?.doc?.slides?.[0]?.title).toBe('Organize o conteúdo do site');
+  const saved = (await library(page)).find(project => project.id === destination.id);
+  expect(saved.doc.slides).toHaveLength(5);
+});
+
+test('cancelar a revisão mantém a prévia identificada e ignora a resposta tardia', async ({ page }) => {
+  test.setTimeout(60_000);
+  let releaseReview;
+  const reviewing = new Promise(resolve => { releaseReview = resolve; });
+  const draft = generated(5, 'Rascunho temporário');
+  let reviewRequested = false;
+  await setup(page, { ai: async route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    if (prompt.startsWith('REVISÃO EDITORIAL')) {
+      reviewRequested = true;
+      await reviewing;
+      return route.fulfill({ json: completion({ edits: [] }) }).catch(() => {});
+    }
+    return route.fulfill({ json: completion(draft) });
+  } });
+  const wizard = await configure(page, { name: 'Prévia cancelada' });
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect.poll(() => reviewRequested).toBe(true);
+  await expect(wizard.getByLabel('Prévia dos cards', { exact: true }).getByRole('article')).toHaveCount(5);
+  await wizard.getByRole('button', { name: 'Cancelar geração', exact: true }).click();
+  await expect(wizard.getByRole('heading', { name: 'Rascunho — revisão interrompida', exact: true })).toBeVisible();
+  await expect(wizard.getByText('Esta prévia não foi aplicada ao projeto. Retome a geração para concluir a revisão.', { exact: true })).toBeVisible();
+  releaseReview();
+  await wizard.getByRole('button', { name: 'Sair da criação', exact: true }).click();
+  await page.getByRole('button', { name: 'Criar um projeto', exact: true }).click();
+  await expect(flow(page).getByLabel('Prévia dos cards', { exact: true })).toHaveCount(0);
+  const after = await library(page);
+  expect(after.find(project => project.name === 'Prévia cancelada').doc.slides).toHaveLength(1);
+  expect(after.flatMap(project => project.doc.slides).some(slide => String(slide.title).startsWith('Rascunho temporário'))).toBe(false);
+});
+
 test('mobile deixa quantidade visível, valida limites e preserva escolha ao voltar à narrativa', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page, { withProject: false, onboarding: true });

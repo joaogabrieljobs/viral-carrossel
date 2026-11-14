@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Loader2, Sparkles, X } from 'lucide-react';
 import BrandLogo from './BrandLogo.jsx';
+import GenerationPreview from './GenerationPreview.jsx';
 import VisualStylePicker from './VisualStylePicker.jsx';
 import { ImgParamsPanel } from './panels/generate-modal-parts.jsx';
 import { CREATIVE_PRESETS, GENERATION_TOPIC_MAX_CHARS, quickTemplateIdFromPreset } from '../utils/generation-prompts.js';
@@ -43,7 +44,7 @@ function Option({ selected, label, desc, example, onClick, disabled }) { return 
 export default function CreateProjectFlow({
   onCreate, onCreateBlank, onCancel, onCancelGeneration, onOpenDraft, hasDraft = false,
   brandRoster = [], activeBrandId, defaultBrand = {}, initialName = '', initialProductKind = 'carrossel',
-  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], imageQuota = null,
+  hasOpenAI = false, hasAnthropic = false, onOpenKeys, visualPresets = [], progress, previewSlides = [], previewPhase = 'draft', imageQuota = null,
 }) {
   const initial = useRef(neutralCreationIdentity(defaultBrand));
   const identityVisualBase = useRef(captureCreationVisualIdentity(initial.current.brand));
@@ -73,6 +74,8 @@ export default function CreateProjectFlow({
   const [wantImages, setWantImages] = useState(false);
   const [params, setParams] = useState({ fidelity:50, creativity:50, irreverence:50, objectivity:50 });
   const [busy, setBusy] = useState(false);
+  const [generationStartedAt, setGenerationStartedAt] = useState(null);
+  const generating = busy && step === 6;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -119,7 +122,7 @@ export default function CreateProjectFlow({
   useEffect(() => {
     mainRef.current?.focus({ preventScroll:true });
     if (mainRef.current) mainRef.current.scrollTop = 0;
-  }, [step]);
+  }, [step, busy]);
   useEffect(() => {
     if (!explicitCardCount || isPresentation) return;
     setCount(current => String(current) === String(explicitCardCount) ? current : String(explicitCardCount));
@@ -242,7 +245,7 @@ export default function CreateProjectFlow({
     }
     if (!hasTextAI) { setError('Configure o acesso à IA para gerar este projeto. Suas escolhas continuam aqui.'); return; }
     if (!name.trim() || !sourceReady || !countValid || (brandId === '__new__' && !brand.name?.trim())) { setError('Revise o nome, o conteúdo e a quantidade antes de gerar.'); return; }
-    busyRef.current = true; setBusy(true); setError(''); setNotice('');
+    busyRef.current = true; setBusy(true); setGenerationStartedAt(Date.now()); setError(''); setNotice('');
     const quickModes = { erro_comum:'editorial', tendencia:'editorial', decodificacao:'deep', comportamento:'storytelling' };
     const resolvedTopic = topic.trim() || 'Organize o material fornecido conforme o objetivo deste projeto.';
     try {
@@ -285,8 +288,9 @@ export default function CreateProjectFlow({
     <header className="vc-create-header"><BrandLogo height={27}/><button type="button" className="vc-btn vc-btn-ghost" disabled={busy} onClick={onCancel}><X size={15} aria-hidden/> Sair da criação</button></header>
     <nav className="vc-create-progress" aria-label="Etapas da criação">{CREATION_STEPS.map((label, i) => <button type="button" key={label} aria-label={`${i + 1}. ${label}`} aria-current={step === i ? 'step' : undefined} disabled={i > furthest || busy || pending} onClick={() => go(i)}><span className="vc-create-step-number" aria-hidden>{i + 1}</span><span className="vc-create-step-label" aria-hidden>. {label}</span></button>)}</nav>
     <main className="vc-create-main" ref={mainRef} tabIndex={-1} aria-labelledby="vc-create-title">
-      <p className="vc-create-kicker">Passo {step + 1} de {CREATION_STEPS.length} · {CREATION_STEPS[step]}</p><h1 id="vc-create-title">{step === 4 ? `Quantos ${item} vamos criar?` : TITLE[step]}</h1><p className="vc-create-intro">{INTRO[step]}</p>
-      <fieldset disabled={busy} className="vc-create-group vc-create-stack">
+      <p className="vc-create-kicker">Passo {step + 1} de {CREATION_STEPS.length} · {CREATION_STEPS[step]}</p><h1 id="vc-create-title">{generating ? 'Criando seu projeto.' : step === 4 ? `Quantos ${item} vamos criar?` : TITLE[step]}</h1><p className="vc-create-intro">{generating ? 'Você pode acompanhar os textos enquanto o Moont revisa a sequência.' : INTRO[step]}</p>
+      {(generating || (step === 6 && previewSlides.length > 0)) && <GenerationPreview active={generating} startedAt={generationStartedAt} progress={progress} slides={previewSlides} phase={previewPhase} isPresentation={isPresentation}/>}
+      <fieldset disabled={busy} className="vc-create-group vc-create-stack" style={generating ? { display:'none' } : undefined}>
       {step === 0 && <><div className="vc-create-grid" role="radiogroup" aria-label="Tipo de projeto"><Option label="Carrossel para redes" desc="Conteúdo em sequência para feed, quadrado ou Stories." selected={!isPresentation} onClick={() => chooseProduct('carrossel')}/><Option label="Apresentação" desc="Slides para uma reunião, proposta, aula, relatório ou pitch." selected={isPresentation} onClick={() => chooseProduct('apresentacao')}/></div><Field label="Nome do projeto" hint="Opcional no editor vazio. Se deixar em branco, o Moont cria um nome provisório."><input className="vc-input" value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoComplete="off"/></Field><div className="vc-create-editor-shortcut"><div><strong>Quer começar do zero?</strong><span>Abra agora um projeto com um único {isPresentation ? 'slide' : 'card'}, sem texto e sem imagem.</span></div><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || busy || !onCreateBlank} onClick={createBlank}>Ir para o editor <ArrowRight size={14} aria-hidden/></button></div></>}
       {step === 1 && <>
         <div className="vc-create-grid vc-create-identity-paths" role="radiogroup" aria-label="Como começar a identidade">
@@ -346,11 +350,6 @@ export default function CreateProjectFlow({
       </>}
       </fieldset>
       {pending && <p role="status" className="vc-create-note" style={{ marginTop:18 }}>Importando arquivo…</p>}
-      {busy && <div role="status" aria-live="polite" className="vc-create-stack" style={{ marginTop:24 }}><strong>{progress?.label || 'Preparando seu projeto…'}</strong><div className="vc-create-progressbar" aria-hidden><span style={progress?.total ? { width:`${Math.max(8, Math.min(100, (Number(progress.current || 0) / Number(progress.total)) * 100))}%`, animation:'none' } : undefined}/></div><p className="vc-create-note">Os {item} prontos aparecem abaixo. A edição completa abre quando a geração terminar.</p>{previewSlides.length > 0 && <div className={`vc-create-live-grid ${isPresentation ? 'is-presentation' : ''}`} aria-label={`${previewSlides.length} ${quantityUnit} prontos`}>
-        {previewSlides.map((slide, index) => <article className="vc-create-live-card" key={slide.id || index} style={{ background:slide.bg || brand.bg || '#111218', color:slide.titleColor || brand.titleColor || '#fff' }}>
-          {slide.bgImage && <img src={slide.bgImage} alt=""/>}<div className="vc-create-live-shade" style={{ opacity:Math.min(.82, Math.max(0, Number(slide.overlay || 0) / 100)) }}/><div className="vc-create-live-copy"><small>{String(index + 1).padStart(2, '0')}</small><strong>{slide.title || 'Conteúdo em preparação'}</strong>{slide.subtitle && <span>{slide.subtitle}</span>}</div>
-        </article>)}
-      </div>}</div>}
       {notice && <p role="status" className="vc-create-note" style={{ marginTop:24 }}>{notice}</p>}
       {error && <div role="alert" className="vc-create-error" style={{ marginTop:24 }}>{error}</div>}
     </main>
