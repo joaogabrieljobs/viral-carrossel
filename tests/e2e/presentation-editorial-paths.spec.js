@@ -1,7 +1,8 @@
+import { presentationBatch } from './helpers/presentation-batches.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
-import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
+import { PRESENTATION_PLAN_PROMPT_VERSION, PRESENTATION_PLAN_SYSTEM_PROMPT } from '../../src/utils/presentation-plan.js';
 
 const routes = [
   ['Auto', 'estrategista editorial', 'uma única lógica dominante'],
@@ -40,12 +41,12 @@ for (const [label, role, criterion] of routes) {
             : user.startsWith('REVISÃO DE APRESENTAÇÃO')
             ? { edits: [{ slideIndex: 1, reason: 'Esclarecer a decisão', subtitle: 'Validar antes de agir.' }] }
             : {
-              slides: Array.from({ length: 6 }, (_, index) => ({
+              slides: presentationBatch(user, Array.from({ length: 6 }, (_, index) => ({
                 title: `Ideia ${index + 1}`,
                 subtitle: 'Contexto disponível.',
                 bodyAfterImage: '',
                 imageQuery: '',
-              })),
+              }))),
               caption: 'Resumo com o próximo passo.',
             };
           return route.fulfill({ json: { choices: [{ message: { content: JSON.stringify(data) } }] } });
@@ -76,8 +77,9 @@ for (const [label, role, criterion] of routes) {
     await modal.getByRole('button', { name: 'Gerar apresentação com imagens', exact: true }).click();
     await expect(modal).toHaveCount(0, { timeout: 30_000 });
     await expect(page.locator('main').getByText('Validar antes de agir.', { exact: true })).toBeVisible();
-    expect(textRequests).toHaveLength(3);
-    for (const request of textRequests) {
+    expect(textRequests).toHaveLength(4);
+    expect(textRequests[0].find(message => message.role === 'system').content).toContain(PRESENTATION_PLAN_SYSTEM_PROMPT);
+    for (const request of textRequests.slice(1)) {
       expect(request.find(message => message.role === 'system').content).toContain(role);
     }
     expect(textRequests[0].find(message => message.role === 'user').content).toContain('PLANEJAMENTO ESTRUTURADO');
@@ -85,7 +87,7 @@ for (const [label, role, criterion] of routes) {
     expect(userPrompt).toContain(criterion);
     expect(userPrompt).toContain('Não mencione o arquivo enviado');
     expect(userPrompt).toContain('PLANO EDITORIAL VALIDADO');
-    expect(textRequests[2].find(message => message.role === 'user').content).toContain('REVISÃO DE PROFUNDIDADE');
+    expect(textRequests[3].find(message => message.role === 'user').content).toContain('REVISÃO DE PROFUNDIDADE');
     expect(imageRequests).toHaveLength(0);
   });
 }

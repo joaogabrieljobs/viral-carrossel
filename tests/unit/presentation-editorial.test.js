@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { callAI, setAIRuntimeSettings, AI_SYSTEM_PT } from '../../src/utils/ai-client.js';
 import {
   presentationAIOptions, buildApresentacaoPackBlock, buildApresentacaoRefineHint,
-  buildPresentationSystemPrompt, buildPresentationSummaryRules,
+  buildPresentationSystemPrompt, buildPresentationSummaryRules, buildPresentationFieldRules,
+  buildPresentationReviewRules,
 } from '../../src/utils/presentation.js';
 import {
   buildGenerationLanguageLayer, buildGenerationSlideLayoutRules, buildGenerationImageLayer,
@@ -155,4 +156,33 @@ it('preserva aula e keynote ao vivo, e a leitura autônoma dos documentos de dec
   const design = buildPresentationDesignSystemPromptBlock('presentation_data_first', 'relatorio');
   expect(design).toContain('Nunca peça que imageQuery fabrique');
   expect(design).toContain('Limites obrigatórios da composição');
+});
+
+describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatorio_executivo', 'estudo_de_caso', 'keynote_manifesto'])('clareza e fidelidade em %s', path => {
+  it('usa limites como tetos e mantém condições essenciais visíveis, sem exigir preenchimento', () => {
+    const fields = buildPresentationFieldRules(path);
+    expect(fields).toContain('Os limites obrigatórios por slide prevalecem');
+    expect(fields).toContain('tetos, não metas de preenchimento');
+    expect(fields).toContain('Balanceado');
+    expect(fields).toContain('speakerNotes');
+    expect(fields).toMatch(/condições de aceite|aceite/);
+    expect(fields).toMatch(/limitações|incerteza/);
+    expect(fields).toContain('sem repetir cada célula');
+    expect(fields).not.toMatch(/normalmente 220–360|duas a quatro frases|mínimo de \d+/);
+    expect(buildPresentationReviewRules(path)).toContain('Um slide curto e completo não precisa ser ampliado');
+  });
+
+  it('preserva idioma e natureza fictícia em redação, revisão e refinamento', () => {
+    expect(buildPresentationSystemPrompt(path)).toContain('O idioma explícito do pedido prevalece');
+    for (const prompt of [
+      buildApresentacaoPackBlock(12, path),
+      buildPresentationReviewRules(path),
+      buildApresentacaoRefineHint(path),
+    ]) {
+      expect(prompt).toMatch(/fictício/);
+      expect(prompt).toMatch(/cliente real/);
+      expect(prompt).not.toContain('Mesa Clara');
+      expect(prompt).not.toContain('R$ 6.000');
+    }
+  });
 });

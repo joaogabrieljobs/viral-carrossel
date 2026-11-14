@@ -1,3 +1,4 @@
+import { presentationBatch } from './helpers/presentation-batches.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi, SESSAO_ATIVA } from './helpers/api-mock.js';
@@ -57,11 +58,11 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
             presentationBlocks: compactBlock, caption: `${originalNotes}\n\n${longCell}` }] };
         } else {
           stages.push('write');
-          data = { slides: Array.from({ length: 6 }, (_, index) => ({
+          data = { slides: presentationBatch(user, Array.from({ length: 6 }, (_, index) => ({
             title: index === 1 ? 'Comparação das ofertas' : 'Definir antes de oferecer',
             subtitle: 'Ofertas em estudo: comparar escopo e condições antes da decisão.', bodyAfterImage: '', imageQuery: '',
             speakerNotes: index === 1 ? originalNotes : '', presentationBlocks: index === 1 ? originalBlock : [],
-          })), caption: 'Definir escopo e condições antes da decisão.' };
+          }))), caption: 'Definir escopo e condições antes da decisão.' };
         }
         return route.fulfill({ json: { choices: [{ message: { content: JSON.stringify(data) } }] } });
       },
@@ -105,7 +106,7 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
     expect(preserved.presentationQuality.renderRepairStatus).toBe('unavailable');
     expect(preserved.presentationQuality.renderedIssues).toEqual([expect.objectContaining({ code: 'render-assets-unavailable', severity: 'warning' })]);
     await expect(page.getByText('Apresentação criada e preservada. A conferência visual ficou pendente porque uma fonte ou imagem não carregou. Confira antes de exportar.', { exact: true })).toBeVisible();
-    expect(stages).toEqual(['plan', 'write', 'editorial-review']);
+    expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review']);
     return;
   }
   try {
@@ -125,5 +126,5 @@ for (const fontsAvailable of [true, false]) test(fontsAvailable
   await expect(exportedBlock.locator('thead th')).toHaveCount(4);
   await expect(exportedBlock.locator('tbody td').first()).toHaveText('Em estudo: oferta.');
   expect(await exportedBlock.evaluate(node => node.scrollHeight <= node.clientHeight + 3)).toBe(true);
-  expect(stages).toEqual(['plan', 'write', 'editorial-review', 'render-repair']);
+  expect(stages).toEqual(['plan', 'write', 'write', 'editorial-review', 'render-repair']);
 });

@@ -1571,6 +1571,9 @@ export default function App() {
   // pelas páginas. O destino só nasce na confirmação final de geração.
   const [creationSession, setCreationSession] = useState(null);
   const creationTargetRef = useRef(null);
+  // Only a new presentation may promote a cancelled, validated batch into its
+  // reserved destination. Existing projects and remixes remain preview-only.
+  const creationValidatedDraftRef = useRef(null);
   const creationRequestRef = useRef(null);
   const [creationRequestVersion, setCreationRequestVersion] = useState(0);
   const creationGenerateRef = useRef(null);
@@ -1584,7 +1587,11 @@ export default function App() {
       return false;
     }
     creationTargetRef.current = null;
+    creationValidatedDraftRef.current = null;
     setCreationPreviewSlides([]);
+    setCreationPreviewPlan(null);
+    setCreationPreviewCompletedCount(0);
+    setCreationPreviewTotalCount(0);
     setCreationPreviewPhase('draft');
     setLibraryOpen(false);
     setSetupOpen(false);
@@ -3306,6 +3313,9 @@ export default function App() {
   const [importProgress, setImportProgress] = useState(null);
   const [creationPreviewSlides, setCreationPreviewSlides] = useState([]);
   const [creationPreviewPhase, setCreationPreviewPhase] = useState('draft');
+  const [creationPreviewPlan, setCreationPreviewPlan] = useState(null);
+  const [creationPreviewCompletedCount, setCreationPreviewCompletedCount] = useState(0);
+  const [creationPreviewTotalCount, setCreationPreviewTotalCount] = useState(0);
   const [generationPreviewContext, setGenerationPreviewContext] = useState(null);
   /** Cancela import de fotos em curso (lote / foto única). */
   const importAbortRef = useRef(null);
@@ -3322,6 +3332,9 @@ export default function App() {
   ), [activeProductKind, material?.content, quickPrompt]);
   const cancelGeneration = useCallback(() => {
     if (imgGenAbortRef.current) imgGenAbortRef.current.cancelled = true;
+    if (creationValidatedDraftRef.current?.job === generationRef.current) {
+      creationValidatedDraftRef.current.cancelled = true;
+    }
     generationRef.current?.cancel();
     cancelAllAIGeneration();
     generationRef.current = null;
@@ -5172,7 +5185,11 @@ export default function App() {
       );
     }
     const sourceSlides = slides;
+    creationValidatedDraftRef.current = null;
     setCreationPreviewSlides([]);
+    setCreationPreviewPlan(null);
+    setCreationPreviewCompletedCount(0);
+    setCreationPreviewTotalCount(Number(count));
     setCreationPreviewPhase('draft');
     setGenerationPreviewContext({ projectId: generationProjectId, startedAt: Date.now(), isPresentation: isApresentacaoPreset(requestedPresetId) });
     setGenProgress({ phase: 'text', current: 0, total: 1, label: 'Preparando contexto do projeto…' });
@@ -5375,7 +5392,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
+    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -5425,8 +5442,27 @@ ${jsonShapeLine}`;
           }));
         },
       },
-      onDraft: draft => {
+      onPlan: plan => {
         checkActive();
+        setCreationPreviewPlan(plan);
+        setCreationPreviewTotalCount(plan.slides.length);
+      },
+      onDraft: (draft, metadata = {}) => {
+        checkActive();
+        if (isPresentationGeneration && !remix && creationSession
+          && creationTargetRef.current?.id === generationProjectId
+          && readDataOwner() === creationSession.owner) {
+          creationValidatedDraftRef.current = {
+            job, cancelled: false, projectId: generationProjectId,
+            sessionId: creationSession.id, owner: creationSession.owner,
+            draft: JSON.parse(JSON.stringify(draft)),
+            plan: metadata.plan || draft.presentationPlan,
+            totalCount: metadata.totalCount ?? Number(count),
+            presentationPath: presentationPathId,
+            visualPreset: effectiveVisualPreset,
+            preserveBrandIdentity, brandVisualOverrides,
+          };
+        }
         // A read-only preview is separate from history and autosave, including
         // a remix. Only the final result below can replace existing cards.
         setCreationPreviewSlides(draft.slides.map((slide, index) => ({
@@ -5434,19 +5470,25 @@ ${jsonShapeLine}`;
           title: slide.title,
           subtitle: slide.subtitle,
           bodyAfterImage: slide.bodyAfterImage,
+          presentationBlocks: slide.presentationBlocks,
+          speakerNotes: slide.speakerNotes,
         })));
-        setCreationPreviewPhase('draft');
+        setCreationPreviewCompletedCount(metadata.completedCount ?? draft.slides.length);
+        setCreationPreviewTotalCount(metadata.totalCount ?? Number(count));
+        setCreationPreviewPhase(metadata.phase || 'draft');
         if (!creationSession && !setupOpen) {
           boardScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
           if (isMobile) setDrawerOpen(false);
         }
       },
-      onStage: stage => {
+      onStage: (stage, details = {}) => {
         checkActive();
         const plannedPresentation = isPresentationGeneration && !remix;
         const stages = plannedPresentation ? {
           planning: [1, 'Organizando o roteiro e as evidências'],
-          writing: [2, 'Desenvolvendo os argumentos de cada slide'],
+          planning_repair: [1, 'Ajustando o roteiro e conferindo as fontes novamente'],
+          writing: [2, details.from ? `Escrevendo slides ${details.from}–${details.to} · ${details.completedCount} de ${details.totalCount} prontos` : 'Desenvolvendo os argumentos de cada slide'],
+          writing_repair: [2, 'Concluindo os slides deste grupo antes de continuar'],
           reviewing: [3, 'Conferindo clareza, profundidade e fidelidade'],
           repairing: [3, 'Ajustando os textos que precisam de revisão'],
         } : {
@@ -5464,11 +5506,13 @@ ${jsonShapeLine}`;
     if (reviewStatus === 'unavailable') toast('Texto gerado. A revisão automática não foi concluída; mantive a primeira versão.', 'warning', 6500);
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     if (reviewStatus === 'needs_attention') {
-      toast(isPresentationGeneration
-        ? 'Preservei o texto completo. Alguns slides ainda precisam de ajuste antes da exportação.'
+      toast(generationIncomplete
+        ? `Preservei ${generatedCount} de ${requestedCount} slides. A geração parou antes de completar a apresentação; confira o rascunho no editor.`
+        : isPresentationGeneration
+        ? 'Preservei o texto completo. Confira as informações e o encaixe dos slides antes de exportar. As imagens aguardam essa revisão.'
         : 'Rascunho preservado. Confira as informações e o tamanho dos textos antes de exportar. As imagens não foram iniciadas para você revisar primeiro.', 'warning', 10000);
       // Do not spend image credits on copy known to need a factual/text fix.
-      if (!isPresentationGeneration) fetchImagesNow = false;
+      fetchImagesNow = false;
     }
     if (!result?.slides?.length) { setGenProgress(null); throw new Error('IA não retornou slides. Tente um tema mais específico.'); }
     setGenProgress({ phase: 'text', current: isPresentationGeneration ? 4 : 3, total: isPresentationGeneration ? 5 : 3, label: isPresentationGeneration ? 'Etapa 4 de 5 · Compondo a apresentação' : 'Etapa 3 de 3 · Montando os cards' });
@@ -5709,6 +5753,7 @@ ${jsonShapeLine}`;
       };
       setHasLastGenerate(true);
     }
+    if (creationValidatedDraftRef.current?.job === job) creationValidatedDraftRef.current = null;
     history.set(d => ({
       ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp,
       ...(isPresentationGeneration
@@ -5732,6 +5777,7 @@ ${jsonShapeLine}`;
             kind: issue.kind || null,
             category: issue.category || null,
             ...(typeof issue.code === 'string' ? { code: issue.code } : {}),
+            ...(Number.isInteger(issue.completedCount) ? { completedCount: issue.completedCount, totalCount: issue.totalCount } : {}),
             ...(typeof issue.claim === 'string' ? { claim: issue.claim.slice(0, 240) } : {}),
           }))
         : [],
@@ -5740,6 +5786,7 @@ ${jsonShapeLine}`;
         presentationQuality: {
           version: 1,
           reviewStatus,
+          ...(generationIncomplete ? { incomplete: true, completedCount: generatedCount, totalCount: requestedCount } : {}),
           repairs: visualQuality?.repairs || [],
           issues: visualQuality?.issues || [],
           checkedAt: new Date().toISOString(),
@@ -5755,6 +5802,7 @@ ${jsonShapeLine}`;
       },
     }));
     setCreationPreviewSlides(newSlides);
+    setCreationPreviewCompletedCount(newSlides.length);
     setCreationPreviewPhase(['needs_attention', 'unavailable'].includes(reviewStatus) ? reviewStatus : 'reviewed');
     setActiveIdx(0); setShellView('project');
     // A IA escreveu subtítulos, logo eles têm de aparecer. Vários padrões visuais
@@ -5992,6 +6040,8 @@ ${jsonShapeLine}`;
       if (isGenerationCancelled(err) || job.signal.aborted) return { cancelled: true };
       trackEvent('carousel_generate_error', {
         msg: String(err?.message || '').slice(0, 80),
+        code: String(err?.code || '').slice(0, 80),
+        stage: String(err?.stage || '').slice(0, 40),
       });
       throw err;
     } finally {
@@ -6010,18 +6060,78 @@ ${jsonShapeLine}`;
     }
     setCreationSession(null);
     creationTargetRef.current = null;
+    creationValidatedDraftRef.current = null;
     setShellView('home');
     setAccountTab('projects');
   }, [cancelGeneration, setShellView, setAccountTab]);
 
   const openCreationDraft = useCallback(() => {
-    if (!creationTargetRef.current || getAIGenerationCount() > 0) return;
-    setCreationSession(null);
-    creationTargetRef.current = null;
-    setAppMode('studio');
-    setTab('texto');
-    setShellView('project');
-  }, [setAppMode, setShellView]);
+    const target = creationTargetRef.current;
+    if (!creationSession || !target || getAIGenerationCount() > 0 || creationRequestRef.current) return;
+    if (activeProjectRef.current !== target.id || readDataOwner() !== creationSession.owner
+      || !accountLibraryReadyRef.current || areAccountDataWritesLocked()) return;
+    const snapshot = creationValidatedDraftRef.current;
+    const recover = snapshot?.cancelled && snapshot.projectId === target.id
+      && snapshot.sessionId === creationSession.id && snapshot.owner === creationSession.owner
+      && snapshot.draft?.slides?.length > 0 && Array.isArray(snapshot.plan?.slides);
+    flushSync(() => {
+      if (recover) history.set(current => {
+        const route = getPresentationPath(snapshot.presentationPath);
+        const totalCount = Math.max(snapshot.draft.slides.length, snapshot.totalCount || snapshot.plan.slides.length);
+        const completedCount = snapshot.draft.slides.length;
+        const incomplete = completedCount < totalCount;
+        const reviewStatus = incomplete ? 'needs_attention' : 'unavailable';
+        const preset = resolvePresentationVisualPresetDefinition(snapshot.visualPreset, visualPresets);
+        const identity = {
+          ...(snapshot.visualPreset && !snapshot.preserveBrandIdentity
+            ? applyVisualPreset(current.brand, snapshot.visualPreset, visualPresets) : current.brand),
+          ...explicitBrandColorsFromKit(current.styleKit),
+          ...sanitizeCustomVisualPresetBrand(snapshot.brandVisualOverrides),
+          subtitleVisible: true,
+        };
+        const presetOverrides = getSlideOverridesForPreset(snapshot.visualPreset, visualPresets);
+        const sourceHosts = collectSourceHosts(current.material?.content, current.material?.sources, current.material?.context, current.styleKit?.contextMd, current.styleKit?.stylePrompt);
+        const text = value => restoreSourceHosts(stripLeadingSlideCardLabel(String(value || '').trim()), sourceHosts);
+        const recovered = snapshot.draft.slides.map((slide, index) => {
+          const stageIndex = totalCount > 1 ? Math.round(index * (route.stages.length - 1) / (totalCount - 1)) : 0;
+          const stage = { ...route.stages[stageIndex], deliveryMode: route.deliveryMode,
+            visualRole: slide.presentationPlan?.visualRole, purpose: slide.presentationPlan?.purpose };
+          const composition = preset?.isCustom ? {} : getPresentationCompositionOverrides(snapshot.visualPreset, { slide, stage, index, count: totalCount });
+          return {
+            ...mkSlide(index + 1, identity), ...presetOverrides, ...composition,
+            title: text(slide.title), subtitle: text(slide.subtitle), bodyAfterImage: text(slide.bodyAfterImage),
+            imageQuery: slide.imageQuery || '', bgImage: null, bgImageId: null, bgImageAssetId: null,
+            presentationPlan: slide.presentationPlan || null, presentationQualityVersion: 1,
+            presentationBlocks: normalizePresentationBlocks(slide.presentationBlocks),
+            caption: slide.speakerNotes || '', photoFraming: 'auto', useCultureLayout: false, showSwipeCue: false,
+            presentationStageId: stage.id || null, presentationStageLabel: stage.label || '',
+          };
+        });
+        return {
+          ...current, brand: identity, fmt: 'apresentacao', productKind: 'apresentacao', creativePreset: 'apresentacao',
+          slides: applyFinalizeCanvasMarginsToSlides(recovered, 'apresentacao'), caption: snapshot.draft.caption || '',
+          quickCardCount: totalCount, presentationPath: snapshot.presentationPath, visualPreset: snapshot.visualPreset,
+          presentationPlan: snapshot.plan, editorialReviewStatus: reviewStatus,
+          editorialReviewIssues: incomplete ? [{ code: 'presentation_incomplete', kind: 'incomplete', slideIndex: null, completedCount, totalCount }] : [],
+          presentationQuality: { version: 1, reviewStatus, incomplete, completedCount, totalCount, renderCheckStatus: 'pending' },
+        };
+      });
+      setCreationSession(null);
+      creationTargetRef.current = null;
+      creationValidatedDraftRef.current = null;
+      setCreationPreviewPhase('needs_attention');
+      setActiveIdx(0);
+      setAppMode('studio');
+      setTab('texto');
+      setShellView('project');
+    });
+    if (recover) {
+      // Match successful creation's atomic flush, so the pending seed autosave
+      // cannot replace recovered slides when the user immediately reloads.
+      const persisted = flushPersistRef.current?.();
+      if (Array.isArray(persisted)) setLibrary(persisted);
+    }
+  }, [creationSession, history.set, visualPresets, setAppMode, setShellView]);
 
   const createBlankProject = useCallback(async ({ name = '', productKind = 'carrossel' } = {}) => {
     if (!creationSession || creationRequestRef.current || getAIGenerationCount() > 0) return false;
@@ -7290,10 +7400,14 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onCancel={leaveCreation}
           onCancelGeneration={cancelGeneration}
           onOpenDraft={openCreationDraft}
-          hasDraft={!!creationTargetRef.current && projectHasCarouselContent(slides)}
+          hasDraft={!!creationTargetRef.current && (projectHasCarouselContent(slides)
+            || (creationValidatedDraftRef.current?.cancelled && creationValidatedDraftRef.current.projectId === activeDocId && creationPreviewSlides.length > 0))}
           progress={genProgress}
           previewSlides={creationPreviewSlides}
           previewPhase={creationPreviewPhase}
+          generationPlan={creationPreviewPlan}
+          previewCompletedCount={creationPreviewCompletedCount}
+          previewTotalCount={creationPreviewTotalCount}
         />
       ) : shellView === 'home' ? (
         <AccountHomeShell
@@ -7677,8 +7791,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
           }} index={activeIdx} count={slides.length} isPresentation={isPresentationProject} onNavigate={index => { setActiveIdx(index); setBoardJump(n => n + 1); }} />}
           <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
           <div id="vc-cards-viewport" className="vc-cards-viewport" ref={boardScrollRef} style={{ flex:1, minWidth:0, overflow:'auto', overscrollBehavior:'contain', touchAction:'pan-x pan-y' }}>
-            {!setupOpen && generationPreviewContext?.projectId === activeDocId && ((generationRef.current && genProgress) || (creationPreviewPhase === 'draft' && creationPreviewSlides.length > 0)) && <div className="vc-editor-generation-preview">
-              <GenerationPreview active={!!generationRef.current && !!genProgress} startedAt={generationPreviewContext.startedAt} progress={genProgress} slides={creationPreviewSlides} phase={creationPreviewPhase} isPresentation={generationPreviewContext.isPresentation}/>
+            {!setupOpen && generationPreviewContext?.projectId === activeDocId && ((generationRef.current && genProgress) || (['draft', 'writing', 'reviewing'].includes(creationPreviewPhase) && (creationPreviewSlides.length > 0 || creationPreviewPlan))) && <div className="vc-editor-generation-preview">
+              <GenerationPreview active={!!generationRef.current && !!genProgress} startedAt={generationPreviewContext.startedAt} progress={genProgress} slides={creationPreviewSlides} phase={creationPreviewPhase} isPresentation={generationPreviewContext.isPresentation} plan={creationPreviewPlan} completedCount={creationPreviewCompletedCount} totalCount={creationPreviewTotalCount}/>
               {!genProgress && <button type="button" className="vc-btn vc-btn-ghost" onClick={() => { setCreationPreviewSlides([]); setGenerationPreviewContext(null); }}>Fechar prévia da geração</button>}
             </div>}
             <EditorialReviewNotice status={doc.editorialReviewStatus} issues={doc.editorialReviewIssues} isPresentation={isPresentationProject} onReviewed={() => history.set(current => ({ ...current, editorialReviewStatus:'reviewed_by_user', editorialReviewIssues:[] }))}/>
@@ -8584,6 +8698,9 @@ Retorne APENAS JSON: ${refineAllWantsBody
         generationProgress={genProgress}
         previewSlides={generationPreviewContext?.projectId === activeDocId ? creationPreviewSlides : []}
         previewPhase={creationPreviewPhase}
+        generationPlan={generationPreviewContext?.projectId === activeDocId ? creationPreviewPlan : null}
+        previewCompletedCount={creationPreviewCompletedCount}
+        previewTotalCount={creationPreviewTotalCount}
         generationStartedAt={generationPreviewContext?.startedAt}
         defaultNiche={niche}
         defaultTopic={prefilledTopic}

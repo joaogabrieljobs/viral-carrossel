@@ -142,4 +142,22 @@ describe('avaliação determinística do contrato de planejamento', () => {
     expect(prompt).toContain(delivery);
     expect(prompt).toContain('sem alocar por índice fixo');
   });
+  it('retorna diagnósticos de campo sem IDs ou valores recebidos', () => {
+    const input = plan(); input.evidence[0].id = 'PRIVATE_IDENTIFIER'; input.evidence[0].quote = 'PRIVATE_TEXT';
+    const result = check(input);
+    expect(result.issues).toContainEqual({ code: 'quote_not_found', path: 'evidence[0].quote' });
+    expect(JSON.stringify(result.errors)).not.toContain('PRIVATE_');
+    expect(JSON.stringify(result.issues)).not.toContain('PRIVATE_');
+  });
+  it('rejeita posições nulas sem quebrar o tratamento da validação', () => {
+    const input = plan(); input.slides[2] = null;
+    expect(check(input)).toMatchObject({ valid: false });
+    expect(check(input).issues).toContainEqual({ code: 'invalid_object', path: 'slides[2]' });
+  });
+  it('mostra as fronteiras dos trechos no prompt sem sugerir citações que cruzam lacunas', () => {
+    const source = { id: 's', text: 'Antes.\n\nDepois.', chunks: [{ text: 'Antes.' }, { text: 'Depois.' }] };
+    const prompt = buildPresentationPlanPrompt({ sources: [source], count: 12 });
+    expect(prompt).toContain('"excerpts":["Antes.","Depois."]');
+    expect(prompt).toContain('um único excerpt');
+  });
 });

@@ -1,6 +1,13 @@
 import React from 'react';
 
 function issueDescription(issue) {
+  if (issue.code === 'presentation_incomplete') {
+    const completed = Number(issue.completedCount);
+    const total = Number(issue.totalCount);
+    return Number.isInteger(completed) && Number.isInteger(total) && total > completed
+      ? `${completed} de ${total} slides foram preservados. Faltam ${total - completed}; complete a sequência antes de exportar.`
+      : 'a apresentação não foi concluída. Complete os slides que faltam antes de exportar.';
+  }
   if (issue.kind === 'missing_title') return 'falta um título.';
   if (issue.kind === 'recovered_title' || issue.code === 'social_title_recovered') return 'título recuperado automaticamente do texto de apoio; confira antes de exportar.';
   if (issue.kind === 'factual') return `informação sem apoio suficiente no briefing${issue.claim ? `: “${issue.claim}”` : '.'}`;
@@ -14,6 +21,10 @@ function issueDescription(issue) {
 export default function EditorialReviewNotice({ status, issues = [], isPresentation = false, onReviewed }) {
   if (!['needs_attention', 'unavailable'].includes(status)) return null;
   const items = Array.isArray(issues) ? issues : [];
+  const incomplete = items.find(issue => issue.code === 'presentation_incomplete');
+  const completed = Number(incomplete?.completedCount);
+  const total = Number(incomplete?.totalCount);
+  const hasIncompleteCount = incomplete && Number.isInteger(completed) && Number.isInteger(total) && total > completed;
   const pages = [...new Set(items.filter(issue => Number.isInteger(issue.slideIndex) && issue.slideIndex >= 0)
     .map(issue => issue.slideIndex + 1))].sort((a, b) => a - b);
   const locations = [
@@ -21,8 +32,13 @@ export default function EditorialReviewNotice({ status, issues = [], isPresentat
     items.some(issue => issue.field === 'caption' || issue.slideIndex === -1) ? 'Legenda' : '',
   ].filter(Boolean).join(' · ');
   return <section className="vc-editor-review-notice" aria-label="Revisão pendente do conteúdo">
-    <strong>Rascunho preservado — revise antes de exportar</strong>
-    <p>{status === 'unavailable'
+    <strong>{incomplete ? 'Apresentação incompleta — revise antes de exportar' : 'Rascunho preservado — revise antes de exportar'}</strong>
+    {incomplete && <p>{hasIncompleteCount
+      ? `${completed} de ${total} slides preservados. A geração parou antes de escrever os ${total - completed} restantes.`
+      : 'Os slides concluídos foram preservados, mas a geração parou antes de completar a apresentação.'} Complete a sequência antes de exportar.</p>}
+    <p>{incomplete
+      ? 'Confira as informações, os títulos e o tamanho dos textos dos slides disponíveis. A sequência ainda precisa ser completada.'
+      : status === 'unavailable'
       ? 'Este texto ainda não passou pela revisão automática. Confira as informações e o tamanho dos textos.'
       : 'A revisão encontrou pontos que precisam de conferência. Verifique as informações, os títulos e o tamanho dos textos.'}</p>
     {locations && <p>{locations}</p>}
@@ -35,6 +51,6 @@ export default function EditorialReviewNotice({ status, issues = [], isPresentat
         {issueDescription(issue)}
       </li>)}</ul>
     </details>}
-    <button type="button" className="vc-btn vc-btn-ghost" onClick={onReviewed}>Conferi o conteúdo</button>
+    {!incomplete && <button type="button" className="vc-btn vc-btn-ghost" onClick={onReviewed}>Conferi o conteúdo</button>}
   </section>;
 }

@@ -1,6 +1,8 @@
+import { presentationBatch } from './helpers/presentation-batches.js';
 import { test, expect } from '@playwright/test';
 import { mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
+import { enterEditorFromHome } from './helpers/project-entry.js';
 
 // These are synthetic projects. Every AI/account request is intercepted; no
 // real campaign, invitation or paid generation participates in this suite.
@@ -477,6 +479,69 @@ test('cancelar a revisão mantém a prévia identificada e ignora a resposta tar
   expect(after.flatMap(project => project.doc.slides).some(slide => String(slide.title).startsWith('Rascunho temporário'))).toBe(false);
 });
 
+test('cancelar após um lote abre os slides concluídos e preserva conteúdo completo ao recarregar', async ({ page }) => {
+  test.setTimeout(60_000);
+  const name = 'Apresentação interrompida com conteúdo';
+  let releaseSecondBatch;
+  const secondBatchGate = new Promise(resolve => { releaseSecondBatch = resolve; });
+  let secondBatchRequested = false;
+  const draft = generated(6, 'Decisão registrada');
+  draft.slides[0].imageQuery = 'editorial meeting notes';
+  draft.slides[0].speakerNotes = 'Notas de apoio completas, sem repetir apenas o título.';
+  draft.slides[1].speakerNotes = 'Detalhes complementares da sequência.';
+  draft.slides[1].presentationBlocks = [{ type:'steps', items:[
+    { title:'Registre a decisão', body:'Inclua quem ficou responsável.' },
+    { title:'Combine o próximo passo', body:'Confirme o acompanhamento com a equipe.' },
+  ] }];
+  await setup(page, { ai: async route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+    if (prompt.startsWith('PLANEJAMENTO ESTRUTURADO')) return route.fulfill({ json:completion({
+      schemaVersion:1, promptVersion:PRESENTATION_PLAN_PROMPT_VERSION,
+      objective:'Registrar decisões e próximos passos.', audience:'Equipe que participa das reuniões.', thesis:'Registrar antes de agir.', evidence:[], gaps:[],
+      slides:draft.slides.map((slide, index) => ({ index:index + 1, visualRole:index === 0 ? 'cover' : index === 5 ? 'closing' : 'content',
+        purpose:index === 0 ? 'introduction' : index === 5 ? 'decision' : 'learning', question:`O que registrar na etapa ${index + 1}?`,
+        keyMessage:slide.title, evidenceIds:[], imageBrief:slide.imageQuery || '' })),
+    }) });
+    const batch = presentationBatch(prompt, draft.slides);
+    if (batch[0].title === draft.slides[3].title) {
+      secondBatchRequested = true;
+      await secondBatchGate;
+    }
+    return route.fulfill({ json:completion({ slides:batch, caption:draft.caption }) }).catch(() => {});
+  } });
+  const wizard = await configure(page, { name, presentation:true, count:6 });
+  await wizard.getByRole('button', { name:'Criar e gerar 6 slides', exact:true }).click();
+  try {
+    await expect.poll(() => secondBatchRequested).toBe(true);
+    await expect(wizard.getByLabel('Prévia dos slides', { exact:true }).getByRole('article')).toHaveCount(3);
+    await wizard.getByRole('button', { name:'Cancelar geração', exact:true }).click();
+    await wizard.getByRole('button', { name:'Abrir rascunho no editor', exact:true }).click();
+    await expect(wizard).toHaveCount(0);
+    const warning = page.getByRole('region', { name:'Revisão pendente do conteúdo' });
+    await expect(warning).toContainText('3 de 6 slides preservados');
+    await expect(page.getByRole('button', { name:'Desfazer', exact:true }).first()).toBeEnabled();
+    const saved = (await library(page)).find(project => project.name === name);
+    expect(saved.doc.slides.map(slide => slide.title)).toEqual(draft.slides.slice(0, 3).map(slide => slide.title));
+    expect(saved.doc.slides[0]).toMatchObject({ imageQuery:draft.slides[0].imageQuery, caption:draft.slides[0].speakerNotes });
+    expect(saved.doc.slides[1]).toMatchObject({ caption:draft.slides[1].speakerNotes, presentationBlocks:draft.slides[1].presentationBlocks });
+    expect(saved.doc.slides[2].bodyAfterImage).toBe(draft.slides[2].bodyAfterImage);
+    expect(saved.doc.caption).toBe(draft.caption);
+    expect(saved.doc.presentationPlan.slides).toHaveLength(6);
+    expect(saved.doc).toMatchObject({ quickCardCount:6, editorialReviewStatus:'needs_attention',
+      presentationQuality:{ incomplete:true, completedCount:3, totalCount:6 } });
+    releaseSecondBatch();
+    // Reload immediately: neither a late batch nor the old seed debounce may
+    // overwrite the explicit decision to open the available three slides.
+    await page.reload();
+    await enterEditorFromHome(page, name);
+    await expect(page.getByRole('region', { name:'Revisão pendente do conteúdo' })).toContainText('3 de 6 slides preservados');
+    const reloaded = (await library(page)).find(project => project.name === name);
+    expect(reloaded.doc.slides).toEqual(saved.doc.slides);
+    expect(reloaded.doc.presentationPlan.slides).toHaveLength(6);
+    expect((await library(page)).find(project => project.id === originalProject.id).doc.slides[0].title).toBe(originalProject.doc.slides[0].title);
+  } finally { releaseSecondBatch(); }
+});
+
 test('mobile deixa quantidade visível, valida limites e preserva escolha ao voltar à narrativa', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page, { withProject: false, onboarding: true });
@@ -563,7 +628,7 @@ test('apresentação passa pelo planejamento e só abre edição após conferir 
         purpose: index === 0 ? 'introduction' : index === 4 ? 'decision' : 'learning',
         question: `Qual o próximo passo ${index + 1}?`, keyMessage: `Organizar o passo ${index + 1}.`, evidenceIds: [], imageBrief: '',
       })),
-    } : prompt.startsWith('REVISÃO DE APRESENTAÇÃO') ? { edits: [] } : generated(5, 'Apresentação nova');
+    } : prompt.startsWith('REVISÃO DE APRESENTAÇÃO') ? { edits: [] } : { ...generated(5, 'Apresentação nova'), slides: presentationBatch(prompt, generated(5, 'Apresentação nova').slides) };
     return route.fulfill({ json: completion(value) });
   } });
   const wizard = await configure(page, { name: 'Apresentação guiada', presentation: true });
@@ -573,7 +638,7 @@ test('apresentação passa pelo planejamento e só abre edição após conferir 
   const deck = (await library(page)).find(p => p.name === 'Apresentação guiada');
   expect(deck.doc.slides).toHaveLength(5);
   expect(deck.doc).toMatchObject({ fmt: 'apresentacao', productKind: 'apresentacao', quickCardCount: 5 });
-  expect(prompts).toHaveLength(3);
+  expect(prompts).toHaveLength(4);
   expect(prompts[0]).toContain('PLANEJAMENTO ESTRUTURADO');
   expect(prompts[1]).toContain('PLANO EDITORIAL VALIDADO');
 });

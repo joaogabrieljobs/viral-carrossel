@@ -1,3 +1,4 @@
+import { presentationBatch } from './helpers/presentation-batches.js';
 import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
@@ -137,7 +138,7 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
               evidenceIds: [], imageBrief: slide.imageQuery,
             })),
           }
-          : /^REVISÃO (?:EDITORIAL|DE APRESENTAÇÃO)/.test(prompt) ? fittedReview : deck;
+          : /^REVISÃO (?:EDITORIAL|DE APRESENTAÇÃO)/.test(prompt) ? fittedReview : { ...deck, slides: presentationBatch(prompt, deck.slides) };
         return route.fulfill({
           json: completion(payload),
         });
@@ -182,11 +183,11 @@ test('deck 16:9 mantém tipo do projeto e encaixa todo o texto nas zonas', async
   expect(imageRequests.some((request) => request.aspectRatio !== '16:9')).toBe(true);
   await expectGeneratedThumbnailsVisible(page, 6);
   await expect.poll(() => persistedSlideImageCount(page), { timeout: 15_000 }).toBe(6);
-  expect(textPrompts).toHaveLength(3);
+  expect(textPrompts).toHaveLength(4);
   expect(textPrompts[0]).toContain('PLANEJAMENTO ESTRUTURADO');
   expect(textPrompts[1]).toContain('PITCH COMPLETO PARA LEITURA AUTÔNOMA');
   expect(textPrompts[1]).not.toContain('bodyAfterImage fica vazio por padrão');
-  expect(textPrompts[2]).toContain('REVISÃO DE PROFUNDIDADE DO PITCH');
+  expect(textPrompts[3]).toContain('REVISÃO DE PROFUNDIDADE DO PITCH');
   await expect(page.locator('main').getByText(pitchArgument, { exact: true })).toBeVisible();
   await expect(page.locator('main').getByText(pitchSupport, { exact: true })).toBeVisible();
   await expect(page.locator('main').getByText(/Fonte: Matéria-prima/)).toHaveCount(0);

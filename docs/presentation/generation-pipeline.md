@@ -1,6 +1,6 @@
 # Geração de apresentações com planejamento e revisão
 
-Versão inicial: 21/10/2026. Aplica-se à geração de novas apresentações nos sete
+Versão inicial: 21/10/2026. Atualizado em 14/11/2026. Aplica-se à geração de novas apresentações nos sete
 caminhos do Moont. Carrosséis e remix mantêm o fluxo existente.
 
 ## Etapas e contratos
@@ -14,14 +14,25 @@ caminhos do Moont. Carrosséis e remix mantêm o fluxo existente.
    antes da redação: objetivo, público, tese, fatos/propostas/lacunas e a função
    de cada slide. Evidências possuem IDs e citações que precisam existir nos
    trechos selecionados. Isso estabelece rastreabilidade; não verifica a verdade
-   externa de uma fonte ou a interpretação semântica do modelo.
+   externa de uma fonte ou a interpretação semântica do modelo. O orquestrador
+   `presentation-planning.js` permite uma recuperação para resposta truncada,
+   JSON inválido ou contrato rejeitado. Usa system prompt próprio e teto de
+   8.192 tokens; diagnósticos contêm códigos, posições e metadados de uso,
+   sem texto privado. Só um roteiro validado chega à prévia e à redação.
 3. **Redação.** A escrita recebe o roteiro validado e os limites da composição.
    Não recebe liberdade para executar código ou escolher coordenadas. Notas de
-   apresentação são salvas no campo editável `caption` de cada slide.
+   apresentação são salvas no campo editável `caption` de cada slide. A escrita
+   ocorre em grupos de até três slides, com uma recuperação por grupo. Cada
+   grupo válido aparece na prévia antes de os próximos ficarem prontos. Se um
+   grupo posterior falhar, o resultado preserva os slides concluídos, marca
+   a apresentação como incompleta e informa a quantidade solicitada e obtida.
 4. **Revisão editorial.** Confere a redação com o roteiro e as evidências.
    Há uma tentativa adicional apenas para slides que excederam os limites.
    O novo fluxo não corta frases por caracteres: se o reparo falhar, mantém
-   o rascunho completo e informa que precisa de atenção.
+   o rascunho completo e informa que precisa de atenção. A conferência factual
+   também inspeciona blocos nativos e notas; suspeitas são sinalizadas para
+   revisão, sem afirmar que uma verificação automática prova a veracidade.
+   Resultados que precisam de atenção não iniciam geração de imagens.
 5. **Composição.** `presentation-composition.js` associa funções a seis
    geometrias permitidas. Comparações, indicadores e sequências podem usar
    blocos nativos editáveis. A função planejada prevalece sobre a distribuição
@@ -39,10 +50,15 @@ caminhos do Moont. Carrosséis e remix mantêm o fluxo existente.
    indisponível e aviso. Isso não exige outra geração; a exportação continua
    verificando fontes, assets e layout.
 
-O percurso normal usa três chamadas de texto: roteiro, redação e revisão. Pode
-usar mais uma para texto acima dos limites e mais uma para transbordamento real.
-Não há repetição automática ilimitada. Cancelamento e troca de projeto impedem
-a aplicação de respostas tardias.
+O percurso normal usa uma chamada de roteiro, uma por grupo de até três slides
+e uma de revisão. Pode usar as recuperações limitadas acima e mais uma para
+transbordamento real. Planejamento, redação e revisão visual solicitam resposta
+sem raciocínio separado nos modelos Z.ai que suportam essa opção; outros modelos
+mantêm suas configurações compatíveis. Não há repetição automática ilimitada.
+Cancelamento e troca de projeto impedem a aplicação de respostas tardias. Na
+criação de apresentação nova, cancelar permite abrir e salvar os grupos já
+validados como rascunho incompleto no mesmo projeto. Não se substitui conteúdo
+de um projeto existente ou remix com essa recuperação.
 
 ## Imagens e compatibilidade
 

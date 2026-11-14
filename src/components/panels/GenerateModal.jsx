@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sparkles, Loader2, Bookmark, X, ChevronRight, ChevronLeft, Check, Settings } from 'lucide-react';
 import { getHooksForNiche } from '../../utils/hooks-library.js';
 import VisualStylePicker from '../VisualStylePicker.jsx';
-import GenerationPreview from '../GenerationPreview.jsx';
+import GenerationPreview, { PresentationStructureSummary } from '../GenerationPreview.jsx';
 import { VISUAL_PRESETS } from '../../styles/visual-presets.jsx';
 import { GEN_MODE_BY_ID, CREATIVE_PRESETS, CREATIVE_PRESET_BY_ID, GENERATION_TOPIC_MAX_CHARS, SLIDE_TEXT_DENSITY_OPTIONS, quickTemplateIdFromPreset, isQuickTemplatePreset, resolveRequestedContentLanguage } from '../../utils/generation-prompts.js';
 import { ModePicker, ReferenceProfilesCuradoria, ImgParamsPanel } from './generate-modal-parts.jsx';
@@ -123,6 +123,7 @@ export function saveGenerationScopePreference(productKind = 'carrossel', withIma
 function GenerateModal({
   open, onClose, onGenerate, onCancelGeneration,
   generationProgress, previewSlides = [], previewPhase = 'draft', generationStartedAt,
+  generationPlan = null, previewCompletedCount, previewTotalCount,
   defaultNiche='', defaultTopic='', defaultTone='', defaultAudience='',
   hasOpenAI=false, hasAnthropic=false, onOpenKeys,
   defaultWithImages = false,
@@ -163,6 +164,9 @@ function GenerateModal({
   const [count, setCount] = useState(() => (
     isPresentation ? getPresentationPath(initialPresentationPath).defaultSlideCount : 6
   ));
+  const countEditedRef = useRef(false);
+  const visualEditedRef = useRef(false);
+  const changeCount = value => { countEditedRef.current = true; setCount(value); };
   const [niche, setNiche] = useState(defaultNiche);
   const [audience, setAudience] = useState(defaultAudience || '');
   const [mode, setMode] = useState(defaultMode);
@@ -182,6 +186,8 @@ function GenerateModal({
     if (!open) return;
     const nextPath = normalizePresentationPath(defaultPresentationPath);
     setPresentationPath(nextPath);
+    countEditedRef.current = false;
+    visualEditedRef.current = false;
     setCount(isPresentation ? getPresentationPath(nextPath).defaultSlideCount : 6);
     setPackCreative(resolveCreativePresetForProduct(defaultCreativePreset, productKind));
   }, [open, defaultCreativePreset, defaultPresentationPath, isPresentation, productKind]);
@@ -274,6 +280,8 @@ function GenerateModal({
   const stepPanelRef = useRef(null);
   const previousStepRef = useRef(step);
   const returnFocusRef = useRef(null);
+  const errorRef = useRef(null);
+  const lastGenerationStageRef = useRef('');
   const requestClose = () => {
     if (busy) {
       onCancelGeneration?.();
@@ -309,6 +317,17 @@ function GenerateModal({
       stepPanelRef.current?.focus({ preventScroll: true });
     }
   }, [open, busy]);
+  useEffect(() => {
+    if (busy && generationProgress?.label) lastGenerationStageRef.current = generationProgress.label;
+  }, [busy, generationProgress?.label]);
+  useEffect(() => {
+    if (!open || !err) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      errorRef.current?.focus({ preventScroll: true });
+      errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, err, busy]);
 
   const onDialogKeyDown = (event) => {
     if (event.key === 'Escape') {
@@ -373,8 +392,8 @@ function GenerateModal({
     const normalized = normalizePresentationPath(pathId);
     const route = getPresentationPath(normalized);
     setPresentationPath(normalized);
-    setCount(route.defaultSlideCount);
-    setVisualPresetLocal(resolveInitialVisualPreset({
+    if (!countEditedRef.current) setCount(route.defaultSlideCount);
+    if (!visualEditedRef.current) setVisualPresetLocal(resolveInitialVisualPreset({
       presets: availableVisualPresets,
       productKind: 'apresentacao',
       defaultVisualPreset: route.suggestedVisualPreset,
@@ -395,7 +414,7 @@ function GenerateModal({
       );
       return;
     }
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); lastGenerationStageRef.current = '';
     try {
       const toneFromBrand = (defaultTone || '').trim() || 'direto e provocativo';
       const narrativeForGenerate = isPresentation
@@ -539,7 +558,12 @@ function GenerateModal({
             paddingBottom: 24,
           }}
         >
-          {busy && <GenerationPreview active startedAt={generationStartedAt} progress={generationProgress} slides={previewSlides} phase={previewPhase} isPresentation={isPresentation}/>}
+          {err && <div role="alert" aria-live="assertive" ref={errorRef} tabIndex={-1} className="vc-create-error vc-create-generation-error" style={{ color:'var(--danger-text)' }}>
+            <strong>Não foi possível concluir a geração.</strong>
+            {lastGenerationStageRef.current && <span className="vc-create-error-stage">{lastGenerationStageRef.current}</span>}
+            <p>{err}</p><p>Suas escolhas continuam aqui para ajustar ou tentar novamente.</p>
+          </div>}
+          {(busy || (err && (previewSlides.length > 0 || generationPlan))) && <GenerationPreview active={busy} startedAt={generationStartedAt} progress={generationProgress} slides={previewSlides} phase={previewPhase} isPresentation={isPresentation} plan={generationPlan} completedCount={previewCompletedCount} totalCount={previewTotalCount}/>}
           {/* ═══════════ ETAPA 1 — IDEIA ═══════════
               Tema, pacote criativo e ganchos salvos. Personalizado expõe modo
               narrativo, nicho, público. Outros pacotes mostram aviso explicando
@@ -888,7 +912,7 @@ function GenerateModal({
                     ? Array.from({ length: 11 }, (_, index) => index + 6)
                     : [3,4,5,6,7,8,9,10]
                   ).map(n=>(
-                    <button type="button" key={n} aria-pressed={count === n} disabled={!!explicitCardScript} onClick={()=>setCount(n)} style={{
+                    <button type="button" key={n} aria-pressed={count === n} disabled={!!explicitCardScript} onClick={()=>changeCount(n)} style={{
                       width:44, height:44, borderRadius:11, fontSize:15, fontWeight:600,
                       cursor:'pointer', fontFamily:'var(--font-ui)', letterSpacing:'-0.014em',
                       fontVariantNumeric:'tabular-nums',
@@ -919,7 +943,7 @@ function GenerateModal({
                       aria-label={isPresentation ? 'Número personalizado de slides' : 'Número personalizado de cards'}
                       onChange={(e) => {
                         const n = Number(e.target.value);
-                        if (Number.isInteger(n) && n >= 1 && n <= 24) setCount(n);
+                        if (Number.isInteger(n) && n >= 1 && n <= 24) changeCount(n);
                       }}
                       style={{
                         width: 52, height: 32, borderRadius: 8,
@@ -944,7 +968,7 @@ function GenerateModal({
                   criativo nem o leiaute dos slides. */}
               <VisualStylePicker
                 value={visualPreset}
-                onChange={setVisualPresetLocal}
+                onChange={value => { visualEditedRef.current = true; setVisualPresetLocal(value); }}
                 presets={availableVisualPresets}
                 title={isPresentation ? 'Escolha um padrão de apresentação 16:9' : 'Escolha um padrão de comunicação 4:5'}
                 suggestedId={isPresentation ? selectedPresentationPath.suggestedVisualPreset : null}
@@ -1147,6 +1171,7 @@ function GenerateModal({
               Resumo das escolhas, contexto aplicado e eventuais erros. */}
           {step === 4 && !busy && (
             <>
+              {isPresentation && <PresentationStructureSummary presentationPath={presentationPath} count={count}/>}
               {/* Resumo das escolhas antes da ação final. */}
               <div style={{
                 padding:'14px 16px', borderRadius:11,
@@ -1273,13 +1298,6 @@ function GenerateModal({
                 )}
               </div>
 
-              {err && (
-                <div role="alert" aria-live="assertive" style={{
-                  fontSize:13, color:'var(--danger-text)', background:'rgba(255,59,48,0.10)', letterSpacing:'-0.011em',
-                  border:'1px solid #7f1d1d', borderRadius:8, padding:'10px 14px',
-                  fontFamily:'var(--font-ui)',
-                }}>{err}</div>
-              )}
             </>
           )}
         </div>

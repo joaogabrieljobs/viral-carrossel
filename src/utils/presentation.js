@@ -56,7 +56,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     defaultSlideCount: 10,
     suggestedVisualPreset: 'presentation_executive_minimal',
     stages: [
-      { label: 'CAPA', instruction: 'Título da apresentação e promessa ou contexto em uma linha.', headlineMode: 'topic', visualRole: 'context' },
+      { label: 'CAPA', instruction: 'Identifique tema, finalidade e natureza do material; um caso fictício continua identificado como fictício.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'CONTEXTO OU MAPA', instruction: 'Mostre por que o assunto importa e, quando ajudar, o percurso do deck.', visualRole: 'diagram' },
       { label: 'CORPO', instruction: 'Desenvolva uma afirmação verificável por slide, apoiada por evidência, exemplo, dado ou diagrama.', evidenceRequired: true },
       { label: 'SÍNTESE', instruction: 'Reúna as conclusões que sustentam a decisão ou aprendizagem.', visualRole: 'summary' },
@@ -76,17 +76,17 @@ export const PRESENTATION_PATHS = Object.freeze([
     stages: [
       { label: 'EMPRESA E PROPÓSITO', instruction: 'Defina em uma frase o que muda, para quem e por que a empresa existe.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'CLIENTE E PROBLEMA', instruction: 'Mostre o usuário, a dor concreta, o custo da dor e a alternativa atual.' },
-      { label: 'POR QUE AGORA', instruction: 'Explique a mudança de tecnologia, comportamento ou mercado que abre a oportunidade.', evidenceRequired: true },
+      { label: 'POR QUE AGORA', instruction: 'Explique uma mudança documentada que abre a oportunidade; sem base, omita esta função em vez de fabricar urgência.', evidenceRequired: true, optionalWhenMissing: true },
       { label: 'SOLUÇÃO E MECANISMO', instruction: 'Explique o produto e como ele resolve a causa central do problema.', visualRole: 'diagram' },
-      { label: 'PRODUTO OU DEMONSTRAÇÃO', instruction: 'Mostre o fluxo, screenshot ou experiência principal; evite fotografia decorativa.', visualRole: 'demo' },
+      { label: 'PRODUTO OU DEMONSTRAÇÃO', instruction: 'Mostre o fluxo ou experiência principal em texto editável; screenshot somente se fornecido. Separe software de serviço humano.', visualRole: 'demo' },
       { label: 'MERCADO E CLIENTE IDEAL', instruction: 'Delimite o segmento acessível, comprador e oportunidade com dados sustentados; sem dados, explicite o recorte e a hipótese de validação.', visualRole: 'data', evidenceRequired: true },
       { label: 'TRAÇÃO E PROVA', instruction: 'Apresente validações reais com período, unidade e comparação quando conhecidos; diferencie resultados de planos e testes futuros.', visualRole: 'data', evidenceRequired: true },
       { label: 'MODELO DE NEGÓCIO', instruction: 'Mostre pagador, lógica de receita e preço somente quando informados.', visualRole: 'diagram' },
-      { label: 'ALTERNATIVAS E VANTAGEM', instruction: 'Compare concorrentes e solução atual; declare a vantagem sem caricaturar as opções.', visualRole: 'comparison', evidenceRequired: true },
+      { label: 'ALTERNATIVAS E VANTAGEM', instruction: 'Compare apenas alternativas documentadas e critérios sustentados; não invente concorrentes ou superioridade.', visualRole: 'comparison', evidenceRequired: true, optionalWhenMissing: true },
       { label: 'AQUISIÇÃO', instruction: 'Explique como o público chega ao produto e qual hipótese ainda precisa ser validada.' },
       { label: 'EQUIPE', instruction: 'Relacione experiência real e responsabilidades à execução; sem dados de equipe, não invente competências nem uma página genérica.', visualRole: 'people', optionalWhenMissing: true },
       { label: 'MARCOS E RECURSOS', instruction: 'Relacione plano, uso dos recursos e marco financiado; não invente projeções.' },
-      { label: 'PEDIDO', instruction: 'Declare valor, recurso, decisão ou próximo encontro e o que ele viabiliza.', visualRole: 'decision' },
+      { label: 'PEDIDO', instruction: 'Declare a decisão ou recurso solicitado e o que viabiliza, sem inventar captação, valor ou próximo encontro. Pode compor o fecho.', visualRole: 'decision' },
       { label: 'DECISÃO E PRÓXIMO PASSO', instruction: 'Feche com o avanço solicitado e o que ele viabiliza; inclua contato somente se informado. Não termine só com fotografia, logo ou promessa abstrata.', visualRole: 'decision' },
     ],
   }),
@@ -102,16 +102,16 @@ export const PRESENTATION_PATHS = Object.freeze([
     stages: [
       { label: 'RELEVÂNCIA E DIAGNÓSTICO', instruction: 'Conecte o tema ao público e abra com uma pergunta curta que revele o ponto de partida.', visualRole: 'question' },
       { label: 'OBJETIVOS OBSERVÁVEIS', instruction: 'Diga o que o participante será capaz de explicar, decidir ou fazer ao final.', visualRole: 'objectives' },
-      { label: 'MAPA DA SESSÃO', instruction: 'Mostre os blocos e onde haverá prática, pausa e síntese.', headlineMode: 'topic', visualRole: 'agenda' },
+      { label: 'MAPA DA SESSÃO', instruction: 'Oriente o percurso entre explicação, prática e síntese quando ajudar; não ocupe uma página só para repetir títulos.', headlineMode: 'topic', visualRole: 'agenda', optionalWhenMissing: true },
       { label: 'CONCEITO', instruction: 'Explique uma ideia por vez, com linguagem adequada ao conhecimento prévio do público.', visualRole: 'diagram' },
       { label: 'EXEMPLO RESOLVIDO', instruction: 'Demonstre o conceito em um caso concreto, expondo raciocínio e critério.', visualRole: 'example' },
       { label: 'VERIFICAÇÃO RÁPIDA', instruction: 'Faça uma pergunta que permita checar entendimento antes de avançar.', visualRole: 'question' },
-      { label: 'ATIVIDADE', instruction: 'Declare objetivo, instrução, tempo, formato, material e entrega esperada.', density: 'medium', visualRole: 'instructions' },
+      { label: 'ATIVIDADE', instruction: 'Declare tarefa, insumos disponíveis, entrega e critério de sucesso. Duração apenas se informada ou identificada como sugestão didática.', density: 'medium', visualRole: 'instructions' },
       { label: 'DEBRIEF', instruction: 'Mostre resposta ou critério, erro comum e pergunta de reflexão após a prática.', visualRole: 'discussion' },
       { label: 'NOVO BLOCO', instruction: 'Repita conceito → exemplo → verificação → prática apenas quando o escopo exigir.', optionalWhenMissing: true },
       { label: 'SÍNTESE POR BLOCOS', instruction: 'Agrupe os princípios essenciais sem repetir o roteiro falado.', visualRole: 'summary' },
       { label: 'TRANSFERÊNCIA', instruction: 'Aplique a aprendizagem a um contexto novo para testar compreensão.', visualRole: 'application' },
-      { label: 'PRÓXIMA AÇÃO E RECURSOS', instruction: 'Feche com tarefa, material de apoio e forma de continuidade.', visualRole: 'decision' },
+      { label: 'PRÓXIMA AÇÃO E RECURSOS', instruction: 'Feche com aplicação executável; materiais, links e acompanhamento apenas quando disponíveis.', visualRole: 'decision' },
     ],
   }),
   path({
@@ -125,7 +125,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     defaultSlideCount: 12,
     suggestedVisualPreset: 'presentation_executive_minimal',
     stages: [
-      { label: 'CAPA PERSONALIZADA', instruction: 'Nomeie proposta, cliente e resultado central sem slogan genérico.', headlineMode: 'topic', visualRole: 'context' },
+      { label: 'CAPA PERSONALIZADA', instruction: 'Nomeie proposta e objetivo; identifique o cliente somente se informado e preserve casos fictícios como fictícios.', headlineMode: 'topic', visualRole: 'context' },
       { label: 'RESUMO DE VALOR', instruction: 'Resuma situação, resultado desejado e proposta em linguagem do cliente.' },
       { label: 'DESAFIO E IMPACTO', instruction: 'Demonstre entendimento do cenário e do efeito atual no negócio.', evidenceRequired: true },
       { label: 'OBJETIVOS E SUCESSO', instruction: 'Converta o pedido em resultados e critérios de sucesso verificáveis.' },
@@ -135,8 +135,8 @@ export const PRESENTATION_PATHS = Object.freeze([
       { label: 'PROVA PRÓXIMA', instruction: 'Apoie cada alegação relevante com caso, evidência ou processo real disponível.', visualRole: 'evidence', evidenceRequired: true },
       { label: 'INVESTIMENTO E CONDIÇÕES', instruction: 'Mostre opções, preço, validade e pagamento somente quando fornecidos.', visualRole: 'comparison' },
       { label: 'PRESSUPOSTOS E EXCLUSÕES', instruction: 'Declare limites, dependências, riscos e o que não está incluído.', density: 'medium' },
-      { label: 'PLANO MÚTUO', instruction: 'Defina decisão, responsável, data e passos de ambos os lados.', visualRole: 'decision' },
-      { label: 'PERGUNTAS', instruction: 'Feche abrindo diálogo, com contato ou próximo encontro quando informado.', density: 'minimal', visualRole: 'question' },
+      { label: 'PLANO MÚTUO', instruction: 'Declare decisão e passos de ambos os lados; responsáveis e datas apenas quando informados, senão como pendências.', visualRole: 'decision' },
+      { label: 'FECHO E PENDÊNCIAS', instruction: 'Feche com o que aprovar e o que ainda combinar, sem uma página genérica de perguntas. Contato ou encontro somente quando informado.', density: 'minimal', visualRole: 'decision' },
     ],
   }),
   path({
@@ -151,16 +151,16 @@ export const PRESENTATION_PATHS = Object.freeze([
     suggestedVisualPreset: 'presentation_data_first',
     stages: [
       { label: 'ASSUNTO, PERÍODO E DECISÃO', instruction: 'Identifique recorte, período e a decisão que o relatório deve apoiar.', headlineMode: 'topic', visualRole: 'context' },
-      { label: 'RESUMO EXECUTIVO', instruction: 'Antecipe de três a cinco conclusões e a decisão requerida.', visualRole: 'summary' },
-      { label: 'SCORECARD', instruction: 'Mostre atual, meta, delta e tendência com unidade, período e fonte.', visualRole: 'data', evidenceRequired: true },
+      { label: 'RESUMO EXECUTIVO', instruction: 'Antecipe as poucas conclusões sustentadas mais relevantes e a decisão requerida; não preencha uma contagem fixa de achados.', visualRole: 'summary' },
+      { label: 'SCORECARD', instruction: 'Mostre indicadores disponíveis com unidade, período e base. Meta só se fornecida, diferença só com entradas comparáveis; não invente tendência.', visualRole: 'data', evidenceRequired: true },
       { label: 'ACHADO', instruction: 'Use uma conclusão no título e uma evidência visual por slide.', visualRole: 'data', evidenceRequired: true },
       { label: 'IMPLICAÇÃO', instruction: 'Explique o que o achado muda para o negócio sem atribuir causalidade sem prova.' },
       { label: 'FATORES E HIPÓTESES', instruction: 'Separe fatores associados, hipóteses e limitações metodológicas.', density: 'medium', visualRole: 'analysis' },
       { label: 'RISCOS E OPORTUNIDADES', instruction: 'Priorize por impacto, probabilidade e urgência quando houver base.', visualRole: 'matrix', evidenceRequired: true },
-      { label: 'RECOMENDAÇÕES', instruction: 'Ligue cada ação ao achado que a justifica e estime impacto e esforço quando possível.', visualRole: 'priorities' },
+      { label: 'RECOMENDAÇÕES', instruction: 'Ligue cada ação ao achado que a justifica; impacto, esforço ou orçamento só quando sustentados.', visualRole: 'priorities' },
       { label: 'OPÇÕES E TRADE-OFFS', instruction: 'Compare escolhas reais e suas consequências para a decisão.', visualRole: 'comparison' },
       { label: 'DECISÃO REQUERIDA', instruction: 'Declare escolha, responsável, prazo e checkpoint somente quando informados.', visualRole: 'decision' },
-      { label: 'APÊNDICE', instruction: 'Reserve método, definições, fontes e limitações para consulta.', density: 'medium', visualRole: 'source', optionalWhenMissing: true },
+      { label: 'APÊNDICE', instruction: 'Método e definições podem complementar a leitura; limitações essenciais acompanham o achado. Não encerre o deck com um apêndice genérico.', density: 'medium', visualRole: 'source', optionalWhenMissing: true },
     ],
   }),
   path({
@@ -174,7 +174,7 @@ export const PRESENTATION_PATHS = Object.freeze([
     defaultSlideCount: 11,
     suggestedVisualPreset: 'presentation_photo_essay',
     stages: [
-      { label: 'RESULTADO COMPROVADO', instruction: 'Abra com a transformação central somente se houver evidência; caso contrário, nomeie o caso sem prometer resultado.', visualRole: 'result', evidenceRequired: true },
+      { label: 'RESULTADO OBSERVADO', instruction: 'Abra com a mudança registrada sem alegar causalidade; sem resultado, nomeie o caso em avaliação. Declare quando fictício.', visualRole: 'result', evidenceRequired: true },
       { label: 'CONTEXTO E BASELINE', instruction: 'Explique cliente ou cenário, público, período e ponto de partida.', visualRole: 'context' },
       { label: 'DESAFIO E IMPACTO', instruction: 'Mostre a restrição, risco ou problema e seu efeito inicial.', evidenceRequired: true },
       { label: 'OBJETIVO E MÉTRICA', instruction: 'Defina o que deveria mudar e como seria observado.', visualRole: 'metric' },
@@ -205,10 +205,10 @@ export const PRESENTATION_PATHS = Object.freeze([
       { label: 'HISTÓRIA OU PROVA', instruction: 'Use exemplo verdadeiro, imagem ou dado único para dar corpo à tese.', visualRole: 'story', evidenceRequired: true },
       { label: 'OBSTÁCULO', instruction: 'Nomeie a crença, sistema ou resistência que impede a mudança.' },
       { label: 'VIRADA', instruction: 'Apresente a nova lente que reorganiza o problema.', visualRole: 'reframe' },
-      { label: 'CICLOS DE CONTRASTE', instruction: 'Alterne realidade atual e possibilidade em dois ou três movimentos, um ponto por slide.', visualRole: 'contrast' },
+      { label: 'CICLOS DE CONTRASTE', instruction: 'Use contraste somente quando acrescentar um argumento distinto, sem repetir a tese nem fabricar uma falsa oposição.', visualRole: 'contrast', optionalWhenMissing: true },
       { label: 'PRINCÍPIOS', instruction: 'Desdobre a visão em duas ou três ideias curtas e memoráveis.' },
       { label: 'IMPLICAÇÕES', instruction: 'Mostre o que muda em escolhas, comportamento ou estratégia.' },
-      { label: 'NOVA REALIDADE', instruction: 'Faça o público visualizar o estado futuro depois da ação.', visualRole: 'vision' },
+      { label: 'NOVA REALIDADE', instruction: 'Descreva uma possibilidade futura como visão ou hipótese, sem prometer resultado inevitável.', visualRole: 'vision' },
       { label: 'CHAMADO', instruction: 'Feche com a ação ou compromisso que o público pode assumir.', visualRole: 'decision' },
     ],
   }),
@@ -323,7 +323,7 @@ CAMINHO DO DECK — ${route.label.toUpperCase()}:
 Objetivo: ${route.intent}
 Modo de entrega: ${route.deliveryMode === 'live' ? 'apresentado ao vivo' : route.deliveryMode === 'leave-behind' ? 'deve funcionar também sem apresentador' : 'híbrido — projeção e leitura posterior'}.
 Densidade predominante: ${route.density}.
-Total: ${n} slides. Combine etapas próximas quando necessário. Se o espaço não bastar, reduza o escopo; não comprima várias mensagens em um slide.
+Total: ${n} slides. Estas funções não exigem uma página cada: combine etapas próximas e omita as sem base. Preserve o total com aspectos distintos sustentados, nunca com repetição. Se o espaço não bastar, priorize a informação essencial; não apague condições para caber.
 ${autoRule}
 
 SEQUÊNCIA-BASE:

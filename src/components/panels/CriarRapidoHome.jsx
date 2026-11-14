@@ -272,7 +272,6 @@ export function CriarRapidoHome({
                     disabled={genBusy}
                     onClick={() => {
                       onPresentationPathChange?.(path.id);
-                      onQuickCardCountChange?.(String(path.defaultSlideCount));
                       trackEvent('presentation_path_selected', { path: path.id, surface: 'criar_rapido' });
                     }}
                     style={{

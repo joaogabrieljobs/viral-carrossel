@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { repairRenderedPresentation } from '../../src/utils/presentation-render-review.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
+import { parsePresentationPlanResponse } from '../../src/utils/presentation-planning.js';
 
 function input() {
   return {
@@ -17,7 +18,7 @@ function input() {
         { index: 2, purpose: 'business_model', question: 'Como gerar receita?', keyMessage: 'Preço é uma proposta em estudo.', evidenceIds: ['e1'] }],
     },
     issues: [{ code: 'render-overflow', slideId: 's1', slideIndex: 1 }], presentationPath: 'pitch',
-    aiOptions: { openaiKey: 'not-in-prompt', maxTokens: 99999 },
+    aiOptions: { openaiKey: 'not-in-prompt', maxTokens: 99999, thinking: 'enabled' },
   };
 }
 const validEdit = () => ({ slideIndex: 1, reason: 'Síntese preserva preço e condição.',
@@ -43,8 +44,7 @@ describe('one bounded repair after real render overflow', () => {
     expect(prompt).not.toContain('blob:foto-original');
     expect(prompt).not.toContain('not-in-prompt');
     expect(prompt).toContain('status":"proposal');
-    expect(aiOptions).toMatchObject({ contentMode: 'pitch', json: true, temperature: 0.1 });
-    expect(aiOptions.maxTokens).toBeLessThanOrEqual(8192);
+    expect(aiOptions).toMatchObject({ contentMode: 'pitch', json: true, jsonParser: parsePresentationPlanResponse, temperature: 0.1, thinking: 'disabled', maxTokens: 8192 });
   });
 
   it.each(['render-overlap', 'logo-overlap', 'render-outside', 'evidence-contrast'])('does not ask the language model to fix %s geometry or colors', async (code) => {

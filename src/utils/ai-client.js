@@ -142,9 +142,17 @@ const parseStructuredText = (text, json, jsonParser) => (
   json ? (typeof jsonParser === 'function' ? jsonParser(text) : extractJSON(text)) : text.trim()
 );
 
-function assertCompleteText(reason) {
+function responseDiagnostics(provider, model, reason, maxTokens, usage = {}) {
+  const value = { provider, model: String(model || '').slice(0, 100), finishReason: String(reason || '').slice(0, 40), maxTokens };
+  for (const [name, amount] of Object.entries({ promptTokens: usage.prompt_tokens ?? usage.input_tokens, completionTokens: usage.completion_tokens ?? usage.output_tokens, totalTokens: usage.total_tokens, reasoningTokens: usage.completion_tokens_details?.reasoning_tokens })) {
+    if (Number.isFinite(amount) && amount >= 0) value[name] = amount;
+  }
+  return value;
+}
+
+function assertCompleteText(reason, aiDiagnostics) {
   if (reason !== 'length' && reason !== 'max_tokens') return;
-  throw Object.assign(new Error('A resposta da IA ficou incompleta. Reduza a quantidade de slides ou o material e tente novamente. Seu projeto foi preservado.'), { code: 'ai_output_truncated' });
+  throw Object.assign(new Error('A resposta da IA ficou incompleta. Reduza a quantidade de slides ou o material e tente novamente. Seu projeto foi preservado.'), { code: 'ai_output_truncated', ...(aiDiagnostics ? { aiDiagnostics } : {}) });
 }
 
 const callAnthropic = async (userMsg, { json = false, jsonParser = null, maxTokens = 4096, tools = null, signal, systemPrompt = AI_SYSTEM_PT } = {}) => {
@@ -283,7 +291,7 @@ function translateProviderError(provider, status, data, raw) {
 const callCompatibleChat = async (
   provider,
   userMsg,
-  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8, onRetry } = {},
+  { json = false, jsonParser = null, maxTokens = 4096, signal, systemPrompt = AI_SYSTEM_PT, temperature = 0.8, onRetry, thinking, onResponseMetadata } = {},
 ) => {
   const apiKey = getProviderKey(provider);
   // Local com chave: proxy Vite directo. Sem chave: proxy serverless (env no host).
@@ -310,6 +318,12 @@ const callCompatibleChat = async (
     throwIfGenerationCancelled(signal);
     const model = modelCandidates[i];
     const payload = { ...basePayload, model };
+    // Structured presentation steps need bounded JSON, not a hidden reasoning
+    // response consuming the output budget. Scope this to supported Z.ai models
+    // and explicit callers; leave social generation and other providers intact.
+    if (provider === 'zai' && thinking === 'disabled' && /^glm-(?:4\.[67](?:-|$)|5(?:\.[012])?(?:-|$))/i.test(model)) {
+      payload.thinking = { type: 'disabled' };
+    }
     const headers = { 'Content-Type': 'application/json' };
     const body = useDirect
       ? payload
@@ -364,7 +378,9 @@ const callCompatibleChat = async (
       throw lastError;
     }
 
-    assertCompleteText(data.choices?.[0]?.finish_reason);
+    const diagnostics = responseDiagnostics(provider, model, data.choices?.[0]?.finish_reason, maxTokens, data.usage);
+    onResponseMetadata?.(diagnostics);
+    assertCompleteText(data.choices?.[0]?.finish_reason, diagnostics);
     const text = data.choices?.[0]?.message?.content || '';
     if (!text.trim()) {
       lastError = new Error(`${provider === 'zai' ? 'Moont AI' : 'Kimi'} retornou conteúdo vazio.`);
@@ -374,7 +390,8 @@ const callCompatibleChat = async (
       }
       throw lastError;
     }
-    return parseStructuredText(text, json, jsonParser);
+    try { return parseStructuredText(text, json, jsonParser); }
+    catch (error) { error.aiDiagnostics = diagnostics; throw error; }
   }
 
   throw lastError || new Error('Moont AI indisponível. Tente novamente.');
@@ -382,7 +399,7 @@ const callCompatibleChat = async (
 
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
-const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, contentLanguage = '', systemPrompt: explicitSystemPrompt = '', temperature, onRetry, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, contentLanguage = '', systemPrompt: explicitSystemPrompt = '', temperature, onRetry, thinking, onResponseMetadata, signal: parentSignal } = {}) => runAIJob(async (signal) => {
   const baseSystemPrompt = contentMode === 'pitch'
     ? PITCH_SYSTEM_PT
     : contentMode === 'presentation'
@@ -403,7 +420,7 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
     return callOpenAIChat(userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, key: getProviderKey('openai') || openaiKey });
   }
   if (provider === 'zai' || provider === 'kimi') {
-    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature, onRetry });
+    return callCompatibleChat(provider, userMsg, { json, jsonParser, maxTokens, signal, systemPrompt, temperature, onRetry, thinking, onResponseMetadata });
   }
   throw new Error('Modelo de texto inválido. Abra Configurar IA e escolha uma opção.');
 }, parentSignal);

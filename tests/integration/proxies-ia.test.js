@@ -98,6 +98,17 @@ describe('H4 — chave da plataforma só com modelo permitido, sem stream/tools,
     expect(res.statusCode).toBe(200);
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer minha-chave');
   });
+
+  it('preserva thinking desativado e o orçamento de apresentação ao encaminhar para Z.ai', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson({ choices: [{ message: { content: '{}' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await callCompatible({ provider: 'zai', operation: 'chat', payload: {
+      model: 'glm-4.7', max_tokens: 8192, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: 'Planeje os slides.' }],
+    } });
+    expect(res.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ thinking: { type: 'disabled' }, max_tokens: 8192, n: 1 });
+  });
 });
 
 describe('H3 — retry do servidor só em erro real', () => {

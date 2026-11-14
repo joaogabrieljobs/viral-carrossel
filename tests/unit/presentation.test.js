@@ -143,6 +143,23 @@ describe('modo Apresentação', () => {
     expect(pack).toMatch(/unidade, período, comparação e fonte/i);
   });
 
+  it('as etapas não exigem metas, datas ou evidências inexistentes para preencher o modelo', () => {
+    const pitch = getPresentationPath('pitch');
+    expect(pitch.stages.find(stage => stage.label === 'POR QUE AGORA').optionalWhenMissing).toBe(true);
+    expect(pitch.stages.find(stage => stage.label === 'ALTERNATIVAS E VANTAGEM').optionalWhenMissing).toBe(true);
+    expect(getPresentationPath('relatorio').stages.find(stage => stage.label === 'SCORECARD').instruction)
+      .toContain('Meta só se fornecida');
+    expect(getPresentationPath('proposta').stages.find(stage => stage.label === 'PLANO MÚTUO').instruction)
+      .toContain('responsáveis e datas apenas quando informados');
+    expect(getPresentationPath('proposta').stages.at(-1).visualRole).toBe('decision');
+    expect(getPresentationPath('aula').stages.find(stage => stage.label === 'ATIVIDADE').instruction)
+      .toContain('entrega e critério de sucesso');
+    expect(getPresentationPath('keynote').stages.find(stage => stage.label === 'CICLOS DE CONTRASTE').optionalWhenMissing)
+      .toBe(true);
+    expect(getPresentationPath('case').stages[0].instruction).toContain('sem alegar causalidade');
+    expect(buildPresentationPathBlock('auto', 6)).toContain('não exigem uma página cada');
+  });
+
   it('não oferece biblioteca nem variações de hook social em apresentações', () => {
     const hookModal = readFileSync(
       fileURLToPath(new URL('../../src/components/panels/HookVariationsModal.jsx', import.meta.url)),

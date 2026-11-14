@@ -2,6 +2,7 @@ import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-
 import { presentationAIOptions } from './presentation.js';
 import { normalizePresentationBlocks } from './presentation-quality.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from './presentation-plan.js';
+import { parsePresentationPlanResponse } from './presentation-planning.js';
 
 const TEXT_FIELDS = ['title', 'subtitle', 'bodyAfterImage', 'caption'];
 const CONTENT_FIELDS = [...TEXT_FIELDS, 'presentationBlocks'];
@@ -112,7 +113,7 @@ ${JSON.stringify(targets)}
 Retorne apenas JSON {"edits":[{"slideIndex":0,"reason":"falha corrigida","subtitle":"redação concisa","caption":"notas existentes seguidas de detalhes adicionais"}]}.
 Cada edição exige slideIndex e reason, e só pode incluir os campos alterados: title, subtitle, bodyAfterImage, caption, presentationBlocks. Não inclua campos adicionais. Não envie edições repetidas. Se não puder corrigir preservando o conteúdo, retorne {"edits":[]}.`;
   try {
-    const response = await callAI(prompt, { ...aiOptions, ...presentationAIOptions('apresentacao', presentationPath), json: true, temperature: 0.1, maxTokens: Math.min(8192, 1800 + targets.length * 1000) });
+    const response = await callAI(prompt, { ...aiOptions, ...presentationAIOptions('apresentacao', presentationPath), json: true, jsonParser: parsePresentationPlanResponse, temperature: 0.1, thinking: 'disabled', maxTokens: 8192 });
     throwIfGenerationCancelled(aiOptions.signal);
     const raw = typeof response === 'string' && response.length <= 100_000 ? JSON.parse(response) : response;
     if (!object(raw) || Object.keys(raw).some(key => key !== 'edits') || !Array.isArray(raw.edits) || raw.edits.length > targets.length) return unavailable();
