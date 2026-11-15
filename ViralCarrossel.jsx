@@ -5251,7 +5251,7 @@ export default function App() {
       : (requestedVisualPresetDef?.productKind === 'apresentacao'
           || (activeProductKind === 'apresentacao' && !requestedVisualPresetDef)
         ? DEFAULT_CAROUSEL_VISUAL_PRESET_ID
-        : (requestedVisualPresetDef?.id || requestedVisualPreset || (projectDesignInstructions ? null : recommendedGenerationVisualPreset({
+        : (requestedVisualPresetDef?.id || requestedVisualPreset || (projectDesignInstructions || remix ? null : recommendedGenerationVisualPreset({
             productKind: 'carrossel', narrative: requestedPresetId !== 'livre' ? requestedPresetId : effectiveMode, presets: visualPresets,
           })?.id)));
     const effectiveVisualPresetDef = resolvePresentationVisualPresetDefinition(

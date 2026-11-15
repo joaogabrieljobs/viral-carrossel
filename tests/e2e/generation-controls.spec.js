@@ -427,6 +427,7 @@ test('remix exige escolha, mantém visual e usa contexto/referências atuais nas
   const after = await doc(page);
   expect(imageRequests).toHaveLength(3);
   expect(after.brand).toEqual(before.brand);
+  expect(after.visualPreset).toEqual(before.visualPreset);
   for (let i = 0; i < 3; i++) {
     const withoutCopy = ({ title, subtitle, bodyAfterImage, ...rest }) => rest;
     expect(withoutCopy(after.slides[i])).toEqual(withoutCopy(before.slides[i]));

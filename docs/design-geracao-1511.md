@@ -17,6 +17,7 @@ Nos testes reais de produção, o início neutro mantinha cores e fontes básica
 - Texto sobre foto escurecida ganha contraste também quando a marcação legada de Cultura não possui corpo. A narrativa Cultura não sobrescreve a composição social nova.
 - Presets personalizados, remix e escolhas explícitas de posição da foto mantêm seus caminhos existentes. Nenhuma mudança global dos projetos já salvos é executada.
 - Na geração rápida do editor, um brief com direção visual explícita continua prevalecendo quando não há preset selecionado. A primeira CI completa identificou que a recomendação automática substituía a fonte Anton de um brief por Playfair; a recomendação agora atua como fallback apenas sem essa direção. O fluxo novo continua usando o preset recomendado ou escolhido explicitamente.
+- Remix sem preset também não recebe recomendação automática: mantém a identidade e a composição existentes. O teste de preservação integral do visual, que revelou essa regressão na segunda CI, passou após a correção junto dos testes de brief explícito e design recomendado.
 
 ## Verificação
 
