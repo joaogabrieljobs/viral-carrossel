@@ -7,7 +7,7 @@
 export const PLAN_TIERS = {
   essential: {
     id: 'essential',
-    name: 'Essencial',
+    name: 'Plano Essencial',
     priceBRL: 19.9,
     priceLabel: 'R$ 19,90',
     imageQuota: 0,
@@ -16,7 +16,7 @@ export const PLAN_TIERS = {
   },
   creator: {
     id: 'creator',
-    name: 'Criador',
+    name: 'Plano Criador',
     priceBRL: 97,
     priceLabel: 'R$ 97',
     imageQuota: 50,
@@ -25,7 +25,7 @@ export const PLAN_TIERS = {
   },
   pro: {
     id: 'pro',
-    name: 'Pro',
+    name: 'Plano Pro',
     priceBRL: 197,
     priceLabel: 'R$ 197',
     imageQuota: 150,
@@ -34,7 +34,7 @@ export const PLAN_TIERS = {
   },
   max: {
     id: 'max',
-    name: 'Max',
+    name: 'Plano Max',
     priceBRL: 297,
     priceLabel: 'R$ 297',
     imageQuota: 300,

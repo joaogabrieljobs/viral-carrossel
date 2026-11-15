@@ -565,7 +565,7 @@ export default function AccountProfile({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div className="vc-eyebrow" style={{ marginBottom: 4 }}>{confirmedExempt ? 'Acesso e créditos' : 'Assinatura'}</div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Moont {usage.planName || 'Studio'}</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{usage.planName || 'Plano não informado'}</h3>
             </div>
             <CreditCard size={18} color="var(--text-muted)" />
           </div>

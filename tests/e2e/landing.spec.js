@@ -34,7 +34,7 @@ test.describe('Landing (RF-01)', () => {
     await expect(page.getByRole('heading', { name: /antes de assinar/i })).toBeAttached();
     for (const id of PLAN_ORDER) {
       const plan = PLAN_TIERS[id];
-      const card = page.getByRole('article', { name: `Plano ${plan.name}`, exact: true });
+      const card = page.getByRole('article', { name: plan.name, exact: true });
       await expect(card).toContainText(plan.priceLabel);
       await expect(card).toContainText(plan.imageQuota ? `${plan.imageQuota} imagens por mês` : 'Sem imagens de IA inclusas');
     }

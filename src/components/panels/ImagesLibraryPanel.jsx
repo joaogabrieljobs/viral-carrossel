@@ -155,7 +155,7 @@ export default function ImagesLibraryPanel({
               }}/>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>
-              {usage.planName ? `Plano ${usage.planName}. ` : ''}O contador reinicia na renovação da assinatura.
+              {usage.planName ? `${usage.planName}. ` : ''}O contador reinicia na renovação da assinatura.
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', lineHeight: 1.55 }}>
               O contador registra cada geração concluída. A galeria abaixo mostra somente imagens ainda vinculadas aos cards e disponíveis neste aparelho; imagens substituídas ou removidas continuam no histórico de Uso.

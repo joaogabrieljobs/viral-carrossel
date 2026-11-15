@@ -1,0 +1,849 @@
+{
+  "id": "79kwu3m",
+  "version": 2,
+  "name": "Reteste refinado 1411 — Aula",
+  "format": "",
+  "caption": "O método Mesa Clara estrutura reuniões em três passos: pauta com decisão esperada, registro com responsável e prazo, e revisão de pendências. Observações fictícias mostraram redução de duração e aumento de decisões documentadas, mas sem isolar o efeito do método. A próxima ação é aprovar o programa proposto de seis semanas, com início e responsáveis ainda pendentes.",
+  "slides": [
+    {
+      "id": "wbdvtfa",
+      "index": 0,
+      "title": "Mesa Clara: decisões mais claras em reuniões internas",
+      "subtitle": "Um método de três passos para estruturar pauta, registrar decisão e revisar pendências.",
+      "bodyAfterImage": "Caso fictício de teste.",
+      "caption": "Abertura: pergunte ao público se suas reuniões terminam com decisões claras. O objetivo desta sessão é apresentar o método Mesa Clara e capacitar líderes a aplicá-lo. Deixe claro que os dados apresentados pertencem a um caso fictício de teste.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 49,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 25
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 53,
+              "w": 78,
+              "h": 39
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "e3imgyw",
+      "index": 1,
+      "title": "O que falta quando a reunião acaba?",
+      "subtitle": "Sem decisão explícita, a equipe acumula pendências e retrabalho, pois ninguém sabe o que foi acordado, quem deve agir e até quando.",
+      "bodyAfterImage": "",
+      "caption": "Problema: reuniões sem decisão documentada geram ambiguidade. O método Mesa Clara resolve isso ao exigir que a decisão esperada seja declarada antes, registrada durante e revisada depois.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "p9jow4s",
+      "index": 2,
+      "title": "O que você será capaz de fazer ao final?",
+      "subtitle": "Aplicar os três passos do método Mesa Clara: estruturar a pauta com a decisão esperada, registrar decisão com responsável e prazo, e revisar pendências.",
+      "bodyAfterImage": "",
+      "caption": "Objetivos observáveis da sessão. Ao final, o participante deve ser capaz de executar os três passos do método em suas próprias reuniões, tornando a decisão explícita e rastreável.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "ekaf4dq",
+      "index": 3,
+      "title": "Como tornar a decisão explícita?",
+      "subtitle": "O método Mesa Clara estrutura a reunião em três passos para que nenhuma decisão fique vaga.",
+      "bodyAfterImage": "",
+      "caption": "Enfatize que o método não exige software próprio. O foco é tornar explícito o que será decidido, quem faz e até quando, usando apenas pauta e registro.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "3xtot4y",
+      "index": 4,
+      "title": "O que mudou nas reuniões observadas?",
+      "subtitle": "No piloto fictício, duração e decisões documentadas mudaram, mas o antes/depois não isola o efeito do método.",
+      "bodyAfterImage": "",
+      "caption": "Sem grupo de controle e com mudança de facilitadores em duas equipes em maio, não é possível atribuir a mudança apenas ao método. Apresente os números como observação, não como prova de causalidade.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "yz5v38v",
+      "index": 5,
+      "title": "Como o método funciona na prática?",
+      "subtitle": "No caso fictício, as equipes seguiram os três passos e registraram as mudanças observadas ao longo dos dois meses.",
+      "bodyAfterImage": "Caso fictício: 4 equipes, 8 pessoas cada, 40 reuniões observadas em abril e maio de 2026.",
+      "caption": "Use este slide para conectar o mecanismo (os três passos) aos resultados observados. Reforce que é um caso fictício de simulação e que as mudanças ocorreram junto com outras variáveis, como a troca de facilitadores.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "d2l5oau",
+      "index": 6,
+      "title": "Essas mudanças comprovam o efeito do método?",
+      "subtitle": "Não. O antes/depois não isola o efeito do método, pois não houve grupo de controle e os facilitadores de duas equipes mudaram no segundo período.",
+      "bodyAfterImage": "Caso fictício: observação sem grupo de controle.",
+      "caption": "É essencial diferenciar observação de causalidade. A queda na duração e o aumento de decisões documentadas foram registrados, mas a mudança simultânea de facilitadores impede atribuir o resultado apenas ao método Mesa Clara.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "7l4b1sd",
+      "index": 7,
+      "title": "Como registrar a decisão no passo 2?",
+      "subtitle": "Tarefa: formule o registro de decisão para uma pendência do caso fictício. O registro deve conter obrigatoriamente a decisão, o responsável e o prazo.",
+      "bodyAfterImage": "Critério de sucesso: presença dos três elementos.",
+      "caption": "Instrua os participantes a escreverem uma linha de registro. Exemplo de insumo: a equipe precisa definir a data de entrega de um relatório. O exercício avalia se o participante aplica a estrutura do passo 2, não o conteúdo específico da pendência.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "vjxays0",
+      "index": 8,
+      "title": "Como corrigir o registro da decisão?",
+      "subtitle": "A resposta modelo deve conter decisão, responsável e prazo. O erro comum é registrar apenas a decisão sem definir quem executa ou até quando.",
+      "bodyAfterImage": "Exemplo de erro: \"Criar relatório\" sem responsável e prazo.",
+      "caption": "Corrija a atividade anterior usando o critério anunciado. Uma resposta que omita responsável ou prazo é insuficiente porque gera a mesma pendência que o método propõe eliminar. O registro completo é o mecanismo que torna a decisão executável.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "sntwwn7",
+      "index": 9,
+      "title": "Quais princípios guiam o Mesa Clara?",
+      "subtitle": "Decisão esperada na pauta, registro com responsável e prazo, e revisão sistemática de pendências.",
+      "bodyAfterImage": "",
+      "caption": "Reforce que o método não exige software próprio. A força do Mesa Clara está na disciplina do ciclo: antes, durante e depois da reunião.\n\nEsses três passos formam o ciclo completo do método.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "kamant8",
+      "index": 10,
+      "title": "Como aplicar na sua equipe?",
+      "subtitle": "Adapte os três passos ao seu contexto: defina a decisão esperada antes, registre durante e revise depois.",
+      "bodyAfterImage": "A aplicação depende de definir o responsável por manter o registro.",
+      "caption": "O método é simples, mas exige consistência. Pergunte aos participantes quem seria o responsável natural em cada equipe deles para manter a pauta e o registro.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 17
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 46,
+              "w": 82,
+              "h": 46
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "io1jxug",
+      "index": 11,
+      "title": "Qual a próxima ação para decisões mais claras?",
+      "subtitle": "Se aprovado, o programa de seis semanas por R$ 6.000 aplica o método com diagnóstico, capacitação e revisão de reuniões.",
+      "bodyAfterImage": "Data de início e responsáveis permanecem em definição.",
+      "caption": "O aceite depende da entrega dos materiais, realização dos dois encontros e revisão das dez reuniões, não de promessa de economia. A aprovação do ciclo e a definição de início e responsáveis ainda estão pendentes.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "mc",
+        "align": "center",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 1,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 700,
+        "bodyWeight": 400,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 10,
+              "y": 29,
+              "w": 80,
+              "h": 22
+            },
+            "subtitle": {
+              "x": 18,
+              "y": 55,
+              "w": 64,
+              "h": 35
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    }
+  ]
+}

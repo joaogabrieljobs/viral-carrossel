@@ -216,7 +216,7 @@ function Plans({ onEnter }) {
           {PLAN_ORDER.map((id) => {
             const plan = PLAN_TIERS[id];
             return (
-              <article key={id} aria-label={`Plano ${plan.name}`} className={id === 'creator' ? 'is-featured' : ''}>
+              <article key={id} aria-label={plan.name} className={id === 'creator' ? 'is-featured' : ''}>
                 {id === 'creator' && <span className="moont-lp-plan__tag">Mais escolhido</span>}
                 <h3>{plan.name}</h3>
                 <p className="moont-lp-plan__price"><strong>{plan.priceLabel}</strong><span>/mês</span></p>

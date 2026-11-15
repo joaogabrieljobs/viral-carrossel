@@ -1,0 +1,849 @@
+{
+  "id": "e82r3dz",
+  "version": 2,
+  "name": "Reteste acesso 1411 — Caso",
+  "format": "",
+  "caption": "O caso fictício Mesa Clara testou um método de três passos para tornar decisões explícitas em reuniões. O piloto mostrou redução de duração e mais decisões documentadas, mas sem grupo de controle o efeito não está isolado. A decisão pendente é aprovar um novo ciclo de seis semanas por R$ 6.000 para verificar a execução do método em outras equipes, sem meta numérica de melhoria.",
+  "slides": [
+    {
+      "id": "uczi89l",
+      "index": 0,
+      "title": "Mesa Clara: decisões mais claras em reuniões internas",
+      "subtitle": "Caso fictício de um serviço de facilitação que estrutura reuniões para tornar decisões explícitas. Avaliamos aqui os resultados observados, os limites da evidência e a proposta de um novo ciclo.",
+      "bodyAfterImage": "Caso fictício criado para teste; dados pertencem à simulação.",
+      "caption": "Abrir declarando o caráter fictício. A tese da apresentação é que reuniões melhores tornam a decisão explícita, mas o antes/depois observado no piloto não isola o efeito do método. O objetivo é avaliar a aprovação de um novo ciclo de seis semanas por R$ 6.000.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 49,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 25
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 53,
+              "w": 78,
+              "h": 39
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "d8n8coy",
+      "index": 1,
+      "title": "O cenário antes da intervenção",
+      "subtitle": "O piloto gratuito ocorreu em quatro equipes de uma organização fictícia, com oito pessoas cada. Foram observadas 20 reuniões de rotina em abril de 2026 para estabelecer o baseline, sem grupo de controle.",
+      "bodyAfterImage": "Período do baseline: abril de 2026. Mesmas equipes e tipo de reunião mantidos em maio.",
+      "caption": "Detalhar que a escolha por observar as mesmas equipes e os mesmos tipos de reunião permite uma comparação antes/depois, mas a ausência de um grupo de controle já impede o isolamento do efeito do método desde a concepção do piloto.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "d4nl7sx",
+      "index": 2,
+      "title": "Decisões implícitas e reuniões longas",
+      "subtitle": "No baseline de abril, 8 das 20 reuniões não documentaram nenhuma decisão e a duração média foi de 45 minutos. O desafio central era transformar conversas em decisões explícitas com responsável e prazo.",
+      "bodyAfterImage": "Proporção inicial: 12 de 20 reuniões com decisão documentada.",
+      "caption": "Enfatizar que o problema não é apenas a duração, mas a falta de registro de decisões. Uma reunião mais curta sem decisão documentada não resolve o problema central. O método propõe atacar a causa: a ausência de uma pauta com decisão esperada.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "3htde51",
+      "index": 3,
+      "title": "Decisão explícita como objetivo",
+      "subtitle": "O objetivo central é transformar a decisão em um registro claro, observável pela proporção de reuniões com decisão documentada e pela redução da duração.",
+      "bodyAfterImage": "",
+      "caption": "O foco do método é tornar a decisão explícita. A duração é uma métrica de acompanhamento, não o objetivo principal. A proporção de reuniões com decisão documentada indica se o propósito foi atingido.\n\nMétricas de acompanhamento: duração média e proporção de decisões documentadas.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "ekkfkp8",
+      "index": 4,
+      "title": "O que se sabia e o que faltava saber",
+      "subtitle": "O piloto forneceu dados de duração e decisão documentada, mas não mediu satisfação, retenção, produtividade individual ou receita.",
+      "bodyAfterImage": "Ausência de medição não significa ausência de impacto; significa que o impacto não pode ser afirmado.",
+      "caption": "É importante diferenciar o que foi observado do que ainda é desconhecido. A falta de dados sobre satisfação ou produtividade impede afirmações sobre o impacto mais amplo do método na organização.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "p84tc4k",
+      "index": 5,
+      "title": "Estrutura em três passos",
+      "subtitle": "O método responde ao diagnóstico ao garantir que a decisão se torne explícita: pauta prévia com decisão esperada, registro durante a reunião e revisão no encontro seguinte.",
+      "bodyAfterImage": "",
+      "caption": "A sequência de três passos cria um mecanismo que obriga a equipe a definir a decisão esperada antes, registrar o compromisso durante e cobrar a execução depois. Isso fecha o ciclo e torna a decisão rastreável.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "9owgjqu",
+      "index": 6,
+      "title": "O piloto e suas condições",
+      "subtitle": "Foram observadas 20 reuniões de rotina em abril de 2026 e outras 20 do mesmo tipo e equipes em maio de 2026. Não houve grupo de controle e os facilitadores de duas equipes mudaram no segundo mês.",
+      "bodyAfterImage": "Antes/depois sem controle não isola o efeito do método.",
+      "caption": "A ausência de grupo de controle e a mudança de facilitadores em duas das quatro equipes são limitações importantes. Qualquer mudança observada pode ser influenciada por esses fatores, não apenas pelo método Mesa Clara.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 78,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "1xnrxdq",
+      "index": 7,
+      "title": "Antes e depois: abril vs. maio",
+      "subtitle": "A duração média caiu de 45 para 33 minutos e a proporção de reuniões com decisão documentada passou de 12/20 para 17/20, nas mesmas equipes e tipo de reunião.",
+      "bodyAfterImage": "",
+      "caption": "A comparação usa as mesmas equipes e o mesmo tipo de reunião de rotina. A redução de 12 minutos na duração e o aumento de 5 reuniões com decisão documentada são fatos observados, não efeitos isolados do método.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "ixa2ld8",
+      "index": 8,
+      "title": "Resultados observados no piloto",
+      "subtitle": "O piloto registrou redução de 12 minutos na duração média e aumento de 5 reuniões com decisão documentada. Não foram medidos receita, satisfação, retenção ou produtividade individual.",
+      "bodyAfterImage": "",
+      "caption": "Estes são os únicos indicadores disponíveis. A ausência de medições de satisfação, retenção e produtividade individual significa que o impacto do método além de tempo e registro de decisões permanece desconhecido.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "yc6dnit",
+      "index": 9,
+      "title": "Limites da atribuição",
+      "subtitle": "O antes/depois não isola o efeito do método. Não houve grupo de controle e os facilitadores de duas equipes mudaram em maio, o que impede atribuir a redução de duração e o aumento de decisões documentadas exclusivamente ao método Mesa Clara.",
+      "bodyAfterImage": "Receita, satisfação, retenção e produtividade individual não foram medidos.",
+      "caption": "Sem grupo de controle e com mudança de facilitadores em duas das quatro equipes, qualquer afirmação de causalidade é infundada. A ausência de medidas de satisfação e produtividade reforça que o escopo do piloto foi limitado à duração e ao registro de decisões.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "bl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "nqau0d8",
+      "index": 10,
+      "title": "Aprendizados e aplicação possível",
+      "subtitle": "Estruturar a reunião para tornar a decisão explícita mostrou impacto nos indicadores observados, mas a ausência de controle limita o aprendizado à viabilidade de execução. O princípio transferível é a disciplina da pauta com decisão esperada; o limite é não garantir a mesma magnitude de resultado sem variáveis controladas.",
+      "bodyAfterImage": "O próximo ciclo deve verificar se o método é executável em outras equipes, sem meta numérica de melhoria aprovada.",
+      "caption": "O aprendizado condicional é: se a equipe adotar os três passos, a decisão tende a se tornar explícita. Porém, não se pode prometer repetição dos resultados do piloto. O foco do novo ciclo é validação de execução, não de impacto.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "bl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 2,
+        "procedureLabelEmphasis": false,
+        "titleSize": 44,
+        "subSize": 72,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 20
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 49,
+              "w": 88,
+              "h": 43
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    },
+    {
+      "id": "5cctd12",
+      "index": 11,
+      "title": "Decisão: aprovar o novo ciclo?",
+      "subtitle": "A proposta é um programa de seis semanas por R$ 6.000 para verificar a execução do método em outras equipes e registrar duração e decisões documentadas. O aceite depende da entrega dos materiais, dois encontros de capacitação e revisão de dez reuniões — não de promessa de economia.",
+      "bodyAfterImage": "",
+      "caption": "O programa exclui licenças de software, integração de sistemas e facilitação contínua após as seis semanas. Ainda não há contratos pagos nem dados de disposição a pagar. A aprovação desta proposta é uma decisão pendente.\n\nSe aprovado, data de início e responsáveis permanecem em definição.",
+      "imageQuery": "",
+      "visual": {
+        "layout": "tl",
+        "align": "left",
+        "photoRegion": "full",
+        "bgFit": "cover",
+        "bgX": 50,
+        "bgY": 50,
+        "bgZoom": 100,
+        "bgMirror": false,
+        "bgOpacity": 100,
+        "overlay": 0,
+        "textShadow": false,
+        "textBg": false,
+        "textBgOpacity": 55,
+        "textInset": 0,
+        "procedureLabelEmphasis": false,
+        "titleSize": 42,
+        "subSize": 68,
+        "bodyAfterSize": 94,
+        "titleTracking": 3,
+        "subTracking": 0,
+        "bodyTracking": 0.4,
+        "titleLeading": 110,
+        "subLeading": 135,
+        "bodyLeading": 135,
+        "titleWeight": 500,
+        "bodyWeight": 300,
+        "logoPosition": "tl",
+        "logoSize": 80,
+        "elementsUnlocked": true,
+        "elementOffsets": {},
+        "canvas": {
+          "enabled": false,
+          "applied": true,
+          "variant": "classic",
+          "preserveZones": true,
+          "zones": {
+            "photo": {
+              "x": 96,
+              "y": 94,
+              "w": 1,
+              "h": 1
+            },
+            "title": {
+              "x": 6,
+              "y": 25,
+              "w": 88,
+              "h": 14
+            },
+            "subtitle": {
+              "x": 6,
+              "y": 42,
+              "w": 88,
+              "h": 14
+            }
+          }
+        }
+      },
+      "overlays": [],
+      "hasPhoto": false,
+      "hasLogo": false
+    }
+  ]
+}

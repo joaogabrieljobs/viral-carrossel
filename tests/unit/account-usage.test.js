@@ -7,7 +7,7 @@ import { normalizeAccountUsage } from '../../src/utils/account-usage.js';
 describe('account usage summary', () => {
   it('keeps unknown usage distinct from a confirmed unused allowance', () => {
     expect(normalizeAccountUsage({ planTier: 'creator' })).toMatchObject({
-      planName: 'Criador', limit: 50, used: null, remaining: null, hasUsage: false, percentage: null,
+      planName: 'Plano Criador', limit: 50, used: null, remaining: null, hasUsage: false, percentage: null,
     });
     expect(normalizeAccountUsage({ imageQuota: { used: 0, limit: 50, tier: 'creator' } })).toMatchObject({
       used: 0, remaining: 50, hasUsage: true, percentage: 0,
@@ -35,7 +35,7 @@ describe('account usage summary', () => {
 
   it('distinguishes a plan without images from an exhausted allowance', () => {
     expect(normalizeAccountUsage({ planTier: 'essential', imageQuota: { used: 0, limit: 0 } })).toMatchObject({
-      planName: 'Essencial', noIncludedImages: true, exhausted: false, percentage: null,
+      planName: 'Plano Essencial', noIncludedImages: true, exhausted: false, percentage: null,
     });
     expect(normalizeAccountUsage({ imageQuota: { used: 50, limit: 50 } })).toMatchObject({
       remaining: 0, exhausted: true, percentage: 100,
@@ -52,7 +52,7 @@ describe('account usage summary', () => {
     expect(normalizeAccountUsage({
       planTier: 'creator', currentPeriodStart: '2026-08-01T12:00:00Z', currentPeriodEnd: '2026-09-01T12:00:00Z',
       imageQuota: { tier: 'pro', used: 25, limit: 150, periodStart: '2026-09-01T12:00:00Z', periodEnd: '2026-10-01T12:00:00Z' },
-    })).toMatchObject({ planName: 'Pro', periodStart: '2026-09-01T12:00:00.000Z', periodEnd: '2026-10-01T12:00:00.000Z' });
+    })).toMatchObject({ planName: 'Plano Pro', periodStart: '2026-09-01T12:00:00.000Z', periodEnd: '2026-10-01T12:00:00.000Z' });
   });
 
   it('uses valid session dates, rejects invalid dates, and never invents a cycle', () => {

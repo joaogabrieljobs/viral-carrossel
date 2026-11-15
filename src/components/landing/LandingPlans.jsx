@@ -12,7 +12,7 @@ export default function LandingPlans({ onEnter, onLogin, isMobile }) {
       <div className="vc-landing-plans-grid">
         {PLAN_ORDER.map(id => {
           const plan = PLAN_TIERS[id];
-          return <article key={id} aria-label={`Plano ${plan.name}`} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 22, border: `1px solid ${id === 'creator' ? 'var(--accent)' : 'var(--glass-border)'}`, borderRadius: 18, background: id === 'creator' ? 'var(--accent-surface)' : 'var(--bg-secondary)' }}>
+          return <article key={id} aria-label={plan.name} style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 22, border: `1px solid ${id === 'creator' ? 'var(--accent)' : 'var(--glass-border)'}`, borderRadius: 18, background: id === 'creator' ? 'var(--accent-surface)' : 'var(--bg-secondary)' }}>
             <h3 style={{ margin: 0, fontSize: 18 }}>{plan.name}</h3>
             <p style={{ margin: 0 }}><strong style={{ fontSize: 30, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>{plan.priceLabel}</strong><span style={{ color: 'var(--text-muted)', fontSize: 12 }}> /mês</span></p>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 600, minHeight: 44 }}>{plan.imageQuota ? `${plan.imageQuota} imagens por mês` : 'Sem imagens de IA inclusas'}</p>

@@ -150,7 +150,7 @@ export default function AccountUsage({
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Imagens do plano</h3>
           </div>
           <span style={{ padding: '6px 11px', border: '1px solid var(--border)', borderRadius: 9999, color: 'var(--text-secondary)', fontSize: 11, fontWeight: 600 }}>
-            {usage.planName ? `Plano ${usage.planName}` : 'Plano não informado'}
+            {usage.planName || 'Plano não informado'}
           </span>
         </div>
 

@@ -2,6 +2,8 @@
 
 14/11/2026, com verificação concluída na madrugada de 15/11 (UTC). Cinco apresentações completas e um Caso parcial. O acesso da conta interrompeu a rodada; isso não equivale à aprovação editorial dos sete modos.
 
+Continuação posterior: [quatro apresentações adicionais, refinamentos e salvamento](./apresentacoes-reteste-2026-11-14-continuacao.md). Este arquivo preserva os resultados e limites das versões anteriores; a continuação discrimina as novas execuções sem reclassificar os resultados históricos.
+
 ## Protocolo
 
 Publicações acompanhadas no domínio `moont.ai`:

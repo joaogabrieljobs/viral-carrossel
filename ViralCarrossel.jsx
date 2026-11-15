@@ -2055,6 +2055,14 @@ export default function App() {
     const prepared = await prepareProjectCloudPayload(entry, {
       snapshot: pending.snapshot, ownerId: owner, isCurrent: canPersistEntry,
     });
+    const confirmedFingerprint = projectCacheFingerprint(mergeConfirmedAssetIds(entry, prepared.entry));
+    const recordProjectReceipt = () => {
+      if (!canPersistEntry()) return;
+      // Confirma só o snapshot enviado deste projeto, mesmo se outro projeto
+      // da fila exigir revisão. Uma edição sucessora terá outro fingerprint
+      // e não será anunciada como salva pelo recibo desta versão.
+      setCloudReceipts(current => ({ ...current, [entry.id]: { owner, at: Date.now(), fingerprint: confirmedFingerprint } }));
+    };
     if (!canPersistEntry()) {
       throw new Error('O projeto mudou durante o envio. As alterações continuam no editor; salve novamente.');
     }
@@ -2090,6 +2098,7 @@ export default function App() {
       v2VersionsRef.current.set(projectId, Math.max(v2VersionsRef.current.get(projectId) || 0, version));
       if (projectId === entry.id && projectCacheFingerprint(confirmedEntry) === projectCacheFingerprint(prepared.entry)) {
         confirmedVersion = version;
+        recordProjectReceipt();
       }
     };
     if (outboxAvailable) {
@@ -2122,7 +2131,8 @@ export default function App() {
       // A confirmação pode ter chegado antes de uma falha posterior do IDB.
       // Não repetir um PUT já confirmado com a versão antiga.
       if (Number.isSafeInteger(confirmedVersion)) {
-        v2BaselinesRef.current.set(entry.id, fingerprint);
+        adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry);
+        v2BaselinesRef.current.set(entry.id, confirmedFingerprint);
         v2RecoveredProjectsRef.current.delete(entry.id);
         return { saved: true, version: confirmedVersion };
       }
@@ -2139,8 +2149,10 @@ export default function App() {
         throw new Error('A conta mudou durante o envio. Sincronize novamente.');
       }
       v2VersionsRef.current.set(entry.id, saved.version);
-      v2BaselinesRef.current.set(entry.id, adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry) || fingerprint);
+      adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry);
+      v2BaselinesRef.current.set(entry.id, confirmedFingerprint);
       v2RecoveredProjectsRef.current.delete(entry.id);
+      recordProjectReceipt();
       return { saved: true, direct: true, version: saved.version };
     }
     const recovery = flushed.recoveries?.find((item) => item.sourceProjectId === entry.id);
@@ -2153,7 +2165,8 @@ export default function App() {
       throw new Error('A conta ainda não confirmou a versão deste projeto. Suas alterações continuam no editor.');
     }
     v2VersionsRef.current.set(entry.id, confirmedVersion);
-    v2BaselinesRef.current.set(entry.id, adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry) || fingerprint);
+    adoptConfirmedAssetIdsRef.current?.(entry.id, prepared.entry);
+    v2BaselinesRef.current.set(entry.id, confirmedFingerprint);
     v2RecoveredProjectsRef.current.delete(entry.id);
     return { saved: true, version: confirmedVersion };
   }, []);
