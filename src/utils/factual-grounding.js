@@ -52,6 +52,10 @@ const negatedGuarantee = (text, index) => /\b(?:nao|nem|no|not|never|without)\b(
 // The evidence filter still removes negated clauses, so that an exclusion in
 // the brief cannot substantiate a newly invented positive inclusion.
 const negatedInclusion = (text, index) => /\b(?:nao|nem|not|never|without|don['’]t|doesn['’]t)\b(?:\s+(?:esta|estao|estara|estarao|sera|serao|foi|foram|is|are|be|being|been|tambem|also|even)){0,2}\s*$/u.test(normalize(text.slice(0, index).split(/[.!?;\n]/u).pop()));
+// Section labels such as "O que o serviço inclui e exclui" name no service.
+// Match only the bare label; a question or heading naming an actual extra
+// remains subject to the same evidence check as the rest of the copy.
+const inclusionWithoutItem = claim => /^(?:inclui|inclus[oa]s?|includes?)(?:\s+(?:e\s+exclui|and\s+excludes?))?\s*[?:—–-]?$/u.test(normalize(claim));
 
 function textFields(draft) {
   const result = (Array.isArray(draft?.slides) ? draft.slides : []).flatMap((slide, slideIndex) =>
@@ -69,7 +73,7 @@ export function auditUnsupportedCommercialClaims(slides, source) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
-        if (rule.category === 'item incluso' && negatedInclusion(text, match.index)) continue;
+        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
         if (!sourceText.includes(normalize(claim))) violations.push({ slideIndex, category: rule.category, claim });
       }
     }
@@ -99,7 +103,7 @@ export function auditDraftFactuality(draft, config = {}) {
       for (const match of text.matchAll(rule.regex)) {
         const claim = match[0].trim();
         if (rule.category === 'garantia' && negatedGuarantee(text, match.index)) continue;
-        if (rule.category === 'item incluso' && negatedInclusion(text, match.index)) continue;
+        if (rule.category === 'item incluso' && (negatedInclusion(text, match.index) || inclusionWithoutItem(claim))) continue;
         if (!sourceText.includes(normalize(claim))) add(rule.category, claim);
       }
     }

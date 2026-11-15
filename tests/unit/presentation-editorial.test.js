@@ -158,6 +158,30 @@ it('preserva aula e keynote ao vivo, e a leitura autônoma dos documentos de dec
   expect(design).toContain('Limites obrigatórios da composição');
 });
 
+it('aula reaproveita o caso fornecido e encerra com aprendizagem em redação, revisão e refinamento', () => {
+  const brief = 'Caso fictício: uma equipe registra decisões em reuniões. Use apenas os dados fornecidos na atividade. A oferta proposta custa R$ 900; o objetivo desta apresentação é ensinar o método.';
+  const prompts = [
+    buildApresentacaoPackBlock(6, 'aula'),
+    buildEditorialReviewPrompt(brief, { slides: [], caption: '' }, { presetId: 'apresentacao', presentationPath: 'aula' }),
+    buildApresentacaoRefineHint('aula'),
+  ];
+  for (const prompt of prompts) {
+    expect(prompt).toContain('o exemplo resolvido e a atividade reutilizam os fatos desse caso');
+    expect(prompt).toContain('O rótulo "caso fictício" não autoriza acrescentar pessoas, datas, decisões ou resultados');
+    expect(prompt).toContain('usar apenas os dados fornecidos prevalece');
+    expect(prompt).toContain('O debrief confere a mesma entrega e os mesmos critérios');
+    expect(prompt).toContain('Feche com a aplicação pelo participante e um critério de aprendizagem');
+    expect(prompt).toContain('Preço ou oferta no material não transformam a conclusão nem a caption em venda');
+    expect(prompt).toContain('somente um objetivo comercial explícito autoriza esse chamado');
+  }
+  expect(prompts[0]).toContain('Se não houver caso fornecido e as instruções permitirem');
+  expect(prompts[0]).not.toContain('Se faltar caso real');
+  expect(prompts[1]).toContain(brief);
+  for (const path of ['pitch', 'proposta_comercial', 'relatorio_executivo']) {
+    expect(buildApresentacaoPackBlock(6, path)).not.toContain('O debrief confere a mesma entrega');
+  }
+});
+
 describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatorio_executivo', 'estudo_de_caso', 'keynote_manifesto'])('clareza e fidelidade em %s', path => {
   it('mantém decisões pendentes e condições exatas em geração, revisão, refinamento e resumo', () => {
     for (const prompt of [buildApresentacaoPackBlock(12, path), buildPresentationReviewRules(path),

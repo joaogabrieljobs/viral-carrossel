@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateReviewedCarousel } from '../../src/utils/editorial-review.js';
+import { generateReviewedCarousel, PRESENTATION_REVIEW_SYSTEM_PROMPT } from '../../src/utils/editorial-review.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION } from '../../src/utils/presentation-plan.js';
 
 const sources = [{ id: 'brief', text: 'O software está construído. A assinatura ainda está em estudo. O piloto pago será a próxima validação.' }];
@@ -77,6 +77,46 @@ describe('apresentação planejada e revisada', () => {
     expect(ai).toHaveBeenCalledTimes(2);
   });
 
+  it('revisão tem sistema e contrato próprios, fontes originais e instruções completas, sem receitas da redação', async () => {
+    const instructions = 'Use somente os dados fornecidos; não invente nomes, datas nem fornecedores.\n'
+      + 'Preserve esta instrução completa. '.repeat(120) + 'FIM DAS INSTRUÇÕES ATUAIS.';
+    const original = 'O piloto não teve grupo de controle. Data de início permanece em definição.';
+    const firstPlan = plan(); firstPlan.evidence[0].claim = 'CLAIM GERADO NÃO É FONTE: Ana aprovou fornecedor A em 10/06.';
+    const ai = vi.fn().mockResolvedValueOnce(firstPlan).mockResolvedValueOnce(draft()).mockResolvedValueOnce({ edits: [] });
+    await generateReviewedCarousel({
+      prompt: 'RECEITA VISUAL EXEMPLO NÃO FACTUAL: fornecedor B, Maria e 10/07. JSON exato a retornar: {"slides":[]}',
+      config: config({ userInstructions: instructions, factualSource: 'Contexto factual atual.', planningContext: {
+        brief: 'Criar uma aula somente com o material original.', sources: [...sources, { id: 'anexo', text: original }],
+      } }), aiOptions: { systemPrompt: 'Você é o redator: gere slides completos.' },
+    }, ai);
+    const [reviewPrompt, reviewOptions] = ai.mock.calls[2];
+    expect(ai.mock.calls[1][1].systemPrompt).toBe('Você é o redator: gere slides completos.');
+    expect(reviewOptions).toMatchObject({ systemPrompt: PRESENTATION_REVIEW_SYSTEM_PROMPT, thinking: 'disabled', maxTokens: 8192 });
+    expect(reviewPrompt).toContain(JSON.stringify(instructions));
+    expect(reviewPrompt).toContain(original);
+    expect(reviewPrompt).toContain('Contexto factual atual.');
+    expect(reviewPrompt).toContain('Criar uma aula somente com o material original.');
+    expect(reviewPrompt).toContain('ROTEIRO — SOMENTE ESTRUTURA, NÃO É FONTE FACTUAL');
+    expect(reviewPrompt).toContain('CONTRATO DE PATCH PARA BLOCOS');
+    expect(reviewPrompt).toContain('"edits":[{"slideIndex":0');
+    expect(reviewPrompt).not.toContain('RECEITA VISUAL EXEMPLO');
+    expect(reviewPrompt).not.toContain('JSON exato a retornar');
+    expect(reviewPrompt).not.toContain('CLAIM GERADO NÃO É FONTE');
+    expect(reviewPrompt).not.toContain('em cada slide inclua presentationBlocks');
+  });
+
+  it.each([
+    { edits: [], slides: [{ title: 'Outro deck' }] },
+    { edits: [{ slideIndex: 0, reason: 'Trocar imagem', imageQuery: 'another image' }] },
+  ])('rejeita resposta de revisão que mistura patches e campos de geração (%j)', async review => {
+    const ai = vi.fn().mockResolvedValueOnce(plan()).mockResolvedValueOnce(draft()).mockResolvedValueOnce(review);
+    const output = await generateReviewedCarousel({ prompt: '', config: config() }, ai);
+    expect(output.reviewStatus).toBe('unavailable');
+    expect(output.result.slides[0].title).toBe(draft().slides[0].title);
+    expect(output.result.slides[0].imageQuery).toBe(draft().slides[0].imageQuery);
+    expect(ai).toHaveBeenCalledTimes(3);
+  });
+
   it('cancelamento entre plano e redação impede a próxima chamada', async () => {
     const abort = new AbortController();
     const ai = vi.fn().mockImplementation(async () => { abort.abort(Object.assign(new Error('cancelado'), { code: 'generation_cancelled' })); return plan(); });
@@ -114,6 +154,7 @@ describe('apresentação planejada e revisada', () => {
     expect(ai).toHaveBeenCalledTimes(4);
     expect(output.reviewStatus).toBe('repaired');
     expect(ai.mock.calls[3][0]).toContain('slideIndex 0');
+    expect(ai.mock.calls[3][1].systemPrompt).toBe(PRESENTATION_REVIEW_SYSTEM_PROMPT);
     expect(output.result.slides[0].title).toBe('Histórico contínuo');
   });
 

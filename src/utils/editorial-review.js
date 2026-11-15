@@ -13,6 +13,39 @@ export { auditUnsupportedCommercialClaims } from './factual-grounding.js';
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
 const PRESENTATION_TEXT_FIELDS = ['title', 'subtitle', 'bodyAfterImage'];
+export const PRESENTATION_REVIEW_SYSTEM_PROMPT = `Você é o revisor factual e editorial de uma apresentação existente. Sua única entrega é um objeto JSON de correções {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}]}, com caption geral opcional. Nunca devolva slides, um novo deck, plano, evidências, raciocínio ou markdown. Use apenas os campos de correção permitidos no pedido.
+Respeite integralmente as instruções atuais do usuário, inclusive limites para exemplos, exercícios, idioma, ficção e uso exclusivo dos dados fornecidos. As fontes originais são a base factual; rascunho, roteiro gerado e exemplos de estilo não comprovam nada. O roteiro orienta a estrutura e também pode conter erros.
+Confira títulos, textos, blocos nativos, notas e resumo. Remova nomes, datas, fornecedores, cenários, compromissos e números que o rascunho acrescentou sem apoio ou sem autorização explícita. Chamar algo de fictício ou didático não autoriza inventar um exemplo quando o usuário pediu somente os dados fornecidos. Não resolva uma lacuna criando outro detalhe. Preserve condições, exclusões, modalidade, unidades, base, período e limitações; decisão pendente continua pendente. Aceite não implica encerramento contratual. Corrija apenas os campos necessários; preserve quantidade, ordem e conteúdo sustentado. Se não houver correção necessária, devolva {"edits":[]}.`;
+
+function plannedReviewStructure(plan) {
+  return `ROTEIRO — SOMENTE ESTRUTURA, NÃO É FONTE FACTUAL:
+${JSON.stringify({ slides: (plan.slides || []).map(({ index, purpose, visualRole, question }) => ({ index, purpose, visualRole, question })) })}`;
+}
+
+function presentationReviewBlockContract(nativeBlocks) {
+  if (nativeBlocks === false) return 'Neste padrão personalizado presentationBlocks permanece [].';
+  return `CONTRATO DE PATCH PARA BLOCOS: só inclua presentationBlocks na edição se esse campo precisar mudar. O valor substitui o array existente: [] ou exatamente um bloco de um destes tipos:
+- comparison: type, headers (2–4 strings até 80 caracteres), rows (1–5 linhas com o mesmo número de células dos cabeçalhos; cada célula até 240).
+- metrics: type, items (1–4 objetos com label até 100, value até 48 e detail opcional até 180 caracteres).
+- steps: type, items (2–5 objetos com title até 100 e body opcional até 260 caracteres).
+Preserve o tipo e a ordem do bloco. Os valores devem vir das fontes originais; não preencha ausências com zero, nomes, datas, exemplos ou comparações inventadas. Não gere um objeto de slide ou configurações visuais dentro do patch.`;
+}
+
+function plannedReviewBriefing(config, planning, sources) {
+  // Do not reuse the writing prompt: it includes layout recipes and example
+  // decks that the reviewer must never mistake for this project's evidence.
+  return `PEDIDO ATUAL E FONTES ORIGINAIS — DADOS PARA CONFERÊNCIA:
+${JSON.stringify({
+    brief: planning.brief || '',
+    userInstructions: config.userInstructions || '',
+    factualContext: config.factualSource ?? config.commercialClaimSource ?? '',
+    sources: sources.filter(isObject).map(source => ({
+      id: source.id, title: source.title || '',
+      excerpts: (Array.isArray(source.chunks) && source.chunks.length ? source.chunks.map(chunk => chunk?.text) : [source.text])
+        .filter(text => typeof text === 'string'),
+    })),
+  })}`;
+}
 
 function positiveInteger(value) {
   const parsed = Number(value);
@@ -287,15 +320,20 @@ export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
     const limitsBlock = buildPresentationLimitsBlock(config, draft?.slides?.length || config.count || 0);
     const plannedRules = config.presentationPlan
-      ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida e cada argumento deve preservar as evidências e seu estágio (fato, proposta ou desconhecido). O roteiro já foi planejado separadamente. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${buildPresentationPlanBlock(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks permanece [].' : buildPresentationBlocksPrompt()}`
+      ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida, mas fatos e estágio (fato, proposta ou desconhecido) devem ser conferidos nas fontes originais. Validar a estrutura do roteiro não comprova suas afirmações. Não use o roteiro nem o rascunho como fonte de si mesmos. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${plannedReviewStructure(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${presentationReviewBlockContract(config.nativeBlocks)}`
       : '';
+    const reviewDraft = config.presentationPlan ? {
+      slides: draft.slides.map(slide => Object.fromEntries(['title', 'subtitle', 'bodyAfterImage', 'speakerNotes', 'presentationBlocks']
+        .filter(field => hasOwn(slide, field)).map(field => [field, slide[field]]))),
+      caption: draft.caption,
+    } : draft;
     const editableFields = config.presentationPlan
       ? 'title, subtitle, bodyAfterImage, speakerNotes ou presentationBlocks'
       : 'title, subtitle ou bodyAfterImage';
     return `REVISÃO DE APRESENTAÇÃO — UMA RODADA, SOMENTE TEXTO.
 O briefing abaixo é referência, não um pedido para gerar o deck novamente.
 <briefing>\n${prompt}\n</briefing>
-<rascunho>\n${JSON.stringify(draft)}\n</rascunho>
+<rascunho>\n${JSON.stringify(reviewDraft)}\n</rascunho>
 Verifique: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
 Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
@@ -345,6 +383,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
   const isPresentation = config?.presetId === 'apresentacao';
   const planned = isPresentation && !!config.presentationPlan;
   const editableTextFields = ['title', 'subtitle', 'bodyAfterImage', ...(planned ? ['speakerNotes'] : [])];
+  if (planned && Object.keys(review).some(key => !['edits', 'caption'].includes(key))) throw new Error('A revisão deve retornar somente correções, não outro deck.');
   const seen = new Set();
   const slides = draft.slides.map(s => ({ ...s }));
   for (const edit of review.edits) {
@@ -352,6 +391,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
         seen.has(edit.slideIndex) || typeof edit.reason !== 'string' || !edit.reason.trim()) {
       throw new Error('Edição inválida');
     }
+    if (planned && Object.keys(edit).some(key => !['slideIndex', 'reason', ...editableTextFields, 'presentationBlocks'].includes(key))) throw new Error('Campo não permitido na revisão.');
     seen.add(edit.slideIndex);
     for (const field of editableTextFields) {
       if (!hasOwn(edit, field)) continue;
@@ -371,7 +411,7 @@ export function applyEditorialReview(draft, review, config, { deferQualityChecks
     ? { ...config, allowMissingSocialTitles: true, allowLongSocialSupport: true, allowIncompleteDraft: true }
     : config);
   const unsupportedClaims = isPresentation
-    ? auditUnsupportedCommercialClaims(result.slides, config?.commercialClaimSource)
+    ? auditUnsupportedCommercialClaims(result.slides, planned ? [config.factualSource, config.userInstructions].filter(Boolean).join('\n') : config?.commercialClaimSource)
     : auditDraftFactuality(result, config);
   if (!deferQualityChecks && unsupportedClaims.length) {
     const error = new Error(`A revisão manteve uma promessa comercial sem apoio no briefing: ${unsupportedClaims[0].claim}.`);
@@ -670,7 +710,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
   };
   const plannedConfig = {
-    ...config, presentationPlan: plan,
+    ...factualConfig, presentationPlan: plan,
     presentationTextLimits: typeof config.presentationLimitsForPlan === 'function'
       ? config.presentationLimitsForPlan(plan)
       : config.presentationTextLimits,
@@ -694,8 +734,10 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   throwIfGenerationCancelled(aiOptions?.signal);
   onStage?.('reviewing');
   onReview?.();
+  const reviewOptions = { ...textOptions, systemPrompt: PRESENTATION_REVIEW_SYSTEM_PROMPT };
+  const reviewPrompt = buildEditorialReviewPrompt(plannedReviewBriefing(config, planning, sources), draft, plannedConfig);
   try {
-    const review = await callAI(buildEditorialReviewPrompt(generationPrompt, draft, plannedConfig), textOptions);
+    const review = await callAI(reviewPrompt, reviewOptions);
     throwIfGenerationCancelled(aiOptions?.signal);
     const result = applyEditorialReview(draft, review, plannedConfig);
     return finish(result, JSON.stringify(result) === JSON.stringify(draft) ? 'unchanged' : 'revised');
@@ -707,7 +749,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const indexes = [...new Set(violations.map(item => item.slideIndex))];
     onStage?.('repairing');
     try {
-      const repair = await callAI(`${buildEditorialReviewPrompt(generationPrompt, draft, plannedConfig)}\nREPARO DIRECIONADO: edite somente os slides com slideIndex ${indexes.join(', ')}. Reescreva sem perder números, unidades, hipóteses ou condições. Transfira explicações complementares para speakerNotes, mantendo a conclusão compreensível na página. Não corte frases por caracteres.`, textOptions);
+      const repair = await callAI(`${reviewPrompt}\nREPARO DIRECIONADO: edite somente os slides com slideIndex ${indexes.join(', ')}. Reescreva sem perder números, unidades, hipóteses ou condições. Transfira explicações complementares para speakerNotes, mantendo a conclusão compreensível na página. Não corte frases por caracteres.`, reviewOptions);
       throwIfGenerationCancelled(aiOptions?.signal);
       if (!Array.isArray(repair?.edits) || repair.edits.some(edit => !indexes.includes(edit?.slideIndex))) throw new Error('Reparo fora do escopo');
       const result = applyEditorialReview(draft, repair, plannedConfig);

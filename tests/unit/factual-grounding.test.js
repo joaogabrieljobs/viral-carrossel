@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { auditDraftFactuality, factualEvidenceText } from '../../src/utils/factual-grounding.js';
+import { auditDraftFactuality, auditUnsupportedCommercialClaims, factualEvidenceText } from '../../src/utils/factual-grounding.js';
 import { assertSocialRefinement, generateReviewedCarousel } from '../../src/utils/editorial-review.js';
 
 const source = 'Público: donos de clínicas, salões, restaurantes e prestadores locais. Problemas: telefone antigo, botões em outro idioma, navegação ruim no celular, ausência de CTA claro e imagens genéricas. Processo: diagnóstico, organizar conteúdo, criar versão responsiva, revisar informações e CTA, publicar e orientar a equipe. Benefício esperado: informação clara e caminho simples para contato. Caso permitido: uma dona de negócio abre o próprio site no celular e encontra o telefone antigo. CTA: solicitar uma análise do site.';
@@ -99,6 +99,18 @@ describe('fidelidade ao briefing — regressões dos nove modos', () => {
     const first = draft(); first.slides[1].subtitle = 'Não promete mas inclui software e automação.';
     expect(auditDraftFactuality(first, { ...config, factualSource: 'Não inclui software e automação.' }))
       .toContainEqual(expect.objectContaining({ field: 'subtitle', category: 'item incluso' }));
+  });
+
+  it.each(['O que o serviço inclui e exclui', 'O que inclui?', 'What the service includes and excludes'])('não trata título sem item como alegação: %s', title => {
+    const first = draft(); first.slides[0].title = title;
+    expect(auditDraftFactuality(first, config)).toEqual([]);
+    expect(auditUnsupportedCommercialClaims(first.slides, source)).toEqual([]);
+  });
+
+  it.each(['O que inclui suporte adicional?', 'O serviço inclui suporte adicional.', 'Inclui e exclui suporte adicional'])('mantém a conferência quando há item nomeado: %s', title => {
+    const first = draft(); first.slides[0].title = title;
+    expect(auditDraftFactuality(first, config)).toContainEqual(expect.objectContaining({ field: 'title', category: 'item incluso' }));
+    expect(auditUnsupportedCommercialClaims(first.slides, source)).toContainEqual(expect.objectContaining({ category: 'item incluso' }));
   });
 
   it('não une campos para fabricar uma alegação e mantém valores factuais fornecidos', () => {

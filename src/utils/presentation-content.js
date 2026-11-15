@@ -26,6 +26,10 @@ export const PRESENTATION_EVIDENCE_RULES = `FIDELIDADE E RACIOCÍNIO DA APRESENT
 - Persuasão e clareza vêm de exemplos, mecanismos e consequências concretas. Evite absolutos, falsa urgência, ataques ao público e falsas dicotomias. Não invente canais de contato, gratuidades ou garantias no fechamento.
 ${PRESENTATION_FIELD_GROUNDING_RULES}`;
 
+const AULA_SOURCE_AND_CLOSING_RULES = `- Se há um caso fornecido, real ou fictício, o exemplo resolvido e a atividade reutilizam os fatos desse caso. O rótulo "caso fictício" não autoriza acrescentar pessoas, datas, decisões ou resultados. Campo não informado continua em aberto; não o complete para tornar o exemplo mais concreto.
+- Uma restrição explícita a usar apenas os dados fornecidos prevalece sobre a permissão geral de criar exemplos hipotéticos. A atividade avaliada deve ser executável com esses insumos; não exija informação de uma reunião real do aluno para resolver o exercício. Aplicação ao contexto do aluno pode vir depois, como transferência, sem alterar a tarefa avaliada. O debrief confere a mesma entrega e os mesmos critérios pedidos na atividade.
+- Feche com a aplicação pelo participante e um critério de aprendizagem. Preço ou oferta no material não transformam a conclusão nem a caption em venda: somente um objetivo comercial explícito autoriza esse chamado. Não apresente compra ou aprovação de proposta como resultado da aprendizagem.`;
+
 const PROFILES = Object.freeze({
   auto: {
     role: 'estrategista editorial de apresentações',
@@ -44,8 +48,10 @@ const PROFILES = Object.freeze({
 - Explique o mecanismo e mostre as etapas do raciocínio no exemplo resolvido, não apenas a resposta. Use contraste entre exemplo correto e erro comum quando pertinente.
 - A prática deve informar tarefa, insumos, formato da entrega e critério de sucesso. Tempo pode ser sugerido como estimativa didática, nunca apresentado como agenda aprovada. Não pressuponha ferramentas ou materiais que não estão disponíveis.
 - Inclua resposta comentada ou critérios de avaliação após a atividade. Perguntas de verificação precisam revelar entendimento, não pedir apenas opinião ou "entenderam?".
-- Se faltar caso real, proponha um exemplo hipotético simples e identificado. Não atribua métricas, histórias ou resultados fictícios a pessoas ou organizações reais. Feche com aplicação em outro contexto e próxima prática.`,
-    review: 'Verifique alinhamento entre objetivo, explicação, exemplo e atividade. Uma instrução executável contém tarefa e entrega; o debrief explica como avaliar. Corrija saltos de conhecimento, perguntas sem critério e exemplos sem raciocínio. Não transforme a aula em proposta comercial.',
+- Se não houver caso fornecido e as instruções permitirem, proponha um exemplo hipotético simples e identificado. Não atribua métricas, histórias ou resultados fictícios a pessoas ou organizações reais.
+${AULA_SOURCE_AND_CLOSING_RULES}`,
+    review: `Verifique alinhamento entre objetivo, explicação, exemplo e atividade. Uma instrução executável contém tarefa e entrega; o debrief explica como avaliar. Corrija saltos de conhecimento, perguntas sem critério e exemplos sem raciocínio. Não transforme a aula em proposta comercial.
+${AULA_SOURCE_AND_CLOSING_RULES}`,
   },
   proposta_comercial: {
     role: 'estrategista de propostas comerciais e escopo de serviços',
