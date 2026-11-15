@@ -3,6 +3,7 @@ import { enterEditorFromHome } from './helpers/project-entry.js';
 import { test, expect } from '@playwright/test';
 import { mockEditorApi as mockApi, SESSAO_ATIVA } from './helpers/api-mock.js';
 import { PRESENTATION_PLAN_PROMPT_VERSION, PRESENTATION_PLAN_SYSTEM_PROMPT } from '../../src/utils/presentation-plan.js';
+import { PRESENTATION_REVIEW_SYSTEM_PROMPT } from '../../src/utils/editorial-review.js';
 
 const routes = [
   ['Auto', 'estrategista editorial', 'uma única lógica dominante'],
@@ -66,7 +67,8 @@ for (const [label, role, criterion] of routes) {
   await page.getByRole('button', { name: 'Gerar apresentação com IA', exact: true }).first().click();
 
     const modal = page.locator('.modal-panel');
-    await modal.getByLabel('Qual é o tema da apresentação?', { exact: true }).fill('Uma decisão com critérios verificáveis');
+    const topic = 'Uma decisão com critérios verificáveis';
+    await modal.getByLabel('Qual é o tema da apresentação?', { exact: true }).fill(topic);
     await modal.getByRole('radio', { name: new RegExp(`^${label}`) }).click();
     await modal.getByRole('button', { name: /Continuar/i }).click();
     await modal.getByRole('group', { name: 'Número de slides', exact: true })
@@ -79,15 +81,30 @@ for (const [label, role, criterion] of routes) {
     await expect(page.locator('main').getByText('Validar antes de agir.', { exact: true })).toBeVisible();
     expect(textRequests).toHaveLength(4);
     expect(textRequests[0].find(message => message.role === 'system').content).toContain(PRESENTATION_PLAN_SYSTEM_PROMPT);
-    for (const request of textRequests.slice(1)) {
+    for (const request of textRequests.slice(1, 3)) {
       expect(request.find(message => message.role === 'system').content).toContain(role);
+      expect(request.find(message => message.role === 'user').content).toContain('ETAPA DE REDAÇÃO EM LOTES');
     }
     expect(textRequests[0].find(message => message.role === 'user').content).toContain('PLANEJAMENTO ESTRUTURADO');
     const userPrompt = textRequests[1].find(message => message.role === 'user').content;
     expect(userPrompt).toContain(criterion);
     expect(userPrompt).toContain('Não mencione o arquivo enviado');
     expect(userPrompt).toContain('PLANO EDITORIAL VALIDADO');
-    expect(textRequests[3].find(message => message.role === 'user').content).toContain('REVISÃO DE PROFUNDIDADE');
+    const reviewRequest = textRequests[3];
+    expect(reviewRequest.find(message => message.role === 'system').content).toContain(PRESENTATION_REVIEW_SYSTEM_PROMPT);
+    const reviewPrompt = reviewRequest.find(message => message.role === 'user').content;
+    expect(reviewPrompt).toContain('REVISÃO DE PROFUNDIDADE');
+    expect(reviewPrompt).toContain('Resposta: um único objeto JSON {"edits"');
+    const reviewBriefing = reviewPrompt.match(/<briefing>\n([\s\S]*?)\n<\/briefing>/)[1];
+    expect(reviewBriefing).toContain('PEDIDO ATUAL E FONTES ORIGINAIS');
+    const originalSources = JSON.parse(reviewBriefing.slice(reviewBriefing.indexOf('\n') + 1));
+    expect(originalSources.brief).toContain(topic);
+    expect(originalSources.factualContext).toContain(topic);
+    expect(originalSources.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'request', excerpts: expect.arrayContaining([expect.stringContaining(topic)]) }),
+    ]));
+    expect(reviewBriefing).not.toContain('ETAPA DE REDAÇÃO EM LOTES');
+    expect(reviewBriefing).not.toContain('Aplicar o critério 1 antes da decisão.');
     expect(imageRequests).toHaveLength(0);
   });
 }
