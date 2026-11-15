@@ -1,6 +1,6 @@
 # Moont — correções do fluxo de apresentações
 
-14/11/2026 · Correções validadas localmente; publicação e reteste real acompanhados nesta rodada.
+14/11/2026 · Correções publicadas e reteste real documentado. Validação editorial integral permanece pendente de acesso para os testes restantes.
 
 ## Problema observado
 
@@ -48,7 +48,15 @@ Os prompts de redação e revisão exigem preservar decisões pendentes, não de
 
 Este ajuste complementar altera sete arquivos de código/teste e este relatório. Ele não modifica layout, cancelamento ou o enquadramento de imagens. Verificação final no checkout isolado: `npm test` passou em 202 arquivos, com 2.187 testes aprovados e quatro falhas esperadas; build, checks de identificadores/props, acessibilidade estática e `git diff --check` passaram. O efeito real nas próximas respostas da IA exige reteste; a CI acompanhará o SHA do ajuste complementar.
 
-## Critérios para encerrar a rodada
+## Revisão dedicada e aprendizagem — `7d9d8f5`
+
+O reteste de Aula ainda acrescentou nomes, fornecedores e datas num exemplo, apesar de a instrução limitar o exercício aos dados fornecidos. A revisão planejada agora recebe um system prompt exclusivo para correções em JSON, o pedido e as fontes originais, sem reutilizar a receita visual de redação. O roteiro gerado entra apenas como estrutura; suas afirmações não se tornam evidência. Respostas que misturam correções com um novo deck ou configurações visuais são rejeitadas, preservando o rascunho.
+
+O modelo Aula exige que exemplo, exercício e correção usem os mesmos insumos e avaliem a mesma entrega. A aplicação ao contexto pessoal fica separada. O encerramento e o resumo concluem a aprendizagem; haver preço no material não autoriza converter a aula em venda. Cabeçalhos sem item, como “Inclui e exclui”, deixam de ser tratados como promessa comercial pelo verificador literal.
+
+O pacote altera seis arquivos. Passaram 285 testes focados, build e checks de identificadores, props, acessibilidade e diff. Publicação `7d9d8f5375aba0b177a22049c61d6df09052fded` em produção; Vercel READY e bundle `/assets/index-D9UlTFEb.js` confirmado. A CI e os resultados reais finais serão registrados no relatório de reteste. Melhor instrução e validação não garantem ausência de erros factuais em toda resposta; os testes reais distinguem entrega técnica de aprovação editorial.
+
+## Critérios de conclusão
 
 1. Confirmar testes de planejamento válido/inválido/truncado, recuperação limitada, cancelamento, fontes e metadados sem material privado.
 2. Confirmar os grupos progressivos, títulos, ordem, total solicitado e preservação explícita de um rascunho parcial quando uma etapa posterior falhar.
@@ -57,3 +65,13 @@ Este ajuste complementar altera sete arquivos de código/teste e este relatório
 5. Repetir a avaliação real dos sete caminhos com o material documentado e distinguir entrega técnica de qualidade editorial, densidade, fidelidade factual e composição. Somente depois dessa observação será possível afirmar que o problema de produção foi resolvido.
 
 O fluxo faz mais de uma chamada por apresentação, proporcionalmente ao total de slides. Grupos menores e recuperação limitada reduzem o tamanho de cada resposta; não constituem, antes do reteste real, garantia de menor duração, custo ou taxa de falhas.
+
+## Interrupção explícita e preservação do diagnóstico
+
+O Caso preservou seis de 12 slides quando o acesso ao serviço começou a retornar 402. Para que a próxima interrupção tenha causa verificável, cada grupo agora registra intervalo, tentativa, resultado, código/campo da validação, status HTTP e metadados permitidos do provedor. Briefing, texto gerado, credenciais e mensagens privadas de erro não entram nesse diagnóstico. A recuperação recebe o campo estrutural a corrigir, com a posição global do slide, mantendo no máximo duas tentativas.
+
+A interface distingue redação incompleta, sessão, confirmação da assinatura, acesso negado e limite de solicitações. A mensagem não deduz “assinatura inativa” a partir de dados em cache. Quantidade solicitada, quantidade preservada, motivo explícito e diagnósticos sobrevivem à recarga. Respostas 401/402/403/429 não disparam uma nova tentativa de geração paga.
+
+Verificação anterior ao pacote final: a [CI de `1667497`](https://github.com/joaogabrieljobs/viral-carrossel/actions/runs/43657887422) passou com 2.197 testes, quatro falhas esperadas, 231 E2E aprovados e 13 pulados; deploy READY. Esse commit ajustou apenas o teste ao novo revisor, sem alterar o bundle do produto. Para a interrupção explícita, 35 testes de geração, 15 de interface e seis E2E passaram; o E2E novo provoca 402 após três de seis slides, confirma ausência de nova chamada e verifica texto, causa e diagnósticos após recarga. A publicação final será registrada abaixo após sua confirmação.
+
+O [reteste real](apresentacoes-reteste-2026-11-14.md) registra cinco apresentações completas, 60 slides, um Caso parcial com backup e as pendências. O PDF do Pitch foi baixado e conferido: 12 páginas em 16:9. As extrapolações editoriais encontradas foram usadas para refinar os prompts, mas as saídas anteriores não demonstram a eficácia integral da versão final.

@@ -26,13 +26,20 @@ caminhos do Moont. Carrosséis e remix mantêm o fluxo existente.
    grupo válido aparece na prévia antes de os próximos ficarem prontos. Se um
    grupo posterior falhar, o resultado preserva os slides concluídos, marca
    a apresentação como incompleta e informa a quantidade solicitada e obtida.
-4. **Revisão editorial.** Confere a redação com o roteiro e as evidências.
-   Há uma tentativa adicional apenas para slides que excederam os limites.
-   O novo fluxo não corta frases por caracteres: se o reparo falhar, mantém
-   o rascunho completo e informa que precisa de atenção. A conferência factual
-   também inspeciona blocos nativos e notas; suspeitas são sinalizadas para
-   revisão, sem afirmar que uma verificação automática prova a veracidade.
-   Resultados que precisam de atenção não iniciam geração de imagens.
+4. **Revisão editorial.** Desde `7d9d8f5`, usa um sistema próprio de revisão,
+   `PRESENTATION_REVIEW_SYSTEM_PROMPT`, separado do sistema de redação. Recebe
+   o pedido, as instruções atuais completas e os textos ou trechos originais
+   selecionados das fontes. Não reutiliza o prompt expandido de geração com
+   receitas visuais e exemplos de estilo. O roteiro fornece somente posições,
+   funções e perguntas; suas afirmações geradas não servem como evidência.
+   O rascunho inclui texto visível, blocos nativos, notas e resumo para conferência.
+   A resposta aceita apenas `edits` e `caption` geral opcional. Cada edição usa
+   índice, motivo e campos de conteúdo permitidos; não pode devolver outro deck,
+   mudar imagens ou configurações visuais. Há uma revisão e, se os limites
+   editoriais ainda exigirem correção, no máximo um reparo restrito aos slides
+   afetados. O fluxo não corta frases por caracteres: se o reparo falhar, mantém
+   o rascunho completo e informa que precisa de atenção. Resultados que precisam
+   de atenção não iniciam geração de imagens.
 5. **Composição.** `presentation-composition.js` associa funções a seis
    geometrias permitidas. Comparações, indicadores e sequências podem usar
    blocos nativos editáveis. A função planejada prevalece sobre a distribuição
@@ -51,14 +58,40 @@ caminhos do Moont. Carrosséis e remix mantêm o fluxo existente.
    verificando fontes, assets e layout.
 
 O percurso normal usa uma chamada de roteiro, uma por grupo de até três slides
-e uma de revisão. Pode usar as recuperações limitadas acima e mais uma para
-transbordamento real. Planejamento, redação e revisão visual solicitam resposta
-sem raciocínio separado nos modelos Z.ai que suportam essa opção; outros modelos
-mantêm suas configurações compatíveis. Não há repetição automática ilimitada.
+e uma de revisão. Os limites da orquestração são duas chamadas de roteiro,
+duas por grupo de redação, uma revisão mais um reparo editorial e uma única
+reescrita visual por transbordamento real. São limites por etapa; o transporte
+pode usar sua recuperação finita de indisponibilidade do provedor. Todas essas
+etapas solicitam até 8.192 tokens e resposta sem raciocínio separado nos modelos
+Z.ai que suportam essa opção; outros modelos mantêm suas configurações
+compatíveis. O backend preserva essa opção e aplica o mesmo teto de tokens.
+Não há repetição automática ilimitada.
 Cancelamento e troca de projeto impedem a aplicação de respostas tardias. Na
 criação de apresentação nova, cancelar permite abrir e salvar os grupos já
 validados como rascunho incompleto no mesmo projeto. Não se substitui conteúdo
 de um projeto existente ou remix com essa recuperação.
+
+## Conferência factual e limites
+
+O guard local usa o contexto factual fornecido, as instruções atuais e os
+textos/excertos originais das fontes. Nunca usa os fatos ou citações produzidos
+pelo próprio plano como prova. Inspeciona títulos, subtítulos, corpo, resumo,
+blocos nativos e notas de apresentação. Suspeitas são sinalizadas para revisão;
+o conteúdo não é apagado nem reescrito mecanicamente para passar no guard.
+
+Essa conferência é conservadora: identifica classes de números, condições e
+alegações comerciais por correspondência literal ou normalização limitada.
+Uma paráfrase legítima ou um cálculo pode exigir conferência manual. Exclusões
+explícitas e títulos sem item concreto, como “O que o serviço inclui e exclui”,
+não são tratados como promessa de inclusão; itens concretos continuam exigindo
+base no material. Instruções negativas não comprovam a promessa que proíbem.
+
+O guard não é um verificador semântico completo. Nomes, datas, mudança de estágio
+de uma decisão, causalidade e condições contratuais também dependem da revisão
+editorial e da avaliação humana do resultado. Uma resposta `edits: []` informa
+apenas que o modelo não solicitou alterações, não certifica a fidelidade do
+deck. Da mesma forma, uma citação literal válida estabelece rastreabilidade,
+não a verdade externa da fonte nem que toda interpretação do trecho está correta.
 
 ## Imagens e compatibilidade
 

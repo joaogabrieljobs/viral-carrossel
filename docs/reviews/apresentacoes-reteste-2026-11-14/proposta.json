@@ -1,0 +1,866 @@
+{
+  "ok": true,
+  "project": {
+    "id": "kpchorl",
+    "version": 2,
+    "name": "Reteste final 1411 — Proposta",
+    "format": "",
+    "caption": "Proposta do Mesa Clara para aprovação de programa de seis semanas por R$ 6.000, com escopo focado em verificar a execução do método em novas equipes. Aceite depende de entregas, não de promessa de economia. Data de início e responsáveis por equipe permanecem como pendências a combinar.",
+    "slideCount": 12,
+    "brand": {
+      "bg": "#fafafc",
+      "bgAlternate": "#f5f5f7",
+      "titleColor": "#000000",
+      "subtitleColor": "#363636",
+      "textColor": "#363636",
+      "accent": "#000000",
+      "titleFont": "\"Outfit\", sans-serif",
+      "bodyFont": "\"Inter\", sans-serif",
+      "logoPosition": "tr",
+      "logoSize": 260,
+      "logoOpacity": 90
+    },
+    "slides": [
+      {
+        "id": "5loql6j",
+        "index": 0,
+        "title": "Mesa Clara: decisões mais claras em reuniões internas",
+        "subtitle": "Programa de seis semanas para estruturar reuniões de pequenas equipes. Caso fictício criado para teste.",
+        "bodyAfterImage": "Proposta para líderes e coordenadores de equipes administrativas.",
+        "caption": "Abertura do deck. O caso é fictício e isso deve estar claro desde o início. A proposta se dirige a líderes que querem tornar as decisões de suas reuniões recorrentes mais explícitas e rastreáveis.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 49,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 25
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 53,
+                "w": 78,
+                "h": 39
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "8062y8k",
+        "index": 1,
+        "title": "Reuniões sem estrutura diluem decisões",
+        "subtitle": "O Mesa Clara propõe um método de três passos para tornar a decisão explícita: pauta com decisão esperada antes, registro com responsável e prazo durante, e revisão de pendências depois. O objetivo deste ciclo de seis semanas é verificar se o método é executável em novas equipes e registrar duração e decisões documentadas.",
+        "bodyAfterImage": "",
+        "caption": "Resumo da proposta. Conecta o problema (decisões diluídas) à solução (método de três passos) e ao objetivo específico deste ciclo (verificar execução e registrar métricas, não prometer economia).",
+        "imageQuery": "",
+        "visual": {
+          "layout": "bl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "o34jwoy",
+        "index": 2,
+        "title": "Sem método, decisões ficam implícitas",
+        "subtitle": "Reuniões de rotina sem estrutura clara tendem a acumular pendências e exigir retrabalho. Quando a decisão esperada não é declarada na pauta e o registro não atribui responsável e prazo, os encaminhamentos dissipam-se e a duração se prolonga.",
+        "bodyAfterImage": "O método Mesa Clara exige pauta prévia e registro formal para reverter esse cenário.",
+        "caption": "Slide de desafio. O foco é o mecanismo do problema: a ausência de estrutura impede a explicitação da decisão. Não inventamos métricas de impacto financeiro ou de produtividade, pois não foram medidos.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "bl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "udyb3lr",
+        "index": 3,
+        "title": "Objetivo do ciclo: verificar execução e registrar métricas",
+        "subtitle": "O programa de seis semanas propõe verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições do piloto.",
+        "bodyAfterImage": "Não há meta numérica de melhoria aprovada para este ciclo.",
+        "caption": "O foco deste ciclo é a validação da execução do método em novas equipes, não a promessa de resultados específicos. A ausência de meta numérica aprovada é deliberada e reflete o estágio atual de verificação.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "7op68sm",
+        "index": 4,
+        "title": "O método estrutura a reunião em três passos",
+        "subtitle": "Cada passo torna a decisão explícita: antes, define-se o que será decidido; durante, registra-se decisão, responsável e prazo; depois, revisam-se as pendências.",
+        "bodyAfterImage": "",
+        "caption": "O mecanismo central do Mesa Clara é a antecipação da decisão na pauta e o registro imediato de responsável e prazo, garantindo que nenhuma decisão fique implícita ou sem dono.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "k4vcd5m",
+        "index": 5,
+        "title": "Piloto: melhoria observada, efeito não isolado",
+        "subtitle": "A duração média caiu e a proporção de decisões documentadas subiu, mas a ausência de grupo de controle impede atribuir o resultado apenas ao método.",
+        "bodyAfterImage": "",
+        "caption": "Facilitadores de duas equipes mudaram em maio e não houve grupo de controle, logo o antes/depois não isola o efeito do método. Receita, satisfação e produtividade não foram medidos.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 40,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "9s2oo3o",
+        "index": 6,
+        "title": "Escopo: o que está incluído e o que está excluído",
+        "subtitle": "O programa entrega diagnóstico, capacitação, modelo editável e revisão de reuniões. Licenças de software, integração de sistemas e facilitação contínua após seis semanas ficam de fora.",
+        "bodyAfterImage": "",
+        "caption": "A separação clara entre incluído e excluído evita expectativas fora do escopo. O método não depende de software próprio, mas o cliente pode usar suas ferramentas existentes para os registros.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 38,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "qi2gqsd",
+        "index": 7,
+        "title": "Etapas e responsabilidades do programa",
+        "subtitle": "O avanço das seis semanas depende de o cliente fornecer os registros de reuniões e indicar um responsável por equipe, viabilizando diagnóstico e capacitação.",
+        "bodyAfterImage": "",
+        "caption": "Sem a indicação do responsável e o acesso aos registros, o diagnóstico não acontece. Essa dependência do cliente é condição para o início efetivo do programa.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "ncc1eur",
+        "index": 8,
+        "title": "Investimento de R$ 6.000 pelo programa",
+        "subtitle": "Programa de seis semanas com pagamento de 50% no início e 50% na entrega. O aceite depende da conclusão dos entregáveis, não de promessa de economia.",
+        "bodyAfterImage": "",
+        "caption": "O valor proposto cobre a execução do escopo definido. Como não há meta numérica de melhoria aprovada nem promessa de economia, o aceite se baseia na entrega dos serviços e materiais.\n\nCondição: pagamento 50/50 vinculado à entrega, não a resultados projetados.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "vx4qwbf",
+        "index": 9,
+        "title": "Aceite depende de entregas, não de promessa de economia",
+        "subtitle": "O critério de aceite é a entrega dos materiais, a realização dos dois encontros de capacitação e a revisão das dez reuniões. Não há compromisso com economia de tempo ou custo.",
+        "bodyAfterImage": "O método não inclui software próprio nem automação.",
+        "caption": "É importante alinhar que o aceite se baseia na execução do escopo proposto, não em resultados de performance. Como não houve grupo de controle no piloto, não é possível garantir economia. A ausência de software próprio também é um limite claro do método.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "mmu91va",
+        "index": 10,
+        "title": "Decisão: aprovar programa de R$ 6.000",
+        "subtitle": "Se aprovado, o cliente compromete-se a fornecer os registros e indicar um responsável por equipe. O fornecedor compromete-se a executar o diagnóstico, capacitação e revisões.",
+        "bodyAfterImage": "Pendências: data de início e nomes dos responsáveis por equipe.",
+        "caption": "A aprovação desta proposta autoriza o início do programa de seis semanas, condicionada à definição das pendências. Sem os registros e os responsáveis indicados pelo cliente, o diagnóstico não pode ser realizado.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "lrtdgv3",
+        "index": 11,
+        "title": "Aprovar o programa para verificar a execução do método",
+        "subtitle": "O próximo passo é aprovar o ciclo de seis semanas para testar a execução do Mesa Clara em novas equipes e registrar duração e decisões documentadas.",
+        "bodyAfterImage": "Data de início e responsáveis permanecem em definição.",
+        "caption": "O objetivo deste ciclo não é validar mercado nem estabelecer meta numérica de melhoria, mas sim verificar a execução do método e coletar dados com as mesmas definições do piloto. Caso fictício para teste.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "mc",
+          "align": "center",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 10,
+                "y": 29,
+                "w": 80,
+                "h": 22
+              },
+              "subtitle": {
+                "x": 18,
+                "y": 55,
+                "w": 64,
+                "h": 35
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      }
+    ]
+  }
+}

@@ -1,5 +1,16 @@
 import React from 'react';
 
+export function presentationInterruptionMessage(reason) {
+  switch (reason) {
+    case 'subscription_required': return 'O serviço pediu a confirmação da assinatura para continuar. Confira o acesso da sua conta antes de tentar novamente.';
+    case 'session_required': return 'A sessão não pôde ser confirmada. Entre novamente na sua conta antes de tentar continuar.';
+    case 'rate_limited': return 'O serviço limitou novas solicitações. Aguarde um pouco antes de tentar novamente.';
+    case 'access_denied': return 'O serviço não autorizou a continuação. Confira o acesso da sua conta.';
+    case 'writing_failed': return 'Não foi possível concluir a redação do próximo grupo de slides.';
+    default: return '';
+  }
+}
+
 function issueDescription(issue) {
   if (issue.code === 'presentation_incomplete') {
     const completed = Number(issue.completedCount);
@@ -25,6 +36,7 @@ export default function EditorialReviewNotice({ status, issues = [], isPresentat
   const completed = Number(incomplete?.completedCount);
   const total = Number(incomplete?.totalCount);
   const hasIncompleteCount = incomplete && Number.isInteger(completed) && Number.isInteger(total) && total > completed;
+  const interruptionMessage = incomplete ? presentationInterruptionMessage(incomplete.interruptionReason) : '';
   const pages = [...new Set(items.filter(issue => Number.isInteger(issue.slideIndex) && issue.slideIndex >= 0)
     .map(issue => issue.slideIndex + 1))].sort((a, b) => a - b);
   const locations = [
@@ -36,6 +48,7 @@ export default function EditorialReviewNotice({ status, issues = [], isPresentat
     {incomplete && <p>{hasIncompleteCount
       ? `${completed} de ${total} slides preservados. A geração parou antes de escrever os ${total - completed} restantes.`
       : 'Os slides concluídos foram preservados, mas a geração parou antes de completar a apresentação.'} Complete a sequência antes de exportar.</p>}
+    {interruptionMessage && <p>{interruptionMessage}</p>}
     <p>{incomplete
       ? 'Confira as informações, os títulos e o tamanho dos textos dos slides disponíveis. A sequência ainda precisa ser completada.'
       : status === 'unavailable'

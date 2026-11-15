@@ -1,0 +1,866 @@
+{
+  "ok": true,
+  "project": {
+    "id": "map6qj1",
+    "version": 2,
+    "name": "Reteste final 1411 — Relatório",
+    "format": "",
+    "caption": "Relatório do piloto Mesa Clara (caso fictício): duração caiu 45→33 min e decisões documentadas subiram 60→85%, mas sem isolamento causal. Decisão requerida: aprovar ciclo de 6 semanas por R$ 6.000 para testar o método em novas equipes. Pendentes: data de início e responsáveis.",
+    "slideCount": 12,
+    "brand": {
+      "bg": "#fafafc",
+      "bgAlternate": "#f5f5f7",
+      "titleColor": "#000000",
+      "subtitleColor": "#363636",
+      "textColor": "#363636",
+      "accent": "#000000",
+      "titleFont": "\"Outfit\", sans-serif",
+      "bodyFont": "\"Inter\", sans-serif",
+      "logoPosition": "tr",
+      "logoSize": 260,
+      "logoOpacity": 90
+    },
+    "slides": [
+      {
+        "id": "qql35qj",
+        "index": 0,
+        "title": "Mesa Clara: decisões mais claras em reuniões internas",
+        "subtitle": "Método de três passos para explicitar decisões, responsáveis e prazos. Este relatório avalia os resultados de um piloto fictício e apoia a decisão de aprovar um novo ciclo.",
+        "bodyAfterImage": "Caso fictício criado para teste; nomes e números pertencem à simulação.",
+        "caption": "Abertura do deck. O caso é fictício e isso deve estar claro desde o início. O objetivo é apresentar o método Mesa Clara e avaliar a aprovação de um novo ciclo com base nos dados do piloto.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 49,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 25
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 53,
+                "w": 78,
+                "h": 39
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "cbhe2jx",
+        "index": 1,
+        "title": "Recorte do relatório e decisão requerida",
+        "subtitle": "Análise do piloto de abril–maio/2026 em quatro equipes para apoiar a aprovação de um programa de seis semanas por R$ 6.000. O objetivo do novo ciclo é verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições.",
+        "bodyAfterImage": "Período do piloto: abril e maio de 2026. Decisão: aprovar ou rejeitar o programa proposto.",
+        "caption": "Define o escopo do relatório. O foco é a decisão sobre o programa de R$ 6.000. O objetivo do novo ciclo é operacional (verificar execução e registrar métricas), não comercial, e não inclui meta numérica de melhoria aprovada.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "bl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 2,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "xjs1k7h",
+        "index": 2,
+        "title": "Resumo: associação positiva, causalidade não isolada",
+        "subtitle": "O piloto registrou redução na duração média (45 para 33 min) e aumento de reuniões com decisão documentada (60% para 85%). Contudo, a ausência de grupo de controle e a mudança de facilitadores em duas equipes impedem atribuir o resultado apenas ao método. A decisão pendente é aprovar o novo ciclo.",
+        "bodyAfterImage": "Receita, satisfação, retenção e produtividade não foram medidos.",
+        "caption": "Síntese executiva. É crucial diferenciar a associação observada da causalidade. A limitação metodológica (sem controle e com mudança de facilitadores) deve pesar na interpretação, mas não invalida a observação de que houve melhoria nos indicadores monitorados.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "bl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 2,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "r2bht2r",
+        "index": 3,
+        "title": "Indicadores do piloto: duração e decisões",
+        "subtitle": "Os indicadores disponíveis mostram redução de duração e aumento de decisões documentadas, mas não há meta definida para comparação.",
+        "bodyAfterImage": "",
+        "caption": "Os números comparam os mesmos 20 encontros de rotina das quatro equipes entre abril e maio de 2026. A ausência de grupo de controle impede atribuir a mudança apenas ao método Mesa Clara.\n\nObservação antes/depois sem grupo de controle.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "8jmn8ha",
+        "index": 4,
+        "title": "Duração média caiu 12 minutos no piloto",
+        "subtitle": "A duração média das reuniões de rotina reduziu de 45 para 33 minutos entre abril e maio de 2026, nas mesmas quatro equipes observadas.",
+        "bodyAfterImage": "",
+        "caption": "A redução de 12 minutos na média é uma observação factual do antes/depois. Não isolamos o efeito do método porque não houve grupo de controle e os facilitadores de duas equipes mudaram em maio.\n\nBase: 20 reuniões em abril e 20 em maio/2026.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "c56fk74",
+        "index": 5,
+        "title": "Decisões documentadas passam de 60% para 85%",
+        "subtitle": "A proporção de reuniões com ao menos uma decisão documentada subiu de 12 em 20 para 17 em 20 no mesmo período e nas mesmas equipes.",
+        "bodyAfterImage": "",
+        "caption": "O indicador mede a proporção de reuniões que registraram ao menos uma decisão, e não o total de decisões por encontro. O aumento está associado ao período, mas não pode ser atribuído exclusivamente ao método pela ausência de controle.\n\nProporção, não quantidade de decisões por reunião.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "fgh0206",
+        "index": 6,
+        "title": "Ganho operacional sugerido, causalidade não comprovada",
+        "subtitle": "A redução de duração e o aumento de decisões documentadas indicam potencial de eficiência, mas a ausência de grupo de controle impede atribuir o resultado exclusivamente ao método Mesa Clara.",
+        "bodyAfterImage": "Receita, satisfação, retenção e produtividade não foram medidos no piloto.",
+        "caption": "O antes/depois mostra associação favorável, mas sem controle e com mudança de facilitadores em duas equipes, outros fatores podem explicar parte do resultado. O ganho operacional é plausível, não confirmado.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "guxlac7",
+        "index": 7,
+        "title": "Limitações metodológicas impedem atribuição causal",
+        "subtitle": "Sem grupo de controle e com mudança de facilitadores em duas das quatro equipes entre abril e maio, o antes/depois não isola o efeito do método Mesa Clara.",
+        "bodyAfterImage": "Receita, satisfação, retenção e produtividade individual permanecem sem medição.",
+        "caption": "A mudança de facilitadores ao mesmo tempo em que o método foi aplicado cria confusão de variáveis. Não é possível afirmar que a redução de 12 minutos ou o salto de 60% para 85% em decisões documentadas seriam reproduzidos em outras condições.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "tew2pra",
+        "index": 8,
+        "title": "Risco de generalização vs. oportunidade de validação",
+        "subtitle": "O risco é tratar a associação observada como prova de eficácia e generalizar o efeito. A oportunidade é usar o novo ciclo para testar a execução em novas equipes com as mesmas definições e registrar duração e decisões.",
+        "bodyAfterImage": "",
+        "caption": "A aprovação do ciclo de seis semanas permite coletar dados adicionais com o mesmo protocolo, reduzindo a lacuna de evidência sem comprometer o negócio com promessas de resultado.\n\nO novo ciclo não exige promessa de economia; o aceite depende da entrega dos materiais e encontros.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 38,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "5aanty4",
+        "index": 9,
+        "title": "Escopo do programa proposto: inclusões e exclusões",
+        "subtitle": "O programa de 6 semanas por R$ 6.000 entrega diagnóstico, capacitação, modelo editável e revisão de 10 reuniões. O aceite depende dessas entregas, não de promessa de economia.",
+        "bodyAfterImage": "",
+        "caption": "O critério de aceite é objetivo: entrega dos materiais, realização dos dois encontros de capacitação e revisão das dez reuniões. Não há vínculo com promessa de economia de tempo ou custo. O cliente deve indicar um responsável por equipe e fornecer os registros existentes.\n\nPagamento: 50% no início, 50% na entrega. Exclui licenças de software, integração e facilitação contínua.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 38,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "scz9pak",
+        "index": 10,
+        "title": "Trade-offs da aprovação: teste em novas equipes vs. lacuna de evidência",
+        "subtitle": "Aprovar permite verificar a execução do método e registrar métricas com as mesmas definições, sem promessa de economia. Rejeitar mantém a lacuna sobre a viabilidade em outras equipes.",
+        "bodyAfterImage": "",
+        "caption": "O objetivo declarado do novo ciclo é verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições do piloto. Como não há meta numérica aprovada, o foco é na execução e coleta de dados, não no atingimento de uma meta de desempenho.\n\nNão há meta numérica de melhoria aprovada para o novo ciclo.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 38,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "1dxuzu9",
+        "index": 11,
+        "title": "Decisão requerida: aprovar o ciclo de R$ 6.000",
+        "subtitle": "Aprovar o programa de seis semanas por R$ 6.000 para testar a execução do método em novas equipes e registrar os indicadores.",
+        "bodyAfterImage": "",
+        "caption": "A aprovação autoriza o início do programa, mas a execução efetiva depende da definição dos responsáveis e da data de início, que ainda estão pendentes. O aceite final do cliente dependerá da entrega dos materiais, realização dos dois encontros e revisão das dez reuniões.\n\nPendentes: data de início e nomes dos responsáveis.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 40,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 2,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 600,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      }
+    ]
+  }
+}

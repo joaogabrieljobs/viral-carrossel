@@ -314,7 +314,7 @@ import {
 } from './src/components/AccountHomeShell.jsx';
 import CreateProjectFlow from './src/components/CreateProjectFlow.jsx';
 import GenerationPreview from './src/components/GenerationPreview.jsx';
-import EditorialReviewNotice from './src/components/EditorialReviewNotice.jsx';
+import EditorialReviewNotice, { presentationInterruptionMessage } from './src/components/EditorialReviewNotice.jsx';
 import {
   normalizeCardVisualStyle,
   CARD_VISUAL_STYLE_OPTIONS,
@@ -5392,7 +5392,7 @@ ${jsonShapeLine}`;
       brandBlock,
       styleKitTextHint,
     ].filter(Boolean).join('\n');
-    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
+    const { result, reviewStatus, plan: generationPlan, incomplete: generationIncomplete = false, interruptionReason: generationInterruptionReason, writingDiagnostics: generationWritingDiagnostics = [], completedCount: generatedCount, totalCount: requestedCount, violations: editorialViolations = [], issues: editorialIssues = [] } = await generateReviewedCarousel({
       prompt,
       config: {
         count: Number(count),
@@ -5489,6 +5489,7 @@ ${jsonShapeLine}`;
           planning_repair: [1, 'Ajustando o roteiro e conferindo as fontes novamente'],
           writing: [2, details.from ? `Escrevendo slides ${details.from}–${details.to} · ${details.completedCount} de ${details.totalCount} prontos` : 'Desenvolvendo os argumentos de cada slide'],
           writing_repair: [2, 'Concluindo os slides deste grupo antes de continuar'],
+          writing_interrupted: [2, `Redação interrompida · ${details.completedCount} de ${details.totalCount} slides preservados. ${presentationInterruptionMessage(details.interruptionReason)}`.trim()],
           reviewing: [3, 'Conferindo clareza, profundidade e fidelidade'],
           repairing: [3, 'Ajustando os textos que precisam de revisão'],
         } : {
@@ -5507,7 +5508,7 @@ ${jsonShapeLine}`;
     if (reviewStatus === 'fitted') toast('Encurtei o texto que não cabia no layout da apresentação.', 'warning', 6500);
     if (reviewStatus === 'needs_attention') {
       toast(generationIncomplete
-        ? `Preservei ${generatedCount} de ${requestedCount} slides. A geração parou antes de completar a apresentação; confira o rascunho no editor.`
+        ? `Preservei ${generatedCount} de ${requestedCount} slides. ${presentationInterruptionMessage(generationInterruptionReason) || 'A geração parou antes de completar a apresentação.'} Confira o rascunho no editor.`
         : isPresentationGeneration
         ? 'Preservei o texto completo. Confira as informações e o encaixe dos slides antes de exportar. As imagens aguardam essa revisão.'
         : 'Rascunho preservado. Confira as informações e o tamanho dos textos antes de exportar. As imagens não foram iniciadas para você revisar primeiro.', 'warning', 10000);
@@ -5778,6 +5779,7 @@ ${jsonShapeLine}`;
             category: issue.category || null,
             ...(typeof issue.code === 'string' ? { code: issue.code } : {}),
             ...(Number.isInteger(issue.completedCount) ? { completedCount: issue.completedCount, totalCount: issue.totalCount } : {}),
+            ...(presentationInterruptionMessage(issue.interruptionReason) ? { interruptionReason: issue.interruptionReason } : {}),
             ...(typeof issue.claim === 'string' ? { claim: issue.claim.slice(0, 240) } : {}),
           }))
         : [],
@@ -5787,6 +5789,8 @@ ${jsonShapeLine}`;
           version: 1,
           reviewStatus,
           ...(generationIncomplete ? { incomplete: true, completedCount: generatedCount, totalCount: requestedCount } : {}),
+          ...(presentationInterruptionMessage(generationInterruptionReason) ? { interruptionReason: generationInterruptionReason } : {}),
+          writingDiagnostics: generationWritingDiagnostics,
           repairs: visualQuality?.repairs || [],
           issues: visualQuality?.issues || [],
           checkedAt: new Date().toISOString(),

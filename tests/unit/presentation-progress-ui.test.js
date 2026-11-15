@@ -45,6 +45,33 @@ describe('acompanhamento de apresentações', () => {
     expect(html).toContain('Prazo não informado');
     expect(html).not.toContain('Conferi o conteúdo');
   });
+  it.each([
+    ['subscription_required', 'O serviço pediu a confirmação da assinatura'],
+    ['session_required', 'A sessão não pôde ser confirmada'],
+    ['rate_limited', 'O serviço limitou novas solicitações'],
+    ['access_denied', 'O serviço não autorizou a continuação'],
+    ['writing_failed', 'Não foi possível concluir a redação do próximo grupo'],
+  ])('mostra a causa explícita %s sem perder o total preservado', (interruptionReason, message) => {
+    const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, { status:'needs_attention', isPresentation:true, issues:[
+      { code:'presentation_incomplete', completedCount:6, totalCount:12, interruptionReason },
+    ] }));
+    expect(html).toContain(message);
+    expect(html).toContain('6 de 12 slides preservados');
+    expect(html).toContain('os 6 restantes');
+    expect(html).toContain('Complete a sequência antes de exportar');
+    expect(html).not.toContain('assinatura inativa');
+    expect(html).not.toContain('Conferi o conteúdo');
+  });
+  it.each([undefined, 'unknown', '402', 'subscription_inactive'])('não deduz causa a partir de motivo ausente ou não reconhecido: %s', interruptionReason => {
+    const html = renderToStaticMarkup(React.createElement(EditorialReviewNotice, { status:'needs_attention', isPresentation:true, issues:[
+      { code:'presentation_incomplete', completedCount:6, totalCount:12, interruptionReason, claim:'Assinatura inativa' },
+    ] }));
+    expect(html).toContain('6 de 12 slides preservados');
+    expect(html).not.toContain('confirmação da assinatura');
+    expect(html).not.toContain('A sessão não pôde');
+    expect(html).not.toContain('O serviço limitou');
+    expect(html).not.toContain('Assinatura inativa');
+  });
   it('mostra a sequência como sugestão adaptável, sem prometer uma página por etapa', () => {
     const html = renderToStaticMarkup(React.createElement(PresentationStructureSummary, { presentationPath:'pitch', count:6 }));
     expect(html).toContain('Estrutura sugerida');

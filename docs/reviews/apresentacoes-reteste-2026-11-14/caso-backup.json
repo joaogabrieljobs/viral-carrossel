@@ -1,0 +1,2343 @@
+{
+  "vcVersion": 2,
+  "folders": [],
+  "docs": [
+    {
+      "id": "cfwc3y7",
+      "name": "Reteste final 1411 — Caso",
+      "status": "draft",
+      "folderId": "",
+      "publicationDate": "",
+      "createdAt": 1794702204321,
+      "updatedAt": 1794702359693,
+      "doc": {
+        "fmt": "apresentacao",
+        "brand": {
+          "id": "s5ocn47",
+          "name": "",
+          "handle": "",
+          "showHandle": false,
+          "handleBadgeX": 5,
+          "handleBadgeY": 4,
+          "titleFont": "\"Outfit\", sans-serif",
+          "bodyFont": "\"Inter\", sans-serif",
+          "bg": "#fafafc",
+          "titleColor": "#000000",
+          "subtitleColor": "#363636",
+          "textColor": "#363636",
+          "accent": "#000000",
+          "showSwipeCue": true,
+          "interleaveBg": false,
+          "bgAlternate": "#f5f5f7",
+          "bio": "",
+          "positioning": "",
+          "defaultTone": "",
+          "defaultAudience": "",
+          "signature": "",
+          "brandTone": null,
+          "useBrandVoice": true,
+          "links": "",
+          "logo": null,
+          "logoImageId": null,
+          "handleAvatar": null,
+          "handleAvatarPosX": 50,
+          "handleAvatarPosY": 50,
+          "handleAvatarRotate": 0,
+          "handleAvatarZoom": 100,
+          "textTitleSize": 100,
+          "textSubSize": 100,
+          "textBodyAfterSize": 100,
+          "textTitleTracking": 0,
+          "textSubTracking": 0,
+          "textTitleLeading": 105,
+          "textSubLeading": 150,
+          "textTitleWeight": 700,
+          "textTitleCase": "normal",
+          "customTitleFont": null,
+          "customBodyFont": null,
+          "logoSize": 260,
+          "logoPosition": "tr",
+          "logoOpacity": 90,
+          "cultureHeaderScale": 100,
+          "pageBadgeScale": 100,
+          "footerBarScale": 100,
+          "footerPillScale": 100,
+          "cultureHeaderLeft": "",
+          "cultureHeaderYear": "",
+          "logoAssetId": null,
+          "niche": "",
+          "styleKit": {
+            "stylePrompt": "",
+            "contextMd": "",
+            "logoOnGenerate": true,
+            "refImages": []
+          }
+        },
+        "slides": [
+          {
+            "id": "gzlpn97",
+            "num": 1,
+            "title": "Mesa Clara: decisões mais claras em reuniões internas",
+            "subtitle": "Caso fictício de teste. Um método de três passos para explicitar decisões, resultados observados em piloto e a decisão sobre um novo ciclo de seis semanas.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 49,
+            "subSize": 72,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "Caso fictício criado para teste; nomes e números pertencem à simulação.",
+            "caption": "Abertura do caso fictício Mesa Clara. O foco é avaliar se a estrutura de três passos torna decisões mais claras e se a proposta de R$ 6.000 para um novo ciclo deve ser aprovada, dados os limites do piloto.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 25
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 53,
+                  "w": 78,
+                  "h": 39
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 49,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 72,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 27.28,
+                  "leadingPercent": 115,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "cover-full",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 3
+              },
+              "subtitle": {
+                "maxChars": 220,
+                "maxLines": 5
+              },
+              "body": {
+                "maxChars": 100,
+                "maxLines": 4
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "cover",
+            "presentationCompositionId": "presentation_photo_essay:cover",
+            "presentationVisualRole": "cover",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "cover",
+              "evidencePosition": null
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 1,
+              "visualRole": "cover",
+              "purpose": "introduction",
+              "question": "Como tornar decisões mais claras em reuniões internas?",
+              "keyMessage": "Caso fictício Mesa Clara: um método de três passos para explicitar decisões em reuniões, seus resultados observados e a decisão sobre um novo ciclo.",
+              "evidenceIds": [
+                "e1",
+                "e2"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [],
+            "presentationStageId": null,
+            "presentationStageLabel": "RESULTADO OBSERVADO"
+          },
+          {
+            "id": "b6k9nae",
+            "num": 2,
+            "title": "Piloto em quatro equipes sem grupo de controle",
+            "subtitle": "O piloto gratuito ocorreu em uma organização fictícia, com quatro equipes de oito pessoas cada. Foram observadas 20 reuniões de rotina em abril de 2026 e outras 20 do mesmo tipo e equipes em maio de 2026.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 44,
+            "subSize": 72,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "Não houve grupo de controle; facilitadores de duas equipes mudaram em maio.",
+            "caption": "Contexto do piloto: a ausência de grupo de controle e a mudança de facilitadores em duas equipes são condições importantes que impedem o isolamento causal do efeito do método. Isso deve ser lembrado ao avaliar os resultados de antes e depois.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 20
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 49,
+                  "w": 88,
+                  "h": 43
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 72,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 27.28,
+                  "leadingPercent": 115,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "image-text",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 2
+              },
+              "subtitle": {
+                "maxChars": 360,
+                "maxLines": 9
+              },
+              "body": {
+                "maxChars": 180,
+                "maxLines": 4
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "content",
+            "presentationCompositionId": "presentation_photo_essay:content",
+            "presentationVisualRole": "content",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "content",
+              "evidencePosition": null
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 2,
+              "visualRole": "content",
+              "purpose": "context",
+              "question": "Qual era o cenário e o ponto de partida do piloto?",
+              "keyMessage": "O piloto gratuito ocorreu em quatro equipes de oito pessoas cada, observando 20 reuniões de rotina em abril e 20 em maio de 2026.",
+              "evidenceIds": [
+                "e3"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [],
+            "presentationStageId": null,
+            "presentationStageLabel": "DESAFIO E IMPACTO"
+          },
+          {
+            "id": "3cmrdd4",
+            "num": 3,
+            "title": "Baseline: 40% das reuniões sem decisão documentada",
+            "subtitle": "Em abril, a duração média das reuniões era de 45 minutos e apenas 12 das 20 reuniões tiveram uma decisão documentada. O impacto de reuniões sem decisão explícita é o ponto de partida para a intervenção.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 38,
+            "subSize": 68,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "",
+            "caption": "O baseline mostra que 8 das 20 reuniões não tiveram decisão documentada. A duração média de 45 minutos serve como referência para a comparação com maio, mas não pode ser atribuída apenas ao método sem controle.\n\nPeríodo de baseline: abril de 2026. 20 reuniões observadas.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 14
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 42,
+                  "w": 88,
+                  "h": 14
+                },
+                "evidence": {
+                  "x": 6,
+                  "y": 58,
+                  "w": 88,
+                  "h": 35
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 38,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 68,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 27.28,
+                  "leadingPercent": 115,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "image-text",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 2
+              },
+              "subtitle": {
+                "maxChars": 180,
+                "maxLines": 3
+              },
+              "body": {
+                "maxChars": 0,
+                "maxLines": 0
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "content",
+            "presentationCompositionId": "presentation_photo_essay:content",
+            "presentationVisualRole": "content",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "content",
+              "evidencePosition": "wide-lower"
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 3,
+              "visualRole": "content",
+              "purpose": "problem",
+              "question": "Qual o impacto de reuniões sem decisão explícita?",
+              "keyMessage": "No baseline, a duração média era de 45 minutos e apenas 12 das 20 reuniões tiveram uma decisão documentada.",
+              "evidenceIds": [
+                "e4",
+                "e5"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [
+              {
+                "type": "metrics",
+                "items": [
+                  {
+                    "label": "Duração média",
+                    "value": "45 min",
+                    "detail": "Abril de 2026, 20 reuniões"
+                  },
+                  {
+                    "label": "Decisões documentadas",
+                    "value": "12 de 20",
+                    "detail": "60% das reuniões em abril"
+                  }
+                ]
+              }
+            ],
+            "presentationStageId": null,
+            "presentationStageLabel": "DIAGNÓSTICO"
+          },
+          {
+            "id": "srpusgb",
+            "num": 4,
+            "title": "Explicitar a decisão como objetivo central",
+            "subtitle": "O foco da intervenção não é apenas encurtar reuniões, mas garantir que cada uma produza uma decisão clara. O sucesso é observado pela proporção de reuniões com decisão documentada e pela duração média registrada.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 42,
+            "subSize": 68,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "",
+            "caption": "O método atua no mecanismo de tornar a decisão explícita desde a pauta. A redução de duração é um efeito esperado dessa estrutura, mas a métrica principal é a decisão documentada, que reflete diretamente o objetivo.\n\nMétricas de acompanhamento: decisão documentada e duração média.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 14
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 42,
+                  "w": 88,
+                  "h": 14
+                },
+                "evidence": {
+                  "x": 6,
+                  "y": 58,
+                  "w": 88,
+                  "h": 35
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 42,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 68,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 27.28,
+                  "leadingPercent": 115,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "image-text",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 2
+              },
+              "subtitle": {
+                "maxChars": 180,
+                "maxLines": 3
+              },
+              "body": {
+                "maxChars": 0,
+                "maxLines": 0
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "content",
+            "presentationCompositionId": "presentation_photo_essay:content",
+            "presentationVisualRole": "content",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "content",
+              "evidencePosition": "wide-lower"
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 4,
+              "visualRole": "content",
+              "purpose": "solution",
+              "question": "O que deveria mudar e como seria observado?",
+              "keyMessage": "O objetivo era explicitar decisões, observado pela proporção de reuniões com decisão documentada e pela duração média registrada.",
+              "evidenceIds": [
+                "e2",
+                "e5"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [
+              {
+                "type": "metrics",
+                "items": [
+                  {
+                    "label": "Decisão documentada",
+                    "value": "Proporção",
+                    "detail": "Reuniões com ao menos uma decisão registrada"
+                  },
+                  {
+                    "label": "Duração média",
+                    "value": "Minutos",
+                    "detail": "Tempo médio de reuniões de rotina observadas"
+                  }
+                ]
+              }
+            ],
+            "presentationStageId": null,
+            "presentationStageLabel": "EXECUÇÃO E DECISÕES"
+          },
+          {
+            "id": "ek8b9rc",
+            "num": 5,
+            "title": "Mudança observada sem isolamento causal",
+            "subtitle": "A duração média caiu de 45 para 33 minutos e decisões documentadas subiram de 12/20 para 17/20. Porém, a ausência de grupo de controle e a mudança de facilitadores em duas equipes impedem atribuir a melhora apenas ao método.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 42,
+            "subSize": 68,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "",
+            "caption": "Embora os números mostrem melhora, é crucial comunicar que facilitadores mudaram em metade das equipes no segundo mês. Isso confunde o resultado: não sabemos se a melhora vem do método, da nova facilitação ou de outros fatores sazonais.\n\nAntes/depois sem controle não isola o efeito da intervenção.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 14
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 42,
+                  "w": 88,
+                  "h": 14
+                },
+                "evidence": {
+                  "x": 6,
+                  "y": 58,
+                  "w": 88,
+                  "h": 35
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 42,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 68,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 27.28,
+                  "leadingPercent": 115,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "image-text",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 2
+              },
+              "subtitle": {
+                "maxChars": 180,
+                "maxLines": 3
+              },
+              "body": {
+                "maxChars": 0,
+                "maxLines": 0
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "content",
+            "presentationCompositionId": "presentation_photo_essay:content",
+            "presentationVisualRole": "content",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "content",
+              "evidencePosition": "wide-lower"
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 5,
+              "visualRole": "content",
+              "purpose": "evidence",
+              "question": "O que os dados do piloto mostram e quais são seus limites?",
+              "keyMessage": "Houve redução de duração e aumento de decisões documentadas, mas sem grupo de controle e com mudança de facilitadores, o efeito não é isolado.",
+              "evidenceIds": [
+                "e4",
+                "e5",
+                "e6"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [
+              {
+                "type": "comparison",
+                "headers": [
+                  "Indicador",
+                  "Abril 2026",
+                  "Maio 2026"
+                ],
+                "rows": [
+                  [
+                    "Duração média",
+                    "45 min",
+                    "33 min"
+                  ],
+                  [
+                    "Decisões documentadas",
+                    "12 de 20",
+                    "17 de 20"
+                  ]
+                ]
+              }
+            ],
+            "presentationStageId": null,
+            "presentationStageLabel": "RESULTADOS"
+          },
+          {
+            "id": "ce5ovov",
+            "num": 6,
+            "title": "Estrutura em três passos como resposta",
+            "subtitle": "O diagnóstico aponta decisões obscuras como problema; a resposta é estruturar a reunião para torná-las explícitas. O método define um fluxo que antecipa, registra e revisa cada decisão, sem depender de software ou automação.",
+            "layout": "tl",
+            "align": "left",
+            "bgImage": null,
+            "bgImageId": null,
+            "imageQuery": "",
+            "videoId": null,
+            "videoMime": null,
+            "videoName": null,
+            "imageReferences": [],
+            "refImage": null,
+            "refImageId": null,
+            "refImageAssetId": null,
+            "imgExtraPrompt": "",
+            "imgMode": "dalle",
+            "bgX": 50,
+            "bgY": 50,
+            "bgZoom": 100,
+            "bgFit": "cover",
+            "bgOpacity": 100,
+            "bgMirror": false,
+            "photoRegion": "full",
+            "overlay": 0,
+            "titleSize": 42,
+            "subSize": 68,
+            "bgPattern": "none",
+            "bodyAfterSize": 94,
+            "customBg": null,
+            "showHandle": true,
+            "elementOffsets": {},
+            "elementsUnlocked": true,
+            "textShadow": false,
+            "textBg": false,
+            "textBgOpacity": 55,
+            "textInset": 0,
+            "procedureLabelEmphasis": false,
+            "titleTracking": 3,
+            "subTracking": 0,
+            "titleLeading": 110,
+            "subLeading": 135,
+            "titleCase": "normal",
+            "titleWeight": 500,
+            "bodyAfterImage": "",
+            "caption": "A simplicidade do método é intencional: ao focar na decisão esperada já na pauta, a reunião ganha um critério claro de sucesso. O registro e a revisão fecham o ciclo e evitam que decisões se diluam sem responsável ou prazo.",
+            "overlays": [],
+            "cultureTone": "",
+            "canvas": {
+              "enabled": false,
+              "applied": true,
+              "variant": "classic",
+              "source": "presentation-preset",
+              "preserveZones": true,
+              "zones": {
+                "title": {
+                  "x": 6,
+                  "y": 25,
+                  "w": 88,
+                  "h": 14
+                },
+                "subtitle": {
+                  "x": 6,
+                  "y": 42,
+                  "w": 88,
+                  "h": 14
+                },
+                "evidence": {
+                  "x": 6,
+                  "y": 58,
+                  "w": 88,
+                  "h": 35
+                },
+                "photo": {
+                  "x": 96,
+                  "y": 94,
+                  "w": 1,
+                  "h": 1
+                }
+              }
+            },
+            "composition": "",
+            "showSwipeCue": false,
+            "edgePeek": false,
+            "useCultureLayout": false,
+            "bodyTracking": 0.4,
+            "bodyLeading": 135,
+            "bodyWeight": 300,
+            "presentationTypographyByComposition": {
+              "cover": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "content": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "divider": {
+                "title": {
+                  "role": "h1",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 44.64,
+                  "leadingPercent": 105,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "data": {
+                "title": {
+                  "role": "number",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 59.52,
+                  "leadingPercent": 100,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "body",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 48.36,
+                  "leadingPercent": 155,
+                  "weight": 300,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "demo": {
+                "title": {
+                  "role": "caption",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 12.4,
+                  "leadingPercent": 140,
+                  "weight": 300,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 37.2,
+                  "leadingPercent": 140,
+                  "weight": 400,
+                  "tracking": 19,
+                  "case": "upper",
+                  "italic": false
+                }
+              },
+              "closing": {
+                "title": {
+                  "role": "h2",
+                  "fontFamily": "\"Cormorant Garamond\", serif",
+                  "sizePercent": 42,
+                  "leadingPercent": 110,
+                  "weight": 500,
+                  "tracking": 3,
+                  "case": "normal",
+                  "italic": false
+                },
+                "subtitle": {
+                  "role": "subtitle",
+                  "fontFamily": "\"Jost\", sans-serif",
+                  "sizePercent": 68,
+                  "leadingPercent": 135,
+                  "weight": 400,
+                  "tracking": 0,
+                  "case": "normal",
+                  "italic": false
+                }
+              }
+            },
+            "presentationTitleSizeByComposition": {
+              "cover": 44.64,
+              "content": 44.64,
+              "divider": 44.64,
+              "data": 59.52,
+              "demo": 12.4,
+              "closing": 27.28
+            },
+            "presentationTitleLeadingByComposition": {
+              "cover": 105,
+              "content": 105,
+              "divider": 105,
+              "data": 100,
+              "demo": 140,
+              "closing": 115
+            },
+            "presentationGlass": null,
+            "presentationAutofit": {
+              "enabled": true,
+              "mode": "preserve-image",
+              "minScale": 0.85,
+              "preventOrphans": true,
+              "splitOnOverflow": false,
+              "rewriteTitle": false
+            },
+            "presentationPresetId": "presentation_photo_essay",
+            "presentationPatternId": "pds.photo-essay",
+            "presentationPatternVersion": "1.0.0",
+            "presentationArchetypeId": "closing-thanks",
+            "presentationEvidenceFallback": null,
+            "presentationRequiresImage": false,
+            "presentationTextLimits": {
+              "title": {
+                "maxChars": 90,
+                "maxLines": 2
+              },
+              "subtitle": {
+                "maxChars": 180,
+                "maxLines": 3
+              },
+              "body": {
+                "maxChars": 0,
+                "maxLines": 0
+              },
+              "wordsPerSlide": 110
+            },
+            "presentationComposition": "closing",
+            "presentationCompositionId": "presentation_photo_essay:closing",
+            "presentationVisualRole": "content",
+            "titlePosition": "top-left",
+            "imagePosition": "none",
+            "presentationLayout": {
+              "titlePosition": "top-left",
+              "imagePosition": "none",
+              "imageTreatment": "evidence-panel",
+              "visualRole": "content",
+              "evidencePosition": "wide-lower"
+            },
+            "photoFraming": "auto",
+            "presentationSuppressPhoto": true,
+            "presentationCompositionVersion": 2,
+            "logoPosition": "tl",
+            "logoSize": 80,
+            "presentationPlan": {
+              "schemaVersion": 1,
+              "promptVersion": "presentation-plan-v1",
+              "index": 6,
+              "visualRole": "content",
+              "purpose": "solution",
+              "question": "Como o método responde ao diagnóstico de decisões obscuras?",
+              "keyMessage": "A estratégia central é estruturar a reunião em três passos: pauta com decisão esperada, registro durante e revisão de pendências depois.",
+              "evidenceIds": [
+                "e2"
+              ],
+              "sourceIds": [
+                "source-base"
+              ],
+              "evidenceStatus": [
+                "fact"
+              ],
+              "imageBrief": ""
+            },
+            "presentationQualityVersion": 1,
+            "presentationBlocks": [
+              {
+                "type": "steps",
+                "items": [
+                  {
+                    "title": "Pauta com decisão esperada",
+                    "body": "Enviada antes da reunião, define o que precisa ser decidido."
+                  },
+                  {
+                    "title": "Registro durante a reunião",
+                    "body": "Anota decisão, responsável e prazo no encontro."
+                  },
+                  {
+                    "title": "Revisão de pendências",
+                    "body": "Acompanhamento das decisões no encontro seguinte."
+                  }
+                ]
+              }
+            ],
+            "presentationStageId": null,
+            "presentationStageLabel": "APRENDIZADOS E APLICAÇÃO"
+          }
+        ],
+        "caption": "",
+        "material": {
+          "content": "Este é um caso fictício criado exclusivamente para teste; todos os nomes e números abaixo pertencem a essa simulação. Mesa Clara é um serviço de facilitação e organização de reuniões, executado por uma facilitadora e um analista. O método tem três passos: enviar pauta com decisão esperada antes da reunião; registrar decisão, responsável e prazo durante a reunião; revisar pendências no encontro seguinte. Não inclui software próprio nem automação.\n\nO piloto gratuito ocorreu em quatro equipes de uma organização fictícia, com oito pessoas por equipe. Foram observadas 20 reuniões de rotina em abril de 2026 e outras 20 reuniões do mesmo tipo e das mesmas equipes em maio de 2026. A duração média registrada passou de 45 para 33 minutos. A proporção de reuniões com uma decisão documentada passou de 12 de 20 para 17 de 20. O total de reuniões observadas foi o mesmo nos dois períodos. Não houve grupo de controle; os facilitadores de duas equipes também mudaram em maio. Portanto, o antes/depois não isola o efeito do método. Não foram medidos receita, satisfação, retenção nem produtividade individual.\n\nA oferta proposta é um programa de seis semanas por R$ 6.000, com pagamento de 50% no início e 50% na entrega. Inclui diagnóstico de quatro equipes, dois encontros de capacitação, um modelo editável de pauta e registro e revisão de dez reuniões. Exclui licenças de software, integração de sistemas e facilitação contínua após as seis semanas. O cliente fornece registros e indica um responsável por equipe. O aceite depende da entrega dos materiais, realização dos dois encontros e revisão das dez reuniões; não depende de promessa de economia.\n\nAinda não existem contratos pagos nem dados sobre disposição a pagar. O segmento inicial pretendido são organizações com equipes administrativas de 5–10 pessoas e reuniões recorrentes; o tamanho desse mercado não foi estimado. A aquisição inicial proposta é indicação pelos participantes do piloto, ainda sem conversão medida.\n\nA decisão em discussão é aprovar o programa de R$ 6.000 para um novo ciclo de seis semanas. Data de início e nomes dos responsáveis permanecem em definição. O objetivo do novo ciclo é verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições. Não há meta numérica de melhoria aprovada.",
+          "sources": "",
+          "context": "Preserve o caráter fictício do caso. Diferencie observações, oferta proposta e decisões pendentes. Não invente clientes, citações, fontes, equipe nominal, resultados, metas ou compromissos. Em aula, use apenas os dados fornecidos para uma atividade com critério de correção. Em keynote, a tese possível é: reuniões melhores tornam a decisão explícita. Em Auto, escolha uma lógica dominante a partir deste material.",
+          "refProfileId": null
+        },
+        "imgParams": {
+          "fidelity": 50,
+          "creativity": 50,
+          "irreverence": 50,
+          "objectivity": 50
+        },
+        "styleKit": {
+          "stylePrompt": "",
+          "contextMd": "",
+          "logoOnGenerate": true,
+          "refImages": []
+        },
+        "mode": "editorial",
+        "quickNarrativeMode": "editorial",
+        "creativePreset": "apresentacao",
+        "presentationPath": "estudo_de_caso",
+        "contentObjective": "auto",
+        "slideTextDensity": "1_2",
+        "cardVisualStyle": "full",
+        "quickCardCount": 12,
+        "autoAdjustOnGenerate": true,
+        "shareCode": "",
+        "shareProjectId": "",
+        "shareRevision": 0,
+        "shareUpdatedAt": 0,
+        "productKind": "apresentacao",
+        "visualPreset": "presentation_photo_essay",
+        "quickPromptDraft": "Mesa Clara: decisões mais claras em reuniões internas. Adapte o material ao caminho escolhido, para líderes e coordenadores de pequenas equipes. Português brasileiro, tom claro, concreto e sóbrio.",
+        "quickGenerationScope": "text",
+        "__v": 1,
+        "presentationDesignSystemId": "pds.photo-essay",
+        "presentationDesignSystemVersion": "1.0.0",
+        "editorialReviewStatus": "needs_attention",
+        "editorialReviewIssues": [
+          {
+            "slideIndex": null,
+            "field": null,
+            "kind": "incomplete",
+            "category": null,
+            "code": "presentation_incomplete",
+            "completedCount": 6,
+            "totalCount": 12
+          },
+          {
+            "slideIndex": 2,
+            "field": "title",
+            "kind": "factual",
+            "category": "dado sem fonte",
+            "claim": "40%"
+          },
+          {
+            "slideIndex": 2,
+            "field": "subtitle",
+            "kind": "factual",
+            "category": "dado sem fonte",
+            "claim": "45 minutos"
+          },
+          {
+            "slideIndex": 2,
+            "field": "bodyAfterImage",
+            "kind": "factual",
+            "category": "dado sem fonte",
+            "claim": "45 minutos"
+          },
+          {
+            "slideIndex": 2,
+            "field": "bodyAfterImage",
+            "kind": "factual",
+            "category": "dado sem fonte",
+            "claim": "60%"
+          }
+        ],
+        "presentationPlan": {
+          "schemaVersion": 1,
+          "promptVersion": "presentation-plan-v1",
+          "objective": "Avaliar o caso fictício Mesa Clara para decidir sobre a aprovação de um novo ciclo de seis semanas do programa de R$ 6.000.",
+          "audience": "Líderes e coordenadores de pequenas equipes",
+          "thesis": "Reuniões melhores tornam a decisão explícita, e o método Mesa Clara oferece uma estrutura verificável para isso, embora sem isolamento causal comprovado no piloto.",
+          "evidence": [
+            {
+              "id": "e1",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "Este é um caso fictício criado exclusivamente para teste; todos os nomes e números abaixo pertencem a essa simulação.",
+              "claim": "O caso Mesa Clara é fictício, criado para teste."
+            },
+            {
+              "id": "e2",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "O método tem três passos: enviar pauta com decisão esperada antes da reunião; registrar decisão, responsável e prazo durante a reunião; revisar pendências no encontro seguinte.",
+              "claim": "O método estruturado em três passos torna a decisão explícita."
+            },
+            {
+              "id": "e3",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "O piloto gratuito ocorreu em quatro equipes de uma organização fictícia, com oito pessoas por equipe.",
+              "claim": "Piloto ocorreu em quatro equipes de oito pessoas cada."
+            },
+            {
+              "id": "e4",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "A duração média registrada passou de 45 para 33 minutos.",
+              "claim": "Duração média das reuniões caiu de 45 para 33 minutos."
+            },
+            {
+              "id": "e5",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "A proporção de reuniões com uma decisão documentada passou de 12 de 20 para 17 de 20.",
+              "claim": "Proporção de reuniões com decisão documentada subiu de 12/20 para 17/20."
+            },
+            {
+              "id": "e6",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "Não houve grupo de controle; os facilitadores de duas equipes também mudaram em maio. Portanto, o antes/depois não isola o efeito do método.",
+              "claim": "Ausência de controle e mudança de facilitadores impedem isolamento causal."
+            },
+            {
+              "id": "e7",
+              "status": "fact",
+              "sourceId": "source-base",
+              "quote": "Não foram medidos receita, satisfação, retenção nem produtividade individual.",
+              "claim": "Receita, satisfação, retenção e produtividade não foram medidos."
+            },
+            {
+              "id": "e8",
+              "status": "proposal",
+              "sourceId": "source-base",
+              "quote": "A oferta proposta é um programa de seis semanas por R$ 6.000, com pagamento de 50% no início e 50% na entrega.",
+              "claim": "Oferta proposta: programa de seis semanas por R$ 6.000."
+            },
+            {
+              "id": "e9",
+              "status": "proposal",
+              "sourceId": "source-base",
+              "quote": "O objetivo do novo ciclo é verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições.",
+              "claim": "Objetivo do novo ciclo é verificar executabilidade e registrar métricas."
+            },
+            {
+              "id": "e10",
+              "status": "unknown",
+              "sourceId": "",
+              "quote": "",
+              "claim": "Não há contratos pagos nem dados de disposição a pagar."
+            }
+          ],
+          "gaps": [
+            "Nomes dos responsáveis e data de início do novo ciclo",
+            "Meta numérica de melhoria aprovada para o novo ciclo",
+            "Estimativa do tamanho do mercado alvo",
+            "Conversão medida de aquisição por indicação"
+          ],
+          "slides": [
+            {
+              "index": 1,
+              "visualRole": "cover",
+              "purpose": "introduction",
+              "question": "Como tornar decisões mais claras em reuniões internas?",
+              "keyMessage": "Caso fictício Mesa Clara: um método de três passos para explicitar decisões em reuniões, seus resultados observados e a decisão sobre um novo ciclo.",
+              "evidenceIds": [
+                "e1",
+                "e2"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 2,
+              "visualRole": "content",
+              "purpose": "context",
+              "question": "Qual era o cenário e o ponto de partida do piloto?",
+              "keyMessage": "O piloto gratuito ocorreu em quatro equipes de oito pessoas cada, observando 20 reuniões de rotina em abril e 20 em maio de 2026.",
+              "evidenceIds": [
+                "e3"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 3,
+              "visualRole": "content",
+              "purpose": "problem",
+              "question": "Qual o impacto de reuniões sem decisão explícita?",
+              "keyMessage": "No baseline, a duração média era de 45 minutos e apenas 12 das 20 reuniões tiveram uma decisão documentada.",
+              "evidenceIds": [
+                "e4",
+                "e5"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 4,
+              "visualRole": "content",
+              "purpose": "solution",
+              "question": "O que deveria mudar e como seria observado?",
+              "keyMessage": "O objetivo era explicitar decisões, observado pela proporção de reuniões com decisão documentada e pela duração média registrada.",
+              "evidenceIds": [
+                "e2",
+                "e5"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 5,
+              "visualRole": "content",
+              "purpose": "evidence",
+              "question": "O que os dados do piloto mostram e quais são seus limites?",
+              "keyMessage": "Houve redução de duração e aumento de decisões documentadas, mas sem grupo de controle e com mudança de facilitadores, o efeito não é isolado.",
+              "evidenceIds": [
+                "e4",
+                "e5",
+                "e6"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 6,
+              "visualRole": "content",
+              "purpose": "solution",
+              "question": "Como o método responde ao diagnóstico de decisões obscuras?",
+              "keyMessage": "A estratégia central é estruturar a reunião em três passos: pauta com decisão esperada, registro durante e revisão de pendências depois.",
+              "evidenceIds": [
+                "e2"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 7,
+              "visualRole": "content",
+              "purpose": "business_model",
+              "question": "O que o programa proposto inclui e exclui?",
+              "keyMessage": "A proposta é de seis semanas por R$ 6.000, incluindo diagnóstico, capacitação, modelo editável e revisão de dez reuniões, sem software ou facilitação contínua.",
+              "evidenceIds": [
+                "e8"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 8,
+              "visualRole": "data",
+              "purpose": "comparison",
+              "question": "Como as condições antes e depois se comparam?",
+              "keyMessage": "Comparando os mesmos tipos de reunião nos dois períodos, a duração caiu de 45 para 33 minutos e decisões documentadas subiram de 12/20 para 17/20.",
+              "evidenceIds": [
+                "e4",
+                "e5"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 9,
+              "visualRole": "data",
+              "purpose": "metrics",
+              "question": "Quais resultados foram de fato observados?",
+              "keyMessage": "Resultados observados restringem-se a duração média e proporção de decisões documentadas; receita, satisfação, retenção e produtividade não foram medidos.",
+              "evidenceIds": [
+                "e4",
+                "e5",
+                "e7"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 10,
+              "visualRole": "content",
+              "purpose": "objection",
+              "question": "O que não pode ser atribuído à intervenção?",
+              "keyMessage": "A melhora observada não pode ser atribuída apenas ao método; a mudança de facilitadores e a ausência de controle impede isolamento causal.",
+              "evidenceIds": [
+                "e6"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 11,
+              "visualRole": "content",
+              "purpose": "learning",
+              "question": "O que pode ser aprendido e transferido deste caso?",
+              "keyMessage": "O princípio transferível é que explicitar a decisão esperada na pauta estrutura a reunião; porém, a validação comercial e causal ainda é desconhecida.",
+              "evidenceIds": [
+                "e2",
+                "e10"
+              ],
+              "imageBrief": ""
+            },
+            {
+              "index": 12,
+              "visualRole": "closing",
+              "purpose": "decision",
+              "question": "Aprovar o programa de R$ 6.000 para um novo ciclo de seis semanas?",
+              "keyMessage": "Decisão pendente sobre aprovar o ciclo para verificar executabilidade em outras equipes, sem meta numérica aprovada e com responsáveis ainda por definir.",
+              "evidenceIds": [
+                "e9"
+              ],
+              "imageBrief": ""
+            }
+          ]
+        },
+        "presentationQuality": {
+          "version": 1,
+          "reviewStatus": "needs_attention",
+          "incomplete": true,
+          "completedCount": 6,
+          "totalCount": 12,
+          "repairs": [],
+          "issues": [],
+          "checkedAt": "2026-11-15T00:25:58.782Z",
+          "renderedIssues": [],
+          "renderRepairStatus": "not_needed",
+          "renderCheckStatus": "passed",
+          "renderCheckedAt": "2026-11-15T00:25:59.050Z"
+        },
+        "editorialContext": {
+          "topic": "Mesa Clara: decisões mais claras em reuniões internas. Adapte o material ao caminho escolhido, para líderes e coordenadores de pequenas equipes. Português brasileiro, tom claro, concreto e sóbrio.",
+          "niche": "",
+          "generatedAt": "2026-11-15T00:25:58.782Z",
+          "suggestedStructureId": "estudo_de_caso"
+        },
+        "formatViews": {
+          "apresentacao": {
+            "brand": {}
+          }
+        }
+      }
+    }
+  ]
+}

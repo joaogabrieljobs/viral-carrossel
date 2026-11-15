@@ -20,7 +20,7 @@ export function parsePresentationPlanResponse(raw) {
 const recoverableResponse = error => error?.code === 'ai_output_truncated' || error?.code === 'ai_invalid_json' || error?.name === 'SyntaxError';
 const responseIssue = error => ({ code: error?.code === 'ai_output_truncated' ? 'output_truncated' : 'invalid_json', path: '$' });
 
-function responseMetadata(value) {
+export function presentationResponseMetadata(value) {
   if (!value || typeof value !== 'object') return undefined;
   const metadata = {};
   for (const key of ['provider', 'model', 'finishReason']) {
@@ -71,7 +71,7 @@ export async function generatePresentationPlan({ brief = '', sources = [], count
         json: true, jsonParser: parsePresentationPlanResponse,
         temperature: 0.2, maxTokens: PRESENTATION_PLAN_MAX_TOKENS, thinking: 'disabled',
         onResponseMetadata: metadata => {
-          response = responseMetadata(metadata);
+          response = presentationResponseMetadata(metadata);
           aiOptions.onResponseMetadata?.(metadata);
         },
       });
@@ -80,7 +80,7 @@ export async function generatePresentationPlan({ brief = '', sources = [], count
       if (!recoverableResponse(error)) throw error;
       issues = [responseIssue(error)];
       previous = undefined;
-      response = response || responseMetadata(error.aiDiagnostics);
+      response = response || presentationResponseMetadata(error.aiDiagnostics);
       diagnostics.push({ stage: 'planning', attempt, outcome: 'invalid_response', issues, ...(response ? { response } : {}) });
       continue;
     }

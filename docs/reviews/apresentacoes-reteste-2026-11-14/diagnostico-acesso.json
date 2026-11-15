@@ -1,0 +1,67 @@
+{
+  "window_utc": {
+    "start": "2026-11-15T00:25:00Z",
+    "end": "2026-11-15T00:35:00Z"
+  },
+  "scope": "Production Moont; request paths only; no customer identifiers, payloads, secrets or billing changes",
+  "http_counts": [
+    {
+      "path": "/api/projects",
+      "status": 402,
+      "count": 23
+    },
+    {
+      "path": "/api/agent-visual-batch",
+      "status": 402,
+      "count": 2
+    },
+    {
+      "path": "/api/agent-access",
+      "status": 402,
+      "count": 1
+    },
+    {
+      "path": "/api/ai/compatible",
+      "status": 200,
+      "count": 2
+    },
+    {
+      "path": "/api/ai/compatible",
+      "status": 402,
+      "count": 1
+    },
+    {
+      "path": "/api/stripe/webhook",
+      "status": 200,
+      "count": 1
+    }
+  ],
+  "safe_runtime_observation": {
+    "timestamp": "2026-11-15T00:25:40.387Z",
+    "path": "/api/stripe/webhook",
+    "event_type": "customer.subscription.updated",
+    "subscription_status": "past_due",
+    "active": false
+  },
+  "limits": [
+    "Aggregate per path/time; not correlated with a particular customer account.",
+    "Vercel error_code empty for the measured requests; an application 402 is not a Vercel infrastructure error.",
+    "Original runtime logs contained no direct HTTP statuses; the separate official metrics query supplied counts.",
+    "No billing or credential changes performed."
+  ],
+  "ci": {
+    "sha": "1667497622170b472c882372f6513150d27fe8e1",
+    "url": "https://github.com/joaogabrieljobs/viral-carrossel/actions/runs/43657887422",
+    "unit_passed": 2197,
+    "expected_fail": 4,
+    "e2e_passed": 231,
+    "e2e_skipped": 13,
+    "gate": "passed"
+  },
+  "production": {
+    "deployment": "dpl_2zwePjtGBNnVS4kf3TVtxexNMXWC",
+    "state": "READY",
+    "sha": "1667497622170b472c882372f6513150d27fe8e1",
+    "entry_bundle": "index-D9UlTFEb.js"
+  }
+}

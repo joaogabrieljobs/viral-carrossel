@@ -1,0 +1,543 @@
+Window: "Moont — Narrativas visuais com IA", App: Google Chrome.
+0 janela padrão Moont — Narrativas visuais com IA: parte do grupo 🔎 Revisão das apresentações - Google Chrome: Joao, URL: moont.ai/?app=1, Secondary Actions: Raise
+	1 container Moont — Narrativas visuais com IA: parte do grupo 🔎 Revisão das apresentações - Google Chrome: Joao, URL: moont.ai/?app=1
+		2 container
+			3 barra de ferramentas
+				4 botão Voltar
+				5 botão (disabled) Avançar
+				6 botão Recarregar
+				7 container
+					8 botão pop up Ver informações do site
+					9 campo de texto (settable) Barra de endereço e de pesquisa, Value: moont.ai/?app=1, Placeholder: Pergunte ao Google ou digite um URL
+					10 botão Adicionar esta guia aos favoritos
+				11 container
+					12 botão pop up Video Download Helper
+Tem acesso a este site
+					13 botão pop up Open Claude
+Tem acesso a este site
+					14 botão pop up Extensões
+				15 caixa de seleção Downloads, Value: 0
+				16 botão Abrir o Gemini no Chrome
+				17 botão Joao
+				18 botão pop up Novo Chrome disponível
+			19 barra de ferramentas Favoritos
+				20 barra de ferramentas Grupos de guias salvos
+					21 botão de grupo de guias salvo  grupo 🔎 Revisão das apresentações: Aberto
+					22 botão de grupo de guias salvo  grupo ✅Batalha Espacial repository setup: Aberto
+					23 botão de grupo de guias salvo  grupo ✅Construído do SAC Elevessy: Aberto
+					24 botão de grupo de guias salvo  grupo 🌍 VETOR terreno: Aberto
+					25 botão de grupo de guias salvo  grupo ✅Habilidades e resumos para projetos: Aberto
+					26 botão de grupo de guias salvo  grupo ✅Story Director — task 01: dados e flag: Aberto
+					27 botão de grupo de guias salvo  grupo ✅Transferência Apple para Elevessy: Aberto
+					28 botão de grupo de guias salvo  grupo Story Director — task 01: dados e flag: Aberto
+					29 botão Grupos de guias
+				30 divisor Separador
+				31 botão de favorito DUX, a fintech da Economia Criativa | Antecipe recebíveis em menos de 24 horas
+				32 botão da pasta de favoritos BICHO
+				33 botão de favorito CINEMA
+				34 botão da pasta de favoritos Todos os favoritos
+				35 divisor Separador
+			36 container
+				37 área de rolagem
+					38 Conteúdo HTML Moont — Narrativas visuais com IA, URL: moont.ai/?app=1
+						39 container
+							40 imagem Moont
+							41 botão Reteste final 1411 — Proposta, Help: Clique para renomear
+							42 texto Salvo na conta às 21:05
+							43 botão Salvar projeto agora, Help: Salvar projeto agora (⌘S)
+							44 botão Projetos
+							45 botão Gerar apresentação com IA
+							46 botão Desfazer, Help: Desfazer (⌘Z)
+							47 botão (disabled) Refazer, Help: Refazer (⌘⇧Z)
+							48 container Formato do card (exportação)
+								49 botão "alternar" Feed 4:5, Help: Feed 4:5 · 1080×1350, Value: 0
+								50 botão "alternar" Quadrado, Help: Quadrado · 1080×1080, Value: 0
+								51 botão "alternar" Stories, Help: Stories · 1080×1920, Value: 0
+								52 botão "alternar" Apresentação 16:9, Help: Apresentação 16:9 · 1920×1080, Value: 1
+							53 botão pop up Modo atual: Studio. Clique para mudar., Help: Modo: Studio — Todos os controles
+								54 imagem
+								55 texto Studio
+								56 imagem
+							57 botão Abrir biblioteca, Help: Biblioteca · 32 projetos
+							58 botão Tela cheia (F)
+							59 botão Ajuda e atalhos
+							60 botão Configurar IA, Help: IA pronta · texto e imagens disponíveis
+							61 botão Pesquisar nicho
+							62 container Conta
+								63 botão Perfil
+							64 grupo de abas Áreas de edição do projeto
+								65 tab (settable, integer) Início, Value: 0
+									66 imagem
+									67 texto Início
+								68 tab (settable, integer) Marca, Value: 0
+									69 imagem
+									70 texto Marca
+								71 tab (settable, integer) Narrativa, Value: 0
+									72 imagem
+									73 texto Narrativa
+								74 tab (settable, integer) Visual, Value: 0
+									75 imagem
+									76 texto Visual
+								77 tab (settable, integer) Imagem, Value: 0
+									78 imagem
+									79 texto Imagem
+								80 tab (selected) Texto, Value: 1
+									81 imagem
+									82 texto Texto
+								83 tab (settable, integer) Layout, Value: 0
+									84 imagem
+									85 texto Layout
+							86 container
+								87 container Tipografia do card
+									88 texto Tipografia do card
+									89 texto Escolha o texto e edite na caixa. Maior abre mais espaço. Alinhamento e cor ficam aqui.
+									90 container
+										91 texto Texto que você quer editar
+										92 botão pop-up Texto do card, Value: Título
+											93 (selected) Título
+									94 texto Caixa de texto
+									95 botão Diminuir a caixa de texto
+									96 botão Aumentar a caixa de texto
+									97 área de entrada de texto (settable) Caixa de texto, Value: Mesa Clara: decisões mais claras em reuniões internas, Placeholder: Seu título aqui
+									98 texto Alinhamento
+									99 container Alinhamento
+										100 botão "alternar" Esquerda, Value: 1
+										101 botão "alternar" Centro, Value: 0
+										102 botão "alternar" Direita, Value: 0
+										103 botão "alternar" Justificar, Value: 0
+									104 texto Área no card
+									105 botão Diminuir a área do texto no card
+									106 botão Aumentar a área do texto no card
+									107 container
+										108 texto Cor do texto
+										109 quadro de cores Cor do texto, Value: rgb 0.00000 0.00000 0.00000 1
+										110 campo de texto (settable) Código da cor do texto, Value: #000000
+									111 texto Fonte do texto selecionado
+									112 botão Fonte do texto selecionado
+									113 container Prévia da fonte selecionada
+										114 text PRÉVIA ·  TÍTULO
+										115 texto Mesa Clara: decisões mais claras em reuniões internas
+									116 botão Aplicar em todos, Help: Usar esta fonte em título de todos os cards
+									117 texto Repete só “título” nos 12 cards.
+								118 text COR DO TEXTO Título = primeira e última folha · Subtítulo = linha curta nos slides do meio · Texto = parágrafos e blocos de corpo. Destaques = trechos marcados no editor. A cor dentro de Tipografia vale só neste card.
+								119 quadro de cores rgb 0.00000 0.00000 0.00000 1
+								120 campo de texto (settable) #000000
+								121 container Contraste 20.1:1 — excelente (AAA).
+									122 text AAA  ·  20.1
+								123 texto Título
+								124 quadro de cores rgb 0.21176 0.21176 0.21176 1
+								125 campo de texto (settable) #363636
+								126 container Contraste 11.6:1 — excelente (AAA).
+									127 text AAA  ·  11.6
+								128 texto Subtítulo (meio)
+								129 quadro de cores rgb 0.21176 0.21176 0.21176 1
+								130 campo de texto (settable) #363636
+								131 container Contraste 11.6:1 — excelente (AAA).
+									132 text AAA  ·  11.6
+								133 texto Texto
+								134 quadro de cores rgb 0.00000 0.00000 0.00000 1
+								135 campo de texto (settable) #000000
+								136 container Contraste 20.1:1 — excelente (AAA).
+									137 text AAA  ·  20.1
+								138 texto Destaques
+								139 container Áreas de texto
+									140 botão Criar texto
+									141 texto Control + clique no card para criar texto naquele ponto.
+									142 texto Selecione uma área de texto no card para editar.
+								143 text TAMANHO Tamanho título 52
+								144 controle deslizante Tamanho título, Value: 52, Secondary Actions: Increment, Decrement
+								145 text Tamanho subtítulo 52
+								146 controle deslizante Tamanho subtítulo, Value: 52, Secondary Actions: Increment, Decrement
+								147 text Tamanho — texto abaixo da foto 52
+								148 controle deslizante Tamanho — texto abaixo da foto, Value: 52, Secondary Actions: Increment, Decrement
+								149 text ESTILO DO TÍTULO Peso e caixa são os controles primários. Tracking/leading em «Ajustes avançados». Peso da fonte
+								150 botão "alternar" 400, Value: 0
+								151 botão "alternar" 600, Value: 1
+								152 botão "alternar" 700, Value: 0
+								153 botão "alternar" 800, Value: 0
+								154 texto Caixa
+								155 botão "alternar" Normal, Value: 1
+								156 botão "alternar" AaA → AAA, Value: 0
+								157 botão "alternar" AaA → aaa, Value: 0
+								158 triângulo de divulgação AJUSTES AVANÇADOS (TÍTULO)
+									159 texto AJUSTES AVANÇADOS (TÍTULO)
+								160 text ESTILO DO SUBTÍTULO Ajustes finos de espaçamento em «Ajustes avançados».
+								161 triângulo de divulgação AJUSTES AVANÇADOS (SUBTÍTULO)
+									162 texto AJUSTES AVANÇADOS (SUBTÍTULO)
+								163 texto LEGIBILIDADE
+								164 botão Sombra no texto
+								165 botão Aplicar tipografia deste slide a todos os slides, Help: Copia tamanhos, espaçamento e legibilidade para todos os slides
+								166 texto Usa os ajustes de
+								167 texto Tamanho
+								168 text ,
+								169 texto Espaçamento
+								170 text ,
+								171 texto Título & subtítulo
+								172 text e
+								173 texto Legibilidade
+								174 text  deste  slide  em todos os  slides  (não altera textos nem posição no grid). TEXTO NOS SLIDES Padrão da marca para tamanho, tracking e peso. Slides novos herdam; ajustes finos por slide continuam na edição individual. TAMANHO Tamanho título 100
+								175 controle deslizante Tamanho título, Value: 100, Secondary Actions: Increment, Decrement
+								176 text Tamanho subtítulo 100
+								177 controle deslizante Tamanho subtítulo, Value: 100, Secondary Actions: Increment, Decrement
+								178 text Tamanho — texto abaixo da foto 100
+								179 controle deslizante Tamanho — texto abaixo da foto, Value: 100, Secondary Actions: Increment, Decrement
+								180 text ESPAÇAMENTO — TÍTULO Entre letras (tracking) 0
+								181 controle deslizante Entre letras (tracking), Value: 0, Secondary Actions: Increment, Decrement
+								182 text Entre linhas (leading) 105
+								183 controle deslizante Entre linhas (leading), Value: 105, Secondary Actions: Increment, Decrement
+								184 texto Peso da fonte
+								185 botão 400
+								186 botão 600
+								187 botão 700
+								188 botão 800
+								189 texto Caixa do título
+								190 botão "alternar" Como digitado (Title case), Value: 1
+								191 botão "alternar" Tudo MAIÚSCULO, Value: 0
+								192 botão "alternar" tudo minúsculo, Value: 0
+								193 text ESPAÇAMENTO — SUBTÍTULO Entre letras (tracking) 0
+								194 controle deslizante Entre letras (tracking), Value: 0, Secondary Actions: Increment, Decrement
+								195 text Entre linhas (leading) 150
+								196 controle deslizante Entre linhas (leading), Value: 150, Secondary Actions: Increment, Decrement
+								197 botão Aplicar tipografia da marca a todos os slides
+								198 text Não altera textos nem layout — só copia os valores acima para cada  slide . FONTES PRÓPRIAS (ARQUIVO) WOFF2, WOFF, TTF ou OTF até 5MB. As listas abaixo (Google) ficam como reserva se o arquivo não tiver todos os pesos. Ficheiro — títulos da marca Carregar fonte do título WOFF2 · WOFF · TTF · OTF — até 5 MB Ficheiro — corpo / subtítulo Carregar fonte do corpo WOFF2 · WOFF · TTF · OTF — até 5 MB FONTES DO PROJETO Combinações para o estilo geral. As fontes escolhidas para cada texto continuam preservadas.
+								199 botão Editorial cultura Tendência/Cultura · título + corpo
+								200 botão Autoridade B2B Erro comum, case · título + corpo
+								201 botão Hype escuro Viral / promo · título + corpo
+								202 botão Magazine cream Decodificação · título + corpo
+								203 botão Minimal clean How-to, checklist · título + corpo
+								204 botão Manifesto brutal Manifesto, provocação · título + corpo
+								205 botão Display condensado Marketing, serviço, e-commerce · título + corpo
+								206 botão Serifa alto contraste Mentoria, marca premium · título + corpo
+								207 botão Grotesca técnica Tecnologia, produto · título + corpo
+								208 botão Suíça editorial Consultoria, diagnóstico · título + corpo
+								209 botão Serifa de citação Ideia central, ensaio · título + corpo
+								210 botão Todas as fontes
+							211 botão pop up Opções de download
+								212 imagem
+								213 texto Exportar
+								214 imagem
+							215 botão Abrir biblioteca de projetos salvos, Help: 32 projetos salvos
+							216 texto Salvo na conta às 21:05
+							217 botão Slide 1 de 12, Help: Clique para selecionar · arraste para reordenar
+							218 botão Slide 2 de 12, Help: Clique para selecionar · arraste para reordenar
+							219 botão Slide 3 de 12, Help: Clique para selecionar · arraste para reordenar
+							220 botão Slide 4 de 12, Help: Clique para selecionar · arraste para reordenar
+							221 botão Slide 5 de 12, Help: Clique para selecionar · arraste para reordenar
+							222 botão Slide 6 de 12, Help: Clique para selecionar · arraste para reordenar
+							223 botão Slide 7 de 12, Help: Clique para selecionar · arraste para reordenar
+							224 botão Slide 8 de 12, Help: Clique para selecionar · arraste para reordenar
+							225 botão Slide 9 de 12, Help: Clique para selecionar · arraste para reordenar
+							226 botão Slide 10 de 12, Help: Clique para selecionar · arraste para reordenar
+							227 botão Slide 11 de 12, Help: Clique para selecionar · arraste para reordenar
+							228 botão Slide 12 de 12, Help: Clique para selecionar · arraste para reordenar
+							229 botão Adicionar slide à apresentação
+							230 barra de ferramentas Zoom e navegação dos cards
+								231 botão (disabled) Slide anterior
+								232 botão pop-up Ir para o card, Value: Slide 1 / 12
+									233 (selected) Slide 1 / 12
+								234 botão Próximo slide
+								235 botão Diminuir zoom
+								236 container Zoom da área de trabalho
+									237 text 100 %
+								238 botão Aumentar zoom
+								239 controle deslizante Zoom dos cards, Value: 105, Secondary Actions: Increment, Decrement
+								240 botão Ajustar cards à tela, Help: Ajustar à tela
+							241 container
+								242 container (showing 0-100 of 121 items)
+									243 container Revisão pendente do conteúdo
+										244 texto Rascunho preservado — revise antes de exportar
+										245 texto A revisão encontrou pontos que precisam de conferência. Verifique as informações, os títulos e o tamanho dos textos.
+										246 texto Slides: 7, 9
+										247 triângulo de divulgação O que conferir
+											248 texto O que conferir
+										249 botão Conferi o conteúdo
+									250 container
+										251 container Help: Título: Mesa Clara: decisões mais claras em reuniões internas — use as setas para mover, Título: Mesa Clara: decisões mais claras em reuniões internas. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											252 cabeçalho Mesa Clara: decisões mais claras em reuniões internas, Help: Duplo clique para editar, Value: 1
+												253 texto Mesa Clara: decisões mais claras em reuniões internas
+										254 container Subtítulo: Programa de seis semanas para estruturar reuniões de pequenas equipes. Caso fict. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: Programa de seis semanas para estruturar reuniões de pequenas equipes. Caso fict — use as setas para mover
+											255 texto Programa de seis semanas para estruturar reuniões de pequenas equipes. Caso fictício criado para teste.
+											256 container Texto abaixo da imagem: Proposta para líderes e coordenadores de equipes administrativas. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Texto abaixo da imagem: Proposta para líderes e coordenadores de equipes administrativas — use as setas para mover · Duplo clique para editar
+												257 texto Proposta para líderes e coordenadores de equipes administrativas.
+									258 texto 01
+									259 botão Visualizar card 1 em tela cheia, Help: Visualizar em tela cheia
+									260 botão Legenda do card 1, Help: Notas deste slide
+									261 botão Excluir card 1
+									262 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										263 imagem
+									264 botão Baixar card 1, Help: Baixar card em PNG
+									265 botão (disabled) Gerar imagem
+									266 botão Direção, Help: Referência e direção da imagem deste slide
+									267 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									268 container
+										269 container Help: Título: Reuniões sem estrutura diluem decisões — use as setas para mover, Título: Reuniões sem estrutura diluem decisões. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											270 cabeçalho Reuniões sem estrutura diluem decisões, Help: Duplo clique para editar, Value: 1
+												271 texto Reuniões sem estrutura diluem decisões
+										272 container Subtítulo: O Mesa Clara propõe um método de três passos para tornar a decisão explícita: pa. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: O Mesa Clara propõe um método de três passos para tornar a decisão explícita: pa — use as setas para mover
+											273 texto O Mesa Clara propõe um método de três passos para tornar a decisão explícita: pauta com decisão esperada antes, registro com responsável e prazo durante, e revisão de pendências depois. O objetivo deste ciclo de seis semanas é verificar se o método é executável em novas equipes e registrar duração e decisões documentadas.
+									274 texto 02
+									275 botão Visualizar card 2 em tela cheia, Help: Visualizar em tela cheia
+									276 botão Legenda do card 2, Help: Notas deste slide
+									277 botão Excluir card 2
+									278 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										279 imagem
+									280 botão Baixar card 2, Help: Baixar card em PNG
+									281 botão (disabled) Gerar imagem
+									282 botão Direção, Help: Referência e direção da imagem deste slide
+									283 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									284 container
+										285 container Help: Título: Sem método, decisões ficam implícitas — use as setas para mover, Título: Sem método, decisões ficam implícitas. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											286 cabeçalho Sem método, decisões ficam implícitas, Help: Duplo clique para editar, Value: 1
+												287 texto Sem método, decisões ficam implícitas
+										288 container Subtítulo: Reuniões de rotina sem estrutura clara tendem a acumular pendências e exigir ret. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: Reuniões de rotina sem estrutura clara tendem a acumular pendências e exigir ret — use as setas para mover
+											289 texto Reuniões de rotina sem estrutura clara tendem a acumular pendências e exigir retrabalho. Quando a decisão esperada não é declarada na pauta e o registro não atribui responsável e prazo, os encaminhamentos dissipam-se e a duração se prolonga.
+											290 container Texto abaixo da imagem: O método Mesa Clara exige pauta prévia e registro formal para reverter esse cená. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Texto abaixo da imagem: O método Mesa Clara exige pauta prévia e registro formal para reverter esse cená — use as setas para mover · Duplo clique para editar
+												291 texto O método Mesa Clara exige pauta prévia e registro formal para reverter esse cenário.
+									292 texto 03
+									293 botão Visualizar card 3 em tela cheia, Help: Visualizar em tela cheia
+									294 botão Legenda do card 3, Help: Notas deste slide
+									295 botão Excluir card 3
+									296 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										297 imagem
+									298 botão Baixar card 3, Help: Baixar card em PNG
+									299 botão (disabled) Gerar imagem
+									300 botão Direção, Help: Referência e direção da imagem deste slide
+									301 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									302 container
+										303 container Help: Título: Objetivo do ciclo: verificar execução e registrar métricas — use as setas para mover, Título: Objetivo do ciclo: verificar execução e registrar métricas. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											304 cabeçalho Objetivo do ciclo: verificar execução e registrar métricas, Help: Duplo clique para editar, Value: 1
+												305 texto Objetivo do ciclo: verificar execução e registrar métricas
+										306 container Subtítulo: O programa de seis semanas propõe verificar se o método é executável em outras e. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: O programa de seis semanas propõe verificar se o método é executável em outras e — use as setas para mover
+											307 texto O programa de seis semanas propõe verificar se o método é executável em outras equipes e registrar duração e decisões documentadas com as mesmas definições do piloto.
+											308 container Texto abaixo da imagem: Não há meta numérica de melhoria aprovada para este ciclo. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Texto abaixo da imagem: Não há meta numérica de melhoria aprovada para este ciclo — use as setas para mover · Duplo clique para editar
+												309 texto Não há meta numérica de melhoria aprovada para este ciclo.
+									310 texto 04
+									311 botão Visualizar card 4 em tela cheia, Help: Visualizar em tela cheia
+									312 botão Legenda do card 4, Help: Notas deste slide
+									313 botão Excluir card 4
+									314 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										315 imagem
+									316 botão Baixar card 4, Help: Baixar card em PNG
+									317 botão (disabled) Gerar imagem
+									318 botão Direção, Help: Referência e direção da imagem deste slide
+									319 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									320 container
+										321 container Help: Título: O método estrutura a reunião em três passos — use as setas para mover, Título: O método estrutura a reunião em três passos. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											322 cabeçalho O método estrutura a reunião em três passos, Help: Duplo clique para editar, Value: 1
+												323 texto O método estrutura a reunião em três passos
+										324 container Subtítulo: Cada passo torna a decisão explícita: antes, define-se o que será decidido; dura. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: Cada passo torna a decisão explícita: antes, define-se o que será decidido; dura — use as setas para mover
+											325 texto Cada passo torna a decisão explícita: antes, define-se o que será decidido; durante, registra-se decisão, responsável e prazo; depois, revisam-se as pendências.
+										326 lista de conteúdos
+											327 container
+												328 container Editar etapa 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													329 texto Antes da reunião
+												330 container Editar explicação da etapa 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													331 texto Enviar pauta com a decisão esperada.
+											332 container
+												333 container Editar etapa 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													334 texto Durante a reunião
+												335 container Editar explicação da etapa 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													336 texto Registrar decisão, responsável e prazo.
+											337 container
+												338 container Editar etapa 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													339 texto No encontro seguinte
+												340 container Editar explicação da etapa 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													341 texto Revisar pendências da reunião anterior.
+									342 texto 05
+									343 botão Visualizar card 5 em tela cheia, Help: Visualizar em tela cheia
+									344 botão Legenda do card 5, Help: Notas deste slide
+									345 botão Excluir card 5
+									346 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										347 imagem
+									348 botão Baixar card 5, Help: Baixar card em PNG
+									349 botão (disabled) Gerar imagem
+									350 botão Direção, Help: Referência e direção da imagem deste slide
+									351 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									352 container
+										353 container Help: Título: Piloto: melhoria observada, efeito não isolado — use as setas para mover, Título: Piloto: melhoria observada, efeito não isolado. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											354 cabeçalho Piloto: melhoria observada, efeito não isolado, Help: Duplo clique para editar, Value: 1
+												355 texto Piloto: melhoria observada, efeito não isolado
+										356 container Subtítulo: A duração média caiu e a proporção de decisões documentadas subiu, mas a ausênci. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: A duração média caiu e a proporção de decisões documentadas subiu, mas a ausênci — use as setas para mover
+											357 texto A duração média caiu e a proporção de decisões documentadas subiu, mas a ausência de grupo de controle impede atribuir o resultado apenas ao método.
+										358 container Editar valor 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											359 texto 45 → 33 min
+										360 container Editar indicador 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											361 texto Duração média
+										362 container Editar condição 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											363 texto Observado em 20 reuniões em abr e 20 em mai/2026.
+										364 container Editar valor 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											365 texto 12/20 → 17/20
+										366 container Editar indicador 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											367 texto Decisões documentadas
+										368 container Editar condição 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											369 texto Proporção de reuniões com ao menos uma decisão.
+									370 texto 06
+									371 botão Visualizar card 6 em tela cheia, Help: Visualizar em tela cheia
+									372 botão Legenda do card 6, Help: Notas deste slide
+									373 botão Excluir card 6
+									374 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										375 imagem
+									376 botão Baixar card 6, Help: Baixar card em PNG
+									377 botão (disabled) Gerar imagem
+									378 botão Direção, Help: Referência e direção da imagem deste slide
+									379 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									380 container
+										381 container Help: Título: Escopo: o que está incluído e o que está excluído — use as setas para mover, Título: Escopo: o que está incluído e o que está excluído. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											382 cabeçalho Escopo: o que está incluído e o que está excluído, Help: Duplo clique para editar, Value: 1
+												383 texto Escopo: o que está incluído e o que está excluído
+										384 container Subtítulo: O programa entrega diagnóstico, capacitação, modelo editável e revisão de reuniõ. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: O programa entrega diagnóstico, capacitação, modelo editável e revisão de reuniõ — use as setas para mover
+											385 texto O programa entrega diagnóstico, capacitação, modelo editável e revisão de reuniões. Licenças de software, integração de sistemas e facilitação contínua após seis semanas ficam de fora.
+										386 tabela Comparação
+											387 row
+												388 cabeçalho da coluna
+													389 container Editar cabeçalho 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														390 texto Item
+												391 cabeçalho da coluna
+													392 container Editar cabeçalho 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														393 texto Incluído
+												394 cabeçalho da coluna
+													395 container Editar cabeçalho 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														396 texto Excluído
+											397 row
+												398 célula
+													399 container Editar linha 1, coluna 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														400 texto Diagnóstico
+												401 célula
+													402 container Editar linha 1, coluna 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														403 texto 4 equipes
+												404 célula
+													405 container Editar linha 1, coluna 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														406 texto —
+											407 row
+												408 célula
+													409 container Editar linha 2, coluna 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														410 texto Capacitação
+												411 célula
+													412 container Editar linha 2, coluna 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														413 texto 2 encontros
+												414 célula
+													415 container Editar linha 2, coluna 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														416 texto —
+											417 row
+												418 célula
+													419 container Editar linha 3, coluna 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														420 texto Modelo
+												421 célula
+													422 container Editar linha 3, coluna 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														423 texto Pauta editável
+												424 célula
+													425 container Editar linha 3, coluna 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														426 texto Software próprio
+											427 row
+												428 célula
+													429 container Editar linha 4, coluna 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														430 texto Revisão
+												431 célula
+													432 container Editar linha 4, coluna 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														433 texto 10 reuniões
+												434 célula
+													435 container Editar linha 4, coluna 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														436 texto Facilitação contínua
+											437 row
+												438 célula
+													439 container Editar linha 5, coluna 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														440 texto Sistemas
+												441 célula
+													442 container Editar linha 5, coluna 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														443 texto —
+												444 célula
+													445 container Editar linha 5, coluna 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+														446 texto Integração
+									447 texto 07
+									448 botão Visualizar card 7 em tela cheia, Help: Visualizar em tela cheia
+									449 botão Legenda do card 7, Help: Notas deste slide
+									450 botão Excluir card 7
+									451 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										452 imagem
+									453 botão Baixar card 7, Help: Baixar card em PNG
+									454 botão (disabled) Gerar imagem
+									455 botão Direção, Help: Referência e direção da imagem deste slide
+									456 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									457 container
+										458 container Help: Título: Etapas e responsabilidades do programa — use as setas para mover, Título: Etapas e responsabilidades do programa. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											459 cabeçalho Etapas e responsabilidades do programa, Help: Duplo clique para editar, Value: 1
+												460 texto Etapas e responsabilidades do programa
+										461 container Subtítulo: O avanço das seis semanas depende de o cliente fornecer os registros de reuniões. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: O avanço das seis semanas depende de o cliente fornecer os registros de reuniões — use as setas para mover
+											462 texto O avanço das seis semanas depende de o cliente fornecer os registros de reuniões e indicar um responsável por equipe, viabilizando diagnóstico e capacitação.
+										463 lista de conteúdos
+											464 container
+												465 container Editar etapa 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													466 texto Diagnóstico
+												467 container Editar explicação da etapa 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													468 texto Cliente fornece registros e indica responsável por equipe.
+											469 container
+												470 container Editar etapa 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													471 texto Capacitação
+												472 container Editar explicação da etapa 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													473 texto Dois encontros para aplicar o método com as equipes.
+											474 container
+												475 container Editar etapa 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													476 texto Revisão
+												477 container Editar explicação da etapa 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+													478 texto Revisão de dez reuniões com uso do modelo editável.
+									479 texto 08
+									480 botão Visualizar card 8 em tela cheia, Help: Visualizar em tela cheia
+									481 botão Legenda do card 8, Help: Notas deste slide
+									482 botão Excluir card 8
+									483 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										484 imagem
+									485 botão Baixar card 8, Help: Baixar card em PNG
+									486 botão (disabled) Gerar imagem
+									487 botão Direção, Help: Referência e direção da imagem deste slide
+									488 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									489 container
+										490 container Help: Título: Investimento de R$ 6.000 pelo programa — use as setas para mover, Título: Investimento de R$ 6.000 pelo programa. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											491 cabeçalho Investimento de R$ 6.000 pelo programa, Help: Duplo clique para editar, Value: 1
+												492 texto Investimento de R$ 6.000 pelo programa
+										493 container Subtítulo: Programa de seis semanas com pagamento de 50% no início e 50% na entrega. O acei. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: Programa de seis semanas com pagamento de 50% no início e 50% na entrega. O acei — use as setas para mover
+											494 texto Programa de seis semanas com pagamento de 50% no início e 50% na entrega. O aceite depende da conclusão dos entregáveis, não de promessa de economia.
+										495 container Editar valor 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											496 texto R$ 6.000
+										497 container Editar indicador 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											498 texto Investimento total
+										499 container Editar condição 1, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											500 texto Programa de seis semanas
+										501 container Editar valor 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											502 texto R$ 3.000
+										503 container Editar indicador 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											504 texto Pagamento inicial
+										505 container Editar condição 2, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											506 texto 50% no início do programa
+										507 container Editar valor 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											508 texto R$ 3.000
+										509 container Editar indicador 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											510 texto Pagamento final
+										511 container Editar condição 3, Help: Duplo clique ou Enter para editar; clique fora para salvar
+											512 texto 50% na entrega dos materiais
+									513 texto 09
+									514 botão Visualizar card 9 em tela cheia, Help: Visualizar em tela cheia
+									515 botão Legenda do card 9, Help: Notas deste slide
+									516 botão Excluir card 9
+									517 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										518 imagem
+									519 botão Baixar card 9, Help: Baixar card em PNG
+									520 botão (disabled) Gerar imagem
+									521 botão Direção, Help: Referência e direção da imagem deste slide
+									522 texto Abra Direção e descreva a imagem que você quer criar. A referência precisa de uma instrução ou do conteúdo do card.
+									523 container
+										524 container Help: Título: Aceite depende de entregas, não de promessa de economia — use as setas para mover, Título: Aceite depende de entregas, não de promessa de economia. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido.
+											525 cabeçalho Aceite depende de entregas, não de promessa de economia, Help: Duplo clique para editar, Value: 1
+												526 texto Aceite depende de entregas, não de promessa de economia
+										527 container Subtítulo: O critério de aceite é a entrega dos materiais, a realização dos dois encontros . Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Subtítulo: O critério de aceite é a entrega dos materiais, a realização dos dois encontros — use as setas para mover
+											528 texto O critério de aceite é a entrega dos materiais, a realização dos dois encontros de capacitação e a revisão das dez reuniões. Não há compromisso com economia de tempo ou custo.
+											529 container Texto abaixo da imagem: O método não inclui software próprio nem automação. Elemento móvel. Use as setas para mover; segure Shift para mover mais rápido., Help: Texto abaixo da imagem: O método não inclui software próprio nem automação — use as setas para mover · Duplo clique para editar
+												530 texto O método não inclui software próprio nem automação.
+									531 texto 10
+									532 botão Visualizar card 10 em tela cheia, Help: Visualizar em tela cheia
+									533 botão Legenda do card 10, Help: Notas deste slide
+									534 botão Excluir card 10
+									535 botão "alternar" Mostrar grade, Help: Mostrar grade de alinhamento em todos os cards, Value: 0
+										536 imagem
+									537 botão Baixar card 10, Help: Baixar card em PNG
+									538 botão (disabled) Gerar imagem
+									539 botão Direção, Help: Referência e direção da imagem deste slide

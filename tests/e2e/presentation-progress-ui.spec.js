@@ -164,3 +164,67 @@ test('roteiro aparece primeiro e os lotes chegam à prévia antes de concluir se
     return projects.find(project => project.id === id)?.doc?.slides?.map(slide => slide.title);
   })).toEqual(slides.map(slide => slide.title));
 });
+
+test('interrupção de acesso preserva três de seis slides e explica a causa após recarregar', async ({ page }) => {
+  test.setTimeout(60_000);
+  const stages = [];
+  const slides = Array.from({ length:6 }, (_, index) => ({
+    title:`Decisão preservada ${index + 1}`, subtitle:'Registre o próximo passo antes de agir.',
+    bodyAfterImage:'', imageQuery:'', presentationBlocks:[], speakerNotes:'',
+  }));
+  const modal = await openPresentationModal(page, {
+    '/api/ai/compatible': async route => {
+      const prompt = route.request().postDataJSON().payload.messages.find(message => message.role === 'user').content;
+      let data;
+      if (prompt.startsWith('PLANEJAMENTO ESTRUTURADO')) {
+        stages.push('plan');
+        data = { schemaVersion:1, promptVersion:PRESENTATION_PLAN_PROMPT_VERSION,
+          objective:'Registrar decisões com clareza.', audience:'Equipe de reuniões.', thesis:'Defina o próximo passo.', evidence:[], gaps:[],
+          slides:slides.map((slide, index) => ({ index:index + 1, visualRole:index === 0 ? 'cover' : index === 5 ? 'closing' : 'content',
+            purpose:index === 0 ? 'introduction' : index === 5 ? 'decision' : 'learning', question:`O que registrar na etapa ${index + 1}?`,
+            keyMessage:slide.title, evidenceIds:[], imageBrief:'' })),
+        };
+      } else if (prompt.startsWith('REVISÃO DE APRESENTAÇÃO')) {
+        stages.push('review');
+        data = { edits:[] };
+      } else {
+        const batch = presentationBatch(prompt, slides);
+        if (batch[0].title !== slides[0].title) {
+          stages.push('subscription-required');
+          return route.fulfill({ status:402, json:{ code:'subscription_required', error:'Confirme o acesso da assinatura.' } });
+        }
+        stages.push('first-batch');
+        data = { slides:batch, caption:'Próximos passos para registrar decisões.' };
+      }
+      return route.fulfill({ json:{ choices:[{ message:{ content:JSON.stringify(data) } }] } });
+    },
+  });
+  await modal.getByRole('button', { name:/Continuar/ }).click();
+  await modal.getByRole('group', { name:'Número de slides', exact:true }).getByRole('button', { name:'6', exact:true }).click();
+  await modal.getByRole('button', { name:/Continuar/ }).click();
+  await modal.getByRole('radio', { name:'Só texto', exact:true }).check();
+  await modal.getByRole('button', { name:/Continuar/ }).click();
+  await modal.getByRole('button', { name:'Gerar apresentação', exact:true }).click();
+  await expect(modal).toHaveCount(0, { timeout:30_000 });
+  const notice = page.getByRole('region', { name:'Revisão pendente do conteúdo', exact:true });
+  await expect(notice).toContainText('3 de 6 slides preservados');
+  await expect(notice).toContainText('O serviço pediu a confirmação da assinatura');
+  await expect(notice).not.toContainText('assinatura inativa');
+  expect(stages).toEqual(['plan', 'first-batch', 'subscription-required']);
+  await expect.poll(() => page.evaluate(() => {
+    const id = JSON.parse(localStorage.getItem('vc_active_doc_id') || 'null');
+    const doc = JSON.parse(localStorage.getItem('vc_library') || '[]').find(project => project.id === id)?.doc;
+    return { titles:doc?.slides?.map(slide => slide.title), issue:doc?.editorialReviewIssues?.find(issue => issue.code === 'presentation_incomplete'), quality:doc?.presentationQuality };
+  })).toMatchObject({ titles:slides.slice(0,3).map(slide => slide.title), issue:{ completedCount:3, totalCount:6, interruptionReason:'subscription_required' },
+    quality:{ incomplete:true, completedCount:3, totalCount:6, interruptionReason:'subscription_required', writingDiagnostics:[
+      expect.objectContaining({ from:1, to:3, outcome:'validated' }),
+      expect.objectContaining({ from:4, to:6, outcome:'access_interrupted', httpStatus:402 }),
+    ] },
+  });
+  await page.reload();
+  await enterEditorFromHome(page);
+  await expect(notice).toContainText('3 de 6 slides preservados');
+  await expect(notice).toContainText('O serviço pediu a confirmação da assinatura');
+  await expect(page.getByRole('heading', { name:slides[2].title, exact:true })).toBeVisible();
+  await expect(page.getByRole('heading', { name:slides[3].title, exact:true })).toHaveCount(0);
+});

@@ -1,0 +1,113 @@
+Window: "Moont — Narrativas visuais com IA", App: Google Chrome.
+0 janela padrão Moont — Narrativas visuais com IA: parte do grupo 🔎 Revisão das apresentações - Google Chrome: Joao, URL: moont.ai/?app=1, Secondary Actions: Raise
+	1 container Moont — Narrativas visuais com IA: parte do grupo 🔎 Revisão das apresentações - Google Chrome: Joao, URL: moont.ai/?app=1
+		2 container
+			3 barra de ferramentas
+				4 botão Voltar
+				5 botão (disabled) Avançar
+				6 botão Recarregar
+				7 container
+					8 botão pop up Ver informações do site
+					9 campo de texto (settable) Barra de endereço e de pesquisa, Value: moont.ai/?app=1, Placeholder: Pergunte ao Google ou digite um URL
+					10 botão Adicionar esta guia aos favoritos
+				11 container
+					12 botão pop up Video Download Helper
+Tem acesso a este site
+					13 botão pop up Open Claude
+Tem acesso a este site
+					14 botão pop up Extensões
+				15 caixa de seleção Downloads, Value: 0
+				16 botão Abrir o Gemini no Chrome
+				17 botão Joao
+				18 botão pop up Novo Chrome disponível
+			19 barra de ferramentas Favoritos
+				20 barra de ferramentas Grupos de guias salvos
+					21 botão de grupo de guias salvo  grupo 🔎 Revisão das apresentações: Aberto
+					22 botão de grupo de guias salvo  grupo ✅Batalha Espacial repository setup: Aberto
+					23 botão de grupo de guias salvo  grupo ✅Construído do SAC Elevessy: Aberto
+					24 botão de grupo de guias salvo  grupo 🌍 VETOR terreno: Aberto
+					25 botão de grupo de guias salvo  grupo ✅Habilidades e resumos para projetos: Aberto
+					26 botão de grupo de guias salvo  grupo ✅Story Director — task 01: dados e flag: Aberto
+					27 botão de grupo de guias salvo  grupo ✅Transferência Apple para Elevessy: Aberto
+					28 botão de grupo de guias salvo  grupo Story Director — task 01: dados e flag: Aberto
+					29 botão Grupos de guias
+				30 divisor Separador
+				31 botão de favorito DUX, a fintech da Economia Criativa | Antecipe recebíveis em menos de 24 horas
+				32 botão da pasta de favoritos BICHO
+				33 botão de favorito CINEMA
+				34 botão da pasta de favoritos Todos os favoritos
+				35 divisor Separador
+			36 container
+				37 área de rolagem
+					38 Conteúdo HTML Moont — Narrativas visuais com IA, URL: moont.ai/?app=1
+						39 container Criar novo projeto
+							40 container
+								41 imagem Moont
+								42 botão (disabled) Sair da criação
+							43 container Etapas da criação
+								44 botão (disabled) 1. Projeto
+								45 botão (disabled) 2. Marca
+								46 botão (disabled) 3. Conteúdo
+								47 botão (disabled) 4. Narrativa
+								48 botão (disabled) 5. Quantidade
+								49 botão (disabled) 6. Visual
+								50 botão (disabled) 7. Revisão
+							51 container Criando seu projeto.
+								52 container
+									53 text PASSO  7  DE  7  ·  REVISÃO
+								54 cabeçalho Criando seu projeto., Value: 1
+									55 texto Criando seu projeto.
+								56 texto Você pode acompanhar os textos enquanto o Moont revisa a sequência.
+								57 container Acompanhamento da geração
+									58 texto Etapa 2 de 5 · Escrevendo slides 4–6 · 3 de 12 prontos
+									59 container
+										60 text Tempo decorrido:  2:21
+									61 triângulo de divulgação Roteiro organizado · 12 slides
+										62 texto Roteiro organizado ·
+										63 texto 12
+										64 texto  slides
+									65 cabeçalho Rascunho — criando os slides, Value: 2
+										66 texto Rascunho — criando os slides
+									67 container
+										68 text Slides preparados:  3  de  12
+									69 texto Os slides prontos aparecem aqui enquanto os próximos são escritos. Esta prévia é somente para acompanhar; o texto e a composição ainda serão revisados.
+									70 container Prévia dos slides
+										71 container Slide 1
+											72 container
+												73 text Slide 01
+											74 cabeçalho Mesa Clara: decisões mais claras em reuniões internas, Value: 3
+												75 texto Mesa Clara: decisões mais claras em reuniões internas
+											76 texto Caso fictício de teste. Um método de três passos para explicitar decisões, resultados observados em piloto e a decisão sobre um novo ciclo de seis semanas.
+											77 texto Caso fictício criado para teste; nomes e números pertencem à simulação.
+											78 triângulo de divulgação Notas de apoio
+												79 texto Notas de apoio
+										80 container Slide 2
+											81 container
+												82 text Slide 02
+											83 cabeçalho Piloto em quatro equipes sem grupo de controle, Value: 3
+												84 texto Piloto em quatro equipes sem grupo de controle
+											85 texto O piloto gratuito ocorreu em uma organização fictícia, com quatro equipes de oito pessoas cada. Foram observadas 20 reuniões de rotina em abril de 2026 e outras 20 do mesmo tipo e equipes em maio de 2026.
+											86 texto Não houve grupo de controle; facilitadores de duas equipes mudaram em maio.
+											87 triângulo de divulgação Notas de apoio
+												88 texto Notas de apoio
+										89 container Slide 3
+											90 container
+												91 text Slide 03
+											92 cabeçalho Baseline: 40% das reuniões sem decisão documentada, Value: 3
+												93 texto Baseline: 40% das reuniões sem decisão documentada
+											94 texto Em abril, a duração média das reuniões era de 45 minutos e apenas 12 das 20 reuniões tiveram uma decisão documentada. O impacto de reuniões sem decisão explícita é o ponto de partida para a intervenção.
+											95 lista de definições Indicadores do slide
+												96 container Duração média
+													97 texto Duração média
+												98 container
+													99 text 45 min Abril de 2026, 20 reuniões
+												100 container Decisões documentadas
+													101 texto Decisões documentadas
+												102 container
+													103 text 12 de 20 60% das reuniões em abril
+											104 triângulo de divulgação Notas de apoio
+												105 texto Notas de apoio
+							106 container
+								107 botão Cancelar geração
+								108 text 7  de  7  · 12 slides
+								109 botão (disabled) Gerando…

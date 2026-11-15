@@ -4,7 +4,7 @@ import { normalizeInstagramCaption } from './editorial-strategy.js';
 import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js';
 import { presentationAIOptions, buildPresentationReviewRules } from './presentation.js';
 import { buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
-import { generatePresentationPlan, parsePresentationPlanResponse } from './presentation-planning.js';
+import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
 import { requiresSocialTitles, recoverSocialTitle, recoverSocialTitleForEditing, missingSocialTitleIndexes, auditSocialTextDensity, buildSocialTextLimitsPrompt } from './social-generation.js';
 import { auditDraftFactuality, auditUnsupportedCommercialClaims, buildFactualGroundingPrompt } from './factual-grounding.js';
@@ -271,16 +271,16 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
     const slide = pitch ? cleanPitchSlide(s)
       : requiresSocialTitles(titleConfig) ? recoverSocialTitle({ ...s }) : { ...s };
     if (presetId === 'apresentacao' && draft.presentationPlan && !String(slide.title || '').trim()) {
-      throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing' });
+      throw Object.assign(new Error(`O slide ${index + 1} precisa de um título específico.`), { code: 'presentation_title_missing', field: 'title', slideIndex: index });
     }
     if (presetId === 'apresentacao' && draft.presentationPlan) {
       slide.presentationBlocks = normalizePresentationBlocks(s.presentationBlocks);
-      if (!nativeBlocks && slide.presentationBlocks.length) throw new Error('Este padrão personalizado não permite quadros automáticos.');
+      if (!nativeBlocks && slide.presentationBlocks.length) throw Object.assign(new Error('Este padrão personalizado não permite quadros automáticos.'), { code: 'presentation_blocks_not_allowed', field: 'presentationBlocks', slideIndex: index });
       if (s.presentationBlocks != null && (!Array.isArray(s.presentationBlocks) || (s.presentationBlocks.length && !slide.presentationBlocks.length))) {
-        throw new Error('A IA retornou uma tabela ou sequência inválida. Seu projeto foi preservado.');
+        throw Object.assign(new Error('A IA retornou uma tabela ou sequência inválida. Seu projeto foi preservado.'), { code: 'presentation_blocks_invalid', field: 'presentationBlocks', slideIndex: index });
       }
       if (s.speakerNotes != null && typeof s.speakerNotes !== 'string') {
-        throw new Error('A IA retornou notas de apresentação inválidas.');
+        throw Object.assign(new Error('A IA retornou notas de apresentação inválidas.'), { code: 'presentation_notes_invalid', field: 'speakerNotes', slideIndex: index });
       }
       slide.speakerNotes = String(s.speakerNotes || '').trim();
       if (slide.presentationBlocks.length) {
@@ -290,7 +290,7 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
         slide.bodyAfterImage = '';
         slide.imageQuery = '';
       }
-      if (slide.speakerNotes.length > 6000) throw new Error('As notas ultrapassaram o limite desta apresentação.');
+      if (slide.speakerNotes.length > 6000) throw Object.assign(new Error('As notas ultrapassaram o limite desta apresentação.'), { code: 'presentation_notes_too_long', field: 'speakerNotes', slideIndex: index });
     }
     if (wantsBody && !bodyAllowed(index, count, presetId, densityId)) slide.bodyAfterImage = '';
     if (!allowIncompleteDraft && ![slide.title, slide.subtitle, wantsBody ? slide.bodyAfterImage : ''].some(v => typeof v === 'string' && v.trim())) {
@@ -627,13 +627,16 @@ function retainGroundedFields(proposed, previous, config) {
  * bounded, and an outage cannot discard already completed work. */
 async function writePresentationBatches({ prompt, plan, config, textOptions, onStage, onDraft }, callAI) {
   const slides = [];
+  const diagnostics = [];
   const batchSize = 3;
   let caption = '';
   for (let offset = 0; offset < plan.slides.length; offset += batchSize) {
     const entries = plan.slides.slice(offset, offset + batchSize);
     const batchPlan = { ...plan, slides: entries };
     let batch;
+    let previousIssue;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
+      let response;
       throwIfGenerationCancelled(textOptions.signal);
       onStage?.(attempt === 1 ? 'writing' : 'writing_repair', { completedCount: slides.length, totalCount: plan.slides.length, from: offset + 1, to: offset + entries.length });
       const task = `\nETAPA DE REDAÇÃO EM LOTES — CONTRATO DESTA RESPOSTA:
@@ -641,24 +644,48 @@ O projeto completo tem ${plan.slides.length} slides. Nesta chamada, devolva EXAT
 POSIÇÕES DESTA CHAMADA: ${JSON.stringify(entries)}
 TÍTULOS JÁ ESCRITOS (continuidade, nunca novas evidências): ${JSON.stringify(slides.map(slide => slide.title))}
 Todo slide exige título específico, curto e não vazio. Respeite os limites de cada posição. speakerNotes é opcional, até 600 caracteres; não copie o briefing nem repita o slide nas notas. Limites são tetos, não metas de preenchimento. Não gere configuração visual, plano ou evidências no JSON de redação. Escreva apenas title, subtitle, bodyAfterImage, imageQuery, presentationBlocks e speakerNotes em cada slide, mais caption (resumo breve ou vazio).
-${attempt > 1 ? 'A resposta anterior deste lote não pôde ser utilizada. Refaça somente estas posições com JSON completo e conciso; preserve fatos e condições essenciais, sem adicionar detalhes para preencher espaço.' : ''}`;
+${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaça somente estas posições com JSON completo e conciso; preserve fatos e condições essenciais, sem adicionar detalhes para preencher espaço. Diagnóstico estrutural (sem conteúdo): ${JSON.stringify(previousIssue)}. O caminho refere-se ao array deste lote; slideIndex identifica a posição no deck completo, começando em zero. Corrija o campo indicado conforme o contrato; todos os valores textuais de blocos devem ser strings e o array aceita no máximo um bloco.` : ''}`;
       try {
-        const raw = await callAI(prompt + task, { ...textOptions, maxTokens: 8192, jsonParser: parsePresentationPlanResponse });
+        const raw = await callAI(prompt + task, { ...textOptions, maxTokens: 8192, jsonParser: parsePresentationPlanResponse,
+          onResponseMetadata: metadata => {
+            response = presentationResponseMetadata(metadata);
+            textOptions.onResponseMetadata?.(metadata);
+          },
+        });
         throwIfGenerationCancelled(textOptions.signal);
-        if (!Array.isArray(raw?.slides) || raw.slides.length !== entries.length || raw.slides.some(slide => !isObject(slide) || typeof slide.title !== 'string' || !slide.title.trim())) {
+        if (!Array.isArray(raw?.slides) || raw.slides.length !== entries.length) {
           throw Object.assign(new Error('A redação não completou as posições deste lote.'), { code: 'presentation_batch_invalid' });
         }
+        const missingTitle = raw.slides.findIndex(slide => !isObject(slide) || typeof slide.title !== 'string' || !slide.title.trim());
+        if (missingTitle >= 0) throw Object.assign(new Error('A redação não completou o título de uma posição deste lote.'), { code: 'presentation_title_missing', field: 'title', slideIndex: missingTitle });
         const attached = attachPresentationPlan({ ...raw, presentationPlan: batchPlan }, batchPlan);
         batch = validateCarouselDraft(attached, { ...config, count: entries.length });
+        diagnostics.push({ stage: 'writing', from: offset + 1, to: offset + entries.length, attempt, outcome: 'validated', ...(response ? { response } : {}) });
         break;
       } catch (error) {
         if (isGenerationCancelled(error) || textOptions.signal?.aborted) throw error;
         // Session/subscription errors must not trigger another paid request.
-        const accessError = error?.isSessionGate || ['session_required', 'subscription_required', 'subscription_inactive', 'session_expired', 'unauthorized', 'payment_required', 'access_denied'].includes(error?.code) || [401, 402, 403, 429].includes(error?.status);
-        if (accessError && !slides.length) throw error;
+        const accessError = error?.isSessionGate || ['session_required', 'subscription_required', 'subscription_inactive', 'session_expired', 'unauthorized', 'payment_required', 'access_denied', 'rate_limited'].includes(error?.code) || [401, 402, 403, 429].includes(error?.status);
+        const interruptionReason = ['subscription_required', 'subscription_inactive', 'payment_required'].includes(error?.code) || error?.status === 402 ? 'subscription_required'
+          : ['session_required', 'session_expired', 'unauthorized'].includes(error?.code) || error?.status === 401 ? 'session_required'
+            : error?.status === 429 || error?.code === 'rate_limited' ? 'rate_limited'
+              : accessError ? 'access_denied' : 'writing_failed';
+        const safeCodes = ['ai_output_truncated', 'ai_invalid_json', 'presentation_batch_invalid', 'presentation_title_missing', 'presentation_blocks_invalid', 'presentation_blocks_not_allowed', 'presentation_notes_invalid', 'presentation_notes_too_long'];
+        const safeField = ['title', 'speakerNotes', 'presentationBlocks'].includes(error?.field) ? error.field : null;
+        const localIndex = Number.isInteger(error?.slideIndex) && error.slideIndex >= 0 && error.slideIndex < entries.length ? error.slideIndex : null;
+        previousIssue = { code: safeCodes.includes(error?.code) ? error.code : error?.name === 'SyntaxError' ? 'ai_invalid_json' : interruptionReason,
+          path: localIndex != null && safeField ? `slides[${localIndex}].${safeField}` : '$',
+          ...(localIndex != null ? { slideIndex: offset + localIndex } : {}) };
+        response = response || presentationResponseMetadata(error?.aiDiagnostics);
+        const httpStatus = Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : undefined;
+        diagnostics.push({ stage: 'writing', from: offset + 1, to: offset + entries.length, attempt,
+          outcome: accessError ? 'access_interrupted' : 'failed', issue: previousIssue,
+          ...(httpStatus ? { httpStatus } : {}), ...(response ? { response } : {}) });
+        if (accessError && !slides.length) { error.writingDiagnostics = diagnostics; throw error; }
         if (attempt === 2 || accessError) {
-          if (!slides.length) throw Object.assign(new Error('O roteiro está pronto, mas não foi possível escrever os primeiros slides. Tente novamente com as mesmas escolhas.'), { code: 'presentation_writing_failed', stage: 'writing' });
-          return { draft: { slides, caption, presentationPlan: plan }, incomplete: true, completedCount: slides.length, totalCount: plan.slides.length };
+          if (!slides.length) throw Object.assign(new Error('O roteiro está pronto, mas não foi possível escrever os primeiros slides. Tente novamente com as mesmas escolhas.'), { code: 'presentation_writing_failed', stage: 'writing', writingDiagnostics: diagnostics });
+          onStage?.('writing_interrupted', { completedCount: slides.length, totalCount: plan.slides.length, interruptionReason, diagnostics });
+          return { draft: { slides, caption, presentationPlan: plan }, incomplete: true, completedCount: slides.length, totalCount: plan.slides.length, interruptionReason, diagnostics };
         }
       }
     }
@@ -668,7 +695,7 @@ ${attempt > 1 ? 'A resposta anterior deste lote não pôde ser utilizada. Refaç
     onDraft?.({ slides: slides.map(slide => ({ ...slide })), caption, presentationPlan: plan }, { phase: 'writing', plan, completedCount: slides.length, totalCount: plan.slides.length, partial: slides.length < plan.slides.length });
     throwIfGenerationCancelled(textOptions.signal);
   }
-  return { draft: { slides, caption, presentationPlan: plan }, incomplete: false, completedCount: slides.length, totalCount: plan.slides.length };
+  return { draft: { slides, caption, presentationPlan: plan }, incomplete: false, completedCount: slides.length, totalCount: plan.slides.length, diagnostics };
 }
 
 /** Planning → validated batches → review. Repair is bounded at each stage,
@@ -697,6 +724,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     brief: planning.brief || '', sources, count: config.count, presentationPath: config.presentationPath,
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
+  let writingDiagnostics = [];
   const finish = (result, reviewStatus, extra = {}) => {
     // Visible native blocks and speaker notes carry factual claims as well.
     // This conservative check flags calculations/paraphrases for review; it
@@ -706,7 +734,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     const facts = auditDraftFactuality({ ...result, slides: result.slides.map(slide => ({ ...slide,
       bodyAfterImage: [slide.bodyAfterImage, slide.speakerNotes, collectText(slide.presentationBlocks)].filter(Boolean).join('\n'),
     })) }, factualConfig).map(issue => ({ ...issue, kind: 'factual' }));
-    return { result, plan, planningDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
+    return { result, plan, planningDiagnostics, writingDiagnostics, reviewStatus: facts.length ? 'needs_attention' : reviewStatus, ...extra,
       ...((facts.length || extra.violations?.length) ? { violations: [...(extra.violations || []), ...facts] } : {}) };
   };
   const plannedConfig = {
@@ -718,12 +746,13 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
   const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt();
   const generationPrompt = `${prompt}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco) e speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
+  writingDiagnostics = written.diagnostics;
   const draft = written.draft;
   if (written.incomplete) {
-    return finish(draft, 'needs_attention', { incomplete: true,
+    return finish(draft, 'needs_attention', { incomplete: true, interruptionReason: written.interruptionReason,
       completedCount: written.completedCount, totalCount: written.totalCount,
-      issues: [{ code: 'presentation_incomplete', slideIndex: null }],
-      violations: [{ code: 'presentation_incomplete', slideIndex: null, kind: 'incomplete', completedCount: written.completedCount, totalCount: written.totalCount }] });
+      issues: [{ code: 'presentation_incomplete', slideIndex: null, interruptionReason: written.interruptionReason }],
+      violations: [{ code: 'presentation_incomplete', slideIndex: null, kind: 'incomplete', completedCount: written.completedCount, totalCount: written.totalCount, interruptionReason: written.interruptionReason }] });
   }
   if (typeof config.presentationLimitsForPlan === 'function') {
     plannedConfig.presentationTextLimits = config.presentationLimitsForPlan(plan, draft.slides);

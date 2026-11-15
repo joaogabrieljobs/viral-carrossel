@@ -277,7 +277,47 @@ describe('apresentação planejada e revisada', () => {
     const output = await generateReviewedCarousel({ prompt: '', config: config({ count: 6 }) }, ai);
     expect(ai).toHaveBeenCalledTimes(3);
     expect(output).toMatchObject({ incomplete: true, completedCount: 3, totalCount: 6, reviewStatus: 'needs_attention' });
+    expect(output.interruptionReason).toBe('session_required');
     expect(output.result.slides.map(slide => slide.title)).toEqual(['Mensagem 1', 'Mensagem 2', 'Mensagem 3']);
+  });
+
+  it.each([
+    [{ status: 402, code: 'subscription_inactive' }, 'subscription_required'],
+    [{ status: 403 }, 'access_denied'],
+    [{ status: 429, code: 'rate_limited' }, 'rate_limited'],
+  ])('preserva 6 de 12 e a causa de acesso sem confundir com erro da IA (%j)', async (details, interruptionReason) => {
+    const denied = Object.assign(new Error('Texto privado da conta e do provedor.'), details);
+    const ai = vi.fn().mockResolvedValueOnce(planWithCount(12)).mockResolvedValueOnce(batch(0)).mockResolvedValueOnce(batch(3)).mockRejectedValue(denied);
+    const onStage = vi.fn();
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ count: 12 }), onStage }, ai);
+    expect(ai).toHaveBeenCalledTimes(4);
+    expect(output).toMatchObject({ incomplete: true, completedCount: 6, totalCount: 12, interruptionReason });
+    expect(output.violations).toContainEqual(expect.objectContaining({ code: 'presentation_incomplete', kind: 'incomplete', interruptionReason, completedCount: 6, totalCount: 12 }));
+    expect(output.issues).toContainEqual(expect.objectContaining({ code: 'presentation_incomplete', interruptionReason }));
+    expect(output.writingDiagnostics.at(-1)).toMatchObject({ from: 7, to: 9, attempt: 1, outcome: 'access_interrupted', httpStatus: details.status,
+      issue: { code: interruptionReason, path: '$' } });
+    expect(onStage).toHaveBeenLastCalledWith('writing_interrupted', expect.objectContaining({ interruptionReason, completedCount: 6 }));
+    expect(JSON.stringify(output.writingDiagnostics)).not.toContain('Texto privado');
+  });
+
+  it('recuperação informa o campo estrutural do lote com índice global, sem registrar conteúdo privado', async () => {
+    const invalid = batch(3);
+    invalid.slides[1].presentationBlocks = [{ type: 'metrics', items: [{ label: 'Informação privada', value: 90 }] }];
+    const metadata = { provider: 'zai', model: 'glm-4.7', finishReason: 'stop', completionTokens: 630, promptTokens: 800, rawText: 'Segredo do briefing' };
+    const onResponseMetadata = vi.fn();
+    const ai = vi.fn().mockResolvedValueOnce(planWithCount(6)).mockResolvedValueOnce(batch(0))
+      .mockImplementationOnce(async (_prompt, options) => { options.onResponseMetadata(metadata); return invalid; })
+      .mockResolvedValueOnce(batch(3)).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: '', config: config({ count: 6 }), aiOptions: { onResponseMetadata } }, ai);
+    expect(output.result.slides).toHaveLength(6);
+    expect(ai).toHaveBeenCalledTimes(5);
+    expect(output.writingDiagnostics[1]).toMatchObject({ from: 4, to: 6, attempt: 1, outcome: 'failed',
+      issue: { code: 'presentation_blocks_invalid', path: 'slides[1].presentationBlocks', slideIndex: 4 },
+      response: { model: 'glm-4.7', finishReason: 'stop', completionTokens: 630 } });
+    expect(ai.mock.calls[3][0]).toContain('presentation_blocks_invalid');
+    expect(ai.mock.calls[3][0]).toContain('todos os valores textuais de blocos devem ser strings');
+    expect(onResponseMetadata).toHaveBeenCalledWith(metadata);
+    expect(JSON.stringify(output.writingDiagnostics)).not.toMatch(/Informação privada|Segredo|rawText/);
   });
 
   it.each(['unchanged', 'unavailable'])('marca número sem fonte para conferência quando a revisão fica %s', async review => {

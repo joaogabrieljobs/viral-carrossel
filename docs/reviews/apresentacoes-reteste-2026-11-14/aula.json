@@ -1,0 +1,866 @@
+{
+  "ok": true,
+  "project": {
+    "id": "hhw103h",
+    "version": 2,
+    "name": "Reteste final 1411 — Aula",
+    "format": "",
+    "caption": "O método Mesa Clara torna decisões explícitas em três passos: pauta prévia, registro durante a reunião e revisão de pendências. O piloto fictício mostrou melhoria na duração e nas decisões documentadas, mas sem grupo de controle o efeito do método não está isolado. A próxima ação é decidir sobre o programa de seis semanas por R$ 6.000, cujo aceite depende da entrega dos materiais, não de promessa de economia.",
+    "slideCount": 12,
+    "brand": {
+      "bg": "#fafafc",
+      "bgAlternate": "#f5f5f7",
+      "titleColor": "#000000",
+      "subtitleColor": "#363636",
+      "textColor": "#363636",
+      "accent": "#000000",
+      "titleFont": "\"Outfit\", sans-serif",
+      "bodyFont": "\"Inter\", sans-serif",
+      "logoPosition": "tr",
+      "logoSize": 260,
+      "logoOpacity": 90
+    },
+    "slides": [
+      {
+        "id": "5vwe84q",
+        "index": 0,
+        "title": "Mesa Clara: decisões explícitas em reuniões",
+        "subtitle": "Suas reuniões terminam com decisões claras?",
+        "bodyAfterImage": "Caso fictício criado para teste.",
+        "caption": "Abra a sessão perguntando ao público quantas reuniões da última semana terminaram com uma decisão documentada. O objetivo é criar contraste entre o esforço da reunião e a clareza do resultado.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 49,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 25
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 53,
+                "w": 78,
+                "h": 39
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "7nibvwl",
+        "index": 1,
+        "title": "O que falta quando a reunião acaba?",
+        "subtitle": "Sem decisão documentada, pendências se acumulam e geram retrabalho na equipe.",
+        "bodyAfterImage": "",
+        "caption": "O problema não é a falta de discussão, mas a ausência de um registro claro do que foi decidido, de quem é responsável e do prazo. Isso gera ambiguidade e novas reuniões para alinhar o mesmo tema.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "h9lrhhm",
+        "index": 2,
+        "title": "Objetivos desta sessão",
+        "subtitle": "Ao final, você será capaz de aplicar os três passos do método para explicitar decisões em suas reuniões recorrentes.",
+        "bodyAfterImage": "",
+        "caption": "Apresente os três passos como um ciclo contínuo. Enfatize que o método não exige software próprio, apenas disciplina no uso da pauta e do registro.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "4fid02c",
+        "index": 3,
+        "title": "Como o método funciona?",
+        "subtitle": "Três passos sequenciais tornam a decisão explícita: pauta antes, registro durante e revisão depois.",
+        "bodyAfterImage": "",
+        "caption": "O método não exige software próprio nem automação. O foco é tornar explícita a decisão que a reunião deve produzir, garantindo que responsável e prazo estejam claros antes de encerrar o item.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "1s4rona",
+        "index": 4,
+        "title": "Exemplo resolvido de reunião",
+        "subtitle": "Sem decisão esperada na pauta, o item vira discussão; com ela, o registro direciona a conversa e fecha responsável e prazo.",
+        "bodyAfterImage": "",
+        "caption": "Sem a decisão esperada na pauta, o item vira apenas discussão. O mecanismo central é antecipar o tipo de decisão: aprovar, escolher, priorizar. Isso direciona a conversa e facilita o registro.\n\nCaso fictício para fins didáticos.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "3ood55f",
+        "index": 5,
+        "title": "Basta documentar para garantir decisão?",
+        "subtitle": "Não. Sem pauta prévia com a decisão esperada, o registro perde foco e a reunião vira atualização sem deliberação.",
+        "bodyAfterImage": "Verificação: a pauta precisa declarar a decisão esperada antes da reunião.",
+        "caption": "Pergunta de verificação para o público: se a pauta lista apenas temas sem decisões esperadas, o que acontece durante a reunião? Resposta: a equipe discute, mas não delibera; o registro fica vago ou inexistente.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "moz2y0j",
+        "index": 6,
+        "title": "Estruture sua próxima reunião",
+        "subtitle": "Escolha um item de pauta real. Defira a decisão esperada, o responsável e o prazo. Entrega: pauta com os três campos preenchidos.",
+        "bodyAfterImage": "",
+        "caption": "O objetivo desta prática é garantir que o participante saia com um rascunho aplicável. Oriente a escolher um item concreto da próxima pauta, não um caso hipotético. O critério de sucesso é ter os três campos preenchidos: decisão, responsável e prazo.\n\nEntrega: pauta com decisão, responsável e prazo preenchidos.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "hsdxwt5",
+        "index": 7,
+        "title": "Onde a prática costuma falhar",
+        "subtitle": "Critério de sucesso: toda pendência revisada tem responsável e prazo. Sem eles, a revisão vira relato de status sem conclusão.",
+        "bodyAfterImage": "Sem dono e prazo, a pendência volta à pauta seguinte sem avanço.",
+        "caption": "No debrief, pergunte: 'Na última vez que revisaram pendências, havia sempre um responsável e um prazo claros?'. O método só funciona se o registro durante a reunião capturar esses dois campos. Sem eles, a revisão vira relato de status sem conclusão.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "43ohkyy",
+        "index": 8,
+        "title": "O que os dados do piloto mostram",
+        "subtitle": "Casos fictícios de observação: duração caiu e mais reuniões registraram decisão, mas não houve grupo de controle.",
+        "bodyAfterImage": "",
+        "caption": "Destaque que os números são de um caso fictício de simulação. A queda na duração e o aumento de decisões documentadas são observações do antes/depois, mas não comprovam causalidade: não houve grupo de controle e os facilitadores de duas equipes mudaram em maio.\n\nAntes/depois não isola o efeito do método.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 42,
+          "subSize": 68,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 14
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 42,
+                "w": 88,
+                "h": 14
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "bxqu3xg",
+        "index": 9,
+        "title": "Esses resultados comprovam o método?",
+        "subtitle": "O antes/depois não isola o efeito do método: não houve grupo de controle e os facilitadores de duas equipes mudaram entre os períodos.",
+        "bodyAfterImage": "Associação observada não demonstra causalidade.",
+        "caption": "Os dados do piloto mostram melhoria na duração e na proporção de decisões documentadas, mas não podemos atribuir essa mudança apenas ao método. A ausência de grupo de controle e a mudança de facilitadores em duas equipes introduzem variáveis confundidoras. É importante ser transparente sobre esse limite antes de decidir sobre o próximo ciclo.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 17
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 46,
+                "w": 82,
+                "h": 46
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "syb4kr3",
+        "index": 10,
+        "title": "Como transferir isso para sua equipe?",
+        "subtitle": "Aplique os três passos na sua próxima reunião recorrente: envie pauta com decisão esperada, registre decisão com responsável e prazo, e revise pendências depois.",
+        "bodyAfterImage": "Registre o resultado para comparar com a linha de base.",
+        "caption": "A transferência acontece quando você substitui o hábito de apenas discutir pelo hábito de explicitar a decisão. Comece por uma reunião recorrente específica. Ao final, verifique se a decisão, o responsável e o prazo foram registrados. Esse registro será sua linha de base para avaliar mudanças futuras.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "tl",
+          "align": "left",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 6,
+                "y": 25,
+                "w": 88,
+                "h": 20
+              },
+              "subtitle": {
+                "x": 6,
+                "y": 49,
+                "w": 88,
+                "h": 43
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      },
+      {
+        "id": "5unc7gn",
+        "index": 11,
+        "title": "Qual é a próxima ação?",
+        "subtitle": "Se aprovado, programa de seis semanas por R$ 6.000. Aceite depende da entrega dos materiais e revisão das reuniões, não de economia.",
+        "bodyAfterImage": "Data de início e responsáveis permanecem em definição.",
+        "caption": "A proposta é um programa de seis semanas por R$ 6.000, pago em 50% no início e 50% na entrega. Inclui diagnóstico, capacitação, modelo editável e revisão de dez reuniões. O aceite é condicional à entrega dos materiais e realização dos encontros, não a resultados de economia. A aprovação desta proposta é uma decisão pendente.",
+        "imageQuery": "",
+        "visual": {
+          "layout": "mc",
+          "align": "center",
+          "photoRegion": "full",
+          "bgFit": "cover",
+          "bgX": 50,
+          "bgY": 50,
+          "bgZoom": 100,
+          "bgMirror": false,
+          "bgOpacity": 100,
+          "overlay": 0,
+          "textShadow": false,
+          "textBg": false,
+          "textBgOpacity": 55,
+          "textInset": 0,
+          "procedureLabelEmphasis": false,
+          "titleSize": 44,
+          "subSize": 72,
+          "bodyAfterSize": 94,
+          "titleTracking": 1,
+          "subTracking": 0,
+          "bodyTracking": 0.4,
+          "titleLeading": 110,
+          "subLeading": 135,
+          "bodyLeading": 135,
+          "titleWeight": 700,
+          "bodyWeight": 400,
+          "logoPosition": "tl",
+          "logoSize": 80,
+          "elementsUnlocked": true,
+          "elementOffsets": {},
+          "canvas": {
+            "enabled": false,
+            "applied": true,
+            "variant": "classic",
+            "preserveZones": true,
+            "zones": {
+              "photo": {
+                "x": 96,
+                "y": 94,
+                "w": 1,
+                "h": 1
+              },
+              "title": {
+                "x": 10,
+                "y": 29,
+                "w": 80,
+                "h": 22
+              },
+              "subtitle": {
+                "x": 18,
+                "y": 55,
+                "w": 64,
+                "h": 35
+              }
+            }
+          }
+        },
+        "overlays": [],
+        "hasPhoto": false,
+        "hasLogo": false
+      }
+    ]
+  }
+}
