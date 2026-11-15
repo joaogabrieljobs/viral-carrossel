@@ -38,44 +38,72 @@ const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
  * enquadramento automático; não se aplica deformação nem composição livre do LLM.
  * A ausência de foto expande a leitura, em vez de deixar um placeholder vazio.
  */
-export function contentAwarePresentationZones(kind, slide = {}) {
+export function presentationDesignFamily(base = {}) {
+  const id = String(base.presentationPresetId || base.presentationPatternId || '');
+  if (/photo.essay|editorial.magazine/.test(id)) return 'editorial';
+  if (/cinematic|typographic.bold/.test(id)) return 'cinematic';
+  if (/modular.cards/.test(id)) return 'modular';
+  if (/technical.blueprint|swiss.grid/.test(id)) return 'grid';
+  return 'executive';
+}
+
+export function contentAwarePresentationZones(kind, slide = {}, family = 'executive') {
   if (hasBlocks(slide)) return {
-    title: rect(6, 25, 88, 14),
-    subtitle: rect(6, 42, 88, 14),
-    evidence: rect(6, 58, 88, 35),
+    title: rect(6, family === 'grid' ? 12 : 15, 88, 17),
+    subtitle: rect(6, family === 'grid' ? 33 : 36, 88, 15),
+    evidence: rect(6, 55, 88, 37),
     photo: inactivePhoto(),
   };
   const visual = hasVisual(slide);
+  // A adaptação ao conteúdo conserva a assinatura espacial do preset. Antes,
+  // todos os padrões eram reduzidos à mesma coluna de texto + painel à direita.
+  if (visual && family === 'editorial' && ['cover', 'demo', 'closing'].includes(kind)) return {
+    title: rect(46, kind === 'closing' ? 22 : kind === 'demo' ? 12 : 15, 48, 26),
+    subtitle: rect(46, kind === 'closing' ? 52 : kind === 'demo' ? 43 : 45, 48, 40),
+    photo: rect(0, 0, 40, 100),
+  };
+  if (visual && family === 'cinematic' && ['cover', 'divider', 'closing'].includes(kind)) return {
+    title: rect(kind === 'closing' ? 62 : 6, kind === 'divider' ? 16 : 12, kind === 'closing' ? 32 : 34, 28),
+    subtitle: rect(kind === 'closing' ? 62 : 6, kind === 'divider' ? 48 : 44, kind === 'closing' ? 32 : 34, 44),
+    // Um painel largo e alto evita transformar retratos em uma faixa que corta
+    // cabeças; a cena ocupa a maior parte do slide, com texto em superfície própria.
+    photo: kind === 'closing' ? rect(0, 0, 56, 100) : kind === 'divider' ? rect(44, 6, 50, 88) : rect(44, 0, 56, 100),
+  };
+  if (visual && family === 'modular' && ['cover', 'demo', 'closing'].includes(kind)) return {
+    title: rect(6, kind === 'closing' ? 22 : kind === 'demo' ? 12 : 16, 50, 26),
+    subtitle: rect(6, kind === 'closing' ? 53 : kind === 'demo' ? 43 : 46, 50, kind === 'closing' ? 37 : 44),
+    photo: rect(62, kind === 'demo' ? 12 : 10, 32, 80),
+  };
   switch (kind) {
     case 'cover': return {
-      title: rect(6, 25, visual ? 52 : 88, 25),
-      subtitle: rect(6, 53, visual ? 52 : 78, 39),
+      title: rect(6, 16, visual ? 52 : 88, 25),
+      subtitle: rect(6, 46, visual ? 52 : 78, 43),
       photo: visual ? rect(64, 0, 36, 100) : inactivePhoto(),
     };
     case 'divider': return {
-      title: visual ? rect(6, 27, 55, 24) : rect(10, 29, 80, 23),
-      subtitle: visual ? rect(6, 55, 55, 37) : rect(15, 56, 70, 34),
+      title: visual ? rect(6, 18, 55, 24) : rect(10, 24, 80, 23),
+      subtitle: visual ? rect(6, 47, 55, 43) : rect(15, 53, 70, 37),
       photo: visual ? rect(66, 27, 28, 65) : inactivePhoto(),
     };
     case 'data': return {
-      title: rect(6, 25, 88, 17),
+      title: rect(6, 14, 88, 20),
       subtitle: visual ? rect(39, 46, 55, 46) : rect(6, 46, 82, 46),
       photo: visual ? rect(6, 46, 28, 46) : inactivePhoto(),
     };
     case 'demo': return {
-      title: rect(6, 25, visual ? 55 : 88, 20),
-      subtitle: rect(6, 49, visual ? 55 : 78, 43),
+      title: rect(6, 14, visual ? 55 : 88, 24),
+      subtitle: rect(6, 44, visual ? 55 : 78, 46),
       photo: visual ? rect(66, 25, 28, 67) : inactivePhoto(),
     };
     case 'closing': return {
-      title: visual ? rect(6, 25, 54, 25) : rect(10, 29, 80, 22),
-      subtitle: visual ? rect(6, 54, 54, 38) : rect(18, 55, 64, 35),
+      title: visual ? rect(6, 18, 54, 25) : rect(10, 24, 80, 22),
+      subtitle: visual ? rect(6, 49, 54, 41) : rect(18, 53, 64, 37),
       photo: visual ? rect(66, 0, 34, 100) : inactivePhoto(),
     };
     default: return {
-      title: rect(6, 25, 88, 20),
-      subtitle: rect(6, 49, visual ? 55 : 88, 43),
-      photo: visual ? rect(66, 49, 28, 43) : inactivePhoto(),
+      title: rect(6, 14, 88, 24),
+      subtitle: rect(6, 44, visual ? 55 : 88, 46),
+      photo: visual ? rect(66, 44, 28, 46) : inactivePhoto(),
     };
   }
 }
@@ -128,13 +156,19 @@ export function plannedPresentationTextLimits(kind, slide = {}, deliveryMode = '
 export function contentAwarePresentationOverrides(base, slide = {}, kind = 'content', { pitch = false, deliveryMode = 'hybrid' } = {}) {
   const structured = hasBlocks(slide);
   const visual = hasVisual(slide) && !structured;
-  const zones = contentAwarePresentationZones(kind, slide);
+  const family = presentationDesignFamily(base);
+  const zones = contentAwarePresentationZones(kind, slide, family);
   const previousTypography = base.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
   const centered = !visual && !structured && ['divider', 'closing'].includes(kind);
-  const titleSize = fittedTitleSize(structured ? 42 : kind === 'cover' ? 49 : 44, slide.title, zones.title);
+  const presetTitleSize = Number(typography.title?.sizePercent);
+  const displaySize = Number.isFinite(presetTitleSize)
+    ? Math.max(44, Math.min(60, presetTitleSize)) : kind === 'cover' ? 49 : 44;
+  const titleSize = fittedTitleSize(structured ? 42 : displaySize, slide.title, zones.title);
   const subSize = structured ? 68 : 72;
-  const imagePosition = structured || !visual ? 'none' : kind === 'data' ? 'left-evidence' : 'right-evidence';
+  const imagePosition = structured || !visual ? 'none' : family === 'editorial' ? 'left-evidence'
+    : family === 'cinematic' && kind === 'closing' ? 'left-evidence'
+    : kind === 'data' ? 'left-evidence' : 'right-evidence';
   const limits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
   return {
     ...base,
@@ -155,7 +189,7 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     titleLeading: 110,
     subLeading: 135,
     subTracking: 0,
-    bodyAfterSize: 94,
+    bodyAfterSize: 110,
     bodyLeading: 135,
     logoPosition: 'tl',
     logoSize: 80,

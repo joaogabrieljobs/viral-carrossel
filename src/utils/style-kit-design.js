@@ -65,5 +65,5 @@ export function needsLightPhotoText(slide) {
   const fullPhoto = slide?.photoRegion == null || slide.photoRegion === 'full';
   const photo = slide?.canvas?.zones?.photo;
   const canvasFullPhoto = !photo || (photo.w >= 90 && photo.h >= 90);
-  return !!slide?.bgImage && fullPhoto && canvasFullPhoto && !slide?.useCultureLayout && (slide.overlay ?? 0) >= 38;
+  return !!slide?.bgImage && fullPhoto && canvasFullPhoto && !(slide?.useCultureLayout && String(slide.bodyAfterImage || '').trim()) && (slide.overlay ?? 0) >= 38;
 }

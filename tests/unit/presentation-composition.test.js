@@ -80,6 +80,25 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
     expect(without.presentationSuppressPhoto).toBe(true);
   });
 
+  it('a adaptação editorial mantém assinaturas diferentes dos presets', () => {
+    const make = id => getPresentationCompositionOverrides(id, {
+      slide: planned('cover', { imageQuery: 'a community space' }), index: 0, count: 5,
+    });
+    const executive = make('presentation_executive_minimal');
+    const editorial = make('presentation_photo_essay');
+    const cinematic = make('presentation_cinematic');
+    const modular = make('presentation_modular_cards');
+    expect(new Set([executive, editorial, cinematic, modular].map(s => JSON.stringify(s.canvas.zones))).size).toBe(4);
+    expect(editorial.canvas.zones.photo.x).toBeLessThan(editorial.canvas.zones.title.x);
+    expect(cinematic.canvas.zones.photo.w).toBeGreaterThan(executive.canvas.zones.photo.w);
+    expect(cinematic.canvas.zones.photo.h).toBe(100);
+    for (const slide of [executive, editorial, cinematic, modular]) {
+      expect(overlaps(slide.canvas.zones.photo, slide.canvas.zones.title)).toBe(false);
+      expect(overlaps(slide.canvas.zones.photo, slide.canvas.zones.subtitle)).toBe(false);
+      expect(slide.bodyAfterSize).toBeGreaterThanOrEqual(100);
+    }
+  });
+
   it('o limite de leitura segue a finalidade sem herdar o subtítulo de 40 caracteres do PDS', () => {
     const make = deliveryMode => getPresentationCompositionOverrides('presentation_premium_dark', {
       slide: planned('content'), stage: { deliveryMode }, index: 2, count: 6,

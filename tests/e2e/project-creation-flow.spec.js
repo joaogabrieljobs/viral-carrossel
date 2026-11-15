@@ -195,6 +195,33 @@ async function configure(page, { name = 'Novo trabalho guiado', count = 5, prese
   return wizard;
 }
 
+test('design recomendado fica visível, aplica o preset e mantém a narrativa escolhida', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await setup(page, { withProject: false, ai: route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    return route.fulfill({ json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated(5, 'Design recomendado')) });
+  } });
+  const wizard = await configure(page, { name: 'Design com preset', defaultIdentity: true });
+  await wizard.getByRole('button', { name: 'Alterar visual', exact: true }).click();
+  await expect(wizard.getByRole('button', { name: /^Design recomendado pelo Moont/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true })).toBeVisible();
+  await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true }).getByRole('button', { name: /^Minimal Clean/ })).toHaveAttribute('aria-pressed', 'true');
+  await wizard.screenshot({ path: testInfo.outputPath('design-recomendado.png') });
+  await next(page);
+  await expect(wizard).toContainText('Minimal Clean · recomendado');
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect(wizard).toHaveCount(0, { timeout: 25_000 });
+  await expect.poll(async () => (await library(page)).find(p => p.name === 'Design com preset')?.doc?.slides?.length).toBe(5);
+  const created = (await library(page)).find(p => p.name === 'Design com preset');
+  await testInfo.attach('projeto-gerado.json', { body: JSON.stringify(created, null, 2), contentType: 'application/json' });
+  expect(created.doc.mode).toBe('how_to');
+  expect(created.doc.visualPreset).toBe('minimal_clean');
+  expect(created.doc.brand.titleFont).toContain('Inter Tight');
+  expect(created.doc.slides[2].canvas.source).toBe('social-preset');
+  const middle = page.locator('main [data-vc-card-surface]').nth(2);
+  await expect(middle).toContainText(created.doc.slides[2].bodyAfterImage);
+});
+
 test('entrada tem duas escolhas, abrir preserva o editor e cancelar não cria projetos', async ({ page }) => {
   await setup(page);
   const before = await library(page);

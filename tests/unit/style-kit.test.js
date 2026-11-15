@@ -149,6 +149,7 @@ describe('regressão MUSA: pedido, brief e identidade', () => {
     expect(needsLightPhotoText(photo)).toBe(true);
     expect(needsLightPhotoText({ ...photo, bgImage: null })).toBe(false);
     expect(needsLightPhotoText({ ...photo, canvas: { zones: { photo: { w: 90, h: 40 } } } })).toBe(false);
-    expect(needsLightPhotoText({ ...photo, useCultureLayout: true })).toBe(false);
+    expect(needsLightPhotoText({ ...photo, useCultureLayout: true, bodyAfterImage: 'Texto de um sanduíche' })).toBe(false);
+    expect(needsLightPhotoText({ ...photo, useCultureLayout: true, bodyAfterImage: '' })).toBe(true);
   });
 });

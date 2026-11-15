@@ -90,6 +90,8 @@ import {
   logoutAccess,
 } from './src/lib/billing.js';
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
+import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
+import { applySocialVisualComposition } from './src/utils/social-visual-composition.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -5232,7 +5234,7 @@ export default function App() {
     });
     const td = SLIDE_TEXT_DENSITY_BY_ID[tdRaw] ? tdRaw : '1_1';
     const cvStyle = normalizeCardVisualStyle(cardStyleArg ?? doc.cardVisualStyle);
-    const requestedVisualPreset = visualPresetArg ?? visualPreset ?? null;
+    const requestedVisualPreset = visualPresetArg === undefined ? (visualPreset ?? null) : visualPresetArg;
     // Arquivos externos podem persistir o ID canônico da fonte (`pds.*`).
     // Resolva-o para o ID de runtime antes de montar prompt, composições e
     // metadados; caso contrário a geração cairia silenciosamente no padrão
@@ -5248,7 +5250,9 @@ export default function App() {
       : (requestedVisualPresetDef?.productKind === 'apresentacao'
           || (activeProductKind === 'apresentacao' && !requestedVisualPresetDef)
         ? DEFAULT_CAROUSEL_VISUAL_PRESET_ID
-        : (requestedVisualPresetDef?.id || requestedVisualPreset));
+        : (requestedVisualPresetDef?.id || requestedVisualPreset || recommendedGenerationVisualPreset({
+            productKind: 'carrossel', narrative: requestedPresetId !== 'livre' ? requestedPresetId : effectiveMode, presets: visualPresets,
+          })?.id));
     const effectiveVisualPresetDef = resolvePresentationVisualPresetDefinition(
       effectiveVisualPreset,
       visualPresets,
@@ -5727,6 +5731,9 @@ ${jsonShapeLine}`;
       }),
       { creativePreset: cp, slideTextDensity: td },
     ));
+    if (!remix && !isPresentationGeneration) {
+      newSlides = applySocialVisualComposition(newSlides, { preset: effectiveVisualPresetDef, photoRegion: cvStyle });
+    }
     if (!remix) {
       newSlides = autoAdjustOnGenerate
         ? autoAdjustSlides(newSlides, { creativePreset: cp, fmt: isPresentationGeneration ? 'apresentacao' : fmt })

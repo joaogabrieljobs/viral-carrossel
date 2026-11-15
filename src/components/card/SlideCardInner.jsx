@@ -2027,7 +2027,8 @@ const SlideCardInner = React.forwardRef(({
     effectivePresentationFilter = presentationImgFilter;
   }
 
-  const culturePack = creativePreset === 'tendencia_cultura';
+  // A narrativa não deve substituir a composição escolhida pelo preset visual.
+  const culturePack = creativePreset === 'tendencia_cultura' && slide.canvas?.source !== 'social-preset';
   const sandwichSkin = culturePack || !!slide.useCultureLayout;
   const cultureRichText = culturePack || !!slide.useCultureLayout;
   const bodyAfterCulture = (slide.bodyAfterImage || '').trim();
@@ -3184,7 +3185,7 @@ const SlideCardInner = React.forwardRef(({
         interactionScale={scale}
         mov={showCanvasChrome ? movOffsetOnly : mov}
         onInlineTextChange={commitInlineText}
-        showSupportingText={presentationMode}
+        showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
       />
     );
   } else if (normalizePhotoRegion(slide) !== 'full' && !cvHasZones && !(sandwich || cultureStatFlat)) {
@@ -3227,7 +3228,7 @@ const SlideCardInner = React.forwardRef(({
         onPhotoZoneClick={onPhotoZoneClick}
         showCanvasChrome={showCanvasChrome}
         mov={mov}
-        showSupportingText={presentationMode}
+        showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
         onInlineTextChange={commitInlineText}
       />
     );

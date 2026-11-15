@@ -10,13 +10,14 @@ import { BODY_FONTS } from '../utils/brand-visuals.js';
 import { sanitizeCustomVisualPresetBrand } from '../utils/custom-visual-presets.js';
 import { CONTENT_OBJECTIVES } from '../utils/editorial-strategy.js';
 import { PRESENTATION_PATHS, getPresentationPath } from '../utils/presentation.js';
-import { VISUAL_PRESETS } from '../styles/visual-presets.jsx';
+import { VISUAL_PRESETS, applyVisualPreset } from '../styles/visual-presets.jsx';
 import { PRESENTATION_VISUAL_PRESETS } from '../styles/presentation-presets.jsx';
 import { normalizeStyleKit, MAX_REF_IMAGES, CONTEXT_MD_MAX, STYLE_PROMPT_MAX } from '../utils/style-kit.js';
 import { storeProjectReference } from '../utils/style-kit-storage.js';
 import { projectLogoFromStored, storeSlideLogo } from '../utils/slide-logo.js';
 import { canAutoApplyExplicitCardScript, parseExplicitCardScript } from '../utils/structured-card-script.js';
 import { CREATION_STEPS, NARRATIVE_CHOICES, CREATION_DENSITIES, cloneCreationBrand, validCreationCount, creationMaterialHasContent, readCreationTextFile, neutralCreationIdentity, creationIdentitySummary, captureCreationVisualIdentity, applyCreationVisualChoice, creationMaterialForSubmission, creationMaterialLimits, creationMaterialOverageMessage } from '../utils/create-project-flow.js';
+import { resolveCreationVisualSelection } from '../utils/generation-visual-choice.js';
 import '../styles/create-project-flow.css';
 
 const PATH_LABELS = { auto:'Deixar o Moont organizar', pitch:'Apresentar um negócio — Pitch', aula_workshop:'Ensinar — Aula ou workshop', proposta_comercial:'Vender uma solução — Proposta', relatorio_executivo:'Mostrar resultados — Relatório', estudo_de_caso:'Demonstrar uma transformação — Caso', keynote_manifesto:'Defender uma visão — Palestra' };
@@ -70,7 +71,7 @@ export default function CreateProjectFlow({
   const [countEdited, setCountEdited] = useState(false);
   const [formatId, setFormatId] = useState(initialProductKind === 'apresentacao' ? 'apresentacao' : 'carrossel');
   const [density, setDensity] = useState('1_2');
-  const [visualPreset, setVisualPreset] = useState(null);
+  const [visualPreset, setVisualPreset] = useState('auto');
   const [cardStyle, setCardStyle] = useState('full');
   const [wantImages, setWantImages] = useState(false);
   const [params, setParams] = useState({ fidelity:50, creativity:50, irreverence:50, objectivity:50 });
@@ -112,6 +113,18 @@ export default function CreateProjectFlow({
     return matching.length ? matching : (isPresentation ? PRESENTATION_VISUAL_PRESETS : VISUAL_PRESETS);
   }, [visualPresets, isPresentation]);
   const customPresets = presets.filter(p => p.isCustom);
+  const visualSelection = resolveCreationVisualSelection({
+    selection: visualPreset, productKind, narrative, presentationPath: path, presets,
+    preserveIdentity: identityPath !== 'moont' || identityVisualEdited,
+  });
+  const selectedVisualLabel = visualSelection.preset?.label || 'Identidade configurada';
+  const visualSummary = visualSelection.automatic
+    ? `${selectedVisualLabel} · recomendado${visualSelection.preserveBrandIdentity ? ' · cores e fontes da marca' : ''}`
+    : selectedVisualLabel;
+  const recommendedPresets = [visualSelection.preset,
+    ...['editorial_magazine', 'minimal_clean', 'mood_sepia', 'presentation_editorial_magazine', 'presentation_modular_cards', 'presentation_premium_dark'].map(id => presets.find(p => p.id === id)),
+    ...presets.filter(p => !p.hidden && !p.isCustom)]
+    .filter((p, i, all) => p && all.findIndex(item => item?.id === p.id) === i).slice(0, 3);
   const identitySummary = creationIdentitySummary(brand, styleKit);
   const identityLabel = identityPath === 'moont' ? 'Padrão do Moont' : identityPath === 'saved' ? (brandRoster.find(b => b.id === brandId)?.name || (visualPreset ? presets.find(p => p.id === visualPreset)?.label : 'Preset salvo')) : 'Identidade personalizada';
   const canContinue = step === 0 ? !!name.trim() : step === 1 ? brandId !== '__new__' || !!brand.name?.trim() : step === 2 ? sourceReady && !hasMaterialOverage : step === 4 ? countValid : true;
@@ -146,7 +159,7 @@ export default function CreateProjectFlow({
     if (next === productKind) return;
     setProductKind(next); setFormatId(next === 'apresentacao' ? 'apresentacao' : 'carrossel');
     setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current));
-    setVisualPreset(null); setBrandVisualOverrides({ ...identityBaseOverrides.current });
+    setVisualPreset('auto'); setBrandVisualOverrides({ ...identityBaseOverrides.current });
     setIdentityVisualEdited(Object.keys(identityBaseOverrides.current).length > 0);
     if (!countEdited) setCount(next === 'apresentacao' ? String(getPresentationPath(path).defaultSlideCount) : '6');
   };
@@ -154,7 +167,7 @@ export default function CreateProjectFlow({
     const next = neutralCreationIdentity(defaultBrand);
     setBrandId(next.brandId); setBrand(next.brand); setStyleKit(next.styleKit);
     identityVisualBase.current = captureCreationVisualIdentity(next.brand); identityBaseOverrides.current = {};
-    setVisualPreset(null); setIdentityVisualEdited(false); setBrandVisualOverrides({});
+    setVisualPreset('auto'); setIdentityVisualEdited(false); setBrandVisualOverrides({});
   };
   const chooseBrand = id => {
     asyncVersion.current++;
@@ -162,7 +175,7 @@ export default function CreateProjectFlow({
     const cloned = profile ? cloneCreationBrand(profile) : neutralCreationIdentity(defaultBrand);
     setBrandId(id); setBrand(cloned.brand); setStyleKit(cloned.styleKit);
     identityVisualBase.current = captureCreationVisualIdentity(cloned.brand); identityBaseOverrides.current = {};
-    setVisualPreset(null); setIdentityVisualEdited(false); setBrandVisualOverrides({});
+    setVisualPreset('auto'); setIdentityVisualEdited(false); setBrandVisualOverrides({});
   };
   const chooseIdentityPath = next => {
     if (pending || next === identityPath) return;
@@ -175,7 +188,7 @@ export default function CreateProjectFlow({
   };
   const chooseVisualPreset = id => {
     const preset = presets.find(p => p.id === id);
-    setVisualPreset(preset?.id || null);
+    setVisualPreset(id === 'auto' ? 'auto' : preset?.id || null);
     setBrand(current => applyCreationVisualChoice(current, identityVisualBase.current, preset));
     setBrandVisualOverrides({ ...identityBaseOverrides.current, ...(preset ? sanitizeCustomVisualPresetBrand(preset.brand) : {}) });
     setIdentityVisualEdited(!preset && Object.keys(identityBaseOverrides.current).length > 0);
@@ -185,7 +198,7 @@ export default function CreateProjectFlow({
     const tokens = sanitizeCustomVisualPresetBrand(patch);
     setBrand(next); setIdentityVisualEdited(true);
     setBrandVisualOverrides(current => ({ ...current, ...tokens }));
-    if (!visualPreset) {
+    if (!visualPreset || visualPreset === 'auto') {
       identityVisualBase.current = captureCreationVisualIdentity(next);
       identityBaseOverrides.current = { ...identityBaseOverrides.current, ...tokens };
     }
@@ -262,10 +275,13 @@ export default function CreateProjectFlow({
     busyRef.current = true; setBusy(true); setGenerationStartedAt(Date.now()); setError(''); setNotice(''); lastGenerationStageRef.current = '';
     const quickModes = { erro_comum:'editorial', tendencia:'editorial', decodificacao:'deep', comportamento:'storytelling' };
     const resolvedTopic = topic.trim() || 'Organize o material fornecido conforme o objetivo deste projeto.';
+    // O rascunho nasce com a mesma identidade que será usada no resultado.
+    const creationBrand = visualSelection.automatic && !visualSelection.preserveBrandIdentity
+      ? applyVisualPreset(brand, visualSelection.presetId, presets) : brand;
     try {
       const result = await onCreate({
-        name:name.trim(), productKind, formatId, brandId, brand:JSON.parse(JSON.stringify(brand)), styleKit:JSON.parse(JSON.stringify(styleKit)), material:creationMaterialForSubmission(material, productKind),
-        generation:{ topic:resolvedTopic, count:Number(count), niche:brand.niche || '', tone:brand.defaultTone || 'claro e direto', audience:brand.defaultAudience || '', imgMode:'dalle', imgParams:{ ...params }, mode:isPresentation ? 'editorial' : isSpecial ? (quickModes[quickTemplateIdFromPreset(narrative)] || 'editorial') : narrative, creativePreset:isPresentation ? 'apresentacao' : isSpecial ? narrative : 'livre', contentObjective:isPresentation ? 'auto' : objective, presentationPath:isPresentation ? path : undefined, slideTextDensity:density, cardVisualStyle:isPresentation ? 'full' : cardStyle, visualPreset, preserveBrandIdentity:visualPreset === null || identityVisualEdited, brandVisualOverrides:{ ...brandVisualOverrides }, fetchImagesNow:hasOpenAI && wantImages },
+        name:name.trim(), productKind, formatId, brandId, brand:JSON.parse(JSON.stringify(creationBrand)), styleKit:JSON.parse(JSON.stringify(styleKit)), material:creationMaterialForSubmission(material, productKind),
+        generation:{ topic:resolvedTopic, count:Number(count), niche:brand.niche || '', tone:brand.defaultTone || 'claro e direto', audience:brand.defaultAudience || '', imgMode:'dalle', imgParams:{ ...params }, mode:isPresentation ? 'editorial' : isSpecial ? (quickModes[quickTemplateIdFromPreset(narrative)] || 'editorial') : narrative, creativePreset:isPresentation ? 'apresentacao' : isSpecial ? narrative : 'livre', contentObjective:isPresentation ? 'auto' : objective, presentationPath:isPresentation ? path : undefined, slideTextDensity:density, cardVisualStyle:isPresentation ? 'full' : cardStyle, visualPreset:visualSelection.presetId, preserveBrandIdentity:visualSelection.preserveBrandIdentity || identityVisualEdited, brandVisualOverrides:{ ...brandVisualOverrides }, fetchImagesNow:hasOpenAI && wantImages },
       });
       if (result?.cancelled && alive.current) setNotice('Geração interrompida. Suas escolhas foram mantidas. Você pode tentar novamente ou abrir o rascunho disponível.');
     } catch (e) { if (alive.current) setError(e.message || 'Não foi possível gerar. Suas escolhas continuam aqui para tentar novamente.'); }
@@ -292,7 +308,7 @@ export default function CreateProjectFlow({
     <Field label={brandId === '__new__' ? 'Nome da nova marca' : 'Nome da marca no projeto'} hint={brandId === '__new__' ? 'Dê um nome para salvar esta marca. Se não quiser salvar, escolha Somente neste projeto.' : 'Opcional. Pode ficar vazio.'}><input className="vc-input" value={brand.name || ''} onChange={e => setBrand(b => ({ ...b, name:e.target.value }))} maxLength={80} placeholder="Ex.: Clínica Janine Araújo"/></Field>
     <div className="vc-create-grid"><Field label="Para quem é o conteúdo?" hint="Opcional."><input className="vc-input" value={brand.defaultAudience || ''} onChange={e => setBrand(b => ({ ...b, defaultAudience:e.target.value }))} placeholder="Ex.: profissionais de saúde"/></Field><Field label="Como a marca deve falar?" hint="Opcional. O tom salvo é reutilizado quando disponível."><input className="vc-input" value={brand.defaultTone || ''} onChange={e => setBrand(b => ({ ...b, defaultTone:e.target.value, brandTone:null }))} placeholder="Ex.: acolhedora, clara e profissional"/></Field></div>
     <Field label="O que o Moont precisa saber sobre a marca?" hint="Opcional. Produto, diferencial, público e cuidados com a comunicação."><textarea className="vc-input" rows={4} value={styleKit.contextMd} maxLength={CONTEXT_MD_MAX} onChange={e => setStyleKit(k => ({ ...k, contextMd:e.target.value }))}/></Field>
-    <details className="vc-create-details"><summary>Cores e fontes — opcional</summary>{visualPreset && <p className="vc-create-note">Estes ajustes personalizam o preset neste projeto. Ao voltar para a identidade configurada ou trocar o tipo de projeto, as cores e fontes da identidade serão restauradas.</p>}<div className="vc-create-stack"><div className="vc-create-colors">{[{ key:'bg',label:'Cor de fundo' },{ key:'titleColor',label:'Cor dos títulos' },{ key:'textColor',label:'Cor do texto' },{ key:'accent',label:'Cor de destaque' }].map(field => <Field key={field.key} label={field.label}><input type="color" aria-label={field.label} value={/^#[0-9a-f]{6}$/i.test(brand[field.key] || '') ? brand[field.key] : '#000000'} onChange={e => editIdentityVisual(field.key === 'textColor' ? { textColor:e.target.value, subtitleColor:e.target.value } : { [field.key]:e.target.value })}/></Field>)}</div><div className="vc-create-grid"><Field label="Fonte dos títulos"><select className="vc-input" value={brand.titleFont || TITLE_FONTS[0].val} onChange={e => editIdentityVisual({ titleFont:e.target.value, customTitleFont:null })}>{!TITLE_FONTS.some(f => f.val === brand.titleFont) && brand.titleFont && <option value={brand.titleFont}>Fonte da identidade salva</option>}{TITLE_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field><Field label="Fonte do texto"><select className="vc-input" value={brand.bodyFont || BODY_FONTS[0].val} onChange={e => editIdentityVisual({ bodyFont:e.target.value, customBodyFont:null })}>{!BODY_FONTS.some(f => f.val === brand.bodyFont) && brand.bodyFont && <option value={brand.bodyFont}>Fonte da identidade salva</option>}{BODY_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field></div></div></details>
+    <details className="vc-create-details"><summary>Cores e fontes — opcional</summary>{visualPreset && visualPreset !== 'auto' && <p className="vc-create-note">Estes ajustes personalizam o preset neste projeto. Ao voltar para a identidade configurada ou trocar o tipo de projeto, as cores e fontes da identidade serão restauradas.</p>}<div className="vc-create-stack"><div className="vc-create-colors">{[{ key:'bg',label:'Cor de fundo' },{ key:'titleColor',label:'Cor dos títulos' },{ key:'textColor',label:'Cor do texto' },{ key:'accent',label:'Cor de destaque' }].map(field => <Field key={field.key} label={field.label}><input type="color" aria-label={field.label} value={/^#[0-9a-f]{6}$/i.test(brand[field.key] || '') ? brand[field.key] : '#000000'} onChange={e => editIdentityVisual(field.key === 'textColor' ? { textColor:e.target.value, subtitleColor:e.target.value } : { [field.key]:e.target.value })}/></Field>)}</div><div className="vc-create-grid"><Field label="Fonte dos títulos"><select className="vc-input" value={brand.titleFont || TITLE_FONTS[0].val} onChange={e => editIdentityVisual({ titleFont:e.target.value, customTitleFont:null })}>{!TITLE_FONTS.some(f => f.val === brand.titleFont) && brand.titleFont && <option value={brand.titleFont}>Fonte da identidade salva</option>}{TITLE_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field><Field label="Fonte do texto"><select className="vc-input" value={brand.bodyFont || BODY_FONTS[0].val} onChange={e => editIdentityVisual({ bodyFont:e.target.value, customBodyFont:null })}>{!BODY_FONTS.some(f => f.val === brand.bodyFont) && brand.bodyFont && <option value={brand.bodyFont}>Fonte da identidade salva</option>}{BODY_FONTS.map(f => <option key={f.val} value={f.val}>{f.name}</option>)}</select></Field></div></div></details>
     <label className="vc-create-upload">Logo da marca — opcional<input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Enviar logo da marca" disabled={pending} onChange={importLogo}/><span className="vc-create-note">Use PNG com fundo transparente. {styleKit.logo?.name || (brand.logoImageId || brand.logo ? 'Logo da marca salva será usada.' : '')}</span></label>
     <label className="vc-create-note"><input type="checkbox" checked={styleKit.logoOnGenerate !== false} onChange={e => setStyleKit(k => ({ ...k, logoOnGenerate:e.target.checked }))}/> Incluir a logo nos novos {item}</label>
     <label className="vc-create-upload">Referências visuais — opcional<input type="file" accept="image/*" multiple aria-label="Adicionar referências visuais" disabled={pending || styleKit.refImages.length >= MAX_REF_IMAGES} onChange={importRefs}/><span className="vc-create-note">Até {MAX_REF_IMAGES} imagens para orientar a aparência. As fotos dos {item} podem ser enviadas depois, no editor.</span></label>
@@ -323,7 +339,7 @@ export default function CreateProjectFlow({
           <Field label="Marca deste projeto" hint="Reutiliza o que estiver salvo na marca: identidade, logo, referências, briefing e tom de voz. Trocar a marca reinicia os ajustes desta página."><select className="vc-input" value={brandId} disabled={pending} onChange={e => chooseBrand(e.target.value)}><option value="__local__">Sem marca salva</option>{brandRoster.map(b => <option key={b.id} value={b.id}>{b.name || 'Marca sem nome'}</option>)}</select></Field>
           <Field label="Padrão visual salvo" hint="Opcional. Reutiliza cores, fontes e composição dos cards. Logos, referências e tom de voz vêm da marca escolhida acima. Escolher Manter restaura as cores e fontes da identidade, sem os ajustes feitos sobre o preset."><select className="vc-input" value={customPresets.some(p => p.id === visualPreset) ? visualPreset : ''} onChange={e => chooseVisualPreset(e.target.value || null)}><option value="">Manter a identidade escolhida</option>{customPresets.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></Field>
           {!customPresets.length && <p className="vc-create-note">Você ainda não tem padrões visuais salvos para este formato. Pode usar uma marca ou explorar os estilos do Moont na etapa Visual.</p>}
-          <div className="vc-create-identity-summary"><strong>{identityLabel}</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais{identitySummary.hasBrief ? ' · briefing incluído' : ''}</span><span>Tom de voz: {identitySummary.tone || 'sem orientação adicional'}.</span>{visualPreset && <span>Padrão visual: {presets.find(p => p.id === visualPreset)?.label}.</span>}<small>As alterações ficam apenas neste projeto. O preset salvo continua disponível como antes.</small></div>
+          <div className="vc-create-identity-summary"><strong>{identityLabel}</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais{identitySummary.hasBrief ? ' · briefing incluído' : ''}</span><span>Tom de voz: {identitySummary.tone || 'sem orientação adicional'}.</span>{visualSelection.preset && <span>Padrão visual: {visualSummary}.</span>}<small>As alterações ficam apenas neste projeto. O preset salvo continua disponível como antes.</small></div>
           <details className="vc-create-details" open={identityAdjustmentsOpen} onToggle={e => setIdentityAdjustmentsOpen(e.currentTarget.open)}><summary>Ajustar para este projeto</summary>{identityEditor}</details>
         </>}
         {identityPath === 'custom' && <>
@@ -351,8 +367,12 @@ export default function CreateProjectFlow({
         <fieldset className="vc-create-group"><legend>Quanto texto por {isPresentation ? 'slide' : 'card'}?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Quantidade de texto">{CREATION_DENSITIES.map(d => <Option key={d.id} {...d} selected={density === d.id} onClick={() => setDensity(d.id)}/>)}</div></fieldset>
       </>}
       {step === 5 && <>
-        <button type="button" className="vc-create-option" aria-pressed={visualPreset === null} onClick={() => chooseVisualPreset(null)}><strong>Manter a identidade configurada</strong><span>Volta às cores e fontes definidas na etapa Marca. Descarta os ajustes visuais feitos sobre um preset.</span></button>
-        <details className="vc-create-details"><summary>Explorar estilos visuais{visualPreset ? ` · ${presets.find(p => p.id === visualPreset)?.label || 'Estilo selecionado'}` : ''}</summary><VisualStylePicker value={visualPreset} onChange={chooseVisualPreset} presets={presets} title={isPresentation ? 'Estilos para apresentação' : 'Estilos para redes'} aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}/></details>
+        <div className="vc-create-grid" role="group" aria-label="Direção de design">
+          <button type="button" className="vc-create-option" aria-pressed={visualPreset === 'auto'} onClick={() => chooseVisualPreset('auto')}><strong>Design recomendado pelo Moont</strong><span>{visualSelection.recommendedId ? presets.find(p => p.id === visualSelection.recommendedId)?.label : 'Estilo para esta narrativa'} · composição, hierarquia e tipografia pensadas para este conteúdo.</span><small>{identityPath !== 'moont' || identityVisualEdited ? 'Preserva as cores, fontes e arquivos da sua identidade.' : 'Aplica a paleta e as fontes do estilo recomendado. Você pode trocar abaixo.'}</small></button>
+          <button type="button" className="vc-create-option" aria-pressed={visualPreset === null} onClick={() => chooseVisualPreset(null)}><strong>Usar somente minha identidade</strong><span>Mantém as cores e fontes configuradas. A organização do conteúdo continua automática.</span></button>
+        </div>
+        <VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={recommendedPresets} title="Estilos para começar" aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}/>
+        <details className="vc-create-details"><summary>Ver todos os estilos visuais{visualSelection.preset ? ` · ${selectedVisualLabel}` : ''}</summary><VisualStylePicker value={visualSelection.presetId} suggestedId={visualSelection.recommendedId} onChange={chooseVisualPreset} presets={presets} title={isPresentation ? 'Estilos para apresentação' : 'Estilos para redes'} aspectRatio={isPresentation ? '16 / 9' : '4 / 5'}/></details>
         <fieldset className="vc-create-group"><legend>Como quer começar com as imagens?</legend><div className="vc-create-grid" role="radiogroup" aria-label="Imagens do projeto"><Option label="Criar o texto primeiro" desc="Organiza o conteúdo agora. Você pode enviar fotos ou gerar imagens no editor." selected={!wantImages} onClick={() => setWantImages(false)}/><Option label="Gerar texto e imagens" desc={hasOpenAI ? 'Cria imagens junto com o conteúdo. Essa opção leva mais tempo.' : 'Configure o acesso à geração de imagens para usar esta opção.'} selected={wantImages && hasOpenAI} disabled={!hasOpenAI} onClick={() => setWantImages(true)}/></div>{!hasOpenAI && onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar geração de imagens</button>}</fieldset>
         {wantImages && hasOpenAI && <details className="vc-create-details"><summary>Ajustar a direção das imagens — opcional</summary><ImgParamsPanel value={params} onChange={(key, value) => setParams(p => ({ ...p, [key]:value }))}/></details>}
         <Field label="Direção visual adicional" hint="Ex.: fotografia natural, fundo claro, poucas cores e títulos elegantes."><textarea className="vc-input" rows={3} maxLength={STYLE_PROMPT_MAX} value={styleKit.stylePrompt} onChange={e => setStyleKit(k => ({ ...k, stylePrompt:e.target.value }))}/></Field>
@@ -362,7 +382,7 @@ export default function CreateProjectFlow({
       {step === 6 && <>
         {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
         {explicitCardCount > 0 && <p role="status" className="vc-create-note"><strong>Roteiro reconhecido: {explicitCardCount} cards.</strong> Cada bloco será usado no card correspondente, na ordem informada.</p>}
-        <dl className="vc-create-review">{reviewRow('Projeto', name, 0)}{reviewRow('Identidade', identityLabel, 1)}{reviewRow('Logo e referências', `${identitySummary.logo} · ${identitySummary.references} referências`, 1)}{reviewRow('Tom de voz', identitySummary.tone || 'Sem orientação adicional', 1)}{reviewRow('Tema', topic || 'Usar o material e o briefing fornecidos', 2)}{reviewRow('Material', `${material.content.length.toLocaleString('pt-BR')} caracteres de apoio${material.sources.trim() ? ' · fontes incluídas' : ''}${material.context.trim() ? ' · instruções incluídas' : ''}`, 2)}{reviewRow('Narrativa', selectedNarrative, 3)}{reviewRow('Quantidade', `${count} ${quantityUnit} · ${FORMAT_LABELS[formatId]}`, 4)}{reviewRow('Texto', CREATION_DENSITIES.find(d => d.id === density)?.label, 4)}{reviewRow('Visual', visualPreset ? `${presets.find(p => p.id === visualPreset)?.label || 'Estilo selecionado'}${identityVisualEdited ? ' · ajustado neste projeto' : ''}` : 'Identidade configurada', 5)}{reviewRow('Imagens', wantImages && hasOpenAI ? 'Gerar texto e imagens' : 'Criar o texto primeiro', 5)}</dl>
+        <dl className="vc-create-review">{reviewRow('Projeto', name, 0)}{reviewRow('Identidade', identityLabel, 1)}{reviewRow('Logo e referências', `${identitySummary.logo} · ${identitySummary.references} referências`, 1)}{reviewRow('Tom de voz', identitySummary.tone || 'Sem orientação adicional', 1)}{reviewRow('Tema', topic || 'Usar o material e o briefing fornecidos', 2)}{reviewRow('Material', `${material.content.length.toLocaleString('pt-BR')} caracteres de apoio${material.sources.trim() ? ' · fontes incluídas' : ''}${material.context.trim() ? ' · instruções incluídas' : ''}`, 2)}{reviewRow('Narrativa', selectedNarrative, 3)}{reviewRow('Quantidade', `${count} ${quantityUnit} · ${FORMAT_LABELS[formatId]}`, 4)}{reviewRow('Texto', CREATION_DENSITIES.find(d => d.id === density)?.label, 4)}{reviewRow('Visual', `${visualSummary}${identityVisualEdited ? ' · ajustado neste projeto' : ''}`, 5)}{reviewRow('Imagens', wantImages && hasOpenAI ? 'Gerar texto e imagens' : 'Criar o texto primeiro', 5)}</dl>
         {isPresentation && <PresentationStructureSummary presentationPath={path} count={count}/>}
         {!hasTextAI && <div className="vc-create-details"><p>Configure o acesso à IA para gerar. Suas escolhas ficam mantidas nesta tela.</p>{onOpenKeys && <button type="button" className="vc-btn vc-btn-ghost" onClick={onOpenKeys}>Configurar acesso à IA</button>}</div>}
         <p className="vc-create-generation-cost"><strong>Antes de gerar:</strong> tempo estimado de {estimatedMinutes} · {imageConsumption}.</p>
