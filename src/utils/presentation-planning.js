@@ -48,7 +48,7 @@ Copie cada quote de um único trecho original, caractere por caractere; nunca co
  * Only a validated plan can reach onPlan or the writing stage. Diagnostics
  * intentionally contain no generated values, evidence IDs, source text or
  * provider error messages. The caller controls how to display/store them. */
-export async function generatePresentationPlan({ brief = '', sources = [], count = 12, presentationPath = 'auto', aiOptions = {}, onStage, onPlan }, callAI) {
+export async function generatePresentationPlan({ brief = '', userInstructions = '', sources = [], count = 12, presentationPath = 'auto', aiOptions = {}, onStage, onPlan }, callAI) {
   if (!Number.isInteger(Number(count)) || Number(count) < 1 || Number(count) > 72) {
     throw Object.assign(new Error('Escolha uma quantidade válida de slides antes de gerar.'), { code: 'presentation_input_invalid' });
   }
@@ -59,7 +59,7 @@ export async function generatePresentationPlan({ brief = '', sources = [], count
     throwIfGenerationCancelled(aiOptions.signal);
     onStage?.(attempt === 1 ? 'planning' : 'planning_repair', { attempt, diagnostics });
     throwIfGenerationCancelled(aiOptions.signal);
-    const prompt = buildPresentationPlanPrompt({ brief, sources, count, presentationPath, compactRepair: attempt > 1 })
+    const prompt = buildPresentationPlanPrompt({ brief, userInstructions, sources, count, presentationPath, compactRepair: attempt > 1 })
       + (attempt > 1 ? repairBlock(previous, issues) : '');
     let raw;
     let response;

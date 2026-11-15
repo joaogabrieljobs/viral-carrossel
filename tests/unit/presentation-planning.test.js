@@ -42,6 +42,21 @@ describe('planejamento limitado com recuperação', () => {
     expect(callAI.mock.calls[1][1].maxTokens).toBe(8192);
   });
 
+  it('mantém a restrição final completa na tentativa inicial e na recuperação do plano de Aula', async () => {
+    const userInstructions = 'Contexto instrucional. '.repeat(650) + 'FINAL: atividade e correção usam somente o caso fornecido.';
+    const callAI = vi.fn().mockRejectedValueOnce(failure('ai_invalid_json')).mockResolvedValueOnce(plan());
+    await generatePresentationPlan({ ...config, presentationPath: 'aula', userInstructions }, callAI);
+    expect(callAI).toHaveBeenCalledTimes(2);
+    for (const [prompt] of callAI.mock.calls) {
+      expect(prompt).toContain(userInstructions);
+      expect(prompt).toContain('CONTRATO DA ATIVIDADE E DA CORREÇÃO');
+      expect(prompt).toContain('purpose=practice');
+      expect(prompt).toContain('correção dessa mesma entrega na posição seguinte');
+      expect(prompt).toContain('Rotular um cenário novo como hipotético não atende essa restrição');
+      expect(prompt).toContain('Não reserve páginas autônomas de oferta');
+    }
+  });
+
   it('devolve os caminhos inválidos para reparo e revalida toda a resposta', async () => {
     const invalid = plan(); invalid.slides[1].purpose = 'inventado';
     const callAI = vi.fn().mockResolvedValueOnce(invalid).mockResolvedValueOnce(plan());

@@ -170,6 +170,10 @@ it('aula reaproveita o caso fornecido e encerra com aprendizagem em redação, r
     expect(prompt).toContain('O rótulo "caso fictício" não autoriza acrescentar pessoas, datas, decisões ou resultados');
     expect(prompt).toContain('usar apenas os dados fornecidos prevalece');
     expect(prompt).toContain('O debrief confere a mesma entrega e os mesmos critérios');
+    expect(prompt).toContain('Título, apoio, blocos e notas devem se referir a esse mesmo objeto');
+    expect(prompt).toContain('resposta modelo compatível com a fonte, justificativa pelo critério anunciado');
+    expect(prompt).toContain('modelo editável citado como entregável futuro não é material disponível');
+    expect(prompt).toContain('Não reserve páginas autônomas de oferta');
     expect(prompt).toContain('Feche com a aplicação pelo participante e um critério de aprendizagem');
     expect(prompt).toContain('Preço ou oferta no material não transformam a conclusão nem a caption em venda');
     expect(prompt).toContain('somente um objetivo comercial explícito autoriza esse chamado');
@@ -195,6 +199,11 @@ describe.each(['auto', 'pitch', 'aula_workshop', 'proposta_comercial', 'relatori
       expect(prompt).toContain('No próprio slide de indicadores');
       expect(prompt).toContain('base/denominador');
       expect(prompt).toContain('licenças de software não equivalem a software próprio');
+      expect(prompt).toContain('mesmo tipo e mesmas equipes não significam as mesmas observações repetidas');
+      expect(prompt).toContain('Também não define condições de pagamento');
+      expect(prompt).toContain('Preserve qualificadores temporais das exclusões');
+      expect(prompt).toContain('não comprovam diagnóstico nem causa do problema');
+      expect(prompt).toContain('uma ressalva em outra página não corrige uma afirmação categórica');
       expect(prompt).not.toContain('Mesa Clara');
       expect(prompt).not.toContain('R$ 6.000');
     }

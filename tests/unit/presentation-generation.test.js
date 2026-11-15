@@ -69,6 +69,39 @@ describe('apresentação planejada e revisada', () => {
     expect(ai.mock.calls.every(([, options]) => options.json && options.temperature === 0.2 && options.maxTokens === 8192 && options.thinking === 'disabled')).toBe(true);
   });
 
+  it('leva a tarefa já escrita ao debrief no lote seguinte e preserva instruções completas nas três etapas', async () => {
+    const lessonPlan = planWithCount(6);
+    lessonPlan.slides[2] = { ...lessonPlan.slides[2], purpose: 'practice', visualRole: 'content',
+      question: 'Quais afirmações são fato e proposta?', keyMessage: 'Classificar duas afirmações e justificar pela modalidade.', evidenceIds: ['e1', 'e2'] };
+    lessonPlan.slides[3] = { ...lessonPlan.slides[3], purpose: 'learning', visualRole: 'content',
+      question: 'Como corrigir as duas classificações?', keyMessage: 'Construído é fato; assinatura em estudo é proposta.', evidenceIds: ['e1', 'e2'] };
+    const firstBatch = batch(0);
+    firstBatch.slides[2] = { title: 'Classifique as duas afirmações',
+      subtitle: 'Entregue duas linhas: software construído e assinatura em estudo. Classifique cada uma e justifique.',
+      bodyAfterImage: 'Critério: distinguir o que existe da intenção.', speakerNotes: 'Use somente as duas afirmações do caso.',
+      imageQuery: '', presentationBlocks: [], bgImageId: 'media-must-not-become-evidence' };
+    const secondBatch = batch(3);
+    secondBatch.slides[0] = { title: 'Confira as duas classificações',
+      subtitle: 'Software construído é fato. Assinatura em estudo é proposta, pois ainda depende de validação.',
+      bodyAfterImage: 'Não classifique uma intenção como resultado.', speakerNotes: '', imageQuery: '', presentationBlocks: [] };
+    const instructions = 'Contexto adicional. '.repeat(180) + 'RESTRIÇÃO FINAL: use apenas as duas afirmações fornecidas; não crie outro caso.';
+    const ai = vi.fn().mockResolvedValueOnce(lessonPlan).mockResolvedValueOnce(firstBatch)
+      .mockResolvedValueOnce(secondBatch).mockResolvedValueOnce({ edits: [] });
+    const output = await generateReviewedCarousel({ prompt: 'Ensine a distinguir fato de proposta.',
+      config: config({ count: 6, presentationPath: 'aula', userInstructions: instructions }) }, ai);
+    expect(ai).toHaveBeenCalledTimes(4); // no extra planning/review call
+    for (const [prompt] of ai.mock.calls.slice(0, 3)) expect(prompt).toContain(instructions);
+    expect(ai.mock.calls[3][0]).toContain(JSON.stringify(instructions));
+    expect(ai.mock.calls[0][0]).toContain('CONTRATO DA ATIVIDADE E DA CORREÇÃO');
+    const previousTask = JSON.parse(ai.mock.calls[2][0].match(/ATIVIDADES JÁ REDIGIDAS — CONTINUIDADE, NÃO FONTE FACTUAL:\n([^\n]+)/)[1]);
+    expect(previousTask).toEqual([{ index: 3, title: firstBatch.slides[2].title,
+      subtitle: firstBatch.slides[2].subtitle, bodyAfterImage: firstBatch.slides[2].bodyAfterImage,
+      presentationBlocks: [], speakerNotes: firstBatch.slides[2].speakerNotes }]);
+    expect(JSON.stringify(previousTask)).not.toContain('media-must-not-become-evidence');
+    expect(output.result.slides).toHaveLength(6);
+    expect(output.result.slides[3].title).toBe(secondBatch.slides[0].title);
+  });
+
   it('interrompe antes da redação se a fonte ou a citação for inventada', async () => {
     const invalid = plan();
     invalid.evidence[0].quote = 'Retenção de 95% comprovada.';

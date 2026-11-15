@@ -2,7 +2,7 @@ import { isGenerationCancelled, throwIfGenerationCancelled } from './generation-
 import { isPersoHybridDensity, isTendenciaCulturaPreset } from './generation-prompts.js';
 import { normalizeInstagramCaption } from './editorial-strategy.js';
 import { isPitchPath, cleanPitchSlide, cleanPitchText } from './pitch-content.js';
-import { presentationAIOptions, buildPresentationReviewRules } from './presentation.js';
+import { presentationAIOptions, buildPresentationReviewRules, getPresentationPath } from './presentation.js';
 import { buildPresentationPlanBlock, attachPresentationPlan } from './presentation-plan.js';
 import { generatePresentationPlan, parsePresentationPlanResponse, presentationResponseMetadata } from './presentation-planning.js';
 import { buildPresentationBlocksPrompt, normalizePresentationBlocks } from './presentation-quality.js';
@@ -319,6 +319,9 @@ export function validateCarouselDraft(rawDraft, { count, presetId, densityId, pr
 export function buildEditorialReviewPrompt(prompt, draft, config = {}) {
   if (config.presetId === 'apresentacao') {
     const limitsBlock = buildPresentationLimitsBlock(config, draft?.slides?.length || config.count || 0);
+    const lessonRepair = getPresentationPath(config.presentationPath).id === 'aula_workshop'
+      ? ' Em Aula, o arco a preservar é o aprendizado: corrija uma etapa de prática/correção omitida e não mantenha um desvio comercial só porque ele foi planejado, sem alterar quantidade ou ordem física.'
+      : '';
     const plannedRules = config.presentationPlan
       ? `\nCompare também o roteiro validado com a redação: cada pergunta precisa ser respondida, mas fatos e estágio (fato, proposta ou desconhecido) devem ser conferidos nas fontes originais. Validar a estrutura do roteiro não comprova suas afirmações. Não use o roteiro nem o rascunho como fonte de si mesmos. Não acrescente tração, preço, equipe ou promessa ausentes. Notas complementam a página, sem esconder ali a conclusão essencial.\n${plannedReviewStructure(config.presentationPlan)}\nPreserve o tipo do bloco e a integridade dos valores/unidades/condições; não duplique tabela em parágrafos. ${presentationReviewBlockContract(config.nativeBlocks)}`
       : '';
@@ -336,7 +339,7 @@ O briefing abaixo é referência, não um pedido para gerar o deck novamente.
 <rascunho>\n${JSON.stringify(reviewDraft)}\n</rascunho>
 Verifique: promessa da capa entregue; caminho escolhido respeitado; uma ideia por slide; progressão sem repetição; títulos legíveis a distância; argumentos e exemplos sustentados pelo material; síntese e próximo passo coerentes.${limitsBlock}
 Leia todos os campos do rascunho, inclusive blocos nativos, speakerNotes e caption. Verifique fatos, estágio e condições em cada campo, não apenas no texto principal. Decisão pendente permanece pendente; aceite não autoriza deduzir encerramento contratual. Base, período e condições essenciais de indicadores e escopo devem estar visíveis no slide correspondente, não somente nas notas.
-Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados. Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
+Corrija apenas problemas identificados. Preserve ordem, quantidade, assunto, arco, números e fatos sustentados.${lessonRepair} Remova ou qualifique alegações sem apoio; não acrescente fontes ou fatos. Não altere imageQuery nem configuração visual.
 Use slideIndex começando em zero. Não envie edições para slides que já estejam bons. Cada índice aparece no máximo uma vez. ${buildPresentationReviewRules(config.presentationPath)}
 Resposta: um único objeto JSON {"edits":[{"slideIndex":0,"reason":"problema concreto","title":"texto corrigido"}],"caption":"resumo geral corrigido apenas se necessário"}.
 Cada edição exige slideIndex e reason; inclua somente os campos que mudam: ${editableFields}. caption é opcional. Se estiver adequado, retorne {"edits":[]}. Sem texto fora do JSON ou campos adicionais.${plannedRules}`;
@@ -639,11 +642,20 @@ async function writePresentationBatches({ prompt, plan, config, textOptions, onS
       let response;
       throwIfGenerationCancelled(textOptions.signal);
       onStage?.(attempt === 1 ? 'writing' : 'writing_repair', { completedCount: slides.length, totalCount: plan.slides.length, from: offset + 1, to: offset + entries.length });
+      // Later batches must see the actual exercise, not only its title or the plan.
+      // Generated text provides continuity only; source restrictions still prevail.
+      const lessonContinuity = getPresentationPath(config.presentationPath).id === 'aula_workshop'
+        ? slides.flatMap((slide, index) => plan.slides[index]?.purpose === 'practice' ? [{
+          index: index + 1,
+          ...Object.fromEntries(['title', 'subtitle', 'bodyAfterImage', 'presentationBlocks', 'speakerNotes']
+            .filter(field => hasOwn(slide, field)).map(field => [field, slide[field]])),
+        }] : []).slice(-4)
+        : [];
       const task = `\nETAPA DE REDAÇÃO EM LOTES — CONTRATO DESTA RESPOSTA:
 O projeto completo tem ${plan.slides.length} slides. Nesta chamada, devolva EXATAMENTE ${entries.length} objetos em slides, apenas as posições ${entries.map(entry => entry.index).join(', ')} do plano, na ordem. Não devolva posições anteriores nem posteriores, não reinicie a narrativa ou crie outra capa/fecho. O plano completo é contexto; as posições abaixo são a tarefa atual.
 POSIÇÕES DESTA CHAMADA: ${JSON.stringify(entries)}
 TÍTULOS JÁ ESCRITOS (continuidade, nunca novas evidências): ${JSON.stringify(slides.map(slide => slide.title))}
-Todo slide exige título específico, curto e não vazio. Respeite os limites de cada posição. speakerNotes é opcional, até 600 caracteres; não copie o briefing nem repita o slide nas notas. Limites são tetos, não metas de preenchimento. Não gere configuração visual, plano ou evidências no JSON de redação. Escreva apenas title, subtitle, bodyAfterImage, imageQuery, presentationBlocks e speakerNotes em cada slide, mais caption (resumo breve ou vazio).
+${lessonContinuity.length ? `ATIVIDADES JÁ REDIGIDAS — CONTINUIDADE, NÃO FONTE FACTUAL:\n${JSON.stringify(lessonContinuity)}\nSe esta chamada inclui a correção, responda à mesma tarefa e ao critério anunciados acima. Confira o conteúdo nas fontes originais; não legitime um cenário que o lote anterior inventou. Não troque a entrega do caso por uma pergunta pessoal ou por outro conceito.\n` : ''}Todo slide exige título específico, curto e não vazio. Respeite os limites de cada posição. speakerNotes é opcional, até 600 caracteres; não copie o briefing nem repita o slide nas notas. Limites são tetos, não metas de preenchimento. Não gere configuração visual, plano ou evidências no JSON de redação. Escreva apenas title, subtitle, bodyAfterImage, imageQuery, presentationBlocks e speakerNotes em cada slide, mais caption (resumo breve ou vazio).
 ${attempt > 1 ? `A resposta anterior deste lote não pôde ser utilizada. Refaça somente estas posições com JSON completo e conciso; preserve fatos e condições essenciais, sem adicionar detalhes para preencher espaço. Diagnóstico estrutural (sem conteúdo): ${JSON.stringify(previousIssue)}. O caminho refere-se ao array deste lote; slideIndex identifica a posição no deck completo, começando em zero. Corrija o campo indicado conforme o contrato; todos os valores textuais de blocos devem ser strings e o array aceita no máximo um bloco.` : ''}`;
       try {
         const raw = await callAI(prompt + task, { ...textOptions, maxTokens: 8192, jsonParser: parsePresentationPlanResponse,
@@ -721,7 +733,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
     ].filter(text => typeof text === 'string').join('\n'),
   };
   const { plan, diagnostics: planningDiagnostics } = await generatePresentationPlan({
-    brief: planning.brief || '', sources, count: config.count, presentationPath: config.presentationPath,
+    brief: planning.brief || '', userInstructions: config.userInstructions || '', sources, count: config.count, presentationPath: config.presentationPath,
     aiOptions: textOptions, onStage, onPlan,
   }, callAI);
   let writingDiagnostics = [];
@@ -744,7 +756,7 @@ export async function generatePlannedPresentation({ prompt, config, aiOptions, o
       : config.presentationTextLimits,
   };
   const blockRules = config.nativeBlocks === false ? 'Neste padrão personalizado presentationBlocks deve ser []. Preserve a composição livre do usuário.' : buildPresentationBlocksPrompt();
-  const generationPrompt = `${prompt}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco) e speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
+  const generationPrompt = `${prompt}\nINSTRUÇÕES ATUAIS DO USUÁRIO — restrições também válidas para cada lote de redação:\n${config.userInstructions || ''}\n${buildPresentationPlanBlock(plan)}\n${blockRules}\nCONTRATO COMPLEMENTAR: em cada slide inclua presentationBlocks (ou [] quando não houver bloco) e speakerNotes (complemento opcional no idioma definido, até 600 caracteres, ou ""). O texto visível deve ser autossuficiente. Não coloque nomes de arquivos, rótulos de extração nem instruções ao designer no texto final. Dados, exemplos e condições permanecem fiéis às evidências. Em slides com bloco, subtitle contextualiza sem repetir suas células; bodyAfterImage fica vazio e apenas aprofundamento vai para speakerNotes.${buildPresentationLimitsBlock(plannedConfig, config.count)}`;
   const written = await writePresentationBatches({ prompt: generationPrompt, plan, config: plannedConfig, textOptions, onStage, onDraft }, callAI);
   writingDiagnostics = written.diagnostics;
   const draft = written.draft;

@@ -71,6 +71,29 @@ criação de apresentação nova, cancelar permite abrir e salvar os grupos já
 validados como rascunho incompleto no mesmo projeto. Não se substitui conteúdo
 de um projeto existente ou remix com essa recuperação.
 
+## Continuidade instrucional da Aula
+
+As instruções atuais completas são passadas separadamente ao planejamento,
+à recuperação do roteiro, a cada lote de redação e à revisão. Assim, uma
+restrição no fim dessas instruções não depende do recorte do briefing. A seleção
+limitada de trechos das fontes continua existindo e não é ampliada por isso.
+
+No caminho Aula, o planner recebe o contrato de atividade e correção antes de
+distribuir as posições. A redação de um lote posterior recebe os campos textuais
+e blocos de até quatro atividades anteriores marcadas como `purpose=practice`,
+além dos títulos de continuidade. Esse conteúdo gerado não se torna evidência:
+a correção deve conferir a mesma tarefa, entrega e critério nas fontes originais.
+Título, apoio e notas precisam tratar do mesmo objeto. A resposta modelo mantém
+lacunas do caso, e a transferência para o contexto do participante vem depois.
+
+A revisão pode aproveitar uma posição redundante ou comercial sem função
+pedagógica para corrigir a mesma atividade, preservando quantidade, ordem física
+e mídia. A presença de uma oferta na fonte não exige páginas comerciais na Aula.
+Esses ajustes não acrescentam chamadas de IA nem alteram o schema. Os testes
+verificam a propagação integral das instruções e o conteúdo transmitido entre
+lotes; não certificam que o modelo produziu um debrief semanticamente correto.
+Essa aderência exige avaliação de uma nova amostra real.
+
 ## Conferência factual e limites
 
 O guard local usa o contexto factual fornecido, as instruções atuais e os
@@ -113,6 +136,10 @@ Os testes de contrato usam casos de apresentação conceitual, proposta, relató
 pitch e aula. Verificam citações falsas, origem inexistente, modalidade,
 cancelamento, perda de condições, limites e conteúdo editável. São avaliações
 determinísticas; não simulam uma nota de qualidade de um modelo real.
+
+A validação local do ajuste de continuidade instrucional passou em 258 testes
+de dez suítes, incluindo regressões de Social e Pitch. Esse resultado verifica
+contratos e orquestração; não registra uma nova geração real como aprovada.
 
 Os testes de navegador cobrem os sete caminhos, texto desenvolvido, geração de
 imagem por moldura, edição de tabela, persistência, troca de formato e PDF.
