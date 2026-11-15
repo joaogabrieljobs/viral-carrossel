@@ -112,6 +112,7 @@ test('upload atual → três anúncios; referências em IndexedDB; projeto B iso
   expect(prompts[0]).toContain('ENTREGA PUBLICITÁRIA');
   expect(prompts[0]).not.toContain('MÉTODO EDITORIAL');
   expect(generated.brand.titleFont).toContain('Anton');
+  expect(generated.visualPreset).toBeNull();
   expect(generated.brand.accent).toBe('#FF5C00');
   expect(generated.slides.every(s => s.titleWeight === 400 && s.photoRegion === 'full')).toBe(true);
   await contextPanel(page);

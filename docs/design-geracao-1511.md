@@ -16,6 +16,7 @@ Nos testes reais de produção, o início neutro mantinha cores e fontes básica
 - O estilo cinematográfico usa um painel alto de imagem: a primeira inspeção local revelou que uma faixa panorâmica cortava o rosto da foto de teste. A geometria foi revista.
 - Texto sobre foto escurecida ganha contraste também quando a marcação legada de Cultura não possui corpo. A narrativa Cultura não sobrescreve a composição social nova.
 - Presets personalizados, remix e escolhas explícitas de posição da foto mantêm seus caminhos existentes. Nenhuma mudança global dos projetos já salvos é executada.
+- Na geração rápida do editor, um brief com direção visual explícita continua prevalecendo quando não há preset selecionado. A primeira CI completa identificou que a recomendação automática substituía a fonte Anton de um brief por Playfair; a recomendação agora atua como fallback apenas sem essa direção. O fluxo novo continua usando o preset recomendado ou escolhido explicitamente.
 
 ## Verificação
 
