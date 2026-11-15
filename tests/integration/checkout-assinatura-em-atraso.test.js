@@ -48,7 +48,7 @@ describe('checkout com assinatura em atraso (achado 5)', () => {
     expect(res.statusCode).toBe(200);
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
     expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: CUSTOMER, return_url: 'https://moont.ai/?app=1' }),
+      expect.objectContaining({ customer: CUSTOMER, locale: 'pt-BR', return_url: 'https://moont.ai/?app=1' }),
     );
     expect(res.body.url).toBe('https://billing.stripe.com/p/session_fake');
     expect(res.body.billingIssue).toBe(true);
@@ -72,6 +72,9 @@ describe('checkout com assinatura em atraso (achado 5)', () => {
   it('assinatura incomplete sem link de fatura cai no portal', async () => {
     const res = await checkoutCom([sub('incomplete', { latest_invoice: 'in_2' })]);
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: CUSTOMER, locale: 'pt-BR' }),
+    );
     expect(res.body.url).toBe('https://billing.stripe.com/p/session_fake');
   });
 

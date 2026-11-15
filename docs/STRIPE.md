@@ -19,6 +19,12 @@
 
 Checkouts iniciados antes da troca para o cookie assinado não podem usar a confirmação nova. Se o pagamento foi concluído, o assinante recupera o acesso pelo login da conta.
 
+### Idioma do portal do cliente
+
+As sessões do Customer Portal enviam `locale: 'pt-BR'`, tanto ao abrir pelo Perfil quanto na regularização de assinatura pendente. Isso fixa os textos da Stripe em português do Brasil, em vez de depender do idioma do navegador ou das preferências do cliente. [Referência da Stripe](https://docs.stripe.com/api/customer_portal/sessions/create#create_portal_session-locale).
+
+Para ver a alteração em uma sessão já aberta, volte ao Moont e use **Perfil → Abrir portal do cliente**, criando uma nova sessão. O parâmetro é da sessão do portal; não traduz nomes de produtos nem altera sessões de Checkout ou faturas hospedadas.
+
 ### Login e-mail + senha (assinantes)
 
 O login inclui **Mostrar/Ocultar senha** e **Esqueci minha senha**. A recuperação

@@ -302,6 +302,7 @@ export async function handleCheckout(req, res) {
         ? invoice.hosted_invoice_url : null;
       const url = invoiceUrl || (await stripe.billingPortal.sessions.create({
         customer: customer.id,
+        locale: 'pt-BR',
         return_url: `${appUrl}/?app=1`,
       })).url;
       return res.status(200).json({
@@ -517,6 +518,7 @@ export async function handlePortal(req, res) {
     const appUrl = getBillingReturnUrl(req);
     const portal = await stripe.billingPortal.sessions.create({
       customer: access.customerId,
+      locale: 'pt-BR',
       return_url: `${appUrl}/?app=1`,
     });
 

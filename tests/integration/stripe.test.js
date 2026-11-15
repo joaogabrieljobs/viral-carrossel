@@ -361,7 +361,7 @@ describe('POST /api/stripe/portal (RF-10)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.url).toContain('https://billing.stripe.com/');
     expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_8' }),
+      expect.objectContaining({ customer: 'cus_8', locale: 'pt-BR' }),
     );
   });
 
