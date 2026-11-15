@@ -1,9 +1,9 @@
 /**
- * Gate de assinatura para endpoints caros (proxies IA, fetch-source).
- * Cookie HMAC válido + assinatura Stripe ativa (exceto BILLING_DISABLED em non-prod).
+ * Gate de acesso para endpoints caros (proxies IA, fetch-source).
+ * Cookie HMAC válido + assinatura ativa ou isenção privada da conta.
  */
 import { readAccessCookie, readCurrentAccessCookie, billingDisabled } from './access.js';
-import { findActiveSubscription } from './stripe.js';
+import { accountEntitlementsEnabled, resolveAccountEntitlement } from './account-entitlements.js';
 
 // Uploads de carrossel fazem várias chamadas OCR em sequência. Um cache curto
 // evita repetir duas consultas Stripe por imagem — TTL baixo para não prolongar
@@ -56,7 +56,7 @@ export async function requireActiveSubscription(req, res, opts = {}) {
     return { billingDisabled: true };
   }
 
-  const cacheKey = cacheAllowed() ? cachedAccessKey(req) : '';
+  const cacheKey = !accountEntitlementsEnabled() && cacheAllowed() ? cachedAccessKey(req) : '';
   const cached = cacheKey ? activeAccessCache.get(cacheKey) : null;
   if (cached && cached.expiresAt > Date.now()) return cached.access;
 
@@ -75,8 +75,8 @@ export async function requireActiveSubscription(req, res, opts = {}) {
   }
 
   try {
-    const sub = await findActiveSubscription(access.customerId);
-    if (!sub) {
+    const entitlement = await resolveAccountEntitlement(access.customerId);
+    if (!entitlement.active) {
       invalidateActiveAccessForCustomer(access.customerId);
       fail(402, 'Assinatura inativa. Renove o plano para continuar.');
       return null;

@@ -12,8 +12,8 @@
  */
 import { createHash } from 'node:crypto';
 import { waitUntil } from '@vercel/functions';
-import { findActiveSubscription } from './stripe.js';
-import { resolveTierFromSubscription, imageQuotaForTier, periodBoundsFromSubscription } from './plans.js';
+import { resolveAccountEntitlement } from './account-entitlements.js';
+import { imageQuotaForTier } from './plans.js';
 import { consumeImageCredit, refundImageCredit, settleImageCredit, getQuotaUsage } from './image-quota.js';
 import {
   isSjinnConfigured, createGptImage2Task, waitForSjinnTask, downloadImageAsBase64,
@@ -73,12 +73,13 @@ export async function storeGeneratedAsset(ownerId, dataUrl) {
 }
 
 async function quotaContext(ownerId) {
-  const sub = await findActiveSubscription(ownerId).catch(() => null);
-  if (!sub) fail(402, 'subscription_inactive', 'Assinatura inativa.');
-  const tier = resolveTierFromSubscription(sub);
+  const entitlement = await resolveAccountEntitlement(ownerId)
+    .catch(() => fail(503, 'entitlement_unavailable', 'Não foi possível verificar o acesso agora.'));
+  if (!entitlement.active) fail(402, 'subscription_inactive', 'Assinatura inativa.');
+  const tier = entitlement.tier;
   const limit = imageQuotaForTier(tier);
   if (limit <= 0) fail(402, 'plan_no_images', 'Seu plano não inclui geração de imagens.');
-  const { periodStartSec, periodEndSec } = periodBoundsFromSubscription(sub);
+  const { quotaPeriodStartSec: periodStartSec, quotaPeriodEndSec: periodEndSec } = entitlement;
   if (!periodStartSec || !periodEndSec) {
     fail(503, 'quota_period_unavailable', 'Não foi possível confirmar o período da assinatura. Nenhum crédito foi usado.');
   }

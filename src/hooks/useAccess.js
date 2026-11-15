@@ -36,6 +36,8 @@ const LOGOUT_CLEANUP_DEVICE_WIPE = 'device-wipe';
 const PROJECTS_V2 = import.meta.env.VITE_PROJECTS_V2 === 'true';
 const LOGOUT_CLEANUP_WARNING = 'Você saiu da conta, mas ainda há dados locais neste navegador. Vamos terminar a limpeza antes de abrir outra conta.';
 const OUTBOX_BOOT_WARNING = 'A biblioteca abriu, mas não foi possível verificar as alterações pendentes neste navegador. Edições ainda não enviadas podem não aparecer; mantenha este navegador e tente salvar novamente antes de sair.';
+const ACCESS_UNCONFIRMED_HINT = 'A consulta não confirmou o acesso à assinatura. Seus projetos não foram apagados. Confira a assinatura no portal do cliente.';
+const ACCESS_SESSION_REQUIRED_HINT = 'Sua sessão não foi confirmada. Seus projetos não foram apagados. Entre novamente para verificar sua conta.';
 const LOGOUT_PRESERVED_KEYS = new Set([
   ACCOUNT_VAULT_KEY, PENDING_SHARE_KEY,
   'vc_account_write_lock', 'vc_account_write_lock_token',
@@ -51,6 +53,7 @@ export function accessStateFromSession(session = {}, current = {}) {
       // em vez do paywall. Durante o uso, mantém a conta aberta localmente.
       status: wasActive ? session.status : 'loading',
       sessionStatus: session.status,
+      verificationRefreshing: false,
       verificationUnavailable: true,
       verificationError: session.error || 'Não foi possível verificar sua conta. Tente novamente.',
       active: wasActive,
@@ -59,17 +62,42 @@ export function accessStateFromSession(session = {}, current = {}) {
   return {
     status: session.billingDisabled ? 'disabled' : (session.active ? 'active' : 'inactive'),
     sessionStatus: session.status || null,
+    verificationRefreshing: false,
     verificationUnavailable: false,
     verificationError: '',
     active: !!session.active,
     email: session.email || null,
     customerId: session.customerId || null,
     billingDisabled: !!session.billingDisabled,
+    billingExempt: session.active === true && session.billingExempt === true && session.accessSource === 'exempt',
+    accessSource: ['exempt', 'stripe'].includes(session.accessSource) ? session.accessSource : null,
+    quotaPeriodStart: session.active ? session.quotaPeriodStart || null : null,
+    quotaPeriodEnd: session.active ? session.quotaPeriodEnd || null : null,
     currentPeriodEnd: session.currentPeriodEnd || null,
     currentPeriodStart: session.currentPeriodStart || null,
     tier: session.tier || null,
     plan: session.plan || null,
     imageQuota: session.imageQuota || null,
+  };
+}
+
+/** A quota refresh also verifies access; unavailable counts are not an active plan. */
+export function accessStateFromUsageSession(session = {}, current = {}) {
+  const unavailableQuota = { status: 'unavailable', available: false, used: null, remaining: null, allowed: false };
+  const otherAccount = (session.email && current.email && session.email.toLowerCase() !== current.email.toLowerCase())
+    || (session.customerId && current.customerId && session.customerId !== current.customerId);
+  if (otherAccount) {
+    return {
+      ...accessStateFromSession({ status: 'error', error: 'A conta da sessão mudou. Entre novamente para confirmar o acesso.' }, current),
+      imageQuota: { ...current.imageQuota, ...unavailableQuota },
+    };
+  }
+  const next = accessStateFromSession(session, current);
+  return {
+    ...next,
+    imageQuota: isAccessSessionUnavailable(session)
+      ? { ...current.imageQuota, ...unavailableQuota }
+      : session.active ? session.imageQuota || unavailableQuota : unavailableQuota,
   };
 }
 
@@ -293,6 +321,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const [accountTab, setAccountTab] = useState('projects'); // projects | profile
   const [access, setAccess] = useState({ status: 'loading', active: false, email: null });
   const latestAccessRef = useRef(access);
+  const usageRefreshIdRef = useRef(0);
   const logoutInFlightRef = useRef(false);
   latestAccessRef.current = access;
   const accessActive = !!access.active;
@@ -324,33 +353,24 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   // Atualizar o consumo não reinicia o login nem a restauração de projetos.
   // Respostas atrasadas de outra conta não alteram a sessão atual.
   const refreshImageUsage = useCallback(async () => {
-    const owner = latestAccessRef.current.email;
+    const owner = { email: latestAccessRef.current.email, customerId: latestAccessRef.current.customerId };
+    if (!owner.email && !owner.customerId) return null;
+    const requestId = ++usageRefreshIdRef.current;
+    const isSameOwner = current => current.email === owner.email && current.customerId === owner.customerId;
+    setAccess(current => isSameOwner(current) ? { ...current, verificationRefreshing: true } : current);
     const session = await fetchAccessSession();
-    if (latestAccessRef.current.email !== owner || !latestAccessRef.current.active) return null;
-    if (isAccessSessionUnavailable(session)) {
-      setAccess((current) => ({
-        ...current,
-        status: session.status,
-        sessionStatus: session.status,
-        verificationUnavailable: true,
-        verificationError: session.error || 'Não foi possível verificar sua conta. Tente novamente.',
-        imageQuota: { ...current.imageQuota, status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
-      }));
-      throw new Error(session.error || 'Não foi possível consultar o uso da conta.');
+    if (requestId !== usageRefreshIdRef.current || !isSameOwner(latestAccessRef.current)) return null;
+    const next = accessStateFromUsageSession(session, latestAccessRef.current);
+    // Reconcile only the session state. Never reload, clear or replace projects
+    // when access changes or a verification request fails.
+    setAccess(current => isSameOwner(current) ? accessStateFromUsageSession(session, current) : current);
+    if (next.verificationUnavailable) throw new Error(next.verificationError || 'Não foi possível consultar o uso da conta.');
+    if (!next.active) {
+      setPaywallEmail(owner.email || '');
+      setLoginHint(next.email ? ACCESS_UNCONFIRMED_HINT : ACCESS_SESSION_REQUIRED_HINT);
+      throw new Error('Não foi possível confirmar o acesso à assinatura. Confira sua conta.');
     }
-    if (!session.active || session.email !== owner) {
-      setAccess((current) => ({
-        ...current,
-        imageQuota: { ...current.imageQuota, status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
-      }));
-      throw new Error('Não foi possível consultar o uso da conta.');
-    }
-    setAccess((current) => ({
-      ...current, tier: session.tier, plan: session.plan,
-      imageQuota: session.imageQuota || { status: 'unavailable', available: false, used: null, remaining: null, allowed: false },
-      currentPeriodStart: session.currentPeriodStart || null,
-      currentPeriodEnd: session.currentPeriodEnd || null,
-    }));
+    setLoginHint(current => [ACCESS_UNCONFIRMED_HINT, ACCESS_SESSION_REQUIRED_HINT].includes(current) ? '' : current);
     return session.imageQuota || null;
   }, []);
 
@@ -748,12 +768,15 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const openPortal = useCallback(async () => {
     try {
       const { url } = await openBillingPortal();
-      if (url) window.location.href = url;
+      if (!url) throw new Error('Não foi possível abrir o portal do cliente. Tente novamente.');
+      window.location.href = url;
+      return { ok: true };
     } catch (e) {
       console.warn('[billing] portal', e);
       const msg = e?.message || 'Não foi possível abrir o portal de assinatura.';
       if (typeof toast === 'function') toast(msg, 'error', 5000);
       else console.error(msg);
+      return { ok: false, error: msg };
     }
   }, [toast]);
   const handleLogout = useCallback(async ({ wipeDevice = false } = {}) => {

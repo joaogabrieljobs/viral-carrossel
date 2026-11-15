@@ -7,6 +7,7 @@ import {
 } from './account-identity-postgres.js';
 import { getPostgresConnection } from './postgres-connection.js';
 import { findActiveSubscription, getStripe } from './stripe.js';
+import { accountEntitlementsEnabled, resolveAccountEntitlement } from './account-entitlements.js';
 
 const TOKEN_PREFIX = 'moont_pat_';
 const TOKEN_PATTERN = /^moont_pat_[A-Za-z0-9_-]{43}$/;
@@ -35,6 +36,11 @@ export function clearAgentSubscriptionCache() {
 }
 
 async function cachedActiveSubscription(ownerId) {
+  // A distributed grant/revocation must not inherit an earlier paid-cache result.
+  if (accountEntitlementsEnabled()) {
+    subscriptionCache.delete(ownerId);
+    return (await resolveAccountEntitlement(ownerId)).active;
+  }
   const hit = subscriptionCache.get(ownerId);
   if (hit && hit.until > Date.now()) return hit.active;
   const active = await findActiveSubscription(ownerId);

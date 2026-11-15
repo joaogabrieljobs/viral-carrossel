@@ -6,7 +6,8 @@ import {
   getAuthRecordsMatchingPassword,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
-import { getStripe, findActiveSubscription } from '../lib/stripe.js';
+import { getStripe } from '../lib/stripe.js';
+import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { accountIdentityBackendEnabled, getAccountByStripeCustomerId } from '../lib/account-identity-postgres.js';
 
@@ -71,8 +72,8 @@ export default async function handler(req, res) {
       customerId = customer.id;
     }
 
-    const sub = await findActiveSubscription(customerId);
-    if (!sub) {
+    const entitlement = await resolveAccountEntitlement(customerId);
+    if (!entitlement.active) {
       setCheckoutIdentityCookie(res, {
         email: cleanEmail,
         customerId,
@@ -103,6 +104,6 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('[auth/login]', e?.message || e);
-    return res.status(500).json({ error: e.message || 'login_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'login_error' });
   }
 }

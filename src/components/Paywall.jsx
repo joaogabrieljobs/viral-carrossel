@@ -14,12 +14,15 @@ export default function Paywall({
   onBack,
   onLogin,
   onRegister,
+  onManageBilling,
   initialEmail = '',
   loginHint = '',
 }) {
   const [email, setEmail] = useState(initialEmail || '');
   const [tier, setTier] = useState('creator');
   const [loading, setLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState('');
   const [error, setError] = useState(loginHint || '');
 
   useEffect(() => {
@@ -31,6 +34,20 @@ export default function Paywall({
   }, [loginHint]);
 
   const plan = PLAN_TIERS[tier] || PLAN_TIERS.creator;
+
+  const manageBilling = async () => {
+    if (!onManageBilling || portalLoading) return;
+    setPortalError('');
+    setPortalLoading(true);
+    try {
+      const result = await onManageBilling();
+      if (result?.ok === false) setPortalError(result.error || 'Não foi possível abrir o portal do cliente. Tente novamente.');
+    } catch (err) {
+      setPortalError(err?.message || 'Não foi possível abrir o portal do cliente. Tente novamente.');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -112,6 +129,18 @@ export default function Paywall({
           Texto (Moont AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.
         </p>
 
+        {onManageBilling && (
+          <section aria-label="Assinatura da sua conta" style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.16)' }}>
+            <p role="status" style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.5 }}>
+              {loginHint || 'Confira sua assinatura e as opções de pagamento no portal do cliente.'}
+            </p>
+            <button type="button" onClick={manageBilling} disabled={portalLoading} className="vc-btn vc-btn-primary" style={{ width: '100%', minHeight: 44 }}>
+              {portalLoading ? 'Abrindo portal…' : 'Abrir portal do cliente'}
+            </button>
+            {portalError && <p role="alert" style={{ margin: '12px 0 0', fontSize: 13, color: '#ff8fab' }}>{portalError}</p>}
+          </section>
+        )}
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
@@ -174,7 +203,7 @@ export default function Paywall({
               boxSizing: 'border-box',
             }}
           />
-          {error && (
+          {error && !(onManageBilling && error === loginHint) && (
             <p style={{ margin: '0 0 12px', fontSize: 13, color: '#ff8fab' }}>{error}</p>
           )}
           <button

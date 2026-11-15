@@ -7350,6 +7350,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
             initialEmail={paywallEmail}
             loginHint={loginHint}
             onBack={reopenLanding}
+            onManageBilling={access.email && !access.verificationUnavailable && ['active', 'inactive'].includes(access.status) ? openPortal : undefined}
             onLogin={() => { setLoginMode('login'); setLoginOpen(true); }}
             onRegister={() => { setLoginMode('register'); setLoginOpen(true); }}
           />
@@ -7441,6 +7442,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           openingDocId={openingDocId}
           onOpenBrands={() => setBrandsOpen(true)}
           accessEmail={access.email}
+          accessStatus={access}
           currentPeriodEnd={access.currentPeriodEnd}
           currentPeriodStart={access.currentPeriodStart}
           planTier={access.tier || null}

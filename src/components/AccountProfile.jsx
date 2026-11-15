@@ -341,6 +341,26 @@ function Field({ label, children }) {
   );
 }
 
+function subscriptionAccessCopy(access, currentPeriodEnd) {
+  if (access?.billingDisabled) return 'A cobrança está desativada neste ambiente.';
+  if (access?.verificationRefreshing) return 'Verificando o acesso à assinatura…';
+  if (access?.verificationUnavailable || ['offline', 'timeout', 'error'].includes(access?.status)) {
+    return 'Não foi possível verificar o acesso à assinatura agora. Tente atualizar novamente.';
+  }
+  if (access?.active === true && access?.status === 'active') {
+    if (access.billingExempt === true && access.accessSource === 'exempt') {
+      const quotaEnd = access.quotaPeriodEnd ? new Date(access.quotaPeriodEnd) : null;
+      return `Conta isenta de cobrança${quotaEnd && Number.isFinite(quotaEnd.getTime()) ? ` · ciclo de créditos até ${quotaEnd.toLocaleDateString('pt-BR')}` : ''}.`;
+    }
+    const end = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
+    return `Acesso à assinatura confirmado${end && Number.isFinite(end.getTime()) ? ` · período atual até ${end.toLocaleDateString('pt-BR')}` : ''}.`;
+  }
+  if (access?.active === false && access?.status === 'inactive') {
+    return 'Acesso à assinatura não confirmado. Confira sua conta no portal do cliente.';
+  }
+  return 'Acesso à assinatura ainda não verificado.';
+}
+
 export default function AccountProfile({
   email,
   libraryCount = 0,
@@ -357,6 +377,8 @@ export default function AccountProfile({
   currentPeriodEnd,
   planTier,
   imageQuota,
+  accessStatus,
+  onRefreshAccess,
   onOpenUsage,
   onProfileSaved,
   cloudProfile,
@@ -389,6 +411,9 @@ export default function AccountProfile({
   const imageProvider = IMAGE_PROVIDERS[aiSettings?.imageProvider] || IMAGE_PROVIDERS.openai;
   const aiReady = hasTextAI && hasImageAI;
   const usage = normalizeAccountUsage({ imageQuota, planTier, currentPeriodEnd });
+  const confirmedExempt = accessStatus?.active === true && accessStatus?.status === 'active'
+    && accessStatus.billingExempt === true && accessStatus.accessSource === 'exempt'
+    && !accessStatus.verificationUnavailable && !accessStatus.verificationRefreshing;
   const imageStatus = aiSettings?.useOwnImageKey
     ? `${imageProvider.name}${hasImageAI ? '' : ' · falta chave'}`
     : usage.noIncludedImages ? 'não inclusas no plano'
@@ -529,7 +554,7 @@ export default function AccountProfile({
         gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr',
         gap: 12,
       }}>
-        <div style={{
+        <div role="region" aria-label="Assinatura e acesso" style={{
           padding: 18,
           borderRadius: 16,
           border: '1px solid var(--border)',
@@ -539,18 +564,23 @@ export default function AccountProfile({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div className="vc-eyebrow" style={{ marginBottom: 4 }}>Assinatura</div>
+              <div className="vc-eyebrow" style={{ marginBottom: 4 }}>{confirmedExempt ? 'Acesso e créditos' : 'Assinatura'}</div>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Moont {usage.planName || 'Studio'}</h3>
             </div>
             <CreditCard size={18} color="var(--text-muted)" />
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-            Plano individual ativo
-            {currentPeriodEnd
-              ? ` · renova ${new Date(currentPeriodEnd).toLocaleDateString('pt-BR')}`
-              : ''}
-            . Pagamento e cancelamento no portal seguro.
+          <p role="status" style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            {subscriptionAccessCopy(accessStatus, currentPeriodEnd)}
+            {onManageBilling && !accessStatus?.billingDisabled && !confirmedExempt ? ' Pagamento e cancelamento no portal seguro.' : ''}
           </p>
+          {confirmedExempt && onManageBilling && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            A isenção de acesso não cancela assinaturas anteriores. Você pode gerenciá-las no portal do cliente.
+          </p>}
+          {onRefreshAccess && <button type="button" className="vc-btn vc-btn-ghost"
+            disabled={!!accessStatus?.verificationRefreshing}
+            onClick={() => { Promise.resolve().then(() => onRefreshAccess()).catch(() => {}); }}>
+            {accessStatus?.verificationRefreshing ? 'Verificando acesso…' : 'Atualizar acesso'}
+          </button>}
           {onManageBilling ? (
             <button
               type="button"
@@ -570,7 +600,7 @@ export default function AccountProfile({
             </button>
           ) : (
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              Billing desativado neste ambiente.
+              {accessStatus?.billingDisabled ? 'Cobrança desativada neste ambiente.' : 'Portal do cliente indisponível neste momento.'}
             </p>
           )}
           {onLogout && (

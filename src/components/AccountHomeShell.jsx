@@ -63,6 +63,7 @@ function AccountHomeShell({
   openingDocId = null,
   onOpenBrands,
   accessEmail,
+  accessStatus,
   currentPeriodEnd,
   currentPeriodStart,
   onRefreshUsage,
@@ -93,7 +94,7 @@ function AccountHomeShell({
   }, [initialProjectView]);
 
   useEffect(() => {
-    if (accountTab === 'usage') onRefreshUsage?.().catch(() => {});
+    if (accountTab === 'usage' || accountTab === 'profile') onRefreshUsage?.().catch(() => {});
   }, [accountTab, onRefreshUsage]);
 
   useEffect(() => {
@@ -173,7 +174,8 @@ function AccountHomeShell({
             <AccountUsage
               imageQuota={imageQuota} planTier={planTier} currentPeriodStart={currentPeriodStart}
               currentPeriodEnd={currentPeriodEnd} useOwnImageKey={useOwnImageKey} isMobile={isMobile}
-              onRefresh={onRefreshUsage} onOpenSettings={onOpenSettings} onManageBilling={onManageBilling}
+              onRefresh={onRefreshUsage} onOpenSettings={onOpenSettings}
+              onManageBilling={accessStatus?.billingExempt && accessStatus?.accessSource === 'exempt' ? undefined : onManageBilling}
             />
           )}
           {accountTab === 'images' && (
@@ -191,6 +193,7 @@ function AccountHomeShell({
                 <p>Seu nome, bio, redes e assinatura.</p>
               </header>
               <AccountProfile
+                accessStatus={accessStatus} onRefreshAccess={onRefreshUsage}
                 email={accessEmail} libraryCount={library.length} brandCount={brandCount}
                 totalCards={totalItems} aiSettings={aiSettings} hasTextAI={hasTextAI} hasImageAI={hasImageAI}
                 isMobile={isMobile} onOpenSettings={onOpenSettings} onManageBilling={onManageBilling}

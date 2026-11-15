@@ -24,11 +24,10 @@ import {
   PLAN_ORDER,
   getPlan,
   getStripePriceIdForTier,
-  resolveTierFromSubscription,
   imageQuotaForTier,
-  periodBoundsFromSubscription,
 } from './plans.js';
 import { getImageQuotaActivity, getQuotaUsage } from './image-quota.js';
+import { resolveAccountEntitlement, resolveAccountExemption } from './account-entitlements.js';
 import {
   accountIdentityBackendEnabled,
   getOrCreateAccountForStripeCustomer,
@@ -92,8 +91,8 @@ export async function handleSession(req, res) {
       return res.status(200).json({ active: false, email: null, status: 'anonymous' });
     }
 
-    const sub = await findActiveSubscription(access.customerId);
-    if (!sub) {
+    const entitlement = await resolveAccountEntitlement(access.customerId);
+    if (!entitlement.active) {
       invalidateActiveAccessForCustomer(access.customerId);
       return res.status(200).json({
         active: false,
@@ -102,8 +101,9 @@ export async function handleSession(req, res) {
       });
     }
 
-    const tier = resolveTierFromSubscription(sub);
-    const bounds = periodBoundsFromSubscription(sub);
+    const tier = entitlement.tier;
+    const bounds = { periodStart: entitlement.quotaPeriodStart, periodEnd: entitlement.quotaPeriodEnd,
+      periodStartSec: entitlement.quotaPeriodStartSec, periodEndSec: entitlement.quotaPeriodEndSec };
     const limit = imageQuotaForTier(tier);
     let imageQuota = {
       status: 'unavailable',
@@ -148,7 +148,11 @@ export async function handleSession(req, res) {
       active: true,
       email: access.email,
       customerId: access.customerId,
-      status: sub.status,
+      status: entitlement.status,
+      accessSource: entitlement.accessSource,
+      billingExempt: entitlement.billingExempt,
+      quotaPeriodStart: bounds.periodStart,
+      quotaPeriodEnd: bounds.periodEnd,
       currentPeriodEnd: bounds.periodEnd,
       currentPeriodStart: bounds.periodStart,
       tier,
@@ -157,7 +161,7 @@ export async function handleSession(req, res) {
     });
   } catch (e) {
     console.error('[auth/session]', e?.message || e);
-    return res.status(500).json({ active: false, error: 'session_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json({ active: false, error: e?.code || 'session_error' });
   }
 }
 
@@ -184,16 +188,6 @@ export async function handleCheckout(req, res) {
     }
 
     const tier = PLAN_ORDER.includes(rawTier) ? rawTier : 'creator';
-    const stripe = getStripe();
-    const priceId = getStripePriceIdForTier(tier);
-    if (!priceId) {
-      return res.status(503).json({
-        error: `O plano ${tier} está temporariamente indisponível para assinatura.`,
-        code: 'plan_price_not_configured',
-      });
-    }
-    const appUrl = getBillingReturnUrl(req);
-
     // O e-mail do formulário não prova titularidade de um customer existente.
     // Só login anterior ou prova curta emitida após Google/senha/cadastro novo
     // podem vincular este checkout a uma conta que já possui projetos.
@@ -205,6 +199,30 @@ export async function handleCheckout(req, res) {
     const accessMatches = !proofMatches && String(access?.email || '').trim().toLowerCase() === cleanEmail;
     const boundCustomerId = proofMatches ? identity.customerId
       : accessMatches ? access.customerId : null;
+    if (boundCustomerId) {
+      const exemption = await resolveAccountExemption(boundCustomerId);
+      if (exemption) {
+        const account = await getOrCreateAccountForStripeCustomer(boundCustomerId);
+        if (!account || account.id !== exemption.accountId
+          || (proofMatches && String(identity.identityEpoch || '') !== String(account.identityEpoch || ''))) {
+          return res.status(403).json({ error: 'A conta mudou. Entre novamente antes de assinar.' });
+        }
+        return res.status(200).json({ alreadyActive: true, requireLogin: true,
+          billingExempt: true, accessSource: 'exempt', tier: exemption.tier,
+          message: 'Sua conta tem acesso isento. Entre para acessar o studio.' });
+      }
+    }
+
+    const stripe = getStripe();
+    const priceId = getStripePriceIdForTier(tier);
+    if (!priceId) {
+      return res.status(503).json({
+        error: `O plano ${tier} está temporariamente indisponível para assinatura.`,
+        code: 'plan_price_not_configured',
+      });
+    }
+    const appUrl = getBillingReturnUrl(req);
+
     let customer;
     let provisionalCheckoutIdentity = proofMatches
       && identity?.source === 'checkout_provisional';
@@ -358,7 +376,7 @@ export async function handleCheckout(req, res) {
     return res.status(200).json({ url: session.url, sessionId: session.id, tier });
   } catch (e) {
     console.error('[stripe/checkout]', e);
-    return res.status(500).json({ error: e.message || 'checkout_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'checkout_error' });
   }
 }
 

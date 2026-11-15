@@ -8,7 +8,8 @@ import {
   upsertPassword,
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
-import { getStripe, findActiveSubscription } from '../lib/stripe.js';
+import { getStripe } from '../lib/stripe.js';
+import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { accountIdentityBackendEnabled } from '../lib/account-identity-postgres.js';
 
@@ -74,8 +75,8 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Cliente Stripe não encontrado' });
     }
     if (customer) {
-      const sub = await findActiveSubscription(customer.id);
-      if (!sub && !force) {
+      const entitlement = await resolveAccountEntitlement(customer.id);
+      if (!entitlement.active && !force) {
         return res.status(402).json({ error: 'Assinatura inativa' });
       }
     }
@@ -101,6 +102,6 @@ export default async function handler(req, res) {
     return res.status(200).json(body);
   } catch (e) {
     console.error('[auth/set-password]', e?.message || e);
-    return res.status(500).json({ error: e.message || 'set_password_error' });
+    return res.status(e?.status === 503 ? 503 : 500).json({ error: e.message || 'set_password_error' });
   }
 }

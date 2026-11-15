@@ -8,12 +8,10 @@
 import { randomUUID } from 'node:crypto';
 import { applyCors } from '../lib/cors.js';
 import { requireActiveSubscription } from '../lib/require-access.js';
-import { findActiveSubscription } from '../lib/stripe.js';
+import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { billingDisabled } from '../lib/access.js';
 import {
-  resolveTierFromSubscription,
   imageQuotaForTier,
-  periodBoundsFromSubscription,
 } from '../lib/plans.js';
 import {
   consumeImageCredit,
@@ -126,14 +124,13 @@ export default async function handler(req, res) {
       periodStartSec = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000;
       periodEndSec = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) / 1000;
     } else {
-      const sub = await findActiveSubscription(access.customerId);
-      if (!sub) {
+      const entitlement = await resolveAccountEntitlement(access.customerId);
+      if (!entitlement.active) {
         return res.status(402).json({ error: 'Assinatura inativa.' });
       }
-      tier = resolveTierFromSubscription(sub);
-      const bounds = periodBoundsFromSubscription(sub);
-      periodStartSec = bounds.periodStartSec;
-      periodEndSec = bounds.periodEndSec;
+      tier = entitlement.tier;
+      periodStartSec = entitlement.quotaPeriodStartSec;
+      periodEndSec = entitlement.quotaPeriodEndSec;
       limit = imageQuotaForTier(tier);
       customerId = access.customerId;
     }

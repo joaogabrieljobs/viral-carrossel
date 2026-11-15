@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { getStripe, findActiveSubscription } from '../../lib/stripe.js';
+import { getStripe } from '../../lib/stripe.js';
+import { resolveAccountEntitlement } from '../../lib/account-entitlements.js';
 import { getLibrarySyncMeta as getLegacyLibrarySyncMeta } from '../../lib/library-sync-store.js';
 import { getLibrarySyncMeta as getPostgresLibrarySyncMeta } from '../../lib/library-sync-postgres.js';
 import { invalidateActiveAccessForCustomer } from '../../lib/require-access.js';
@@ -52,7 +53,7 @@ async function chooseCustomer(customers, googleSub) {
 
   const active = [];
   for (const customer of customers) {
-    if (await findActiveSubscription(customer.id)) active.push(customer);
+    if ((await resolveAccountEntitlement(customer.id)).active) active.push(customer);
   }
   return active.length === 1 ? active[0] : null;
 }
@@ -151,8 +152,8 @@ export default async function handler(req, res) {
     const revokedBefore = dbIdentity
       ? Number(account.sessionRevokedBefore || 0)
       : Number(customer.metadata?.vc_session_revoked_before || 0);
-    const sub = await findActiveSubscription(customer.id);
-    if (sub) {
+    const entitlement = await resolveAccountEntitlement(customer.id);
+    if (entitlement.active) {
       const token = createAccessToken({
         customerId: customer.id,
         email: profile.email,
@@ -173,6 +174,7 @@ export default async function handler(req, res) {
     return res.redirect(302, `${appUrl}/?login=no_subscription`);
   } catch (e) {
     console.error('[auth/google/callback]', e?.message || e);
+    if (e?.status === 503) return res.status(503).send('Não foi possível verificar seu acesso. Tente entrar novamente.');
     return res.redirect(302, `${appUrl}/?login=error`);
   }
 }
