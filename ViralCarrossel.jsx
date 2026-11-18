@@ -4019,7 +4019,9 @@ export default function App() {
       for (const [k, rect] of Object.entries(zonePatch || {})) {
         if (rect && typeof rect === 'object') nextZones[k] = clampRect(rect);
       }
-      return applyFormatEdit(d, idx, { canvas: { ...canvas, zones: nextZones } });
+      // `userEdited` desliga os ajustes automáticos de zona no render: a
+      // geometria que a pessoa desenhou é a que vale.
+      return applyFormatEdit(d, idx, { canvas: { ...canvas, zones: nextZones, userEdited: true } });
     });
   }, [history]);
 
@@ -5732,7 +5734,14 @@ ${jsonShapeLine}`;
       { creativePreset: cp, slideTextDensity: td },
     ));
     if (!remix && !isPresentationGeneration) {
-      newSlides = applySocialVisualComposition(newSlides, { preset: effectiveVisualPresetDef, photoRegion: cvStyle });
+      // Marca efetiva e formato entram na conta: a composição já nasce acima
+      // do selo/barra do rodapé e respeita o alinhamento declarado pelo preset.
+      newSlides = applySocialVisualComposition(newSlides, {
+        preset: effectiveVisualPresetDef,
+        photoRegion: cvStyle,
+        brand: generationBrand,
+        formato: fmt && fmt !== 'apresentacao' ? fmt : 'carrossel',
+      });
     }
     if (!remix) {
       newSlides = autoAdjustOnGenerate

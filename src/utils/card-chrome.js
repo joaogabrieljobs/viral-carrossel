@@ -47,3 +47,51 @@ export function footerChromeReservePct(brand, formato = 'carrossel') {
   // Tolerância: 189/1350 vira 14,000000000000002 em ponto flutuante e subiria meio ponto à toa.
   return Math.ceil((px / f.h) * 100 * 2 - 1e-6) / 2;
 }
+
+/** Zonas baixas sobem em bloco; zonas altas só encurtam (pontos percentuais). */
+const MIN_ALTURA_PARA_ENCURTAR = 20;
+
+/**
+ * Proteção de render: devolve as zonas de título e apoio acima de `basePct`.
+ *
+ * A composição nova já nasce acima do rodapé. Isto cobre o que ela não vê:
+ * projeto gerado antes da reserva existir, ou selo/barra que a pessoa
+ * acrescentou depois de as zonas terem sido gravadas. Só age quando há
+ * sobreposição real; sem ela devolve as mesmas zonas.
+ *
+ * - Zona de apoio alta (texto ancorado em cima): encurta.
+ * - Zona de apoio baixa (capa, texto ancorado embaixo): sobe, e leva o
+ *   título junto para conservar o intervalo entre os dois.
+ */
+export function textZonesAboveFooter({ title, subtitle }, basePct) {
+  if (!title || !subtitle || !(basePct < 100)) return { title, subtitle };
+  const excesso = (z) => Math.max(0, z.y + z.h - basePct);
+  let t = title;
+  let s = subtitle;
+  const dSub = excesso(s);
+  if (dSub > 0) {
+    if (s.h - dSub >= MIN_ALTURA_PARA_ENCURTAR) {
+      s = { ...s, h: s.h - dSub };
+    } else {
+      s = { ...s, y: Math.max(0, s.y - dSub) };
+      const mesmaColuna = t.x < subtitle.x + subtitle.w && subtitle.x < t.x + t.w;
+      const intervalo = Math.max(0, subtitle.y - (title.y + title.h));
+      const invasao = t.y + t.h + intervalo - s.y;
+      if (mesmaColuna && invasao > 0) t = { ...t, y: Math.max(0, t.y - invasao) };
+    }
+  }
+  const dTit = excesso(t);
+  if (dTit > 0) t = { ...t, h: Math.max(4, t.h - dTit) };
+  return { title: t, subtitle: s };
+}
+
+/**
+ * A proteção vale para a composição social gerada que a pessoa não mexeu:
+ * zona editada à mão ou elemento arrastado ficam exatamente onde ela deixou.
+ */
+export function footerGuardApplies(slide, hasOffset = () => false) {
+  const canvas = slide?.canvas;
+  if (!canvas || canvas.source !== 'social-preset') return false;
+  if (canvas.userEdited || canvas.enabled) return false;
+  return !hasOffset(slide, 'title') && !hasOffset(slide, 'subtitle');
+}

@@ -23,7 +23,8 @@ export function socialTextLimits(config = {}) {
   return { ...(SOCIAL_TEXT_LIMITS[config.densityId] || SOCIAL_TEXT_LIMITS['1_1']), maxLines: SOCIAL_SUPPORT_MAX_LINES };
 }
 
-function visibleSocialText(value) {
+/** Texto como o leitor vê: sem os marcadores de destaque e itálico. */
+export function visibleSocialText(value) {
   return cultureAccentRenderablePieces(String(value || '').trim()).map(piece => piece.v).join('');
 }
 

@@ -45,3 +45,46 @@ describe('reserva do rodapé — selo e barra de três colunas', () => {
     expect(footerChromeReservePct({ footerPillText: 'x' }, 'formato-inexistente')).toBe(14);
   });
 });
+
+import { textZonesAboveFooter, footerGuardApplies } from '../../src/utils/card-chrome.js';
+
+describe('proteção de render — zonas gravadas que entram na faixa do rodapé', () => {
+  const z = (x, y, w, h) => ({ x, y, w, h });
+
+  it('sem sobreposição devolve as mesmas zonas', () => {
+    const zonas = { title: z(7, 42, 86, 28), subtitle: z(7, 72, 86, 14) };
+    const r = textZonesAboveFooter(zonas, 86);
+    expect(r.title).toBe(zonas.title);
+    expect(r.subtitle).toBe(zonas.subtitle);
+    expect(textZonesAboveFooter(zonas, 100)).toEqual(zonas);
+  });
+
+  it('capa antiga: o conjunto sobe e conserva o intervalo', () => {
+    const r = textZonesAboveFooter({ title: z(7, 47, 86, 28), subtitle: z(7, 77, 86, 14) }, 86);
+    expect(r.subtitle).toEqual(z(7, 72, 86, 14));
+    expect(r.title).toEqual(z(7, 42, 86, 28));
+  });
+
+  it('miolo com foto no topo: título sobe até a base da foto', () => {
+    const r = textZonesAboveFooter({ title: z(7, 53, 86, 20), subtitle: z(7, 76, 86, 14) }, 86);
+    expect(r.subtitle.y + r.subtitle.h).toBe(86);
+    expect(r.title).toEqual(z(7, 49, 86, 20));
+  });
+
+  it('zona de apoio alta só encurta; o título não se move', () => {
+    const zonas = { title: z(51, 17, 43, 32), subtitle: z(51, 53, 43, 36) };
+    const r = textZonesAboveFooter(zonas, 86);
+    expect(r.subtitle).toEqual(z(51, 53, 43, 33));
+    expect(r.title).toBe(zonas.title);
+  });
+
+  it('só vale para composição social gerada e intocada', () => {
+    const base = { canvas: { source: 'social-preset', enabled: false, applied: true } };
+    expect(footerGuardApplies(base)).toBe(true);
+    expect(footerGuardApplies({ canvas: { ...base.canvas, userEdited: true } })).toBe(false);
+    expect(footerGuardApplies({ canvas: { ...base.canvas, enabled: true } })).toBe(false);
+    expect(footerGuardApplies({ canvas: { source: 'presentation-preset' } })).toBe(false);
+    expect(footerGuardApplies({})).toBe(false);
+    expect(footerGuardApplies(base, (_, chave) => chave === 'subtitle')).toBe(false);
+  });
+});

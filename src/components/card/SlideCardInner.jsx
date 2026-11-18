@@ -19,7 +19,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { footerChromeReservePx } from '../../utils/card-chrome.js';
+import { footerChromeReservePx, footerGuardApplies, textZonesAboveFooter } from '../../utils/card-chrome.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
@@ -789,8 +789,15 @@ const ClassicCanvasInner = React.forwardRef(({
     ? subtitleTypography.italic === true
     : brand.subtitleItalic === true;
   const pr = clampRect(zcv.photo || DEFAULT_CANVAS_ZONES_CLASSIC.photo);
-  const tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
-  const sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
+  let tr = clampRect(zcv.title || DEFAULT_CANVAS_ZONES_CLASSIC.title);
+  let sr = clampRect(zcv.subtitle || DEFAULT_CANVAS_ZONES_CLASSIC.subtitle);
+  // Selo e barra do rodapé são absolutos e não empurram nada. Se as zonas
+  // gravadas (projeto antigo, ou assinatura acrescentada depois) entram na
+  // faixa deles, o texto sobe aqui. Zona ou elemento que a pessoa moveu fica.
+  if (footerGuardApplies(slide, hasElementOffset)) {
+    const reservaPx = footerChromeReservePx(brand, f);
+    if (reservaPx > 0) ({ title: tr, subtitle: sr } = textZonesAboveFooter({ title: tr, subtitle: sr }, 100 - (reservaPx / f.h) * 100));
+  }
   const shadow = slide.textShadow !== false
     ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
     : 'none';
@@ -909,7 +916,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </div>}
 
       <OverflowScaler
-        containerProps={{ ...movOu('title'), 'data-vc-quality-zone': showSupportingText ? 'title' : undefined }}
+        containerProps={{ ...movOu('title'), 'data-vc-zone': 'title', 'data-vc-quality-zone': showSupportingText ? 'title' : undefined }}
         containerStyle={{
           ...pctBox(tr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -986,7 +993,7 @@ const ClassicCanvasInner = React.forwardRef(({
       </OverflowScaler>
 
       <OverflowScaler
-        containerProps={{ ...movOu('subtitle'), 'data-vc-quality-zone': showSupportingText ? 'subtitle' : undefined }}
+        containerProps={{ ...movOu('subtitle'), 'data-vc-zone': 'subtitle', 'data-vc-quality-zone': showSupportingText ? 'subtitle' : undefined }}
         containerStyle={{
           ...pctBox(sr, f),
           ...VC_TEXT_ZONE_STYLE,
@@ -1169,7 +1176,7 @@ const ClassicCanvasInner = React.forwardRef(({
         );
       })()}
 
-      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && !(forExport && !String(brand.handle || '').trim()) && (
         <div style={{
           ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
@@ -1661,7 +1668,7 @@ const ClassicLegadoInsetPhotoColumn = React.forwardRef(({
 
       {brandFooterChrome}
 
-      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && !(forExport && !String(brand.handle || '').trim()) && (
         <div style={{
           ...vcHandleBadgeBoxPositionStyle(brand),
           display: 'flex', alignItems: 'center', gap: f.w * 0.012,
@@ -2110,7 +2117,7 @@ const SlideCardInner = React.forwardRef(({
           return (
             <>
               {hasHeaderBar && (
-                <div {...mov('headerBar', {
+                <div data-vc-chrome="headerBar" {...mov('headerBar', {
                   position:'absolute', top:f.h*0.028, left:f.w*0.05,
                   right: hasPageBadge ? f.w*0.16 : f.w*0.05,
                   zIndex:25,
@@ -2137,7 +2144,7 @@ const SlideCardInner = React.forwardRef(({
                 </div>
               )}
               {hasPageBadge && (
-                <div {...mov('pageBadge', {
+                <div data-vc-chrome="pageBadge" {...mov('pageBadge', {
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
@@ -2180,7 +2187,7 @@ const SlideCardInner = React.forwardRef(({
             );
           };
           return (
-            <div {...mov('footerBar', {
+            <div data-vc-chrome="footerBar" {...mov('footerBar', {
               position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
               zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
               gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
@@ -2199,10 +2206,16 @@ const SlideCardInner = React.forwardRef(({
           const showArrow = brand.footerPillArrow !== false;
           // Padding-right encolhe quando não tem seta (visual mais compacto).
           const padRight = (showArrow ? f.w*0.014 : f.w*0.028) * escPill;
+          // Com a foto em coluna lateral, o meio do card é a divisa entre foto e
+          // painel: o selo centra na coluna de texto.
+          const colunaTexto = slide.socialComposition === 'portrait-editorial' ? slide.canvas?.zones?.title : null;
+          const pillCenterPct = colunaTexto && Number.isFinite(colunaTexto.x) && Number.isFinite(colunaTexto.w)
+            ? colunaTexto.x + colunaTexto.w / 2
+            : 50;
           return (
-            <div {...mov('pill', {
+            <div data-vc-chrome="pill" {...mov('pill', {
               position:'absolute', bottom: f.h*0.058,
-              left:'50%', transform:'translateX(-50%)',
+              left:`${pillCenterPct}%`, transform:'translateX(-50%)',
               zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
             })}>
               <div style={{
@@ -2446,7 +2459,7 @@ const SlideCardInner = React.forwardRef(({
       >
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
-          <div {...mov('headerBar', {
+          <div data-vc-chrome="headerBar" {...mov('headerBar', {
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           })}>
@@ -2464,7 +2477,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         {showCultureIdx && (
-          <div {...mov('pageBadge', {
+          <div data-vc-chrome="pageBadge" {...mov('pageBadge', {
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
@@ -2761,7 +2774,7 @@ const SlideCardInner = React.forwardRef(({
       >
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
         {hasBar && (
-          <div {...mov('headerBar', {
+          <div data-vc-chrome="headerBar" {...mov('headerBar', {
             position:'absolute', top:f.h*0.028, left:f.w*0.05, right:f.w*0.16, zIndex:25,
             display:'flex', justifyContent:'space-between', alignItems:'center', gap:f.w*0.02,
           })}>
@@ -2779,7 +2792,7 @@ const SlideCardInner = React.forwardRef(({
           </div>
         )}
         {showCultureIdx && (
-          <div {...mov('pageBadge', {
+          <div data-vc-chrome="pageBadge" {...mov('pageBadge', {
             position:'absolute', top:f.h*0.032, right:f.w*0.05, zIndex:30,
             background: cr.solidBgIsLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)',
             color: cr.solidBgIsLight ? '#1d1d1f' : '#ffffff',
@@ -3384,7 +3397,7 @@ const SlideCardInner = React.forwardRef(({
       })()}
 
       {/* Handle badge */}
-      {brand.showHandle && slide.showHandle && !hideInstaBadge && (
+      {brand.showHandle && slide.showHandle && !hideInstaBadge && !(forExport && !String(brand.handle || '').trim()) && (
         <div {...mov('handleBadge', {
           ...vcHandleBadgeBoxPositionStyle(brand),
           display:'flex', alignItems:'center', gap:f.w*0.012,
