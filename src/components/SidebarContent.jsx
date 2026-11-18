@@ -6,6 +6,7 @@ import { RemixPanel } from './panels/RemixPanel.jsx';
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { Sparkles, Search, Download, Trash2, Copy, Palette, Layout, Crop, Wand2, Loader2, Bookmark, Move, Video, TrendingUp, RefreshCw, X, Upload, Link as LinkIcon, FileText, Type, BookOpen, Image as ImageIcon, ArrowUp, ArrowDown, Zap, Highlighter, ChevronRight, ChevronDown, Check, Instagram, Home, Layers, SlidersHorizontal, FolderPlus } from 'lucide-react';
 import { extractDominantColor } from '../utils/color-extraction.js';
+import { footerPillColors } from '../utils/card-chrome.js';
 import { saveHookToLibrary } from '../utils/hooks-library.js';
 import VisualStylePicker from './VisualStylePicker.jsx';
 import { VISUAL_PRESETS } from '../styles/visual-presets.jsx';
@@ -2928,7 +2929,7 @@ function SidebarContent({
                         <label className="vc-label-sm">Texto</label>
                         <input
                           type="color"
-                          value={brand.footerPillFg || '#ffffff'}
+                          value={footerPillColors(brand).fg}
                           onChange={e=>setBrand({ ...brand, footerPillFg: e.target.value })}
                           aria-label="Cor do texto do selo"
                           style={{ width:'100%', height:32, padding:0, border:'1px solid var(--border)', borderRadius:6, background:'none', cursor:'pointer' }}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { footerChromeReservePx, footerChromeReservePct } from '../../src/utils/card-chrome.js';
+import { footerChromeReservePx, footerChromeReservePct, footerPillBottomPx, footerBarHeightPx, footerPillColors } from '../../src/utils/card-chrome.js';
 import { FORMATS } from '../../src/utils/formats.js';
 
 const feed = FORMATS.carrossel; // 1080 × 1350
@@ -29,9 +29,21 @@ describe('reserva do rodapé — selo e barra de três colunas', () => {
     expect(footerChromeReservePx({ footerBarLeft: 'Tema' }, feed)).toBeCloseTo(103.68, 5);
   });
 
-  it('com selo e barra prevalece a maior reserva', () => {
+  it('com selo e barra, o selo empilha acima da barra e a reserva soma os dois', () => {
+    // Antes prevalecia a maior reserva: o selo ficava a 78 px da base e a
+    // barra ocupava de 51 a 116 px — um por cima do outro, com o rótulo da
+    // coluna central escondido atrás do selo.
     const marca = { footerPillText: 'x', footerBarLeft: 'Tema|Growth' };
-    expect(footerChromeReservePx(marca, feed)).toBeCloseTo(189, 5);
+    // base da barra 51,3 + barra 64,368 + respiro 29,7 = 145,368 (base do selo)
+    expect(footerPillBottomPx(marca, feed)).toBeCloseTo(145.368, 5);
+    expect(footerPillBottomPx(marca, feed)).toBeGreaterThan(feed.h * 0.038 + footerBarHeightPx(marca, feed));
+    // 145,368 + selo 86,4 + margem 24,3
+    expect(footerChromeReservePx(marca, feed)).toBeCloseTo(256.068, 5);
+  });
+
+  it('sem barra o selo fica onde sempre ficou', () => {
+    expect(footerPillBottomPx({ footerPillText: 'x' }, feed)).toBeCloseTo(78.3, 5);
+    expect(footerBarHeightPx({ footerPillText: 'x' }, feed)).toBe(0);
   });
 
   it('percentual arredonda para cima em passos de 0,5 e acompanha o formato', () => {
@@ -86,5 +98,41 @@ describe('proteção de render — zonas gravadas que entram na faixa do rodapé
     expect(footerGuardApplies({ canvas: { source: 'presentation-preset' } })).toBe(false);
     expect(footerGuardApplies({})).toBe(false);
     expect(footerGuardApplies(base, (_, chave) => chave === 'subtitle')).toBe(false);
+  });
+});
+
+describe('cores do selo do rodapé', () => {
+  it('destaque escuro sem cor de texto definida recebe texto claro', () => {
+    // Minimal Clean tem destaque #1a1a1a: o texto fixo #0a0a0a saía preto sobre preto.
+    expect(footerPillColors({ accent: '#1a1a1a' })).toMatchObject({ bg: '#1a1a1a', fg: '#ffffff' });
+  });
+
+  it('destaque claro mantém o texto escuro', () => {
+    expect(footerPillColors({ accent: '#c0ff32' })).toMatchObject({ bg: '#c0ff32', fg: '#0a0a0a' });
+    expect(footerPillColors({ accent: '#fbbf24' }).fg).toBe('#0a0a0a');
+  });
+
+  it('fundo próprio do selo decide o texto pelo contraste, inclusive translúcido', () => {
+    expect(footerPillColors({ accent: '#fbbf24', footerPillBg: 'rgba(0,0,0,0.55)' }).fg).toBe('#ffffff');
+    expect(footerPillColors({ accent: '#111111', footerPillBg: 'rgba(255,255,255,0.95)' }).fg).toBe('#0a0a0a');
+    // Quase transparente: o que se vê é a foto escurecida atrás do selo.
+    expect(footerPillColors({ footerPillBg: 'rgba(255,255,255,0.12)' }).fg).toBe('#ffffff');
+  });
+
+  it('cor de texto escolhida para o selo é respeitada', () => {
+    expect(footerPillColors({ accent: '#1a1a1a', footerPillFg: '#f0ead6' })).toMatchObject({ bg: '#1a1a1a', fg: '#f0ead6' });
+  });
+
+  it('sem destaque nem fundo, selo escuro com texto claro', () => {
+    expect(footerPillColors({})).toMatchObject({ bg: '#0a0a0a', fg: '#ffffff' });
+  });
+
+  it('seta do selo: cor do fundo quando opaco, tinta de contraste quando translúcido', () => {
+    // Opaco: círculo na cor do texto, seta na cor do fundo.
+    expect(footerPillColors({ accent: '#c0ff32' }).arrow).toBe('#c0ff32');
+    // Reflexivo Cream: fundo branco a 12% e texto creme. A seta na cor do
+    // fundo sumia dentro do círculo creme.
+    expect(footerPillColors({ footerPillBg: 'rgba(255,255,255,0.12)', footerPillFg: '#f0ead6' }).arrow).toBe('#0a0a0a');
+    expect(footerPillColors({ footerPillBg: 'rgba(0,0,0,0.55)', footerPillFg: '#fff5d1' }).arrow).toBe('#0a0a0a');
   });
 });

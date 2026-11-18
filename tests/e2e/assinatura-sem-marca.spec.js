@@ -41,11 +41,22 @@ async function abrir(page, { preset, brand, slides }) {
   await enterEditorFromHome(page);
   const superficie = page.locator('main [data-vc-card-surface]');
   await expect(superficie).toHaveCount(slides.length);
-  await page.evaluate(() => document.fonts.ready);
+  // As fontes do padrão são pedidas depois do primeiro render. Sem esperar a
+  // fila esvaziar, a captura saía com a fonte reserva em um ou outro padrão.
+  await page.waitForFunction(async () => {
+    await document.fonts.ready;
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return document.fonts.status === 'loaded';
+  });
   return superficie;
 }
 
-/** Sobreposições entre selo/barra do rodapé e o TEXTO renderizado nas zonas. */
+// Capturas em 2×: a 1× o card de 360 px deixa o texto pequeno do rodapé com
+// poucos pixels por letra, e a imagem parece serrilhada sem que o card esteja.
+test.use({ deviceScaleFactor: 2 });
+
+/** Sobreposições entre selo/barra do rodapé e o TEXTO renderizado nas zonas,
+ *  e entre os próprios ornamentos (selo por cima da barra). */
 const colisoes = card => card.evaluate(el => {
   const caixa = n => { const r = n.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
   const ornamentos = [...el.querySelectorAll('[data-vc-chrome="pill"], [data-vc-chrome="footerBar"]')].map(n => ({ nome: n.dataset.vcChrome, ...caixa(n) }));
@@ -56,7 +67,25 @@ const colisoes = card => card.evaluate(el => {
     const cruza = t.l < o.r - 1 && o.l < t.r - 1 && t.t < o.b - 1 && o.t < t.b - 1;
     if (cruza) achados.push(`${o.nome} × "${t.texto}"`);
   }
+  for (let a = 0; a < ornamentos.length; a++) for (let b = a + 1; b < ornamentos.length; b++) {
+    const x = ornamentos[a], y = ornamentos[b];
+    if (x.l < y.r - 1 && y.l < x.r - 1 && x.t < y.b - 1 && y.t < x.b - 1) achados.push(`${x.nome} × ${y.nome}`);
+  }
   return { ornamentos: ornamentos.length, textos: textos.length, achados };
+});
+
+/** Contraste WCAG entre o texto do selo e o fundo dele (translúcido: sobre a foto escurecida). */
+const contrasteDoSelo = card => card.evaluate(el => {
+  const selo = el.querySelector('[data-vc-chrome="pill"] > div');
+  if (!selo) return null;
+  const ler = (valor) => { const n = valor.match(/[\d.]+/g).map(Number); return { r: n[0], g: n[1], b: n[2], a: n[3] ?? 1 }; };
+  const estilo = getComputedStyle(selo);
+  const fundo = ler(estilo.backgroundColor), texto = ler(estilo.color);
+  const visto = ['r', 'g', 'b'].map(c => fundo[c] * fundo.a + 40 * (1 - fundo.a));
+  const lum = ([r, g, b]) => [r, g, b].map(v => v / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((soma, v, i) => soma + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const a = lum([texto.r, texto.g, texto.b]), b = lum(visto);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 });
 
 for (const preset of SOCIAIS) test(`sem marca: ${preset.id} não imprime texto provisório nem cobre o texto`, async ({ page }, testInfo) => {
@@ -72,7 +101,7 @@ for (const preset of SOCIAIS) test(`sem marca: ${preset.id} não imprime texto p
     const r = await colisoes(card);
     expect(r.textos, 'o card tem texto nas zonas').toBeGreaterThan(0);
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
-    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`sem-marca-${i + 1}.png`) });
+    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-sem-marca-${i + 1}.png`) });
   }
 });
 
@@ -91,7 +120,8 @@ for (const preset of SOCIAIS) test(`com assinatura: ${preset.id} mantém selo e 
     const r = await colisoes(card);
     expect(r.ornamentos).toBeGreaterThanOrEqual(2);
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
-    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`com-assinatura-${i + 1}.png`) });
+    expect(await contrasteDoSelo(card), `texto do selo no card ${i + 1} de ${preset.id}`).toBeGreaterThanOrEqual(4.5);
+    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-com-assinatura-${i + 1}.png`) });
   }
 });
 
@@ -102,7 +132,8 @@ test('projeto antigo: zonas gravadas sob o selo sobem no render', async ({ page 
   // Geometria anterior à reserva: capa com apoio até 91% e selo por cima.
   const antigos = applySocialVisualComposition(cards(), { preset, brand: { ...brand, footerPillText: '' }, formato: 'carrossel' })
     .map(({ socialCompositionVersion, ...slide }) => slide);
-  expect(antigos[0].canvas.zones.subtitle.y).toBe(77);
+  // Sem selo, o apoio da capa termina em 91%: por baixo de onde o selo vai entrar.
+  expect(antigos[0].canvas.zones.subtitle.y + antigos[0].canvas.zones.subtitle.h).toBe(91);
   const superficie = await abrir(page, { preset, brand, slides: antigos });
   for (let i = 0; i < antigos.length; i++) {
     const r = await colisoes(superficie.nth(i));

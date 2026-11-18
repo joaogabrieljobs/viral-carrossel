@@ -222,6 +222,42 @@ test('design recomendado fica visível, aplica o preset e mantém a narrativa es
   await expect(middle).toContainText(created.doc.slides[2].bodyAfterImage);
 });
 
+// O fim da criação gravava o projeto lendo o documento que o React ainda não
+// tinha renderizado: o rascunho de 1 card voltava para o navegador por cerca
+// de meio segundo, por cima dos cards já gerados. Quem lesse nesse intervalo
+// (ou perdesse a aba ali) ficava com o rascunho. Depois que a geração aparece
+// gravada, nenhuma gravação seguinte pode ter menos cards.
+test('depois de gravar os cards gerados, a criação não regrava o rascunho inicial', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    window.__vcLibraryWrites = [];
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function patchedSetItem(key, value) {
+      if (this === window.localStorage && key === 'vc_library') {
+        try {
+          const entry = JSON.parse(value).find(p => p.name === 'Gravação sem recuo');
+          if (entry) window.__vcLibraryWrites.push(entry.doc?.slides?.length ?? 0);
+        } catch { /* valor inválido não é uma gravação de projeto */ }
+      }
+      return setItem.apply(this, arguments);
+    };
+  });
+  await setup(page, { ai: route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    return route.fulfill({ json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated(5, 'Sem recuo')) });
+  } });
+  const wizard = await configure(page, { name: 'Gravação sem recuo' });
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect(wizard).toHaveCount(0, { timeout: 25_000 });
+  const writes = () => page.evaluate(() => window.__vcLibraryWrites.slice());
+  await expect.poll(async () => (await writes()).includes(5)).toBe(true);
+  // Cobre o autosave (400 ms) e a gravação da biblioteca (100 ms) que vêm depois.
+  await page.waitForTimeout(1500);
+  const all = await writes();
+  const afterGeneration = all.slice(all.indexOf(5));
+  expect(afterGeneration, `sequência completa de gravações: ${all.join(', ')}`).toEqual(afterGeneration.map(() => 5));
+});
+
 // Rodada R2 (15–16/11/2026): os nove carrosséis gerados saíram com título,
 // subtítulo e apoio em 100/100/100, e não nos tamanhos da composição. A marca
 // do projeto nasce com os três tamanhos em 100 (DEFAULT_BRAND); a geração
@@ -246,9 +282,9 @@ test('geração social conserva a tipografia que a composição definiu', async 
   })), null, 2), contentType: 'application/json' });
   for (const slide of created.doc.slides) {
     expect(slide.canvas.source).toBe('social-preset');
-    // Composição tipográfica (sem foto): 76 / 108 / 140, entrelinhas 110 / 138.
-    expect([slide.titleSize, slide.subSize, slide.bodyAfterSize]).toEqual([76, 108, 140]);
-    expect([slide.titleLeading, slide.subLeading]).toEqual([110, 138]);
+    // Composição tipográfica (sem foto), v3: 116 / 112 / 140, entrelinhas 104 / 136.
+    expect([slide.titleSize, slide.subSize, slide.bodyAfterSize]).toEqual([116, 112, 140]);
+    expect([slide.titleLeading, slide.subLeading]).toEqual([104, 136]);
   }
 });
 

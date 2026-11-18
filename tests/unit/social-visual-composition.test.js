@@ -3,6 +3,7 @@ import { VISUAL_PRESETS, applyVisualPreset } from '../../src/styles/visual-prese
 import {
   applySocialVisualComposition,
   PORTRAIT_CENTER_MAX_SUPPORT_CHARS,
+  SOCIAL_COMPOSITION_TYPOGRAPHY,
   SOCIAL_COMPOSITION_VERSION,
 } from '../../src/utils/social-visual-composition.js';
 import { footerChromeReservePct } from '../../src/utils/card-chrome.js';
@@ -61,7 +62,8 @@ describe('composição social — o texto nunca fica sob o rodapé', () => {
       if (slide.socialComposition === 'photo-story') expect(fim(photo)).toBeLessThanOrEqual(title.y);
       if (slide.socialComposition === 'portrait-editorial') expect(photo.x + photo.w).toBeLessThanOrEqual(title.x);
       // A zona de apoio continua utilizável depois de ceder espaço.
-      expect(subtitle.h).toBeGreaterThanOrEqual(14);
+      // Na capa a caixa do apoio acompanha o texto (5,5 a 14); no miolo, 14 no mínimo.
+      expect(subtitle.h).toBeGreaterThanOrEqual(slide.socialComposition === 'cover-photo' ? 5.5 : 14);
       expect(slide.socialCompositionVersion).toBe(SOCIAL_COMPOSITION_VERSION);
       expect(slide.canvas.source).toBe('social-preset');
     }
@@ -74,20 +76,22 @@ describe('composição social — exemplos de reserva', () => {
   it('selo com seta sobe a capa cinco pontos no Feed', () => {
     const p = preset('viral_hype_dark');
     const [capa, , , miolo] = applySocialVisualComposition(cards(), { preset: p, brand: applyVisualPreset(MARCAS.vazia, p.id), formato: 'carrossel' });
-    expect(capa.canvas.zones.title.y).toBe(42);
-    expect(capa.canvas.zones.subtitle).toMatchObject({ y: 72, h: 14 });
+    // Apoio de uma linha: caixa de 5,5% colada na base (86), título logo acima.
+    expect(capa.canvas.zones.subtitle).toMatchObject({ y: 80.5, h: 5.5 });
+    expect(capa.canvas.zones.title).toMatchObject({ y: 41, h: 38 });
     // No miolo a foto cede a altura; título e apoio conservam o tamanho.
     expect(miolo.socialComposition).toBe('photo-story');
-    expect(miolo.canvas.zones.photo.h).toBe(45);
-    expect(miolo.canvas.zones.title).toMatchObject({ y: 49, h: 20 });
-    expect(miolo.canvas.zones.subtitle).toMatchObject({ y: 72, h: 14 });
+    // Reserva 14% → base 86 → o miolo (limite 90) sobe 4.
+    expect(miolo.canvas.zones.photo.h).toBe(42);
+    expect(miolo.canvas.zones.title).toMatchObject({ y: 44.5, h: 21.5 });
+    expect(miolo.canvas.zones.subtitle).toMatchObject({ y: 67.5, h: 18.5 });
   });
 
   it('assinatura oculta por falta de marca não desloca nada', () => {
     const p = preset('tabloid_keywords');
     const [capa] = applySocialVisualComposition(cards(), { preset: p, brand: applyVisualPreset(MARCAS.vazia, p.id), formato: 'carrossel' });
-    expect(capa.canvas.zones.title.y).toBe(47);
-    expect(capa.canvas.zones.subtitle.y).toBe(77);
+    expect(capa.canvas.zones.title.y).toBe(46);
+    expect(capa.canvas.zones.subtitle.y).toBe(85.5);
   });
 
   it('hashtag digitada pela pessoa volta a reservar o rodapé', () => {
@@ -96,13 +100,13 @@ describe('composição social — exemplos de reserva', () => {
     const [capa] = applySocialVisualComposition(cards(), { preset: p, brand, formato: 'carrossel' });
     // Selo sem seta: reserva 13% → base 87 → sobe 4.
     expect(capa.canvas.zones.subtitle.y + capa.canvas.zones.subtitle.h).toBe(87);
-    expect(capa.canvas.zones.title.y).toBe(43);
+    expect(capa.canvas.zones.title.y).toBe(42);
   });
 
   it('sem marca informada usa a assinatura do próprio preset', () => {
     const p = preset('viral_hype_dark');
     const [capa] = applySocialVisualComposition(cards(), { preset: p });
-    expect(capa.canvas.zones.subtitle.y).toBe(72);
+    expect(capa.canvas.zones.subtitle.y).toBe(80.5);
   });
 });
 
@@ -173,7 +177,7 @@ describe('projetos achatados — restaurar hierarquia do estilo', () => {
     const [capa, miolo] = gerados();
     const manual = { ...miolo, titleSize: 120 };
     const result = restoreSocialCompositionTypography([achatar(capa), manual]);
-    expect(result[0].titleSize).toBe(88);
+    expect(result[0].titleSize).toBe(SOCIAL_COMPOSITION_TYPOGRAPHY['cover-photo'].titleSize);
     expect(result[1]).toBe(manual);
   });
 
@@ -182,5 +186,82 @@ describe('projetos achatados — restaurar hierarquia do estilo', () => {
     expect(restoreSocialCompositionTypography(slides)).toBe(slides);
     const legado = [{ id: 'x', titleSize: 100, subSize: 100, bodyAfterSize: 100 }];
     expect(restoreSocialCompositionTypography(legado)).toBe(legado);
+  });
+});
+
+// Conferência visual de 18/11/2026: título pequeno (69 px num card de 1080),
+// título e apoio em ilhas separadas por um vão fixo, sombra dura e véu cinza
+// sobre a foto inteira. A versão 3 agrupa o bloco de texto e sobe a escala.
+describe('composição social v3 — bloco agrupado e escala tipográfica', () => {
+  const pxTitulo = (slide) => 0.084 * slide.titleSize;
+  const pxApoio = (slide) => 0.028 * slide.subSize;
+
+  it.each(SOCIAIS.map((p) => [p.id, p]))('%s: título encosta no apoio e os dois crescem a partir da mesma linha', (_, preset) => {
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    for (const slide of applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' })) {
+      const { title, subtitle } = slide.canvas.zones;
+      expect(subtitle.y - fim(title)).toBeGreaterThanOrEqual(0);
+      expect(subtitle.y - fim(title)).toBeLessThanOrEqual(2);
+      // Título ancorado embaixo da sua caixa, apoio em cima: sem vão entre eles.
+      expect(slide.socialZoneAnchors).toEqual({ title: 'end', subtitle: 'start' });
+      expect(slide.socialCompositionVersion).toBe(3);
+    }
+  });
+
+  it('o título domina: pelo menos 2,8× o apoio fora da coluna estreita', () => {
+    const preset = SOCIAIS.find((p) => p.id === 'viral_hype_dark');
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    for (const slide of applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' })) {
+      expect(pxTitulo(slide) / pxApoio(slide)).toBeGreaterThanOrEqual(2.8);
+      expect(slide.titleLeading).toBeLessThanOrEqual(106);
+    }
+  });
+
+  it('na coluna ao lado da foto o título ainda passa de 2× o apoio', () => {
+    const preset = SOCIAIS.find((p) => p.id === 'editorial_magazine');
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    const coluna = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' })
+      .filter((s) => s.socialComposition === 'portrait-editorial');
+    expect(coluna.length).toBeGreaterThan(0);
+    for (const slide of coluna) expect(pxTitulo(slide) / pxApoio(slide)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('capa: degradê só atrás do texto, sem sombra dura; seta de arrastar só na capa', () => {
+    const preset = SOCIAIS.find((p) => p.id === 'viral_hype_dark');
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    const [capa, ...resto] = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' });
+    expect(capa.socialComposition).toBe('cover-photo');
+    expect(capa.overlayMode).toBe('scrim');
+    expect(capa.textShadow).toBe(false);
+    expect(capa.showSwipeCue).toBe(true);
+    for (const slide of resto) expect(slide.showSwipeCue).toBe(false);
+  });
+
+  it('foto no topo com cabeçalho do padrão recebe escurecimento só na faixa do cabeçalho', () => {
+    const preset = SOCIAIS.find((p) => p.id === 'bold_promo_rosa');
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    const miolo = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' })
+      .find((s) => s.socialComposition === 'photo-story');
+    expect(miolo.overlayMode).toBe('top');
+    expect(miolo.overlay).toBeGreaterThan(0);
+    const semCabecalho = applySocialVisualComposition(cards(), {
+      preset, formato: 'carrossel',
+      brand: { ...brand, cultureHeaderLeft: '', cultureHeaderCenter: '', cultureHeaderYear: '', showPageBadge: false },
+    }).find((s) => s.socialComposition === 'photo-story');
+    expect(semCabecalho.overlay).toBe(0);
+  });
+
+  it('capa: a caixa do apoio cresce com o texto e nunca passa de 14%', () => {
+    const preset = SOCIAIS.find((p) => p.id === 'viral_hype_dark');
+    const brand = applyVisualPreset(MARCAS.vazia, preset.id);
+    const altura = (apoio) => applySocialVisualComposition(cards(apoio), { preset, brand: { ...brand, footerPillText: '' }, formato: 'carrossel' })[0].canvas.zones.subtitle;
+    const curta = altura('Apoio curto.');
+    const media = altura('Um apoio de tamanho médio, com duas linhas no card, para ver a base do texto junto do rodapé.');
+    const longa = altura('x'.repeat(600));
+    expect(curta.h).toBe(5.5);
+    expect(media.h).toBeGreaterThan(curta.h);
+    expect(longa.h).toBe(14);
+    // A base da caixa não muda: o bloco cresce para cima.
+    for (const z of [curta, media, longa]) expect(z.y + z.h).toBe(91);
   });
 });

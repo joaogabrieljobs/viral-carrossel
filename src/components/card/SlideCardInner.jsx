@@ -19,7 +19,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
-import { footerChromeReservePx, footerGuardApplies, textZonesAboveFooter } from '../../utils/card-chrome.js';
+import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter } from '../../utils/card-chrome.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
@@ -764,6 +764,11 @@ const ClassicCanvasInner = React.forwardRef(({
   );
   const zcv = slide.canvas.zones;
   const Lzn = LAYOUTS.find((l) => l.id === slide.layout) || DEFAULT_LAYOUT;
+  // Composição social v3: cada caixa tem sua âncora (título embaixo, apoio em
+  // cima) para os dois formarem um bloco. Sem o campo, vale a âncora do layout.
+  const ANCORA_FLEX = { start: 'flex-start', center: 'center', end: 'flex-end' };
+  const jcTitulo = ANCORA_FLEX[slide.socialZoneAnchors?.title] || Lzn.jc;
+  const jcApoio = ANCORA_FLEX[slide.socialZoneAnchors?.subtitle] || Lzn.jc;
   const padTitleXp = canvasClassicTitlePaddingXPx(f, slide);
   const padSubtitleXp = canvasClassicSubtitlePaddingXPx(f, slide);
   const padYZn = canvasClassicTextPaddingYPx(f, slide);
@@ -851,9 +856,15 @@ const ClassicCanvasInner = React.forwardRef(({
         {slide.bgImage && imgReady && !imgErr && slide.overlay > 0 && (
           <div style={{
             position:'absolute', inset:0, pointerEvents:'none',
-            background: cultureCoverOnly
-              ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
-              : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
+            background: slide.overlayMode === 'scrim'
+              // Capa social: escuro só onde o texto está; o resto da foto fica limpo.
+              ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.9, slide.overlay/100 * 1.4)}) 0%, rgba(0,0,0,${Math.min(0.72, slide.overlay/100 * 1.1)}) 30%, rgba(0,0,0,${slide.overlay/100*0.3}) 56%, transparent 76%), linear-gradient(to bottom, rgba(0,0,0,${slide.overlay/100*0.6}) 0%, transparent 17%)`
+              : slide.overlayMode === 'top'
+                // Foto no topo: só a faixa do cabeçalho escurece.
+                ? `linear-gradient(to bottom, rgba(0,0,0,${slide.overlay/100}) 0%, rgba(0,0,0,${slide.overlay/100*0.4}) 14%, transparent 30%)`
+                : cultureCoverOnly
+                  ? `linear-gradient(to top, rgba(0,0,0,${Math.min(0.92, slide.overlay/100 * 1.05)}) 0%, rgba(0,0,0,${slide.overlay/100*0.35}) 45%, transparent 72%)`
+                  : `linear-gradient(175deg, rgba(0,0,0,${slide.overlay/100*0.4}) 0%, rgba(0,0,0,${slide.overlay/100}) 100%)`,
           }}/>
         )}
         <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 2 }} />
@@ -926,7 +937,7 @@ const ClassicCanvasInner = React.forwardRef(({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: Lzn.jc,
+          justifyContent: jcTitulo,
           alignItems: Lzn.ai,
           textAlign: slide.align,
           background: 'transparent',
@@ -978,6 +989,9 @@ const ClassicCanvasInner = React.forwardRef(({
           width: '100%',
           textTransform: titleTypography ? resolvedTitleTransform : (isBebas ? 'uppercase' : resolvedTitleTransform),
           fontStyle: resolvedTitleItalic ? 'italic' : 'normal',
+          // Fonte de peso único (Anton, Bebas): sem negrito sintético, que
+          // engrossa o traço e faz as letras se atropelarem.
+          fontSynthesisWeight: 'none',
           textShadow: shadow,
         } }}>{culture ? (
           <CultureInlineRich
@@ -1007,7 +1021,7 @@ const ClassicCanvasInner = React.forwardRef(({
           padding: `${padYZn}px ${padSubtitleXp}px`,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: Lzn.jc,
+          justifyContent: jcApoio,
           alignItems: Lzn.ai,
           textAlign: slide.align,
         }}
@@ -2174,8 +2188,19 @@ const SlideCardInner = React.forwardRef(({
           const fRight = brand.footerBarRight;
           const hasFooter = !!(fLeft || fCenter || fRight);
           if (!hasFooter) return null;
-          const labelColor = slide.bgImage ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
-          const valueColor = slide.bgImage ? '#ffffff' : (displayTitleInk || '#000');
+          // Texto branco só quando a foto está de fato atrás da barra. Com a
+          // foto numa caixa (topo ou coluna), a barra fica sobre o papel do
+          // card e branco some em padrão claro.
+          const zonaFoto = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
+          const colunaTextoBarra = slide.socialComposition === 'portrait-editorial' ? slide.canvas?.zones?.title : null;
+          const fotoAtrasDaBarra = !!slide.bgImage && (!zonaFoto
+            || (zonaFoto.y + zonaFoto.h >= 95 && zonaFoto.x <= 5 && zonaFoto.x + zonaFoto.w >= 95));
+          const labelColor = fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
+          const valueColor = fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');
+          // Com a foto em coluna lateral, a barra cabe na coluna de texto em vez
+          // de atravessar a divisa entre foto e painel.
+          const barLeft = colunaTextoBarra && Number.isFinite(colunaTextoBarra.x) ? f.w * colunaTextoBarra.x / 100 : f.w * 0.05;
+          const barRight = colunaTextoBarra && Number.isFinite(colunaTextoBarra.w) ? f.w * (100 - colunaTextoBarra.x - colunaTextoBarra.w) / 100 : f.w * 0.05;
           const Col = ({ data }) => {
             if (!data) return <div style={{ flex:1 }}/>;
             const [label, value] = String(data).split('|');
@@ -2192,7 +2217,7 @@ const SlideCardInner = React.forwardRef(({
           };
           return (
             <div data-vc-chrome="footerBar" {...mov('footerBar', {
-              position:'absolute', bottom: f.h*0.038, left: f.w*0.05, right: f.w*0.05,
+              position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight,
               zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
               gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
             })}>
@@ -2203,8 +2228,9 @@ const SlideCardInner = React.forwardRef(({
           );
         })()}
         {brand.footerPillText && (() => {
-          const pillBg = brand.footerPillBg || brand.accent || '#0a0a0a';
-          const pillFg = brand.footerPillFg || (pillBg === brand.accent ? '#0a0a0a' : '#ffffff');
+          // Texto do selo pelo contraste com o fundo: o escuro fixo sumia em
+          // padrões de destaque escuro.
+          const { bg: pillBg, fg: pillFg, arrow: pillArrow } = footerPillColors(brand);
           // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
           // Default true se undefined; só esconde quando explicitamente false.
           const showArrow = brand.footerPillArrow !== false;
@@ -2218,7 +2244,8 @@ const SlideCardInner = React.forwardRef(({
             : 50;
           return (
             <div data-vc-chrome="pill" {...mov('pill', {
-              position:'absolute', bottom: f.h*0.058,
+              // Com a barra de três colunas, o selo empilha acima dela.
+              position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar),
               left:`${pillCenterPct}%`, transform:'translateX(-50%)',
               zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
             })}>
@@ -2236,7 +2263,7 @@ const SlideCardInner = React.forwardRef(({
                 {showArrow && (
                   <span style={{
                     width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',
-                    background: pillFg, color: pillBg,
+                    background: pillFg, color: pillArrow,
                     display:'inline-flex', alignItems:'center', justifyContent:'center',
                     fontSize: f.w*0.030*escPill, fontWeight:700, lineHeight:1,
                     flexShrink:0,
