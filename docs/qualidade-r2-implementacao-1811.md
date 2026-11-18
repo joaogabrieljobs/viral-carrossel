@@ -145,3 +145,67 @@ npm run test:e2e
 ```
 
 Para ver no navegador sem crédito: `npx playwright test tests/e2e/assinatura-sem-marca.spec.js` grava capturas dos 12 presets sociais, com e sem marca, em `test-results/`.
+
+## Atualização de 18/11/2026 (tarde) — conferência com o João
+
+Estado: 14 commits locais sobre `7088a34`. Nada enviado, nada publicado. Publicação em espera por decisão desta sessão, depois da avaliação visual abaixo.
+
+### O que entrou
+
+| Commit | O quê |
+|---|---|
+| `5b0fbc2` | Gravação pós-geração: o fim da criação espera o React aplicar o documento gerado antes de gravar. Teste novo falhava 6 de 6 (sequência de gravações 1, 5, 1, 5) e passa 6 de 6. |
+| `5bc68be` | Teste de fonte por card espera o retrato inteiro gravado, não só o card 1. |
+| `b1b5519` | Composição social v3 e correções do rodapé (detalhe abaixo). |
+
+### Avaliação visual
+
+O João olhou as capturas do teste de assinatura e apontou: texto colado embaixo, selo preto com texto preto, fonte serrilhada, e depois, no geral, "cards feios, cara de anos 2000; falta uso de fonte, diagramação e arquitetura".
+
+Eu não tinha aberto as 48 capturas. O teste media texto contra ornamento, mas não media selo contra barra nem a cor do texto do selo. Depois disso as 48 foram vistas uma a uma, antes e depois da mudança.
+
+O que a v3 muda em projeto novo:
+
+- Título e apoio formam um bloco: caixa do título ancorada embaixo, caixa do apoio ancorada em cima (`socialZoneAnchors`).
+- Escala: título de 69 a 80 px para 98 a 116 px num card de 1080 (2,8× o apoio ou mais). Na coluna estreita ao lado da foto, de 60 para 69 px (2× o apoio).
+- Capa: degradê só atrás do texto no lugar do véu sobre a foto inteira, sem sombra dura, bloco colado na base.
+- Seta "arraste" só na capa.
+
+O que vale também para projeto antigo (correção de render):
+
+- Selo e barra de três colunas empilham em vez de dividir a mesma faixa.
+- Texto do selo escolhido por contraste; seta do selo visível em selo translúcido (o Reflexivo Cream publicava um círculo vazio).
+- Barra do rodapé com tinta do card quando a foto não está atrás dela, e dentro da coluna de texto quando a foto é coluna lateral.
+- Título sem negrito sintético em fonte de peso único (Anton).
+
+Capturas e comparações: `/Users/elevessy/Documents/viral-carrossel/_capturas-assinatura-1811/` (`antes/`, `depois/`, três folhas `antes-depois-*.png`).
+
+### O que a v3 não resolve
+
+- Arquitetura continua com dois arranjos de miolo (foto em cima, foto em coluna). Não há ritmo de arquétipos (declaração só de texto, lista numerada, dado em destaque, fechamento).
+- O selo "ARRASTA PRO LADO" continua com cara de botão. É assinatura de padrão; não foi redesenhado.
+- Tabloid: o título do padrão pede maiúsculas e o card gerado sai em caixa mista (já era assim).
+- "Fonte serrilhada": nas capturas em 2× não aparece. As primeiras eram em 1×, com o card em 360 px. Não comparei com o PNG exportado.
+- Nenhuma imagem real gerada: todas as capturas usam a mesma foto de arquivo.
+
+### Testes
+
+- `npm test`: 2557 passaram, 4 falhas esperadas.
+- Navegador, suíte completa em `b1b5519` menos os ajustes de teste: 272 passaram, 3 falharam, 16 pulados. As 3: teste de fonte por card (dois tamanhos) e conferência de composição da apresentação.
+- Teste de assinatura com as verificações novas: 26 de 26.
+
+### Instabilidade: o que mudou e o que não mudou
+
+Medição no commit publicado, arquivo de criação repetido 20 vezes sem carga minha: "design recomendado" 3 de 20, "prévia" 4 de 20, "apresentação confere composição" 1 de 20. Esta última não estava na lista anterior; existe no commit publicado.
+
+- Gravação antiga pós-geração: causa confirmada e corrigida (`5b0fbc2`). Prova: teste determinístico. A repetição longa (420 testes) rodou duas vezes e as duas ficaram inválidas: 8 e 55 falhas por `page.goto` sem resposta em 30 a 60 s, com a máquina em carga média 11 a 19 (Epic Games Launcher a 100% de CPU havia 12 h). Nenhuma falha de gravação antiga apareceu nelas, mas não servem como prova estatística.
+- Conferência de composição da apresentação: continua instável (`renderCheckStatus` ausente ou `unavailable`). Hipótese testada e **não confirmada**: a conferência seria pulada quando os slides ainda não foram montados (`roots.length !== newSlides.length`). Reduzir a CPU do navegador em 6× e 20× não reproduziu (8 de 8 passaram). Sem correção.
+- Teste de fonte por card: a corrida da leitura antiga foi removida no teste. Sob carga ainda falha em outros pontos (início não visível em 5 s depois do reload; fonte do título depois do reload). Não investigado.
+
+### Enquadramento de foto (checkout principal)
+
+Levantado, não juntado. São 7 arquivos, 80 linhas, último toque em 14 e 15/11, com testes próprios. Toca `ViralCarrossel.jsx` em quatro pontos de aplicação de foto; a composição v3 já grava `photoFraming: 'auto'`.
+
+### IA real
+
+Não validado. `.env.local` só tem token de armazenamento; não há chave de modelo nesta máquina.
