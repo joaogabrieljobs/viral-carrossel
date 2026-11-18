@@ -29,6 +29,9 @@ import {
 } from '../utils/custom-visual-presets.js';
 import { normalizeHookLibrary } from '../utils/hooks-library.js';
 import { isProjectOutboxUnavailable, selectRestoredProjectId } from '../utils/project-sync-control.js';
+import {
+  isFreeSession, markFreePlanUse, stashFreePlanDrafts, clearFreePlanDrafts,
+} from '../utils/free-plan.js';
 
 const LOGOUT_CLEANUP_PENDING_KEY = 'vc_logout_cleanup_pending';
 const LOGOUT_CLEANUP_NORMAL = 'normal';
@@ -66,6 +69,8 @@ export function accessStateFromSession(session = {}, current = {}) {
     verificationUnavailable: false,
     verificationError: '',
     active: !!session.active,
+    // Conta autenticada sem assinatura. `active` continua sendo "pagou".
+    free: isFreeSession(session),
     email: session.email || null,
     customerId: session.customerId || null,
     billingDisabled: !!session.billingDisabled,
@@ -308,11 +313,13 @@ export async function logoutWithProtectedLibrary({
 
 export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloudLibraryApplied,
   onCloudProjectsObserved, onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia,
-  onLibraryReady, onLibraryBlocked, toast } = {}) {
+  onLibraryReady, onLibraryBlocked, onFreeDraftsRecovered, toast } = {}) {
   const libraryCallbacksRef = useRef({ onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked });
+    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked,
+    onFreeDraftsRecovered });
   libraryCallbacksRef.current = { onCloudLibraryApplied, onCloudProjectsObserved,
-    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked };
+    onCloudMetadataObserved, onCloudMediaHydrated, onHydrateCloudProjectMedia, onLibraryReady, onLibraryBlocked,
+    onFreeDraftsRecovered };
   const [landingOpen, setLandingOpen] = useState(() => shouldShowOnboardingLanding());
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -325,6 +332,9 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
   const logoutInFlightRef = useRef(false);
   latestAccessRef.current = access;
   const accessActive = !!access.active;
+  const accessFree = !access.active && !!access.free;
+  /** Entra no editor quem pagou ou quem tem conta no plano grátis. */
+  const canUseStudio = accessActive || accessFree;
 
   const enterStudio = useCallback(() => {
     dismissOnboardingLanding();
@@ -472,8 +482,10 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         || billing === 'restored'
         || billing === 'success';
       const sessionOwners = dataOwnerAliases(session?.email, session?.customerId);
+      const sessionFree = isFreeSession(session);
+      const sessionSignedIn = !!session?.active || sessionFree;
       const sessionStillOwnsData = () => !cancelled && !bootExpired
-        && (!session?.active || !sessionOwners.size || sessionOwners.has(readDataOwner()));
+        && (!sessionSignedIn || !sessionOwners.size || sessionOwners.has(readDataOwner()));
       let restoredSnapshot;
       const ownerGate = await awaitBoot(ensureAccountDataOwner(session, {
         explicitLogin,
@@ -492,6 +504,37 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         return;
       }
       if (!sessionStillOwnsData()) return;
+
+      // Plano grátis: os projetos vivem só neste navegador, então não há
+      // biblioteca remota para esperar. O marcador registra desde quando,
+      // para a assinatura futura saber o que preservar.
+      if (sessionFree) {
+        markFreePlanUse(readDataOwner());
+        libraryCallbacksRef.current.onLibraryReady?.();
+      }
+      // Acabou de assinar depois de usar o grátis aqui: separa o que foi feito
+      // no grátis ANTES de a biblioteca da conta substituir a lista local.
+      let freeDrafts = [];
+      if (session?.active) {
+        let localBeforeCloud = restoredSnapshot?.library;
+        if (!Array.isArray(localBeforeCloud)) {
+          try { localBeforeCloud = JSON.parse(localStorage.getItem(SK.library) || '[]'); }
+          catch { localBeforeCloud = []; }
+        }
+        freeDrafts = stashFreePlanDrafts(readDataOwner(), localBeforeCloud);
+      }
+      const recoverFreeDrafts = () => {
+        if (!freeDrafts.length) return;
+        const owner = readDataOwner();
+        try {
+          const recovered = libraryCallbacksRef.current.onFreeDraftsRecovered?.(owner, freeDrafts);
+          if (recovered === false) return; // editor ainda não pôde aplicar: tenta no próximo boot
+          clearFreePlanDrafts();
+          if (recovered > 0) {
+            toast?.(`${recovered} projeto(s) feitos no plano grátis foram mantidos na sua biblioteca.`, 'info', 7000);
+          }
+        } catch { /* a cópia fica em disco para a próxima carga */ }
+      };
 
       // Multiutilizador: biblioteca na nuvem por conta (após isolamento local).
       if (session?.active) {
@@ -564,6 +607,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             if (restored.empty && Array.isArray(localLibrary) && localLibrary.length) {
               libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot, { preserveLocal: true });
               libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, null);
+              recoverFreeDrafts();
               libraryCallbacksRef.current.onLibraryReady?.();
               toast?.('Há projetos apenas neste navegador. Use “Sync na nuvem” para enviá-los à conta.', 'warning', 7000);
             } else {
@@ -586,6 +630,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
               } catch { /* perfil continua na nuvem se o navegador estiver cheio */ }
               libraryCallbacksRef.current.onCloudProjectsObserved?.(owner, projects, snapshot);
               libraryCallbacksRef.current.onCloudMetadataObserved?.(owner, metadata, snapshot);
+              recoverFreeDrafts();
               libraryCallbacksRef.current.onLibraryReady?.();
               // A foto selecionada e a logo são enriquecimento visual: um
               // IndexedDB lento não deve segurar a biblioteca no BootScreen.
@@ -662,7 +707,10 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
             return;
           }
         } catch { /* rede / Blob — cofre local continua */ }
-        if (sessionStillOwnsData()) libraryCallbacksRef.current.onLibraryReady?.();
+        if (sessionStillOwnsData()) {
+          recoverFreeDrafts();
+          libraryCallbacksRef.current.onLibraryReady?.();
+        }
         }
       }
 
@@ -674,13 +722,20 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       if (pulaLanding) {
         dismissOnboardingLanding();
         setLandingOpen(false);
-        if (!session.active && !loginStatus && !billing && !pendingShare) setPaywallOpen(true);
+        if (!sessionSignedIn && !loginStatus && !billing && !pendingShare) setPaywallOpen(true);
       }
       // Link de equipe sem sessão: pede login (não paywall genérico).
-      if (pendingShare && !session.active) {
+      if (pendingShare && !sessionSignedIn) {
         setLoginHint('Entre na sua conta Moont para abrir o projeto da equipe.');
         setLoginOpen(true);
         setPaywallOpen(false);
+        setLandingOpen(false);
+      }
+      // Convite de equipe numa conta grátis: abrir o projeto é recurso pago.
+      if (pendingShare && sessionFree) {
+        setLoginHint('Abrir projeto compartilhado pela equipe faz parte dos planos pagos.');
+        setPaywallEmail(session.email || '');
+        setPaywallOpen(true);
         setLandingOpen(false);
       }
       if (!pulaLanding && (q?.get('landing') === '1' || q?.get('intro') === '1' || q?.get('welcome') === '1')) {
@@ -689,8 +744,9 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       if (billing === 'success' && session.active) {
         enterStudio();
       }
-      if ((billing === 'restored' || loginStatus === 'google' || loginStatus === 'password') && session.active) {
+      if ((billing === 'restored' || loginStatus === 'google' || loginStatus === 'password') && sessionSignedIn) {
         trackEvent(loginStatus === 'password' ? 'login_password_ok' : 'login_google_ok');
+        if (sessionFree) trackEvent('free_plan_enter');
         enterStudio();
       }
       if (q?.get('account_switch') === '1' && session.active) {
@@ -705,6 +761,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
         enterStudio();
       }
       if (billing === 'cancel') {
+        // Quem tem conta grátis e desistiu do checkout volta ao editor, não à parede.
+        setPaywallEmail(session.email || '');
         setPaywallOpen(true);
         setLandingOpen(false);
       }
@@ -750,7 +808,7 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
       toast?.(session.error || 'Não foi possível verificar sua conta. Tente novamente.', 'warning', 7000);
       return;
     }
-    if (session.active) {
+    if (session.active || isFreeSession(session)) {
       enterStudio();
       return;
     }
@@ -797,6 +855,8 @@ export function useAccess({ setShellView, onLeaveEditor, onBeforeLogout, onCloud
     loginHint, setLoginHint,
     access, setAccess,
     accessActive,
+    accessFree,
+    canUseStudio,
     accountTab, setAccountTab,
     enterStudio,
     goAccount,

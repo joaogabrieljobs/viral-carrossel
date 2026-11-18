@@ -12,6 +12,7 @@ import { buildImgParamsTagsEN } from './generation-prompts.js';
 import { ZAI_FALLBACK_MODELS } from '../../shared/ai-models.js';
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
 import { PITCH_SYSTEM_PT } from './pitch-content.js';
+import { assertPaidFeature } from './free-plan.js';
 import { buildPresentationSystemPrompt } from './presentation.js';
 
 // Acima do orçamento do proxy (240 s em api/ai/compatible.js): se o cliente
@@ -400,6 +401,7 @@ const callCompatibleChat = async (
 // Texto incluso = Z.ai no servidor (`ZAI_API_KEY`). Sem chave própria noutro
 // provedor, usa sempre Z.ai — não cai em Anthropic (mais caro).
 const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, openaiKey = null, contentMode, presentationPath, contentLanguage = '', systemPrompt: explicitSystemPrompt = '', temperature, onRetry, thinking, onResponseMetadata, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+  assertPaidFeature('text');
   const baseSystemPrompt = contentMode === 'pitch'
     ? PITCH_SYSTEM_PT
     : contentMode === 'presentation'
@@ -428,6 +430,7 @@ const callAI = (userMsg, { json = false, jsonParser = null, maxTokens = 4096, op
 // Pesquisa com web_search é EXCLUSIVA do Claude/Anthropic (BYOK). Sem chave Anthropic,
 // a UI deve cair em callAI (Z.ai) sem web ao vivo.
 const callAIwithSearch = (userMsg, { json = false, maxTokens = 4096, signal: parentSignal } = {}) => runAIJob(async (signal) => {
+  assertPaidFeature('text');
   if (!getProviderKey('anthropic')) {
     throw new Error('Pesquisa web ao vivo precisa de chave Anthropic (opcional).');
   }
@@ -584,6 +587,7 @@ function resolveZaiImageSize(model, aspectRatio = '4:5') {
 }
 
 async function generateZaiImage(q, imgParams, imgExtraPrompt, signal, options = {}) {
+  assertPaidFeature('image');
   const apiKey = getProviderKey('zai');
   if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
@@ -675,6 +679,7 @@ function getOpenAIImageOrder() {
 
 /** Geração com uma ou mais imagens de referência (API edits — multipart). */
 async function generateDALLEEdits(refBlob, prompt, apiKey, signal, options = {}) {
+  assertPaidFeature('image');
   const referenceBlobs = Array.isArray(refBlob) ? refBlob : [refBlob];
   if (!IS_LOCAL_DEV && !apiKey) throw new Error('Chave OpenAI ausente.');
   const headers = {};
@@ -808,6 +813,7 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
  * Default: imagens inclusas no plano. BYOK só com useOwnImageKey.
  */
 const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(async (signal) => {
+  assertPaidFeature('image');
   options = { ...options, signal };
   const { refImage, imgExtraPrompt } = options || {};
   const refs = options.refImages || (refImage ? [refImage] : []);
@@ -905,6 +911,7 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
 /** Wrapper que tenta `generateDALLE` até N+1 vezes com backoff curto. Útil para rate-limits transitórios.
  *  Erros 4xx persistentes (auth, conteúdo, modelo indisponível) NÃO retentam — só rede / 5xx / 429. */
 const generateDALLEWithRetry = (q, apiKey, imgParams = null, options = {}, { retries = 1, backoffMs = 1200 } = {}) => runAIJob(async (signal) => {
+  assertPaidFeature('image');
   // A operação identifica o pedido do usuário, não cada tentativa de rede.
   // Reutilizá-la permite que o servidor reconheça uma resposta perdida sem
   // reservar um segundo crédito na retentativa.

@@ -7,6 +7,7 @@
 import { SK } from './storage.js';
 import { USER_PROFILE_KEY } from './user-profile.js';
 import { CUSTOM_VISUAL_PRESETS_KEY } from './custom-visual-presets.js';
+import { FREE_PLAN_SINCE_KEY } from './free-plan.js';
 import { updateDurableVault } from './account-vault-store.js';
 import { imageGet, imagePut, newImageId, origemParaBlob, blobParaDataUrl } from './image-store.js';
 
@@ -27,6 +28,8 @@ const SNAPSHOT_KEYS = [
   /** Preferências criativas também pertencem à conta, não ao navegador. */
   SK.hookLibrary,
   CUSTOM_VISUAL_PRESETS_KEY,
+  /** Desde quando a conta usa o grátis aqui: decide o que preservar ao assinar. */
+  FREE_PLAN_SINCE_KEY,
 ];
 
 function readLegacyVaultMap() {

@@ -4,6 +4,11 @@ const blocked = (reason, message) => ({ canGenerate: false, reason, message });
 
 /** Acesso à imagem é independente da disponibilidade do provedor de texto. */
 export function imageGenerationAccess({ access = {}, useOwnImageKey = false, hasByokImageKey = false } = {}) {
+  // Plano grátis: nem a plataforma nem a chave própria geram imagem. O botão
+  // continua clicável (`upgrade`) para levar à assinatura em vez de ficar mudo.
+  if (access.free && !access.active) {
+    return { ...blocked('free_plan', 'Gerar imagem faz parte dos planos pagos. No grátis você envia suas próprias fotos.'), upgrade: true };
+  }
   if (useOwnImageKey) {
     return hasByokImageKey ? ready : blocked('missing_image_key',
       'Sua chave de imagem não está configurada. Abra Configurar IA para adicioná-la ou usar as imagens do plano.');

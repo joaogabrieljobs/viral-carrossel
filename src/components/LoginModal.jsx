@@ -69,7 +69,8 @@ export default function LoginModal({
         setCheckoutReady(true);
         return;
       }
-      if (data.active) {
+      // Conta sem assinatura entra no plano grátis: mesmo caminho de quem pagou.
+      if (data.active || data.free) {
         dismissOnboardingLanding();
         onClose?.();
         if (typeof onLoggedIn === 'function') {

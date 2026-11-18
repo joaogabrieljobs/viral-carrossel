@@ -1,4 +1,5 @@
 import { prepareImageReferencesForUpload } from './image-reference-upload.js';
+import { assertPaidFeature } from './free-plan.js';
 import { createBrowserOcrSession, shouldUseBrowserOcrFallback } from './browser-ocr.js';
 
 export const CAROUSEL_OCR_MAX_IMAGES = 10;
@@ -61,6 +62,7 @@ export function validateCarouselOcrFiles(files) {
 }
 
 export async function readCarouselImageText(dataUrl, { fetchImpl = fetch, signal } = {}) {
+  assertPaidFeature('text');
   const [prepared] = await prepareImageReferencesForUpload([dataUrl]);
   const response = await fetchImpl('/api/ai/ocr', {
     method: 'POST',

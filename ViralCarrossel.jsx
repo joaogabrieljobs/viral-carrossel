@@ -248,6 +248,10 @@ import { imageGenerationAccess, slideImageGenerationState } from './src/utils/im
 import { GLOBAL_STYLE } from './src/styles/global-style.js';
 import { useExport, waitForExportReadiness } from './src/hooks/useExport.js';
 import { useAccess } from './src/hooks/useAccess.js';
+import {
+  FREE_PROJECT_LIMIT, PLAN_REQUIRED_MESSAGES, setPaidFeatureGate, isPlanRequiredError,
+  planFreePlanDraftRecovery, rememberUpgradeReturn, takeUpgradeReturn,
+} from './src/utils/free-plan.js';
 import { useLibrary } from './src/hooks/useLibrary.js';
 import { useToasts } from './src/hooks/useToasts.js';
 import { useAiSettings } from './src/hooks/useAiSettings.js';
@@ -1434,17 +1438,42 @@ export default function App() {
   const {
     renameDoc, setDocStatus, setDocFolder, setDocPublicationDate,
     createFolder, renameFolder, deleteFolder,
-    openDoc: openDocLocal, newDoc, duplicateDoc, newFromContext, createSeriesDrafts,
+    openDoc: openDocLocal, newDoc, duplicateDoc: duplicateDocRaw, newFromContext: newFromContextRaw,
+    createSeriesDrafts: createSeriesDraftsRaw,
     deleteDoc: deleteDocLocal,
-    exportDoc, exportAllDocs, handleImportFile,
+    exportDoc, exportAllDocs, handleImportFile: handleImportFileRaw,
     shellView, setShellView, importDocRef,
   } = useLibrary({
     library, setLibrary, libraryFolders, setLibraryFolders, activeDocId, setActiveDocId,
     history, slides, brand, brandRoster, setBrandRoster, activeBrandId, setActiveBrandId,
     setLibraryOpen, toast, setError, visualPresets,
   });
+  // Plano grátis: até FREE_PROJECT_LIMIT projetos. O limite só barra CRIAR;
+  // quem já tem mais (ex-assinante) continua abrindo e editando todos.
+  const openUpgradeRef = useRef(null);
+  const freeLimitBlocks = useCallback((adding = 1) => {
+    if (!accessSessionRef.current?.free) return false;
+    if ((libraryPersistRef.current || []).length + adding <= FREE_PROJECT_LIMIT) return false;
+    openUpgradeRef.current?.('projects');
+    return true;
+  }, []);
+  const duplicateDoc = useCallback((docId) => (freeLimitBlocks() ? undefined : duplicateDocRaw(docId)),
+    [freeLimitBlocks, duplicateDocRaw]);
+  const newFromContext = useCallback((docId, kind) => (freeLimitBlocks() ? undefined : newFromContextRaw(docId, kind)),
+    [freeLimitBlocks, newFromContextRaw]);
+  const createSeriesDrafts = useCallback((drafts = []) => (
+    freeLimitBlocks(Array.isArray(drafts) ? drafts.length : 1) ? undefined : createSeriesDraftsRaw(drafts)
+  ), [freeLimitBlocks, createSeriesDraftsRaw]);
+  const handleImportFile = useCallback((event) => {
+    if (freeLimitBlocks()) {
+      if (event?.target) event.target.value = '';
+      return undefined;
+    }
+    return handleImportFileRaw(event);
+  }, [freeLimitBlocks, handleImportFileRaw]);
   const deleteDoc = useCallback(async (docId) => {
-    if (!PROJECTS_V2) return deleteDocLocal(docId);
+    // Conta grátis não tem biblioteca na nuvem: excluir é sempre local.
+    if (!PROJECTS_V2 || accessSessionRef.current?.free) return deleteDocLocal(docId);
     if (!docId || !accountLibraryReadyRef.current || areAccountDataWritesLocked()) return false;
     const owner = readDataOwner();
     if (!owner || v2ObservedOwnerRef.current !== owner) {
@@ -1486,7 +1515,8 @@ export default function App() {
     }
   }, [deleteDocLocal, toast]);
   const openDoc = useCallback(async (docId) => {
-    if (!PROJECTS_V2) return openDocLocal(docId);
+    // Conta grátis: o projeto só existe neste navegador, não há versão remota a conferir.
+    if (!PROJECTS_V2 || accessSessionRef.current?.free) return openDocLocal(docId);
     const owner = readDataOwner();
     const entry = libraryPersistRef.current.find((project) => project.id === docId);
     if (!entry) {
@@ -1598,11 +1628,14 @@ export default function App() {
   const creationRequestRef = useRef(null);
   const [creationRequestVersion, setCreationRequestVersion] = useState(0);
   const creationGenerateRef = useRef(null);
+  const openDocRef = useRef(null);
+  openDocRef.current = openDoc;
   const createProjectByKind = useCallback((kind, projectName) => {
     if (!accountLibraryReadyRef.current || areAccountDataWritesLocked()) {
       toast('Aguarde seus projetos terminarem de carregar para criar um novo.', 'info', 4500);
       return false;
     }
+    if (freeLimitBlocks()) return false;
     if (getAIGenerationCount() > 0) {
       toast('Conclua ou cancele a geração em andamento antes de criar outro projeto.', 'info', 4500);
       return false;
@@ -1625,7 +1658,7 @@ export default function App() {
       name: typeof projectName === 'string' ? projectName : '',
     });
     return true;
-  }, [toast]);
+  }, [toast, freeLimitBlocks]);
 
   /** Selecciona marca para produção (Home) sem sobrescrever o projeto aberto. */
   const selectBrandForProduction = useCallback((brandId) => {
@@ -2021,6 +2054,25 @@ export default function App() {
     setPhotoLoad(null);
   }, []);
 
+  /** Devolve quantos projetos voltaram; `false` adia para a próxima carga. */
+  const recoverFreePlanDrafts = useCallback((owner, drafts) => {
+    if (!owner || readDataOwner() !== owner || areAccountDataWritesLocked()) return false;
+    const current = libraryPersistRef.current || [];
+    const additions = planFreePlanDraftRecovery(drafts, current, {
+      newId: uid,
+      sameContent: (a, b) => projectCacheFingerprint(a) === projectCacheFingerprint(b),
+    }).map((entry) => normalizeLibraryEntry({
+      ...entry, doc: ensureDocShape(entry.doc || {}), updatedAt: Date.now(),
+    }, libraryFoldersPersistRef.current));
+    if (!additions.length) return 0;
+    const next = [...additions, ...current];
+    flushSync(() => {
+      libraryPersistRef.current = next;
+      setLibrary(next);
+    });
+    return additions.length;
+  }, []);
+
   const observeCloudMetadataV2 = useCallback((owner, metadata, snapshot) => {
     if (!PROJECTS_V2 || !owner || readDataOwner() !== owner) return;
     v2MetaRevisionRef.current = Number.isSafeInteger(metadata?.revision) ? metadata.revision : null;
@@ -2247,6 +2299,19 @@ export default function App() {
   // Salvar e Sync usam a mesma transação: flush → merge → pull → React → toast.
   // O ref bloqueia também dois cliques antes de o estado busy renderizar.
   const syncProjectLibrary = useCallback(async (source = 'sync') => {
+    // Plano grátis: salvar é gravar neste aparelho. Não há conta para onde enviar.
+    if (accessSessionRef.current?.free) {
+      try {
+        const pending = flushPersistNow({ returnSnapshot: true });
+        flushSync(() => setLibrary(pending.snapshot.library));
+        setLastSavedAt(Date.now());
+        if (source === 'salvar') toast('Projeto salvo neste aparelho.', 'success', 3000);
+        return { localSaved: true, cloudSaved: false };
+      } catch (error) {
+        toast(error?.message || 'Não foi possível salvar neste aparelho.', 'error', 5000);
+        return { localSaved: false, cloudSaved: false };
+      }
+    }
     if (cloudSyncInFlightRef.current) return;
     cloudSyncInFlightRef.current = true;
     setCloudSyncBusy(true);
@@ -2529,6 +2594,12 @@ export default function App() {
   }, [doc, activeDocId, accountLibraryReady]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const activeIdxRef = useRef(0);
+  activeIdxRef.current = activeIdx;
+  const shellViewRef = useRef(shellView);
+  shellViewRef.current = shellView;
+  /** Recurso pago que levou a conta grátis à página de assinatura ('' = nenhum). */
+  const [upgradeFeature, setUpgradeFeature] = useState('');
   const [selectedCardElement, setSelectedCardElement] = useState(null);
   const [editorFocus, setEditorFocus] = useState(null);
   const [editingTextArea, setEditingTextArea] = useState(null);
@@ -2635,6 +2706,8 @@ export default function App() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupProductKind, setSetupProductKind] = useState(activeProductKind);
   const openGenerationSetup = useCallback((kind = activeProductKind) => {
+    // Grátis: avisar antes de a pessoa preencher o pedido, não depois.
+    if (accessSessionRef.current?.free) { openUpgradeRef.current?.('text'); return; }
     const normalizedKind = kind === 'apresentacao' ? 'apresentacao' : 'carrossel';
     setSetupProductKind(normalizedKind);
     setSetupOpen(true);
@@ -2662,6 +2735,8 @@ export default function App() {
     loginHint, setLoginHint,
     access, setAccess,
     accessActive,
+    accessFree,
+    canUseStudio,
     accountTab, setAccountTab,
     enterStudio,
     goAccount,
@@ -2676,7 +2751,8 @@ export default function App() {
     onLeaveEditor: () => setDrawerOpen(false),
     onBeforeLogout: async () => {
       await stopCloudAutoPush();
-      if (PROJECTS_V2) {
+      // No grátis não há envio à conta a confirmar: o cofre local guarda os projetos.
+      if (PROJECTS_V2 && !accessSessionRef.current?.free) {
         const receipt = await syncProjectLibrary('logout');
         if (receipt?.cloudSaved !== true) {
           throw new Error('As últimas alterações ainda não foram confirmadas na sua conta. Salve ou sincronize antes de sair.');
@@ -2684,7 +2760,7 @@ export default function App() {
       }
       const pending = flushPersistRef.current({ returnSnapshot: true });
       setLibrary(pending.snapshot.library);
-      return PROJECTS_V2 ? { ...pending, v2CloudSaved: true } : pending;
+      return PROJECTS_V2 && !accessSessionRef.current?.free ? { ...pending, v2CloudSaved: true } : pending;
     },
     onCloudLibraryApplied: applyCloudLibrarySnapshot,
     onCloudProjectsObserved: observeCloudProjectsV2,
@@ -2693,16 +2769,79 @@ export default function App() {
     onHydrateCloudProjectMedia: hydrateProjectMediaForAccount,
     onLibraryReady: markAccountLibraryReady,
     onLibraryBlocked: setAccountRestoreError,
+    onFreeDraftsRecovered: recoverFreePlanDrafts,
     toast,
   });
   accessSessionRef.current = access;
+
+  /**
+   * Único caminho para a página de assinatura a partir do editor. Grava antes
+   * o que está aberto: depois do pagamento a pessoa volta ao mesmo projeto e
+   * card. Nada é descartado — o editor continua montado por trás dos planos.
+   */
+  const openUpgrade = useCallback((feature = 'text') => {
+    try { flushPersistRef.current?.(); } catch { /* o autosave grava em seguida */ }
+    const editor = editorSyncStateRef.current || {};
+    rememberUpgradeReturn({
+      owner: readDataOwner(),
+      docId: shellViewRef.current === 'project' ? editor.activeDocId : '',
+      slideIndex: activeIdxRef.current,
+      feature,
+    });
+    setLoginHint(PLAN_REQUIRED_MESSAGES[feature] || PLAN_REQUIRED_MESSAGES.text);
+    setPaywallEmail(accessSessionRef.current?.email || '');
+    setUpgradeFeature(feature);
+    setPaywallOpen(true);
+    trackEvent('free_plan_upgrade_prompt', { feature });
+  }, [setLoginHint, setPaywallEmail, setPaywallOpen]);
+  openUpgradeRef.current = openUpgrade;
+  /** Configurar IA (chave própria) é recurso pago: no grátis leva aos planos. */
+  const openKeys = useCallback(() => {
+    if (accessSessionRef.current?.free) { openUpgrade('keys'); return; }
+    setKeysOpen(true);
+  }, [openUpgrade]);
+  // O portão vale a partir deste render: funções de IA consultam o módulo.
+  setPaidFeatureGate({ blocked: accessFree, onBlocked: openUpgrade });
+  useEffect(() => () => setPaidFeatureGate({ blocked: false }), []);
+
   const handleSyncCloud = useCallback(() => {
+    if (accessSessionRef.current?.free) {
+      openUpgrade('cloud');
+      return;
+    }
     if (!access?.active) {
       toast('Entre na conta para sincronizar seus projetos.', 'warning', 4500);
       return;
     }
     return syncProjectLibrary('sync');
-  }, [access?.active, syncProjectLibrary, toast]);
+  }, [access?.active, syncProjectLibrary, toast, openUpgrade]);
+
+  /** Fechar a página de assinatura sem assinar: segue no grátis, no mesmo lugar. */
+  const continueOnFreePlan = useCallback(() => {
+    takeUpgradeReturn(readDataOwner()); // não houve saída: o retorno guardado perde a função
+    setLoginHint('');
+    setUpgradeFeature('');
+    setPaywallOpen(false);
+  }, [setLoginHint, setPaywallOpen]);
+
+  // Volta do checkout (ou de um checkout cancelado): reabre o projeto e o card
+  // que estavam abertos quando a pessoa foi para a assinatura. Uma vez por carga.
+  const upgradeReturnDoneRef = useRef(false);
+  useEffect(() => {
+    if (upgradeReturnDoneRef.current || !accountLibraryReady || !canUseStudio
+      || paywallOpen || landingOpen || access.status === 'loading') return;
+    upgradeReturnDoneRef.current = true;
+    const target = takeUpgradeReturn(readDataOwner());
+    if (!target || !(libraryPersistRef.current || []).some((entry) => entry.id === target.docId)) return;
+    const paid = !!accessSessionRef.current?.active;
+    void Promise.resolve(openDocRef.current?.(target.docId)).then((opened) => {
+      if (opened === false) return;
+      setShellView('project');
+      const total = (libraryPersistRef.current || []).find((entry) => entry.id === target.docId)?.doc?.slides?.length || 1;
+      setActiveIdx(Math.max(0, Math.min(target.slideIndex, total - 1)));
+      if (paid) toast('Assinatura ativa. Você voltou ao projeto em que estava.', 'success', 6000);
+    }).catch(() => { /* o projeto continua na biblioteca */ });
+  }, [accountLibraryReady, canUseStudio, paywallOpen, landingOpen, access.status, setShellView, toast]);
   // Auto-push na nuvem ~4s após uma edição real, inclusive durante outro envio.
   const cloudAutoPushSkipFirstRef = useRef(true);
   const scheduleCloudAutoPush = useCallback(({ immediate = false } = {}) => {
@@ -3805,6 +3944,7 @@ export default function App() {
       type="button"
       data-vc-tour="generate"
       onClick={() => {
+        if (accessFree) { openUpgrade('text'); return; }
         if (appMode === 'criador') {
           const topic = String(quickPrompt || '').trim();
           if (!topic) {
@@ -3930,7 +4070,7 @@ export default function App() {
         children: <span style={{ fontSize: 14, fontWeight: 600 }}>?</span>,
       })}
       {editorIconBtn({
-        onClick: () => setKeysOpen(true),
+        onClick: openKeys,
         title: hasAnyAI && hasOpenAI
           ? 'IA pronta · texto e imagens disponíveis'
           : (hasAnyAI ? `Texto pronto · ${imageGenerationAvailability.message}` : 'Configurar provedores de IA'),
@@ -4791,6 +4931,10 @@ export default function App() {
   }, [setSlides, toast]);
 
   const generateSlideImageAt = useCallback(async (idx, parentSignal = null, target = null) => {
+    if (accessSessionRef.current?.free) {
+      openUpgradeRef.current?.('image');
+      return { ok: false, reason: 'free_plan' };
+    }
     const generationProjectId = target?.projectId || activeProjectRef.current;
     if (!generationProjectId || activeProjectRef.current !== generationProjectId) {
       return { ok: false, reason: 'stale_target' };
@@ -5149,6 +5293,7 @@ export default function App() {
     announcement = false,
     remix = false,
   }) => {
+    if (accessSessionRef.current?.free) { openUpgradeRef.current?.('text'); return undefined; }
     const rawTopic = String(topic || '');
     const requestedPresetId = presetArg ?? creativePreset ?? 'livre';
     // Detecte antes do limite do campo de tema. O tema curto continua
@@ -6208,6 +6353,7 @@ ${jsonShapeLine}`;
       || readDataOwner() !== creationSession.owner) {
       throw new Error('A conta ainda está carregando. Aguarde antes de abrir o editor.');
     }
+    if (freeLimitBlocks()) return false;
     const isPresentation = productKind === 'apresentacao';
     const brandId = uid();
     const identity = hydrateBrandTextColors({ ...DEFAULT_BRAND, id:brandId, name:'' });
@@ -6499,6 +6645,7 @@ Retorne exatamente: ${singleJson}`,
   };
 
   const generateCaption = async () => {
+    if (accessFree) { openUpgrade('text'); return; }
     const projectId = activeProjectRef.current;
     setGenCaption(true); setError('');
     const job = startAIJob();
@@ -6621,6 +6768,7 @@ ${isPresentationSummary
     productKind = null,
     presentationPath: quickPresentationPath = null,
   } = {}) => {
+    if (accessSessionRef.current?.free) { openUpgradeRef.current?.('text'); return undefined; }
     const topic = String(promptText || '').trim();
     if (!topic) {
       toast('Escreva o que você quer gerar no prompt.', 'error');
@@ -6693,7 +6841,7 @@ ${isPresentationSummary
   const analyzeBrandTone = useCallback(async (options = {}) => {
     if (analyzingBrandTone) return null;
     if (!hasAnyAI) {
-      setKeysOpen(true);
+      openKeys();
       toast('Ative a IA de texto para analisar o tom.', 'info');
       return null;
     }
@@ -7150,7 +7298,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
   const cloudReceipt = cloudReceipts[activeDocId];
   const confirmedCloudAt = cloudReceipt && cloudReceipt.owner === readDataOwner()
     && cloudReceipt.fingerprint === currentDocumentFingerprint ? cloudReceipt.at : null;
-  const saveIndicator = <ProjectSaveStatus localSavedAt={lastSavedAt} cloudSavedAt={confirmedCloudAt} busy={cloudSyncBusy || autoSaveBusy} error={cloudUnsaved} onRetry={salvarProjeto} />;
+  const saveIndicator = <ProjectSaveStatus localSavedAt={lastSavedAt} cloudSavedAt={confirmedCloudAt} busy={!accessFree && (cloudSyncBusy || autoSaveBusy)} error={cloudUnsaved} onRetry={salvarProjeto} deviceOnly={accessFree} onUpgrade={accessFree ? () => openUpgrade('cloud') : undefined} />;
 
   const editingCardVisual = !!panelSlide.visualBrand && ['texto', 'visual', 'ajustes'].includes(tab);
   const sidebarBrand = editingCardVisual ? { ...displayBrand, ...sanitizeCustomVisualPresetBrand(panelSlide.visualBrand) } : displayBrand;
@@ -7196,9 +7344,10 @@ Retorne APENAS JSON: ${refineAllWantsBody
       if (!id) return;
       const entry = library.find((e) => e.id === id);
       const name = (entry?.name || 'este projeto').trim() || 'este projeto';
-      if (!window.confirm(`Apagar o projeto «${name}» por completo?\n\nTodos os cards serão removidos da biblioteca ${PROJECTS_V2 ? 'da sua conta' : 'deste navegador'}.`)) return;
+      const cloudLibrary = PROJECTS_V2 && !accessFree;
+      if (!window.confirm(`Apagar o projeto «${name}» por completo?\n\nTodos os cards serão removidos da biblioteca ${cloudLibrary ? 'da sua conta' : 'deste navegador'}.`)) return;
       void deleteDoc(id);
-      if (!PROJECTS_V2) toast('Projeto apagado.', 'success', 3000);
+      if (!cloudLibrary) toast('Projeto apagado.', 'success', 3000);
     },
     selectedCardElement,
     editorFocus,
@@ -7409,7 +7558,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     );
   }
 
-  if (access.status === 'loading' || (accessActive && !accountLibraryReady)) {
+  if (access.status === 'loading' || (canUseStudio && !accountLibraryReady)) {
     return (
       <BootScreen
         label={accessActive ? 'Restaurando seus projetos…' : 'Abrindo sua conta…'}
@@ -7423,7 +7572,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     );
   }
 
-  if (paywallOpen || !accessActive) {
+  if (paywallOpen || !canUseStudio) {
     return (
       <div
         className="vc-landing-shell"
@@ -7441,12 +7590,16 @@ Retorne APENAS JSON: ${refineAllWantsBody
         <Suspense fallback={<BootScreen label="Abrindo sua conta…" />}>
           <Paywall
             isMobile={isMobile}
-            initialEmail={paywallEmail}
-            loginHint={loginHint}
-            onBack={reopenLanding}
-            onManageBilling={access.email && !access.verificationUnavailable && ['active', 'inactive'].includes(access.status) ? openPortal : undefined}
-            onLogin={() => { setLoginMode('login'); setLoginOpen(true); }}
-            onRegister={() => { setLoginMode('register'); setLoginOpen(true); }}
+            initialEmail={paywallEmail || (accessFree ? access.email || '' : '')}
+            loginHint={accessFree ? '' : loginHint}
+            freeAccount={accessFree}
+            upgradeReason={accessFree ? loginHint : ''}
+            upgradeFeature={accessFree ? upgradeFeature : ''}
+            onContinueFree={accessFree ? continueOnFreePlan : undefined}
+            onBack={accessFree ? undefined : reopenLanding}
+            onManageBilling={!accessFree && access.email && !access.verificationUnavailable && ['active', 'inactive'].includes(access.status) ? openPortal : undefined}
+            onLogin={accessFree ? undefined : () => { setLoginMode('login'); setLoginOpen(true); }}
+            onRegister={accessFree ? undefined : () => { setLoginMode('register'); setLoginOpen(true); }}
           />
           <LoginModal
             open={loginOpen}
@@ -7493,9 +7646,11 @@ Retorne APENAS JSON: ${refineAllWantsBody
           hasOpenAI={hasOpenAI}
           hasAnthropic={hasAnyAI}
           imageQuota={access.imageQuota}
-          onOpenKeys={() => setKeysOpen(true)}
+          onOpenKeys={openKeys}
           onCreate={createAndGenerateProject}
           onCreateBlank={createBlankProject}
+          freePlan={accessFree}
+          onUpgrade={openUpgrade}
           onCancel={leaveCreation}
           onCancelGeneration={cancelGeneration}
           onOpenDraft={openCreationDraft}
@@ -7526,7 +7681,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
           onOpenTemplates={() => setTemplatesOpen(true)}
           onOpenResearch={() => setResearchOpen(true)}
           onOpenHelp={() => setHelpOpen(true)}
-          onOpenSettings={() => setKeysOpen(true)}
+          onOpenSettings={openKeys}
           onContinueEditor={() => setShellView('project')}
           onManageBilling={access.billingDisabled ? undefined : openPortal}
           onLogout={handleLogout}
@@ -8812,7 +8967,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
         imageProviderLabel={
           aiSettings.imageModels?.openai === 'gpt-image-1.5' ? 'GPT Image 1.5' : 'GPT Image 2'
         }
-        onOpenKeys={() => setKeysOpen(true)}
+        onOpenKeys={openKeys}
         onGoToMaterial={() => {
           setShellView('project');
           // «Fontes & referências» vive na tab narrativa — 'material' não é uma

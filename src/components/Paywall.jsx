@@ -3,11 +3,13 @@ import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { startCheckout } from '../lib/billing.js';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 import BrandLogo from './BrandLogo.jsx';
-import { PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
+import { FREE_PLAN, PLAN_ORDER, PLAN_TIERS } from '../../shared/plans.js';
 
 /**
- * Paywall — 4 planos (Essencial / Criador / Pro / Max).
- * Texto BYOK (padrão Z.ai); imagens inclusas nos planos com quota > 0.
+ * Planos — 4 pagos (Essencial / Criador / Pro / Max) e o grátis.
+ * Sem conta: oferece começar grátis (criar conta) ou assinar.
+ * Conta grátis (`freeAccount`): é a página de upgrade; fechar volta ao editor
+ * no mesmo ponto, sem perder o projeto aberto.
  */
 export default function Paywall({
   isMobile,
@@ -17,9 +19,14 @@ export default function Paywall({
   onManageBilling,
   initialEmail = '',
   loginHint = '',
+  freeAccount = false,
+  upgradeReason = '',
+  upgradeFeature = '',
+  onContinueFree,
 }) {
   const [email, setEmail] = useState(initialEmail || '');
-  const [tier, setTier] = useState('creator');
+  // Quem veio por imagem gerada precisa de um plano com imagens; para texto, o Essencial já resolve.
+  const [tier, setTier] = useState(freeAccount && upgradeFeature && upgradeFeature !== 'image' ? 'essential' : 'creator');
   const [loading, setLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState('');
@@ -108,7 +115,7 @@ export default function Paywall({
           color: 'var(--accent, #5b53e8)',
           fontWeight: 600,
         }}>
-          Escolha o plano
+          {freeAccount ? 'Você está no plano grátis' : 'Escolha o plano'}
         </p>
         <h1 style={{
           margin: '0 0 12px',
@@ -118,7 +125,7 @@ export default function Paywall({
           fontFamily: 'var(--font-display, Inter, sans-serif)',
           lineHeight: 1.15,
         }}>
-          Studio completo. Imagens inclusas nos planos pagos.
+          {freeAccount ? 'Assine para criar com IA.' : 'Studio completo. Imagens inclusas nos planos pagos.'}
         </h1>
         <p style={{
           margin: '0 0 20px',
@@ -126,8 +133,34 @@ export default function Paywall({
           lineHeight: 1.5,
           color: 'var(--text-secondary, #b8b4c2)',
         }}>
-          Texto (Moont AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.
+          {freeAccount
+            ? 'Seu projeto continua aberto. Depois de assinar, você volta ao mesmo card.'
+            : 'Texto (Moont AI) e imagens inclusos no plano. No Essencial, imagens pedem chave própria em Configurações.'}
         </p>
+
+        {freeAccount && upgradeReason && (
+          <p role="status" data-vc-upgrade-reason style={{
+            margin: '0 0 20px', padding: '12px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+            border: '1px solid rgba(91,83,232,0.45)', background: 'rgba(91,83,232,0.12)',
+          }}>
+            {upgradeReason}
+          </p>
+        )}
+
+        {!freeAccount && onRegister && (
+          <section aria-label="Plano grátis" style={{
+            marginBottom: 20, padding: 16, borderRadius: 12,
+            border: '1px solid rgba(215,255,90,0.45)', background: 'rgba(215,255,90,0.06)',
+          }}>
+            <strong style={{ display: 'block', fontSize: 15 }}>{FREE_PLAN.name} · {FREE_PLAN.priceLabel}</strong>
+            <p style={{ margin: '6px 0 12px', fontSize: 13, lineHeight: 1.5, color: 'var(--text-secondary, #b8b4c2)' }}>
+              Crie seus carrosséis à mão: textos, layout, estilos, suas fotos e exportação. Sem IA e sem imagem gerada. Até {FREE_PLAN.projectLimit} projetos, guardados neste aparelho.
+            </p>
+            <button type="button" onClick={onRegister} className="vc-btn vc-btn-primary" style={{ width: '100%', minHeight: 48 }}>
+              Começar grátis
+            </button>
+          </section>
+        )}
 
         {onManageBilling && (
           <section aria-label="Assinatura da sua conta" style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.16)' }}>
@@ -181,12 +214,14 @@ export default function Paywall({
         </p>
 
         <form onSubmit={submit}>
-          <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600 }}>
-            E-mail
+          <label htmlFor="vc-paywall-email" style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600 }}>
+            {freeAccount ? 'E-mail da sua conta' : 'E-mail'}
           </label>
           <input
+            id="vc-paywall-email"
             type="email"
             required
+            readOnly={freeAccount && !!initialEmail}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="voce@email.com"
@@ -227,12 +262,17 @@ export default function Paywall({
             }}
           >
             {loading ? <Loader2 size={18} className="spin" /> : <ArrowRight size={18} />}
-            Continuar · {plan.priceLabel}/mês
+            {freeAccount ? 'Assinar' : 'Continuar'} · {plan.priceLabel}/mês
           </button>
         </form>
 
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <GoogleSignInButton />
+          {freeAccount && onContinueFree && (
+            <button type="button" onClick={onContinueFree} className="vc-btn vc-btn-ghost" style={{ minHeight: 48 }}>
+              Continuar no plano grátis
+            </button>
+          )}
+          {!freeAccount && <GoogleSignInButton />}
           {onLogin && <button type="button" onClick={onLogin} style={{
             minHeight: 44,
             borderRadius: 9999,

@@ -67,7 +67,9 @@ function PerSlideImageRefBlock({
       ? 'A referência deste card está indisponível. Reenvie o arquivo para manter o @nome.' : '')
   )).find(Boolean) || '';
   const imageAction = perSlideImageActionState(slide, generateImageBusy, itemLabel);
-  const disabled = (generationState ? !generationState.canGenerate : false) || Boolean(refError);
+  // No plano grátis o botão não trava: o clique leva à página de assinatura.
+  const upgradeOnly = generationState?.upgrade === true;
+  const disabled = !upgradeOnly && ((generationState ? !generationState.canGenerate : false) || Boolean(refError));
   const planWithoutImages = generationState?.reason === 'plan_without_images';
   const disabledReason = planWithoutImages || !(disabled && !generateImageBusy)
     ? ''

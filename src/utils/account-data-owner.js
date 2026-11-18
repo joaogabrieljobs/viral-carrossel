@@ -6,6 +6,7 @@
 import { clearAccountLocalData } from './clear-account-data.js';
 import { SK, areAccountDataWritesLocked, bindAccountDataWriteOwner, isAccountDataWriteOwnerCurrent, isAccountWriteLockProbePending, lockAccountDataWrites, unlockAccountDataWrites, waitForAccountWriteLockProbe } from './storage.js';
 import { restoreAccountVault, snapshotAccountVault } from './account-vault.js';
+import { isFreeSession } from './free-plan.js';
 
 export const DATA_OWNER_KEY = SK.dataOwner;
 
@@ -118,7 +119,9 @@ function reloadAccountSwitch() {
  */
 export async function ensureAccountDataOwner(session, { explicitLogin = false, onRestored, isCurrent } = {}) {
   if (typeof localStorage === 'undefined') return 'ok';
-  if (!session?.active) return 'ok';
+  // Conta grátis não tem assinatura, mas tem dono: sem isto, duas contas
+  // grátis no mesmo navegador veriam os projetos uma da outra.
+  if (!session?.active && !isFreeSession(session)) return 'ok';
 
   // Depois de login/redirect, este documento pode estar retomando o lease da
   // própria aba. Decidir o owner antes do probe deixaria a biblioteca vazia.

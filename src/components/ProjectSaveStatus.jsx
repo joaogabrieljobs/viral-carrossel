@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Check, CloudUpload, Loader2 } from 'lucide-react';
+import { Check, CloudUpload, Loader2, Smartphone } from 'lucide-react';
 
-export function ProjectSaveStatus({ localSavedAt, cloudSavedAt, busy, error, onRetry }) {
+/**
+ * `deviceOnly`: plano grátis. O projeto vive só neste aparelho, então não há
+ * envio à conta pendente nem botão de tentar de novo — só a hora da gravação
+ * local e, se o chamador quiser, um caminho para guardar na conta (assinatura).
+ */
+export function ProjectSaveStatus({ localSavedAt, cloudSavedAt, busy, error, onRetry, deviceOnly = false, onUpgrade }) {
   const [online, setOnline] = useState(() => navigator.onLine);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -9,6 +14,16 @@ export function ProjectSaveStatus({ localSavedAt, cloudSavedAt, busy, error, onR
     window.addEventListener('offline', update);
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
+  if (deviceOnly) {
+    const hora = localSavedAt ? new Date(localSavedAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+    return (
+      <span data-vc-save-device-only style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, lineHeight:1.35, color:'var(--text-secondary)', maxWidth:'min(230px, 60vw)', flexShrink:0 }}>
+        <Smartphone size={13} aria-hidden style={{ flexShrink:0 }} />
+        <span role="status" style={{ minWidth:0 }}>{hora ? `Salvo só neste aparelho às ${hora}` : 'Salvo só neste aparelho'}</span>
+        {onUpgrade && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight:44, padding:'0 8px', fontSize:11, flexShrink:0, whiteSpace:'nowrap' }} onClick={onUpgrade} aria-label="Guardar na conta: ver planos">Guardar na conta</button>}
+      </span>
+    );
+  }
   const confirmed = cloudSavedAt && !error;
   const label = busy ? 'Salvando na conta…'
     : confirmed ? `Salvo na conta às ${new Date(cloudSavedAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}`

@@ -9,6 +9,7 @@ import {
   GraduationCap, ScrollText, Megaphone,
 } from 'lucide-react';
 import { TEMPLATES, PALETTES } from './design-data.js';
+import { assertPaidFeature } from './free-plan.js';
 import { INSTAGRAM_HASHTAG_LIMIT, INSTAGRAM_CAPTION_LIMIT } from './editorial-strategy.js';
 import { REFERENCE_PROFILE_BY_ID } from './brand-visuals.js';
 import { normalizeBrandTone } from './brand-tone.js';
@@ -427,6 +428,7 @@ const FETCH_SOURCE_API = '/api/fetch-source';
 
 /** Servidor (Vite dev ou Netlify) devolve JSON { text } — evita CORS do browser. */
 async function fetchPlainTextFromUrl(url) {
+  assertPaidFeature('text');
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 22000);
   try {
