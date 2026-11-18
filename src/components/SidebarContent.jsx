@@ -28,7 +28,7 @@ import { ElementsPanel } from './panels/ElementsPanel.jsx';
 import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
 import { applyTextFontToAllCards } from '../utils/card-text-fonts.js';
 import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
-import { textoParaEdicao } from '../utils/preset-tokens.js';
+import { resolvePresetChromeDetalhado, textoParaEdicao } from '../utils/preset-tokens.js';
 import { addOverlayToSlide, removeOverlayFromSlide, overlayMoveKey, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
@@ -2820,6 +2820,17 @@ function SidebarContent({
                 )}
               </div>
             </S>)}
+
+            {tab==='brand' && resolvePresetChromeDetalhado(brand).ocultos.length > 0 && (
+              <p
+                role="note"
+                data-vc-signature-hint
+                style={{ margin:'4px 0 8px', padding:'8px 10px', borderRadius:8, fontSize:12, lineHeight:1.45,
+                  color:'var(--text-secondary)', background:'var(--bg-card)', border:'1px solid var(--border)' }}
+              >
+                Este estilo tem espaço para a sua marca. Preencha o @ ou o nome, ou escreva seu texto nos campos abaixo, para que apareça nos cards. Enquanto estiver vazio, nada provisório é impresso.
+              </p>
+            )}
 
             {tab==='brand' && (
               <S
