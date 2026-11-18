@@ -161,3 +161,44 @@ describe('parser privado de planejamento', () => {
     } finally { warn.mockRestore(); }
   });
 });
+
+describe('recuperação com trechos reais e motivo legível', () => {
+  it('citação parafraseada: a segunda tentativa recebe o trecho real da fonte como sugestão', async () => {
+    const parafraseado = plan(); parafraseado.evidence[0].quote = 'Foram observadas vinte reuniões no piloto gratuito.';
+    const callAI = vi.fn().mockResolvedValueOnce(parafraseado).mockResolvedValueOnce(plan());
+    const result = await generatePresentationPlan({ ...config }, callAI);
+    expect(result.attempts).toBe(2);
+    const recuperacao = callAI.mock.calls[1][0];
+    expect(recuperacao).toContain('TRECHOS REAIS DAS FONTES PARA AS CITAÇÕES REPROVADAS');
+    expect(recuperacao).toMatch(/são sugestões de onde a informação está, não confirmação/);
+    expect(recuperacao).toContain('"Foram observadas 20 reuniões."');
+    // A regra de cópia literal continua no pedido.
+    expect(recuperacao).toContain('Copie cada quote de um único trecho original');
+  });
+
+  it('a sugestão não afrouxa o validador: citação que continua errada reprova', async () => {
+    const parafraseado = plan(); parafraseado.evidence[0].quote = 'Foram observadas vinte reuniões no piloto gratuito.';
+    const callAI = vi.fn().mockResolvedValue(parafraseado); const onPlan = vi.fn();
+    const error = await generatePresentationPlan({ ...config, onPlan }, callAI).catch(e => e);
+    expect(error.code).toBe('presentation_plan_invalid');
+    expect(onPlan).not.toHaveBeenCalled();
+    expect(error.message).toBe('Não foi possível conferir o roteiro e suas evidências após a recuperação. Motivo: uma citação do roteiro não foi localizada literalmente no material. Você pode tentar novamente com as mesmas escolhas.');
+    expect(error.issueCodes).toEqual({ quote_not_found: 1 });
+    expect(error.reason).toBe('uma citação do roteiro não foi localizada literalmente no material');
+  });
+
+  it('resposta incompleta nas duas tentativas diz que a resposta veio incompleta', async () => {
+    const callAI = vi.fn().mockRejectedValue(failure('ai_output_truncated'));
+    const error = await generatePresentationPlan({ ...config }, callAI).catch(e => e);
+    expect(error.code).toBe('presentation_plan_incomplete');
+    expect(error.message).toContain('Motivo: a resposta do roteiro veio incompleta.');
+    expect(error.message).not.toMatch(/Provider details|private content/);
+  });
+
+  it('sem citação reprovada o pedido de recuperação não ganha o bloco', async () => {
+    const invalido = plan(); invalido.slides[1].purpose = 'finalidade_inexistente';
+    const callAI = vi.fn().mockResolvedValueOnce(invalido).mockResolvedValueOnce(plan());
+    await generatePresentationPlan({ ...config }, callAI);
+    expect(callAI.mock.calls[1][0]).not.toContain('TRECHOS REAIS DAS FONTES');
+  });
+});

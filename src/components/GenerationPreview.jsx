@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { getPresentationPath } from '../utils/presentation.js';
 import { normalizePresentationBlocks } from '../utils/presentation-quality.js';
+// A prévia mostra o texto como o leitor vai ver: os marcadores de destaque
+// (**trecho**, _itálico_) são formatação do card, não texto literal.
+import { visibleSocialText } from '../utils/social-generation.js';
 
 function PreviewEvidence({ blocks }) {
   const block = normalizePresentationBlocks(blocks)[0];
@@ -92,9 +95,9 @@ export default function GenerationPreview({ active, startedAt, progress, slides 
           {slide.bgImage && <img src={slide.bgImage} alt=""/>}
           <div className="vc-create-live-copy">
             <small>{item} {String(index + 1).padStart(2, '0')}</small>
-            <h3>{slide.title || 'Título em revisão'}</h3>
-            {slide.subtitle && <p>{slide.subtitle}</p>}
-            {slide.bodyAfterImage && <p>{slide.bodyAfterImage}</p>}
+            <h3>{visibleSocialText(slide.title) || 'Título em revisão'}</h3>
+            {slide.subtitle && <p>{visibleSocialText(slide.subtitle)}</p>}
+            {slide.bodyAfterImage && <p>{visibleSocialText(slide.bodyAfterImage)}</p>}
             {isPresentation && <PreviewEvidence blocks={slide.presentationBlocks}/>}
             {isPresentation && slide.speakerNotes && <details className="vc-create-preview-notes"><summary>Notas de apoio</summary><p>{slide.speakerNotes}</p></details>}
           </div>
