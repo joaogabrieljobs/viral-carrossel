@@ -82,8 +82,8 @@ describe('composição social — exemplos de reserva', () => {
     // No miolo a foto cede a altura; título e apoio conservam o tamanho.
     expect(miolo.socialComposition).toBe('photo-story');
     // Reserva 14% → base 86 → o miolo (limite 90) sobe 4.
-    expect(miolo.canvas.zones.photo.h).toBe(42);
-    expect(miolo.canvas.zones.title).toMatchObject({ y: 44.5, h: 21.5 });
+    expect(miolo.canvas.zones.photo.h).toBe(47.5);
+    expect(miolo.canvas.zones.title).toMatchObject({ y: 50, h: 16 });
     expect(miolo.canvas.zones.subtitle).toMatchObject({ y: 67.5, h: 18.5 });
   });
 

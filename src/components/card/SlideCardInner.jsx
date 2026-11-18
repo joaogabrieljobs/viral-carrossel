@@ -20,6 +20,7 @@ import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowSca
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx, footerGuardApplies, footerPillBottomPx, footerPillColors, textZonesAboveFooter } from '../../utils/card-chrome.js';
+import { titleLetterSpacingEm } from '../../utils/title-tracking.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
@@ -979,7 +980,7 @@ const ClassicCanvasInner = React.forwardRef(({
           ),
           boxSizing: 'content-box',
           fontWeight: resolvedTitleWeight,
-          letterSpacing: `${(-3 + resolvedTitleTracking) / 100}em`,
+          letterSpacing: `${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`,
           margin: 0,
           overflowWrap: 'break-word',
           wordBreak: 'normal',
@@ -1003,7 +1004,7 @@ const ClassicCanvasInner = React.forwardRef(({
             fontSize={f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale}
             lineHeight={presentationTitleLeadingPercent(slide) / 100}
             fontWeight={resolvedTitleWeight}
-            letterSpacing={`${(-3 + resolvedTitleTracking) / 100}em`}
+            letterSpacing={`${titleLetterSpacingEm(resolvedTitleFF, resolvedTitleTracking)}em`}
           />
         ) : textoComDestaque(slide.title, slide.destaqueSpans?.title, cultureAccentCol)}</InlineEditableText>
         </div>
@@ -2257,7 +2258,6 @@ const SlideCardInner = React.forwardRef(({
                 fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
                 letterSpacing:'-0.011em', whiteSpace:'nowrap',
                 textTransform: 'uppercase',
-                boxShadow:'0 4px 16px rgba(0,0,0,0.18)',
               }}>
                 {brand.footerPillText}
                 {showArrow && (

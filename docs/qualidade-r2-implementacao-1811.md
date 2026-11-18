@@ -209,3 +209,19 @@ Levantado, não juntado. São 7 arquivos, 80 linhas, último toque em 14 e 15/11
 ### IA real
 
 Não validado. `.env.local` só tem token de armazenamento; não há chave de modelo nesta máquina.
+
+### Segunda rodada visual (18/11, fim da tarde)
+
+O João apontou, sobre a folha do Tabloid: "efeitos de sombra feios, letras muito coladas e sem qualidade". O recorte enviado era a linha ANTES da folha, mas a conferência do DEPOIS achou três coisas de verdade:
+
+- **Letras coladas:** todo título recebia −3% de espaçamento. Bom para grotesca larga, ruim para fonte condensada (Anton, Bebas Neue, Oswald, Barlow Condensed). Agora a base depende da fonte (`src/utils/title-tracking.js`); só no renderizador de caixas, usado pelo card gerado.
+- **Sombra:** o selo do rodapé perdeu a sombra projetada. O título gerado já não tinha sombra desde a v3.
+- **"Sem qualidade":** as fontes dos padrões vêm da rede (Google Fonts). A captura era tirada antes de elas chegarem e registrava o card em Helvetica de reserva; aconteceu em duas folhas e numa rodada inteira em tamanho real. O teste agora só fotografa com a fonte do título e a do corpo carregadas; se não chegarem, confere a geometria e não grava captura.
+
+Ajuste de diagramação: no card com foto em cima, a caixa do título passou a caber duas linhas (16% da altura) e a foto ganhou o espaço. Com título de uma linha o vão sob a foto caiu de 14% para 8%.
+
+Capturas em tamanho real de exportação (1080 × 1350): `_capturas-assinatura-1811/tamanho-real/`. Gerar de novo: `CAPTURA_ESCALA=3 npx playwright test tests/e2e/assinatura-sem-marca.spec.js`.
+
+Não resolvido nesta rodada: no Viral Hype o selo fica centralizado enquanto o texto é alinhado à esquerda; o espaçamento por tipo de fonte não foi levado aos renderizadores antigos (card montado à mão fora da composição gerada).
+
+Testes: `npm test` 2560 passaram, 4 falhas esperadas. Teste de assinatura 26 de 26. A suíte completa de navegador não foi rodada de novo depois desta rodada.

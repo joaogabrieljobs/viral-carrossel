@@ -41,19 +41,34 @@ async function abrir(page, { preset, brand, slides }) {
   await enterEditorFromHome(page);
   const superficie = page.locator('main [data-vc-card-surface]');
   await expect(superficie).toHaveCount(slides.length);
-  // As fontes do padrão são pedidas depois do primeiro render. Sem esperar a
-  // fila esvaziar, a captura saía com a fonte reserva em um ou outro padrão.
-  await page.waitForFunction(async () => {
-    await document.fonts.ready;
-    await new Promise(resolve => setTimeout(resolve, 250));
-    return document.fonts.status === 'loaded';
-  });
+  await page.evaluate(() => document.fonts.ready);
   return superficie;
+}
+
+/**
+ * As fontes do padrão vêm da rede (Google Fonts) e chegam depois do primeiro
+ * render; `document.fonts.ready` resolve antes de a folha de estilo delas
+ * existir. Fotografar nesse intervalo registra o card em Helvetica de reserva,
+ * que não é o card. Devolve false se as fontes não chegarem: a geometria é
+ * conferida do mesmo jeito, mas a captura não é gravada.
+ */
+async function fontesDoPadraoProntas(page, brand, testInfo) {
+  const familias = [brand.titleFont, brand.bodyFont].map(f => String(f || '').split(',')[0].replace(/["']/g, '').trim()).filter(Boolean);
+  try {
+    await page.waitForFunction(nomes => nomes.every(nome => [...document.fonts]
+      .some(face => face.family.replace(/["']/g, '') === nome && face.status === 'loaded')), familias, { timeout: 12_000 });
+    await page.evaluate(() => document.fonts.ready);
+    return true;
+  } catch {
+    testInfo.annotations.push({ type: 'aviso', description: `fontes ${familias.join(', ')} não carregaram; captura não gravada` });
+    return false;
+  }
 }
 
 // Capturas em 2×: a 1× o card de 360 px deixa o texto pequeno do rodapé com
 // poucos pixels por letra, e a imagem parece serrilhada sem que o card esteja.
-test.use({ deviceScaleFactor: 2 });
+// CAPTURA_ESCALA=3 gera o card em 1080 px de largura, o tamanho do PNG exportado.
+test.use({ deviceScaleFactor: Number(process.env.CAPTURA_ESCALA) || 2 });
 
 /** Sobreposições entre selo/barra do rodapé e o TEXTO renderizado nas zonas,
  *  e entre os próprios ornamentos (selo por cima da barra). */
@@ -93,6 +108,7 @@ for (const preset of SOCIAIS) test(`sem marca: ${preset.id} não imprime texto p
   const brand = applyVisualPreset({ name: 'Padrão', handle: '', showHandle: false, logo: null }, preset.id);
   const slides = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' });
   const superficie = await abrir(page, { preset, brand, slides });
+  const fotografar = await fontesDoPadraoProntas(page, brand, testInfo);
   for (let i = 0; i < slides.length; i++) {
     const card = superficie.nth(i);
     const texto = (await card.innerText()).toUpperCase();
@@ -101,7 +117,7 @@ for (const preset of SOCIAIS) test(`sem marca: ${preset.id} não imprime texto p
     const r = await colisoes(card);
     expect(r.textos, 'o card tem texto nas zonas').toBeGreaterThan(0);
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
-    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-sem-marca-${i + 1}.png`) });
+    if (i < 2 && fotografar) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-sem-marca-${i + 1}.png`) });
   }
 });
 
@@ -113,6 +129,7 @@ for (const preset of SOCIAIS) test(`com assinatura: ${preset.id} mantém selo e 
     footerBarLeft: 'Tema|Retratos', footerBarCenter: 'Por|Ateliê Traço', footerBarRight: 'Salve|para depois' };
   const slides = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' });
   const superficie = await abrir(page, { preset, brand, slides });
+  const fotografar = await fontesDoPadraoProntas(page, brand, testInfo);
   for (let i = 0; i < slides.length; i++) {
     const card = superficie.nth(i);
     await expect(card).toContainText('ARRASTA PRO LADO');
@@ -121,7 +138,7 @@ for (const preset of SOCIAIS) test(`com assinatura: ${preset.id} mantém selo e 
     expect(r.ornamentos).toBeGreaterThanOrEqual(2);
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
     expect(await contrasteDoSelo(card), `texto do selo no card ${i + 1} de ${preset.id}`).toBeGreaterThanOrEqual(4.5);
-    if (i < 2) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-com-assinatura-${i + 1}.png`) });
+    if (i < 2 && fotografar) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-com-assinatura-${i + 1}.png`) });
   }
 });
 
