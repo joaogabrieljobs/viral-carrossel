@@ -113,10 +113,18 @@ export default async function handler(req, res) {
         if (!startingAfter || page === 9) throw new Error('Muitos clientes para o mesmo e-mail');
       }
       if (!customers.length) {
-        setLoginHintCookie(res, profile.email);
-        return res.redirect(302, `${appUrl}/?login=no_subscription`);
+        // Primeira entrada com Google: cria a conta, que começa no plano
+        // grátis. A chave por `sub` faz dois retornos simultâneos do mesmo
+        // Google convergirem no mesmo customer.
+        customer = await stripe.customers.create({
+          email: profile.email,
+          metadata: { product: 'viral-carrossel' },
+        }, {
+          idempotencyKey: `moont-google-signup-${crypto.createHash('sha256').update(String(profile.sub), 'utf8').digest('hex')}`,
+        });
+      } else {
+        customer = await chooseCustomer(customers, profile.sub);
       }
-      customer = await chooseCustomer(customers, profile.sub);
     }
     if (!customer) return res.redirect(302, `${appUrl}/?login=account_conflict`);
 
@@ -153,17 +161,19 @@ export default async function handler(req, res) {
       ? Number(account.sessionRevokedBefore || 0)
       : Number(customer.metadata?.vc_session_revoked_before || 0);
     const entitlement = await resolveAccountEntitlement(customer.id);
+    const token = createAccessToken({
+      customerId: customer.id,
+      email: profile.email,
+      identityEpoch,
+      ...(account ? { accountId: account.id } : {}),
+      iatMs: Math.max(Date.now(), revokedBefore + 1),
+    });
+    setAccessCookie(res, token);
     if (entitlement.active) {
-      const token = createAccessToken({
-        customerId: customer.id,
-        email: profile.email,
-        identityEpoch,
-        ...(account ? { accountId: account.id } : {}),
-        iatMs: Math.max(Date.now(), revokedBefore + 1),
-      });
-      setAccessCookie(res, token);
       return res.redirect(302, `${appUrl}/?billing=restored&login=google`);
     }
+    // Sem assinatura: o Google provou a identidade e a conta entra no plano
+    // grátis. A prova curta continua disponível para assinar este customer.
     setCheckoutIdentityCookie(res, {
       email: profile.email,
       customerId: customer.id,
@@ -171,7 +181,7 @@ export default async function handler(req, res) {
       identityEpoch,
     });
     setLoginHintCookie(res, profile.email);
-    return res.redirect(302, `${appUrl}/?login=no_subscription`);
+    return res.redirect(302, `${appUrl}/?login=google&plan=free`);
   } catch (e) {
     console.error('[auth/google/callback]', e?.message || e);
     if (e?.status === 503) return res.status(503).send('Não foi possível verificar seu acesso. Tente entrar novamente.');

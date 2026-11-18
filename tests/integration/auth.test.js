@@ -97,11 +97,18 @@ describe('GET /api/auth/session (RF-04)', () => {
     expect(typeof res.body.currentPeriodEnd).toBe('string');
   });
 
-  it('cookie válido sem assinatura → inactive', async () => {
+  it('cookie válido sem assinatura → plano grátis: identificado, mas nunca ativo', async () => {
     const res = makeRes();
     await sessionHandler(makeReq({ cookie: cookieFor('cus_2', 'user2@teste.exemplo') }), res);
-    expect(res.body).toMatchObject({ active: false, status: 'inactive', email: 'user2@teste.exemplo' });
-    expect(res.body.customerId).toBeUndefined();
+    expect(res.body).toMatchObject({
+      active: false, free: true, status: 'inactive', tier: 'free',
+      email: 'user2@teste.exemplo', customerId: 'cus_2',
+      plan: { id: 'free', imageQuota: 0, projectLimit: 3 },
+    });
+    // Nada de quota, período ou origem de acesso: isso só existe para quem pagou.
+    expect(res.body.imageQuota).toBeUndefined();
+    expect(res.body.accessSource).toBeUndefined();
+    expect(res.body.currentPeriodEnd).toBeUndefined();
   });
 
   it('cookie adulterado → anonymous (não vaza erro)', async () => {
@@ -248,33 +255,54 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
     expect(res.redirectUrl).toBe(`${APP}/?login=invalid_state`);
   });
 
-  it('conta Google sem assinatura → ?login=no_subscription e e-mail só no cookie', async () => {
+  it('primeira entrada com Google cria a conta no plano grátis; e-mail só no cookie', async () => {
     stubGoogleFetch('semplano@teste.exemplo');
     stripeMock.customers.list.mockResolvedValue({ data: [] });
+    const created = { id: 'cus_google_novo', email: 'semplano@teste.exemplo', metadata: { product: 'viral-carrossel' } };
+    stripeMock.customers.create.mockResolvedValue(structuredClone(created));
+    stripeMock.customers.update.mockImplementation(async (_, data) => {
+      created.metadata = { ...created.metadata, ...data.metadata };
+      return structuredClone(created);
+    });
+    stripeMock.customers.retrieve.mockImplementation(async () => structuredClone(created));
     const res = makeRes();
     await googleCallbackHandler(
       makeReq({ url: '/api/auth/google/callback?code=abc&state=S', cookie: 'vc_google_oauth=S' }),
       res,
     );
-    expect(res.redirectUrl).toBe(`${APP}/?login=no_subscription`);
+    expect(res.redirectUrl).toBe(`${APP}/?login=google&plan=free`);
     expect(res.redirectUrl).not.toContain('email=');
     expect(cookieValue(res, 'vc_login_hint')).toBe('semplano@teste.exemplo');
-    expect(cookieValue(res, COOKIE_NAME)).toBeNull();
+    expect(stripeMock.customers.create).toHaveBeenCalledWith(
+      { email: 'semplano@teste.exemplo', metadata: { product: 'viral-carrossel' } },
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^moont-google-signup-[a-f0-9]{64}$/) }),
+    );
+    expect(created.metadata.vc_google_sub).toBe('google-sub-owner');
+
+    // A sessão identifica a conta, mas não é assinatura: sessão grátis e IA recusada.
+    const access = `${COOKIE_NAME}=${encodeURIComponent(cookieValue(res, COOKIE_NAME))}`;
+    const session = makeRes();
+    await sessionHandler(makeReq({ cookie: access }), session);
+    expect(session.body).toMatchObject({ active: false, free: true, customerId: 'cus_google_novo' });
+    const gate = makeRes();
+    expect(await requireActiveSubscription(makeReq({ cookie: access }), gate)).toBeNull();
+    expect(gate.statusCode).toBe(402);
   });
 
-  it('Google verificado com assinatura inativa deixa prova curta ligada ao customer antigo', async () => {
+  it('Google verificado com assinatura inativa entra no grátis e deixa prova curta ligada ao customer antigo', async () => {
     stubGoogleFetch('dona@teste.exemplo');
     stripeMock.customers.list.mockResolvedValue({ data: [{ id: 'cus_antigo', email: 'dona@teste.exemplo' }] });
     const res = makeRes();
     await googleCallbackHandler(
       makeReq({ url: '/api/auth/google/callback?code=abc&state=S', cookie: 'vc_google_oauth=S' }), res,
     );
-    expect(res.redirectUrl).toBe(`${APP}/?login=no_subscription`);
+    expect(res.redirectUrl).toBe(`${APP}/?login=google&plan=free`);
     expect(checkoutIdentityFrom(res)).toMatchObject({
       email: 'dona@teste.exemplo', customerId: 'cus_antigo', source: 'verified_login',
       identityEpoch: expect.any(String),
     });
-    expect(cookieValue(res, COOKIE_NAME)).toBeNull();
+    // Plano grátis: a sessão é do customer antigo, com a mesma versão da identidade da prova.
+    expect(cookieValue(res, COOKIE_NAME)).toBeTruthy();
   });
 
   it('Google encontra assinatura ativa mesmo quando o primeiro customer duplicado está inativo', async () => {
@@ -314,7 +342,7 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
     await googleCallbackHandler(makeReq({
       url: '/api/auth/google/callback?code=abc&state=S', cookie: 'vc_google_oauth=S',
     }), google);
-    expect(google.redirectUrl).toBe(`${APP}/?login=no_subscription`);
+    expect(google.redirectUrl).toBe(`${APP}/?login=google&plan=free`);
     const proof = checkoutIdentityFrom(google);
     expect(proof).toMatchObject({ customerId: customer.id, identityEpoch: expect.any(String) });
     expect(customer.metadata).toMatchObject({
@@ -388,7 +416,7 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
     const google = makeRes();
     await googleCallbackHandler(makeReq({ url: '/api/auth/google/callback?code=abc&state=S',
       cookie: 'vc_google_oauth=S' }), google);
-    expect(google.redirectUrl).toBe(`${APP}/?login=no_subscription`);
+    expect(google.redirectUrl).toBe(`${APP}/?login=google&plan=free`);
 
     const renewed = makeRes();
     await checkoutHandler(makeReq({ method: 'POST', body: { email: customer.email }, cookie: oldProof }), renewed);
@@ -460,7 +488,7 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
     expect(stripeMock.checkout.sessions.create.mock.calls[0][0].customer).toBe(customer.id);
   });
 
-  it('login por senha pausado durante vínculo Google não cria prova utilizável', async () => {
+  it('login por senha pausado durante vínculo Google não cria prova nem sessão utilizável', async () => {
     const password = 'SenhaPreClaim123!';
     const { salt, hash } = hashPassword(password);
     const customer = { id: 'cus_race', email: 'dona@teste.exemplo', metadata: {
@@ -485,11 +513,20 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
       vc_pw_hash: '', vc_pw_salt: '', vc_session_revoked_before: String(Date.now()) };
     continueSubscription();
     await pendingLogin;
-    expect(login.statusCode).toBe(402);
+    expect(login.statusCode).toBe(200);
+    expect(login.body).toMatchObject({ active: false, free: true });
     const proof = setCookies(login).filter((entry) => entry.startsWith(`${CHECKOUT_IDENTITY_COOKIE}=`)).at(-1).split(';')[0];
     const checkout = makeRes();
     await checkoutHandler(makeReq({ method: 'POST', body: { email: customer.email }, cookie: proof }), checkout);
     expect(checkout.statusCode).toBe(403);
+    // A sessão grátis emitida por esse login nasceu com a identidade antiga:
+    // depois do vínculo Google ela não identifica mais ninguém.
+    const staleAccess = `${COOKIE_NAME}=${encodeURIComponent(cookieValue(login, COOKIE_NAME))}`;
+    expect(await readCurrentAccessCookie(makeReq({ cookie: staleAccess }))).toBeNull();
+    const session = makeRes();
+    await sessionHandler(makeReq({ cookie: staleAccess }), session);
+    expect(session.body).toMatchObject({ active: false, status: 'anonymous' });
+    expect(session.body.free).toBeUndefined();
   });
 
   it('confirmação pausada durante mudança da identidade não reabre acesso', async () => {
@@ -557,18 +594,21 @@ describe('GET /api/auth/google/callback (RF-05)', () => {
 });
 
 describe('identidade para renovar assinatura por senha', () => {
-  it('senha correta com assinatura inativa prepara o checkout do customer original', async () => {
+  it('senha correta com assinatura inativa entra no grátis e prepara o checkout do customer original', async () => {
     const { salt, hash } = hashPassword('MinhaSenha123!');
     const customer = { id: 'cus_antigo', email: 'dona@teste.exemplo', metadata: { vc_pw_salt: salt, vc_pw_hash: hash } };
     stripeMock.customers.list.mockResolvedValue({ data: [customer] });
     stripeMock.customers.retrieve.mockResolvedValue(customer);
     const res = makeRes();
     await loginHandler(makeReq({ method: 'POST', body: { email: customer.email, password: 'MinhaSenha123!' } }), res);
-    expect(res.statusCode).toBe(402);
-    expect(res.body.needCheckout).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ active: false, free: true, plan: 'free', customerId: customer.id });
+    expect(res.body.needCheckout).toBeUndefined();
     expect(checkoutIdentityFrom(res)).toEqual({
       email: customer.email, customerId: customer.id, source: 'verified_login',
     });
+    const access = `${COOKIE_NAME}=${encodeURIComponent(cookieValue(res, COOKIE_NAME))}`;
+    expect((await readCurrentAccessCookie(makeReq({ cookie: access })))?.customerId).toBe(customer.id);
   });
 
   it('senha errada não emite prova para renovar assinatura', async () => {
@@ -617,7 +657,8 @@ describe('identidade para renovar assinatura por senha', () => {
     await loginHandler(makeReq({ method: 'POST', body: {
       email: old.email, password: 'SenhaDaDona123!',
     } }), res);
-    expect(res.statusCode).toBe(402); // assinatura antiga inativa; identidade validada
+    expect(res.statusCode).toBe(200); // assinatura antiga inativa; identidade validada → plano grátis
+    expect(res.body).toMatchObject({ active: false, free: true });
     expect(checkoutIdentityFrom(res)?.customerId).toBe(old.id);
     expect(stripeMock.customers.list).toHaveBeenNthCalledWith(2, {
       email: old.email, limit: 100, starting_after: 'cus_novo',
@@ -651,11 +692,12 @@ describe('identidade para renovar assinatura por senha', () => {
     expect(cookieValue(res, COOKIE_NAME)).toBeNull();
   });
 
-  it('cadastro novo cria customer próprio e prova apenas para assinar esse customer', async () => {
+  it('cadastro novo cria customer próprio, entra no grátis e a prova só assina esse customer', async () => {
     const res = makeRes();
     await registerHandler(makeReq({ method: 'POST', body: { email: 'nova@teste.exemplo', password: 'MinhaSenha123!' } }), res);
     expect(res.statusCode).toBe(200);
-    expect(res.body.needCheckout).toBe(true);
+    expect(res.body).toMatchObject({ active: false, free: true, plan: 'free', customerId: 'cus_novo_nova' });
+    expect(res.body.needCheckout).toBeUndefined();
     expect(stripeMock.customers.create).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'nova@teste.exemplo', metadata: { product: 'viral-carrossel' },
@@ -670,7 +712,10 @@ describe('identidade para renovar assinatura por senha', () => {
     expect(checkoutIdentityFrom(res)).toEqual({
       email: 'nova@teste.exemplo', customerId: 'cus_novo_nova', source: 'new_registration',
     });
-    expect(cookieValue(res, COOKIE_NAME)).toBeNull();
+    // A sessão é do customer recém-criado, e só dele.
+    const token = cookieValue(res, COOKIE_NAME);
+    expect(JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8')))
+      .toMatchObject({ customerId: 'cus_novo_nova', email: 'nova@teste.exemplo' });
 
     // A mesma aba assina precisamente o customer recém-criado; não abre outro.
     stripeMock.customers.retrieve.mockResolvedValue({ id: 'cus_novo_nova', email: 'nova@teste.exemplo' });

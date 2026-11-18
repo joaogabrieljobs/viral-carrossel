@@ -160,7 +160,7 @@ describe('autenticação com ACCOUNT_IDENTITY_BACKEND=postgres', () => {
       email: 'nova@example.com', password: 'NovaSenhaSegura123',
     } }), response);
     expect(response.statusCode).toBe(200);
-    expect(response.body.needCheckout).toBe(true);
+    expect(response.body).toMatchObject({ active: false, free: true, plan: 'free', customerId: 'cus_new' });
     expect(stripeMock.customers.create.mock.calls[0][1]).toMatchObject({
       idempotencyKey: expect.stringMatching(/^moont-register-customer-/),
     });

@@ -26,6 +26,7 @@ import {
   getStripePriceIdForTier,
   imageQuotaForTier,
 } from './plans.js';
+import { FREE_PLAN } from '../../shared/plans.js';
 import { getImageQuotaActivity, getQuotaUsage } from './image-quota.js';
 import { resolveAccountEntitlement, resolveAccountExemption } from './account-entitlements.js';
 import {
@@ -94,10 +95,16 @@ export async function handleSession(req, res) {
     const entitlement = await resolveAccountEntitlement(access.customerId);
     if (!entitlement.active) {
       invalidateActiveAccessForCustomer(access.customerId);
+      // Conta autenticada sem assinatura = plano grátis. `active` continua
+      // significando "pagou": IA, nuvem e agentes seguem respondendo 402.
       return res.status(200).json({
         active: false,
+        free: true,
         email: access.email,
+        customerId: access.customerId,
         status: 'inactive',
+        tier: FREE_PLAN.id,
+        plan: FREE_PLAN,
       });
     }
 

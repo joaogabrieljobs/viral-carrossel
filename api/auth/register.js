@@ -1,5 +1,6 @@
 import { applyCors } from '../lib/cors.js';
-import { setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
+import { createAccessToken, setAccessCookie, setCheckoutIdentityCookie, setLoginHintCookie } from '../lib/access.js';
+import { FREE_PLAN } from '../../shared/plans.js';
 import {
   normalizeEmail,
   isValidEmail,
@@ -36,7 +37,8 @@ function readBody(req) {
 /**
  * POST /api/auth/register — cria conta e-mail+senha.
  * Cliente preexistente só pode ser associado após autenticação; o cadastro
- * público cria sempre uma identidade Stripe nova, sem acesso imediato.
+ * público cria sempre uma identidade Stripe nova, que entra no plano grátis
+ * (sessão sem assinatura: IA, nuvem e agentes continuam recusando).
  */
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
@@ -99,12 +101,26 @@ export default async function handler(req, res) {
       ...(identity ? { identityEpoch: identity.identityEpoch } : {}),
     });
     setLoginHintCookie(res, cleanEmail);
+    // Conta nova entra direto no plano grátis. A sessão nasce depois da
+    // credencial: no backend de identidade, definir a senha revoga tudo o
+    // que foi emitido antes, então o token precisa ser posterior a isso.
+    setAccessCookie(res, createAccessToken({
+      customerId: customer.id,
+      email: cleanEmail,
+      ...(identity ? {
+        identityEpoch: identity.identityEpoch,
+        accountId: identity.id,
+        iatMs: Math.max(Date.now(), Number(identity.sessionRevokedBefore || 0) + 1),
+      } : {}),
+    }));
 
     return res.status(200).json({
       active: false,
-      needCheckout: true,
+      free: true,
+      plan: FREE_PLAN.id,
       email: cleanEmail,
-      message: 'Conta criada. Escolha um plano para entrar no studio.',
+      customerId: customer.id,
+      message: 'Conta criada. Você entrou no plano grátis.',
     });
   } catch (e) {
     if (registrationConflict(e)) {

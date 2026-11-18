@@ -45,6 +45,23 @@ export const PLAN_TIERS = {
 
 export const PLAN_ORDER = ['essential', 'creator', 'pro', 'max'];
 
+/**
+ * Plano grátis: conta sem assinatura. Fica FORA de PLAN_ORDER de propósito —
+ * PLAN_ORDER valida o plano no checkout e nas concessões manuais, e "free"
+ * ali viraria um plano comprável sem preço. Sem IA, sem imagem gerada,
+ * projetos só no aparelho. Spec: docs/product/plano-gratis.md
+ */
+export const FREE_PROJECT_LIMIT = 3;
+export const FREE_PLAN = Object.freeze({
+  id: 'free',
+  name: 'Plano Grátis',
+  priceBRL: 0,
+  priceLabel: 'R$ 0',
+  imageQuota: 0,
+  projectLimit: FREE_PROJECT_LIMIT,
+  blurb: 'Crie à mão · sem IA · até 3 projetos neste aparelho',
+});
+
 export function getPlan(tier) {
   return PLAN_TIERS[tier] || null;
 }

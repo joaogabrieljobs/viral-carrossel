@@ -7,6 +7,7 @@ import {
   passwordAuthConfigured,
 } from '../lib/password-auth.js';
 import { getStripe } from '../lib/stripe.js';
+import { FREE_PLAN } from '../../shared/plans.js';
 import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { consumeRateLimit, rateLimitResponse } from '../lib/rate-limit.js';
 import { accountIdentityBackendEnabled, getAccountByStripeCustomerId } from '../lib/account-identity-postgres.js';
@@ -20,7 +21,8 @@ function readBody(req) {
 }
 
 /**
- * POST /api/auth/login — e-mail + senha → cookie se assinatura ativa.
+ * POST /api/auth/login — e-mail + senha → cookie de sessão.
+ * Sem assinatura ativa a conta entra no plano grátis (`free: true`).
  */
 export default async function handler(req, res) {
   applyCors(req, res, { credentials: true });
@@ -73,21 +75,6 @@ export default async function handler(req, res) {
     }
 
     const entitlement = await resolveAccountEntitlement(customerId);
-    if (!entitlement.active) {
-      setCheckoutIdentityCookie(res, {
-        email: cleanEmail,
-        customerId,
-        source: 'verified_login',
-        identityEpoch: record.identityEpoch,
-      });
-      setLoginHintCookie(res, cleanEmail);
-      return res.status(402).json({
-        error: 'Assinatura inativa. Renove o plano para entrar.',
-        needCheckout: true,
-        email: cleanEmail,
-      });
-    }
-
     const token = createAccessToken({
       customerId,
       email: cleanEmail,
@@ -95,6 +82,28 @@ export default async function handler(req, res) {
       ...(dbIdentity ? { accountId: record.accountId } : {}),
       ...(dbIdentity ? { iatMs: Math.max(Date.now(), Number(record.sessionRevokedBefore || 0) + 1) } : {}),
     });
+    if (!entitlement.active) {
+      // Plano grátis: a senha prova a identidade, então a sessão existe.
+      // O cookie não concede nada pago — cada rota de IA, nuvem e agente
+      // confere a assinatura por conta própria e responde 402.
+      setCheckoutIdentityCookie(res, {
+        email: cleanEmail,
+        customerId,
+        source: 'verified_login',
+        identityEpoch: record.identityEpoch,
+      });
+      setLoginHintCookie(res, cleanEmail);
+      setAccessCookie(res, token);
+      return res.status(200).json({
+        active: false,
+        free: true,
+        plan: FREE_PLAN.id,
+        email: cleanEmail,
+        customerId,
+        login: 'password',
+      });
+    }
+
     setAccessCookie(res, token);
     return res.status(200).json({
       active: true,
