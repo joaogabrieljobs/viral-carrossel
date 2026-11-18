@@ -1,0 +1,79 @@
+/**
+ * Ficha visual do projeto — pessoas, objetos e lugares que aparecem nas imagens.
+ *
+ * Rodada R2 (15–16/11/2026): 7 de 9 carrosséis tiveram foto contradizendo o
+ * briefing (camisa verde-oliva virou branca; porta solta virou porta em
+ * parede; ateliê de cerâmica virou marcenaria) e o mesmo objeto mudou de
+ * desenho entre a capa e o miolo. A causa: cada imagem era pedida só com uma
+ * `imageQuery` de 8–15 palavras, escrita por card, sem descrição compartilhada.
+ *
+ * A ficha é escrita UMA vez, junto com o texto, com os atributos que o
+ * material informa. Ela segue inteira em todo pedido de imagem do projeto;
+ * a `imageQuery` continua descrevendo só a cena daquele card.
+ *
+ * É OPCIONAL e à prova de falha: se o modelo não devolver a ficha, ou
+ * devolver algo inválido, a geração segue exatamente como antes.
+ */
+import { imageFramingDirection } from '../../shared/image-aspect.js';
+
+export const VISUAL_BIBLE_MAX_ENTITIES = 4;
+const EN_MIN = 20;
+const EN_MAX = 400;
+const NEVER_MAX = 200;
+const SUBJECTS_MAX = 1600;
+
+/** Modelo do campo no contrato JSON do rascunho. */
+export const VISUAL_BIBLE_SCHEMA = Object.freeze({ entities: [{ id: '', en: '', never: '' }] });
+
+const limpar = (valor) => String(valor ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+const slug = (valor) => limpar(valor).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+/**
+ * Aceita só o que tem forma segura; descarta o resto sem lançar erro.
+ * Devolve `null` quando não sobra nenhuma entidade utilizável.
+ */
+export function normalizeVisualBible(raw) {
+  const lista = Array.isArray(raw?.entities) ? raw.entities : null;
+  if (!lista) return null;
+  const vistos = new Set();
+  const entities = [];
+  for (const item of lista) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const id = slug(item.id);
+    const en = limpar(item.en).slice(0, EN_MAX);
+    if (!id || vistos.has(id) || en.length < EN_MIN) continue;
+    vistos.add(id);
+    entities.push({ id, en, never: limpar(item.never).slice(0, NEVER_MAX) });
+    if (entities.length >= VISUAL_BIBLE_MAX_ENTITIES) break;
+  }
+  return entities.length ? { entities } : null;
+}
+
+/** Instrução para o modelo de texto, anexada às regras de `imageQuery`. */
+export function buildVisualBiblePromptRules() {
+  return `visualBible — FICHA VISUAL DO PROJETO:
+• Preencha quando o material descreve pessoas, objetos ou lugares concretos que aparecem nas imagens. Até ${VISUAL_BIBLE_MAX_ENTITIES} entidades, uma por pessoa, objeto ou lugar; a mesma entidade vale para todas as imagens em que ela aparece.
+• Cada entidade: "id" curto em minúsculas; "en" em INGLÊS, 12–40 palavras, com TODOS os atributos visíveis que o material informa — cor, material, forma, quantidade, posição, roupa; "never" em INGLÊS com o que o material nega ou exclui para essa entidade ("" se nada).
+• Copie os atributos do material. Não invente idade, etnia, marca, estampa ou detalhe ausente; o que o material não informa fica de fora da ficha.
+• A ficha guarda o que NÃO muda. A imageQuery de cada card descreve só a cena: ação, estado do objeto naquele momento, ângulo e enquadramento.
+• Material sem elementos visuais concretos: "visualBible": {"entities": []}.`;
+}
+
+/**
+ * Bloco em inglês para o gerador de imagem. Vai junto do tema do card, e não
+ * na "direção da marca": acrescentar a ficha não pode trocar a linguagem
+ * visual que o projeto já recebia.
+ */
+export function composeSubjectsDirection(visualBible) {
+  const bible = normalizeVisualBible(visualBible);
+  if (!bible) return '';
+  const linhas = bible.entities.map((e) => `- ${e.id}: ${e.en}${e.never ? ` NEVER: ${e.never}.` : ''}`);
+  return (`PROJECT SUBJECTS — whenever one of these appears in the scene it must match this description exactly, and look the same in every image of this project:\n${linhas.join('\n')}\nDo not add attributes, accessories or objects that contradict these descriptions.`).slice(0, SUBJECTS_MAX);
+}
+
+/** Ficha + enquadramento do painel: tudo que descreve a cena deste card. */
+export function composeSceneDirection({ visualBible = null, slide = null, fmt = 'carrossel' } = {}) {
+  return [composeSubjectsDirection(visualBible), `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
+    .filter(Boolean).join('\n\n');
+}

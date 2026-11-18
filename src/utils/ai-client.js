@@ -510,11 +510,37 @@ function resolveSjinnAspectRatio(aspectRatio = '4:5') {
   return ratio === '4:5' ? '2:3' : ratio;
 }
 
+/**
+ * `scene` descreve a CENA deste card: a ficha visual do projeto (pessoas,
+ * objetos e lugares com os atributos do material) e o enquadramento do painel.
+ * Vai colada ao tema, em todos os ramos, e NÃO conta como direção de marca:
+ * acrescentá-la não troca a linguagem visual que o projeto já recebia.
+ * `maxChars` é o teto do provedor; a cena cede espaço para que as regras
+ * fixas ("no text") nunca caiam fora do corte.
+ */
 function buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
   withReference = false,
   priorityFirst = false,
   aspectRatio = '4:5',
+  scene = '',
+  maxChars = 0,
 } = {}) {
+  const sceneFull = String(scene || '').trim().slice(0, 2200);
+  if (sceneFull) {
+    const semCena = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference, priorityFirst, aspectRatio });
+    // Com direção de marca ou referência, as regras fixas ("no text") ficam no
+    // FIM do prompt: a cena só ocupa o que sobra do teto do provedor. Sem elas,
+    // tema e regras vêm primeiro e o corte só alcança a direção de arte longa.
+    const regrasNoFim = withReference || !!String(imgExtraPrompt || '').trim();
+    const disponivel = maxChars > 0 && regrasNoFim ? Math.max(0, maxChars - semCena.length - 8) : sceneFull.length;
+    const cena = sceneFull.slice(0, disponivel).trim();
+    if (!cena) return semCena;
+    const marcador = `THEME OF THIS CARD: ${(q || '').slice(0, 280)}${buildImgParamsTagsEN(imgParams)}`;
+    const posicao = semCena.indexOf(marcador);
+    if (posicao < 0) return semCena;
+    const corte = posicao + marcador.length;
+    return `${semCena.slice(0, corte)}\n\n${cena}${semCena.slice(corte)}`;
+  }
   const safeTheme = (q || '').slice(0, 280);
   const axisTags = buildImgParamsTagsEN(imgParams);
   const extra = (imgExtraPrompt || '').trim().slice(0, 3000);
@@ -562,7 +588,7 @@ async function generateZaiImage(q, imgParams, imgExtraPrompt, signal, options = 
   if (!apiKey) throw new Error('Falta a chave do provedor de imagem. Adicione-a em Configurar IA.');
   const model = _aiRuntimeSettings.imageModels?.zai || 'cogview-4-250304';
   const aspectRatio = normalizeImageAspectRatio(options.aspectRatio);
-  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, aspectRatio });
+  const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, { withReference: false, aspectRatio, scene: options.sceneDirection });
   const payload = {
     model,
     prompt: prompt.slice(0, 32000),
@@ -732,6 +758,8 @@ const generatePlatformSjinnImage = async (q, imgParams = null, options = {}) => 
     withReference: refs.length > 0,
     priorityFirst: true,
     aspectRatio: requestedAspectRatio,
+    scene: options.sceneDirection,
+    maxChars: 4000,
   });
   let res;
   try {
@@ -800,6 +828,7 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
     const promptRef = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
       withReference: true,
       aspectRatio: options.aspectRatio,
+      scene: options.sceneDirection,
     });
     throwIfGenerationCancelled(signal);
     return generateDALLEEdits(blobs, promptRef, apiKey, signal, options);
@@ -808,6 +837,7 @@ const generateDALLE = (q, apiKey, imgParams = null, options = {}) => runAIJob(as
   const prompt = buildGptImageFullPrompt(q, imgParams, imgExtraPrompt, {
     withReference: false,
     aspectRatio: options.aspectRatio,
+    scene: options.sceneDirection,
   });
   const headers = { 'Content-Type': 'application/json' };
   if (IS_LOCAL_DEV) {

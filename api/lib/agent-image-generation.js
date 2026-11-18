@@ -35,6 +35,18 @@ function fail(status, code, message, extra = {}) {
   throw Object.assign(new Error(message), { status, code, ...extra });
 }
 
+/**
+ * O editor acrescenta regras fixas a toda imagem (sem texto, sem logos, assunto
+ * inteiro no quadro). Aqui a query do card ia crua para o gerador; as regras
+ * não podem depender de quem faz o pedido.
+ */
+const AGENT_IMAGE_HARD_RULES = 'HARD RULES: Strictly no text, no captions, no watermarks, no logos inside the image. Keep the main subject complete inside the frame, with breathing room around faces, hands and the key object.';
+
+export function agentImagePrompt(imageQuery) {
+  const tema = String(imageQuery || '').trim().slice(0, 3600);
+  return `${tema}\n\n${AGENT_IMAGE_HARD_RULES}`;
+}
+
 /** Mesma regra do editor; o SJinn não aceita 4:5, então feed cai em 2:3. */
 export function imageAspectRatio(doc) {
   const format = String(doc?.format || doc?.formatId || '').toLowerCase();
@@ -158,7 +170,7 @@ async function generateOne(ownerId, slide, aspectRatio, deadlineAt) {
   const remaining = deadlineAt - Date.now();
   if (remaining < 5_000) return { slideId: slide.slideId, errorCode: 'image_job_timeout' };
   try {
-    const taskId = await createGptImage2Task({ prompt: slide.imageQuery, aspectRatio, resolution: '1K', imageList: [] });
+    const taskId = await createGptImage2Task({ prompt: agentImagePrompt(slide.imageQuery), aspectRatio, resolution: '1K', imageList: [] });
     const data = await waitForSjinnTask(taskId, { deadlineMs: Math.min(SJINN_DEADLINE_MS, deadlineAt - Date.now()) });
     const url = extractSjinnOutputUrl(data);
     if (!url) return { slideId: slide.slideId, errorCode: 'image_result_missing' };

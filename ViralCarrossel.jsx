@@ -93,6 +93,8 @@ import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_B
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
 import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography } from './src/utils/social-visual-composition.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
+import { imageAspectRatioForSlide } from './shared/image-aspect.js';
+import { composeSceneDirection, normalizeVisualBible } from './src/utils/visual-bible.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -593,12 +595,6 @@ const PhotoPositionModal = lazy(() => import('./src/components/PhotoPositionModa
 const KeysModal = lazy(() => import('./src/components/KeysModal.jsx'));
 const TemplatesModal = lazy(() => import('./src/components/TemplatesModal.jsx'));
 
-function imageAspectRatioForFormat(fmt) {
-  if (fmt === 'apresentacao') return '16:9';
-  if (fmt === 'quadrado') return '1:1';
-  if (fmt === 'stories') return '9:16';
-  return '4:5';
-}
 
 // ─── VIDEO URL MAP (módulo-level, sincronizado do App.videoUrls state) ───────
 
@@ -4823,7 +4819,10 @@ export default function App() {
         signal: job.signal,
         refImages: await runAIJob(() => resolveImageReferences(styleKit, generationSnap.refImage, generationSnap.refImageId || generationSnap.refImageAssetId, generationSnap.imageReferences), job.signal),
         imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(generationSnap, imageState.extraPrompt)),
-        aspectRatio: imageAspectRatioForFormat(fmt),
+        // Ficha visual do projeto + enquadramento do painel, junto do tema; a
+        // proporção acompanha a zona real da foto, não o formato do card.
+        sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: generationSnap, fmt }),
+        aspectRatio: imageAspectRatioForSlide(generationSnap, fmt),
         usageContext: {
           projectId: generationProjectId,
           projectName: activeEntry?.name || '',
@@ -4882,7 +4881,7 @@ export default function App() {
         return next;
       });
     }
-  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast, activeEntry?.name]);
+  }, [slides, fmt, imageGenerationAvailability, openaiKey, imgParams, styleKit, setSlides, toast, activeEntry?.name, doc.visualBible]);
 
   useEffect(() => {
     const onQuota = (ev) => {
@@ -5605,6 +5604,11 @@ ${jsonShapeLine}`;
     const visualSlideOverrides = generationPresetId
       ? getSlideOverridesForPreset(generationPresetId, visualPresets)
       : {};
+    // Ficha visual: opcional e à prova de falha. Sem ela (ou inválida) as
+    // imagens são pedidas como antes. Remix conserva a ficha do projeto.
+    const generationVisualBible = isPresentationGeneration
+      ? null
+      : (remix ? (doc.visualBible || null) : normalizeVisualBible(result.visualBible));
     let newSlides = remix ? mergeRemixedSlides(sourceSlides, result.slides, fetchImagesNow) : (
       attachGenerationCanvasLayouts(
       result.slides.map((s, i) => {
@@ -5808,6 +5812,7 @@ ${jsonShapeLine}`;
     if (creationValidatedDraftRef.current?.job === job) creationValidatedDraftRef.current = null;
     history.set(d => ({
       ...d, brand: generationBrand, slides: newSlides, mode: effectiveMode, creativePreset: cp,
+      ...(isPresentationGeneration ? {} : { visualBible: generationVisualBible }),
       ...(isPresentationGeneration
         ? { fmt: 'apresentacao', productKind: 'apresentacao', presentationPath: presentationPathId }
         : {
@@ -5922,7 +5927,15 @@ ${jsonShapeLine}`;
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], [newSlides[i]?.imgExtraPrompt,
                 generationPlan ? 'PRESENTATION IMAGE PANEL: keep the main subject complete within the frame, with breathing room around faces, hands and products. This is an illustration, never a fabricated screenshot, chart, testimonial or proof. Editable text is composed separately.' : '',
               ].filter(Boolean).join('\n'))),
-              aspectRatio: generationPlan ? presentationPhotoAspectRatio(newSlides[i]) : isPresentationGeneration ? '16:9' : imageAspectRatioForFormat(fmt),
+              sceneDirection: composeSceneDirection({
+                visualBible: isPresentationGeneration ? null : generationVisualBible,
+                slide: newSlides[i],
+                fmt: isPresentationGeneration ? 'apresentacao' : (fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
+              }),
+              aspectRatio: generationPlan
+                ? presentationPhotoAspectRatio(newSlides[i])
+                : isPresentationGeneration ? '16:9'
+                  : imageAspectRatioForSlide(newSlides[i], fmt && fmt !== 'apresentacao' ? fmt : 'carrossel'),
               usageContext: {
                 projectId: generationProjectId,
                 projectName: activeEntry?.name || '',
@@ -6921,7 +6934,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
               signal: templateJob.signal,
               refImages: await resolveImageReferences(styleKit, newSlides[i]?.refImage, newSlides[i]?.refImageId || newSlides[i]?.refImageAssetId, newSlides[i]?.imageReferences),
               imgExtraPrompt: composeImgExtraPrompt(styleKit, composeSlideReferencePrompt(newSlides[i], newSlides[i]?.imgExtraPrompt)),
-              aspectRatio: imageAspectRatioForFormat(fmt === 'apresentacao' ? 'carrossel' : fmt),
+              sceneDirection: composeSceneDirection({ visualBible: doc.visualBible, slide: newSlides[i], fmt: fmt === 'apresentacao' ? 'carrossel' : fmt }),
+              aspectRatio: imageAspectRatioForSlide(newSlides[i], fmt === 'apresentacao' ? 'carrossel' : fmt),
               usageContext: {
                 projectId,
                 projectName: activeEntry?.name || '',

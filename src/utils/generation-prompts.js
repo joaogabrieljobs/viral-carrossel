@@ -16,6 +16,7 @@ import { genModeUiLabel } from './ui-depth-labels.js';
 import { isPitchPath, buildPitchFieldRules } from './pitch-content.js';
 import { buildPresentationMaterial } from './presentation-material.js';
 import { buildSocialTextLimitsPrompt, socialTextLimits } from './social-generation.js';
+import { buildVisualBiblePromptRules, VISUAL_BIBLE_SCHEMA } from './visual-bible.js';
 import {
   buildPresentationFieldRules, buildPresentationLanguageRules, buildPresentationImageRules,
 } from './presentation.js';
@@ -1134,11 +1135,13 @@ function buildGenerationImageLayer(presetId, topic, n, audience, projectDirectio
     return buildPresentationImageRules(presentationPath, topic, projectDirection);
   }
   if (projectDirection) return `imageQuery — DIREÇÃO DO PROJETO:
-• INGLÊS, 8–15 palavras: sujeito + ação + ambiente + linguagem visual/luz extraída do brief.
+• INGLÊS, 8–15 palavras: sujeito + ação + ambiente. A linguagem visual e a luz do brief entram só quando couberem na cena — luz de interior não se aplica a uma cena externa; não repita a mesma expressão de luz em todas as queries.
 • Relacione a cena à mensagem específica do card. Varie cenas mantendo a identidade do projeto.
 • Siga a estética explicitada no brief/estilo (fotografia, 3D, animação, colagem etc.). Não imponha realismo, silêncio visual ou tons dessaturados por padrão.
 • Reserve área legível para as camadas editáveis de título/subtítulo; nunca desenhe texto, logo ou marca-d'água dentro da imagem.
-• As referências são moodboard, não autorização para copiar rosto, personagem ou logo. Arquivos apenas citados no Markdown não estão anexados.`;
+• As referências são moodboard, não autorização para copiar rosto, personagem ou logo. Arquivos apenas citados no Markdown não estão anexados.
+
+${buildVisualBiblePromptRules()}`;
 
   const nicheStr = n ? ` (nicho: ${n})` : '';
   const audStr = audience ? ` (público: ${audience})` : '';
@@ -1166,7 +1169,9 @@ function buildGenerationImageLayer(presetId, topic, n, audience, projectDirectio
 • Varie ambiente, clima e composição entre slides quando o conteúdo ou o modo narrativo pedirem contraste — não prenda todo o carrossel a um único clima visual “editorial”.
 • Os eixos ajustados pelo usuário têm PRIORIDADE sobre exemplos genéricos ou um “look” único.
 • EVITE repetir o mesmo clichê visual em todos os slides sem necessidade.
-• Cada slide: imageQuery DIFERENTE.`;
+• Cada slide: imageQuery DIFERENTE.
+
+${buildVisualBiblePromptRules()}`;
 }
 
 
@@ -1450,6 +1455,11 @@ function buildHookVariationRules(narrativeModeId, creativePresetId) {
 ${buildHookModeVariationRules(isTendenciaCulturaPreset(creativePresetId) ? 'editorial' : narrativeModeId, creativePresetId)}`;
 }
 
+/** A ficha visual vale onde a imagem ilustra diretamente o material do usuário. */
+function wantsVisualBible(presetId) {
+  return presetId !== 'apresentacao' && !isTendenciaCulturaPreset(presetId);
+}
+
 function buildGenerationJsonContract(presetId, densityId, count, projectDesignSchema = null, presentationPath = 'auto') {
   const slide = { title: '', subtitle: '', imageQuery: '' };
   const isPresentation = presetId === 'apresentacao';
@@ -1466,7 +1476,13 @@ ${isPresentation
       ? 'cultureTone é opcional: omita ou use "", "light", "dark", "accent". Respeite os campos vazios exigidos pelo layout.'
       : ''}
 Sem cercas de código, comentários ou vírgulas finais; escape aspas e quebras de linha dentro das strings. Destaque no máximo um trecho com **asteriscos duplos**; para itálico use _underscores_. Esses marcadores são formatados pelo card, não são texto literal. Não use outros recursos de Markdown. Copie domínios e URLs exatamente como no material, sem espaço antes de .com e sem cortar o começo do endereço.
-${JSON.stringify({ slides: [slide], caption: '', ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}) })}`;
+${JSON.stringify({
+    slides: [slide], caption: '',
+    // Ficha visual: só nos carrosséis com imagem direta do material. Cultura pede
+    // relação indireta com o tema; o deck planeja imagem no roteiro.
+    ...(wantsVisualBible(presetId) ? { visualBible: VISUAL_BIBLE_SCHEMA } : {}),
+    ...(projectDesignSchema ? { projectDesign: projectDesignSchema } : {}),
+  })}`;
 }
 
 /** Viés para pesquisa de nicho — alinha ideias e ganchos ao modo/pacote do documento. */
