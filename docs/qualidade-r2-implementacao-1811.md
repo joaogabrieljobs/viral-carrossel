@@ -239,3 +239,25 @@ Estado para publicar: 18 commits locais sobre `7088a34` (o último só de docume
 O que continua sem validação: nenhuma geração com IA real (texto ou imagem); exportação ZIP/PDF, celular e Tauri não conferidos à mão; três testes de navegador instáveis já existentes no commit publicado (conferência de composição da apresentação, fonte por card sob carga, e os de criação só deixam de falhar pela gravação antiga).
 
 Como a publicação funciona neste projeto: push em `main` dispara o deploy de produção na Vercel e o CI do GitHub (unitários e navegador). Os 8 deploys anteriores foram todos por push direto em `main`. O deploy de `7088a34` fica como candidato a reversão imediata na Vercel.
+
+## Publicação de 18/11/2026
+
+O João confirmou "sim, publicar" depois de ver os fatos (testes verdes, IA real não validada).
+
+- 14:19 (BRT): push de `9d3198f` em `main` (18 commits, avanço direto sobre `7088a34`).
+- Deploy de produção na Vercel `dpl_8yoAXtYokFFxYCPV5GQCT2Xcm2Ca`: READY. moont.ai passou a servir o pacote novo 40 s depois do push. `moont.ai/?app=1` abre a tela de planos sem erro de console; nenhum erro de servidor na hora seguinte. O editor em produção não foi aberto por esta sessão (exige login).
+- CI do GitHub (run 44357370269): `quality` passou; `e2e` **falhou** com 272 passaram, 3 falharam, 16 pulados; `deployment-gate` falhou por consequência.
+
+### A falha do CI
+
+Três testes do teste de assinatura (`com assinatura`: `reflexivo_cream`, `editorial_magazine`, `cinematic_hybrid`), card 2, colisão `footerBar × pill`, nas duas tentativas.
+
+Causa: a posição do selo era calculada pela altura esperada da barra, uma linha por valor. No CI as fontes dos padrões não chegam e a fonte reserva é mais larga; na coluna estreita ao lado da foto um valor quebrou linha, a barra cresceu e encostou no selo. Acontece igual com qualquer valor longo na barra. Localmente não aparecia porque as fontes reais são mais estreitas.
+
+Alcance em produção: só card com foto em coluna, com selo e barra de três colunas ao mesmo tempo, e valor de barra que quebre linha. Nenhum padrão do Moont traz os dois ornamentos juntos; depende de a pessoa preencher ambos. Antes desta entrega o selo ficava por cima da barra em todo card com os dois, então não é piora em relação ao que estava no ar.
+
+Correção (`d1d82c2`, local, ainda não enviada): com os dois presentes, selo e barra são renderizados como uma pilha real, e a barra pode quebrar linha. Quatro casos novos com valores longos falhavam 4 de 4 e passam. `SEM_FONTES_DA_REDE=1` bloqueia os servidores de fonte para reproduzir a condição do CI.
+
+Testes em `d1d82c2`: `npm test` 2562 passaram; navegador completo, com o teste de assinatura na condição do CI, 279 passaram, 0 falharam, 16 pulados.
+
+Lição registrada: teste de geometria que só roda com as fontes da rede não vale como portão. Antes de enviar, rodar o teste de assinatura também com `SEM_FONTES_DA_REDE=1`.
