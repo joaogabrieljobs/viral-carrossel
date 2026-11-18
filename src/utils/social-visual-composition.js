@@ -150,10 +150,12 @@ export function applySocialVisualComposition(slides, { preset, photoRegion = 'fu
       zones = { photo: box(0, 0, 46, 100), title: box(51, 10, 43, 39), subtitle: box(51, 50.5, 43, 38.5 - s) };
     } else if (photo) {
       // A foto cede a altura do rodapé; título e apoio conservam o tamanho.
-      // Caixa do título para duas linhas: com uma linha sobra pouco vão sob a
-      // foto, e um título de três linhas reduz um pouco em vez de a foto encolher.
+      // Caixa do título com 21,5%: duas linhas de fonte larga cabem no tamanho
+      // cheio, contando a margem interna da caixa. Com 16% e 18,5% o ajuste
+      // automático já encolhia o título. Custo: título de uma linha deixa um
+      // vão maior sob a foto.
       const s = shift(90);
-      zones = { photo: box(0, 0, 100, 51.5 - s), title: box(7, 54 - s, 86, 16), subtitle: box(7, 71.5 - s, 86, 18.5) };
+      zones = { photo: box(0, 0, 100, 46 - s), title: box(7, 48.5 - s, 86, 21.5), subtitle: box(7, 71.5 - s, 86, 18.5) };
     } else {
       const s = shift(89);
       zones = { photo: box(96, 94, 1, 1), title: box(8, 12, 84, 36), subtitle: box(8, 49.5, 84, 39.5 - s) };

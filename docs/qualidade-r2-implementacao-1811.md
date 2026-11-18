@@ -218,10 +218,23 @@ O João apontou, sobre a folha do Tabloid: "efeitos de sombra feios, letras muit
 - **Sombra:** o selo do rodapé perdeu a sombra projetada. O título gerado já não tinha sombra desde a v3.
 - **"Sem qualidade":** as fontes dos padrões vêm da rede (Google Fonts). A captura era tirada antes de elas chegarem e registrava o card em Helvetica de reserva; aconteceu em duas folhas e numa rodada inteira em tamanho real. O teste agora só fotografa com a fonte do título e a do corpo carregadas; se não chegarem, confere a geometria e não grava captura.
 
-Ajuste de diagramação: no card com foto em cima, a caixa do título passou a caber duas linhas (16% da altura) e a foto ganhou o espaço. Com título de uma linha o vão sob a foto caiu de 14% para 8%.
+Tentativa revertida: reduzir a caixa do título no card com foto em cima (16% e depois 18,5% da altura) para diminuir o vão sob título de uma linha. As duas medidas encolhiam título de duas linhas em fonte larga, porque a caixa tem margem interna. Voltou para 21,5%. Limitação que fica: título de uma linha deixa cerca de 14% de vão sob a foto.
 
 Capturas em tamanho real de exportação (1080 × 1350): `_capturas-assinatura-1811/tamanho-real/`. Gerar de novo: `CAPTURA_ESCALA=3 npx playwright test tests/e2e/assinatura-sem-marca.spec.js`.
 
 Não resolvido nesta rodada: no Viral Hype o selo fica centralizado enquanto o texto é alinhado à esquerda; o espaçamento por tipo de fonte não foi levado aos renderizadores antigos (card montado à mão fora da composição gerada).
 
-Testes: `npm test` 2560 passaram, 4 falhas esperadas. Teste de assinatura 26 de 26. A suíte completa de navegador não foi rodada de novo depois desta rodada.
+### Junção do enquadramento de foto e portão final (18/11, noite)
+
+O João respondeu "serve, próximo passo" às capturas em tamanho real.
+
+- **Enquadramento de foto** (`7fab392`): as alterações não commitadas do checkout principal (7 arquivos, 80 linhas, de 14 e 15/11) foram copiadas para esta branch como patch e aplicaram sem conflito. O checkout principal não foi tocado e continua com as mesmas alterações soltas. **Depois que esta branch entrar em `main`, essas alterações soltas passam a ser duplicata do que já está commitado e precisam ser descartadas lá antes de atualizar o checkout.**
+- `npm test`: 2562 passaram, 4 falhas esperadas.
+- Navegador, suíte completa com tudo junto: 271 passaram, 4 falharam, 16 pulados, com a máquina em carga média de 22 a 38. As 4 (logout em `billing-jornadas` e `library-cloud-sync`, dois testes de logo) falharam por elemento não visível em 5 s. Os quatro arquivos repetidos duas vezes em seguida: 50 de 50 passaram.
+- Teste de assinatura: 26 de 26, capturas conferidas depois da junção (recortes e fontes certos).
+
+Estado para publicar: 17 commits locais sobre `7088a34`; `origin/main` continua em `7088a34`. Nada enviado.
+
+O que continua sem validação: nenhuma geração com IA real (texto ou imagem); exportação ZIP/PDF, celular e Tauri não conferidos à mão; três testes de navegador instáveis já existentes no commit publicado (conferência de composição da apresentação, fonte por card sob carga, e os de criação só deixam de falhar pela gravação antiga).
+
+Como a publicação funciona neste projeto: push em `main` dispara o deploy de produção na Vercel e o CI do GitHub (unitários e navegador). Os 8 deploys anteriores foram todos por push direto em `main`. O deploy de `7088a34` fica como candidato a reversão imediata na Vercel.
