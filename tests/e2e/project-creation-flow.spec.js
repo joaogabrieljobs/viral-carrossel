@@ -222,6 +222,36 @@ test('design recomendado fica visível, aplica o preset e mantém a narrativa es
   await expect(middle).toContainText(created.doc.slides[2].bodyAfterImage);
 });
 
+// Rodada R2 (15–16/11/2026): os nove carrosséis gerados saíram com título,
+// subtítulo e apoio em 100/100/100, e não nos tamanhos da composição. A marca
+// do projeto nasce com os três tamanhos em 100 (DEFAULT_BRAND); a geração
+// reaplica o preset, que apaga esses campos; a mudança 100 → undefined
+// disparava a sincronização "marca → todos os slides" e achatava a hierarquia.
+test('geração social conserva a tipografia que a composição definiu', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await setup(page, { withProject: false, ai: route => {
+    const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
+    return route.fulfill({ json: completion(prompt.startsWith('REVISÃO EDITORIAL') ? { edits: [] } : generated(5, 'Hierarquia preservada')) });
+  } });
+  const wizard = await configure(page, { name: 'Hierarquia do estilo', defaultIdentity: true });
+  await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
+  await expect(wizard).toHaveCount(0, { timeout: 25_000 });
+  await expect.poll(async () => (await library(page)).find(p => p.name === 'Hierarquia do estilo')?.doc?.slides?.length).toBe(5);
+  // A sincronização indevida rodava num efeito depois da gravação: espera o
+  // estado assentar antes de ler.
+  await page.waitForTimeout(1500);
+  const created = (await library(page)).find(p => p.name === 'Hierarquia do estilo');
+  await testInfo.attach('tipografia.json', { body: JSON.stringify(created.doc.slides.map(s => ({
+    comp: s.socialComposition, titleSize: s.titleSize, subSize: s.subSize, bodyAfterSize: s.bodyAfterSize, titleLeading: s.titleLeading, subLeading: s.subLeading,
+  })), null, 2), contentType: 'application/json' });
+  for (const slide of created.doc.slides) {
+    expect(slide.canvas.source).toBe('social-preset');
+    // Composição tipográfica (sem foto): 76 / 108 / 140, entrelinhas 110 / 138.
+    expect([slide.titleSize, slide.subSize, slide.bodyAfterSize]).toEqual([76, 108, 140]);
+    expect([slide.titleLeading, slide.subLeading]).toEqual([110, 138]);
+  }
+});
+
 test('entrada tem duas escolhas, abrir preserva o editor e cancelar não cria projetos', async ({ page }) => {
   await setup(page);
   const before = await library(page);

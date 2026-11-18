@@ -276,6 +276,7 @@ function SidebarContent({
   fmt = 'carrossel',
   applyTypographyToAllCards,
   applyBrandTypographyToAllSlides,
+  setBrandTypography = setBrand,
   canvasEditMode = false, setCanvasEditMode = () => {},
   showPreviewAlignGrid = false, setShowPreviewAlignGrid = () => {},
   anyCanvasEnabled = false,
@@ -2436,15 +2437,15 @@ function SidebarContent({
                   textTransform:'uppercase',
                   marginBottom:6,
                 }}>Tamanho</div>
-                <Slider label="Tamanho título" value={brand.textTitleSize ?? 100} min={50} max={180} onChange={v => setBrand({ ...brand, textTitleSize: v })} />
-                <Slider label="Tamanho subtítulo" value={brand.textSubSize ?? 100} min={50} max={180} onChange={v => setBrand({ ...brand, textSubSize: v })} />
+                <Slider label="Tamanho título" value={brand.textTitleSize ?? 100} min={50} max={180} onChange={v => setBrandTypography({ textTitleSize: v })} />
+                <Slider label="Tamanho subtítulo" value={brand.textSubSize ?? 100} min={50} max={180} onChange={v => setBrandTypography({ textSubSize: v })} />
                 {(creativePreset === 'tendencia_cultura' || slides.some((s) => s.useCultureLayout || !!(String(s.bodyAfterImage || '').trim()))) ? (
                   <Slider
                     label="Tamanho — texto abaixo da foto"
                     value={brand.textBodyAfterSize ?? brand.textSubSize ?? 100}
                     min={50}
                     max={180}
-                    onChange={(v) => setBrand({ ...brand, textBodyAfterSize: v })}
+                    onChange={(v) => setBrandTypography({ textBodyAfterSize: v })}
                   />
                 ) : null}
               </div>
@@ -2458,13 +2459,13 @@ function SidebarContent({
                   textTransform:'uppercase',
                   marginBottom:6,
                 }}>Espaçamento — Título</div>
-                <Slider label="Entre letras (tracking)" value={brand.textTitleTracking ?? 0} min={-10} max={30} onChange={v => setBrand({ ...brand, textTitleTracking: v })} />
-                <Slider label="Entre linhas (leading)" value={brand.textTitleLeading ?? 105} min={80} max={180} onChange={v => setBrand({ ...brand, textTitleLeading: v })} />
+                <Slider label="Entre letras (tracking)" value={brand.textTitleTracking ?? 0} min={-10} max={30} onChange={v => setBrandTypography({ textTitleTracking: v })} />
+                <Slider label="Entre linhas (leading)" value={brand.textTitleLeading ?? 105} min={80} max={180} onChange={v => setBrandTypography({ textTitleLeading: v })} />
                 <div>
                   <label className="vc-label-sm">Peso da fonte</label>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4 }}>
                     {[400, 600, 700, 800].map(w => (
-                      <button key={w} type="button" onClick={()=>setBrand({ ...brand, textTitleWeight: w })}
+                      <button key={w} type="button" onClick={()=>setBrandTypography({ textTitleWeight: w })}
                         style={{
                           padding:'7px 0', borderRadius:6, fontSize:11, cursor:'pointer',
                           fontWeight:w, fontFamily: effectiveTitleFontFamily(brand), transition:'all 0.12s',
@@ -2491,7 +2492,7 @@ function SidebarContent({
                         <button
                           key={c.id}
                           type="button"
-                          onClick={()=>setBrand({ ...brand, textTitleCase: c.id })}
+                          onClick={()=>setBrandTypography({ textTitleCase: c.id })}
                           title={c.title}
                           aria-label={c.title}
                           aria-pressed={on}
@@ -2530,8 +2531,8 @@ function SidebarContent({
                   textTransform:'uppercase',
                   marginBottom:6,
                 }}>Espaçamento — Subtítulo</div>
-                <Slider label="Entre letras (tracking)" value={brand.textSubTracking ?? 0} min={-10} max={30} onChange={v => setBrand({ ...brand, textSubTracking: v })} />
-                <Slider label="Entre linhas (leading)" value={brand.textSubLeading ?? 150} min={100} max={220} onChange={v => setBrand({ ...brand, textSubLeading: v })} />
+                <Slider label="Entre letras (tracking)" value={brand.textSubTracking ?? 0} min={-10} max={30} onChange={v => setBrandTypography({ textSubTracking: v })} />
+                <Slider label="Entre linhas (leading)" value={brand.textSubLeading ?? 150} min={100} max={220} onChange={v => setBrandTypography({ textSubLeading: v })} />
               </div>
               <div style={{ marginTop:10, paddingTop:12, borderTop:'1px solid var(--hairline)' }}>
                 <button
@@ -3314,8 +3315,7 @@ function SidebarContent({
 
             <FontPairingPicker
               brand={brand}
-              onApply={(p) => setBrand({
-                ...brand,
+              onApply={(p) => setBrandTypography({
                 titleFont: p.titleFont,
                 bodyFont: p.bodyFont,
                 textTitleWeight: clampTitleWeight(p.titleFont, p.textTitleWeight),

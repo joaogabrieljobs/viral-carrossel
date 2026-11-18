@@ -92,6 +92,7 @@ import {
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
 import { applySocialVisualComposition } from './src/utils/social-visual-composition.js';
+import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
   PRESENTATION_VISUAL_PRESET_CATALOG,
@@ -1233,6 +1234,23 @@ export default function App() {
       }),
     [history],
   );
+  // Controles de tipografia da marca: marca e slides mudam na MESMA gravação
+  // (um passo de desfazer). Só o campo alterado é propagado, e tamanhos em
+  // proporção — ver `src/utils/brand-typography.js`.
+  const setBrandTypography = useCallback(
+    (next) =>
+      history.set((d) => {
+        const cur = hydrateBrandTextColors(brandForFormatDisplay(
+          d.brand && typeof d.brand === 'object' ? d.brand : { ...DEFAULT_BRAND },
+          d.fmt, d.formatViews, d.creativePreset,
+        ));
+        const brandNext = hydrateBrandTextColors(typeof next === 'function' ? next(cur) : { ...cur, ...next });
+        const edited = applyBrandEdit(d, brandNext);
+        const slidesNext = propagateBrandTypography(edited.slides, cur, brandNext);
+        return slidesNext === edited.slides ? edited : { ...edited, slides: slidesNext };
+      }),
+    [history],
+  );
   // Importar em “Logo da marca” atualiza a identidade compartilhada também no
   // Studio. Ajustes de outros campos e logos específicas continuam no projeto.
   const saveBrandLogo = useCallback((patch) => {
@@ -1649,7 +1667,12 @@ export default function App() {
     const b = brandRoster.find(x => x.id === brandId);
     if (!b) return;
     setActiveBrandId(brandId);
-    history.set(d => ({ ...d, brand: hydrateBrandTextColors({ ...b }) }));
+    // Trocar o perfil é uma escolha da pessoa: a tipografia do novo perfil
+    // chega aos slides, só nos campos que diferem e em proporção nos tamanhos.
+    history.set(d => {
+      const nextBrand = hydrateBrandTextColors({ ...b });
+      return { ...d, brand: nextBrand, slides: propagateBrandTypography(d.slides, d.brand, nextBrand) };
+    });
   }, [brandRoster, history]);
   const upsertBrand = useCallback((brandObj) => {
     const norm = hydrateBrandTextColors(brandObj);
@@ -1700,7 +1723,10 @@ export default function App() {
     // O perfil selecionado e o perfil gravado no projeto precisam mudar na
     // mesma ação. Caso contrário, o sincronizador por projeto restaura o ID
     // antigo no render seguinte.
-    history.set((current) => ({ ...current, brand: hydrateBrandTextColors(newBrand) }));
+    history.set((current) => {
+      const nextBrand = hydrateBrandTextColors(newBrand);
+      return { ...current, brand: nextBrand, slides: propagateBrandTypography(current.slides, current.brand, nextBrand) };
+    });
     setActiveBrandId(newBrand.id);
     return newBrand;
   }, [doc.brand, doc.styleKit, brandRoster.length, history, upsertBrand]);
@@ -4734,23 +4760,11 @@ export default function App() {
     toast('Tipografia da marca aplicada a todos os slides.', 'success');
   }, [brand, setSlides, toast]);
 
-  // Auto-aplica tipografia da marca em TODOS os slides quando user mexe nos sliders
-  // do painel "Texto nos slides". Antes precisava apertar o botão "Aplicar a todos".
-  // Skip primeira renderização (evita sobrescrever per-card overrides no boot).
-  const brandTypoFirstRunRef = useRef(true);
-  useEffect(() => {
-    if (brandTypoFirstRunRef.current) {
-      brandTypoFirstRunRef.current = false;
-      return;
-    }
-    const patch = typographyPatchFromBrand(brand);
-    setSlides((list) => list.map((sl) => ({ ...sl, ...patch })));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    brand.textTitleSize, brand.textSubSize, brand.textBodyAfterSize,
-    brand.textTitleTracking, brand.textTitleLeading, brand.textTitleWeight, brand.textTitleCase,
-    brand.textSubTracking, brand.textSubLeading,
-  ]);
+  // A tipografia da marca chega aos slides por ação explícita (`setBrandTypography`,
+  // troca de perfil, "Aplicar a todos"). Havia aqui um efeito que regravava os
+  // nove campos em todos os slides a cada mudança de `brand.text*`, inclusive
+  // as feitas por código: ao gravar uma geração social ele apagava a hierarquia
+  // que a composição acabara de definir (R2: tudo em 100/100/100).
 
   const persistFullscreenPresentationAdjustDraft = useCallback((draftBySlideId) => {
     if (!draftBySlideId || typeof draftBySlideId !== 'object') return;
@@ -7155,6 +7169,7 @@ Retorne APENAS JSON: ${refineAllWantsBody
     fmt,
     applyTypographyToAllCards,
     applyBrandTypographyToAllSlides,
+    setBrandTypography,
     canvasEditMode, setCanvasEditMode,
     showPreviewAlignGrid, setShowPreviewAlignGrid,
     anyCanvasEnabled: displaySlides.some((s) => s.canvas?.enabled),
