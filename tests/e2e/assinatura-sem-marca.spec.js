@@ -29,6 +29,9 @@ async function abrir(page, { preset, brand, slides }) {
     fmt: 'carrossel', productKind: 'carrossel', creativePreset: 'livre', visualPreset: preset.id, brand, slides,
   } };
   await mockApi(page, { session: SESSAO_ATIVA });
+  // SEM_FONTES_DA_REDE=1 reproduz o CI, onde as fontes dos padrões não chegam
+  // e o card é medido com a fonte reserva, mais larga.
+  if (process.env.SEM_FONTES_DA_REDE) await page.route(/fonts\.(googleapis|gstatic)\.com/, route => route.abort());
   await page.setViewportSize({ width: 1680, height: 1000 });
   await page.addInitScript(p => {
     if (sessionStorage.getItem('assinatura-fixture')) return;
@@ -139,6 +142,26 @@ for (const preset of SOCIAIS) test(`com assinatura: ${preset.id} mantém selo e 
     expect(r.achados, `card ${i + 1} de ${preset.id}`).toEqual([]);
     expect(await contrasteDoSelo(card), `texto do selo no card ${i + 1} de ${preset.id}`).toBeGreaterThanOrEqual(4.5);
     if (i < 2 && fotografar) await card.screenshot({ path: testInfo.outputPath(`${preset.id}-com-assinatura-${i + 1}.png`) });
+  }
+});
+
+// CI de 18/11/2026: sem as fontes da rede, o texto da barra ficou mais largo,
+// quebrou em duas linhas na coluna estreita ao lado da foto e encostou no
+// selo. A posição do selo era calculada supondo barra de uma linha por valor.
+// Valores longos reproduzem a quebra com qualquer fonte.
+for (const id of ['editorial_magazine', 'reflexivo_cream', 'cinematic_hybrid', 'mood_sepia']) test(`barra com valores longos: ${id} mantém o selo acima da barra na coluna estreita`, async ({ page }) => {
+  test.setTimeout(45_000);
+  const preset = VISUAL_PRESETS.find(p => p.id === id);
+  const brand = { ...applyVisualPreset({ name: 'Ateliê Traço', handle: 'atelietraco', showHandle: false, logo: null }, preset.id),
+    footerPillText: 'ARRASTA PRO LADO', footerPillArrow: true,
+    footerBarLeft: 'Tema|Retratos de estúdio', footerBarCenter: 'Conteúdo por|Ateliê Traço Fotografia', footerBarRight: 'Não esqueça|de salvar para depois' };
+  const slides = applySocialVisualComposition(cards(), { preset, brand, formato: 'carrossel' });
+  expect(slides.some(s => s.socialComposition === 'portrait-editorial')).toBe(true);
+  const superficie = await abrir(page, { preset, brand, slides });
+  for (let i = 0; i < slides.length; i++) {
+    const r = await colisoes(superficie.nth(i));
+    expect(r.ornamentos).toBeGreaterThanOrEqual(2);
+    expect(r.achados, `card ${i + 1} de ${preset.id} (${slides[i].socialComposition})`).toEqual([]);
   }
 });
 

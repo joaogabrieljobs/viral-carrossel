@@ -2188,88 +2188,111 @@ const SlideCardInner = React.forwardRef(({
           const fCenter = brand.footerBarCenter;
           const fRight = brand.footerBarRight;
           const hasFooter = !!(fLeft || fCenter || fRight);
-          if (!hasFooter) return null;
-          // Texto branco só quando a foto está de fato atrás da barra. Com a
-          // foto numa caixa (topo ou coluna), a barra fica sobre o papel do
-          // card e branco some em padrão claro.
-          const zonaFoto = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
-          const colunaTextoBarra = slide.socialComposition === 'portrait-editorial' ? slide.canvas?.zones?.title : null;
-          const fotoAtrasDaBarra = !!slide.bgImage && (!zonaFoto
-            || (zonaFoto.y + zonaFoto.h >= 95 && zonaFoto.x <= 5 && zonaFoto.x + zonaFoto.w >= 95));
-          const labelColor = fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
-          const valueColor = fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');
-          // Com a foto em coluna lateral, a barra cabe na coluna de texto em vez
-          // de atravessar a divisa entre foto e painel.
-          const barLeft = colunaTextoBarra && Number.isFinite(colunaTextoBarra.x) ? f.w * colunaTextoBarra.x / 100 : f.w * 0.05;
-          const barRight = colunaTextoBarra && Number.isFinite(colunaTextoBarra.w) ? f.w * (100 - colunaTextoBarra.x - colunaTextoBarra.w) / 100 : f.w * 0.05;
-          const Col = ({ data }) => {
-            if (!data) return <div style={{ flex:1 }}/>;
-            const [label, value] = String(data).split('|');
-            return (
-              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:f.h*0.004 }}>
-                <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: labelColor,
-                  letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
-                {value && (
-                  <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: valueColor,
-                    fontWeight: 700 }}>{value}</span>
-                )}
+          const hasPill = !!brand.footerPillText;
+          if (!hasFooter && !hasPill) return null;
+          // Com a foto em coluna lateral, o meio do card é a divisa entre foto e
+          // painel: selo e barra ficam na coluna de texto.
+          const colunaTexto = slide.socialComposition === 'portrait-editorial' ? slide.canvas?.zones?.title : null;
+          const naColuna = !!(colunaTexto && Number.isFinite(colunaTexto.x) && Number.isFinite(colunaTexto.w));
+          const barLeft = naColuna ? f.w * colunaTexto.x / 100 : f.w * 0.05;
+          const barRight = naColuna ? f.w * (100 - colunaTexto.x - colunaTexto.w) / 100 : f.w * 0.05;
+          // Selo e barra juntos formam uma pilha de verdade (selo em cima). A
+          // posição do selo era calculada pela altura esperada da barra; quando
+          // um valor quebrava linha (coluna estreita, fonte mais larga), a barra
+          // crescia e encostava no selo.
+          const empilhado = hasFooter && hasPill;
+
+          let barra = null;
+          if (hasFooter) {
+            // Texto branco só quando a foto está de fato atrás da barra. Com a
+            // foto numa caixa (topo ou coluna), a barra fica sobre o papel do
+            // card e branco some em padrão claro.
+            const zonaFoto = (slide.canvas?.applied || slide.canvas?.enabled) ? slide.canvas?.zones?.photo : null;
+            const fotoAtrasDaBarra = !!slide.bgImage && (!zonaFoto
+              || (zonaFoto.y + zonaFoto.h >= 95 && zonaFoto.x <= 5 && zonaFoto.x + zonaFoto.w >= 95));
+            const labelColor = fotoAtrasDaBarra ? 'rgba(255,255,255,0.55)' : (displayBodyInk || '#888');
+            const valueColor = fotoAtrasDaBarra ? '#ffffff' : (displayTitleInk || '#000');
+            const Col = ({ data }) => {
+              if (!data) return <div style={{ flex:1 }}/>;
+              const [label, value] = String(data).split('|');
+              return (
+                <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:f.h*0.004 }}>
+                  <span style={{ fontSize: f.w*0.020*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: labelColor,
+                    letterSpacing:'0.04em', textTransform:'uppercase' }}>{label || ''}</span>
+                  {value && (
+                    <span style={{ fontSize: f.w*0.022*escFooterBar, fontFamily: getTextFont(slide, 'footerBar', bodyFF), color: valueColor,
+                      fontWeight: 700 }}>{value}</span>
+                  )}
+                </div>
+              );
+            };
+            barra = (
+              <div data-vc-chrome="footerBar" {...mov('footerBar', {
+                ...(empilhado
+                  ? { position:'relative', alignSelf:'stretch' }
+                  : { position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight, zIndex: 25 }),
+                display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+                gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
+              })}>
+                <Col data={fLeft}/>
+                <Col data={fCenter}/>
+                <Col data={fRight}/>
               </div>
             );
-          };
-          return (
-            <div data-vc-chrome="footerBar" {...mov('footerBar', {
-              position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight,
-              zIndex: 25, display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-              gap: f.w*0.02, pointerEvents: movableElements ? 'auto' : 'none',
-            })}>
-              <Col data={fLeft}/>
-              <Col data={fCenter}/>
-              <Col data={fRight}/>
-            </div>
-          );
-        })()}
-        {brand.footerPillText && (() => {
-          // Texto do selo pelo contraste com o fundo: o escuro fixo sumia em
-          // padrões de destaque escuro.
-          const { bg: pillBg, fg: pillFg, arrow: pillArrow } = footerPillColors(brand);
-          // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
-          // Default true se undefined; só esconde quando explicitamente false.
-          const showArrow = brand.footerPillArrow !== false;
-          // Padding-right encolhe quando não tem seta (visual mais compacto).
-          const padRight = (showArrow ? f.w*0.014 : f.w*0.028) * escPill;
-          // Com a foto em coluna lateral, o meio do card é a divisa entre foto e
-          // painel: o selo centra na coluna de texto.
-          const colunaTexto = slide.socialComposition === 'portrait-editorial' ? slide.canvas?.zones?.title : null;
-          const pillCenterPct = colunaTexto && Number.isFinite(colunaTexto.x) && Number.isFinite(colunaTexto.w)
-            ? colunaTexto.x + colunaTexto.w / 2
-            : 50;
-          return (
-            <div data-vc-chrome="pill" {...mov('pill', {
-              // Com a barra de três colunas, o selo empilha acima dela.
-              position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar),
-              left:`${pillCenterPct}%`, transform:'translateX(-50%)',
-              zIndex:25, pointerEvents: movableElements ? 'auto' : 'none',
-            })}>
-              <div style={{
-                background: pillBg, color: pillFg,
-                padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
-                borderRadius: 9999,
-                display:'inline-flex', alignItems:'center', gap: f.w*0.018,
-                fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
-                letterSpacing:'-0.011em', whiteSpace:'nowrap',
-                textTransform: 'uppercase',
-              }}>
-                {brand.footerPillText}
-                {showArrow && (
-                  <span style={{
-                    width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',
-                    background: pillFg, color: pillArrow,
-                    display:'inline-flex', alignItems:'center', justifyContent:'center',
-                    fontSize: f.w*0.030*escPill, fontWeight:700, lineHeight:1,
-                    flexShrink:0,
-                  }}>→</span>
-                )}
+          }
+
+          let selo = null;
+          if (hasPill) {
+            // Texto do selo pelo contraste com o fundo: o escuro fixo sumia em
+            // padrões de destaque escuro.
+            const { bg: pillBg, fg: pillFg, arrow: pillArrow } = footerPillColors(brand);
+            // Seta opcional — REF 2/5 mostram, REF 3 (Mood Sépia hashtag) não.
+            // Default true se undefined; só esconde quando explicitamente false.
+            const showArrow = brand.footerPillArrow !== false;
+            // Padding-right encolhe quando não tem seta (visual mais compacto).
+            const padRight = (showArrow ? f.w*0.014 : f.w*0.028) * escPill;
+            const pillCenterPct = naColuna ? colunaTexto.x + colunaTexto.w / 2 : 50;
+            selo = (
+              <div data-vc-chrome="pill" {...mov('pill', {
+                ...(empilhado
+                  ? { position:'relative' }
+                  : { position:'absolute', bottom: footerPillBottomPx(brand, f, escFooterBar),
+                      left:`${pillCenterPct}%`, transform:'translateX(-50%)', zIndex:25 }),
+                pointerEvents: movableElements ? 'auto' : 'none',
+              })}>
+                <div style={{
+                  background: pillBg, color: pillFg,
+                  padding: `${f.h*0.012*escPill}px ${padRight}px ${f.h*0.012*escPill}px ${f.w*0.028*escPill}px`,
+                  borderRadius: 9999,
+                  display:'inline-flex', alignItems:'center', gap: f.w*0.018,
+                  fontSize: f.w*0.026*escPill, fontWeight:700, fontFamily: getTextFont(slide, 'pill', bodyFF),
+                  letterSpacing:'-0.011em', whiteSpace:'nowrap',
+                  textTransform: 'uppercase',
+                }}>
+                  {brand.footerPillText}
+                  {showArrow && (
+                    <span style={{
+                      width: f.w*0.05*escPill, height: f.w*0.05*escPill, borderRadius:'50%',
+                      background: pillFg, color: pillArrow,
+                      display:'inline-flex', alignItems:'center', justifyContent:'center',
+                      fontSize: f.w*0.030*escPill, fontWeight:700, lineHeight:1,
+                      flexShrink:0,
+                    }}>→</span>
+                  )}
+                </div>
               </div>
+            );
+          }
+
+          if (!empilhado) return <>{barra}{selo}</>;
+          return (
+            <div data-vc-chrome-stack="footer" style={{
+              position:'absolute', bottom: f.h*0.038, left: barLeft, right: barRight, zIndex: 25,
+              display:'flex', flexDirection:'column', alignItems:'center', gap: f.h*0.022,
+              pointerEvents:'none',
+            }}>
+              {selo}
+              {barra}
             </div>
           );
         })()}
