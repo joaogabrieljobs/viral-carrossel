@@ -232,8 +232,9 @@ O João respondeu "serve, próximo passo" às capturas em tamanho real.
 - `npm test`: 2562 passaram, 4 falhas esperadas.
 - Navegador, suíte completa com tudo junto: 271 passaram, 4 falharam, 16 pulados, com a máquina em carga média de 22 a 38. As 4 (logout em `billing-jornadas` e `library-cloud-sync`, dois testes de logo) falharam por elemento não visível em 5 s. Os quatro arquivos repetidos duas vezes em seguida: 50 de 50 passaram.
 - Teste de assinatura: 26 de 26, capturas conferidas depois da junção (recortes e fontes certos).
+- Navegador, suíte completa no commit final de código (`b68af7a`): **275 passaram, 0 falharam**, 16 pulados (8,4 min).
 
-Estado para publicar: 17 commits locais sobre `7088a34`; `origin/main` continua em `7088a34`. Nada enviado.
+Estado para publicar: 18 commits locais sobre `7088a34` (o último só de documentação); `origin/main` continua em `7088a34`. Nada enviado.
 
 O que continua sem validação: nenhuma geração com IA real (texto ou imagem); exportação ZIP/PDF, celular e Tauri não conferidos à mão; três testes de navegador instáveis já existentes no commit publicado (conferência de composição da apresentação, fonte por card sob carga, e os de criação só deixam de falhar pela gravação antiga).
 
