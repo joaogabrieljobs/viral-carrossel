@@ -55,12 +55,19 @@ export function auditSocialTextDensity(slides, config = {}) {
 export function buildSocialTextLimitsPrompt(config = {}) {
   if (!requiresSocialTitles(config)) return '';
   const limits = socialTextLimits(config);
+  // "Detalhado" precisa pedir desenvolvimento. Com a regra de tetos sozinha
+  // ("não preencha espaço") o modelo entregava título e uma linha curta mesmo
+  // com a densidade máxima escolhida. Só vale quando a pessoa escolheu 1/1; sem
+  // densidade informada continua o contrato de tetos.
+  const volume = config.densityId === '1_1'
+    ? `- DETALHADO: a pessoa pediu desenvolvimento. Nos cards de miolo, subtitle com duas frases completas, de 100 a 160 caracteres, e bodyAfterImage com um exemplo, condição ou consequência concreta, de 80 a 140 caracteres. Capa e fechamento podem ser mais curtos. Cada frase traz informação nova do material ou do pedido; não repita o título nem a legenda, não use frase de efeito para ocupar espaço. Não invente fato, número ou exemplo para cumprir a faixa: se o material não sustenta, escreva menos. Os números acima continuam sendo tetos; não esconda excesso em título, outro campo ou fonte menor.`
+    : `- São TETOS, nunca metas mínimas. Uma ideia por card, uma ou duas frases de apoio; não preencha espaço, repita a legenda nem acrescente exemplos para atingir um tamanho. Preserve condições e fatos ao sintetizar. Não esconda excesso em título, outro campo ou fonte menor.`;
   return `CONTRATO DE TEXTO — ${limits.label}, igual em todos os modos narrativos:
 - title: obrigatório e específico, até ${limits.title} caracteres e ${limits.titleWords} palavras; nunca "Seu título aqui".
 - subtitle: até ${limits.subtitle} caracteres e ${limits.maxLines} linhas curtas.
 - bodyAfterImage: opcional quando permitido pelo layout, até ${limits.bodyAfterImage} caracteres e ${limits.maxLines} linhas curtas. Deixe vazio se não acrescentar informação.
 - subtitle + bodyAfterImage juntos: até ${limits.support} caracteres, incluindo o espaço entre blocos. A zona abaixo da imagem não é espaço para continuar um texto longo.
-- São TETOS, nunca metas mínimas. Uma ideia por card, uma ou duas frases de apoio; não preencha espaço, repita a legenda nem acrescente exemplos para atingir um tamanho. Preserve condições e fatos ao sintetizar. Não esconda excesso em título, outro campo ou fonte menor.
+${volume}
 - O modo organiza a sequência; não altera estes limites. Não aumente a quantidade pedida para acomodar texto. Se o usuário pediu texto literal, preserve-o para revisão em vez de cortá-lo silenciosamente.`;
 }
 

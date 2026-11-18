@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { VISUAL_PRESETS, applyVisualPreset } from '../../src/styles/visual-presets.jsx';
+import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset } from '../../src/styles/visual-presets.jsx';
 import {
   applySocialVisualComposition,
+  restyleSocialSlides,
   PORTRAIT_CENTER_MAX_SUPPORT_CHARS,
   SOCIAL_COMPOSITION_TYPOGRAPHY,
   SOCIAL_COMPOSITION_VERSION,
@@ -263,5 +264,57 @@ describe('composição social v3 — bloco agrupado e escala tipográfica', () =
     expect(longa.h).toBe(14);
     // A base da caixa não muda: o bloco cresce para cima.
     for (const z of [curta, media, longa]) expect(z.y + z.h).toBe(91);
+  });
+});
+
+// Uso real de 18/11/2026 (projeto em Stories, Mood Sépia): depois de gerar, a
+// pessoa aplicou um padrão a todos os cards. O app zerava a composição e
+// voltava ao layout clássico, mas os cards guardavam "sem véu e sem sombra" da
+// composição: título creme direto sobre a foto, ilegível.
+describe('trocar o padrão num projeto já gerado', () => {
+  const comFoto = (slides) => slides.map((s, i) => (i === 2 ? s : { ...s, bgImageId: `img-${i}` }));
+  const gerar = (id, formato = 'stories') => {
+    const preset = SOCIAIS.find((p) => p.id === id);
+    const brand = applyVisualPreset(MARCAS.completa, preset.id);
+    return comFoto(applySocialVisualComposition(cards(), { preset, brand, formato }));
+  };
+
+  it('outro padrão do Moont recompõe os cards em vez de voltar ao layout clássico', () => {
+    const gerados = gerar('viral_hype_dark');
+    const novo = SOCIAIS.find((p) => p.id === 'mood_sepia');
+    const brand = applyVisualPreset(MARCAS.completa, novo.id);
+    const result = restyleSocialSlides(gerados, { preset: novo, brand, formato: 'stories', overrides: getSlideOverridesForPreset(novo.id) });
+    expect(result).toHaveLength(gerados.length);
+    for (const slide of result) {
+      expect(slide.canvas?.source).toBe('social-preset');
+      expect(slide.socialVisualPresetId).toBe('mood_sepia');
+      expect(slide.socialCompositionVersion).toBe(SOCIAL_COMPOSITION_VERSION);
+      expect(slide.titleSize).toBe(SOCIAL_COMPOSITION_TYPOGRAPHY[slide.socialComposition].titleSize);
+    }
+    // Mood Sépia põe a foto em coluna no miolo: a composição é a do padrão novo.
+    expect(result[1].socialComposition).toBe('portrait-editorial');
+  });
+
+  it('padrão sem composição própria volta ao clássico com véu e sombra sobre a foto', () => {
+    const gerados = gerar('viral_hype_dark');
+    const personalizado = { id: 'custom_x', isCustom: true, slideDefaults: { layout: 'bc', align: 'center' } };
+    const result = restyleSocialSlides(gerados, { preset: personalizado, brand: {}, formato: 'stories', overrides: { canvas: null, layout: 'bc', align: 'center', titleSize: 100 } });
+    for (const slide of result) {
+      expect(slide.canvas).toBeNull();
+      expect(slide.socialComposition).toBeUndefined();
+      expect(slide.socialZoneAnchors).toBeUndefined();
+      expect(slide.overlayMode).toBeUndefined();
+      if (slide.bgImageId) {
+        expect(slide.overlay).toBeGreaterThanOrEqual(60);
+        expect(slide.textShadow).toBe(true);
+      }
+    }
+  });
+
+  it('projeto que nunca teve composição só recebe o reset do padrão', () => {
+    const manuais = [{ id: 'a', title: 'T', overlay: 20, textShadow: false, bgImageId: 'x' }];
+    const novo = SOCIAIS.find((p) => p.id === 'mood_sepia');
+    const result = restyleSocialSlides(manuais, { preset: novo, brand: {}, formato: 'carrossel', overrides: { layout: 'bc' } });
+    expect(result).toEqual([{ id: 'a', title: 'T', overlay: 20, textShadow: false, bgImageId: 'x', layout: 'bc' }]);
   });
 });

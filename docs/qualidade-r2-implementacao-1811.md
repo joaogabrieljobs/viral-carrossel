@@ -279,3 +279,17 @@ O João confirmou "sim, enviar". Push de `c02d52e` em `main` (correção da pilh
 Registro do servidor: um `sjinn-image` com tempo esgotado às 15:11 BRT, uma ocorrência, um usuário.
 
 Estado: `origin/main` em `c02d52e`; branch local dois commits à frente (`7af3e74` e este registro).
+
+### Terceiro envio e dois achados no projeto real (18/11/2026, 16:03 BRT)
+
+Push de `d379fd5` (aviso de gravação no celular). Deploy `dpl_qo5Emw9wASZGzRdtJ318jSTXPBku` READY. CI (run 44376458199) verde: 2562 unitários, 280 de navegador.
+
+O João mandou o card 2 do projeto "Teste Clínica Janine" (Stories, Mood Sépia, densidade Detalhado): título e uma linha de apoio, creme sobre foto clara, quase ilegível. O projeto foi lido no banco de produção, só leitura (`moont.account_projects`, id `0grus0u`).
+
+**Card ilegível.** Os cards tinham as marcas da composição v3 (`socialComposition`, versão 3, âncoras) mas `canvas` nulo, `titleSize` 100 e `layout` `bc`; em `formatViews.stories` havia o reset `visualBrand/visualPresetId/visualCreativePreset: null`, que só `applyVisualStylePreset` grava. Ou seja: depois de gerar, um padrão foi aplicado a todos os cards. Esse caminho zerava a composição (`getSlideOverridesForPreset`) e voltava ao layout clássico, mas não mexia em `overlay` nem em `textShadow`, que a composição tinha deixado em 0 e falso para o card com foto em caixa. Resultado: texto direto sobre a foto. Já era assim antes desta entrega (a composição antiga também gravava véu 0 e sem sombra no miolo).
+
+Correção (local): `restyleSocialSlides`. Projeto que nasceu composto é recomposto com o padrão novo; padrão sem composição própria volta ao clássico com véu e sombra sobre a foto; projeto nunca composto recebe só o reset, como antes. Reaplicar o padrão no editor conserta um projeto já afetado.
+
+**Texto curto no Detalhado.** O contrato de texto dizia, em toda densidade, "São TETOS, nunca metas mínimas ... não preencha espaço". O modelo obedecia. Agora, só com a densidade 1/1 escolhida, o contrato pede desenvolvimento nos cards de miolo (apoio com duas frases, 100 a 160 caracteres; texto após a imagem com exemplo ou condição, 80 a 140), mantendo os tetos e a proibição de inventar para cumprir a faixa. As outras densidades e a ausência de densidade continuam no contrato de tetos. **Não validado com o modelo real**: é mudança de instrução, o efeito só aparece gerando.
+
+Testes locais: `npm test` 2568 passaram; navegador nas telas de estilo, geração, criação e assinatura, 70 de 70.

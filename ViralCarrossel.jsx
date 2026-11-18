@@ -91,7 +91,7 @@ import {
 } from './src/lib/billing.js';
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
-import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography } from './src/utils/social-visual-composition.js';
+import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides } from './src/utils/social-visual-composition.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { composeSceneDirection, normalizeVisualBible } from './src/utils/visual-bible.js';
@@ -1394,10 +1394,14 @@ export default function App() {
             ...d,
             visualPreset: resolvedPresetId,
             brand: applyVisualPreset(d.brand, resolvedPresetId, visualPresets),
-            slides: (Array.isArray(d.slides) ? d.slides : []).map((slide) => ({
-              ...slide,
-              ...getSlideOverridesForPreset(resolvedPresetId, visualPresets),
-            })),
+            // Projeto gerado é recomposto com o padrão novo; só o reset
+            // deixava texto sem véu nem sombra sobre a foto.
+            slides: restyleSocialSlides(Array.isArray(d.slides) ? d.slides : [], {
+              preset,
+              brand: applyVisualPreset(d.brand, resolvedPresetId, visualPresets),
+              formato: d.fmt && d.fmt !== 'apresentacao' ? d.fmt : 'carrossel',
+              overrides: getSlideOverridesForPreset(resolvedPresetId, visualPresets),
+            }),
           };
       return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
     });

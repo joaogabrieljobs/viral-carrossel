@@ -185,3 +185,32 @@ export function applySocialVisualComposition(slides, { preset, photoRegion = 'fu
     };
   });
 }
+
+/** Marcas que a composição grava no card; sem as caixas elas não significam nada. */
+const SOCIAL_COMPOSITION_FIELDS = ['socialComposition', 'socialCompositionVersion', 'socialVisualPresetId', 'socialZoneAnchors', 'overlayMode'];
+
+/**
+ * Troca de padrão num projeto já gerado.
+ *
+ * `overrides` é o reset do padrão novo (zera caixas, tipografia e layout). Só
+ * com ele os cards voltavam ao layout clássico guardando o "sem véu e sem
+ * sombra" da composição: texto direto sobre a foto. Aqui, projeto que nasceu
+ * composto é recomposto com o padrão novo; se o padrão não tem composição
+ * própria (personalizado), o card volta ao clássico já com véu e sombra.
+ * Projeto que nunca foi composto recebe só o reset, como antes.
+ */
+export function restyleSocialSlides(slides, { preset, brand = null, formato = 'carrossel', overrides = {} } = {}) {
+  if (!Array.isArray(slides)) return slides;
+  const eraComposto = slides.some((slide) => slide?.socialComposition);
+  const base = slides.map((slide) => ({ ...slide, ...overrides }));
+  if (!eraComposto) return base;
+  const recomposto = applySocialVisualComposition(base, { preset, brand, formato });
+  if (recomposto !== base) return recomposto;
+  return base.map((slide) => {
+    const limpo = { ...slide };
+    for (const campo of SOCIAL_COMPOSITION_FIELDS) delete limpo[campo];
+    const temFoto = !!(slide.bgImage || slide.bgImageId || slide.bgImageAssetId);
+    return temFoto ? { ...limpo, overlay: Math.max(Number(slide.overlay) || 0, 60), textShadow: true } : limpo;
+  });
+}
+
