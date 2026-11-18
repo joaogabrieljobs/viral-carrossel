@@ -17,10 +17,13 @@ export function ProjectSaveStatus({ localSavedAt, cloudSavedAt, busy, error, onR
           : localSavedAt ? 'Salvo no aparelho · pendente na conta' : 'Aguardando salvamento';
   const Icon = busy ? Loader2 : confirmed ? Check : CloudUpload;
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, lineHeight:1.35, color:'var(--text-secondary)', maxWidth:200 }}>
+    // Não encolhe: ao lado de um nome de projeto longo, este aviso cedia
+    // largura até o texto quebrar em quatro linhas e o botão sair da tela no
+    // celular. Quem cede é o nome, que já corta com reticências.
+    <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, lineHeight:1.35, color:'var(--text-secondary)', maxWidth:'min(210px, 56vw)', flexShrink:0 }}>
       <Icon size={13} aria-hidden style={{ flexShrink:0 }} />
-      <span role="status">{label}</span>
-      {!busy && !confirmed && onRetry && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight:32, padding:'0 6px', fontSize:11 }} onClick={onRetry} aria-label="Tentar salvar na conta">Salvar</button>}
+      <span role="status" style={{ minWidth:0 }}>{label}</span>
+      {!busy && !confirmed && onRetry && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight:32, padding:'0 6px', fontSize:11, flexShrink:0, whiteSpace:'nowrap' }} onClick={onRetry} aria-label="Tentar salvar na conta">Salvar</button>}
     </span>
   );
 }

@@ -47,3 +47,42 @@ test('salvo na conta só aparece para a edição confirmada pelo servidor', asyn
   await expect(confirmed.first()).toBeVisible();
   expect(manifest.docs.find(item => item.id === 'save-status').doc.caption).toBe('A edição mais recente ainda precisa ser enviada.');
 });
+
+// Relato de 18/11/2026 (iPhone, 390 px): com nome de projeto longo e gravação
+// pendente na conta, o botão "Salvar" do aviso saía cortado pela borda direita
+// e o texto do aviso se espremia em quatro linhas.
+test('no celular o aviso de gravação pendente e seu botão cabem na tela', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page, { session:SESSAO_ATIVA, extra:{
+    // Conta vazia e nenhum envio: o projeto fica gravado só no aparelho.
+    '/api/library-sync': route => route.fulfill({ json:{ ok:true, empty:true, meta:null } }),
+  } });
+  await page.addInitScript(() => {
+    localStorage.setItem('vc_shell_view', JSON.stringify('project'));
+    localStorage.setItem('vc_active_doc_id', JSON.stringify('save-status-mobile'));
+    localStorage.setItem('vc_library', JSON.stringify([{ id:'save-status-mobile', name:'Design 1511 R2 — Estudo de caso — Quando o pedido encontra a fila', doc:{
+      caption:'', slides:[{ id:'save-card', title:'Uma ideia clara', subtitle:'Apoio' }],
+    } }]));
+  });
+  await page.goto('/?app=1');
+  await enterEditorFromHome(page);
+  // Uma edição grava no aparelho; sem envio, o aviso longo aparece.
+  await page.getByRole('button', { name:/Legenda.*card 1/i }).first().click();
+  const dialog = page.getByRole('dialog', { name:'Legenda da publicação' });
+  await dialog.getByRole('textbox').fill('Edição local.');
+  await dialog.getByRole('button', { name:/Fechar|Concluir|Salvar/ }).first().click();
+  await expect(page.getByRole('status').filter({ hasText:/Salvo no aparelho · pendente na conta/ }).first()).toBeVisible({ timeout: 20_000 });
+  const retry = page.getByRole('button', { name:'Tentar salvar na conta', exact:true });
+  await expect(retry.first()).toBeVisible({ timeout: 20_000 });
+  const box = await retry.first().boundingBox();
+  expect(box.x, 'botão começa dentro da tela').toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, 'botão termina dentro da tela').toBeLessThanOrEqual(390);
+  const status = await retry.first().evaluate(el => {
+    const texto = el.parentElement.querySelector('[role="status"]');
+    const estilo = getComputedStyle(texto);
+    return { linhas: Math.round(texto.getBoundingClientRect().height / parseFloat(estilo.lineHeight)), largura: document.documentElement.scrollWidth };
+  });
+  expect(status.linhas, 'texto do aviso em no máximo duas linhas').toBeLessThanOrEqual(2);
+  expect(status.largura, 'sem rolagem horizontal').toBeLessThanOrEqual(390);
+});
