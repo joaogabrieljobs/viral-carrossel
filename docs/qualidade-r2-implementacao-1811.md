@@ -64,8 +64,9 @@ Arquivos: `shared/image-aspect.js`, `src/utils/visual-bible.js` (novo), `src/uti
 - Na segunda tentativa de planejamento, o pedido de recuperação mostra ao modelo os trechos reais da fonte mais próximos de cada citação reprovada. É sugestão: o validador continua exigindo cópia literal.
 - A mensagem de falha passa a dizer o motivo, a partir dos códigos do diagnóstico, sem expor conteúdo.
 - A prévia progressiva deixou de mostrar marcadores `**` crus.
+- A legenda gerada perde a linha de rótulo entre colchetes (`[Legenda]`) quando ela vem sozinha no início.
 
-Arquivos: `src/utils/presentation-plan-repair.js` (novo), `src/utils/presentation-planning.js`, `src/components/GenerationPreview.jsx`.
+Arquivos: `src/utils/presentation-plan-repair.js` (novo), `src/utils/presentation-planning.js`, `src/components/GenerationPreview.jsx`, `src/utils/editorial-strategy.js`.
 
 ## O que NÃO foi feito
 
@@ -96,9 +97,43 @@ Arquivos: `src/utils/presentation-plan-repair.js` (novo), `src/utils/presentatio
 - **Conflito de merge provável** em `ViralCarrossel.jsx` com as alterações locais de enquadramento de foto do checkout principal (`generateSlideImageAt` e arredores). Os trechos são vizinhos, não os mesmos.
 - **Divergência entre documento e código encontrada:** `docs/design-geracao-1511.md` afirma que "o rodapé tem espaço reservado" na composição social. Na versão publicada a reserva só existia no renderer legado; esta branch torna a afirmação verdadeira.
 
-## Instabilidade já existente
+## Instabilidade já existente (não causada por esta branch)
 
-`tests/e2e/project-creation-flow.spec.js` → "prévia mostra todos os textos durante a revisão sem salvar o rascunho incompleto" falha de forma intermitente **também em `7088a34`** (2 de 10 execuções lá; 3 de 10 aqui). A asserção que falha é a que protege contra uma gravação antiga da biblioteca desfazer o salvamento final (a biblioteca aparece com 1 slide logo depois de aparecer com 5). Não foi investigada. Vale olhar: pode ser só o teste, pode ser a corrida real.
+Três testes de navegador falham de forma intermitente **também em `7088a34`**. Cada um foi repetido no commit publicado, num worktree separado, para comparar.
+
+| Teste | Em `7088a34` | Nesta branch |
+|---|---|---|
+| `project-creation-flow` → "prévia mostra todos os textos durante a revisão sem salvar o rascunho incompleto" | 2 de 10 | 3 de 10 |
+| `project-creation-flow` → "design recomendado fica visível, aplica o preset e mantém a narrativa escolhida" | 7 de 20 | 2 de 10 |
+| `card-text-fonts` → "fonte individual preserva outros textos e cards, herança e reload a 1680px" | 3 de 60 | 5 de 50 |
+
+### Causa dos dois primeiros: gravação antiga logo depois de gerar (confirmada)
+
+Não é só o teste. Um diagnóstico temporário (não commitado) registrou cada gravação de `vc_library` depois de uma geração "texto primeiro" com IA simulada. O padrão se repetiu em 16 de 16 execuções:
+
+| Momento | Cards gravados | Quem grava |
+|---|---|---|
+| t | 1 (rascunho inicial) | `flushPersistRef.current()` no fim da criação (`ViralCarrossel.jsx`, efeito de `creationRequestVersion`) |
+| t + 30 ms | 5 | outro flush com o documento já aplicado; pelo momento, o do aviso de backup (`setTimeout(..., 0)`, só na primeira geração do navegador). Autor inferido, não rastreado |
+| t + 140 ms | 1 | temporizador de 100 ms da biblioteca, com o estado que o primeiro flush devolveu |
+| t + 550 ms | 5 | autosave de 400 ms do documento |
+
+O flush "atômico" do fim da criação lê o documento **antes** de o React aplicar os slides gerados. O `flushSync` logo acima dele só confirma atualizações síncronas; o `history.set` da geração entrou na fila normal e ainda não foi renderizado quando a resposta da IA chega sem intervalo real (é o caso do fluxo "texto primeiro"). O resultado antigo é devolvido para `setLibrary`, e por cerca de meio segundo o navegador guarda o projeto com o rascunho de 1 card.
+
+Impacto real: baixo. Fechar a aba nessa janela dispara o flush de `pagehide`, que usa o documento vivo. Só uma queda do navegador nesse meio segundo perderia a geração. **Não foi corrigido**: é o caminho de gravação de um app publicado, fora do escopo desta rodada, e a correção muda a ordem entre gravar e devolver o resultado da criação. Proposta, para decidir: fazer esse flush depois de o React aplicar o documento gerado (mesma técnica do flush do aviso de backup) e só então resolver a criação.
+
+### Causa do terceiro: o teste confere cedo demais (hipótese forte)
+
+O teste espera `slides[0].textFonts` ficar igual a `{ título, subtítulo }` e então lê o resto do documento salvo. Esse mesmo valor já existia num estado anterior da sequência, então a espera pode passar com uma gravação antiga, quando os passos seguintes aconteceram dentro do intervalo do autosave. As falhas observadas (fonte de texto livre ausente, fonte do segundo card ainda presente) batem com isso, e o estado na tela está correto. Não alterei o teste.
+
+## Resultado dos testes no último commit de código (`fb8a855`)
+
+| Suíte | Resultado |
+|---|---|
+| `npm test` (checagens + Vitest) | 215 arquivos, 2533 passaram, 4 falhas esperadas (`it.fails`), 0 falhas |
+| `npx playwright test` (bateria completa) | 274 passaram, 16 pulados, 0 falhas, em 6,2 min |
+
+A bateria de navegador anterior, sobre `29c3247`, teve 272 passaram e 2 falhas: os testes "design recomendado" e "fonte individual a 1680px" da tabela acima. Uma execução verde não garante a próxima enquanto as três instabilidades existirem.
 
 ## Como conferir
 
