@@ -18,6 +18,7 @@ export function usePhotoFraming(slides, fmt) {
     const result = cachedPhotoFraming(request);
     return {
       ...slide,
+      photoFraming: 'auto',
       ...(result?.position || {}),
       autoPhotoPending: !result?.ready,
     };

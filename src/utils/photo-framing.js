@@ -5,6 +5,41 @@ const cache = new Map();
 const MAX_CACHE = 80;
 const clamp = value => Math.max(0, Math.min(100, value));
 
+function hasManualPhotoOffset(slide) {
+  const offset = slide?.elementOffsets?.photo;
+  return !!(offset && (Number(offset.x) !== 0 || Number(offset.y) !== 0));
+}
+
+/**
+ * Projetos antigos não tinham `photoFraming`. Se a foto continua no recorte
+ * central padrão, ela nunca foi posicionada pelo usuário e pode receber o
+ * enquadramento inteligente com segurança. Qualquer ajuste legado é manual.
+ */
+export function usesAutomaticPhotoFraming(slide) {
+  if (!slide || slide.photoFraming === 'manual') return false;
+  if (slide.photoFraming === 'auto') return true;
+  return (slide.bgX ?? 50) === 50
+    && (slide.bgY ?? 50) === 50
+    && (slide.bgZoom ?? 100) === 100
+    && !hasManualPhotoOffset(slide);
+}
+
+/** Uma foto nova não deve herdar o recorte manual da imagem anterior. */
+export function automaticPhotoFramingPatch(patch = {}, currentSlide = null) {
+  const previousOffsets = currentSlide?.elementOffsets || patch.elementOffsets || {};
+  return {
+    ...patch,
+    photoFraming: 'auto',
+    bgFit: 'cover',
+    bgX: 50,
+    bgY: 50,
+    bgZoom: 100,
+    bgMirror: false,
+    presentationImgAdjust: undefined,
+    elementOffsets: { ...previousOffsets, photo: { x: 0, y: 0 } },
+  };
+}
+
 /** CSS background-position é relativo à sobra do recorte, não ao centro da foto. */
 export function cropToBackgroundPosition(crop, width, height) {
   if (!crop || !width || !height) return { bgX: 50, bgY: 50 };
@@ -15,7 +50,7 @@ export function cropToBackgroundPosition(crop, width, height) {
 }
 
 export function photoFramingRequest(slide, fmt) {
-  if (!slide?.bgImage || slide.photoFraming !== 'auto' || slide.bgFit !== 'cover') return null;
+  if (!slide?.bgImage || !usesAutomaticPhotoFraming(slide) || slide.bgFit !== 'cover') return null;
   const f = FORMATS[fmt] || FORMATS.carrossel;
   const photo = (slide.canvas?.enabled || slide.canvas?.applied) && slide.canvas?.zones?.photo;
   const width = f.w * (photo ? photo.w / 100 : 1);
