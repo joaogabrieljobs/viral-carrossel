@@ -57,6 +57,10 @@ export default function CreateProjectFlow({
   const [brandVisualOverrides, setBrandVisualOverrides] = useState({});
   const [step, setStep] = useState(0);
   const [furthest, setFurthest] = useState(0);
+  // Etapa de onde a pessoa saiu por um atalho (ex.: "Ajustar logo e
+  // referências" na etapa Visual). "Continuar" devolve para lá em vez de
+  // seguir para a etapa seguinte e obrigar a refazer o caminho.
+  const [returnStep, setReturnStep] = useState(null);
   const [productKind, setProductKind] = useState(initialProductKind === 'apresentacao' ? 'apresentacao' : 'carrossel');
   const [name, setName] = useState(initialName);
   const [brandId, setBrandId] = useState('__local__');
@@ -154,7 +158,7 @@ export default function CreateProjectFlow({
     if (!explicitCardCount || isPresentation) return;
     setCount(current => String(current) === String(explicitCardCount) ? current : String(explicitCardCount));
   }, [explicitCardCount, isPresentation]);
-  const go = next => { if (busy || pending) return; setError(''); setNotice(''); setStep(next); setFurthest(v => Math.max(v, next)); };
+  const go = next => { if (busy || pending) return; setError(''); setNotice(''); setReturnStep(null); setStep(next); setFurthest(v => Math.max(v, next)); };
   const chooseProduct = next => {
     if (next === productKind) return;
     setProductKind(next); setFormatId(next === 'apresentacao' ? 'apresentacao' : 'carrossel');
@@ -377,7 +381,7 @@ export default function CreateProjectFlow({
         {wantImages && hasOpenAI && <details className="vc-create-details"><summary>Ajustar a direção das imagens — opcional</summary><ImgParamsPanel value={params} onChange={(key, value) => setParams(p => ({ ...p, [key]:value }))}/></details>}
         <Field label="Direção visual adicional" hint="Ex.: fotografia natural, fundo claro, poucas cores e títulos elegantes."><textarea className="vc-input" rows={3} maxLength={STYLE_PROMPT_MAX} value={styleKit.stylePrompt} onChange={e => setStyleKit(k => ({ ...k, stylePrompt:e.target.value }))}/></Field>
         {!isPresentation && <details className="vc-create-details"><summary>Organização da foto e do texto — opcional</summary><div className="vc-create-grid" role="radiogroup" aria-label="Composição dos cards">{[{ id:'full', label:'Imagem no fundo', desc:'Texto sobre a imagem.' },{ id:'inset_h_top', label:'Foto no topo', desc:'Texto abaixo da foto.' },{ id:'inset_h_middle', label:'Foto no meio', desc:'Título acima e apoio abaixo.' },{ id:'inset_h_bottom', label:'Foto embaixo', desc:'Texto acima da foto.' }].map(v => <Option key={v.id} {...v} selected={cardStyle === v.id} onClick={() => setCardStyle(v.id)}/>)}</div></details>}
-        <div className="vc-create-identity-summary"><strong>Logo e referências — opcionais</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais.</span><button type="button" className="vc-btn vc-btn-ghost" onClick={() => { if (identityPath === 'moont') setIdentityPath('custom'); setIdentityAdjustmentsOpen(true); go(1); }}>Ajustar logo e referências</button></div>
+        <div className="vc-create-identity-summary"><strong>Logo e referências — opcionais</strong><span>{identitySummary.logo} · {identitySummary.references} referências visuais.</span><button type="button" className="vc-btn vc-btn-ghost" onClick={() => { if (busy || pending) return; const origem = step; if (identityPath === 'moont') setIdentityPath('custom'); setIdentityAdjustmentsOpen(true); go(1); setReturnStep(origem); }}>Ajustar logo e referências</button></div>
       </>}
       {step === 6 && <>
         {hasMaterialOverage && <div role="alert" className="vc-create-error">{materialOverageMessage}</div>}
@@ -393,6 +397,6 @@ export default function CreateProjectFlow({
       {pending && <p role="status" className="vc-create-note" style={{ marginTop:18 }}>Importando arquivo…</p>}
       {notice && <p role="status" className="vc-create-note" style={{ marginTop:24 }}>{notice}</p>}
     </main>
-    <footer className="vc-create-footer"><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || (busy && !onCancelGeneration)} onClick={busy ? onCancelGeneration : step > 0 ? () => go(step - 1) : onCancel}><ArrowLeft size={15} aria-hidden/>{busy ? 'Cancelar geração' : step > 0 ? 'Voltar' : 'Cancelar'}</button><span className="vc-create-note">{step + 1} de {CREATION_STEPS.length}{step >= 4 && countValid ? ` · ${count} ${quantityUnit}` : ''}</span>{step < 6 ? <button type="button" className="vc-create-primary" disabled={!canContinue || pending || busy} onClick={() => go(step + 1)}>Continuar <ArrowRight size={14} aria-hidden/></button> : <button type="button" className="vc-create-primary" disabled={busy || pending || !countValid || !sourceReady || !hasTextAI || hasMaterialOverage} title={hasMaterialOverage ? 'Reduza o material na etapa Conteúdo antes de criar.' : undefined} onClick={create}>{busy ? <Loader2 size={15} aria-hidden/> : <Sparkles size={15} aria-hidden/>} {busy ? 'Gerando…' : `Criar e gerar ${count} ${quantityUnit}`}</button>}</footer>
+    <footer className="vc-create-footer"><button type="button" className="vc-btn vc-btn-ghost" disabled={pending || (busy && !onCancelGeneration)} onClick={busy ? onCancelGeneration : step > 0 ? () => go(step - 1) : onCancel}><ArrowLeft size={15} aria-hidden/>{busy ? 'Cancelar geração' : step > 0 ? 'Voltar' : 'Cancelar'}</button><span className="vc-create-note">{step + 1} de {CREATION_STEPS.length}{step >= 4 && countValid ? ` · ${count} ${quantityUnit}` : ''}</span>{step < 6 ? <button type="button" className="vc-create-primary" disabled={!canContinue || pending || busy} onClick={() => go(returnStep != null && returnStep > step ? returnStep : step + 1)}>Continuar <ArrowRight size={14} aria-hidden/></button> : <button type="button" className="vc-create-primary" disabled={busy || pending || !countValid || !sourceReady || !hasTextAI || hasMaterialOverage} title={hasMaterialOverage ? 'Reduza o material na etapa Conteúdo antes de criar.' : undefined} onClick={create}>{busy ? <Loader2 size={15} aria-hidden/> : <Sparkles size={15} aria-hidden/>} {busy ? 'Gerando…' : `Criar e gerar ${count} ${quantityUnit}`}</button>}</footer>
   </section>;
 }

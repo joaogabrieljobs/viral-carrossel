@@ -736,6 +736,32 @@ test('apresentação passa pelo planejamento e só abre edição após conferir 
   expect(prompts[1]).toContain('PLANO EDITORIAL VALIDADO');
 });
 
+// Relato de 18/11/2026 (iPhone): na etapa Visual, "Ajustar logo e referências"
+// leva à etapa Marca. Depois de anexar, "Continuar" seguia para a etapa 3 e a
+// pessoa tinha de refazer o caminho até a 6: "volta para páginas anteriores".
+test('atalho de logo e referências devolve à etapa de onde a pessoa saiu', async ({ page }) => {
+  test.setTimeout(60_000);
+  await setup(page);
+  const wizard = await configure(page, { name: 'Atalho de referências' });
+  const passo = wizard.locator('.vc-create-kicker');
+  await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
+  await expect(passo).toContainText('Passo 6 de 7');
+  await wizard.getByRole('button', { name: 'Ajustar logo e referências', exact: true }).click();
+  await expect(passo).toContainText('Passo 2 de 7');
+  await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(passo).toContainText('Passo 6 de 7');
+  // Fora do atalho, Continuar volta a andar uma etapa por vez.
+  await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
+  await expect(passo).toContainText('Passo 5 de 7');
+  await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(passo).toContainText('Passo 6 de 7');
+  // Quem chega à etapa 2 pelo caminho normal segue para a 3.
+  for (let i = 0; i < 4; i++) await wizard.getByRole('button', { name: 'Voltar', exact: true }).click();
+  await expect(passo).toContainText('Passo 2 de 7');
+  await wizard.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(passo).toContainText('Passo 3 de 7');
+});
+
 test('estrutura pronta mantém a paleta da marca quando a pessoa escolhe sua identidade', async ({ page }) => {
   await setup(page, { ai: route => {
     const prompt = route.request().postDataJSON().payload.messages.find(m => m.role === 'user').content;
