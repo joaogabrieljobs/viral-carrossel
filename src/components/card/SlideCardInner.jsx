@@ -19,6 +19,7 @@ import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
 import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
+import { footerChromeReservePx } from '../../utils/card-chrome.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
 import { normalizeOverlays, overlayMoveKey } from '../../utils/card-overlays.js';
@@ -641,36 +642,8 @@ function vcTitleOvershootShift(fontSizePx, leadingPct) {
   return Math.round(fontSizePx * (lh <= 1.05 ? 0.22 : 0.16));
 }
 
-/**
- * Faixa do rodapé ocupada pelos ornamentos de preset — pill de CTA/hashtag e
- * footer bar de 3 colunas.
- *
- * Os dois são `position:absolute` com `zIndex:25`, então não empurram nada: o
- * bloco de texto (que em bl/bc/br é `justify-content:flex-end`) encosta a base
- * do título no padding e passa por baixo do ornamento. Aqui devolvemos a altura
- * em px que o padding inferior precisa reservar, já com respiro.
- */
-function vcFooterOrnamentReservePx(brand, f) {
-  let reserva = 0;
-  if (String(brand.footerPillText || '').trim()) {
-    // A seta circular (f.w*0.05) é MAIS ALTA que a linha de texto do selo
-    // (f.w*0.026). Medir só pelo texto subdimensionava a faixa em ~19px e o
-    // título encostava 10px dentro do selo — exatamente nos três padrões que
-    // usam seta, e em nenhum dos que a desligam.
-    const comSeta = brand.footerPillArrow !== false;
-    const alturaConteudo = Math.max(f.w * 0.026 * 1.25, comSeta ? f.w * 0.05 : 0);
-    const alturaPill = f.h * 0.024 + alturaConteudo;
-    reserva = Math.max(reserva, f.h * 0.058 + alturaPill);
-  }
-  const colunas = [brand.footerBarLeft, brand.footerBarCenter, brand.footerBarRight];
-  if (colunas.some((c) => String(c || '').trim())) {
-    // `label|valor` renderiza duas linhas; só label, uma.
-    const temValor = colunas.some((c) => String(c || '').includes('|'));
-    const alturaBar = f.w * 0.020 * 1.3 + (temValor ? f.h * 0.004 + f.w * 0.022 * 1.3 : 0);
-    reserva = Math.max(reserva, f.h * 0.038 + alturaBar);
-  }
-  return reserva > 0 ? reserva + f.h * 0.018 : 0;
-}
+// A reserva do rodapé (selo e barra de 3 colunas) vive em `utils/card-chrome.js`:
+// o renderer legado, as zonas do canvas e a composição social usam o mesmo cálculo.
 
 /** Reforço de padding lateral em zonas texto canvas — tracking negativo + fontes grandes “comem” a margem antes do padding nominal. */
 function usesImportedPresentationGeometry(slide) {
@@ -3462,7 +3435,7 @@ const SlideCardInner = React.forwardRef(({
         const padVTop = f.h * (0.09 + inset * 0.003);
         const padVBot = Math.max(
           f.h * (0.06 + inset * 0.003),
-          vcFooterOrnamentReservePx(brand, f),
+          footerChromeReservePx(brand, f),
         );
         const shadow = slide.textShadow !== false
           ? '0 2px 24px rgba(0,0,0,0.85), 0 1px 6px rgba(0,0,0,0.95)'
