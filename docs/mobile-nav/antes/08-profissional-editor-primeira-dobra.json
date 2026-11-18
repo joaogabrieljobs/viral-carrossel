@@ -1,0 +1,529 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 43,
+ "menoresQue44": [
+  {
+   "rotulo": "Projetos",
+   "x": 12,
+   "y": 2,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Gerar carrossel com IA",
+   "x": 247,
+   "y": 2,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 338,
+   "y": 2,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Controle profissional. Clique para mudar.",
+   "x": 12,
+   "y": 102,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 68,
+   "y": 99,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 112,
+   "y": 99,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5 · 1080×1350",
+   "x": 16,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Quadrado · 1080×1080",
+   "x": 103,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Stories · 1080×1920",
+   "x": 190,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Apresentação 16:9 · 1920×1080",
+   "x": 277,
+   "y": 153,
+   "w": 97,
+   "h": 32
+  },
+  {
+   "rotulo": "Card anterior",
+   "x": 35,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ir para o card",
+   "x": 75,
+   "y": 253,
+   "w": 78,
+   "h": 40
+  },
+  {
+   "rotulo": "Próximo card",
+   "x": 153,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir zoom",
+   "x": 198,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Aumentar zoom",
+   "x": 276,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ajustar cards à tela",
+   "x": 316,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir a caixa de texto",
+   "x": 18,
+   "y": 514,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Aumentar a caixa de texto",
+   "x": 48,
+   "y": 514,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Próximo slide",
+   "x": 310,
+   "y": 501,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Visualizar card 1 em tela cheia",
+   "x": 66,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Legenda do card 1",
+   "x": 104,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Excluir elemento selecionado",
+   "x": 142,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Baixar card 1",
+   "x": 180,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Mostrar grade",
+   "x": 218,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Preview qualidade tipográfica",
+   "x": 256,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Ir para slide 1",
+   "x": 148,
+   "y": 799,
+   "w": 18,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 2",
+   "x": 171,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 3",
+   "x": 182,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 4",
+   "x": 193,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 5",
+   "x": 204,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  }
+ ],
+ "alvos": [
+  {
+   "rotulo": "Projetos",
+   "x": 12,
+   "y": 2,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Gerar carrossel com IA",
+   "x": 247,
+   "y": 2,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 338,
+   "y": 2,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Controle profissional. Clique para mudar.",
+   "x": 12,
+   "y": 102,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 68,
+   "y": 99,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 112,
+   "y": 99,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5 · 1080×1350",
+   "x": 16,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Quadrado · 1080×1080",
+   "x": 103,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Stories · 1080×1920",
+   "x": 190,
+   "y": 153,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Apresentação 16:9 · 1920×1080",
+   "x": 277,
+   "y": 153,
+   "w": 97,
+   "h": 32
+  },
+  {
+   "rotulo": "Card 1 de 5",
+   "x": 10,
+   "y": 190,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 2 de 5",
+   "x": 60,
+   "y": 190,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 3 de 5",
+   "x": 110,
+   "y": 190,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 4 de 5",
+   "x": 160,
+   "y": 189,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 5 de 5",
+   "x": 210,
+   "y": 190,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Adicionar card ao carrossel",
+   "x": 260,
+   "y": 190,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card anterior",
+   "x": 35,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ir para o card",
+   "x": 75,
+   "y": 253,
+   "w": 78,
+   "h": 40
+  },
+  {
+   "rotulo": "Próximo card",
+   "x": 153,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir zoom",
+   "x": 198,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Aumentar zoom",
+   "x": 276,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ajustar cards à tela",
+   "x": 316,
+   "y": 251,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir a caixa de texto",
+   "x": 18,
+   "y": 514,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Aumentar a caixa de texto",
+   "x": 48,
+   "y": 514,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Próximo slide",
+   "x": 310,
+   "y": 501,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Visualizar card 1 em tela cheia",
+   "x": 66,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Legenda do card 1",
+   "x": 104,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Excluir elemento selecionado",
+   "x": 142,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Baixar card 1",
+   "x": 180,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Mostrar grade",
+   "x": 218,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Preview qualidade tipográfica",
+   "x": 256,
+   "y": 744,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Ir para slide 1",
+   "x": 148,
+   "y": 799,
+   "w": 18,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 2",
+   "x": 171,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 3",
+   "x": 182,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 4",
+   "x": 193,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 5",
+   "x": 204,
+   "y": 799,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Gerar imagem",
+   "x": 14,
+   "y": 837,
+   "w": 217,
+   "h": 44
+  },
+  {
+   "rotulo": "Referência e direção da imagem deste card",
+   "x": 239,
+   "y": 837,
+   "w": 105,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir aba Narrativa",
+   "x": 8,
+   "y": 780,
+   "w": 60,
+   "h": 56
+  },
+  {
+   "rotulo": "Abrir aba Texto",
+   "x": 72,
+   "y": 780,
+   "w": 60,
+   "h": 56
+  },
+  {
+   "rotulo": "Abrir aba Imagem",
+   "x": 136,
+   "y": 780,
+   "w": 60,
+   "h": 56
+  },
+  {
+   "rotulo": "Abrir aba Mais",
+   "x": 200,
+   "y": 780,
+   "w": 60,
+   "h": 56
+  },
+  {
+   "rotulo": "Opções de download",
+   "x": 268,
+   "y": 780,
+   "w": 114,
+   "h": 44
+  }
+ ],
+ "card": {
+  "x": 14,
+  "y": 314,
+  "w": 330,
+  "h": 413,
+  "fracaoVisivel": 100
+ }
+}

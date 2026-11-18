@@ -6,7 +6,7 @@
 
 ## 1. Inventário (capturas reais, 390×844)
 
-Roteiro: `tests/e2e/zz-inventario-mobile.spec.js` (temporário, fora do portão). Capturas e medidas em `docs/mobile-nav/antes/`. Projeto de teste com 5 cards, conta do plano Criador, `/api` simulado.
+Roteiro: `tests/e2e/inventario-mobile.spec.js` (fora do portão; roda com `MOONT_INVENTARIO=1`). Capturas e medidas em `docs/mobile-nav/antes/`. Projeto de teste com 5 cards (texto sem sombra, como os cards criados pelo app), conta do plano Criador, `/api` simulado.
 
 | Tela | Alvos de toque visíveis | Abaixo de 44 px | Card |
 |---|---|---|---|

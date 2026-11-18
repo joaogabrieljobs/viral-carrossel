@@ -1,0 +1,599 @@
+{
+ "vw": 390,
+ "vh": 844,
+ "scrollWidth": 390,
+ "rolagemHorizontal": false,
+ "total": 50,
+ "menoresQue44": [
+  {
+   "rotulo": "Projetos",
+   "x": 12,
+   "y": -10,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 247,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 338,
+   "y": -10,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 12,
+   "y": 90,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 68,
+   "y": 87,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 112,
+   "y": 87,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5 · 1080×1350",
+   "x": 16,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Quadrado · 1080×1080",
+   "x": 103,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Stories · 1080×1920",
+   "x": 190,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Apresentação 16:9 · 1920×1080",
+   "x": 277,
+   "y": 141,
+   "w": 97,
+   "h": 32
+  },
+  {
+   "rotulo": "Padrão",
+   "x": 16,
+   "y": 528,
+   "w": 85,
+   "h": 36
+  },
+  {
+   "rotulo": "Gerir marcas",
+   "x": 107,
+   "y": 528,
+   "w": 73,
+   "h": 36
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  },
+  {
+   "rotulo": "Card anterior",
+   "x": 35,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ir para o card",
+   "x": 75,
+   "y": 4,
+   "w": 78,
+   "h": 40
+  },
+  {
+   "rotulo": "Próximo card",
+   "x": 153,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir zoom",
+   "x": 198,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Aumentar zoom",
+   "x": 276,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ajustar cards à tela",
+   "x": 316,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir a caixa de texto",
+   "x": 18,
+   "y": 264,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Aumentar a caixa de texto",
+   "x": 48,
+   "y": 264,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Próximo slide",
+   "x": 310,
+   "y": 251,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Visualizar card 1 em tela cheia",
+   "x": 66,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Legenda do card 1",
+   "x": 104,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Excluir elemento selecionado",
+   "x": 142,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Baixar card 1",
+   "x": 180,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Mostrar grade",
+   "x": 218,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Preview qualidade tipográfica",
+   "x": 256,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Ir para slide 1",
+   "x": 148,
+   "y": 550,
+   "w": 18,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 2",
+   "x": 171,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 3",
+   "x": 182,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 4",
+   "x": 193,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 5",
+   "x": 204,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  }
+ ],
+ "alvos": [
+  {
+   "rotulo": "Projetos",
+   "x": 12,
+   "y": -10,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Escrever o pedido e gerar",
+   "x": 247,
+   "y": -10,
+   "w": 85,
+   "h": 40
+  },
+  {
+   "rotulo": "Perfil",
+   "x": 338,
+   "y": -10,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Modo atual: Criar rápido. Clique para mudar.",
+   "x": 12,
+   "y": 90,
+   "w": 52,
+   "h": 34
+  },
+  {
+   "rotulo": "Abrir biblioteca",
+   "x": 68,
+   "y": 87,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Configurar IA",
+   "x": 112,
+   "y": 87,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Feed 4:5 · 1080×1350",
+   "x": 16,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Quadrado · 1080×1080",
+   "x": 103,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Stories · 1080×1920",
+   "x": 190,
+   "y": 141,
+   "w": 85,
+   "h": 32
+  },
+  {
+   "rotulo": "Apresentação 16:9 · 1920×1080",
+   "x": 277,
+   "y": 141,
+   "w": 97,
+   "h": 32
+  },
+  {
+   "rotulo": "Fechar editor",
+   "x": 336,
+   "y": 389,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "rotulo": "Início",
+   "x": 0,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Ajustes",
+   "x": 196,
+   "y": 412,
+   "w": 195,
+   "h": 48
+  },
+  {
+   "rotulo": "Padrão",
+   "x": 16,
+   "y": 528,
+   "w": 85,
+   "h": 36
+  },
+  {
+   "rotulo": "Gerir marcas",
+   "x": 107,
+   "y": 528,
+   "w": 73,
+   "h": 36
+  },
+  {
+   "rotulo": "Carrossel",
+   "x": 21,
+   "y": 608,
+   "w": 172,
+   "h": 58
+  },
+  {
+   "rotulo": "Apresentação",
+   "x": 197,
+   "y": 608,
+   "w": 172,
+   "h": 58
+  },
+  {
+   "rotulo": "Abrir narrativa de comunicação 5 erros no Instagram",
+   "x": 16,
+   "y": 691,
+   "w": 174,
+   "h": 117
+  },
+  {
+   "rotulo": "Criar nova comunicação",
+   "x": 198,
+   "y": 691,
+   "w": 174,
+   "h": 117
+  },
+  {
+   "rotulo": "Biblioteca",
+   "x": 16,
+   "y": 827,
+   "w": 358,
+   "h": 44
+  },
+  {
+   "rotulo": "Opções de download",
+   "x": 12,
+   "y": 757,
+   "w": 114,
+   "h": 44
+  },
+  {
+   "rotulo": "Abrir biblioteca de projetos salvos",
+   "x": 307,
+   "y": 763,
+   "w": 71,
+   "h": 32
+  },
+  {
+   "rotulo": "Card 1 de 5",
+   "x": 10,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 2 de 5",
+   "x": 60,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 3 de 5",
+   "x": 110,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 4 de 5",
+   "x": 160,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card 5 de 5",
+   "x": 210,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Adicionar card ao carrossel",
+   "x": 260,
+   "y": -8,
+   "w": 44,
+   "h": 56
+  },
+  {
+   "rotulo": "Card anterior",
+   "x": 35,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ir para o card",
+   "x": 75,
+   "y": 4,
+   "w": 78,
+   "h": 40
+  },
+  {
+   "rotulo": "Próximo card",
+   "x": 153,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir zoom",
+   "x": 198,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Aumentar zoom",
+   "x": 276,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Ajustar cards à tela",
+   "x": 316,
+   "y": 2,
+   "w": 40,
+   "h": 44
+  },
+  {
+   "rotulo": "Diminuir a caixa de texto",
+   "x": 18,
+   "y": 264,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Aumentar a caixa de texto",
+   "x": 48,
+   "y": 264,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "rotulo": "Próximo slide",
+   "x": 310,
+   "y": 251,
+   "w": 40,
+   "h": 40
+  },
+  {
+   "rotulo": "Visualizar card 1 em tela cheia",
+   "x": 66,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Legenda do card 1",
+   "x": 104,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Excluir elemento selecionado",
+   "x": 142,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Baixar card 1",
+   "x": 180,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Mostrar grade",
+   "x": 218,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Preview qualidade tipográfica",
+   "x": 256,
+   "y": 495,
+   "w": 36,
+   "h": 36
+  },
+  {
+   "rotulo": "Ir para slide 1",
+   "x": 148,
+   "y": 550,
+   "w": 18,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 2",
+   "x": 171,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 3",
+   "x": 182,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 4",
+   "x": 193,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Ir para slide 5",
+   "x": 204,
+   "y": 550,
+   "w": 6,
+   "h": 6
+  },
+  {
+   "rotulo": "Gerar imagem",
+   "x": 14,
+   "y": 588,
+   "w": 217,
+   "h": 44
+  },
+  {
+   "rotulo": "Referência e direção da imagem deste card",
+   "x": 239,
+   "y": 588,
+   "w": 105,
+   "h": 44
+  }
+ ],
+ "card": {
+  "x": 14,
+  "y": 65,
+  "w": 330,
+  "h": 413,
+  "fracaoVisivel": 100
+ }
+}
