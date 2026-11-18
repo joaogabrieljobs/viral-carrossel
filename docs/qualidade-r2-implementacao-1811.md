@@ -261,3 +261,21 @@ Correção (`d1d82c2`, local, ainda não enviada): com os dois presentes, selo e
 Testes em `d1d82c2`: `npm test` 2562 passaram; navegador completo, com o teste de assinatura na condição do CI, 279 passaram, 0 falharam, 16 pulados.
 
 Lição registrada: teste de geometria que só roda com as fontes da rede não vale como portão. Antes de enviar, rodar o teste de assinatura também com `SEM_FONTES_DA_REDE=1`.
+
+### Segundo envio e resultado (18/11/2026, 15:52 BRT)
+
+O João confirmou "sim, enviar". Push de `c02d52e` em `main` (correção da pilha selo + barra e o registro acima).
+
+- Deploy de produção `dpl_6SFxm5uZECCzaai6mVqCiYzWKGSM`: READY.
+- CI do GitHub (run 44374329986): **verde**. `quality` 2562 passaram; `e2e` 279 passaram, 0 falharam, 16 pulados; `deployment-gate` passou.
+
+### Primeiro uso real pelo João, no iPhone (entre os dois envios, sobre `9d3198f`)
+
+1. **"Continuar" volta em vez de avançar depois de anexar referência na etapa 2 do assistente.** Não reproduzido: no Chromium, em 390 px com toque e em desktop, anexar a imagem e continuar leva à etapa 3. O botão só chama `go(step + 1)`. Causa desconhecida; falta saber se voltou para a etapa 1 do assistente ou para a tela inicial, e se ocorre sem anexo. Hipótese não testada: ao voltar do seletor de fotos do iOS a página perde o estado do assistente.
+2. **"Pedi texto bem detalhado e veio pouco."** Não é desta entrega. "Detalhado" (`1_1`) limita o apoio a 300 caracteres por card; "Balanceado" (`1_2`), a 220. Instrução no pedido não passa do teto da densidade.
+3. **Apresentações de teste só com foto na capa.** Protocolo do teste R2, registrado no LEIA-ME do pacote: "apresentações 16:9 com fotografia ilustrativa somente na capa. Texto primeiro, imagens depois pelo editor"; carrosséis com foto nos cards 1 e 3; densidade Balanceado.
+4. **Botão "Salvar" do aviso de gravação cortado no celular.** Reproduzido em 390 px (aviso em 3 linhas no Chromium; 4 e botão cortado no iPhone). Corrigido em `7af3e74`, local, **não enviado**: o aviso deixou de encolher e quem cede largura é o nome do projeto.
+
+Registro do servidor: um `sjinn-image` com tempo esgotado às 15:11 BRT, uma ocorrência, um usuário.
+
+Estado: `origin/main` em `c02d52e`; branch local dois commits à frente (`7af3e74` e este registro).
