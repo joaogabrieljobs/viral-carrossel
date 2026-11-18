@@ -108,6 +108,9 @@ Faça essa seleção internamente. Retorne apenas o JSON pedido, sem expor rascu
 /** Limites do produto aplicados também quando o modelo ignora o prompt. */
 export function normalizeInstagramCaption(value) {
   let tags = 0;
-  return String(value || '').replace(/#[\p{L}\p{N}_]+/gu, tag => ++tags <= INSTAGRAM_HASHTAG_LIMIT ? tag : '')
+  // Rótulo entre colchetes sozinho na primeira linha ("[ESTANTE DE TROCA]") é
+  // resíduo de marcação do rascunho, visto na rodada R2; não faz parte da legenda.
+  return String(value || '').replace(/^\s*\[[^\]\n]{2,60}\][ \t]*\n+(?=\S)/u, '')
+    .replace(/#[\p{L}\p{N}_]+/gu, tag => ++tags <= INSTAGRAM_HASHTAG_LIMIT ? tag : '')
     .trim().slice(0, INSTAGRAM_CAPTION_LIMIT).trimEnd();
 }
