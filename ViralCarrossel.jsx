@@ -6328,6 +6328,26 @@ ${jsonShapeLine}`;
     });
   };
 
+  // A geração termina com `history.set` chamado depois de um `await`: o React
+  // agenda essa atualização na fila normal, e `flushSync` só aplica a fila
+  // síncrona. Ler o documento "ao vivo" logo em seguida devolvia o rascunho
+  // anterior. Esta espera agenda um marcador na mesma fila, depois do
+  // documento gerado, e só resolve quando o React o aplicou: nesse ponto o
+  // documento gerado já foi renderizado e `editorSyncStateRef` o enxerga.
+  const [docCommitTick, setDocCommitTick] = useState(0);
+  const docCommitWaitersRef = useRef([]);
+  useEffect(() => {
+    docCommitWaitersRef.current.splice(0).forEach(resolve => resolve());
+  }, [docCommitTick]);
+  useEffect(() => () => {
+    // Ao desmontar, ninguém fica esperando um render que não virá.
+    docCommitWaitersRef.current.splice(0).forEach(resolve => resolve());
+  }, []);
+  const waitForPendingDocCommit = useCallback(() => new Promise((resolve) => {
+    docCommitWaitersRef.current.push(resolve);
+    setDocCommitTick(tick => tick + 1);
+  }), []);
+
   useEffect(() => {
     const request = creationRequestRef.current;
     if (!request || request.started || !creationSession) return undefined;
@@ -6350,10 +6370,15 @@ ${jsonShapeLine}`;
       try {
         const result = await creationGenerateRef.current(request.generation);
         if (creationRequestRef.current !== request) return;
-        if (!result?.cancelled && readDataOwner() === request.owner
-          && activeProjectRef.current === request.projectId) {
-          // Commit the generated history before reading its live persistence
-          // snapshot. A fast response can still share React's async batch.
+        const stillTarget = () => readDataOwner() === request.owner
+          && activeProjectRef.current === request.projectId;
+        if (!result?.cancelled && stillTarget()) {
+          // Wait for React to apply the generated document before reading its
+          // live persistence snapshot; flushSync alone leaves it pending.
+          await waitForPendingDocCommit();
+          if (creationRequestRef.current !== request) return;
+        }
+        if (!result?.cancelled && stillTarget()) {
           flushSync(() => {
             setCreationSession(current => current?.id === request.sessionId ? null : current);
             setTab('texto');
