@@ -19,6 +19,38 @@ export const PORTRAIT_CENTER_MAX_SUPPORT_CHARS = 120;
 
 const meio = (valor) => Math.round(valor * 2) / 2;
 
+/** Hierarquia tipográfica de cada composição. Fonte única: gerar e restaurar usam a mesma tabela. */
+export const SOCIAL_COMPOSITION_TYPOGRAPHY = Object.freeze({
+  'cover-photo': Object.freeze({ titleSize: 88, subSize: 108, bodyAfterSize: 140, titleLeading: 110, subLeading: 138 }),
+  'portrait-editorial': Object.freeze({ titleSize: 66, subSize: 100, bodyAfterSize: 140, titleLeading: 110, subLeading: 138 }),
+  'photo-story': Object.freeze({ titleSize: 76, subSize: 108, bodyAfterSize: 140, titleLeading: 110, subLeading: 138 }),
+  typographic: Object.freeze({ titleSize: 76, subSize: 108, bodyAfterSize: 140, titleLeading: 110, subLeading: 138 }),
+});
+
+/**
+ * Assinatura do achatamento da R2: card de composição social com os três
+ * tamanhos em 100. A composição nunca produz esse trio (o apoio é sempre 140),
+ * então o sinal é específico de quem passou pela antiga sincronização
+ * "marca → todos os slides".
+ */
+export function isFlattenedSocialSlide(slide) {
+  return slide?.canvas?.source === 'social-preset'
+    && !!SOCIAL_COMPOSITION_TYPOGRAPHY[slide.socialComposition]
+    && slide.titleSize === 100 && slide.subSize === 100 && slide.bodyAfterSize === 100;
+}
+
+/**
+ * Ação explícita "Restaurar hierarquia do estilo": devolve aos cards achatados
+ * os tamanhos e entrelinhas da composição. Não mexe em zonas, texto ou foto, e
+ * não toca cards que não tenham a assinatura. Mesmo array quando nada muda.
+ */
+export function restoreSocialCompositionTypography(slides) {
+  if (!Array.isArray(slides) || !slides.some(isFlattenedSocialSlide)) return slides;
+  return slides.map((slide) => (isFlattenedSocialSlide(slide)
+    ? { ...slide, ...SOCIAL_COMPOSITION_TYPOGRAPHY[slide.socialComposition] }
+    : slide));
+}
+
 function supportChars(slide) {
   return [slide?.subtitle, slide?.bodyAfterImage]
     .map((texto) => Array.from(visibleSocialText(texto)).length)
@@ -67,6 +99,7 @@ export function applySocialVisualComposition(slides, { preset, photoRegion = 'fu
       const s = shift(89);
       zones = { photo: box(96, 94, 1, 1), title: box(8, cover ? 24 : 20, 84, 30), subtitle: box(8, 55, 84, 34 - s) };
     }
+    const composition = fullBleed ? 'cover-photo' : portrait ? 'portrait-editorial' : photo ? 'photo-story' : 'typographic';
     const centered = presetCentered && !(portrait && supportChars(slide) > PORTRAIT_CENTER_MAX_SUPPORT_CHARS);
     return {
       ...slide,
@@ -75,11 +108,9 @@ export function applySocialVisualComposition(slides, { preset, photoRegion = 'fu
       align: centered ? 'center' : 'left',
       photoRegion: 'full', photoFraming: 'auto', bgFit: 'cover', overlay: fullBleed ? 62 : 0,
       textInset: 0, textShadow: fullBleed,
-      titleSize: fullBleed ? 88 : portrait ? 66 : 76,
-      subSize: portrait ? 100 : 108, bodyAfterSize: 140,
-      titleLeading: 110, subLeading: 138,
+      ...SOCIAL_COMPOSITION_TYPOGRAPHY[composition],
       socialVisualPresetId: preset.id,
-      socialComposition: fullBleed ? 'cover-photo' : portrait ? 'portrait-editorial' : photo ? 'photo-story' : 'typographic',
+      socialComposition: composition,
       socialCompositionVersion: SOCIAL_COMPOSITION_VERSION,
       canvas: { enabled: false, applied: true, variant: 'classic', source: 'social-preset', preserveZones: true, zones },
     };

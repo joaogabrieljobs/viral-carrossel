@@ -110,6 +110,10 @@ function luminance(channels) {
   return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
 }
 
+/** Piso de leitura no deck: 1,25% da largura — 24 px num slide de 1920.
+ * Ponto de partida calibrável; entra só como aviso. */
+export const PRESENTATION_TEXT_FLOOR_RATIO = 0.0125;
+
 /** Measurements run on the actual offscreen export tree after fonts/assets.
  * Photo semantics cannot be inferred here; contrast is checked only where a
  * native evidence panel declares an opaque surface. */
@@ -130,6 +134,22 @@ export function auditRenderedPresentationLayout(roots, { getStyle = globalThis.g
       if (frame?.width && (box.left < frame.left - 2 || box.top < frame.top - 2 || box.right > frame.right + 2 || box.bottom > frame.bottom + 2)) add('render-outside', 'Há conteúdo fora da área do slide.');
       if ((node.scrollHeight > node.clientHeight + 3 && node.clientHeight > 0) || (node.scrollWidth > node.clientWidth + 3 && node.clientWidth > 0)) add('render-overflow', 'O texto ou quadro de dados excede a área disponível. Amplie a área ou revise o conteúdo.');
       measured.push({ node, box });
+    }
+    // Aviso, nunca bloqueio: texto de título, subtítulo ou apoio abaixo do piso
+    // de leitura em projeção. Blocos de dados têm escala própria e ficam fora.
+    if (typeof getStyle === 'function') {
+      const largura = surface.clientWidth || frame?.width || 0;
+      const piso = largura * PRESENTATION_TEXT_FLOOR_RATIO;
+      const pequeno = piso > 0 && measured.some(({ node }) => {
+        if (node.getAttribute?.('data-vc-quality-zone') === 'evidence') return false;
+        const folhas = [node, ...Array.from(node.querySelectorAll?.('*') || [])]
+          .filter((el) => Array.from(el.childNodes || []).some((filho) => filho.nodeType === 3 && filho.textContent?.trim()));
+        return folhas.some((el) => {
+          const px = Number.parseFloat(getStyle(el)?.fontSize);
+          return px > 0 && px < piso - 0.5;
+        });
+      });
+      if (pequeno) add('text-below-floor', 'Há texto pequeno demais para leitura em apresentação. Aumente o tamanho ou reduza o texto do slide.', 'warning');
     }
     for (let i = 0; i < measured.length; i += 1) for (let j = i + 1; j < measured.length; j += 1) {
       const a = measured[i]; const b = measured[j];

@@ -91,7 +91,7 @@ import {
 } from './src/lib/billing.js';
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
-import { applySocialVisualComposition } from './src/utils/social-visual-composition.js';
+import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography } from './src/utils/social-visual-composition.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import {
   PRESENTATION_VISUAL_PRESETS,
@@ -4760,6 +4760,14 @@ export default function App() {
     toast('Tipografia da marca aplicada a todos os slides.', 'success');
   }, [brand, setSlides, toast]);
 
+  // Projetos gerados antes da correção ficaram com tudo em 100/100/100. Não
+  // corrigimos sozinhos ao abrir: a pessoa decide, e é um passo de desfazer.
+  const canRestoreStyleHierarchy = useMemo(() => slides.some(isFlattenedSocialSlide), [slides]);
+  const restoreStyleHierarchy = useCallback(() => {
+    setSlides((list) => restoreSocialCompositionTypography(list));
+    toast('Hierarquia do estilo restaurada. Use Desfazer para voltar.', 'success', 4000);
+  }, [setSlides, toast]);
+
   // A tipografia da marca chega aos slides por ação explícita (`setBrandTypography`,
   // troca de perfil, "Aplicar a todos"). Havia aqui um efeito que regravava os
   // nove campos em todos os slides a cada mudança de `brand.text*`, inclusive
@@ -7170,6 +7178,8 @@ Retorne APENAS JSON: ${refineAllWantsBody
     applyTypographyToAllCards,
     applyBrandTypographyToAllSlides,
     setBrandTypography,
+    canRestoreStyleHierarchy,
+    restoreStyleHierarchy,
     canvasEditMode, setCanvasEditMode,
     showPreviewAlignGrid, setShowPreviewAlignGrid,
     anyCanvasEnabled: displaySlides.some((s) => s.canvas?.enabled),

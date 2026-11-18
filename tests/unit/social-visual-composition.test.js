@@ -148,3 +148,39 @@ describe('composição social — alinhamento vem do preset', () => {
     expect(miolo.align).toBe('center');
   });
 });
+
+import { isFlattenedSocialSlide, restoreSocialCompositionTypography, SOCIAL_COMPOSITION_TYPOGRAPHY } from '../../src/utils/social-visual-composition.js';
+
+describe('projetos achatados — restaurar hierarquia do estilo', () => {
+  const preset = VISUAL_PRESETS.find((p) => p.id === 'editorial_magazine');
+  const gerados = () => applySocialVisualComposition(cards(), { preset });
+  // O que a antiga sincronização fazia: tudo em 100, entrelinhas da marca.
+  const achatar = (slide) => ({ ...slide, titleSize: 100, subSize: 100, bodyAfterSize: 100, titleLeading: 112, subLeading: 145 });
+
+  it('a composição nunca produz a assinatura do achatamento', () => {
+    for (const slide of gerados()) expect(isFlattenedSocialSlide(slide)).toBe(false);
+    for (const t of Object.values(SOCIAL_COMPOSITION_TYPOGRAPHY)) expect([t.titleSize, t.subSize, t.bodyAfterSize]).not.toEqual([100, 100, 100]);
+  });
+
+  it('restaura tamanhos e entrelinhas sem tocar em zonas, texto ou foto', () => {
+    const originais = gerados();
+    const achatados = originais.map(achatar);
+    expect(achatados.every(isFlattenedSocialSlide)).toBe(true);
+    expect(restoreSocialCompositionTypography(achatados)).toEqual(originais);
+  });
+
+  it('só toca cards com a assinatura; ajuste manual fica', () => {
+    const [capa, miolo] = gerados();
+    const manual = { ...miolo, titleSize: 120 };
+    const result = restoreSocialCompositionTypography([achatar(capa), manual]);
+    expect(result[0].titleSize).toBe(88);
+    expect(result[1]).toBe(manual);
+  });
+
+  it('sem nada a restaurar devolve o mesmo array', () => {
+    const slides = gerados();
+    expect(restoreSocialCompositionTypography(slides)).toBe(slides);
+    const legado = [{ id: 'x', titleSize: 100, subSize: 100, bodyAfterSize: 100 }];
+    expect(restoreSocialCompositionTypography(legado)).toBe(legado);
+  });
+});

@@ -749,6 +749,8 @@ const ClassicCanvasInner = React.forwardRef(({
   interactionScale = 1,
   onInlineTextChange = null,
   showSupportingText = false,
+  /** Deck 16:9: aceita reduzir mais o texto para caber. Carrossel não — ver pisos abaixo. */
+  presentationMode = false,
   /** Arrasto livre; vem do SlideCardInner. Ausente quando o chrome de zonas
    *  esta ligado — aí quem posiciona e o overlay de zonas. */
   mov = null,
@@ -938,7 +940,9 @@ const ClassicCanvasInner = React.forwardRef(({
         ]}
         minScale={presentationAutofitSoftFloor(slide, 0.45)}
         strictMinScale={strictPresentationAutofit(slide)}
-        hardMinScale={showSupportingText ? 0.32 : 0.45}
+        // Piso frouxo só no deck. O carrossel gerado também tem texto de apoio,
+        // mas num card de 1080 um título a 32% some: fica no piso social.
+        hardMinScale={presentationMode ? 0.32 : 0.45}
       >
         {(titleScale) => (
         <div
@@ -1029,7 +1033,7 @@ const ClassicCanvasInner = React.forwardRef(({
         ]}
         minScale={presentationAutofitSoftFloor(slide, 0.62)}
         strictMinScale={strictPresentationAutofit(slide)}
-        hardMinScale={showSupportingText ? 0.45 : 0.62}
+        hardMinScale={presentationMode ? 0.45 : 0.62}
       >
         {(subScale) => (
         <div
@@ -1093,7 +1097,7 @@ const ClassicCanvasInner = React.forwardRef(({
             as="p"
             value={supportingText}
             onCommit={(text) => onInlineTextChange?.('bodyAfterImage', text)}
-            elementProps={movOu('bodyAfterImage', {
+            elementProps={{ 'data-vc-support-text': 'true', ...movOu('bodyAfterImage', {
               color: bodyInk,
               fontFamily: bodyAfterFF,
               fontSize: f.w * 0.018 * (bodyAfterSizePercent(slide, brand) / 100) * subScale,
@@ -1114,7 +1118,7 @@ const ClassicCanvasInner = React.forwardRef(({
               ),
               opacity: 0.82,
               textShadow: shadow,
-            })}
+            }) }}
           >
             {textoComDestaque(
               supportingText,
@@ -3167,6 +3171,7 @@ const SlideCardInner = React.forwardRef(({
         interactionScale={scale}
         mov={showCanvasChrome ? movOffsetOnly : mov}
         onInlineTextChange={commitInlineText}
+        presentationMode={presentationMode}
         showSupportingText={presentationMode || slide.canvas?.source === 'social-preset'}
       />
     );

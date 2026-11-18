@@ -1,10 +1,38 @@
 /** Composição determinística: o modelo escolhe a função, nunca CSS ou coordenadas. */
+import { FORMATS } from './formats.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
 const DATA_PURPOSES = new Set(['comparison', 'business_model', 'revenue_model', 'metrics', 'market', 'traction']);
 const DEMO_PURPOSES = new Set(['journey', 'roadmap', 'workflow', 'product_demo', 'process']);
 const text = value => String(value || '').trim().toLowerCase();
+
+/**
+ * Tamanho do texto de apoio (`bodyAfterImage`) no deck.
+ *
+ * O slide guarda tamanhos na escala do Feed; a vista 16:9 multiplica por
+ * (1080/1350)×(1080/1920) = 0,45 e limita o resultado a 52–130
+ * (`slideForFormatDisplay`). Título e subtítulo escapam disso pelos tokens de
+ * composição; o apoio não. O valor fixo 110 que existia aqui chegava à tela
+ * como 52% — 18 px num slide de 1920, ilegível em projeção (rodada R2) —
+ * enquanto o sistema visual da apresentação define corpo de 24 a 28 px.
+ *
+ * Gravamos o valor que, depois da conversão, entrega o corpo do preset, nunca
+ * abaixo do piso de leitura.
+ */
+const PRESENTATION_VIEW_FACTOR = (FORMATS.apresentacao.h / FORMATS.carrossel.h) * (FORMATS.carrossel.w / FORMATS.apresentacao.w);
+/** Piso de leitura do apoio no deck, na escala da vista: 1920 × 0,018 × 0,70 ≈ 24 px. */
+export const PRESENTATION_SUPPORT_MIN_VIEW_SIZE = 70;
+const PRESENTATION_SUPPORT_DEFAULT_VIEW_SIZE = 72;
+
+export function presentationSupportTextSize(base = {}) {
+  const doPreset = Number(base.bodyAfterSize);
+  const naVista = Math.max(
+    PRESENTATION_SUPPORT_MIN_VIEW_SIZE,
+    Number.isFinite(doPreset) && doPreset > 0 ? doPreset : PRESENTATION_SUPPORT_DEFAULT_VIEW_SIZE,
+  );
+  return Math.round(naVista / PRESENTATION_VIEW_FACTOR);
+}
 
 export function resolvePresentationVisualRole(slide = {}, stage = {}) {
   const plan = slide.presentationPlan;
@@ -189,7 +217,7 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     titleLeading: 110,
     subLeading: 135,
     subTracking: 0,
-    bodyAfterSize: 110,
+    bodyAfterSize: presentationSupportTextSize(base),
     bodyLeading: 135,
     logoPosition: 'tl',
     logoSize: 80,

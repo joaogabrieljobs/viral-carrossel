@@ -277,6 +277,8 @@ function SidebarContent({
   applyTypographyToAllCards,
   applyBrandTypographyToAllSlides,
   setBrandTypography = setBrand,
+  canRestoreStyleHierarchy = false,
+  restoreStyleHierarchy = null,
   canvasEditMode = false, setCanvasEditMode = () => {},
   showPreviewAlignGrid = false, setShowPreviewAlignGrid = () => {},
   anyCanvasEnabled = false,
@@ -2564,6 +2566,24 @@ function SidebarContent({
                   <Layers size={14} strokeWidth={2}/>
                   Aplicar tipografia a todos os {itemsLabel}
                 </button>
+                {canRestoreStyleHierarchy ? (
+                  <div data-vc-restore-hierarchy style={{ marginTop:10 }}>
+                    <button
+                      type="button"
+                      onClick={() => restoreStyleHierarchy?.()}
+                      style={{
+                        width:'100%', minHeight:44, padding:'0 16px', borderRadius:9999,
+                        border:'1px solid var(--border)', background:'var(--bg-card)', color:'var(--text-primary)',
+                        fontSize:12, fontWeight:600, fontFamily:'var(--font-ui)', letterSpacing:'-0.011em', cursor:'pointer',
+                      }}
+                    >
+                      Restaurar hierarquia do estilo
+                    </button>
+                    <p style={{ margin:'8px 0 0', fontSize:11, lineHeight:1.47, letterSpacing:'-0.011em', color:'var(--text-muted)' }}>
+                      Este projeto ficou com título, subtítulo e apoio no mesmo tamanho-base. Restaurar devolve os tamanhos que o estilo define para capa e miolo, sem mexer no texto nem nas fotos.
+                    </p>
+                  </div>
+                ) : null}
                 <p style={{
                   margin:'8px 0 0',
                   fontSize:11,
