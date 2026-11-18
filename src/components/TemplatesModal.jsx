@@ -42,7 +42,8 @@ function PreviewTemplate({ tpl }) {
   // A assinatura guarda tokens ({handle}, {marca}, {ano}) que o card resolve no
   // render. Sem resolver aqui, o catálogo exibia "{handle}{ano}" literal — o
   // mesmo artefato de template que a gente passou a sessão a limpar.
-  const txt = (v) => resolvePresetText(String(v || ''), null);
+  // Miniatura do seletor: o template mostra a sua cara, com as amostras.
+  const txt = (v) => resolvePresetText(String(v || ''), null, { modo: 'preview' });
   return (
     <div
       aria-hidden

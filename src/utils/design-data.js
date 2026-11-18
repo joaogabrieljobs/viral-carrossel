@@ -351,7 +351,7 @@ export const TEMPLATES = [
     creativePreset: 'quick_tendencia',
     signature: {
       cultureHeaderLeft: '{handle}',
-      footerPillText: '#SUAHASHTAG',
+      footerPillText: '{exemplo:#SUAHASHTAG}',
       footerPillArrow: false,
       showPageBadge: true,
     },
@@ -398,7 +398,7 @@ export const TEMPLATES = [
     palette: 20, pairingId: 'display_condensado',
     creativePreset: 'quick_erro_comum',
     signature: {
-      cultureHeaderLeft: 'SEU SERVIÇO',
+      cultureHeaderLeft: '{exemplo:SEU SERVIÇO}',
       cultureHeaderYear: '{ano}',
       footerPillText: 'FALE COMIGO',
     },
@@ -469,7 +469,7 @@ export const TEMPLATES = [
     palette: 23, pairingId: 'display_condensado',
     creativePreset: 'quick_erro_comum',
     signature: {
-      footerBarLeft: 'Produto|Sua linha',
+      footerBarLeft: 'Produto|{exemplo:Sua linha}',
       footerBarCenter: 'Por|{marca}',
       footerBarRight: 'Salve|para depois',
     },

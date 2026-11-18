@@ -4,6 +4,7 @@ import { FontFamilySelect } from '../ui/font-pickers.jsx';
 import { normalizeOverlays, parseOverlayMoveKey, updateOverlayOnSlide } from '../../utils/card-overlays.js';
 import { getTextFont, textFontPatch } from '../../utils/card-text-fonts.js';
 import { remapDestaqueSpansOnEdit } from '../../utils/text-spans.js';
+import { resolvePresetChrome, textoParaEdicao } from '../../utils/preset-tokens.js';
 
 const CARD_ALIGN = [
   { id: 'left', label: 'Esquerda', short: 'Esq.', Icon: AlignLeft },
@@ -43,10 +44,11 @@ function readDraft(slide, brand, key, overlay) {
   if (key === 'bodyAfterImage') return slide.bodyAfterImage ?? '';
   if (key === 'eyebrow') return slide.eyebrowText ?? '';
   if (key === 'offer') return keptLines([slide.strikethroughText, slide.afterTitleText]);
-  if (key === 'headerBar') return keptLines([brand?.cultureHeaderLeft, brand?.cultureHeaderCenter, brand?.cultureHeaderYear]);
+  // Amostras `{exemplo:…}` do preset não são texto da pessoa: o campo abre vazio.
+  if (key === 'headerBar') return keptLines([brand?.cultureHeaderLeft, brand?.cultureHeaderCenter, brand?.cultureHeaderYear].map(textoParaEdicao));
   if (key === 'handleBadge') return brand?.handle ?? '';
-  if (key === 'pill') return brand?.footerPillText ?? '';
-  if (key === 'footerBar') return keptLines([brand?.footerBarLeft, brand?.footerBarCenter, brand?.footerBarRight]);
+  if (key === 'pill') return textoParaEdicao(brand?.footerPillText);
+  if (key === 'footerBar') return keptLines([brand?.footerBarLeft, brand?.footerBarCenter, brand?.footerBarRight].map(textoParaEdicao));
   if (key === 'pageBadge') return String(slide.num || 1);
   return '';
 }
@@ -62,17 +64,20 @@ function readColor(slide, brand, key, overlay) {
 /** Escolhas locais do card, independentes da combinação tipográfica da marca. */
 export function CardTextFontPanel({ slide, brand, selectedKey, onSelect, onUpdate, onUpdateBrand, onApplyAll, cardCount = 1 }) {
   const hidden = new Set(slide?.hiddenElements || []);
+  // A lista segue o que o card imprime: assinatura oculta por falta de marca
+  // não vira um alvo fantasma de edição.
+  const chrome = resolvePresetChrome(brand) || {};
   const targets = !slide ? [] : [
     { key: 'title', label: 'Título', text: slide.title },
     { key: 'subtitle', label: 'Subtítulo', text: slide.subtitle },
     { key: 'eyebrow', label: 'Título de apoio', text: slide.eyebrowText },
     { key: 'bodyAfterImage', label: 'Texto abaixo da imagem', text: slide.bodyAfterImage },
     { key: 'offer', label: 'Preço / oferta', text: [slide.strikethroughText, slide.afterTitleText].filter(Boolean).join(' · ') },
-    { key: 'headerBar', label: 'Cabeçalho', text: [brand?.cultureHeaderLeft, brand?.cultureHeaderCenter, brand?.cultureHeaderYear].filter(Boolean).join(' · ') },
+    { key: 'headerBar', label: 'Cabeçalho', text: [chrome.cultureHeaderLeft, chrome.cultureHeaderCenter, chrome.cultureHeaderYear].filter(Boolean).join(' · ') },
     { key: 'pageBadge', label: 'Número do card', text: brand?.showPageBadge ? String(slide.num || 1) : '' },
     { key: 'handleBadge', label: 'Assinatura / @', text: brand?.showHandle && slide.showHandle !== false ? (brand.handle || 'Assinatura') : '' },
-    { key: 'pill', label: 'Chamada do rodapé', text: brand?.footerPillText },
-    { key: 'footerBar', label: 'Rodapé', text: [brand?.footerBarLeft, brand?.footerBarCenter, brand?.footerBarRight].filter(Boolean).join(' · ') },
+    { key: 'pill', label: 'Chamada do rodapé', text: chrome.footerPillText },
+    { key: 'footerBar', label: 'Rodapé', text: [chrome.footerBarLeft, chrome.footerBarCenter, chrome.footerBarRight].filter(Boolean).join(' · ') },
   ].filter(target => !hidden.has(target.key) && (target.text || ['title', 'subtitle'].includes(target.key)));
   const overlays = normalizeOverlays(slide?.overlays);
   overlays.forEach((overlay, index) => {

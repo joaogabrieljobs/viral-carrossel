@@ -5,8 +5,15 @@
  * para os comentários deste ficheiro. Nenhum preset pode conter nome de marca,
  * handle, frase de terceiro ou nome inventado de publicação: tudo isso vaza
  * para o carrossel do usuário. Use os tokens de `src/utils/preset-tokens.js`
- * (`{handle}`, `{marca}`, `{ano}`) ou um placeholder genérico em português
- * ("SUA CATEGORIA", "SUA EDITORIA").
+ * (`{handle}`, `{marca}`, `{ano}`).
+ *
+ * REGRA DO TEXTO PROVISÓRIO: amostra de editoria, categoria, hashtag ou
+ * chamada entra SEMPRE como `{exemplo:TEXTO}` — aparece na miniatura do
+ * seletor e nunca no card. Um literal como "SUA EDITORIA" ou "TENDÊNCIAS" sai
+ * impresso no carrossel de quem ainda não cadastrou marca e afirma uma
+ * categoria que o Moont não classificou. Literal só para chamada funcional
+ * que vale em qualquer conteúdo ("ARRASTA PRO LADO").
+ * `tests/unit/visual-presets.test.js` reprova texto provisório literal.
  *
  * REGRA DE CONTRASTE: título, subtítulo e texto ≥ 4.5:1 contra o fundo; o
  * accent ≥ 3:1, porque é usado em traço de riscado e em palavras destacadas.
@@ -300,7 +307,7 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 116,
       textSubLeading: 140,
       // Header bar 3 colunas — placeholder editorial
-      cultureHeaderLeft: 'DESTAQUE',
+      cultureHeaderLeft: '{exemplo:DESTAQUE}',
       cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '{ano}',
       // Badge "N/M" canto sup direito (pill cinza-escuro com blur)
@@ -336,14 +343,14 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 118,
       textSubLeading: 145,
       // Header bar 3-col fininho no topo (placeholder editorial)
-      cultureHeaderLeft: 'ESTUDO DE CASO',
+      cultureHeaderLeft: '{exemplo:ESTUDO DE CASO}',
       cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '©{ano}',
       showPageBadge: true,
       // Star ornament 8-pontas centralizado acima do eyebrow
       showStarOrnament: true,
       // Pill do rodapé é CTA — não repete o rótulo que já está no header.
-      footerPillText: 'VEJA O CASO COMPLETO',
+      footerPillText: '{exemplo:VEJA O CASO COMPLETO}',
       // Subtítulo preservado — pode ser editado ou ocultado manualmente
       subtitleVisible: true,
     },
@@ -382,7 +389,7 @@ export const VISUAL_PRESETS = [
       showPageBadge: false,
       showStarOrnament: false,
       // Pill hashtag SEM seta (variante minimal)
-      footerPillText: '#SUAHASHTAG',
+      footerPillText: '{exemplo:#SUAHASHTAG}',
       footerPillBg: 'rgba(0,0,0,0.55)',
       footerPillFg: '#fff5d1',
       footerPillArrow: false,  // sem seta — visual mais compacto
@@ -422,7 +429,7 @@ export const VISUAL_PRESETS = [
       textSubLeading: 140,
       // Header 3-col sutil (placeholder editorial @copyright)
       cultureHeaderLeft: '{handle}',
-      cultureHeaderCenter: 'SUA CATEGORIA',
+      cultureHeaderCenter: '{exemplo:SUA CATEGORIA}',
       cultureHeaderYear: '©{ano}',
       showPageBadge: false,  // promo não usa contador
       showStarOrnament: false,
@@ -465,7 +472,7 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 112,
       textSubLeading: 145,
       // Header 2-col (centro vazio)
-      cultureHeaderLeft: 'SUA EDITORIA',
+      cultureHeaderLeft: '{exemplo:SUA EDITORIA}',
       cultureHeaderCenter: '',  // vazio — só 2 colunas visíveis
       cultureHeaderYear: '{handle}',
       showPageBadge: true,
@@ -507,12 +514,12 @@ export const VISUAL_PRESETS = [
       textTitleLeading: 124,
       textSubLeading: 140,
       cultureHeaderLeft: '{marca}',
-      cultureHeaderCenter: 'SUA EDITORIA',
+      cultureHeaderCenter: '{exemplo:SUA EDITORIA}',
       cultureHeaderYear: '',
       showPageBadge: true,
       showStarOrnament: false,
       // Pill verde-menta no rodapé
-      footerPillText: '#SUAHASHTAG',
+      footerPillText: '{exemplo:#SUAHASHTAG}',
       footerPillBg: '#34d399',
       footerPillFg: '#0a0a0a',
       footerPillArrow: false,
@@ -585,7 +592,7 @@ export const VISUAL_PRESETS = [
       textTitleTracking: 1,
       textTitleLeading: 116,
       textSubLeading: 145,
-      cultureHeaderLeft: 'TENDÊNCIAS',
+      cultureHeaderLeft: '{exemplo:TENDÊNCIAS}',
       cultureHeaderCenter: '{marca}',
       cultureHeaderYear: '{ano}',
       showPageBadge: true,
@@ -704,7 +711,7 @@ export const VISUAL_PRESETS = [
       cultureHeaderYear: '',
       showPageBadge: false,
       // Footer 3 colunas: "RÓTULO|VALOR" em cada uma
-      footerBarLeft: 'Tema|Sua editoria',
+      footerBarLeft: 'Tema|{exemplo:Sua editoria}',
       footerBarCenter: 'Conteúdo por|{marca}',
       footerBarRight: 'Não esqueça|de salvar',
       // Subtítulo sutil branco regular abaixo do título grande

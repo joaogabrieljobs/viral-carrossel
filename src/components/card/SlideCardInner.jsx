@@ -18,7 +18,7 @@ import { normalizePresentationImgAdjust, buildPresentationImageFilter, presentat
 import { pctBox, CanvasZonesOverlay } from './CanvasZonesOverlay.jsx';
 import { VcBgPatternLayer, CultureInlineRich, CultureRichParagraphs, OverflowScaler } from './render-primitives.jsx';
 import { vcHexToRgb, vcNormalizeHex, vcRelLuminance01, cultureReadableInks, inkIfReadable, accentInkOnSurface } from '../../utils/brand-visuals.js';
-import { resolvePresetText, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
+import { resolvePresetChrome, PLACEHOLDER_HANDLE } from '../../utils/preset-tokens.js';
 import { footerChromeReservePx } from '../../utils/card-chrome.js';
 import { cultureAccentRenderablePieces } from '../../utils/text-spans.js';
 import { elementOffsetStyle, hasElementOffset, getElementOffset, clampPct0a100 } from '../../utils/card-elements.js';
@@ -1767,14 +1767,10 @@ const SlideCardInner = React.forwardRef(({
   const profileLogo = typeof brand?.logo === 'string' ? brand.logo : '';
   slide = React.useMemo(() => resolveSlideTextFonts(slide, brand), [slide, brand]);
   const brandRaw = React.useMemo(() => brandWithSlideLogo(brand, slide), [brand, slide.logoImageId, slide.logoImage, slide.logoHidden, slide.logoPosition, slide.logoSize, slide.logoOpacity]);
-  brand = React.useMemo(() => {
-    const campos = ['cultureHeaderLeft', 'cultureHeaderCenter', 'cultureHeaderYear',
-      'footerPillText', 'footerBarLeft', 'footerBarCenter', 'footerBarRight'];
-    if (!brandRaw || !campos.some((k) => String(brandRaw[k] || '').includes('{'))) return brandRaw;
-    const out = { ...brandRaw };
-    for (const k of campos) out[k] = resolvePresetText(brandRaw[k], brandRaw);
-    return out;
-  }, [brandRaw]);
+  // `resolvePresetChrome` resolve os tokens e aplica as regras de visibilidade
+  // (selo, cabeçalho, barra atômica). Token sem valor some do card: nenhum
+  // "SUA MARCA" ou "@seuperfil" chega ao resultado de quem não tem marca.
+  brand = React.useMemo(() => resolvePresetChrome(brandRaw), [brandRaw]);
   const logoFallback = profileLogo && profileLogo !== brand?.logo ? profileLogo : '';
 
   const f = FORMATS[fmt] || FORMATS.carrossel;

@@ -7,6 +7,8 @@ import {
   getSlideOverridesForPreset,
 } from '../../src/styles/visual-presets.jsx';
 import { wcagContrast } from '../../src/utils/wcag.js';
+import { resolvePresetChrome, PRESET_CHROME_TEXT_FIELDS } from '../../src/utils/preset-tokens.js';
+import { TEMPLATES } from '../../src/utils/design-data.js';
 
 /** Campos de texto do preset que acabam impressos no card do usuário. */
 const CAMPOS_TEXTO_BRAND = [
@@ -15,11 +17,14 @@ const CAMPOS_TEXTO_BRAND = [
 ];
 const CAMPOS_TEXTO_SLIDE = ['eyebrowText', 'strikethroughText', 'afterTitleText'];
 
+/** A amostra `{exemplo:TEXTO}` aparece na miniatura: o TEXTO também é auditado. */
+const semInvolucroDeAmostra = (v) => v.replace(/\{exemplo:([^{}]*)\}/gi, '$1');
+
 function textosDe(preset) {
   const out = [];
   for (const k of CAMPOS_TEXTO_BRAND) {
     const v = preset.brand?.[k];
-    if (typeof v === 'string' && v.trim()) out.push([k, v]);
+    if (typeof v === 'string' && v.trim()) out.push([k, semInvolucroDeAmostra(v)]);
   }
   for (const k of CAMPOS_TEXTO_SLIDE) {
     const v = preset.slideDefaults?.[k];
@@ -233,5 +238,65 @@ describe('applyVisualPreset — troca de padrão não acumula assinatura', () =>
     expect(overrides.presentationTitleSizeByComposition).toBeUndefined();
     expect(overrides.presentationTitleLeadingByComposition).toBeUndefined();
     expect(overrides.presentationTypographyByComposition).toBeUndefined();
+  });
+});
+
+describe('padrões visuais — texto provisório nunca chega ao card', () => {
+  // Estes termos são examinados nos presets DO MOONT, nunca em texto de usuário:
+  // a pessoa pode digitar "SUA EDITORIA" de propósito e o card imprime.
+  const PROVISORIO = /(^|[^\p{L}])(su[ao]s?|seus?)\s+\p{L}|@seuperfil|#sua/iu;
+  const semAmostras = (v) => v.replace(/\{exemplo:[^{}]*\}/gi, '');
+  const marcaVazia = { name: 'Padrão', handle: '' };
+
+  it('texto provisório de preset só existe dentro de {exemplo:…}', () => {
+    const achados = [];
+    for (const p of VISUAL_PRESETS) {
+      for (const k of CAMPOS_TEXTO_BRAND) {
+        const v = p.brand?.[k];
+        if (typeof v === 'string' && PROVISORIO.test(semAmostras(v))) achados.push(`${p.id}.${k} = "${v}"`);
+      }
+    }
+    for (const t of TEMPLATES) {
+      for (const k of CAMPOS_TEXTO_BRAND) {
+        const v = t.signature?.[k];
+        if (typeof v === 'string' && PROVISORIO.test(semAmostras(v))) achados.push(`template ${t.id}.${k} = "${v}"`);
+      }
+    }
+    expect(achados).toEqual([]);
+  });
+
+  it('sem marca cadastrada, nenhum preset imprime texto de origem automática sem valor', () => {
+    const achados = [];
+    for (const p of VISUAL_PRESETS) {
+      const marca = resolvePresetChrome(applyVisualPreset(marcaVazia, p.id));
+      for (const k of PRESET_CHROME_TEXT_FIELDS) {
+        const v = String(marca[k] || '');
+        if (v.includes('{') || PROVISORIO.test(v)) achados.push(`${p.id}.${k} = "${v}"`);
+      }
+    }
+    expect(achados).toEqual([]);
+  });
+
+  it('sem marca, só sobram chamadas funcionais que valem em qualquer conteúdo', () => {
+    const FUNCIONAIS = new Set(['ARRASTA PRO LADO']);
+    const sobras = new Set();
+    for (const p of VISUAL_PRESETS) {
+      const marca = resolvePresetChrome(applyVisualPreset(marcaVazia, p.id));
+      for (const k of PRESET_CHROME_TEXT_FIELDS) {
+        const v = String(marca[k] || '').trim();
+        if (v) sobras.add(v);
+      }
+    }
+    expect([...sobras].filter((v) => !FUNCIONAIS.has(v))).toEqual([]);
+  });
+
+  it('com marca cadastrada, a assinatura do preset aparece', () => {
+    const marca = { name: 'Ateliê Traço', handle: 'atelietraco' };
+    const reflexivo = resolvePresetChrome(applyVisualPreset(marca, 'reflexivo_cream'));
+    expect(reflexivo.footerPillText).toBe('@atelietraco');
+    const tabloid = resolvePresetChrome(applyVisualPreset(marca, 'tabloid_keywords'));
+    expect(tabloid.cultureHeaderLeft).toBe('Ateliê Traço');
+    // A hashtag continua sendo amostra até a pessoa escrever a dela.
+    expect(tabloid.footerPillText).toBe('');
   });
 });

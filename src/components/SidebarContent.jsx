@@ -28,6 +28,7 @@ import { ElementsPanel } from './panels/ElementsPanel.jsx';
 import { TextAreaPanel } from './panels/TextAreaPanel.jsx';
 import { applyTextFontToAllCards } from '../utils/card-text-fonts.js';
 import { CardTextFontPanel } from './panels/CardTextFontPanel.jsx';
+import { textoParaEdicao } from '../utils/preset-tokens.js';
 import { addOverlayToSlide, removeOverlayFromSlide, overlayMoveKey, parseOverlayMoveKey } from '../utils/card-overlays.js';
 import { projectsForBrand } from '../utils/brand-context.js';
 import { projectHasCarouselContent } from '../utils/context-status.js';
@@ -2830,7 +2831,7 @@ function SidebarContent({
                 <div>
                   <label className="vc-label-sm">Esquerda</label>
                   <input
-                    value={brand.cultureHeaderLeft ?? ''}
+                    value={textoParaEdicao(brand.cultureHeaderLeft)}
                     onChange={e=>setBrand({ ...brand, cultureHeaderLeft: e.target.value })}
                     className="vc-input"
                     placeholder="@seuperfil"
@@ -2840,7 +2841,7 @@ function SidebarContent({
                 <div>
                   <label className="vc-label-sm">Centro</label>
                   <input
-                    value={brand.cultureHeaderCenter ?? ''}
+                    value={textoParaEdicao(brand.cultureHeaderCenter)}
                     onChange={e=>setBrand({ ...brand, cultureHeaderCenter: e.target.value })}
                     className="vc-input"
                     placeholder="Sua categoria"
@@ -2850,7 +2851,7 @@ function SidebarContent({
                 <div>
                   <label className="vc-label-sm">Direita (ano)</label>
                   <input
-                    value={brand.cultureHeaderYear ?? ''}
+                    value={textoParaEdicao(brand.cultureHeaderYear)}
                     onChange={e=>setBrand({ ...brand, cultureHeaderYear: e.target.value })}
                     className="vc-input"
                     placeholder="2026"
@@ -2866,19 +2867,19 @@ function SidebarContent({
                 fold
                 sectionId="marca-selo"
                 title="Selo do rodapé"
-                hint={String(brand.footerPillText || '').trim() || 'CTA, hashtag ou @. Vazio esconde.'}
+                hint={String(textoParaEdicao(brand.footerPillText) || '').trim() || 'CTA, hashtag ou @. Vazio esconde.'}
               >
                 <div>
                   <label className="vc-label-sm">Texto</label>
                   <input
-                    value={brand.footerPillText ?? ''}
+                    value={textoParaEdicao(brand.footerPillText)}
                     onChange={e=>setBrand({ ...brand, footerPillText: e.target.value })}
                     className="vc-input"
                     placeholder="#suahashtag"
                     style={{ fontSize:12 }}
                   />
                 </div>
-                {String(brand.footerPillText || '').trim() ? (
+                {String(textoParaEdicao(brand.footerPillText) || '').trim() ? (
                   <>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                       <div>
@@ -2931,7 +2932,7 @@ function SidebarContent({
                   <div key={campo}>
                     <label className="vc-label-sm">{rotulo}</label>
                     <input
-                      value={brand[campo] ?? ''}
+                      value={textoParaEdicao(brand[campo])}
                       onChange={e=>setBrand({ ...brand, [campo]: e.target.value })}
                       className="vc-input"
                       placeholder={exemplo}
