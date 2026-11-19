@@ -29,7 +29,7 @@ export default function AdminEntry() {
         <main style={{ padding: '72px 24px', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
           <h1 style={{ fontSize: 28, margin: '0 0 12px' }}>Página não encontrada</h1>
           <p style={{ color: 'var(--text-muted)', margin: '0 0 24px' }}>Esta página não existe.</p>
-          <a href="/" className="vc-btn vc-btn-ghost" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center' }}>Voltar ao Moont</a>
+          <a href="/" className="vc-btn vc-btn-ghost" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', textDecoration: 'none' }}>Voltar ao Moont</a>
         </main>
       )}
       {state.status === 'error' && <p role="alert" style={{ padding: 32, margin: 0 }}>{state.message}</p>}

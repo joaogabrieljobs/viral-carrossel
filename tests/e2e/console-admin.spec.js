@@ -126,6 +126,10 @@ test('admin vê os números, abre uma conta, concede Max sem limite com o códig
   await expect(ficha).toContainText('Isenta · Max · sem limite de imagens');
   await capturar(page, '3-isenta');
 
+  await page.getByRole('tab', { name: 'Isenções' }).click();
+  await expect(page.getByRole('table', { name: 'Isenções' })).toContainText('Max · sem limite de imagens');
+  await page.getByRole('table', { name: 'Isenções' }).getByRole('button', { name: 'cliente@empresa.exemplo' }).click();
+
   await ficha.getByLabel('Motivo para revogar').fill('Fim do teste');
   await ficha.getByRole('button', { name: 'Pedir código e revogar' }).click();
   await ficha.getByLabel('Código de 6 dígitos').fill(emails[1].code);

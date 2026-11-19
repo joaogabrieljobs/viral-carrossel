@@ -158,7 +158,7 @@ function Accounts({ wide, openAccount }) {
           <Rows wide={wide} label="Contas encontradas" onOpen={(row) => openAccount(row.id)}
             columns={[['email', 'E-mail'], ['created', 'Criada em'], ['access', 'Acesso'], ['providers', 'Entrada']]}
             rows={d.accounts.map((a) => ({ key: a.id, id: a.id, email: a.email || a.customerId || a.id, created: data(a.createdAt),
-              access: a.exempt ? 'Isenta' : a.customerId ? 'Cliente Stripe' : 'Sem cliente', providers: a.providers.join(', ') || '—' }))} />
+              access: a.exempt ? 'Isenta' : a.customerId ? 'Cliente Stripe' : 'Sem cliente', providers: a.providers.map((p) => (p === 'google' ? 'Google' : 'Senha')).join(', ') || '—' }))} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             {search.page > 1 && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 40 }} onClick={() => setSearch((s) => ({ ...s, page: s.page - 1 }))}>Anterior</button>}
             {d.hasMore && <button type="button" className="vc-btn vc-btn-ghost" style={{ minHeight: 40 }} onClick={() => setSearch((s) => ({ ...s, page: s.page + 1 }))}>Próxima</button>}
@@ -280,10 +280,10 @@ function AccountDetail({ id, me, back }) {
                 <div style={{ fontSize: 15, fontWeight: 600, marginTop: 6 }}>
                   {active ? `Isenta · ${grantLabel(active)}` : sub.value?.status && sub.value.status !== 'none' ? `Assinatura ${TIER_LABEL[sub.value.tier] || sub.value.tier} (${sub.value.status})` : sub.value?.status === 'none' ? 'Plano grátis' : '—'}
                 </div>
-                <div style={muted}>{sub.value?.periodEnd ? `Renova em ${data(sub.value.periodEnd)}${sub.value.cancelAtPeriodEnd ? ' (cancelada no fim do ciclo)' : ''}. ` : ''}{sub.reason ? `${sub.reason} ` : ''}Fonte: {sub.source}</div>
+                <div style={muted}>{active ? 'Fonte: Banco: isenções' : <>{sub.value?.periodEnd ? `Renova em ${data(sub.value.periodEnd)}${sub.value.cancelAtPeriodEnd ? ' (cancelada no fim do ciclo)' : ''}. ` : ''}{sub.reason ? `${sub.reason} ` : ''}Fonte: {sub.source}</>}</div>
               </div>
               <Metric label="Imagens no ciclo atual" metric={a.quota} pick={(v) => (v[0] ? fmt(v[0].used) : '0')} hint={a.quota.value?.[0] ? `ciclo desde ${data(a.quota.value[0].periodStart)}` : 'sem ciclo registrado'} />
-              <Metric label="Projetos na nuvem" metric={a.library} pick={(v) => fmt(v.projectCount)} />
+              <Metric label="Projetos na nuvem" metric={a.library} pick={(v) => fmt(v.projectCount)} hint={a.library.value && !a.library.value.updatedAt ? 'nunca sincronizou' : ''} />
               <Metric label="Modelos publicados" metric={a.templates} pick={(v) => fmt(v.active)} hint={a.templates.value ? `${fmt(a.templates.value.removed)} removidos` : ''} />
             </div>
             <div style={{ ...card, display: 'grid', gap: 10 }}>
@@ -319,7 +319,7 @@ function AccountDetail({ id, me, back }) {
 
 function Grants({ wide, openAccount }) {
   const [all, setAll] = useState(false);
-  const [state, reload] = useLoad(() => adminGrants(all), [all]);
+  const [state, reload] = useLoad(() => adminGrants(all).then((r) => r.grants), [all]);
   return (
     <Section title="Isenções" onReload={reload} loading={state.loading}
       actions={<button type="button" className="vc-btn vc-btn-ghost" aria-pressed={all} style={{ minHeight: 40 }} onClick={() => setAll((v) => !v)}>{all ? 'Só ativas' : 'Incluir revogadas'}</button>}>
@@ -353,7 +353,7 @@ function Health() {
 }
 
 function Audit({ wide, openAccount }) {
-  const [state, reload] = useLoad(() => adminActions());
+  const [state, reload] = useLoad(() => adminActions().then((r) => r.actions));
   return (
     <Section title="Trilha" onReload={reload} loading={state.loading}>
       <p style={{ ...muted, margin: 0 }}>Últimas 100 ações do console. A trilha não pode ser alterada nem apagada. Decisões de moderação ficam no histórico da moderação.</p>
@@ -392,7 +392,7 @@ export default function AdminConsole({ me }) {
             <div style={muted}>{me.email || 'sem e-mail'} · {me.role === 'admin' ? 'admin' : 'suporte (só consulta)'}</div>
           </div>
         </div>
-        <a href="/?app=1" className="vc-btn vc-btn-ghost" style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>Voltar ao studio</a>
+        <a href="/?app=1" className="vc-btn vc-btn-ghost" style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>Voltar ao studio</a>
       </header>
       <nav aria-label="Áreas do console" style={{ overflowX: 'auto', margin: wide ? 0 : '0 -16px', padding: wide ? 0 : '0 16px' }}>
         <div role="tablist" aria-label="Áreas do console" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', minWidth: 'max-content' }}>

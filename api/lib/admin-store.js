@@ -149,7 +149,9 @@ export function createAdminStore({ sql: injectedSql, env = process.env } = {}) {
       q(`SELECT * FROM moont.account_access_grants WHERE account_id = $1::uuid ORDER BY created_at DESC LIMIT 20`, [accountId]),
       customerId ? metric('Banco: cota de imagens', () => q(`SELECT period_start_sec, used FROM moont.image_quota_periods
         WHERE owner_id = $1 ORDER BY period_start_sec DESC LIMIT 3`, [customerId])) : { value: [], source: 'Banco: cota de imagens' },
-      customerId ? metric('Banco: biblioteca', async () => (await q(`SELECT project_count, updated_at FROM moont.account_libraries WHERE owner_id = $1`, [customerId]))[0] || null)
+      customerId ? metric('Banco: biblioteca', async () => (await q(`SELECT project_count, updated_at FROM moont.account_libraries WHERE owner_id = $1`, [customerId]))[0]
+        // Sem linha na biblioteca: a conta nunca sincronizou, então são 0 projetos na nuvem (fato, não falha de leitura).
+        || { project_count: 0, updated_at: null })
         : { value: null, source: 'Banco: biblioteca', reason: 'Conta sem cliente Stripe vinculado.' },
       customerId ? metric('Banco: avisos do Stripe', () => q(`SELECT event_type, object_status, received_at FROM moont.billing_events
         WHERE customer_id = $1 ORDER BY received_at DESC LIMIT 10`, [customerId])) : { value: [], source: 'Banco: avisos do Stripe' },
