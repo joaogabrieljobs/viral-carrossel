@@ -63,6 +63,8 @@ function publicSlideState(slide) {
     status: slide.status,
     ...(slide.errorCode ? { errorCode: slide.errorCode } : {}),
     ...(slide.assetId ? { assetId: slide.assetId } : {}),
+    // Imagem gerada que o card recusou: fica na biblioteca e o crédito foi usado.
+    ...(slide.status === 'failed' && slide.assetId ? { creditUsed: true } : {}),
   };
 }
 

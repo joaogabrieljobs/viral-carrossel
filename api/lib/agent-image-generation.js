@@ -197,16 +197,29 @@ async function mapWithConcurrency(items, limit, work) {
   return results;
 }
 
-/** Liquida os créditos conforme o estado final de cada card. */
+/**
+ * Liquida os créditos conforme o estado final de cada card.
+ *
+ * Quem decide a cobrança é a imagem, não o card: se ela chegou a ser gravada
+ * (`assetId`), foi paga ao provedor e está na biblioteca da conta — o crédito é
+ * consumido mesmo quando o fechamento recusou aplicá-la (`image_input_changed`,
+ * `image_already_present`, `image_slide_missing`). Estornar esse caso dava
+ * imagem grátis, repetível, a quem editasse o card durante a geração (M1,
+ * 2026-11-18). Só o card que falhou SEM imagem devolve o crédito.
+ */
 async function settleCredits(ownerId, periodStartSec, slides) {
   const results = await Promise.all(slides.map(async slide => {
     if (!slide.operationId || slide.creditReserved === false) return true;
     try {
-      if (slide.status === 'done') await settleImageCredit({
+      const imageStored = typeof slide.assetId === 'string' && slide.assetId.length > 0;
+      if (slide.status === 'done' || (slide.status === 'failed' && imageStored)) await settleImageCredit({
         customerId: ownerId,
         periodStartSec,
         operationId: slide.operationId,
-        metadata: { assetId: slide.assetId },
+        metadata: {
+          assetId: slide.assetId,
+          ...(slide.status === 'failed' ? { rejected: slide.errorCode || 'image_not_applied' } : {}),
+        },
       });
       else if (slide.status === 'failed') await refundImageCredit({ customerId: ownerId, periodStartSec, operationId: slide.operationId });
       return true;

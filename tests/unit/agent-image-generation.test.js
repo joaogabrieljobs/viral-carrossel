@@ -327,6 +327,44 @@ describe('runAgentImageJob', () => {
     expect(mocked.refund.mock.calls[0][0].operationId).toBe(op('s2'));
   });
 
+  // M1 (2026-11-18): o card recusado no fechamento mantém o assetId — a imagem
+  // foi gerada, paga ao provedor e gravada na biblioteca. Estornar esse crédito
+  // dava imagem grátis a quem editasse a direção do card enquanto gerava.
+  it.each([
+    ['image_input_changed', 'a direção do card foi editada durante a geração'],
+    ['image_already_present', 'o card recebeu outra foto durante a geração'],
+    ['image_slide_missing', 'o card foi removido durante a geração'],
+  ])('imagem gravada e recusada (%s: %s) consome o crédito em vez de estornar', async (errorCode) => {
+    // O fechamento real devolve o card recusado como `failed` COM o assetId gravado.
+    mocked.finishJob.mockImplementation(async (_owner, _request, outcomes) => ({
+      finished: true, job: { status: 'failed' },
+      slides: outcomes.map(outcome => (outcome.slideId === 's1'
+        ? { ...outcome, status: 'failed', errorCode, operationId: op('s1') }
+        : { ...outcome, status: 'done', operationId: op(outcome.slideId) })),
+    }));
+    await runAgentImageJob(ctx());
+    const recusado = mocked.finishJob.mock.calls[0][2][0];
+    expect(recusado.assetId).toMatch(/^original_/); // a imagem existe e saiu para o cliente
+    expect(mocked.refund).not.toHaveBeenCalled();
+    expect(mocked.settle).toHaveBeenCalledTimes(2);
+    expect(mocked.settle).toHaveBeenCalledWith(expect.objectContaining({
+      customerId: owner, periodStartSec: 100, operationId: op('s1'),
+      metadata: expect.objectContaining({ assetId: recusado.assetId, rejected: errorCode }),
+    }));
+  });
+
+  it('falha sem imagem gravada continua estornando: só paga quem recebeu a imagem', async () => {
+    mocked.wait.mockRejectedValue(Object.assign(new Error('demorou'), { code: 'sjinn_timeout' }));
+    mocked.finishJob.mockImplementation(async (_owner, _request, outcomes) => ({
+      finished: true, job: { status: 'failed' },
+      slides: outcomes.map(outcome => ({ ...outcome, status: 'failed', operationId: op(outcome.slideId) })),
+    }));
+    await runAgentImageJob(ctx());
+    expect(mocked.finishJob.mock.calls[0][2].every(outcome => !outcome.assetId)).toBe(true);
+    expect(mocked.settle).not.toHaveBeenCalled();
+    expect(mocked.refund.mock.calls.map(call => call[0].operationId).sort()).toEqual([op('s1'), op('s2')].sort());
+  });
+
   it('não liquida nada quando o fechamento do job falha; o leitor expira depois', async () => {
     mocked.finishJob.mockRejectedValue(new Error('db down'));
     expect(await runAgentImageJob(ctx())).toBeNull();
@@ -363,6 +401,25 @@ describe('getAgentChangeStatus', () => {
     expect(mocked.refund).toHaveBeenCalledTimes(4);
     expect(new Set(mocked.refund.mock.calls.map(call => call[0].operationId)))
       .toEqual(new Set([op('s1'), op('s2')]));
+  });
+});
+
+describe('M1 — liquidação tardia de card recusado com imagem', () => {
+  it('a reconciliação também consome o crédito do card recusado que ficou com a imagem', async () => {
+    mocked.job.mockResolvedValue({
+      job: { requestId, projectId: 'p', status: 'failed', kind: 'image' },
+      slides: [
+        { slideId: 's1', status: 'failed', errorCode: 'image_input_changed', assetId: 'original_paga', operationId: op('s1') },
+        { slideId: 's2', status: 'failed', errorCode: 'sjinn_timeout', operationId: op('s2') },
+      ],
+      meta: { kind: 'image', periodStartSec: 100, creditsSettled: false },
+    });
+    mocked.markSettled.mockResolvedValue(true);
+    await getAgentChangeStatus(owner, requestId);
+    expect(mocked.settle).toHaveBeenCalledTimes(1);
+    expect(mocked.settle.mock.calls[0][0]).toMatchObject({ operationId: op('s1'), metadata: { assetId: 'original_paga' } });
+    expect(mocked.refund).toHaveBeenCalledTimes(1);
+    expect(mocked.refund.mock.calls[0][0].operationId).toBe(op('s2'));
   });
 });
 

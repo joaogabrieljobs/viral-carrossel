@@ -260,6 +260,13 @@ describe('agent image jobs store', () => {
       slideId:'s2', status:'failed', errorCode:'image_input_changed',
     });
     expect(rows.get(owner).get(id).entry.doc.slides[1].bgImageAssetId).toBeUndefined();
+    // M1: a imagem recusada continua na biblioteca e segue na resposta, agora
+    // dizendo que o crédito foi usado (antes era estornada: imagem grátis).
+    expect(promptChanged.slides[0].assetId).toBe('original_old_prompt');
+    expect(promptChanged.job.slides[0]).toEqual({
+      slideId:'s2', status:'failed', errorCode:'image_input_changed',
+      assetId:'original_old_prompt', creditUsed:true,
+    });
 
     jobs.get(owner).clear();
     rows.get(owner).get(id).version = 4;
