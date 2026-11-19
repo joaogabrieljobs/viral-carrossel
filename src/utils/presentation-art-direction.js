@@ -35,6 +35,18 @@ export function artDirectedPresentationZones(kind, slide, family, { visual, stru
     if (family === 'data') return { title: box(6, 13, 86, 22), subtitle: box(7, 43, 78, 46), photo: noPhoto() };
     return { title: box(6, 14, 88, 24), subtitle: box(6, 44, 88, 46), photo: noPhoto() };
   }
+  // An editorial correction may need more explanation than the original
+  // short draft. Reflow the composition before validating its new limits;
+  // don't force a complete argument into a narrow demo caption or drop copy.
+  const readingWeight = String(slide.subtitle || '').length + String(slide.bodyAfterImage || '').length * 0.8;
+  if (readingWeight > 300) {
+    const leftPhoto = family === 'editorial' || family === 'photo';
+    return {
+      title: box(6, 13, 88, 23),
+      subtitle: box(leftPhoto ? 39 : 6, 42, 55, 49),
+      photo: box(leftPhoto ? 6 : 68, 40, 26, 50),
+    };
+  }
   const rhythm = ['executive', 'editorial', 'data', 'swiss', 'cinematic', 'typographic', 'modular', 'photo', 'technical', 'premium'].indexOf(family) % 3;
   if (kind === 'data') return {
     title: box(6, 13, 88, 22), subtitle: box(43 + rhythm, 46, 50 - rhythm, 43), photo: box(6, 44, 30 + rhythm, 45),

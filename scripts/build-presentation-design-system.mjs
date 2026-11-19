@@ -698,7 +698,9 @@ function compilePattern(pattern, config, compositions) {
   const bodyLeading = clamp(Math.round((Number(bodyScale.lineHeight) || 1.45) * 100), 100, 190);
   const titleWeight = clamp(Number(titleType.weight) || 700, 100, 900);
   const subtitleWeight = clamp(Number(subtitleType.weight) || 400, 100, 900);
-  const bodyWeight = clamp(Number(bodyType.weight) || 400, 100, 900);
+  // Long arguments need a regular reading weight even when the source uses
+  // light text for a short photographic caption. Display faces keep theirs.
+  const bodyWeight = clamp(Number(bodyType.weight) || 400, 400, 900);
   const titleCase = typographyCase(titleType.case);
   const subtitleCase = typographyCase(subtitleType.case);
   const textBgOpacity = glassOpacityPercent(pattern.effects?.glass);

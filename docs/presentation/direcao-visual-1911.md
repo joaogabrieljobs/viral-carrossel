@@ -45,16 +45,19 @@ Crítica do plano: não acrescentar ornamento para disfarçar texto repetido. As
 
 - Dez famílias reconhecidas separadamente; grade própria com e sem fotografia, por função da página.
 - Corpo tipográfico e números compilados do catálogo existente. Argumentos usam a fonte de leitura; capas mantêm o desenho, o peso e o tracking da fonte display. Ajuste de título em passos menores, considerando famílias condensadas.
+- Após conferir as capturas da CI, o corpo de leitura recebe peso mínimo 400; o peso leve de uma legenda fotográfica não passa automaticamente para um argumento longo. Títulos de display mantêm o peso próprio, inclusive 300/400 quando esse é o desenho da família.
 - Conversão do tracking usa a mesma base da família no compilador e no renderer. Antes, a base fixa de −3 do compilador não correspondia à base +1,5 de Anton/Bebas no renderer; o espaçamento final abria 0,045 em além do previsto.
 - Colunas estreitas e baixas recebem orçamento menor na redação. O texto de projetos existentes não é cortado para caber.
+- Quando a revisão acrescenta um argumento completo, a diagramação é recalculada para dar largura à leitura e manter uma área separada para a foto. O primeiro E2E do commit `713e9c1` mostrou que validar o argumento maior contra a coluna estreita segurava as imagens como conteúdo pendente; o teste continua exigindo seis imagens e texto completo.
 - Comparações com hierarquia de cabeçalho e primeira coluna; indicadores com valores tabulares e escala maior; etapas com agrupamento visual, sem numeração duplicada nos casos A–E.
 - Regras gráficas discretas próprias das famílias; foto continua em superfície separada. Apoio em apresentação mantém opacidade plena.
+- Contador da apresentação vira fólio discreto no rodapé da superfície de leitura, em vez da cápsula grande sobre a foto. Se o rodapé da marca já está ocupado, preserva a posição anterior; a opção de ocultar o contador continua valendo.
 - Instruções de negrito pontual e de ritmo em todos os sete caminhos, incluindo Pitch; revisão preserva marcação interna sustentada, sem Markdown externo ao JSON.
 - Novas gerações e reaplicação de preset nos decks planejados recebem a direção. Projetos salvos não são alterados em massa.
 
 ## Evidências e limites
 
 - Testes focados de composição, tipografia, compilação e renderer: 54 aprovados; os 16 testes de direção e Pitch também passaram depois do ajuste do critério de leitura para pixels reais.
-- Suíte final: 2.664 aprovados, 4 falhas esperadas, 224 arquivos. A primeira execução neste worktree expôs um vínculo de `node_modules` antigo sem PGlite e uma expectativa antiga de tamanho percentual; o vínculo passou a usar dependências com o mesmo hash de lockfile. Não se afrouxou o limite de tempo da suíte.
+- Suíte final: 2.667 aprovados, 4 falhas esperadas, 224 arquivos. A primeira execução neste worktree expôs um vínculo de `node_modules` antigo sem PGlite e uma expectativa antiga de tamanho percentual; o vínculo passou a usar dependências com o mesmo hash de lockfile. Não se afrouxou o limite de tempo da suíte.
 - Galeria independente gerada pelo renderer real, com seletor dos dez presets, cinco páginas e versões Antes/Depois: `/Users/elevessy/Documents/viral-carrossel/REDESIGN-APRESENTACOES-19-11-2026/GALERIA-APRESENTACOES.html`. Os dois arquivos JavaScript ao lado precisam permanecer juntos.
-- Construção da galeria e sintaxe dos bundles verificadas. A galeria não é uma captura de navegador: a automação de abas ficou indisponível neste chat, e a tentativa de usar a janela nativa do Chrome retornou `cgWindowNotFound`. A revisão visual em tela e o reteste dos 16 modos continuam pendentes; não são substituídos pelos testes de código.
+- Construção da galeria e sintaxe dos bundles verificadas. A galeria não é uma captura de navegador: a automação de abas ficou indisponível neste chat, e a tentativa de usar a janela nativa do Chrome retornou `cgWindowNotFound`. Foram conferidas capturas da CI para Executivo, Cinemático, Ensaio Fotográfico e Modular no commit 713e9c1, usando os mesmos textos e fotografia do controle. A inspeção do catálogo interativo e o reteste real dos 16 modos continuam pendentes. A CI dessa versão aprovou 301 cenários e revelou a falha do Pitch descrita acima; os ajustes posteriores exigem nova CI.

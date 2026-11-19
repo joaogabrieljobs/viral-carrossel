@@ -2149,6 +2149,8 @@ const SlideCardInner = React.forwardRef(({
           }, brand, slide, hideInstaBadge);
           const hasHeaderBar = !!(hLeft || hRight) || (!!hCenter && !!(brand.cultureHeaderLeft || '').trim());
           const hasPageBadge = !!brand.showPageBadge;
+          const quietFolio = presentationMode && slide.presentationArtDirectionVersion === 1 && footerChromeReservePx(brand, f) === 0;
+          const folioOnRight = (slide.canvas?.zones?.title?.x || 0) > 40;
           if (!hasHeaderBar && !hasPageBadge) return null;
           // Cor branca translúcida quando há foto BG; senão tom da marca.
           const headerColor = slide.bgImage ? 'rgba(255,255,255,0.85)' : (displayBodyInk || '#555');
@@ -2184,13 +2186,20 @@ const SlideCardInner = React.forwardRef(({
                 </div>
               )}
               {hasPageBadge && (
-                <div data-vc-chrome="pageBadge" {...mov('pageBadge', {
+                <div data-vc-chrome="pageBadge" data-vc-presentation-folio={quietFolio ? '1' : undefined} {...mov('pageBadge', {
                   position:'absolute', top:f.h*0.024, right:f.w*0.05, zIndex:30,
                   background: badgeBg, color: badgeColor,
                   padding:`${f.h*0.006*escBadge}px ${f.w*0.022*escBadge}px`, borderRadius:9999,
                   fontSize:f.w*0.024*escBadge, fontWeight:600, fontFamily:getTextFont(slide, 'pageBadge', bodyFF),
                   letterSpacing:'-0.011em', fontVariantNumeric:'tabular-nums',
                   backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
+                  ...(quietFolio ? {
+                    top:'auto', bottom:f.h*0.026,
+                    left:folioOnRight ? 'auto' : f.w*0.06, right:folioOnRight ? f.w*0.06 : 'auto',
+                    background:'transparent', color:displayBodyInk || '#555', padding:0, borderRadius:0,
+                    fontSize:f.w*0.011*escBadge, fontWeight:500, letterSpacing:'0.04em',
+                    backdropFilter:'none', WebkitBackdropFilter:'none',
+                  } : {}),
                   pointerEvents: movableElements ? 'auto' : 'none',
                 })}>{num}/{total}</div>
               )}

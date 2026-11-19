@@ -1,15 +1,18 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { PRESENTATION_VISUAL_PRESETS, getPresentationCompositionOverrides } from '../../src/styles/presentation-presets.jsx';
+import { PRESENTATION_VISUAL_PRESETS, getPresentationCompositionOverrides, applyPresentationVisualPreset } from '../../src/styles/presentation-presets.jsx';
 import { presentationFamily } from '../../src/utils/presentation-art-direction.js';
 import { buildPresentationFieldRules } from '../../src/utils/presentation.js';
 import PresentationBlocks from '../../src/components/PresentationBlocks.jsx';
 import { titleLetterSpacingEm } from '../../src/utils/title-tracking.js';
+import { applyEditorialReview } from '../../src/utils/editorial-review.js';
+import { SlideCardInner } from '../../src/components/card/SlideCardInner.jsx';
+import { DEFAULT_BRAND, mkSlide } from '../../src/utils/doc-schema.js';
 
-const make = (id, role = 'content', extra = {}) => getPresentationCompositionOverrides(id, {
+const make = (id, role = 'content', extra = {}, stage = {}) => getPresentationCompositionOverrides(id, {
   slide: { title: 'Uma ideia com consequência', subtitle: 'Um argumento completo, sem inventar dados.', presentationPlan: { visualRole: role, purpose: 'explain' }, ...extra },
-  index: role === 'cover' ? 0 : 2, count: 5,
+  index: role === 'cover' ? 0 : 2, count: 5, stage,
 });
 const presets = PRESENTATION_VISUAL_PRESETS.filter(p => p.sourceId);
 describe('direções visuais dos dez padrões planejados', () => {
@@ -23,6 +26,7 @@ describe('direções visuais dos dez padrões planejados', () => {
       const type = s.presentationTypographyByComposition.content.subtitle;
       expect(type.fontFamily, preset.id).toBe(s.presentationBodyTypography.fontFamily);
       expect(type.weight).toBe(s.presentationBodyTypography.weight);
+      expect(type.weight).toBeGreaterThanOrEqual(400);
       expect(type.case).toBe('normal');
       expect(type.leadingPercent).toBeGreaterThanOrEqual(132);
     }
@@ -60,6 +64,33 @@ describe('direções visuais dos dez padrões planejados', () => {
     expect(result.presentationTextLimits.subtitle.maxChars).toBeLessThanOrEqual(180);
     expect({ ...source, ...result }.subtitle).toBe(source.subtitle);
   });
+  it('uma revisão com argumento completo ganha coluna de leitura e mantém a foto', () => {
+    const source = {
+      title: 'Conecte a medição à decisão',
+      subtitle: 'O clique isolado não explica o impacto no negócio. A equipe conecta exposição, comportamento esperado e janela de leitura antes de iniciar o experimento. Assim, uma diferença observada pode orientar uma decisão concreta, com responsabilidade clara sobre o próximo passo e sobre os limites da análise.',
+      bodyAfterImage: 'A hipótese deve definir o mecanismo esperado e o critério de decisão. Um resultado inconclusivo exige rever a pergunta antes de ampliar o investimento.',
+      imageQuery: 'illustrative workshop',
+    };
+    const result = make('presentation_executive_minimal', 'demo', source, { contentMode: 'pitch' });
+    expect(result.canvas.zones.subtitle.w).toBeGreaterThanOrEqual(55);
+    expect(result.presentationTextLimits.subtitle.maxChars).toBeGreaterThanOrEqual(source.subtitle.length);
+    expect(result.presentationTextLimits.body.maxChars).toBeGreaterThanOrEqual(source.bodyAfterImage.length);
+    expect(result.presentationSuppressPhoto).toBe(false);
+    expect({ ...source, ...result }.subtitle).toBe(source.subtitle);
+  });
+  it('aplica a revisão longa com limites recalculados e continua recusando promessa sem fonte', () => {
+    const argument = 'O clique isolado não explica o impacto no negócio. A equipe conecta exposição, comportamento esperado e janela de leitura antes de iniciar o experimento. Assim, uma diferença observada pode orientar uma decisão concreta, com responsabilidade clara sobre o próximo passo e sobre os limites da análise.';
+    const support = 'A hipótese deve definir o mecanismo esperado e o critério de decisão. Um resultado inconclusivo exige rever a pergunta antes de ampliar o investimento.';
+    const slides = ['cover', 'demo', 'closing'].map(visualRole => ({ title: 'Uma conclusão clara', subtitle: 'Uma explicação breve.', bodyAfterImage: '', imageQuery: visualRole === 'demo' ? 'illustrative workshop' : '', presentationPlan: { visualRole, purpose: 'explain' } }));
+    const config = { count: 3, presetId: 'apresentacao', densityId: '1_2', presentationPath: 'pitch', factualSource: 'Organizar um teste com hipótese e decisão.', presentationPlan: { slides: [] },
+      presentationLimitsForPlan: (_plan, candidate) => candidate.map((slide, index) => getPresentationCompositionOverrides('presentation_executive_minimal', { slide, stage: { contentMode: 'pitch' }, index, count: 3 }).presentationTextLimits),
+    };
+    const review = { edits: [{ slideIndex: 1, reason: 'Desenvolver o mecanismo e a decisão', subtitle: argument, bodyAfterImage: support }] };
+    const result = applyEditorialReview({ slides, caption: '' }, review, config);
+    expect(result.slides[1].subtitle).toBe(argument);
+    expect(result.slides[1].bodyAfterImage).toBe(support);
+    expect(() => applyEditorialReview({ slides, caption: '' }, { edits: [{ ...review.edits[0], subtitle: argument + ' Sem taxas escondidas.' }] }, config)).toThrow(/promessa comercial/);
+  });
   it('a identidade do quadro aparece igualmente na prévia e exportação', () => {
     const blocks = [{ type: 'metrics', items: [{ value: '48', label: 'Pedidos', detail: 'Segundo mês do piloto' }] }];
     const html = forExport => renderToStaticMarkup(React.createElement(PresentationBlocks, { blocks, rect: { x: 6, y: 52, w: 88, h: 39 }, frame: { w: 1920, h: 1080 }, family: 'modular', accent: '#5733cc', ink: '#111111', background: '#ffffff', fontFamily: 'Inter', forExport }));
@@ -69,6 +100,21 @@ describe('direções visuais dos dez padrões planejados', () => {
       expect(rendered).toContain('font-variant-numeric:tabular-nums');
       expect(rendered).toContain('Segundo mês do piloto');
       expect(rendered).toContain('font-size:76px');
+    }
+  });
+  it('o contador de apresentação vira fólio discreto na superfície de leitura', () => {
+    const id = 'presentation_executive_minimal';
+    const slide = { ...mkSlide(1, DEFAULT_BRAND), ...make(id, 'cover'), title: 'Uma ideia com consequência', subtitle: 'Uma explicação breve.' };
+    const brand = { ...applyPresentationVisualPreset(DEFAULT_BRAND, id), showPageBadge: true, showHandle: false };
+    for (const forExport of [false, true]) {
+      const html = renderToStaticMarkup(React.createElement(SlideCardInner, { slide, brand, fmt: 'apresentacao', creativePreset: 'apresentacao', num: 1, total: 3, forExport }));
+      const tag = html.match(/<div[^>]*data-vc-presentation-folio="1"[^>]*>/)?.[0];
+      expect(tag).toBeTruthy();
+      expect(tag).toContain('background:transparent');
+      const fontSize = Number(tag.match(/font-size:([\d.]+)px/)?.[1]);
+      expect(fontSize).toBeGreaterThanOrEqual(18);
+      expect(fontSize).toBeLessThanOrEqual(24);
+      expect(html).toContain('1/3');
     }
   });
 });

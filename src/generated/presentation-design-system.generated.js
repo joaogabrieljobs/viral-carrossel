@@ -2007,7 +2007,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "textSubTracking": 19,
       "textSubSize": 37.2,
       "textBodyAfterSize": 75.23,
-      "bodyWeight": 300,
+      "bodyWeight": 400,
       "textBodyTracking": 0.4,
       "textBodyLeading": 155,
       "textTitleLeading": 105,
@@ -2028,7 +2028,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "bodyAfterSize": 75.23,
       "bodyTracking": 0.4,
       "bodyLeading": 155,
-      "bodyWeight": 300,
+      "bodyWeight": 400,
       "presentationTypographyByComposition": {
         "cover": {
           "title": {
@@ -2165,7 +2165,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       },
       "presentationBodyTypography": {
         "fontFamily": "\"Jost\", sans-serif",
-        "weight": 300,
+        "weight": 400,
         "leadingPercent": 155,
         "tracking": 1
       },
