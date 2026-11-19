@@ -216,6 +216,15 @@ export const VISUAL_TO_CREATIVE_PRESET = {
   cinematic_hybrid: 'tendencia_cultura',
   authority_black: 'quick_erro_comum',
   minimal_clean: 'livre',
+  // Famílias v4: só para a etiqueta "combina com seu conteúdo" no seletor.
+  // Aplicar uma família não troca o pacote (ver applyVisualPresetToCard e a
+  // troca de padrão no editor).
+  social_ficha: 'quick_erro_comum',
+  social_manchete: 'quick_tendencia',
+  social_revista: 'tendencia_cultura',
+  social_documental: 'quick_comportamento',
+  social_grade: 'quick_decodificacao',
+  social_minimal: 'livre',
 };
 
 export function suggestCreativePresetForVisual(visualPresetId) {
@@ -229,12 +238,13 @@ export function suggestCreativePresetForVisual(visualPresetId) {
  * o picker poder marcar "combina com seu conteúdo".
  */
 export const SUGGESTED_VISUAL_PRESET_BY_CREATIVE = {
-  quick_erro_comum: 'authority_black',      // autoridade escura + ficha técnica
-  quick_tendencia: 'tabloid_keywords',      // manchete de plantão + destaques
-  quick_decodificacao: 'case_study_neon',   // estudo de caso com prova
-  quick_comportamento: 'mood_sepia',        // reflexivo, quote-driven
-  tendencia_cultura: 'editorial_magazine',  // capa de revista
-  livre: 'minimal_clean',                   // sem pacote: tipografia limpa
+  // Biblioteca de carrosséis v4 (famílias visíveis no seletor).
+  quick_erro_comum: 'social_ficha',         // informação modular, rótulos
+  quick_tendencia: 'social_manchete',       // tipografia de manchete
+  quick_decodificacao: 'social_grade',      // estrutura, contraste de escala
+  quick_comportamento: 'social_documental', // retrato e legenda
+  tendencia_cultura: 'social_revista',      // capa de revista
+  livre: 'social_minimal',                  // sem pacote: tipografia limpa
 };
 
 export function suggestVisualPresetForCreative(creativePresetId) {

@@ -2,6 +2,7 @@ import { FORMATS } from './formats.js';
 import { LOGO_SIZE_MAX, LOGO_SIZE_MIN } from './slide-logo.js';
 import { hasPresentationDesign, presentationForSocialFormat } from './presentation-format.js';
 import { restorePresentationPhotoComposition } from './presentation-composition.js';
+import { socialFormatPatch } from './social-visual-composition.js';
 
 /** Ajustes visuais que podem ser diferentes em cada proporção. Texto e foto continuam no slide. */
 const VIEW_KEYS = [
@@ -138,16 +139,19 @@ export function slideForFormatDisplay(slide, fmt, formatViews, creativePreset) {
   const adaptPresentation = fmt !== 'apresentacao' && hasPresentationDesign(slide, creativePreset);
   if (fmt === 'carrossel' && !adaptPresentation) return slide;
   const entry = viewEntry(formatViews, fmt, slide.id) || {};
+  // Carrossel da biblioteca v4: Quadrado e Stories são recompostos (zonas,
+  // escala e dispositivos do formato), não o Feed reduzido.
+  const socialLibrary = !adaptPresentation && fmt !== 'apresentacao' && slide.socialCompositionVersion >= 4 && !!slide.socialArt;
   const base = adaptPresentation
     ? presentationForSocialFormat(slideForFormatDisplay(source, 'apresentacao', formatViews), fmt)
-    : source;
+    : socialLibrary ? { ...source, ...socialFormatPatch(source, fmt) } : source;
   const next = { ...base, ...entry };
   // Ajustes já gravados antes da opção automática também são escolhas manuais.
   if (adaptPresentation && !entry.photoFraming
     && (['bgX', 'bgY', 'bgZoom', 'bgFit'].some(key => Object.hasOwn(entry, key)) || entry.elementOffsets?.photo)) {
     next.photoFraming = 'manual';
   }
-  if (!adaptPresentation) {
+  if (!adaptPresentation && !socialLibrary) {
     const factor = formatFitFactor(fmt);
     if (entry.titleSize == null) next.titleSize = clampSize((slide.titleSize ?? 100) * factor);
     if (entry.subSize == null) next.subSize = clampSize((slide.subSize ?? 100) * factor);

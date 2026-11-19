@@ -72,11 +72,15 @@ describe('composição social com design e conteúdo preservados', () => {
     expect(source[2].canvas.applied).toBe(false);
   });
   it('mantém estilos personalizados e organização explícita da foto', () => {
-    expect(applySocialVisualComposition(source, { preset: { isCustom: true } })).toBe(source);
+    // Padrão personalizado agora recebe a composição da biblioteca v4 (família
+    // deduzida da fonte da marca), sem trocar texto nem foto.
+    const custom = applySocialVisualComposition(source, { preset: { isCustom: true } });
+    expect(custom[0].socialCompositionVersion).toBe(4);
+    custom.forEach((s, i) => expect(s).toMatchObject({ title: source[i].title, subtitle: source[i].subtitle, imageQuery: source[i].imageQuery }));
     expect(applySocialVisualComposition(source, { preset: VISUAL_PRESETS[0], photoRegion: 'top' })).toBe(source);
   });
   it('sem foto usa composição tipográfica; foto escura sem corpo também recebe contraste', () => {
-    const result = applySocialVisualComposition([{ ...source[0], imageQuery: '' }], { preset: VISUAL_PRESETS[0] });
+    const result = applySocialVisualComposition([{ ...source[0], imageQuery: '' }], { preset: VISUAL_PRESETS.find(p => p.id === 'sports_editorial') });
     expect(result[0].socialComposition).toBe('typographic');
     expect(result[0].overlay).toBe(0);
     expect(needsLightPhotoText({ bgImage: 'photo', overlay: 70, useCultureLayout: true, bodyAfterImage: '' })).toBe(true);

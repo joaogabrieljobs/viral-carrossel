@@ -56,6 +56,6 @@ export function applyVisualPresetToCard(doc, index, preset, presets) {
     ...patch,
     visualBrand: sanitizeCustomVisualPresetBrand(brand),
     visualPresetId: preset.id,
-    visualCreativePreset: preset.creativePreset || suggestCreativePresetForVisual(preset.id) || doc.creativePreset,
+    visualCreativePreset: preset.socialFamily ? doc.creativePreset : (preset.creativePreset || suggestCreativePresetForVisual(preset.id) || doc.creativePreset),
   });
 }

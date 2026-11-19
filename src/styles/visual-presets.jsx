@@ -29,6 +29,7 @@
 
 import React from 'react';
 import { clampTitleWeight } from '../utils/slide-design-system.js';
+import { SOCIAL_FAMILIES, SOCIAL_FAMILY_KEYS, LEGACY_SOCIAL_STYLE_FAMILY, socialCardLayout } from '../utils/social-families.js';
 
 // Índices em TITLE_FONTS e BODY_FONTS (referência rápida — ver ViralCarrossel.jsx)
 //
@@ -78,6 +79,9 @@ function PreviewCard({ bg, children, style, gradId = 'vcPreviewWash' }) {
  * Mini-card 4:5 com assinatura visual (header, badge, título, pill…).
  */
 export function renderPresetPreview(preset, svgStyle = {}) {
+  if (preset?.socialFamily && SOCIAL_FAMILIES[preset.socialFamily] && preset.id === SOCIAL_FAMILIES[preset.socialFamily].presetId) {
+    return renderSocialFamilyPreview(preset, svgStyle);
+  }
   const b = preset.brand || {};
   const d = preset.slideDefaults || {};
   const gradId = `vcPrev-${preset.id || 'x'}`;
@@ -285,7 +289,7 @@ const FF = {
   italiana:     '"Italiana", serif',
 };
 
-export const VISUAL_PRESETS = [
+const LEGACY_SOCIAL_PRESETS = [
   // 1. Sports Editorial — foto de fundo + título rosa pastel bold, barra
   //    editorial de 3 colunas em maiúsculas e contador N/M no canto superior.
   {
@@ -761,7 +765,90 @@ export const VISUAL_PRESETS = [
   },
 ];
 
+/**
+ * Biblioteca de carrosséis v4: nove famílias com sequência própria
+ * (src/utils/social-families.js). Cores e fontes abaixo são o ponto de
+ * partida; a composição reconstrói a página com a identidade do usuário
+ * quando ele mantém a marca própria.
+ */
+function socialFamilyPreset(key) {
+  const f = SOCIAL_FAMILIES[key];
+  const t = f.type;
+  return {
+    id: f.presetId,
+    socialFamily: key,
+    label: f.label,
+    desc: f.intent,
+    // Sem creativePreset: trocar de família não muda pacote nem narrativa.
+    brand: {
+      ...f.brand,
+      titleFont: t.title,
+      bodyFont: t.body,
+      textTitleWeight: t.titleWeight,
+      textTitleCase: t.titleCase,
+      textTitleTracking: t.titleTracking,
+      textTitleLeading: t.titleLeading,
+      textSubLeading: 140,
+      cultureHeaderLeft: '', cultureHeaderCenter: '', cultureHeaderYear: '',
+      showPageBadge: false,
+      showStarOrnament: false,
+      subtitleVisible: true,
+      subtitleWeight: t.bodyWeight,
+      subtitleCase: 'normal',
+      subtitleItalic: false,
+    },
+    slideDefaults: { layout: 'tl', align: 'left' },
+  };
+}
+
+export const SOCIAL_FAMILY_PRESETS = SOCIAL_FAMILY_KEYS.map(socialFamilyPreset);
+
+/**
+ * Os doze estilos anteriores continuam abrindo projetos salvos sem mudança
+ * (composição v3). Saem do seletor e indicam a família que os substitui.
+ */
+export const VISUAL_PRESETS = [
+  ...SOCIAL_FAMILY_PRESETS,
+  ...LEGACY_SOCIAL_PRESETS.map((p) => ({ ...p, hidden: true, legacySocialStyle: true, successorFamily: LEGACY_SOCIAL_STYLE_FAMILY[p.id] })),
+];
+
 export const VISUAL_PRESET_BY_ID = Object.fromEntries(VISUAL_PRESETS.map(p => [p.id, p]));
+
+/** Mini-card desenhado a partir da geometria real da capa da família. */
+function renderSocialFamilyPreview(preset, svgStyle = {}) {
+  const b = preset.brand || {};
+  const L = socialCardLayout(preset.socialFamily, 'cover', { formato: 'carrossel', photo: true });
+  const X = (v) => (v / 100) * 80; const Y = (v) => (v / 100) * 100;
+  const T = L.title; const S = L.subtitle; const P = L.photo;
+  const lines = [0.92, 0.7];
+  const lh = Math.min(7, Y(T.h) / 3.2);
+  const tx = L.align === 'center' ? (w) => X(T.x) + (X(T.w) - X(T.w) * w) / 2 : () => X(T.x);
+  return (
+    <PreviewCard bg={b.bg || '#222'} style={svgStyle} gradId={`vcFam-${preset.socialFamily}`}>
+      {({ washId }) => (
+        <>
+          {P && <rect x={X(P.x)} y={Y(P.y)} width={X(P.w)} height={Y(P.h)} fill={L.onPhoto ? '#6b6258' : '#9a8f83'} opacity={L.onPhoto ? 1 : 0.55} />}
+          {P && L.onPhoto && <rect x="0" y="40" width="80" height="60" fill={`url(#${washId})`} />}
+          {L.chrome.filter((d) => d.t === 'block' || d.t === 'rule').map((d, i) => (
+            <rect key={i} x={X(d.x)} y={Y(d.y)} width={Math.max(0.6, X(d.w))} height={Math.max(0.5, Y(d.h))}
+              fill={d.color === 'accent' ? b.accent : d.color === 'ground' ? b.bg : b.titleColor} opacity={d.color === 'rule' ? 0.3 : 1} />
+          ))}
+          {L.chrome.filter((d) => d.t === 'circle' && d.opacity !== 0).map((d, i) => (
+            <circle key={`c${i}`} cx={X(d.x + d.d / 2)} cy={Y(d.y) + X(d.d) / 2} r={X(d.d) / 2} fill={b.accent} />
+          ))}
+          {lines.map((w, i) => (
+            <rect key={`t${i}`} x={tx(w)} y={Y(T.y + T.h) - lh * (lines.length - i) - 0.5} width={X(T.w) * w} height={lh * 0.72}
+              fill={L.onPhoto ? '#ffffff' : b.titleColor} rx="0.4" />
+          ))}
+          {[0.8, 0.55].map((w, i) => (
+            <rect key={`s${i}`} x={L.align === 'center' ? X(S.x) + (X(S.w) - X(S.w) * w) / 2 : X(S.x)} y={Y(S.y) + 1 + i * 3} width={X(S.w) * w} height="1.4"
+              fill={L.onPhoto ? 'rgba(255,255,255,0.75)' : (b.textColor || b.subtitleColor)} rx="0.4" />
+          ))}
+        </>
+      )}
+    </PreviewCard>
+  );
+}
 
 /**
  * Aplica overrides de marca de um preset visual. Retorna NOVO brand (não muta).

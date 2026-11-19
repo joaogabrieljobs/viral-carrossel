@@ -1,0 +1,144 @@
+/**
+ * Dispositivos gráficos dos carrosséis → estilos. Função pura, usada pelo
+ * editor e pela exportação (mesmo componente). Cores vêm da marca efetiva e
+ * do chão do card; nada aqui é CSS livre vindo do modelo.
+ *
+ * Só recursos que o html2canvas desenha: cor sólida, borda, raio, rotação
+ * simples. Sem mix-blend-mode, sem filtros, sem máscaras.
+ */
+
+function hexToRgb(hex) {
+  let s = String(hex || '').replace('#', '').trim();
+  if (s.length === 3) s = s.split('').map((c) => c + c).join('');
+  if (!/^[0-9a-f]{6}$/i.test(s)) return null;
+  const n = parseInt(s, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+export function luminance(hex) {
+  const c = hexToRgb(hex);
+  if (!c) return null;
+  const ch = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+}
+
+export function contrastRatio(a, b) {
+  const la = luminance(a); const lb = luminance(b);
+  if (la == null || lb == null) return 1;
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Primeira tinta da lista com contraste ≥ mínimo; senão preto/branco. */
+export function readableInk(ground, candidates, min = 4.5) {
+  for (const c of candidates.filter(Boolean)) if (contrastRatio(ground, c) >= min) return c;
+  return contrastRatio(ground, '#111111') >= contrastRatio(ground, '#FFFFFF') ? '#111111' : '#FFFFFF';
+}
+
+function mix(a, b, t) {
+  const x = hexToRgb(a); const y = hexToRgb(b);
+  if (!x || !y) return a;
+  const c = (k) => Math.round(x[k] + (y[k] - x[k]) * t).toString(16).padStart(2, '0');
+  return `#${c('r')}${c('g')}${c('b')}`;
+}
+
+/**
+ * Chão e tintas do card a partir da marca. `inverse` usa a cor do título
+ * como fundo; `accent`, a cor de acento — sempre com tinta legível (≥ 4,5:1).
+ */
+export function socialGround(brand = {}, ground = 'bg') {
+  const bg = brand.bg || '#FFFFFF';
+  const title = brand.titleColor || '#111111';
+  const body = brand.subtitleColor || title;
+  const muted = brand.textColor || body;
+  const accent = brand.accent || title;
+  if (ground === 'inverse' || ground === 'inverseDark') {
+    const g = ground === 'inverseDark' ? '#000000' : title;
+    const ink = readableInk(g, [bg, '#FFFFFF', '#111111']);
+    return { bg: g, ink, body: ink, muted: readableInk(g, [mix(ink, g, 0.25), ink], 4.5), accent: contrastRatio(g, accent) >= 3 ? accent : ink };
+  }
+  if (ground === 'accent') {
+    const ink = readableInk(accent, [bg, title, '#FFFFFF', '#111111']);
+    return { bg: accent, ink, body: ink, muted: ink, accent: ink };
+  }
+  if (ground === 'surface') {
+    const g = mix(bg, title, 0.06);
+    return { bg: g, ink: readableInk(g, [title]), body: readableInk(g, [body, title]), muted: readableInk(g, [muted, body]), accent };
+  }
+  return { bg, ink: title, body, muted, accent };
+}
+
+function colorFor(token, inks) {
+  if (token === 'ink') return inks.ink;
+  if (token === 'body') return inks.body;
+  if (token === 'muted') return inks.muted;
+  if (token === 'accent') return inks.accent;
+  if (token === 'ground') return inks.bg;
+  if (token === 'rule') return inks.ink;
+  return /^#|^rgb/.test(String(token)) ? token : inks.ink;
+}
+
+export function fillSocialTokens(value, tokens = {}) {
+  let missing = false;
+  const out = String(value).replace(/\{(\w+)(\?)?\}/g, (_, name, optional) => {
+    const v = tokens[name];
+    if (v == null || String(v).trim() === '') { if (!optional) missing = true; return ''; }
+    return String(v);
+  }).replace(/(\s·\s)+$/, '').replace(/^(\s·\s)+/, '').trim();
+  return missing || !out ? null : out;
+}
+
+/**
+ * @param {{chrome: object[], ground: string}} art  (slide.socialArt)
+ * @param {{ frame:{w:number,h:number}, brand:object, tokens:object, fonts:{title:string, body:string, label?:string} }} ctx
+ */
+export function socialChromeElements(art, { frame, brand, tokens = {}, fonts = {} }) {
+  if (!art || !Array.isArray(art.chrome) || !frame) return [];
+  const inks = socialGround(brand, art.ground);
+  const scale = frame.w / 1080;
+  const pct = (v) => `${v}%`;
+  const out = [];
+  art.chrome.forEach((d, i) => {
+    const key = `${d.t}-${i}`;
+    const zIndex = d.z === 'over' ? 3 : 1;
+    const color = colorFor(d.color, inks);
+    const opacity = d.color === 'rule' && d.opacity == null ? 0.28 : (d.opacity ?? 1);
+    if (opacity === 0) return;
+    if (d.t === 'rule' || d.t === 'block') {
+      out.push({ key, z: zIndex, style: {
+        left: pct(d.x), top: pct(d.y), width: Math.max(1, (d.w / 100) * frame.w), height: Math.max(1, (d.h / 100) * frame.h),
+        background: color, opacity, borderRadius: d.radius ? d.radius * scale : 0,
+        transform: d.rotate ? `rotate(${d.rotate}deg)` : undefined,
+      } });
+    } else if (d.t === 'circle') {
+      const size = (d.d / 100) * frame.w;
+      out.push({ key, z: zIndex, style: { left: pct(d.x), top: pct(d.y), width: size, height: size, borderRadius: '50%', background: color, opacity } });
+    } else if (d.t === 'frame') {
+      out.push({ key, z: zIndex, style: { left: pct(d.x), top: pct(d.y), width: pct(d.w), height: pct(d.h), border: `${Math.max(1, 1.5 * scale)}px solid ${color}`, opacity: d.color === 'rule' ? 0.35 : opacity } });
+    } else if (d.t === 'grid') {
+      const m = d.margin ?? 7.5; const colW = (100 - 2 * m) / d.cols; const px = Math.max(1, scale);
+      const bands = Array.isArray(d.bands) && d.bands.length ? d.bands : [[0, 100]];
+      for (let c = 0; c <= d.cols; c += 1) {
+        bands.forEach(([y0, y1], bi) => out.push({ key: `${key}-${c}-${bi}`, z: 0.5, style: { left: pct(m + c * colW), top: pct(y0), width: px, height: pct(y1 - y0), background: color, opacity: d.opacity ?? 0.3 } }));
+      }
+    } else if (d.t === 'text') {
+      const t = fillSocialTokens(d.text, tokens);
+      if (!t) return;
+      const family = d.role === 'title' ? fonts.title : d.role === 'label' ? (fonts.label || fonts.body) : fonts.body;
+      out.push({ key, z: zIndex, text: t, style: {
+        left: pct(d.x), top: pct(d.y), width: d.w != null ? pct(d.w) : undefined, textAlign: d.align || 'left',
+        fontFamily: family, fontSize: d.size * scale, fontWeight: d.weight || (d.role === 'title' ? undefined : 500),
+        fontStyle: d.italic ? 'italic' : 'normal', lineHeight: d.leading || 1.15,
+        letterSpacing: d.tracking ? `${d.tracking / 100}em` : undefined, textTransform: d.case === 'upper' ? 'uppercase' : undefined,
+        color, opacity, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', fontSynthesis: 'none',
+      } });
+    }
+  });
+  return out;
+}
+
+export function socialChromeTokens(brand = {}, { index = 0, total = 1 } = {}) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const name = String(brand.name || '').trim();
+  return { n: pad(index + 1), total: pad(total), marca: name };
+}

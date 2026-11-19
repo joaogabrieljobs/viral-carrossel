@@ -27,6 +27,9 @@ export const PRESENTATION_LIBRARY_FONTS = Object.freeze([
   { family: 'Instrument Serif', axes: 'ital@0;1', license: 'OFL-1.1', source: 'https://github.com/Instrument/instrument-serif' },
   { family: 'Instrument Sans', axes: 'wght@400..600', license: 'OFL-1.1', source: 'https://github.com/Instrument/instrument-sans' },
   { family: 'Plus Jakarta Sans', axes: 'wght@400..800', license: 'OFL-1.1', source: 'https://github.com/tokotype/PlusJakartaSans' },
+  // Biblioteca de carrosséis (famílias Revista e Cinema).
+  { family: 'Figtree', axes: 'wght@400..700', license: 'OFL-1.1', source: 'https://github.com/erikdkennedy/figtree' },
+  { family: 'Oswald', axes: 'wght@400..700', license: 'OFL-1.1', source: 'https://github.com/googlefonts/OswaldFont' },
 ]);
 
 export const PRESENTATION_FONTS_CSS_URL = `https://fonts.googleapis.com/css2?${PRESENTATION_LIBRARY_FONTS
@@ -183,6 +186,18 @@ export const PRESENTATION_FONT_FACES = Object.freeze([
     "family": "Plus Jakarta Sans",
     "file": "PlusJakartaSans.woff",
     "weight": "200 800",
+    "style": "normal"
+  },
+  {
+    "family": "Figtree",
+    "file": "Figtree.woff",
+    "weight": "300 900",
+    "style": "normal"
+  },
+  {
+    "family": "Oswald",
+    "file": "Oswald.woff",
+    "weight": "200 700",
     "style": "normal"
   }
 ]);

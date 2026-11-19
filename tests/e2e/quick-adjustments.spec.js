@@ -123,8 +123,9 @@ test('Criar rápido reúne presets e texto; mantém dois destinos e outros modos
   await custom.click();
   await expect.poll(async () => (await savedDoc(page)).visualPreset).toBe('custom_quick_test');
   expect((await savedDoc(page)).slides.every(card => !card.visualBrand)).toBe(true);
-  await page.getByRole('button', { name: 'Estilo Bold Promo Pink', exact: true }).click();
-  await expect.poll(async () => (await savedDoc(page)).visualPreset).toBe('bold_promo_rosa');
+  // Família da biblioteca v4 (os estilos anteriores saíram dos ajustes rápidos).
+  await page.getByRole('button', { name: 'Estilo Documental', exact: true }).click();
+  await expect.poll(async () => (await savedDoc(page)).visualPreset).toBe('social_documental');
   expect((await savedDoc(page)).slides.map(card => [card.title, card.subtitle, card.bodyAfterImage, card.strikethroughText, card.afterTitleText]))
     .toEqual(original.slides.map(card => [card.title, card.subtitle, card.bodyAfterImage, card.strikethroughText, card.afterTitleText]));
 

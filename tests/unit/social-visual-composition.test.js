@@ -10,7 +10,10 @@ import {
 import { footerChromeReservePct } from '../../src/utils/card-chrome.js';
 import { resolvePresetChrome } from '../../src/utils/preset-tokens.js';
 
-const SOCIAIS = VISUAL_PRESETS.filter((p) => p.productKind !== 'apresentacao');
+// Composição v3: os doze estilos que projetos salvos continuam usando. As nove
+// famílias da biblioteca v4 têm a própria suíte (social-library-v4.test.js),
+// com as mesmas garantias de rodapé, sobreposição e piso de leitura.
+const SOCIAIS = VISUAL_PRESETS.filter((p) => p.productKind !== 'apresentacao' && p.legacySocialStyle);
 const FORMATOS = ['carrossel', 'quadrado', 'stories'];
 const MARCAS = {
   vazia: { name: 'Padrão', handle: '' },

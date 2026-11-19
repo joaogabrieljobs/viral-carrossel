@@ -205,18 +205,19 @@ test('design recomendado fica visível, aplica o preset e mantém a narrativa es
   await wizard.getByRole('button', { name: 'Alterar visual', exact: true }).click();
   await expect(wizard.getByRole('button', { name: /^Design recomendado pelo Moont/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true })).toBeVisible();
-  await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true }).getByRole('button', { name: /^Minimal Clean/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(wizard.getByRole('group', { name: 'Estilos para começar', exact: true }).getByRole('button', { name: /^Ficha técnica/ })).toHaveAttribute('aria-pressed', 'true');
   await wizard.screenshot({ path: testInfo.outputPath('design-recomendado.png') });
   await next(page);
-  await expect(wizard).toContainText('Minimal Clean · recomendado');
+  await expect(wizard).toContainText('Ficha técnica · recomendado');
   await wizard.getByRole('button', { name: 'Criar e gerar 5 cards', exact: true }).click();
   await expect(wizard).toHaveCount(0, { timeout: 25_000 });
   await expect.poll(async () => (await library(page)).find(p => p.name === 'Design com preset')?.doc?.slides?.length).toBe(5);
   const created = (await library(page)).find(p => p.name === 'Design com preset');
   await testInfo.attach('projeto-gerado.json', { body: JSON.stringify(created, null, 2), contentType: 'application/json' });
   expect(created.doc.mode).toBe('how_to');
-  expect(created.doc.visualPreset).toBe('minimal_clean');
-  expect(created.doc.brand.titleFont).toContain('Inter Tight');
+  // Biblioteca v4: "Ensinar passo a passo" recomenda a família Ficha técnica.
+  expect(created.doc.visualPreset).toBe('social_ficha');
+  expect(created.doc.brand.titleFont).toContain('IBM Plex Sans');
   expect(created.doc.slides[2].canvas.source).toBe('social-preset');
   const middle = page.locator('main [data-vc-card-surface]').nth(2);
   await expect(middle).toContainText(created.doc.slides[2].bodyAfterImage);
@@ -282,9 +283,17 @@ test('geração social conserva a tipografia que a composição definiu', async 
   })), null, 2), contentType: 'application/json' });
   for (const slide of created.doc.slides) {
     expect(slide.canvas.source).toBe('social-preset');
-    // Composição tipográfica (sem foto), v3: 116 / 112 / 140, entrelinhas 104 / 136.
-    expect([slide.titleSize, slide.subSize, slide.bodyAfterSize]).toEqual([116, 112, 140]);
-    expect([slide.titleLeading, slide.subLeading]).toEqual([104, 136]);
+    // Biblioteca v4: tamanhos por função do card (não um trio fixo). O que este
+    // teste protege é a hierarquia: nada volta a 100/100/100 e o corpo fica no
+    // piso de leitura (≥ 30 px em 1080), com o título bem acima dele.
+    expect(slide.socialCompositionVersion).toBe(4);
+    expect([slide.titleSize, slide.subSize, slide.bodyAfterSize]).not.toEqual([100, 100, 100]);
+    const tituloPx = 1080 * 0.084 * slide.titleSize / 100;
+    const apoioPx = 1080 * 0.028 * slide.subSize / 100;
+    expect(apoioPx).toBeGreaterThanOrEqual(29.9);
+    expect(tituloPx / apoioPx).toBeGreaterThanOrEqual(1.6);
+    expect(slide.titleLeading).toBeGreaterThanOrEqual(104);
+    expect(slide.subLeading).toBeGreaterThanOrEqual(136);
   }
 });
 

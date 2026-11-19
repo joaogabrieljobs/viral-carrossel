@@ -7,6 +7,7 @@ import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
 import PresentationArtChrome from './PresentationArtChrome.jsx';
+import SocialArtChrome from './SocialArtChrome.jsx';
 import { normalizePresentationBlocks } from '../../utils/presentation-quality.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
@@ -597,8 +598,11 @@ function slideStoredPresentationCssFilter(slide) {
 
 /** Tratamento fotográfico da família: só uma lista fechada de funções CSS. */
 function presentationFamilyPhotoFilter(slide) {
-  const value = String(slide?.presentationPhotoTreatment || '').trim();
-  if (!value || slide?.presentationArtDirectionVersion !== 2) return undefined;
+  // Carrosséis da biblioteca v4 também têm tratamento por família; a mesma
+  // lista fechada vale para o editor e para o filtro aplicado na exportação.
+  const social = slide?.socialCompositionVersion >= 4;
+  const value = String((social ? slide?.socialPhotoTreatment : slide?.presentationPhotoTreatment) || '').trim();
+  if (!value || (!social && slide?.presentationArtDirectionVersion !== 2)) return undefined;
   return /^((grayscale|sepia|saturate|contrast|brightness)\(\d*\.?\d+\)\s*)+$/.test(value) ? value : undefined;
 }
 
@@ -790,7 +794,7 @@ const ClassicCanvasInner = React.forwardRef(({
   const resolvedSubtitleFF = getTextFont(slide, 'subtitle', subtitleTypography?.fontFamily || subtitleFF);
   const bodyAfterFF = getTextFont(slide, 'bodyAfterImage', bodyFF);
   const resolvedTitleWeight = finiteNumber(titleTypography?.weight) ?? slide.titleWeight ?? 800;
-  const resolvedSubtitleWeight = finiteNumber(subtitleTypography?.weight) ?? brand.subtitleWeight ?? 400;
+  const resolvedSubtitleWeight = finiteNumber(subtitleTypography?.weight) ?? finiteNumber(slide.subtitleWeight) ?? brand.subtitleWeight ?? 400;
   const resolvedTitleTracking = finiteNumber(titleTypography?.tracking) ?? slide.titleTracking ?? 0;
   const resolvedSubtitleTracking = finiteNumber(subtitleTypography?.tracking) ?? slide.subTracking ?? 0;
   const resolvedSubtitleSize = presentationSubtitleMetric(slide, 'sizePercent', slide.subSize ?? 100);
@@ -803,7 +807,8 @@ const ClassicCanvasInner = React.forwardRef(({
     subtitleTypography?.case,
     subtitleTextTransform(brand),
   );
-  const resolvedTitleItalic = titleTypography?.italic === true;
+  // Afirmação tipográfica das famílias de carrossel com itálico verdadeiro.
+  const resolvedTitleItalic = titleTypography ? titleTypography.italic === true : slide.titleItalic === true;
   const resolvedSubtitleItalic = subtitleTypography
     ? subtitleTypography.italic === true
     : brand.subtitleItalic === true;
@@ -937,6 +942,7 @@ const ClassicCanvasInner = React.forwardRef(({
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
       <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} index={num - 1} total={total} />
+      <SocialArtChrome slide={slide} brand={brand} frame={f} titleFont={titleFF} bodyFont={bodyFF} index={num - 1} total={total} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
         data-vc-photo-zone="1"
@@ -1010,7 +1016,7 @@ const ClassicCanvasInner = React.forwardRef(({
           // Nas fontes novas, descendentes também ultrapassam o line box.
           // Sem reserva inferior, flex-end cria overflow constante mesmo com
           // uma linha curta, e o autofit reduz o título até o piso à toa.
-          paddingBottom: slide.presentationArtDirectionVersion === 2 ? vcTitleOvershootShift(
+          paddingBottom: (slide.presentationArtDirectionVersion === 2 || slide.socialCompositionVersion >= 4) ? vcTitleOvershootShift(
             f.w * 0.084 * (presentationTitleSizePercent(slide) / 100) * titleScale,
             presentationTitleLeadingPercent(slide),
           ) : 0,

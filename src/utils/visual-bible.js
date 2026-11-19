@@ -15,6 +15,7 @@
  * devolver algo inválido, a geração segue exatamente como antes.
  */
 import { imageFramingDirection } from '../../shared/image-aspect.js';
+import { socialPhotoDirection } from './social-families.js';
 
 export const VISUAL_BIBLE_MAX_ENTITIES = 4;
 const EN_MIN = 20;
@@ -74,6 +75,10 @@ export function composeSubjectsDirection(visualBible) {
 
 /** Ficha + enquadramento do painel: tudo que descreve a cena deste card. */
 export function composeSceneDirection({ visualBible = null, slide = null, fmt = 'carrossel' } = {}) {
-  return [composeSubjectsDirection(visualBible), `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
+  // Carrossel da biblioteca v4: a linguagem fotográfica da família chega ao
+  // pedido real de imagem. Fica na cena (não na direção de marca), então uma
+  // direção de marca ou referência enviada pela pessoa continua prevalecendo.
+  const family = slide?.socialCompositionVersion >= 4 ? socialPhotoDirection(slide.socialFamily, 'en') : '';
+  return [composeSubjectsDirection(visualBible), family ? `PHOTOGRAPHIC LANGUAGE: ${family}` : '', `FRAMING: ${imageFramingDirection(slide || {}, fmt)}`]
     .filter(Boolean).join('\n\n');
 }

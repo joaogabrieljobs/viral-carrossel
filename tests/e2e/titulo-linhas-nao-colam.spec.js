@@ -20,12 +20,22 @@ const MINIMO = {
   Playfair: 1.10,
   'Yeseva One': 1.10,
   'Inter Tight': 1.14,
+  // Biblioteca de carrosséis v4 (calibrado em 1080×1350 com o título deste teste).
+  Fraunces: 1.06,
+  Archivo: 1.10,
+  'Instrument Serif': 1.04,
+  'Bodoni Moda': 1.08,
+  'IBM Plex Sans': 1.12,
+  Syne: 1.10,
+  Oswald: 1.20,
 };
 const TRACKING_MIN_EM = -0.025;
 
 const PADROES = [
   'Sports Editorial', 'Case Study Neon', 'Mood Sépia', 'Bold Promo Pink',
   'Tabloid Keywords', 'Luxury Hybrid', 'Viral Hype Dark', 'Authority Black', 'Minimal Clean',
+  // Famílias da biblioteca v4.
+  'Revista', 'Manchete', 'Grade suíça', 'Documental', 'Produto', 'Ficha técnica', 'Pôster', 'Cinema',
 ];
 
 async function tipografiaDoTitulo(page) {

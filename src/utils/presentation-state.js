@@ -22,7 +22,8 @@ import {
 } from './custom-visual-presets.js';
 import { resolvePresentationVisualRole } from './presentation-composition.js';
 
-export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'minimal_clean';
+// Biblioteca de carrosséis v4: padrão neutro quando o produto volta de apresentação.
+export const DEFAULT_CAROUSEL_VISUAL_PRESET_ID = 'social_minimal';
 
 function resolvePresentationPreset(presetId, presets) {
   const catalog = Array.isArray(presets) ? presets : PRESENTATION_VISUAL_PRESETS;

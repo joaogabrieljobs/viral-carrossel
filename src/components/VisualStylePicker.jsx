@@ -24,7 +24,14 @@ export default function VisualStylePicker({
   aspectRatio = null,
 }) {
   const catalog = Array.isArray(presets) ? presets : [];
-  const visiblePresets = catalog.filter((preset) => !preset?.hidden);
+  // Biblioteca de carrosséis v4: as famílias vêm primeiro; os doze estilos
+  // anteriores continuam escolhíveis num grupo próprio, com a composição antiga.
+  const legacySocial = catalog.filter((preset) => preset?.legacySocialStyle);
+  const visiblePresets = [
+    ...catalog.filter((preset) => !preset?.hidden),
+    ...(legacySocial.length ? [{ __heading: true, id: '__legacy_heading' }] : []),
+    ...legacySocial,
+  ];
   // Um projeto antigo pode continuar usando um preset oculto. Ele não volta à
   // grade de escolha, mas a interface ainda identifica claramente o estilo em
   // uso até a pessoa optar por um dos padrões atuais.
@@ -54,6 +61,16 @@ export default function VisualStylePicker({
         }}
       >
         {visiblePresets.map((p) => {
+          if (p.__heading) {
+            return (
+              <div key={p.id} style={{
+                gridColumn: '1 / -1', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+                letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)',
+              }}>
+                Estilos anteriores · composição antiga
+              </div>
+            );
+          }
           const isActive = selected?.id === p.id;
           const isSuggested = !isActive && suggestedId === p.id;
           const swatches = paletteSwatches(p);
@@ -223,7 +240,7 @@ export default function VisualStylePicker({
             marginBottom: 4,
             fontFamily: 'var(--font-ui)',
           }}>
-            {selected.hidden ? `Padrão legado em uso · ${selected.label}` : selected.label}
+            {selected.hidden ? `Padrão anterior em uso · ${selected.label}${selected.successorFamily ? ' · sucessor sugerido: ' + (catalog.find((p) => p.socialFamily === selected.successorFamily)?.label || '') : ''}` : selected.label}
           </div>
           <div style={{
             fontSize: 12,

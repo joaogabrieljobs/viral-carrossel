@@ -92,7 +92,9 @@ import {
 } from './src/lib/billing.js';
 import { VISUAL_PRESETS, applyVisualPreset, getSlideOverridesForPreset, PRESET_BRAND_SIGNATURE_KEYS } from './src/styles/visual-presets.jsx';
 import { recommendedGenerationVisualPreset } from './src/utils/generation-visual-choice.js';
-import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides } from './src/utils/social-visual-composition.js';
+import { applySocialVisualComposition, isFlattenedSocialSlide, restoreSocialCompositionTypography, restyleSocialSlides, usesSocialLibrary } from './src/utils/social-visual-composition.js';
+import { buildSocialSequencePrompt } from './src/utils/social-sequence.js';
+import { socialFamilyFor } from './src/utils/social-families.js';
 import { propagateBrandTypography } from './src/utils/brand-typography.js';
 import { imageAspectRatioForSlide } from './shared/image-aspect.js';
 import { composeSceneDirection, normalizeVisualBible } from './src/utils/visual-bible.js';
@@ -1392,7 +1394,9 @@ export default function App() {
     if (!preset) return;
     const resolvedPresetId = preset.id;
     const isPresentationVisual = preset?.productKind === 'apresentacao';
-    const fromPreset = preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId);
+    // Família da biblioteca v4 muda só a forma: pacote criativo e modo
+    // narrativo do projeto continuam como estavam.
+    const fromPreset = preset?.socialFamily ? null : (preset?.creativePreset || suggestCreativePresetForVisual(resolvedPresetId));
     history.set((d) => {
       if (scope === 'card') return applyVisualPresetToCard(d, index, preset, visualPresets);
       d = transformFormatVisuals(d, items => items.map(item => ({ ...item, visualBrand:null, visualPresetId:null, visualCreativePreset:null })));
@@ -1414,6 +1418,7 @@ export default function App() {
               brand: applyVisualPreset(d.brand, resolvedPresetId, visualPresets),
               formato: d.fmt && d.fmt !== 'apresentacao' ? d.fmt : 'carrossel',
               overrides: getSlideOverridesForPreset(resolvedPresetId, visualPresets),
+              narrative: d.quickNarrativeMode || 'editorial',
             }),
           };
       return preserveVisualPresetContent(fromPreset ? { ...next, creativePreset: fromPreset } : next, d);
@@ -5487,7 +5492,9 @@ Não invente garantia, prazo, preço, item incluso ou promessa comercial que nã
       : '';
     const apresentacaoDesignBlock = isPresentationGeneration
       ? buildPresentationDesignSystemPromptBlock(effectiveVisualPresetDef, presentationPathId, { planned: !remix })
-      : '';
+      : (!remix && usesSocialLibrary(effectiveVisualPresetDef)
+        ? buildSocialSequencePrompt({ family: socialFamilyFor(effectiveVisualPresetDef, brand), narrative: effectiveMode })
+        : '');
     const presentationRoute = isPresentationGeneration
       ? getPresentationPath(presentationPathId)
       : null;
@@ -5944,6 +5951,8 @@ ${jsonShapeLine}`;
         photoRegion: cvStyle,
         brand: generationBrand,
         formato: fmt && fmt !== 'apresentacao' ? fmt : 'carrossel',
+        // O modo narrativo muda o ritmo de funções dos cards, nunca a família.
+        narrative: effectiveMode,
       });
     }
     if (!remix) {

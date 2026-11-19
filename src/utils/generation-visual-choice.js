@@ -3,12 +3,12 @@ import { getPresentationPath } from './presentation.js';
 // Direção visual e arco narrativo são escolhas independentes: recomendar uma
 // pele nunca troca o modo de escrita nem injeta o texto de um template.
 const SOCIAL_STYLES = Object.freeze({
-  none: 'editorial_magazine', editorial: 'authority_black', how_to: 'minimal_clean',
-  storytelling: 'mood_sepia', viral: 'tabloid_keywords', pain: 'reflexivo_cream',
-  deep: 'editorial_magazine', jornalistico: 'sports_editorial', sensacionalista: 'viral_hype_dark',
-  tendencia_cultura: 'reflexivo_cream', quick_erro_comum: 'authority_black',
-  quick_tendencia: 'sports_editorial', quick_decodificacao: 'editorial_magazine',
-  quick_comportamento: 'mood_sepia',
+  none: 'social_minimal', editorial: 'social_grade', how_to: 'social_ficha',
+  storytelling: 'social_documental', viral: 'social_manchete', pain: 'social_cinema',
+  deep: 'social_revista', jornalistico: 'social_ficha', sensacionalista: 'social_poster',
+  tendencia_cultura: 'social_revista', quick_erro_comum: 'social_ficha',
+  quick_tendencia: 'social_manchete', quick_decodificacao: 'social_revista',
+  quick_comportamento: 'social_documental',
 });
 
 export function recommendedGenerationVisualPreset({ productKind = 'carrossel', narrative = 'editorial', presentationPath = 'auto', presets = [] } = {}) {
