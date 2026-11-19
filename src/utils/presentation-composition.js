@@ -1,5 +1,6 @@
 /** Composição determinística: o modelo escolhe a função, nunca CSS ou coordenadas. */
 import { FORMATS } from './formats.js';
+import { presentationFamily, artDirectedPresentationZones, presentationTypeDirection } from './presentation-art-direction.js';
 const DATA_ROLES = new Set(['data', 'metric', 'result', 'matrix', 'comparison', 'priorities']);
 const DEMO_ROLES = new Set(['demo', 'example', 'evidence', 'story', 'people', 'application']);
 const DIVIDER_ROLES = new Set(['divider', 'agenda', 'question', 'reframe', 'contrast', 'statement', 'vision', 'objectives']);
@@ -67,77 +68,16 @@ const hasBlocks = slide => Array.isArray(slide.presentationBlocks)
  * A ausência de foto expande a leitura, em vez de deixar um placeholder vazio.
  */
 export function presentationDesignFamily(base = {}) {
-  const id = String(base.presentationPresetId || base.presentationPatternId || '');
-  if (/photo.essay|editorial.magazine/.test(id)) return 'editorial';
-  if (/cinematic|typographic.bold/.test(id)) return 'cinematic';
-  if (/modular.cards/.test(id)) return 'modular';
-  if (/technical.blueprint|swiss.grid/.test(id)) return 'grid';
-  return 'executive';
+  return presentationFamily(base.presentationPresetId || base.presentationPatternId);
 }
 
 export function contentAwarePresentationZones(kind, slide = {}, family = 'executive') {
-  if (hasBlocks(slide)) return {
-    title: rect(6, family === 'grid' ? 12 : 15, 88, 17),
-    subtitle: rect(6, family === 'grid' ? 33 : 36, 88, 15),
-    evidence: rect(6, 55, 88, 37),
-    photo: inactivePhoto(),
-  };
-  const visual = hasVisual(slide);
-  // A adaptação ao conteúdo conserva a assinatura espacial do preset. Antes,
-  // todos os padrões eram reduzidos à mesma coluna de texto + painel à direita.
-  if (visual && family === 'editorial' && ['cover', 'demo', 'closing'].includes(kind)) return {
-    title: rect(46, kind === 'closing' ? 22 : kind === 'demo' ? 12 : 15, 48, 26),
-    subtitle: rect(46, kind === 'closing' ? 52 : kind === 'demo' ? 43 : 45, 48, 40),
-    photo: rect(0, 0, 40, 100),
-  };
-  if (visual && family === 'cinematic' && ['cover', 'divider', 'closing'].includes(kind)) return {
-    title: rect(kind === 'closing' ? 62 : 6, kind === 'divider' ? 16 : 12, kind === 'closing' ? 32 : 34, 28),
-    subtitle: rect(kind === 'closing' ? 62 : 6, kind === 'divider' ? 48 : 44, kind === 'closing' ? 32 : 34, 44),
-    // Um painel largo e alto evita transformar retratos em uma faixa que corta
-    // cabeças; a cena ocupa a maior parte do slide, com texto em superfície própria.
-    photo: kind === 'closing' ? rect(0, 0, 56, 100) : kind === 'divider' ? rect(44, 6, 50, 88) : rect(44, 0, 56, 100),
-  };
-  if (visual && family === 'modular' && ['cover', 'demo', 'closing'].includes(kind)) return {
-    title: rect(6, kind === 'closing' ? 22 : kind === 'demo' ? 12 : 16, 50, 26),
-    subtitle: rect(6, kind === 'closing' ? 53 : kind === 'demo' ? 43 : 46, 50, kind === 'closing' ? 37 : 44),
-    photo: rect(62, kind === 'demo' ? 12 : 10, 32, 80),
-  };
-  switch (kind) {
-    case 'cover': return {
-      title: rect(6, 16, visual ? 52 : 88, 25),
-      subtitle: rect(6, 46, visual ? 52 : 78, 43),
-      photo: visual ? rect(64, 0, 36, 100) : inactivePhoto(),
-    };
-    case 'divider': return {
-      title: visual ? rect(6, 18, 55, 24) : rect(10, 24, 80, 23),
-      subtitle: visual ? rect(6, 47, 55, 43) : rect(15, 53, 70, 37),
-      photo: visual ? rect(66, 27, 28, 65) : inactivePhoto(),
-    };
-    case 'data': return {
-      title: rect(6, 14, 88, 20),
-      subtitle: visual ? rect(39, 46, 55, 46) : rect(6, 46, 82, 46),
-      photo: visual ? rect(6, 46, 28, 46) : inactivePhoto(),
-    };
-    case 'demo': return {
-      title: rect(6, 14, visual ? 55 : 88, 24),
-      subtitle: rect(6, 44, visual ? 55 : 78, 46),
-      photo: visual ? rect(66, 25, 28, 67) : inactivePhoto(),
-    };
-    case 'closing': return {
-      title: visual ? rect(6, 18, 54, 25) : rect(10, 24, 80, 22),
-      subtitle: visual ? rect(6, 49, 54, 41) : rect(18, 53, 64, 37),
-      photo: visual ? rect(66, 0, 34, 100) : inactivePhoto(),
-    };
-    default: return {
-      title: rect(6, 14, 88, 24),
-      subtitle: rect(6, 44, visual ? 55 : 88, 46),
-      photo: visual ? rect(66, 44, 28, 46) : inactivePhoto(),
-    };
-  }
+  return artDirectedPresentationZones(kind, slide, family, { visual: hasVisual(slide), structured: hasBlocks(slide) });
 }
 
-function titleLinesAt(value, width, size) {
-  const capacity = Math.max(1, width / (size * 0.55));
+function titleLinesAt(value, width, size, fontFamily = '') {
+  const condensed = /Bebas|Anton|Condensed/i.test(fontFamily);
+  const capacity = Math.max(1, width / (size * (condensed ? 0.43 : 0.55)));
   return String(value || '').split('\n').reduce((total, paragraph) => {
     let lines = 1;
     let used = 0;
@@ -154,13 +94,14 @@ function titleLinesAt(value, width, size) {
 }
 
 /** Escalas fechadas e piso legível; o texto nunca é cortado para caber. */
-function fittedTitleSize(defaultSize, value, zone) {
+function fittedTitleSize(defaultSize, value, zone, fontFamily = '') {
   if (!String(value || '').trim()) return defaultSize;
   const width = 1920 * zone.w / 100 - 24;
   const height = 1080 * zone.h / 100 - 14;
-  const choices = [...new Set([defaultSize, 44, 42, 40, 38, 36, 34, 32])]
+  const steps = Array.from({ length: Math.ceil((defaultSize - 32) / 4) + 1 }, (_, i) => Math.max(32, defaultSize - i * 4));
+  const choices = [...new Set([...steps, 32])]
     .filter(size => size <= defaultSize).sort((a, b) => b - a);
-  return choices.find(size => titleLinesAt(value, width, 1920 * 0.084 * size / 100)
+  return choices.find(size => titleLinesAt(value, width, 1920 * 0.084 * size / 100, fontFamily)
     * (1920 * 0.084 * size / 100) * 1.1 <= height) || choices.at(-1);
 }
 
@@ -188,16 +129,24 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
   const zones = contentAwarePresentationZones(kind, slide, family);
   const previousTypography = base.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
-  const centered = !visual && !structured && ['divider', 'closing'].includes(kind);
-  const presetTitleSize = Number(typography.title?.sizePercent);
-  const displaySize = Number.isFinite(presetTitleSize)
-    ? Math.max(44, Math.min(60, presetTitleSize)) : kind === 'cover' ? 49 : 44;
-  const titleSize = fittedTitleSize(structured ? 42 : displaySize, slide.title, zones.title);
-  const subSize = structured ? 68 : 72;
+  const centered = false;
+  const direction = presentationTypeDirection(family, kind);
+  const displaySize = direction.titleSize;
+  const titleSize = fittedTitleSize(structured ? Math.min(46, displaySize) : displaySize, slide.title, zones.title, typography.title?.fontFamily);
+  const subSize = structured ? 57 : direction.bodySize;
+  const bodyType = base.presentationBodyTypography || {};
+  const titleLeading = Math.max(96, Math.min(118, Number(typography.title?.leadingPercent) || 108));
+  const bodyLeading = Math.max(132, Math.min(152, Number(bodyType.leadingPercent) || 142));
   const imagePosition = structured || !visual ? 'none' : family === 'editorial' ? 'left-evidence'
     : family === 'cinematic' && kind === 'closing' ? 'left-evidence'
     : kind === 'data' ? 'left-evidence' : 'right-evidence';
-  const limits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
+  const rawLimits = pitch ? (base.presentationTextLimits || {}) : plannedPresentationTextLimits(kind, slide, deliveryMode);
+  const narrow = zones.subtitle.w < 45 && zones.subtitle.h < 50;
+  const limits = narrow ? {
+    ...rawLimits,
+    subtitle: { ...rawLimits.subtitle, maxChars: Math.min(rawLimits.subtitle?.maxChars || 180, 180), maxLines: 6 },
+    body: { ...rawLimits.body, maxChars: Math.min(rawLimits.body?.maxChars || 90, 90), maxLines: 3 },
+  } : rawLimits;
   return {
     ...base,
     layout: centered ? 'mc' : 'tl',
@@ -214,11 +163,13 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
     presentationCompositionVersion: 2,
     titleSize,
     subSize,
-    titleLeading: 110,
-    subLeading: 135,
-    subTracking: 0,
+    titleLeading,
+    subLeading: bodyLeading,
+    subTracking: bodyType.tracking ?? 1,
+    presentationDesignFamily: family,
+    presentationArtDirectionVersion: 1,
     bodyAfterSize: presentationSupportTextSize(base),
-    bodyLeading: 135,
+    bodyLeading,
     logoPosition: 'tl',
     logoSize: 80,
     titlePosition: centered ? 'center' : 'top-left',
@@ -239,8 +190,9 @@ export function contentAwarePresentationOverrides(base, slide = {}, kind = 'cont
       ...previousTypography,
       [kind]: {
         ...typography,
-        title: { ...typography.title, sizePercent: titleSize, leadingPercent: 110, ...(pitch ? { case: 'normal' } : {}) },
-        subtitle: { ...typography.subtitle, sizePercent: subSize, leadingPercent: 135, tracking: 0, case: 'normal' },
+        title: { ...typography.title, sizePercent: titleSize, leadingPercent: titleLeading, ...(pitch ? { case: 'normal' } : {}) },
+        // subtitle is an argument here, not the catalog's uppercase eyebrow.
+        subtitle: { ...typography.subtitle, ...bodyType, sizePercent: subSize, leadingPercent: bodyLeading, tracking: bodyType.tracking ?? 1, weight: bodyType.weight || 400, case: 'normal' },
       },
     },
     canvas: { ...base.canvas, preserveZones: true, zones },
@@ -261,10 +213,10 @@ export function restorePresentationPhotoComposition(slide) {
       return offset && Object.values(offset).some(value => Number(value) !== 0);
     })) return slide;
   const kind = rolesForRestoredPhoto.has(slide.presentationComposition) ? slide.presentationComposition : 'content';
-  const zones = contentAwarePresentationZones(kind, slide);
+  const zones = contentAwarePresentationZones(kind, slide, presentationDesignFamily(slide));
   const previousTypography = slide.presentationTypographyByComposition || {};
   const typography = previousTypography[kind] || {};
-  const titleSize = fittedTitleSize(typography.title?.sizePercent || slide.titleSize || 44, slide.title, zones.title);
+  const titleSize = fittedTitleSize(typography.title?.sizePercent || slide.titleSize || 44, slide.title, zones.title, typography.title?.fontFamily);
   const imagePosition = kind === 'data' ? 'left-evidence' : 'right-evidence';
   return {
     ...slide,

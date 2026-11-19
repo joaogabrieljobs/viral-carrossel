@@ -372,12 +372,18 @@ export function buildPresentationSystemPrompt(pathId) {
 
 export function buildPresentationFieldRules(pathId) {
   const route = getPresentationPath(pathId);
-  return route.id === 'pitch' ? buildPitchFieldRules() : presentationFieldsForRoute(route);
+  return `${route.id === 'pitch' ? buildPitchFieldRules() : presentationFieldsForRoute(route)}
+TIPOGRAFIA E RITMO DE LEITURA:
+- Dê ao título uma conclusão curta, de preferência em 4–9 palavras; estenda somente para preservar um número ou condição essencial. O parágrafo desenvolve, sem repetir o título.
+- Em subtitle e bodyAfterImage, use **negrito** em uma ou duas expressões realmente decisivas (dado, condição, ação ou contraste), sem criar um fato novo. O trecho destacado deve existir na própria frase. Não destaque o parágrafo inteiro, não use marcação em títulos nem nas células dos blocos nativos.
+- Use parágrafos curtos com uma função cada. Uma quebra de linha separa ideias, não cada palavra. Não alinhe com espaços, não desenhe colunas ou tabelas com caracteres e não use CAIXA ALTA em frases de leitura.
+- Se existir um quadro de métricas, comparação ou etapas, o texto acima explica o significado. Não repita todas as células em prosa. Valores, unidades e limitações ficam juntos no quadro editável.`;
 }
 
 export function buildPresentationReviewRules(pathId) {
   const route = getPresentationPath(pathId);
-  return route.id === 'pitch' ? buildPitchReviewRules() : presentationReviewForRoute(route);
+  return `${route.id === 'pitch' ? buildPitchReviewRules() : presentationReviewForRoute(route)}
+Preserve os destaques **negrito** dentro das strings de subtitle e bodyAfterImage quando marcam uma ideia relevante e sustentada. Remova destaque do parágrafo inteiro ou de uma promessa sem fonte. O JSON não recebe cercas Markdown nem formatação externa. Nenhum destaque pode acrescentar um fato ou esconder uma condição.`;
 }
 
 export function buildPresentationLanguageRules(pathId, tone) {

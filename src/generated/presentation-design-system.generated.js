@@ -196,6 +196,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
           }
         }
       },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Inter\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 145,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Inter Tight\", sans-serif",
+        "weight": 600
+      },
       "presentationTitleSizeByComposition": {
         "cover": 59.52,
         "content": 39.68,
@@ -465,6 +475,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Source Serif 4\", serif",
+        "weight": 400,
+        "leadingPercent": 150,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Playfair Display\", serif",
+        "weight": 700
       },
       "presentationTitleSizeByComposition": {
         "cover": 49.6,
@@ -736,6 +756,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"IBM Plex Sans\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 140,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"IBM Plex Mono\", monospace",
+        "weight": 500
       },
       "presentationTitleSizeByComposition": {
         "cover": 29.76,
@@ -1009,6 +1039,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
           }
         }
       },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Inter\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 140,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Archivo\", sans-serif",
+        "weight": 800
+      },
       "presentationTitleSizeByComposition": {
         "cover": 79.37,
         "content": 44.64,
@@ -1119,7 +1159,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "bodyFont": "\"Inter\", sans-serif",
       "textTitleWeight": 400,
       "textTitleCase": "upper",
-      "textTitleTracking": 7,
+      "textTitleTracking": 2.5,
       "textTitleSize": 74.4,
       "subtitleWeight": 500,
       "subtitleCase": "upper",
@@ -1138,7 +1178,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "center",
       "titleSize": 74.4,
       "subSize": 44.64,
-      "titleTracking": 7,
+      "titleTracking": 2.5,
       "subTracking": 31,
       "titleLeading": 95,
       "subLeading": 130,
@@ -1156,7 +1196,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 124.01,
             "leadingPercent": 90,
             "weight": 400,
-            "tracking": 7,
+            "tracking": 2.5,
             "case": "upper",
             "italic": false
           },
@@ -1200,7 +1240,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 74.4,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": 7,
+            "tracking": 2.5,
             "case": "upper",
             "italic": false
           },
@@ -1222,7 +1262,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 124.01,
             "leadingPercent": 90,
             "weight": 400,
-            "tracking": 7,
+            "tracking": 2.5,
             "case": "upper",
             "italic": false
           },
@@ -1266,7 +1306,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 74.4,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": 7,
+            "tracking": 2.5,
             "case": "upper",
             "italic": false
           },
@@ -1281,6 +1321,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Inter\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 145,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Bebas Neue\", sans-serif",
+        "weight": 400
       },
       "presentationTitleSizeByComposition": {
         "cover": 124.01,
@@ -1388,7 +1438,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "bodyFont": "\"Space Grotesk\", sans-serif",
       "textTitleWeight": 400,
       "textTitleCase": "upper",
-      "textTitleTracking": 2,
+      "textTitleTracking": -2.5,
       "textTitleSize": 69.44,
       "subtitleWeight": 700,
       "subtitleCase": "normal",
@@ -1407,7 +1457,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
       "align": "left",
       "titleSize": 69.44,
       "subSize": 74.4,
-      "titleTracking": 2,
+      "titleTracking": -2.5,
       "subTracking": -1,
       "titleLeading": 95,
       "subLeading": 120,
@@ -1425,7 +1475,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 173.61,
             "leadingPercent": 85,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1447,7 +1497,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 69.44,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1469,7 +1519,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 111.61,
             "leadingPercent": 90,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1491,7 +1541,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 39.68,
             "leadingPercent": 105,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1513,7 +1563,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 69.44,
             "leadingPercent": 95,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1535,7 +1585,7 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "sizePercent": 173.61,
             "leadingPercent": 85,
             "weight": 400,
-            "tracking": 2,
+            "tracking": -2.5,
             "case": "upper",
             "italic": false
           },
@@ -1550,6 +1600,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Space Grotesk\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 135,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Anton\", sans-serif",
+        "weight": 400
       },
       "presentationTitleSizeByComposition": {
         "cover": 173.61,
@@ -1822,6 +1882,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
           }
         }
       },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Inter\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 145,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Plus Jakarta Sans\", sans-serif",
+        "weight": 700
+      },
       "presentationTitleSizeByComposition": {
         "cover": 34.72,
         "content": 34.72,
@@ -2093,6 +2163,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
           }
         }
       },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Jost\", sans-serif",
+        "weight": 300,
+        "leadingPercent": 155,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Cormorant Garamond\", serif",
+        "weight": 500
+      },
       "presentationTitleSizeByComposition": {
         "cover": 44.64,
         "content": 44.64,
@@ -2358,6 +2438,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"IBM Plex Sans\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 145,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"JetBrains Mono\", monospace",
+        "weight": 700
       },
       "presentationTitleSizeByComposition": {
         "cover": 34.72,
@@ -2631,6 +2721,16 @@ export const GENERATED_PRESENTATION_PATTERNS = Object.freeze([
             "italic": false
           }
         }
+      },
+      "presentationBodyTypography": {
+        "fontFamily": "\"Manrope\", sans-serif",
+        "weight": 400,
+        "leadingPercent": 150,
+        "tracking": 1
+      },
+      "presentationNumericTypography": {
+        "fontFamily": "\"Cormorant\", serif",
+        "weight": 300
       },
       "presentationTitleSizeByComposition": {
         "cover": 89.29,

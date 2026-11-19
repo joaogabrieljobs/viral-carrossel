@@ -6,6 +6,7 @@ import { Layout, Minus, Plus, Video, User } from 'lucide-react';
 import { getVideoUrl } from '../../utils/video-store.js';
 import AutoFitText from '../AutoFitText.jsx';
 import PresentationBlocks from '../PresentationBlocks.jsx';
+import PresentationArtChrome from './PresentationArtChrome.jsx';
 import { normalizePresentationBlocks } from '../../utils/presentation-quality.js';
 import { hydrateBrandTextColors, effectiveTitleFontFamily } from '../../utils/brand-helpers.js';
 import { SectionLabel as S } from '../ui/SectionLabel.jsx';
@@ -924,6 +925,7 @@ const ClassicCanvasInner = React.forwardRef(({
       style={{ width:f.w, height:f.h, background:bg, position:'relative', overflow:'hidden', fontFamily: bodyFF }}
     >
       <VcBgPatternLayer pattern={slide.bgPattern} style={{ zIndex: 1 }} />
+      <PresentationArtChrome slide={slide} frame={f} accent={brand.accent} ink={titleInk} />
       {!slide.presentationSuppressPhoto && <div
         {...movOu('photo', photoZoneBoxStyle)}
         data-vc-photo-zone="1"
@@ -1147,7 +1149,7 @@ const ClassicCanvasInner = React.forwardRef(({
                 brand,
                 `${(-0.4 + (slide.subTracking ?? 0)) / 100}em`,
               ),
-              opacity: 0.82,
+              opacity: presentationMode ? 1 : 0.82,
               textShadow: shadow,
             }) }}
           >
@@ -1170,6 +1172,9 @@ const ClassicCanvasInner = React.forwardRef(({
         ink={bodyInk}
         background={bg}
         fontFamily={bodyAfterFF}
+        family={slide.presentationDesignFamily}
+        accent={brand.accent}
+        numericTypography={slide.presentationNumericTypography}
         forExport={forExport}
         onChange={(blocks) => onInlineTextChange?.('presentationBlocks', blocks)}
       />}

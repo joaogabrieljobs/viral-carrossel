@@ -89,7 +89,8 @@ describe('composição de apresentação orientada pelo plano editorial', () => 
     const cinematic = make('presentation_cinematic');
     const modular = make('presentation_modular_cards');
     expect(new Set([executive, editorial, cinematic, modular].map(s => JSON.stringify(s.canvas.zones))).size).toBe(4);
-    expect(editorial.canvas.zones.photo.x).toBeLessThan(editorial.canvas.zones.title.x);
+    expect(editorial.canvas.zones.photo.w).toBeGreaterThan(50);
+    expect(editorial.canvas.zones.title.w).toBeLessThan(40);
     expect(cinematic.canvas.zones.photo.w).toBeGreaterThan(executive.canvas.zones.photo.w);
     expect(cinematic.canvas.zones.photo.h).toBe(100);
     for (const slide of [executive, editorial, cinematic, modular]) {

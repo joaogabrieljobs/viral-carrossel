@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { titleTrackingBase } from '../src/utils/title-tracking.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -489,8 +490,8 @@ function parseSourceTracking(value) {
 }
 
 /**
- * O renderer guarda tracking como ajuste relativo: no CSS soma -3 ao título
- * e -1 ao subtítulo. Convertemos o valor absoluto da fonte para o controlo que
+ * O renderer guarda tracking como ajuste relativo: o título usa a base da
+ * família (condensada ou regular), o subtítulo usa -1. Convertemos o valor absoluto para o controle que
  * reproduz exatamente o token de origem (ex.: 0.14em vira 15, pois -1+15=14).
  */
 function rendererTrackingControl(value, rendererBase) {
@@ -591,7 +592,7 @@ function compositionTypographyToken(pattern, composition, field) {
   const scale = typographyScaleForRole(pattern.typography.scale, role, fallbackRole);
   const fallbackDefinition = pattern.typography?.[isTitle ? 'title' : 'subtitle'] || {};
   const basePx = CANVAS.width * (isTitle ? 0.084 : 0.028);
-  const rendererTrackingBase = isTitle ? -3 : -1;
+  const rendererTrackingBase = isTitle ? titleTrackingBase(FONT_ALLOWLIST[definition.family] || definition.family) : -1;
   return {
     role: String(role || fallbackRole),
     fontFamily: FONT_ALLOWLIST[definition.family]
@@ -685,7 +686,7 @@ function compilePattern(pattern, config, compositions) {
   const titleSize = rendererSizePercent(titleScale.size, CANVAS.width * 0.084);
   const subtitleSize = rendererSizePercent(subtitleScale.size, CANVAS.width * 0.028);
   const bodySize = rendererSizePercent(bodyScale.size, CANVAS.width * 0.018);
-  const titleTracking = rendererTrackingControl(titleType.letterSpacing, -3);
+  const titleTracking = rendererTrackingControl(titleType.letterSpacing, titleTrackingBase(FONT_ALLOWLIST[titleType.family]));
   const subtitleTracking = rendererTrackingControl(subtitleType.letterSpacing, -1);
   const bodyTracking = rendererTrackingControl(bodyType.letterSpacing, -0.4);
   const titleLeading = clamp(Math.round((Number(titleScale.lineHeight) || 1.08) * 100), 85, 140);
@@ -769,6 +770,16 @@ function compilePattern(pattern, config, compositions) {
       bodyLeading,
       bodyWeight,
       presentationTypographyByComposition,
+      presentationBodyTypography: {
+        fontFamily: FONT_ALLOWLIST[bodyType.family],
+        weight: bodyWeight,
+        leadingPercent: bodyLeading,
+        tracking: rendererTrackingControl(bodyType.letterSpacing, -1),
+      },
+      presentationNumericTypography: {
+        fontFamily: FONT_ALLOWLIST[pattern.typography.numeric?.family] || FONT_ALLOWLIST[titleType.family],
+        weight: Number(pattern.typography.numeric?.weight) || titleWeight,
+      },
       presentationTitleSizeByComposition,
       presentationTitleLeadingByComposition,
       textBg: false,

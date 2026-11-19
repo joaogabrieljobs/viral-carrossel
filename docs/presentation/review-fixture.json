@@ -1,0 +1,90 @@
+{
+  "title": "Revisão tipográfica — Aula fictícia",
+  "note": "Textos da Aula R4; quadro e exercício conferidos no DOM salvo. Foto ilustrativa do acervo Moont usada apenas para comparar composição, não para validar o prompt de imagem da Aula.",
+  "slides": [
+    {
+      "title": "Três zonas para organizar o ateliê compartilhado",
+      "subtitle": "Oficina fictícia de organização com zonas Verde, Amarela e Vermelha. Ao final, cada participante classifica cinco materiais pela regra local.",
+      "bodyAfterImage": "Contexto fictício para fins didáticos; não é um registro real.",
+      "imageQuery": "Editorial photograph of a shared craft studio with three work zones, natural window light, paper supplies and stamps on wooden tables, no text visible"
+    },
+    {
+      "title": "A prioridade é conferir: dúvida leva ao vermelho",
+      "subtitle": "Verde = Pronto para usar (completo, conferido e disponível). Amarela = Em uso (separado para atividade em andamento, com responsável). Vermelha = Conferir antes de usar (quantidade desconhecida, item faltando ou condição não verificada).",
+      "bodyAfterImage": "",
+      "imageQuery": "",
+      "presentationBlocks": [
+        {
+          "type": "comparison",
+          "headers": [
+            "Zona",
+            "Nome",
+            "Condição"
+          ],
+          "rows": [
+            [
+              "Verde",
+              "Pronto para usar",
+              "Completo, conferido e disponível"
+            ],
+            [
+              "Amarela",
+              "Em uso",
+              "Separado para atividade em andamento, com responsável"
+            ],
+            [
+              "Vermelha",
+              "Conferir antes de usar",
+              "Quantidade desconhecida, item faltando ou condição não verificada"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Exemplo resolvido: pacote conferido vai para o verde",
+      "subtitle": "Um pacote lacrado de 50 folhas, já conferido e sem reserva, vai para Pronto para usar (verde). O critério é estar completo, conferido e disponível ao mesmo tempo.",
+      "bodyAfterImage": "Se faltasse conferência ou houvesse reserva, a zona seria outra.",
+      "imageQuery": ""
+    },
+    {
+      "title": "Exercício em duplas: classifique cinco materiais",
+      "subtitle": "Em duplas, 4 minutos: classifique os itens A a E e explique cada decisão em uma frase. Use as três zonas — Verde (Pronto para usar), Amarela (Em uso) e Vermelha (Conferir antes de usar).",
+      "bodyAfterImage": "",
+      "imageQuery": "",
+      "presentationBlocks": [
+        {
+          "type": "steps",
+          "items": [
+            {
+              "title": "A",
+              "body": "Caixa com 12 lápis conferidos e sem reserva."
+            },
+            {
+              "title": "B",
+              "body": "Conjunto completo de carimbos separado para a atividade atual de Joana."
+            },
+            {
+              "title": "C",
+              "body": "Pacote de folhas cuja quantidade ainda não foi contada."
+            },
+            {
+              "title": "D",
+              "body": "Kit com uma peça faltando, reservado para a atividade atual de Leo."
+            },
+            {
+              "title": "E",
+              "body": "Conjunto de envelopes usado ontem, agora conferido, completo e sem reserva."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Gabarito e transferência para a rotina",
+      "subtitle": "A = Verde; B = Amarela; C = Vermelha; D = Vermelha, pois a condição incompleta prevalece sobre a reserva; E = Verde. A prioridade de conferência decide o item D.",
+      "bodyAfterImage": "Transferência: revise a zona Em uso ao fim de cada atividade e devolva apenas materiais completos e conferidos ao Pronto para usar. Esta é uma convenção do ateliê, não uma norma técnica universal.",
+      "imageQuery": ""
+    }
+  ]
+}
