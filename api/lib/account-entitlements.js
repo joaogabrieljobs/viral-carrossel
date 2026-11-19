@@ -52,7 +52,8 @@ function grantFromRow(row) {
   if (!row) return null;
   return { id: row.id, accountId: row.account_id, tier: row.tier,
     startsAtSec: Number(row.starts_at_sec), expiresAtSec: row.expires_at_sec == null ? null : Number(row.expires_at_sec),
-    quotaAnchorSec: Number(row.quota_anchor_sec), revokedAt: row.revoked_at || null };
+    quotaAnchorSec: Number(row.quota_anchor_sec), revokedAt: row.revoked_at || null,
+    unlimitedImages: row.unlimited_images === true };
 }
 
 async function storage(work) {
@@ -87,7 +88,7 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
 
   /** Idempotent account-scoped issuance. An explicit historical anchor preserves consumed quota. */
   async function grantAccess({ accountId, tier, startsAtSec, expiresAtSec = null,
-    quotaAnchorSec, requestId, actor, reason }) {
+    quotaAnchorSec, requestId, actor, reason, unlimitedImages = false }) {
     if (!UUID.test(accountId || '') || !PLAN_ORDER.includes(tier)) throw fail('entitlement_invalid_input', 'Conta ou plano inválido.', 400);
     const start = second(startsAtSec, 'Início');
     const expiry = expiresAtSec == null ? null : second(expiresAtSec, 'Validade');
@@ -103,7 +104,8 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
         if (String(replay.account_id) !== accountId || replay.tier !== tier
           || Number(replay.starts_at_sec) !== start || Number(replay.quota_anchor_sec) !== anchor
           || (replay.expires_at_sec == null ? null : Number(replay.expires_at_sec)) !== expiry
-          || replay.actor !== operator || replay.reason !== why) {
+          || replay.actor !== operator || replay.reason !== why
+          || (replay.unlimited_images === true) !== (unlimitedImages === true)) {
           throw fail('entitlement_request_conflict', 'Idempotência já utilizada para outra concessão.', 409);
         }
         return { grant: grantFromRow(replay), replayed: true };
@@ -121,13 +123,13 @@ export function createAccountEntitlementStore({ sql: injectedSql } = {}) {
           AND ($3::bigint IS NULL OR starts_at_sec < $3::bigint)`, [accountId, start, expiry]);
       if (existing.length) throw fail('entitlement_grant_conflict', 'Já existe concessão neste período. Revogue-a antes de substituir.', 409);
       const row = (await tx.unsafe(`INSERT INTO moont.account_access_grants
-        (account_id, tier, starts_at_sec, expires_at_sec, quota_anchor_sec, request_id, actor, reason)
-        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [accountId, tier, start, expiry, anchor, key, operator, why]))[0];
+        (account_id, tier, starts_at_sec, expires_at_sec, quota_anchor_sec, request_id, actor, reason, unlimited_images)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [accountId, tier, start, expiry, anchor, key, operator, why, unlimitedImages === true]))[0];
       await tx.unsafe(`INSERT INTO moont.account_access_grant_events
         (grant_id, account_id, action, request_id, actor, reason, details)
         VALUES ($1::uuid, $2::uuid, 'granted', $3, $4, $5, $6::jsonb)`,
-      [row.id, accountId, key, operator, why, JSON.stringify({ tier, startsAtSec: start, expiresAtSec: expiry, quotaAnchorSec: anchor })]);
+      [row.id, accountId, key, operator, why, JSON.stringify({ tier, startsAtSec: start, expiresAtSec: expiry, quotaAnchorSec: anchor, unlimitedImages: unlimitedImages === true })]);
       return { grant: grantFromRow(row), replayed: false };
     }));
   }
@@ -170,7 +172,7 @@ export async function resolveAccountExemption(customerId, { nowSec = Math.floor(
   if (!grant || grant.revokedAt || grant.startsAtSec > nowSec || (grant.expiresAtSec != null && grant.expiresAtSec <= nowSec)) return null;
   const bounds = monthlyQuotaBounds(grant.quotaAnchorSec, nowSec);
   return { active: true, accessSource: 'exempt', billingExempt: true, status: 'exempt',
-    tier: grant.tier, accountId: grant.accountId,
+    tier: grant.tier, accountId: grant.accountId, unlimitedImages: grant.unlimitedImages === true,
     quotaPeriodStart: bounds.periodStart, quotaPeriodEnd: bounds.periodEnd,
     quotaPeriodStartSec: bounds.periodStartSec, quotaPeriodEndSec: bounds.periodEndSec };
 }

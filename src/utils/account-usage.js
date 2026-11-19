@@ -32,10 +32,12 @@ export function normalizeAccountUsage({
   const hasUsage = used !== null && limit !== null;
   // The server uses this same calculation. Deriving from confirmed counts also
   // prevents an inconsistent remaining field from overstating the allowance.
-  const remaining = hasUsage ? Math.max(0, limit - used) : null;
+  // Isenção sem limite (o servidor manda `unlimited`): o uso é contado, mas não há teto a mostrar.
+  const unlimited = imageQuota?.unlimited === true;
+  const remaining = hasUsage && !unlimited ? Math.max(0, limit - used) : null;
   const noIncludedImages = limit === 0;
-  const exhausted = hasUsage && limit > 0 && remaining === 0;
-  const percentage = hasUsage && limit > 0 ? Math.min(100, (used / limit) * 100) : null;
+  const exhausted = hasUsage && !unlimited && limit > 0 && remaining === 0;
+  const percentage = hasUsage && !unlimited && limit > 0 ? Math.min(100, (used / limit) * 100) : null;
   let periodStart = isoDateOrNull(imageQuota?.periodStart) || isoDateOrNull(currentPeriodStart);
   let periodEnd = isoDateOrNull(imageQuota?.periodEnd) || isoDateOrNull(currentPeriodEnd);
   if (periodStart && periodEnd && periodStart >= periodEnd) {
@@ -46,7 +48,8 @@ export function normalizeAccountUsage({
   return {
     planName: plan?.name || null,
     isFree: plan?.id === FREE_PLAN.id,
-    limit,
+    unlimited,
+    limit: unlimited ? null : limit,
     used,
     remaining,
     hasUsage,

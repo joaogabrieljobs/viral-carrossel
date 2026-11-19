@@ -65,6 +65,19 @@ describe('account usage summary', () => {
 describe('account usage page', () => {
   const render = (props = {}) => renderToStaticMarkup(React.createElement(AccountUsage, props));
 
+  it('conta sem limite mostra "Sem limite", o uso contado e nenhuma barra de progresso', () => {
+    const html = render({ imageQuota: { status: 'available', available: true, used: 46, limit: 1_000_000, remaining: 999_954, tier: 'max', unlimited: true } });
+    expect(html).toContain('Sem limite de imagens');
+    expect(html).toContain('Sem limite');
+    expect(html).toContain('46');
+    expect(html).not.toContain('1.000.000');
+    expect(html).not.toContain('999.954');
+    expect(html).not.toContain('999954');
+    expect(html).not.toContain('role="progressbar"');
+    expect(normalizeAccountUsage({ imageQuota: { used: 46, limit: 1_000_000, tier: 'max', unlimited: true } }))
+      .toMatchObject({ unlimited: true, used: 46, limit: null, remaining: null, exhausted: false, percentage: null });
+  });
+
   it('shows unavailable consumption without a fabricated progress indicator', () => {
     const html = render({ planTier: 'creator', imageQuota: { status: 'unavailable', used: 0, limit: 50 } });
     expect(html).toContain('Uso indisponível');

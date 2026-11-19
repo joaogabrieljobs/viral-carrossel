@@ -137,7 +137,7 @@ export default function CreateProjectFlow({
     ? `${Math.max(4, Math.ceil(Number(count || 1) * 0.8))}–${Math.max(8, Math.ceil(Number(count || 1) * 1.8))} min`
     : '2–5 min';
   const imageConsumption = wantImages && hasOpenAI
-    ? `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`
+    ? `até ${count} crédito${Number(count) === 1 ? '' : 's'} de imagem${imageQuota?.unlimited ? ' · conta sem limite' : Number.isFinite(imageQuota?.remaining) ? ` · saldo atual: ${imageQuota.remaining}` : ''}`
     : 'nenhum crédito de imagem';
   useEffect(() => { alive.current = true; return () => { alive.current = false; asyncVersion.current++; }; }, []);
   useEffect(() => {

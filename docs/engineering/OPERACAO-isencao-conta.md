@@ -1,6 +1,8 @@
 # Operação de isenção de acesso por conta
 
-A isenção concede acesso ao Moont por uma concessão privada vinculada ao UUID da conta. Ela mantém um plano explícito e sua quota finita. O plano `creator` inclui 50 imagens por ciclo mensal; isenção não significa imagens ilimitadas.
+A isenção concede acesso ao Moont por uma concessão privada vinculada ao UUID da conta. Ela mantém um plano explícito e sua quota finita. O plano `creator` inclui 50 imagens por ciclo mensal; por padrão, isenção não significa imagens ilimitadas.
+
+**Sem limite de imagens** (migração 017, João, 19/11): a concessão pode levar `unlimitedImages: true` (coluna `unlimited_images`). O plano continua explícito; só o teto mensal sai. O servidor usa `UNLIMITED_IMAGE_CEILING` (`api/lib/plans.js`) como limite numérico, cada geração continua reservada e contada no banco de quota, e a sessão manda `imageQuota.unlimited: true` para a tela mostrar "Sem limite". Mudar uma concessão existente para sem limite exige revogar a atual e conceder outra, com a mesma âncora de quota.
 
 O vínculo usado na consulta é `moont.account_stripe_customers`, com `verified_at` preenchido e o customer exato da conta autenticada. E-mail não é chave de autorização e não une contas duplicadas. Cookies, epochs, escopos MCP e isolamento de projetos continuam sendo verificados.
 

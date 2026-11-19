@@ -135,6 +135,10 @@ export default function ImagesLibraryPanel({
             Você está usando sua própria chave de imagem, por isso o plano não conta consumo.
             As imagens continuam salvas abaixo.
           </div>
+        ) : usage.unlimited && usage.hasUsage ? (
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', lineHeight: 1.5 }}>
+            <strong>{usadas}</strong> geradas neste ciclo · <strong>sem limite</strong> de imagens nesta conta.
+          </div>
         ) : temQuota ? (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>

@@ -10,9 +10,7 @@ import { applyCors } from '../lib/cors.js';
 import { requireActiveSubscription } from '../lib/require-access.js';
 import { resolveAccountEntitlement } from '../lib/account-entitlements.js';
 import { billingDisabled } from '../lib/access.js';
-import {
-  imageQuotaForTier,
-} from '../lib/plans.js';
+import { imageLimitForEntitlement } from '../lib/plans.js';
 import {
   consumeImageCredit,
   refundImageCredit,
@@ -114,6 +112,7 @@ export default async function handler(req, res) {
   let periodEndSec = null;
   let customerId = access.customerId || 'billing-disabled';
   let limit = 50;
+  let unlimited = false;
 
   try {
     if (billingDisabled() || access.billingDisabled) {
@@ -131,7 +130,8 @@ export default async function handler(req, res) {
       tier = entitlement.tier;
       periodStartSec = entitlement.quotaPeriodStartSec;
       periodEndSec = entitlement.quotaPeriodEndSec;
-      limit = imageQuotaForTier(tier);
+      limit = imageLimitForEntitlement(entitlement);
+      unlimited = entitlement.unlimitedImages === true;
       customerId = access.customerId;
     }
   } catch (e) {
@@ -242,6 +242,7 @@ export default async function handler(req, res) {
         status: 'available',
         available: true,
         allowed: consumed.remaining > 0,
+        ...(unlimited ? { unlimited: true } : {}),
       },
       ...(consumed.degraded ? { quotaDegraded: true } : {}),
     });

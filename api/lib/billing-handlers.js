@@ -25,6 +25,7 @@ import {
   getPlan,
   getStripePriceIdForTier,
   imageQuotaForTier,
+  imageLimitForEntitlement,
 } from './plans.js';
 import { FREE_PLAN } from '../../shared/plans.js';
 import { getImageQuotaActivity, getQuotaUsage } from './image-quota.js';
@@ -111,7 +112,8 @@ export async function handleSession(req, res) {
     const tier = entitlement.tier;
     const bounds = { periodStart: entitlement.quotaPeriodStart, periodEnd: entitlement.quotaPeriodEnd,
       periodStartSec: entitlement.quotaPeriodStartSec, periodEndSec: entitlement.quotaPeriodEndSec };
-    const limit = imageQuotaForTier(tier);
+    const limit = imageLimitForEntitlement(entitlement);
+    const unlimited = entitlement.unlimitedImages === true;
     let imageQuota = {
       status: 'unavailable',
       available: false,
@@ -145,6 +147,7 @@ export async function handleSession(req, res) {
         status: 'available',
         available: true,
         tier,
+        ...(unlimited ? { unlimited: true } : {}),
       };
     } catch (qe) {
       imageQuota.code = qe?.code === 'quota_period_unavailable' ? qe.code : 'quota_store_unavailable';

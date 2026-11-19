@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAccountEntitlementStore, monthlyQuotaBounds, resolveAccountEntitlement,
 } from '../../api/lib/account-entitlements.js';
+import { imageLimitForEntitlement, UNLIMITED_IMAGE_CEILING } from '../../api/lib/plans.js';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const grantId = '22222222-2222-4222-8222-222222222222';
@@ -28,7 +29,7 @@ describe('account access entitlement resolver', () => {
     const entitlement = await resolveAccountEntitlement('cus_owner', { enabled: true, nowSec: now,
       store: { findGrantForCustomer: vi.fn().mockResolvedValue(grant) }, findSubscription });
     expect(entitlement).toEqual({ active: true, accessSource: 'exempt', billingExempt: true, status: 'exempt',
-      tier: 'creator', accountId, quotaPeriodStart: '2026-02-28T13:42:09.000Z',
+      tier: 'creator', accountId, unlimitedImages: false, quotaPeriodStart: '2026-02-28T13:42:09.000Z',
       quotaPeriodEnd: '2026-03-31T13:42:09.000Z', quotaPeriodStartSec: sec('2026-02-28T13:42:09Z'),
       quotaPeriodEndSec: sec('2026-03-31T13:42:09Z') });
     expect(entitlement).not.toHaveProperty('subscription');
@@ -101,9 +102,38 @@ describe('private transactional grant administration', () => {
     expect(result).toMatchObject({ grant, replayed: false });
     expect(sql.begin).toHaveBeenCalledOnce();
     expect(sql.unsafe).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO moont.account_access_grants'),
-      [accountId, 'creator', anchor, null, anchor, input.requestId, input.actor, input.reason]);
+      [accountId, 'creator', anchor, null, anchor, input.requestId, input.actor, input.reason, false]);
     expect(sql.unsafe).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO moont.account_access_grant_events'),
-      [grantId, accountId, input.requestId, input.actor, input.reason, JSON.stringify({ tier: 'creator', startsAtSec: anchor, expiresAtSec: null, quotaAnchorSec: anchor })]);
+      [grantId, accountId, input.requestId, input.actor, input.reason, JSON.stringify({ tier: 'creator', startsAtSec: anchor, expiresAtSec: null, quotaAnchorSec: anchor, unlimitedImages: false })]);
+  });
+
+  it('isenção sem limite de imagens grava a marca, entra na auditoria e muda o limite resolvido', async () => {
+    const sql = sqlMock();
+    sql.unsafe.mockImplementation(async statement => {
+      if (statement.includes('FOR UPDATE OF a')) return [{ id: accountId }];
+      if (statement.includes('INSERT INTO moont.account_access_grants')) return [{ ...row, tier: 'max', unlimited_images: true }];
+      return [];
+    });
+    const result = await createAccountEntitlementStore({ sql }).grantAccess({ ...input, tier: 'max', unlimitedImages: true });
+    expect(result.grant).toMatchObject({ tier: 'max', unlimitedImages: true });
+    expect(sql.unsafe).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO moont.account_access_grants'),
+      [accountId, 'max', anchor, null, anchor, input.requestId, input.actor, input.reason, true]);
+    expect(sql.unsafe).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO moont.account_access_grant_events'),
+      expect.arrayContaining([JSON.stringify({ tier: 'max', startsAtSec: anchor, expiresAtSec: null, quotaAnchorSec: anchor, unlimitedImages: true })]));
+
+    const entitlement = await resolveAccountEntitlement('cus_owner', { enabled: true, nowSec: now,
+      store: { findGrantForCustomer: vi.fn().mockResolvedValue({ ...grant, tier: 'max', unlimitedImages: true }) } });
+    expect(entitlement).toMatchObject({ tier: 'max', unlimitedImages: true });
+    expect(imageLimitForEntitlement(entitlement)).toBe(UNLIMITED_IMAGE_CEILING);
+    expect(imageLimitForEntitlement({ tier: 'max' })).toBe(300);
+    expect(imageLimitForEntitlement({ tier: 'creator', unlimitedImages: 'true' })).toBe(50);
+  });
+
+  it('repetir a concessão mudando só o "sem limite" é conflito, não substituição silenciosa', async () => {
+    const sql = sqlMock();
+    sql.unsafe.mockImplementation(async statement => statement.includes('WHERE request_id = $1') ? [row] : []);
+    await expect(createAccountEntitlementStore({ sql }).grantAccess({ ...input, unlimitedImages: true }))
+      .rejects.toMatchObject({ status: 409, code: 'entitlement_request_conflict' });
   });
 
   it('replays exact request without writing another grant/audit, and rejects changed input', async () => {

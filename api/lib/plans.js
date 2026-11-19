@@ -82,3 +82,16 @@ export function periodBoundsFromSubscription(sub) {
 }
 
 export { PLAN_TIERS, PLAN_ORDER, getPlan, imageQuotaForTier };
+
+/**
+ * Teto usado quando a isenção é "sem limite de imagens". O banco de quota
+ * exige um limite numérico; este valor nunca é atingido na prática e o uso
+ * continua sendo contado. A interface mostra "Sem limite" (imageQuota.unlimited).
+ */
+export const UNLIMITED_IMAGE_CEILING = 1_000_000;
+
+/** Limite mensal de imagens de um acesso resolvido (assinatura ou isenção). */
+export function imageLimitForEntitlement(entitlement) {
+  if (entitlement?.unlimitedImages === true) return UNLIMITED_IMAGE_CEILING;
+  return imageQuotaForTier(entitlement?.tier);
+}
